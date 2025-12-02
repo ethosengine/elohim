@@ -1,17 +1,37 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  ViewChild,
+  ViewContainerRef,
+  ComponentRef,
+  inject
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
-import { DocumentGraphService } from '../../services/document-graph.service';
+import { Subject, Subscription, forkJoin, of } from 'rxjs';
+import { takeUntil, catchError } from 'rxjs/operators';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
-import { NavigationService, NavigationContext } from '../../services/navigation.service';
+import { ContentService } from '../../services/content.service';
+import { DataLoaderService } from '../../services/data-loader.service';
+import { SeoService } from '../../../services/seo.service';
 import { ContentNode } from '../../models/content-node.model';
+import {
+  RendererRegistryService,
+  ContentRenderer,
+  RendererCompletionEvent
+} from '../../renderers/renderer-registry.service';
+
+import { TrustBadgeService } from '../../services/trust-badge.service';
+import { TrustBadge } from '../../models/trust-badge.model';
+
+// Content I/O for download functionality
+import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';
 
 @Component({
   selector: 'app-content-viewer',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, ContentDownloadComponent],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],
 })
@@ -22,49 +42,49 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   isLoading = true;
   error: string | null = null;
 
-  // Hierarchical navigation context
-  navigationContext: NavigationContext | null = null;
-  breadcrumbs: Array<{ label: string; path: string; typeLabel?: string }> = [];
-  children: ContentNode[] = [];
+  // Tab state
+  activeTab: 'content' | 'trust' | 'governance' | 'network' = 'content';
+
+  // Trust data
+  trustBadge: TrustBadge | null = null;
+  isLoadingTrust = false;
+
+  // "Appears in paths" back-links (Wikipedia-style)
+  containingPaths: Array<{ pathId: string; pathTitle: string; stepIndex: number }> = [];
+  loadingPaths = false;
+
+  // Dynamic renderer hosting
+  @ViewChild('rendererHost', { read: ViewContainerRef, static: false })
+  rendererHost!: ViewContainerRef;
+  private rendererRef: ComponentRef<ContentRenderer> | null = null;
+  private rendererSubscription: Subscription | null = null;
+
+  /** Whether we have a registered renderer for the current content format */
+  hasRegisteredRenderer = false;
 
   private readonly destroy$ = new Subject<void>();
   private nodeId: string | null = null;
+  private readonly seoService = inject(SeoService);
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
-    private readonly graphService: DocumentGraphService,
     private readonly affinityService: AffinityTrackingService,
-    private readonly navigationService: NavigationService
+    private readonly rendererRegistry: RendererRegistryService,
+    private readonly contentService: ContentService,
+    private readonly dataLoader: DataLoaderService,
+    private readonly trustBadgeService: TrustBadgeService
   ) {}
 
   ngOnInit(): void {
-    // Handle old-style direct content access: /content/:id
+    // Handle direct content access: /lamad/resource/:resourceId or /lamad/content/:id
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe((params) => {
-      const directId = params['id'];
-      if (directId) {
-        this.nodeId = directId;
-        this.loadContent(directId);
-        // Don't use hierarchical context for direct access
+      const resourceId = params['resourceId'] ?? params['id'];
+      if (resourceId) {
+        this.nodeId = resourceId;
+        this.loadContent(resourceId);
       }
     });
-
-    // Handle new hierarchical navigation context
-    this.navigationService.context$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe((context) => {
-        if (context?.currentNode) {
-          this.navigationContext = context;
-          this.breadcrumbs = this.navigationService.getBreadcrumbs(context);
-
-          // Convert children to ContentNodes
-          this.children = context.children; // Already ContentNodes
-
-          // Load the current node
-          this.nodeId = context.currentNode.id;
-          this.loadContent(context.currentNode.id);
-        }
-      });
 
     // Listen for affinity changes
     this.affinityService.changes$
@@ -79,6 +99,75 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.destroyRenderer();
+  }
+
+  /**
+   * Clean up the current renderer instance
+   */
+  private destroyRenderer(): void {
+    if (this.rendererSubscription) {
+      this.rendererSubscription.unsubscribe();
+      this.rendererSubscription = null;
+    }
+    if (this.rendererRef) {
+      this.rendererRef.destroy();
+      this.rendererRef = null;
+    }
+  }
+
+  /**
+   * Dynamically instantiate the appropriate renderer for the current node.
+   * Called after the node is loaded and the view is ready.
+   */
+  private loadRenderer(): void {
+    if (!this.node || !this.rendererHost) {
+      return;
+    }
+
+    // Clean up previous renderer
+    this.destroyRenderer();
+    this.rendererHost.clear();
+
+    // Get the renderer component for this content format
+    const rendererComponent = this.rendererRegistry.getRenderer(this.node);
+
+    if (!rendererComponent) {
+      this.hasRegisteredRenderer = false;
+      return;
+    }
+
+    this.hasRegisteredRenderer = true;
+
+    // Create the renderer component
+    this.rendererRef = this.rendererHost.createComponent(rendererComponent);
+
+    // Set the node input using setInput to trigger ngOnChanges
+    this.rendererRef.setInput('node', this.node);
+
+    // Subscribe to completion events if the renderer supports them
+    const instance = this.rendererRef.instance as any;
+    if (instance.complete) {
+      this.rendererSubscription = instance.complete.subscribe(
+        (event: RendererCompletionEvent) => this.onRendererComplete(event)
+      );
+    }
+  }
+
+  /**
+   * Handle completion events from interactive renderers (quiz, simulation, etc.)
+   * Updates affinity based on the completion result.
+   */
+  private onRendererComplete(event: RendererCompletionEvent): void {
+    if (!this.nodeId) return;
+
+    // Map completion result to affinity delta
+    // Passing increases affinity more than failing
+    const affinityDelta = event.passed
+      ? 0.3 + (event.score / 100) * 0.2  // 0.3 to 0.5 for passing
+      : 0.1;                              // Small bump for attempting
+
+    this.affinityService.incrementAffinity(this.nodeId, affinityDelta);
   }
 
   /**
@@ -88,11 +177,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
     this.isLoading = true;
     this.error = null;
 
-    this.graphService.graph$.pipe(takeUntil(this.destroy$)).subscribe({
-      next: (graph) => {
-        if (!graph) return;
-
-        const contentNode = graph.nodes.get(nodeId);
+    this.dataLoader.getContent(nodeId).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (contentNode) => {
         if (!contentNode) {
           this.error = 'Content not found';
           this.isLoading = false;
@@ -102,6 +188,18 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
         // Set ContentNode
         this.node = contentNode;
 
+        // Update SEO metadata for this content
+        this.seoService.updateForContent({
+          id: contentNode.id,
+          title: contentNode.title,
+          summary: contentNode.description,
+          contentType: contentNode.contentType,
+          thumbnailUrl: contentNode.metadata?.['thumbnailUrl'],
+          authors: contentNode.metadata?.['authors'],
+          createdAt: contentNode.createdAt,
+          updatedAt: contentNode.updatedAt
+        });
+
         // Get current affinity
         this.affinity = this.affinityService.getAffinity(nodeId);
 
@@ -109,25 +207,113 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
         this.affinityService.trackView(nodeId);
 
         // Load related nodes
-        this.loadRelatedNodes(graph, this.node.relatedNodeIds);
+        this.loadRelatedNodes(contentNode.relatedNodeIds);
+
+        // Load containing paths (Wikipedia-style "appears in" back-links)
+        this.loadContainingPaths(nodeId);
+
+        // Load trust badge data for Attestations tab
+        this.loadTrustBadge(nodeId);
 
         this.isLoading = false;
+
+        // Load the appropriate renderer for this content format
+        // Use setTimeout to ensure ViewChild is available after view updates
+        setTimeout(() => this.loadRenderer(), 0);
       },
-      error: (err) => {
+      error: () => {
         this.error = 'Failed to load content';
         this.isLoading = false;
-        console.error('Error loading content:', err);
       },
     });
   }
 
   /**
+   * Load paths that contain this content (Wikipedia-style back-links)
+   */
+  private loadContainingPaths(nodeId: string): void {
+    this.loadingPaths = true;
+    this.containingPaths = [];
+
+    this.contentService.getContainingPathsSummary(nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (paths) => {
+          this.containingPaths = paths;
+          this.loadingPaths = false;
+        },
+        error: () => {
+          this.loadingPaths = false;
+        }
+      });
+  }
+
+  /**
+   * Load Trust Badge data for the Attestations tab
+   */
+  private loadTrustBadge(nodeId: string): void {
+    this.isLoadingTrust = true;
+    this.trustBadge = null;
+
+    this.trustBadgeService.getBadge(nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (badge) => {
+          this.trustBadge = badge;
+          this.isLoadingTrust = false;
+        },
+        error: () => {
+          this.isLoadingTrust = false;
+        }
+      });
+  }
+
+  /**
+   * Switch active tab
+   */
+  setActiveTab(tab: 'content' | 'trust' | 'governance' | 'network'): void {
+    this.activeTab = tab;
+  }
+
+  /**
+   * Handle badge action click
+   */
+  handleAction(action: any): void {
+    if (action.route) {
+      this.router.navigate([action.route]);
+    }
+    // Actions without routes are no-ops (e.g., placeholder actions)
+  }
+
+  /**
+   * Navigate to a path that contains this content
+   */
+  navigateToPath(pathId: string, stepIndex: number): void {
+    this.router.navigate(['/lamad/path', pathId, 'step', stepIndex]);
+  }
+
+  /**
    * Load related content nodes
    */
-  private loadRelatedNodes(graph: any, relatedIds: string[]): void {
-    this.relatedNodes = relatedIds
-      .map((id: string) => graph.nodes.get(id))
-      .filter((node: ContentNode | undefined): node is ContentNode => node !== undefined);
+  private loadRelatedNodes(relatedIds: string[]): void {
+    if (!relatedIds || relatedIds.length === 0) {
+      this.relatedNodes = [];
+      return;
+    }
+
+    // Load related nodes in parallel (limit to 5)
+    const loadObservables = relatedIds.slice(0, 5).map(id =>
+      this.dataLoader.getContent(id).pipe(catchError(() => of(null)))
+    );
+
+    forkJoin(loadObservables).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (nodes) => {
+        this.relatedNodes = nodes.filter((n): n is ContentNode => n !== null);
+      },
+      error: () => {
+        this.relatedNodes = [];
+      }
+    });
   }
 
   /**
@@ -154,69 +340,10 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Navigate to a child node in the hierarchy using composite identifiers
+   * Navigate back to lamad home
    */
-  navigateToChild(child: ContentNode): void {
-    if (this.navigationContext) {
-      // Build composite parent path: "epic:id:feature:id"
-      const parentPath = this.navigationContext.pathSegments
-        .map(s => s.urlSegment)
-        .join(':');
-
-      // Navigate to child with composite identifier
-      this.navigationService.navigateTo(
-        child.contentType,
-        child.id,
-        {
-          parentPath: parentPath || undefined,
-          queryParams: this.navigationContext.queryParams
-        }
-      );
-    } else {
-      // Fallback to direct navigation with composite identifier
-      this.router.navigate(['/lamad', `${child.contentType}:${child.id}`]);
-    }
-  }
-
-  /**
-   * Navigate up one level in the hierarchy
-   */
-  navigateUp(): void {
-    this.navigationService.navigateUp();
-  }
-
-  /**
-   * Navigate to a breadcrumb using composite path
-   */
-  navigateToBreadcrumb(compositePath: string): void {
-    if (!compositePath || compositePath.length === 0) {
-      this.navigationService.navigateToHome();
-    } else {
-      this.router.navigate([`/lamad/${compositePath}`], {
-        queryParams: this.navigationContext?.queryParams || {}
-      });
-    }
-  }
-
-  /**
-   * Navigate back to mission map
-   */
-  backToMap(): void {
-    this.router.navigate(['/lamad/map']);
-  }
-
-  /**
-   * Check if we're in hierarchical navigation mode
-   */
-  isHierarchicalMode(): boolean {
-    return this.navigationContext !== null;
-  }
-
-  /**
-   * Check if there are children to display
-   */
-  hasChildren(): boolean {
-    return this.children.length > 0;
+  backToHome(): void {
+    this.router.navigate(['/lamad']);
   }
 
   /**
@@ -263,63 +390,13 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Render markdown content
+   * Get content as string (handles string | object union type)
    */
-  renderMarkdown(content: string): string {
-    // Simple markdown rendering
-    let html = content;
-
-    // Headers
-    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-
-    // Bold
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-    // Italic
-    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-    // Links
-    html = html.replace(/\\\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>');
-
-    // Code blocks
-    html = html.replace(/```(.*?)```/gs, '<pre><code>$1</code></pre>');
-
-    // Inline code
-    html = html.replace(/`(.*?)`/g, '<code>$1</code>');
-
-    // Line breaks
-    html = html.replace(/\n/g, '<br>');
-
-    return html;
-  }
-
-  /**
-   * Render Gherkin content with syntax highlighting
-   */
-  renderGherkin(content: string): string {
-    const lines = content.split('\n');
-    const keywords = ['Feature:', 'Background:', 'Scenario:', 'Scenario Outline:', 'Given', 'When', 'Then', 'And', 'But', 'Examples:'];
-
-    return lines
-      .map((line) => {
-        const trimmed = line.trim();
-        let className = '';
-
-        if (trimmed.startsWith('@')) {
-          className = 'gherkin-tag';
-        } else if (keywords.some(keyword => trimmed.startsWith(keyword))) {
-          className = 'gherkin-keyword';
-        } else if (trimmed.startsWith('|')) {
-          className = 'gherkin-table';
-        } else if (trimmed.startsWith('#')) {
-          className = 'gherkin-comment';
-        }
-
-        return `<div class="${className}">${this.escapeHtml(line)}</div>`;
-      })
-      .join('');
+  getStringContent(content: string | object): string {
+    if (typeof content === 'string') {
+      return content;
+    }
+    return JSON.stringify(content, null, 2);
   }
 
   /**
@@ -355,19 +432,5 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   getMetadataVersion(): string | null {
     if (!this.node?.metadata?.['version']) return null;
     return this.node.metadata['version'];
-  }
-
-  /**
-   * Escape HTML entities
-   */
-  private escapeHtml(text: string): string {
-    const map: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;',
-    };
-    return text.replace(/[&<>"']/g, (m) => map[m]);
   }
 }

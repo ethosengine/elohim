@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-household-oldest child becoming household partner without losing childhood",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-oldest child becoming household partner without losing childhood",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Oldest child becoming household partner without losing childhood",
+  "description": "Oldest child becoming household partner without losing childhood",
+  "content": "Scenario: Oldest child becoming household partner without losing childhood\n    Given Maria's 14-year-old is becoming a genuine household contributor\n    And this is necessary given their circumstances\n    When the household_elohim tracks the teen's contributions\n    Then it should recognize his age-appropriate household help\n    And it should warn if he's taking on too much adult responsibility\n    And it should help Maria preserve his childhood while accepting necessary help\n    And it should prevent parentification while valuing legitimate contribution\n    And the protocol should navigate this concerning but realistic dynamic carefully\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:household",
+    "related_users:parent,child,young_child,preteen,teen",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Oldest child becoming household partner without losing childhood",
+    "ogDescription": "Oldest child becoming household partner without losing childhood",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-oldest child becoming household partner without losing childhood",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Oldest child becoming household partner without losing childhood - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-oldest child becoming household partner without losing childhood",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-oldest child becoming household partner without losing childhood",
+    "name": "Oldest child becoming household partner without losing childhood",
+    "description": "Oldest child becoming household partner without losing childhood",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

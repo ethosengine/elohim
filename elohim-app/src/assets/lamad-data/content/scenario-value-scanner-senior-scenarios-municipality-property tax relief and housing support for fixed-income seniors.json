@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-property tax relief and housing support for fixed-income seniors",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality-property tax relief and housing support for fixed-income seniors",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Property tax relief and housing support for fixed-income seniors",
+  "description": "Property tax relief and housing support for fixed-income seniors",
+  "content": "Scenario: Property tax relief and housing support for fixed-income seniors\n    Given Margaret lives on fixed income\n    And property taxes or rent can threaten housing stability\n    When the municipality_elohim identifies housing assistance\n    Then senior property tax relief programs should be communicated\n    And rental assistance should be accessible if applicable\n    And Margaret should be able to age in place affordably\n    And housing stability should be protected for seniors\n    And municipal housing policy should recognize fixed-income constraints\n    And aging in community should be economically feasible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Property tax relief and housing support for fixed-income seniors",
+    "ogDescription": "Property tax relief and housing support for fixed-income seniors",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-municipality-property tax relief and housing support for fixed-income seniors",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Property tax relief and housing support for fixed-income seniors - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-municipality-property tax relief and housing support for fixed-income seniors",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality-property tax relief and housing support for fixed-income seniors",
+    "name": "Property tax relief and housing support for fixed-income seniors",
+    "description": "Property tax relief and housing support for fixed-income seniors",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

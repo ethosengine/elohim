@@ -1,0 +1,106 @@
+{
+  "id": "human-bub-builder",
+  "did": "did:web:elohim.host:human:bub-builder",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Bub",
+  "description": "General contractor. Building homes and communities for 25 years. Teaching the next generation the trade.",
+  "content": {
+    "displayName": "Bub",
+    "bio": "General contractor. Building homes and communities for 25 years. Teaching the next generation the trade.",
+    "profileReach": "community",
+    "isPseudonymous": false,
+    "acceptingConnections": true,
+    "primaryLocation": {
+      "layer": "county_regional",
+      "displayName": "Valley County",
+      "reach": "community"
+    },
+    "organizations": [
+      {
+        "id": "org-bub-construction",
+        "name": "Bub's Construction",
+        "role": "owner"
+      }
+    ],
+    "communities": [
+      "community-builders-guild",
+      "community-apprenticeship-program",
+      "community-local-church"
+    ],
+    "publicAffinities": [
+      "construction",
+      "skilled-trades",
+      "apprenticeship",
+      "quality-craftsmanship",
+      "sustainable-building"
+    ],
+    "publicAttestations": [
+      "attestation-general-contractor-license",
+      "attestation-master-builder"
+    ]
+  },
+  "contentFormat": "human-json",
+  "sourcePath": "humans/bub-builder/profile.json",
+  "tags": [
+    "layer-county_regional",
+    "sustainable-building",
+    "skilled-trades",
+    "role-owner",
+    "quality-craftsmanship",
+    "local-economy",
+    "construction",
+    "apprenticeship",
+    "human-graph",
+    "reach-community",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "local-economy",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "workplace",
+      "community",
+      "county_regional"
+    ],
+    "organizationCount": 1,
+    "communityCount": 3
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Bub",
+    "ogDescription": "General contractor. Building homes and communities for 25 years. Teaching the next generation the trade.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-bub-builder",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-bub-builder.jpg",
+    "ogImageAlt": "Bub's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-bub-builder",
+    "identifier": "did:web:elohim.host:human:bub-builder",
+    "name": "Bub",
+    "description": "General contractor. Building homes and communities for 25 years. Teaching the next generation the trade.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Valley County",
+      "description": "county_regional"
+    },
+    "affiliation": [
+      {
+        "@type": "Organization",
+        "name": "Bub's Construction",
+        "@id": "org-bub-construction"
+      }
+    ]
+  },
+  "createdAt": "2025-12-01T20:08:11.328517",
+  "updatedAt": "2025-12-01T20:08:11.328518"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-family-family care tokens accumulate across all members' contributions",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:family-family care tokens accumulate across all members' contributions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family care tokens accumulate across all members' contributions",
+  "description": "Family care tokens accumulate across all members' contributions",
+  "content": "Scenario: Family care tokens accumulate across all members' contributions\n    Given family participates in care token economy\n    And Sarah, partner, Tommy, and Emma all contribute\n    When family care tokens are calculated\n    Then Sarah's extensive contributions should be valued highly\n    And children's age-appropriate work should count\n    And partner's contributions should be recognized\n    And extended family care should be tracked\n    And family care tokens should reflect collective contributions\n    And tokens should be available for family resource access\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:family",
+    "related_users:young_child,child,parent,grandparent,partner",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family care tokens accumulate across all members' contributions",
+    "ogDescription": "Family care tokens accumulate across all members' contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-family-family care tokens accumulate across all members' contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family care tokens accumulate across all members' contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-family-family care tokens accumulate across all members' contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:family-family care tokens accumulate across all members' contributions",
+    "name": "Family care tokens accumulate across all members' contributions",
+    "description": "Family care tokens accumulate across all members' contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

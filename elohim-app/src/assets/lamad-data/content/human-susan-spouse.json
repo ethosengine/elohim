@@ -1,0 +1,82 @@
+{
+  "id": "human-susan-spouse",
+  "did": "did:web:elohim.host:human:susan-spouse",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Susan",
+  "description": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
+  "content": {
+    "displayName": "Susan",
+    "bio": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
+    "profileReach": "network",
+    "isPseudonymous": false,
+    "acceptingConnections": true,
+    "primaryLocation": {
+      "layer": "neighborhood",
+      "displayName": "Tech Valley",
+      "reach": "community"
+    },
+    "communities": [
+      "community-local-church",
+      "community-homeschool-coop"
+    ],
+    "publicAffinities": [
+      "education",
+      "family-systems",
+      "community-building",
+      "health-wellness"
+    ]
+  },
+  "contentFormat": "human-json",
+  "sourcePath": "humans/susan-spouse/profile.json",
+  "tags": [
+    "community-building",
+    "core-family",
+    "family-systems",
+    "reach-network",
+    "health-wellness",
+    "education",
+    "layer-neighborhood",
+    "human-graph",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "core-family",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "neighborhood",
+      "community"
+    ],
+    "communityCount": 2
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Susan",
+    "ogDescription": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-susan-spouse",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-susan-spouse.jpg",
+    "ogImageAlt": "Susan's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-susan-spouse",
+    "identifier": "did:web:elohim.host:human:susan-spouse",
+    "name": "Susan",
+    "description": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Tech Valley",
+      "description": "neighborhood"
+    }
+  },
+  "createdAt": "2025-12-01T20:08:11.328348",
+  "updatedAt": "2025-12-01T20:08:11.328349"
+}

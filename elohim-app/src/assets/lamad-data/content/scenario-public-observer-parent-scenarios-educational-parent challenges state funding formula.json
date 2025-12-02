@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-educational-parent challenges state funding formula",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent challenges state funding formula",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parent challenges state funding formula",
+  "description": "Parent challenges state funding formula",
+  "content": "Scenario: Parent challenges state funding formula\n    Given the parent learns state funding shortchanges their district\n    And wonders why their child's school lacks basic resources\n    When the parent reviews Observer's state funding analysis\n    Then they see their district receives $3,000 less per student\n    And understand state formula creates massive inequities\n    And learn this explains overcrowded classes and cut programs\n    And connect with parents in other underfunded districts statewide\n    And parent advocacy expands to state-level funding reform\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:teacher,board_member,student,citizen,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,district_elohim,education_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parent challenges state funding formula",
+    "ogDescription": "Parent challenges state funding formula",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent challenges state funding formula",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent challenges state funding formula - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent challenges state funding formula",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent challenges state funding formula",
+    "name": "Parent challenges state funding formula",
+    "description": "Parent challenges state funding formula",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

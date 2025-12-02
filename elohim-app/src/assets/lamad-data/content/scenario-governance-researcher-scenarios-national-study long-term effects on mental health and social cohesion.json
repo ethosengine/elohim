@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-national-study long-term effects on mental health and social cohesion",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:national-study long-term effects on mental health and social cohesion",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Study long-term effects on mental health and social cohesion",
+  "description": "Study long-term effects on mental health and social cohesion",
+  "content": "Scenario: Study long-term effects on mental health and social cohesion\n    Given protocol aims to reduce loneliness and improve wellbeing\n    When James analyzes decade of mental health and cohesion data\n    Then he finds sustained reduction in loneliness indicators\n    And he documents improved community social networks\n    And he examines whether benefits distribute equitably\n    And he identifies mental health improvements particularly strong for isolated individuals\n    And long-term health effects justify protocol as public health intervention\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:national",
+    "related_users:constitutional_council_member,policy_maker,technical_expert",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/national.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-national",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-national",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Study long-term effects on mental health and social cohesion",
+    "ogDescription": "Study long-term effects on mental health and social cohesion",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-study long-term effects on mental health and social cohesion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Study long-term effects on mental health and social cohesion - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-study long-term effects on mental health and social cohesion",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:national-study long-term effects on mental health and social cohesion",
+    "name": "Study long-term effects on mental health and social cohesion",
+    "description": "Study long-term effects on mental health and social cohesion",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-workplace-organizational-workplace relationships build professional networks",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:workplace-organizational-workplace relationships build professional networks",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Workplace relationships build professional networks",
+  "description": "Workplace relationships build professional networks",
+  "content": "Scenario: Workplace relationships build professional networks\n    Given Jasmine works with manager Sarah and co-workers across age ranges\n    And workplace relationships can support her future career\n    When workplace_elohim tracks her professional relationship development\n    Then it should recognize relationship building as valuable outcome of work\n    And help her understand how to develop professional references\n    And surface when relationships could support her career goals\n    And teach her to navigate workplace relationships appropriately\n    And build her professional social capital\n    And demonstrate that work creates networks, not just income\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:workplace_organizational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Workplace relationships build professional networks",
+    "ogDescription": "Workplace relationships build professional networks",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-workplace-organizational-workplace relationships build professional networks",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace relationships build professional networks - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-workplace-organizational-workplace relationships build professional networks",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:workplace-organizational-workplace relationships build professional networks",
+    "name": "Workplace relationships build professional networks",
+    "description": "Workplace relationships build professional networks",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

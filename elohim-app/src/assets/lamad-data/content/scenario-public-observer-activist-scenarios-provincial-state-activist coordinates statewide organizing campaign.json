@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-provincial-state-activist coordinates statewide organizing campaign",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:provincial-state-activist coordinates statewide organizing campaign",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Activist coordinates statewide organizing campaign",
+  "description": "Activist coordinates statewide organizing campaign",
+  "content": "Scenario: Activist coordinates statewide organizing campaign\n    Given housing justice activists across 15 cities face same state policy barrier\n    And coordination is exhausting without infrastructure\n    When the Observer facilitates statewide activist network\n    Then activists can share tactics and research\n    And coordinate testimony across multiple legislative hearings\n    And track campaign progress and legislator commitments\n    And distributed organizing becomes coordinated movement\n    And state-level power builds through network effects\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:provincial_state",
+    "related_users:community_organizer,activist,politician,journalist",
+    "related_layers:municipality,nation_state,county_regional",
+    "elohim_agents:public_observer,regional_elohim,policy_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Activist coordinates statewide organizing campaign",
+    "ogDescription": "Activist coordinates statewide organizing campaign",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-provincial-state-activist coordinates statewide organizing campaign",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist coordinates statewide organizing campaign - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-provincial-state-activist coordinates statewide organizing campaign",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:provincial-state-activist coordinates statewide organizing campaign",
+    "name": "Activist coordinates statewide organizing campaign",
+    "description": "Activist coordinates statewide organizing campaign",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

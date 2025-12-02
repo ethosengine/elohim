@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-household-transition and turnover management in student households",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:household-transition and turnover management in student households",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Transition and turnover management in student households",
+  "description": "Transition and turnover management in student households",
+  "content": "Scenario: Transition and turnover management in student households\n    Given student housing is temporary and roommates change\n    And Kenji might have different roommates each year\n    When roommates transition in and out of household\n    Then the household_elohim should document established patterns\n    And it should help new roommates integrate into household norms\n    And it should preserve institutional knowledge across transitions\n    And it should help negotiate new arrangements with new people\n    And the system should reduce friction from household turnover\n    And care economy patterns should transfer across roommate changes\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:household",
+    "related_users:young_adult,adult,roommate",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Transition and turnover management in student households",
+    "ogDescription": "Transition and turnover management in student households",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-transition and turnover management in student households",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Transition and turnover management in student households - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-transition and turnover management in student households",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:household-transition and turnover management in student households",
+    "name": "Transition and turnover management in student households",
+    "description": "Transition and turnover management in student households",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

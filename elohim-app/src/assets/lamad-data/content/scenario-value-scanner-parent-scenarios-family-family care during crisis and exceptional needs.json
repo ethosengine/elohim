@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-family-family care during crisis and exceptional needs",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-family care during crisis and exceptional needs",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family care during crisis and exceptional needs",
+  "description": "Family care during crisis and exceptional needs",
+  "content": "Scenario: Family care during crisis and exceptional needs\n    Given family members sometimes have crisis needs\n    And Sarah might need to care for sick parent or struggling sibling\n    When family crisis occurs\n    Then the family_elohim should coordinate emergency care response\n    And it should show who has capacity to help\n    And it should recognize crisis care as extraordinary contribution\n    And temporary intensive care should be specially valued\n    And the system should enable family mutual aid during crisis\n    And care economy should support family resilience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:family",
+    "related_users:child,grandparent,partner,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family care during crisis and exceptional needs",
+    "ogDescription": "Family care during crisis and exceptional needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-family care during crisis and exceptional needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family care during crisis and exceptional needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-family care during crisis and exceptional needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-family care during crisis and exceptional needs",
+    "name": "Family care during crisis and exceptional needs",
+    "description": "Family care during crisis and exceptional needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,61 @@
+{
+  "id": "feature-social-medium-child-scenarios-affinity-network",
+  "did": "did:web:elohim.host:content:social-medium:child:scenarios:affinity-network",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Age-Appropriate Interest Communities for Child",
+  "description": "As a child in the social_medium system Operating at the affinity_network governance layer I want to pursue my interests with others who share them So that I can develop skills, make friends, and explore my passions safely",
+  "content": "@epic:social_medium\n@user_type:child\n@governance_layer:affinity_network\n@related_users:elder,content_creator,community_moderator,child\n@related_layers:educational,neighborhood,family\n@elohim_agents:guardian_agent,matching_agent,moderation_agent\n\nFeature: Age-Appropriate Interest Communities for Child\n  As a child in the social_medium system\n  Operating at the affinity_network governance layer\n  I want to pursue my interests with others who share them\n  So that I can develop skills, make friends, and explore my passions safely\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the child user is registered in the system\n    And the affinity_network governance context is active\n    And Emma, age 12, has earned neighborhood reach through good judgment\n\n  Scenario: Child joins age-appropriate interest community\n    Given Emma loves drawing manga-style art\n    When she discovers a youth manga artists community in her region\n    And the community is moderated and age-appropriate (ages 10-16)\n    Then she can request to join through her parent's approval\n    And her parents see the community charter and moderator information\n    And upon approval, she gains access to the creative space\n    And she can share art, get feedback, and learn techniques\n    And all participants are age-verified and properly supervised\n\n  Scenario: Child learns from elder mentor in safe context\n    Given Emma has been active in the manga community for 6 months\n    And she shows dedication and growing skill\n    When an elder community artist offers mentorship\n    Then the matching agent verifies the elder's background and trustworthiness\n    And the mentorship is structured with appropriate boundaries\n    And Emma's parents are notified and can approve the arrangement\n    And mentorship interactions are visible to community moderators\n    And Emma receives valuable guidance in a safe learning relationship\n\n  Scenario: Child's creative work spreads through earned reach\n    Given Emma creates a manga story about environmental conservation\n    And she shares it in her manga artists community\n    When other young artists appreciate and share her work\n    And the story demonstrates both artistic skill and positive values\n    Then the work travels through network based on genuine appreciation\n    And it reaches other youth environmental and art communities\n    And Emma experiences validation for quality contribution\n    And she learns that good work naturally finds its audience\n    And no algorithmic manipulation or viral exploitation occurs\n\n  Scenario: Child prevented from exposure to inappropriate content\n    Given Emma participates in the manga community\n    When an older teen posts art with mature themes\n    And the content is not appropriate for younger members\n    Then the guardian agent prevents Emma from seeing the mature content\n    And the moderator is notified to evaluate the post\n    And age-appropriate content guidelines are reinforced\n    And Emma's experience remains safe and appropriate to her development\n    And the older teen receives guidance about age-appropriate spaces\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:affinity_network",
+    "related_users:elder,content_creator,community_moderator,child",
+    "related_layers:educational,neighborhood,family",
+    "elohim_agents:guardian_agent,matching_agent,moderation_agent",
+    "social-medium",
+    "feature"
+  ],
+  "sourcePath": "social_medium/child/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "scenario-social-medium-child-scenarios-affinity-network-child joins age-appropriate interest community",
+    "scenario-social-medium-child-scenarios-affinity-network-child learns from elder mentor in safe context",
+    "scenario-social-medium-child-scenarios-affinity-network-child's creative work spreads through earned reach",
+    "scenario-social-medium-child-scenarios-affinity-network-child prevented from exposure to inappropriate content",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "epic": "social_medium",
+    "scenarioCount": 4
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Age-Appropriate Interest Communities for Child",
+    "ogDescription": "As a child in the social_medium system Operating at the affinity_network governance layer I want to pursue my interests with others who share them So that I can develop skills, make friends, and explo",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-social-medium-child-scenarios-affinity-network",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Age-Appropriate Interest Communities for Child - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-social-medium-child-scenarios-affinity-network",
+    "identifier": "did:web:elohim.host:content:social-medium:child:scenarios:affinity-network",
+    "name": "Age-Appropriate Interest Communities for Child",
+    "description": "As a child in the social_medium system Operating at the affinity_network governance layer I want to pursue my interests with others who share them So that I can develop skills, make friends, and explore my passions safely",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

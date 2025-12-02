@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-household-shared living space decisions preserve elderly authority",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:household-shared living space decisions preserve elderly authority",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Shared living space decisions preserve elderly authority",
+  "description": "Shared living space decisions preserve elderly authority",
+  "content": "Scenario: Shared living space decisions preserve elderly authority\n    Given Helen's daughter occasionally stays to provide care\n    And Helen's home is multigenerational at times\n    When household decisions need to be made\n    Then Helen's authority in her own home should be paramount\n    And family members should defer to her household preferences\n    And the household_elohim should mediate conflicting preferences\n    And Helen's long-standing patterns should have priority\n    And she should not feel like she's lost control of her space\n    And care recipients should not become subordinate in their own homes\n    And the protocol should preserve hierarchy: this is Helen's home\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:household",
+    "related_users:caregiver,family_member,home_health_aide",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Shared living space decisions preserve elderly authority",
+    "ogDescription": "Shared living space decisions preserve elderly authority",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-household-shared living space decisions preserve elderly authority",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Shared living space decisions preserve elderly authority - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-household-shared living space decisions preserve elderly authority",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:household-shared living space decisions preserve elderly authority",
+    "name": "Shared living space decisions preserve elderly authority",
+    "description": "Shared living space decisions preserve elderly authority",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

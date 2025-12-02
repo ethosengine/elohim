@@ -1,0 +1,98 @@
+{
+  "id": "human-ronald-refugee",
+  "did": "did:web:elohim.host:human:ronald-refugee",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Ronald",
+  "description": "Fled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find.",
+  "content": {
+    "displayName": "Ronald",
+    "bio": "Fled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find.",
+    "profileReach": "community",
+    "isPseudonymous": false,
+    "acceptingConnections": true,
+    "primaryLocation": {
+      "layer": "municipality",
+      "displayName": "Metro City",
+      "reach": "community"
+    },
+    "communities": [
+      "community-refugee-resettlement",
+      "community-engineers-network"
+    ],
+    "publicAffinities": [
+      "engineering",
+      "refugee-rights",
+      "professional-recertification",
+      "community-building"
+    ],
+    "accessibilityNeeds": [
+      "translation-support"
+    ],
+    "languagePreferences": {
+      "primary": "ar",
+      "secondary": "en",
+      "learningLevel": "advanced"
+    },
+    "foreignCredentials": [
+      {
+        "type": "degree",
+        "name": "Bachelor of Engineering - Civil",
+        "status": "pending-equivalency"
+      }
+    ]
+  },
+  "contentFormat": "human-json",
+  "sourcePath": "humans/ronald-refugee/profile.json",
+  "tags": [
+    "newcomer",
+    "human",
+    "refugee-rights",
+    "engineering",
+    "professional-recertification",
+    "community-building",
+    "human-graph",
+    "reach-community",
+    "layer-municipality"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "newcomer",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "community",
+      "municipality"
+    ],
+    "communityCount": 2,
+    "designNotes": "Represents legitimate foreign credentials pending verification (contrast with dolittle-doctor fraud)."
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Ronald",
+    "ogDescription": "Fled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-ronald-refugee",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-ronald-refugee.jpg",
+    "ogImageAlt": "Ronald's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-ronald-refugee",
+    "identifier": "did:web:elohim.host:human:ronald-refugee",
+    "name": "Ronald",
+    "description": "Fled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Metro City",
+      "description": "municipality"
+    }
+  },
+  "createdAt": "2025-12-01T20:08:11.328564",
+  "updatedAt": "2025-12-01T20:08:11.328565"
+}

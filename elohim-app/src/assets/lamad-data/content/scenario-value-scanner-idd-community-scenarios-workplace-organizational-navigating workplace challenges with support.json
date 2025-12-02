@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-workplace-organizational-navigating workplace challenges with support",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-navigating workplace challenges with support",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Navigating workplace challenges with support",
+  "description": "Navigating workplace challenges with support",
+  "content": "Scenario: Navigating workplace challenges with support\n    Given a patron was rude to Jordan about their disability\n    And workplace discrimination is unacceptable\n    When the incident occurs\n    Then the personal_agent helps Jordan process the experience\n    And supervisors address the patron's behavior\n    And Jordan receives support from colleagues\n    And the workplace_elohim facilitates dignity-preserving response\n    And Jordan's right to respectful treatment is defended\n    And Jordan experiences workplace protection and advocacy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Navigating workplace challenges with support",
+    "ogDescription": "Navigating workplace challenges with support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-navigating workplace challenges with support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Navigating workplace challenges with support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-navigating workplace challenges with support",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-navigating workplace challenges with support",
+    "name": "Navigating workplace challenges with support",
+    "description": "Navigating workplace challenges with support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

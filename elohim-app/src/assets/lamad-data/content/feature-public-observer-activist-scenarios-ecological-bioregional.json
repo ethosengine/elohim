@@ -1,0 +1,62 @@
+{
+  "id": "feature-public-observer-activist-scenarios-ecological-bioregional",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:ecological-bioregional",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Environmental Justice Advocacy for Activist",
+  "description": "As an activist in the public_observer system Operating at the ecological_bioregional governance layer I want to fight pollution and demand environmental justice So that communities of color and low-income neighborhoods get environmental protection",
+  "content": "@epic:public_observer\n@user_type:activist\n@governance_layer:ecological_bioregional\n@related_users:community_organizer,citizen,scientist\n@related_layers:municipality,county_regional,provincial_state\n@elohim_agents:public_observer,ecological_elohim,community_elohim\n\nFeature: Environmental Justice Advocacy for Activist\n  As an activist in the public_observer system\n  Operating at the ecological_bioregional governance layer\n  I want to fight pollution and demand environmental justice\n  So that communities of color and low-income neighborhoods get environmental protection\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the activist user is registered in the system\n    And the ecological_bioregional governance context is active\n\n  Scenario: Activist documents industrial pollution concentration pattern\n    Given the activist works on environmental justice\n    And suspects systematic pollution burden on communities of color\n    When the Observer maps pollution sources and demographics\n    Then the activist sees industrial permits cluster in Black and Latino neighborhoods\n    And parks and trees concentrate in white affluent areas\n    And asthma hospitalizations correlate with pollution exposure\n    And environmental racism pattern becomes statistically undeniable\n    And legal and regulatory action gains evidentiary foundation\n\n  Scenario: Activist tracks polluter violations and regulatory failure\n    Given a facility near the activist's community violates air quality standards\n    And regulatory response seems inadequate\n    When the Observer documents violation history\n    Then the activist sees 47 violations over three years\n    And learns penalties were minimal and ineffective\n    And identifies which regulators approved permits despite violations\n    And exposes revolving door between industry and enforcement\n    And regulatory capture becomes visible and challengeable\n\n  Scenario: Activist opposes new polluting facility with evidence\n    Given a company applies for permit to build polluting facility\n    And claims it will have minimal environmental impact\n    When the Observer analyzes company's environmental track record\n    Then the activist shows violations at their other facilities\n    And calculates health impacts on nearby residents\n    And demonstrates existing pollution burden in target neighborhood\n    And organizes affected community for testimony\n    And corporate claims meet community evidence\n\n  Scenario: Activist demands community benefits agreement for environmental justice\n    Given a development will impact the activist's environmental justice community\n    And community has disproportionate environmental burden\n    When the Observer documents cumulative environmental harms\n    Then the activist presents evidence of existing pollution exposure\n    And demands green infrastructure investment as mitigation\n    And proposes specific community benefits (parks, tree canopy, remediation)\n    And coalition negotiates from position of documented harm\n    And development must address environmental justice not just profit\n\n  Scenario: Activist connects local environmental struggle to regional climate justice\n    Given the activist fights pollution in their neighborhood\n    When the Observer reveals regional climate adaptation patterns\n    Then the activist sees climate resilience investments favor wealthy areas\n    And flood vulnerability concentrates in communities of color\n    And urban heat island effects exacerbate environmental injustice\n    And local environmental fight connects to climate justice movement\n    And climate policy must address environmental equity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:ecological_bioregional",
+    "related_users:community_organizer,citizen,scientist",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,ecological_elohim,community_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-activist-scenarios-ecological-bioregional-activist documents industrial pollution concentration pattern",
+    "scenario-public-observer-activist-scenarios-ecological-bioregional-activist tracks polluter violations and regulatory failure",
+    "scenario-public-observer-activist-scenarios-ecological-bioregional-activist opposes new polluting facility with evidence",
+    "scenario-public-observer-activist-scenarios-ecological-bioregional-activist demands community benefits agreement for environmental justice",
+    "scenario-public-observer-activist-scenarios-ecological-bioregional-activist connects local environmental struggle to regional climate justice",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 5
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Environmental Justice Advocacy for Activist",
+    "ogDescription": "As an activist in the public_observer system Operating at the ecological_bioregional governance layer I want to fight pollution and demand environmental justice So that communities of color and low-in",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-activist-scenarios-ecological-bioregional",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Environmental Justice Advocacy for Activist - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-activist-scenarios-ecological-bioregional",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:ecological-bioregional",
+    "name": "Environmental Justice Advocacy for Activist",
+    "description": "As an activist in the public_observer system Operating at the ecological_bioregional governance layer I want to fight pollution and demand environmental justice So that communities of color and low-income neighborhoods get environmental protection",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

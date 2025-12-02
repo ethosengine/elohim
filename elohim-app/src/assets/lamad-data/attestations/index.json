@@ -1,0 +1,443 @@
+{
+  "lastUpdated": "2025-11-26T12:00:00.000Z",
+  "totalCount": 24,
+  "attestations": [
+    {
+      "id": "att-manifesto-governance-ratified",
+      "contentId": "manifesto",
+      "attestationType": "governance-ratified",
+      "reachGranted": "commons",
+      "grantedBy": {
+        "type": "governance",
+        "grantorId": "elohim-protocol-council",
+        "grantorName": "Elohim Protocol Council",
+        "qualifyingAttestations": ["governance-authority"]
+      },
+      "grantedAt": "2025-06-15T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "governance",
+        "description": "Ratified as foundational document through governance process",
+        "references": ["governance-decision-2025-001"]
+      },
+      "metadata": {
+        "votes": { "for": 12, "against": 0, "abstain": 1 }
+      }
+    },
+    {
+      "id": "att-manifesto-curriculum-canonical",
+      "contentId": "manifesto",
+      "attestationType": "curriculum-canonical",
+      "reachGranted": "commons",
+      "grantedBy": {
+        "type": "steward",
+        "grantorId": "steward-curriculum",
+        "grantorName": "Curriculum Architect",
+        "qualifyingAttestations": ["curriculum-architect"]
+      },
+      "grantedAt": "2025-06-20T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "review",
+        "description": "Designated as canonical entry point for all learning paths"
+      }
+    },
+    {
+      "id": "att-manifesto-safety-reviewed",
+      "contentId": "manifesto",
+      "attestationType": "safety-reviewed",
+      "reachGranted": "federated",
+      "grantedBy": {
+        "type": "elohim",
+        "grantorId": "elohim-community-learning",
+        "grantorName": "Learning Community Elohim",
+        "qualifyingAttestations": ["constitutional-guardian", "safety-reviewer"]
+      },
+      "grantedAt": "2025-06-01T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "automated",
+        "description": "Constitutional safety review by Learning Community Elohim. Content aligns with flourishing principles, contains no harmful patterns.",
+        "automatedChecks": ["constitutional-alignment", "no-harmful-content", "no-misinformation", "accessibility-basic"]
+      }
+    },
+    {
+      "id": "att-manifesto-license-cleared",
+      "contentId": "manifesto",
+      "attestationType": "license-cleared",
+      "reachGranted": "commons",
+      "grantedBy": {
+        "type": "steward",
+        "grantorId": "steward-legal",
+        "grantorName": "Legal Steward",
+        "qualifyingAttestations": ["legal-reviewer"]
+      },
+      "grantedAt": "2025-06-10T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "review",
+        "description": "Original work, CC BY-SA 4.0 license applied"
+      }
+    },
+    {
+      "id": "att-governance-epic-steward-approved",
+      "contentId": "governance-epic",
+      "attestationType": "steward-approved",
+      "reachGranted": "community",
+      "grantedBy": {
+        "type": "steward",
+        "grantorId": "steward-governance",
+        "grantorName": "Governance Steward",
+        "qualifyingAttestations": ["domain-steward", "governance-expert"]
+      },
+      "grantedAt": "2025-07-01T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "review",
+        "description": "Reviewed for governance domain accuracy and pedagogical value"
+      }
+    },
+    {
+      "id": "att-governance-epic-peer-reviewed",
+      "contentId": "governance-epic",
+      "attestationType": "peer-reviewed",
+      "reachGranted": "federated",
+      "grantedBy": {
+        "type": "community",
+        "grantorId": "peer-review-panel-governance",
+        "grantorName": "Governance Peer Review Panel"
+      },
+      "grantedAt": "2025-08-15T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "review",
+        "description": "Peer-reviewed by 3 domain experts",
+        "reviewers": ["reviewer-001", "reviewer-002", "reviewer-003"]
+      }
+    },
+    {
+      "id": "att-governance-epic-safety",
+      "contentId": "governance-epic",
+      "attestationType": "safety-reviewed",
+      "reachGranted": "federated",
+      "grantedBy": {
+        "type": "elohim",
+        "grantorId": "elohim-community-learning",
+        "grantorName": "Learning Community Elohim"
+      },
+      "grantedAt": "2025-07-05T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "automated",
+        "automatedChecks": ["constitutional-alignment", "no-harmful-content"]
+      }
+    },
+    {
+      "id": "att-social-medium-steward-approved",
+      "contentId": "epic-social-medium",
+      "attestationType": "steward-approved",
+      "reachGranted": "community",
+      "grantedBy": {
+        "type": "steward",
+        "grantorId": "steward-technology",
+        "grantorName": "Technology Steward"
+      },
+      "grantedAt": "2025-07-10T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "review",
+        "description": "Approved for technology curriculum track"
+      }
+    },
+    {
+      "id": "att-social-medium-community-endorsed",
+      "contentId": "epic-social-medium",
+      "attestationType": "community-endorsed",
+      "reachGranted": "community",
+      "grantedBy": {
+        "type": "community",
+        "grantorId": "elohim-protocol-learners",
+        "grantorName": "Elohim Protocol Learners Community"
+      },
+      "grantedAt": "2025-09-20T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "vote",
+        "description": "Endorsed by 8 community members",
+        "endorsers": ["learner-001", "learner-002", "learner-003", "learner-004", "learner-005", "learner-006", "learner-007", "learner-008"]
+      },
+      "metadata": {
+        "endorsementCount": 8,
+        "threshold": 3
+      }
+    },
+    {
+      "id": "att-value-scanner-author-verified",
+      "contentId": "epic-value-scanner",
+      "attestationType": "author-verified",
+      "reachGranted": "local",
+      "grantedBy": {
+        "type": "elohim",
+        "grantorId": "elohim-community-learning",
+        "grantorName": "Learning Community Elohim"
+      },
+      "grantedAt": "2025-08-01T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "automated",
+        "description": "Author identity verified through cryptographic authentication"
+      }
+    },
+    {
+      "id": "att-value-scanner-steward-approved",
+      "contentId": "epic-value-scanner",
+      "attestationType": "steward-approved",
+      "reachGranted": "community",
+      "grantedBy": {
+        "type": "steward",
+        "grantorId": "steward-economics",
+        "grantorName": "Economics Steward"
+      },
+      "grantedAt": "2025-08-15T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "review",
+        "description": "Reviewed for economic accuracy, REA ontology properly explained"
+      }
+    },
+    {
+      "id": "att-draft-content-author-only",
+      "contentId": "draft-new-feature",
+      "attestationType": "author-verified",
+      "reachGranted": "local",
+      "grantedBy": {
+        "type": "elohim",
+        "grantorId": "elohim-community-learning",
+        "grantorName": "Learning Community Elohim"
+      },
+      "grantedAt": "2025-11-25T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "automated",
+        "description": "Author identity verified"
+      }
+    },
+    {
+      "id": "att-disputed-content-steward",
+      "contentId": "disputed-economic-model",
+      "attestationType": "steward-approved",
+      "reachGranted": "community",
+      "grantedBy": {
+        "type": "steward",
+        "grantorId": "steward-economics",
+        "grantorName": "Economics Steward"
+      },
+      "grantedAt": "2025-09-01T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "review",
+        "description": "Initially approved, now under dispute review"
+      }
+    },
+    {
+      "id": "att-under-review-content",
+      "contentId": "pending-review-guide",
+      "attestationType": "author-verified",
+      "reachGranted": "local",
+      "grantedBy": {
+        "type": "elohim",
+        "grantorId": "elohim-community-learning",
+        "grantorName": "Learning Community Elohim"
+      },
+      "grantedAt": "2025-11-20T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "automated",
+        "description": "Author verified, steward review pending"
+      }
+    },
+    {
+      "id": "att-revoked-example",
+      "contentId": "outdated-protocol-spec",
+      "attestationType": "steward-approved",
+      "reachGranted": "community",
+      "grantedBy": {
+        "type": "steward",
+        "grantorId": "steward-technology",
+        "grantorName": "Technology Steward"
+      },
+      "grantedAt": "2025-03-01T00:00:00.000Z",
+      "status": "revoked",
+      "revocation": {
+        "revokedAt": "2025-10-15T00:00:00.000Z",
+        "revokedBy": "steward-technology",
+        "reason": "superseded",
+        "explanation": "Protocol specification updated to v2.0, this version is no longer accurate",
+        "appealable": false
+      },
+      "evidence": {
+        "type": "review",
+        "description": "Original approval for v1.0 specification"
+      }
+    },
+    {
+      "id": "att-hardware-spec-author-verified",
+      "contentId": "hardware-spec",
+      "attestationType": "author-verified",
+      "reachGranted": "local",
+      "grantedBy": {
+        "type": "elohim",
+        "grantorId": "elohim-community-learning",
+        "grantorName": "Learning Community Elohim"
+      },
+      "grantedAt": "2025-11-20T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "automated",
+        "description": "Author identity verified through cryptographic authentication"
+      }
+    },
+    {
+      "id": "att-hardware-spec-steward-approved",
+      "contentId": "hardware-spec",
+      "attestationType": "steward-approved",
+      "reachGranted": "community",
+      "grantedBy": {
+        "type": "steward",
+        "grantorId": "steward-curriculum",
+        "grantorName": "Curriculum Architect"
+      },
+      "grantedAt": "2025-11-22T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "review",
+        "description": "Approved for community distribution"
+      }
+    },
+    {
+      "id": "att-global-orchestra-steward-approved",
+      "contentId": "elohim-global-orchestra",
+      "attestationType": "steward-approved",
+      "reachGranted": "community",
+      "grantedBy": {
+        "type": "steward",
+        "grantorId": "steward-governance",
+        "grantorName": "Governance Steward"
+      },
+      "grantedAt": "2025-09-01T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "review",
+        "description": "Approved as part of governance curriculum"
+      }
+    },
+    {
+      "id": "att-observer-protocol-community-endorsed",
+      "contentId": "observer-protocol",
+      "attestationType": "community-endorsed",
+      "reachGranted": "community",
+      "grantedBy": {
+        "type": "community",
+        "grantorId": "elohim-protocol-learners",
+        "grantorName": "Elohim Protocol Learners Community"
+      },
+      "grantedAt": "2025-10-01T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "vote",
+        "description": "Endorsed by community members",
+        "endorsers": ["learner-001", "learner-002", "learner-003", "learner-004", "learner-005"]
+      },
+      "metadata": {
+        "endorsementCount": 5,
+        "threshold": 3
+      }
+    },
+    {
+      "id": "att-holochain-intro-peer-reviewed",
+      "contentId": "tech-holochain-intro",
+      "attestationType": "peer-reviewed",
+      "reachGranted": "federated",
+      "grantedBy": {
+        "type": "community",
+        "grantorId": "holochain-developers-guild",
+        "grantorName": "Holochain Developers Guild"
+      },
+      "grantedAt": "2025-08-20T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "review",
+        "description": "Technical accuracy verified by Holochain developers",
+        "reviewers": ["holo-dev-001", "holo-dev-002"]
+      }
+    },
+    {
+      "id": "att-holochain-intro-safety",
+      "contentId": "tech-holochain-intro",
+      "attestationType": "safety-reviewed",
+      "reachGranted": "federated",
+      "grantedBy": {
+        "type": "elohim",
+        "grantorId": "elohim-community-learning",
+        "grantorName": "Learning Community Elohim"
+      },
+      "grantedAt": "2025-08-22T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "automated",
+        "automatedChecks": ["constitutional-alignment", "no-harmful-content", "technical-accuracy"]
+      }
+    },
+    {
+      "id": "att-evolution-trust-accessibility",
+      "contentId": "simulation-evolution-of-trust",
+      "attestationType": "accessibility-checked",
+      "reachGranted": "community",
+      "grantedBy": {
+        "type": "steward",
+        "grantorId": "steward-accessibility",
+        "grantorName": "Accessibility Steward"
+      },
+      "grantedAt": "2025-07-15T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "review",
+        "description": "Meets WCAG 2.1 AA standards for interactive content"
+      }
+    },
+    {
+      "id": "att-evolution-trust-license",
+      "contentId": "simulation-evolution-of-trust",
+      "attestationType": "license-cleared",
+      "reachGranted": "commons",
+      "grantedBy": {
+        "type": "steward",
+        "grantorId": "steward-legal",
+        "grantorName": "Legal Steward"
+      },
+      "grantedAt": "2025-07-10T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "review",
+        "description": "Public domain work by Nicky Case, freely embeddable"
+      }
+    },
+    {
+      "id": "att-private-draft-no-attestations",
+      "contentId": "private-draft-notes",
+      "attestationType": "author-verified",
+      "reachGranted": "private",
+      "grantedBy": {
+        "type": "author",
+        "grantorId": "demo-learner",
+        "grantorName": "Demo Learner"
+      },
+      "grantedAt": "2025-11-26T00:00:00.000Z",
+      "status": "active",
+      "evidence": {
+        "type": "automated",
+        "description": "Self-attested draft content"
+      }
+    }
+  ]
+}

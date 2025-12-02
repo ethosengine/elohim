@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-individual-choosing how to spend free time",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-choosing how to spend free time",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Choosing how to spend free time",
+  "description": "Choosing how to spend free time",
+  "content": "Scenario: Choosing how to spend free time\n    Given Jordan has free time after work\n    And Jordan has multiple activity options available\n    When Jordan considers what to do\n    Then the personal_agent shows activity options with pictures\n    And each option includes simple information (location, time, who)\n    And Jordan selects their preferred activity\n    And the system helps coordinate any needed support\n    But Jordan's choice drives what happens\n    And Jordan's preferences are learned and remembered\n    And Jordan experiences agency over their own time\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-individual",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Choosing how to spend free time",
+    "ogDescription": "Choosing how to spend free time",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-choosing how to spend free time",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Choosing how to spend free time - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-choosing how to spend free time",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-choosing how to spend free time",
+    "name": "Choosing how to spend free time",
+    "description": "Choosing how to spend free time",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

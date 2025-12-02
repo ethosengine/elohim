@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-advising national council on fundamental constitutional tension",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state-advising national council on fundamental constitutional tension",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Advising National Council on fundamental constitutional tension",
+  "description": "Advising National Council on fundamental constitutional tension",
+  "content": "Scenario: Advising National Council on fundamental constitutional tension\n    Given National Council deliberates care vs privacy at constitutional level\n    And technical capabilities shape what's constitutionally possible\n    When I testify about technical constraints and possibilities\n    Then I explain: what surveillance capabilities would enable better care\n    And I clarify: technical limits on achieving privacy while providing protection\n    And I present: tradeoff between optimization and dignity\n    And I stop: before dictating which values should prevail\n    And I inform: constitutional interpretation with technical reality\n    And I respect: that council must choose values not just optimize outcomes\n    And I demonstrate: expertise serving democratic judgment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Advising National Council on fundamental constitutional tension",
+    "ogDescription": "Advising National Council on fundamental constitutional tension",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-nation-state-advising national council on fundamental constitutional tension",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advising National Council on fundamental constitutional tension - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-nation-state-advising national council on fundamental constitutional tension",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state-advising national council on fundamental constitutional tension",
+    "name": "Advising National Council on fundamental constitutional tension",
+    "description": "Advising National Council on fundamental constitutional tension",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

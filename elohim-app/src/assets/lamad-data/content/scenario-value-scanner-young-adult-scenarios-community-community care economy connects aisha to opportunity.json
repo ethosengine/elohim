@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-community-community care economy connects aisha to opportunity",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community-community care economy connects aisha to opportunity",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community care economy connects Aisha to opportunity",
+  "description": "Community care economy connects Aisha to opportunity",
+  "content": "Scenario: Community care economy connects Aisha to opportunity\n    Given Aisha is building her adult life\n    And community networks provide opportunities\n    When Aisha participates actively in community care\n    Then the community_elohim should surface relevant opportunities\n    And it should connect her to job leads, housing, or collaborations\n    And her care contributions should give her access to community resources\n    And the system should recognize that care builds networks\n    And community care economy should create opportunity pathways\n    And participation should tangibly improve her life prospects\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:community",
+    "related_users:adult,worker,student,volunteer",
+    "related_layers:neighborhood,workplace_organizational,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community care economy connects Aisha to opportunity",
+    "ogDescription": "Community care economy connects Aisha to opportunity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-community-community care economy connects aisha to opportunity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community care economy connects Aisha to opportunity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-community-community care economy connects aisha to opportunity",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community-community care economy connects aisha to opportunity",
+    "name": "Community care economy connects Aisha to opportunity",
+    "description": "Community care economy connects Aisha to opportunity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

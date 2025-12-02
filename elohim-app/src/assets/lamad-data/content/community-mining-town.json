@@ -1,0 +1,30 @@
+{
+  "id": "community-mining-town",
+  "did": "did:web:elohim.host:community:mining-town",
+  "contentType": "organization",
+  "activityPubType": "Group",
+  "title": "Mining Town",
+  "description": "Community with 1 members",
+  "content": {
+    "name": "Mining Town",
+    "memberCount": 1,
+    "memberIds": [
+      "human-mary-miner"
+    ]
+  },
+  "contentFormat": "html",
+  "tags": [
+    "community",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-mary-miner"
+  ],
+  "metadata": {
+    "category": "community",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z"
+}

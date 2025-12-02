@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-workplace-organizational-learning professional norms through care economy lens",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:workplace-organizational-learning professional norms through care economy lens",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Learning professional norms through care economy lens",
+  "description": "Learning professional norms through care economy lens",
+  "content": "Scenario: Learning professional norms through care economy lens\n    Given Aisha is learning professional workplace culture\n    And she's developing professional identity\n    When the workplace_elohim guides her professional development\n    Then it should help her understand workplace care economy\n    And it should teach that her work is care labor (contributing to organizational flourishing)\n    And it should explain that she deserves care in return\n    And professional development should include care economy literacy\n    And she should learn to apply care principles to employment\n    And workplace norms should be understood through care framework\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,adult,employer,colleague",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Learning professional norms through care economy lens",
+    "ogDescription": "Learning professional norms through care economy lens",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-workplace-organizational-learning professional norms through care economy lens",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning professional norms through care economy lens - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-workplace-organizational-learning professional norms through care economy lens",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:workplace-organizational-learning professional norms through care economy lens",
+    "name": "Learning professional norms through care economy lens",
+    "description": "Learning professional norms through care economy lens",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

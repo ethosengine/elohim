@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-ecological-citizen evaluates development environmental claims",
+  "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:ecological-citizen evaluates development environmental claims",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Citizen evaluates development environmental claims",
+  "description": "Citizen evaluates development environmental claims",
+  "content": "Scenario: Citizen evaluates development environmental claims\n    Given a developer claims their project is environmentally sustainable\n    And uses terms like \"green building\" and \"eco-friendly\"\n    When the Observer fact-checks environmental claims\n    Then the citizen sees actual environmental review data\n    And views the developer's environmental track record\n    And understands real impacts on habitat, pollution, resources\n    And can distinguish genuine sustainability from greenwashing\n    And environmental accountability becomes measurable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:ecological_bioregional",
+    "related_users:activist,community_organizer,politician",
+    "related_layers:municipality,community,county_regional",
+    "elohim_agents:public_observer,community_elohim,ecological_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Citizen evaluates development environmental claims",
+    "ogDescription": "Citizen evaluates development environmental claims",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-ecological-citizen evaluates development environmental claims",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Citizen evaluates development environmental claims - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-ecological-citizen evaluates development environmental claims",
+    "identifier": "did:web:elohim.host:content:public-observer:citizen:scenarios:ecological-citizen evaluates development environmental claims",
+    "name": "Citizen evaluates development environmental claims",
+    "description": "Citizen evaluates development environmental claims",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

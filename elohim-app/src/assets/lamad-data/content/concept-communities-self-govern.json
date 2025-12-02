@@ -1,0 +1,29 @@
+{
+  "id": "concept-communities-self-govern",
+  "contentType": "concept",
+  "title": "Communities self-govern",
+  "description": "without corporate oversight, using transparent, locally-owned infrastructure",
+  "content": "without corporate oversight, using transparent, locally-owned infrastructure",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/vision/concept-communities-self-govern.json",
+  "tags": [
+    "vision",
+    "governance",
+    "community",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "governance-epic",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "vision",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.001316",
+  "updatedAt": "2025-11-28T17:11:57.001316"
+}

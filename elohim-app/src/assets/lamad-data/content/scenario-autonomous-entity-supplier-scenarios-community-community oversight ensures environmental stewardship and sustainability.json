@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-community-community oversight ensures environmental stewardship and sustainability",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:community-community oversight ensures environmental stewardship and sustainability",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community oversight ensures environmental stewardship and sustainability",
+  "description": "Community oversight ensures environmental stewardship and sustainability",
+  "content": "Scenario: Community oversight ensures environmental stewardship and sustainability\n    Given private ownership may prioritize short-term profit over environmental health\n    And community bears environmental impacts of farming practices\n    When community has governance voice in farm environmental practices\n    Then sustainable and regenerative agriculture is prioritized through community input\n    And environmental practices are transparent and accountable to community\n    And water quality, soil health, and biodiversity are protected as community values\n    And farm environmental stewardship benefits entire community ecosystem\n    And community_elohim monitors environmental practices and community accountability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,small_business_owner]",
+    "related_layers:[workplace_organizational,industry_sector,ecological_bioregional]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community oversight ensures environmental stewardship and sustainability",
+    "ogDescription": "Community oversight ensures environmental stewardship and sustainability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-community-community oversight ensures environmental stewardship and sustainability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community oversight ensures environmental stewardship and sustainability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-community-community oversight ensures environmental stewardship and sustainability",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:community-community oversight ensures environmental stewardship and sustainability",
+    "name": "Community oversight ensures environmental stewardship and sustainability",
+    "description": "Community oversight ensures environmental stewardship and sustainability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-industry-sector-advocating for worker ownership and cooperative models",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-advocating for worker ownership and cooperative models",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Advocating for worker ownership and cooperative models",
+  "description": "Advocating for worker ownership and cooperative models",
+  "content": "Scenario: Advocating for worker ownership and cooperative models\n    Given current ownership structures extract from workers\n    When workers want to explore alternative ownership models\n    Then the protocol should provide information about worker cooperatives\n    And connect workers interested in cooperative organizing\n    And support transition toward worker ownership in food service\n    And build examples of care-economy-aligned food business models\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-industry-sector"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Advocating for worker ownership and cooperative models",
+    "ogDescription": "Advocating for worker ownership and cooperative models",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-advocating for worker ownership and cooperative models",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advocating for worker ownership and cooperative models - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-advocating for worker ownership and cooperative models",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-advocating for worker ownership and cooperative models",
+    "name": "Advocating for worker ownership and cooperative models",
+    "description": "Advocating for worker ownership and cooperative models",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

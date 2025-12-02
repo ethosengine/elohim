@@ -1,0 +1,253 @@
+.not-found-container {
+  min-height: calc(100vh - 64px); /* Account for Lamad header */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--lamad-bg-primary);
+  padding: 2rem;
+}
+
+.not-found-content {
+  text-align: center;
+  max-width: 700px;
+  width: 100%;
+}
+
+/* Visual Element - Book Stack */
+.error-visual {
+  position: relative;
+  margin-bottom: 2rem;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.book-stack {
+  position: relative;
+  width: 100px;
+  height: 120px;
+}
+
+.book {
+  position: absolute;
+  width: 80px;
+  height: 20px;
+  border-radius: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.book-1 {
+  background: var(--lamad-accent-primary);
+  bottom: 0;
+  width: 85px;
+}
+
+.book-2 {
+  background: var(--lamad-accent-secondary);
+  bottom: 24px;
+  width: 75px;
+  transform: translateX(-50%) rotate(-2deg);
+}
+
+.book-3 {
+  background: linear-gradient(135deg, var(--lamad-accent-primary), var(--lamad-accent-secondary));
+  bottom: 48px;
+  width: 80px;
+  transform: translateX(-50%) rotate(1deg);
+}
+
+.question-mark {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--lamad-text-tertiary);
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-10px);
+  }
+}
+
+/* Typography */
+h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--lamad-text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.message {
+  font-size: 1.0625rem;
+  color: var(--lamad-text-secondary);
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+.attempted-url {
+  margin-bottom: 2rem;
+}
+
+.attempted-url code {
+  background: var(--lamad-bg-secondary);
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  color: var(--lamad-text-tertiary);
+  border: 1px solid var(--lamad-border);
+  word-break: break-all;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 2.5rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn i {
+  font-size: 0.875rem;
+}
+
+.btn-primary {
+  background: var(--lamad-accent-gradient);
+  color: white;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.btn-secondary {
+  background: var(--lamad-bg-secondary);
+  color: var(--lamad-text-primary);
+  border: 1px solid var(--lamad-border);
+}
+
+.btn-secondary:hover {
+  background: var(--lamad-bg-tertiary);
+  border-color: var(--lamad-border-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--lamad-text-secondary);
+}
+
+.btn-ghost:hover {
+  color: var(--lamad-text-primary);
+  background: var(--lamad-bg-secondary);
+}
+
+/* Suggestions */
+.suggestions {
+  text-align: left;
+}
+
+.suggestions-title {
+  font-size: 0.8125rem;
+  color: var(--lamad-text-tertiary);
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.suggestion-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.suggestion-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--lamad-bg-secondary);
+  border: 1px solid var(--lamad-border);
+  border-radius: 10px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.suggestion-card:hover {
+  background: var(--lamad-surface-hover);
+  border-color: var(--lamad-border-hover);
+  transform: translateY(-2px);
+}
+
+.suggestion-card i {
+  font-size: 1.5rem;
+  color: var(--lamad-accent-primary);
+  width: 40px;
+  text-align: center;
+}
+
+.suggestion-card div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.suggestion-card strong {
+  color: var(--lamad-text-primary);
+  font-size: 0.9375rem;
+}
+
+.suggestion-card span {
+  color: var(--lamad-text-tertiary);
+  font-size: 0.8125rem;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .not-found-container {
+    padding: 1.5rem;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .message {
+    font-size: 0.9375rem;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .suggestion-cards {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-household-household accessibility increases with declining mobility",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:household-household accessibility increases with declining mobility",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Household accessibility increases with declining mobility",
+  "description": "Household accessibility increases with declining mobility",
+  "content": "Scenario: Household accessibility increases with declining mobility\n    Given Helen's mobility is gradually declining\n    And her household needs ongoing adaptation\n    When accessibility needs change over time\n    Then the household_elohim should proactively suggest adaptations\n    And Helen should be consulted on all modifications\n    And her home should evolve to support her changing capabilities\n    And the goal should be maximum independence at home\n    And dignity should be preserved throughout adaptation\n    And the protocol should enable aging in place with grace\n    And her ability to remain home should be extended as long as possible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:household",
+    "related_users:caregiver,family_member,home_health_aide",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Household accessibility increases with declining mobility",
+    "ogDescription": "Household accessibility increases with declining mobility",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-household-household accessibility increases with declining mobility",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household accessibility increases with declining mobility - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-household-household accessibility increases with declining mobility",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:household-household accessibility increases with declining mobility",
+    "name": "Household accessibility increases with declining mobility",
+    "description": "Household accessibility increases with declining mobility",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,69 @@
+{
+  "id": "feature-value-scanner-young-adult-scenarios-family",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Family Layer Value Recognition for Young Adult",
+  "description": "As a young adult maintaining family relationships while establishing independence Operating at the family governance layer I want to contribute to family care economy across distance So that I maintain family bonds through reciprocal care",
+  "content": "@epic:value_scanner\n@user_type:young_adult\n@governance_layer:family\n@related_users:parent,teen,adult,single_parent\n@related_layers:individual,household,community\n@elohim_agents:personal_agent,family_elohim\n\nFeature: Family Layer Value Recognition for Young Adult\n  As a young adult maintaining family relationships while establishing independence\n  Operating at the family governance layer\n  I want to contribute to family care economy across distance\n  So that I maintain family bonds through reciprocal care\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the young_adult user \"Aisha\" is registered in the system\n    And Aisha is 23 years old living independently\n    And Aisha's family includes parents and younger siblings\n    And the family governance context is active\n    And the family_elohim coordinates across geographic distance\n    And Aisha participates as an independent adult family member\n\n  Scenario: Remote care contributions to family of origin\n    Given Aisha lives in a different city from her family\n    And she wants to stay connected through care\n    When Aisha helps her younger siblings with homework remotely\n    Then the family_elohim should track her care contributions\n    And care tokens should accumulate for her help\n    And her parents should see her contributions\n    And siblings should be able to request her help\n    And the system should maintain family care bonds across distance\n    And geographic separation shouldn't prevent care economy participation\n\n  Scenario: Transition from dependent child to independent adult in family\n    Given Aisha was recently a dependent family member\n    And she's now an independent adult\n    When Aisha participates in family governance\n    Then her voice should carry equal weight to other adults\n    And she should participate in family decisions as a peer\n    And her care contributions should be recognized as adult care work\n    And the family_elohim should reflect her changed status\n    And family relationships should adapt to her independence\n    And she should be valued as capable adult contributor\n\n  Scenario: Contributing to family care economy while managing own resources\n    Given Aisha has limited financial resources\n    And she wants to support her family\n    When Aisha decides what care to contribute\n    Then the system should help her balance competing obligations\n    And it should recognize that her care capacity is limited\n    And it should validate both family support and self-care\n    And the family_elohim should not create unsustainable demands\n    And Aisha should maintain boundaries while remaining connected\n\n  Scenario: Care contributions during family visits\n    Given Aisha visits her family home periodically\n    And she provides substantial care labor during visits\n    When Aisha cooks, shops, and helps with household tasks\n    Then the family_elohim should track her visit contributions\n    And cooking, shopping, and household help should all be valued\n    And her care work should be visible to the family\n    And recognition should validate her adult contributions\n    And family visits should be understood as care labor, not just leisure\n    And care tokens should reflect the value she provides\n\n  Scenario: Participating in family decisions from distance\n    Given Aisha is geographically distant from family\n    And important family decisions need her input\n    When the family makes significant decisions\n    Then the family_elohim should facilitate remote participation\n    And Aisha's input should be solicited appropriately\n    And her adult perspective should be valued\n    And technology should enable genuine participation\n    And distance shouldn't exclude her from family governance\n    And her independent status should give her legitimate voice\n\n  Scenario: Learning adult family care from parents' modeling\n    Given Aisha's parents demonstrate care economy practices\n    And she's learning adult family participation\n    When Aisha observes family care patterns\n    Then the family_elohim should make parental care work visible\n    And Aisha should learn what adult family care looks like\n    And intergenerational knowledge transfer should occur\n    And she should understand family care as lifelong practice\n    And the system should facilitate learning from family elders\n\n  Scenario: Supporting younger siblings while building own life\n    Given Aisha has younger teenage siblings\n    And she wants to support their development\n    When Aisha provides mentoring and help\n    Then the family_elohim should recognize sibling care\n    And her contributions should be valued appropriately\n    And siblings should learn from her young adult experience\n    And the system should coordinate cross-generational sibling support\n    And family bonds should be strengthened through visible care\n    And Aisha should model care economy participation for siblings\n\n  Scenario: Balancing family obligations with personal sustainability\n    Given Aisha's family has ongoing needs\n    And she has limited time and energy\n    When family requests compete with Aisha's capacity\n    Then the personal_agent should help her set boundaries\n    And it should flag when family demands become unsustainable\n    And it should help her communicate limits lovingly\n    And the family_elohim should respect her capacity constraints\n    And she should maintain family connection without burning out\n    And sustainable care should be prioritized over martyrdom\n\n  Scenario: Family privacy controls for independent adult\n    Given Aisha has adult autonomy\n    And she maintains some privacy from family\n    When Aisha configures family data sharing\n    Then she should control what family sees\n    And she should choose what care contributions to share\n    And her financial details should remain private unless she shares\n    And personal life decisions should be hers to disclose\n    And the system should support healthy adult family boundaries\n    And privacy should coexist with care economy participation\n\n  Scenario: Care tokens flow between independent adult and family\n    Given Aisha both contributes to and receives from family\n    And care flows in multiple directions\n    When family care tokens are calculated\n    Then Aisha's contributions should generate tokens\n    And she should be able to use tokens for family support when needed\n    And parents' ongoing care should be recognized\n    And reciprocal care should be tracked transparently\n    And the family care economy should adapt to her independence\n    And adult family relationships should involve mutual care\n\n  Scenario: Family financial support coordinated through care economy\n    Given Aisha's family sometimes needs financial help\n    And Aisha wants to contribute within her means\n    When Aisha provides financial support to family\n    Then the contribution should be recognized as care work\n    And it should be coordinated through family_elohim\n    And the system should help her determine sustainable amounts\n    And family financial support should be visible care contribution\n    And her limited resources should be acknowledged\n    And financial care should strengthen rather than strain relationships\n\n  Scenario: Maintaining family cultural practices across distance\n    Given Aisha's family has specific cultural traditions\n    And she wants to maintain cultural connection\n    When Aisha participates in family cultural practices\n    Then the family_elohim should support cultural continuity\n    And it should help coordinate cultural events across distance\n    And it should recognize cultural care work she performs\n    And family cultural values should shape her care economy participation\n    And distance shouldn't prevent cultural transmission\n    And her cultural identity should be maintained through family care bonds\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:family",
+    "related_users:parent,teen,adult,single_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-young-adult-scenarios-family-remote care contributions to family of origin",
+    "scenario-value-scanner-young-adult-scenarios-family-transition from dependent child to independent adult in family",
+    "scenario-value-scanner-young-adult-scenarios-family-contributing to family care economy while managing own resources",
+    "scenario-value-scanner-young-adult-scenarios-family-care contributions during family visits",
+    "scenario-value-scanner-young-adult-scenarios-family-participating in family decisions from distance",
+    "scenario-value-scanner-young-adult-scenarios-family-learning adult family care from parents' modeling",
+    "scenario-value-scanner-young-adult-scenarios-family-supporting younger siblings while building own life",
+    "scenario-value-scanner-young-adult-scenarios-family-balancing family obligations with personal sustainability",
+    "scenario-value-scanner-young-adult-scenarios-family-family privacy controls for independent adult",
+    "scenario-value-scanner-young-adult-scenarios-family-care tokens flow between independent adult and family",
+    "scenario-value-scanner-young-adult-scenarios-family-family financial support coordinated through care economy",
+    "scenario-value-scanner-young-adult-scenarios-family-maintaining family cultural practices across distance",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": "value_scanner",
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family Layer Value Recognition for Young Adult",
+    "ogDescription": "As a young adult maintaining family relationships while establishing independence Operating at the family governance layer I want to contribute to family care economy across distance So that I maintai",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-young-adult-scenarios-family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Family Layer Value Recognition for Young Adult - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-young-adult-scenarios-family",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family",
+    "name": "Family Layer Value Recognition for Young Adult",
+    "description": "As a young adult maintaining family relationships while establishing independence Operating at the family governance layer I want to contribute to family care economy across distance So that I maintain family bonds through reciprocal care",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

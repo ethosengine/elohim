@@ -1,0 +1,69 @@
+{
+  "id": "feature-value-scanner-parent-scenarios-household",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:household",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Household Layer Value Recognition for Parent",
+  "description": "As a parent managing most household care labor Operating at the household governance layer I want equitable partnership and fair labor distribution So that household care is shared and all contributions are valued",
+  "content": "@epic:value_scanner\n@user_type:parent\n@governance_layer:household\n@related_users:partner,child,adult\n@related_layers:individual,family,community\n@elohim_agents:personal_agent,household_elohim\n\nFeature: Household Layer Value Recognition for Parent\n  As a parent managing most household care labor\n  Operating at the household governance layer\n  I want equitable partnership and fair labor distribution\n  So that household care is shared and all contributions are valued\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the parent user \"Sarah\" is registered in the system\n    And Sarah's household includes her partner and two children\n    And Sarah manages 75% of household care labor\n    And both Sarah and her partner work full-time\n    And the household governance context is active\n    And the household_elohim coordinates family care economy\n    And household income is approximately $80,000 annually\n\n  Scenario: Making invisible household labor distribution visible to partner\n    Given Sarah performs 75% of household care labor\n    And her partner believes he \"helps around the house\"\n    When the household_elohim generates labor distribution report\n    Then it should show precise breakdown of who does what\n    And it should quantify \"Sarah: 75%, Partner: 25%\"\n    And the data should be undeniable and specific\n    And the partner should see his contribution is not equitable\n    And visibility should enable reality-based conversation\n    And the system should make invisible labor undeniably visible\n\n  Scenario: Tracking mental load separately from physical tasks\n    Given Sarah manages meal planning, scheduling, inventory, coordination\n    And mental labor is typically invisible to partners\n    When the household_elohim tracks cognitive labor\n    Then it should distinguish planning from execution\n    And it should show \"Sarah performed 89% of household planning labor this week\"\n    And mental load should be valued as heavily as physical work\n    And the partner should see that \"helping with dishes\" doesn't equal Sarah's total coordination\n    And cognitive labor should become visible and valued\n    And the full scope of Sarah's work should be undeniable\n\n  Scenario: Data-informed negotiation for equitable labor distribution\n    Given household labor distribution is currently inequitable\n    And Sarah wants fair partnership without resentment\n    When Sarah and her partner negotiate labor distribution\n    Then the household_elohim should provide specific data\n    And it should show time spent, complexity of tasks, and mental load\n    And it should enable \"Let's talk about the 75/25 split\" conversation\n    And negotiation should be based on reality, not perception\n    And the system should support movement toward equity\n    And care economy principles should guide fair distribution\n\n  Scenario: Household budget coordination across competing needs\n    Given the household has limited financial resources\n    And Tommy needs school supplies, Emma needs sports equipment\n    And utilities need paying and groceries need buying\n    When Sarah manages household budget\n    Then the household_elohim should coordinate across all needs\n    And it should surface conflicts and trade-offs\n    And it should help prioritize based on family values\n    And budget decisions should be transparent to both partners\n    And financial management should be recognized as skilled labor\n    And Sarah's budget work should accumulate care tokens\n\n  Scenario: Household care tokens reflect both partners' contributions\n    Given both Sarah and her partner contribute to household\n    And contributions are currently very unequal\n    When household care tokens are calculated\n    Then they should reflect actual labor performed\n    And Sarah's 75% contribution should yield 75% of household tokens\n    And tokens should give standing in household resource decisions\n    And economic equity should follow labor equity\n    And care contributions should determine household governance power\n    And the partner should understand that tokens reflect actual work\n\n  Scenario: Coordinating children's different developmental needs in household\n    Given Tommy (5) needs wonder-preservation\n    And Emma (8) needs autonomy-building\n    When Sarah coordinates household routines\n    Then the household_elohim should help balance different needs\n    And it should suggest how to serve both children appropriately\n    And it should track whether each child's needs are being met\n    And developmental coordination should be recognized as complex work\n    And Sarah's skilled navigation of competing needs should be valued\n    And household care should serve all members' flourishing\n\n  Scenario: Household inventory management made visible\n    Given Sarah tracks what's in the pantry, fridge, and cabinets\n    And she knows when milk is running low and what needs replacing\n    When the household_elohim tracks inventory management\n    Then it should recognize this as sophisticated logistics work\n    And it should value the mental tracking Sarah performs\n    And it should show \"Sarah managed 94% of household inventory awareness\"\n    And this invisible cognitive labor should become visible\n    And inventory management should be valued as professional-grade skill\n    And the partner should see this work that he doesn't even know happens\n\n  Scenario: Equitable decision-making based on care contribution\n    Given Sarah contributes 75% of household labor\n    And household decisions affect everyone\n    When major household decisions need to be made\n    Then the household_elohim should weight input by care contribution\n    And Sarah's voice should carry appropriate weight\n    And care tokens should give her standing in decisions\n    And those who do the work should have power over the work\n    And household governance should be based on care economy equity\n    And Sarah should have decision authority matching her labor\n\n  Scenario: Household schedule coordination across four people\n    Given Sarah coordinates schedules for herself, partner, Tommy, and Emma\n    And everyone has different needs, activities, and constraints\n    When Sarah manages the family calendar\n    Then the household_elohim should recognize this as complex coordination\n    And it should track the cognitive labor of schedule management\n    And it should value the dozens of micro-decisions required\n    And Sarah's coordination work should be made visible\n    And schedule management should accumulate significant care tokens\n    And this invisible orchestration should be recognized as skilled work\n\n  Scenario: Household nutrition planning and execution\n    Given Sarah plans meals for family nutritional needs\n    And she manages Tommy's preferences, Emma's activities, budget constraints\n    When Sarah performs nutrition work\n    Then the household_elohim should track planning and execution separately\n    And it should recognize nutritional knowledge as professional skill\n    And it should value meal planning as complex decision-making\n    And it should show the full scope: planning, shopping, prep, cooking, cleanup\n    And nutrition work should be recognized as health care labor\n    And Sarah's nutrition expertise should be valued professionally\n\n  Scenario: Household emotional labor and relationship maintenance\n    Given Sarah remembers birthdays, maintains family connections\n    And she manages emotional climate and resolves conflicts\n    When the household_elohim tracks emotional labor\n    Then it should recognize relationship maintenance as valuable work\n    And it should track conflict resolution, emotional support, connection-building\n    And emotional labor should be valued as heavily as physical labor\n    And Sarah's work maintaining family emotional health should be visible\n    And the partner should see this typically invisible labor\n    And household care economy should value all forms of care\n\n  Scenario: Partner accountability for equitable labor sharing\n    Given the household_elohim makes labor distribution visible\n    And the partner can see he performs only 25% of household work\n    When the partner commits to increasing his contribution\n    Then the system should track whether he follows through\n    And it should provide accountability for behavioral change\n    And it should show whether labor distribution is actually improving\n    And accountability should be built into the care economy system\n    And moving toward equity should be trackable and measurable\n    And the system should support partnership transformation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:household",
+    "related_users:partner,child,adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-parent-scenarios-household-making invisible household labor distribution visible to partner",
+    "scenario-value-scanner-parent-scenarios-household-tracking mental load separately from physical tasks",
+    "scenario-value-scanner-parent-scenarios-household-data-informed negotiation for equitable labor distribution",
+    "scenario-value-scanner-parent-scenarios-household-household budget coordination across competing needs",
+    "scenario-value-scanner-parent-scenarios-household-household care tokens reflect both partners' contributions",
+    "scenario-value-scanner-parent-scenarios-household-coordinating children's different developmental needs in household",
+    "scenario-value-scanner-parent-scenarios-household-household inventory management made visible",
+    "scenario-value-scanner-parent-scenarios-household-equitable decision-making based on care contribution",
+    "scenario-value-scanner-parent-scenarios-household-household schedule coordination across four people",
+    "scenario-value-scanner-parent-scenarios-household-household nutrition planning and execution",
+    "scenario-value-scanner-parent-scenarios-household-household emotional labor and relationship maintenance",
+    "scenario-value-scanner-parent-scenarios-household-partner accountability for equitable labor sharing",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": "value_scanner",
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Household Layer Value Recognition for Parent",
+    "ogDescription": "As a parent managing most household care labor Operating at the household governance layer I want equitable partnership and fair labor distribution So that household care is shared and all contributio",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-parent-scenarios-household",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Household Layer Value Recognition for Parent - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-parent-scenarios-household",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:household",
+    "name": "Household Layer Value Recognition for Parent",
+    "description": "As a parent managing most household care labor Operating at the household governance layer I want equitable partnership and fair labor distribution So that household care is shared and all contributions are valued",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

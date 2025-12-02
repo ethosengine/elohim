@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-recognizing food systems care work from field to table",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-recognizing food systems care work from field to table",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Recognizing food systems care work from field to table",
+  "description": "Recognizing food systems care work from field to table",
+  "content": "Scenario: Recognizing food systems care work from field to table\n    Given my restaurant work is one link in food systems care chain\n    And farmers, distributors, and preparers all contribute care labor\n    When I view food systems through care economy lens\n    Then the protocol should make visible the care work in entire food chain\n    And help me understand my connection to farmers and food producers\n    And recognize that all food work is care labor serving human nourishment\n    And build consciousness about care economy in food systems\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Recognizing food systems care work from field to table",
+    "ogDescription": "Recognizing food systems care work from field to table",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-recognizing food systems care work from field to table",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognizing food systems care work from field to table - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-recognizing food systems care work from field to table",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-recognizing food systems care work from field to table",
+    "name": "Recognizing food systems care work from field to table",
+    "description": "Recognizing food systems care work from field to table",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

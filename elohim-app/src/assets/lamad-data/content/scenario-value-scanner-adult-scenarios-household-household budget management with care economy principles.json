@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-household-household budget management with care economy principles",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:household-household budget management with care economy principles",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Household budget management with care economy principles",
+  "description": "Household budget management with care economy principles",
+  "content": "Scenario: Household budget management with care economy principles\n    Given household operates on $65k/year budget\n    And resources must cover housing, food, children's needs, healthcare, saving\n    When Sarah makes purchasing decisions\n    Then the household_elohim should track spending against budget\n    And it should integrate financial constraints with family needs\n    And it should help Sarah and partner make informed trade-offs\n    And budget should reflect care priorities, not just consumption\n    And financial management should serve household flourishing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:household",
+    "related_users:parent,partner,child,young_adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Household budget management with care economy principles",
+    "ogDescription": "Household budget management with care economy principles",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-household-household budget management with care economy principles",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household budget management with care economy principles - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-household-household budget management with care economy principles",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:household-household budget management with care economy principles",
+    "name": "Household budget management with care economy principles",
+    "description": "Household budget management with care economy principles",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

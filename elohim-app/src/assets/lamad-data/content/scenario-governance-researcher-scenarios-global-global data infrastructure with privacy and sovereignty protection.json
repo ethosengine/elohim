@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-global-global data infrastructure with privacy and sovereignty protection",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:global-global data infrastructure with privacy and sovereignty protection",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Global data infrastructure with privacy and sovereignty protection",
+  "description": "Global data infrastructure with privacy and sovereignty protection",
+  "content": "Scenario: Global data infrastructure with privacy and sovereignty protection\n    Given I need access to data across nations for research\n    And I must respect privacy, sovereignty, and data justice\n    When global research infrastructure is designed\n    Then I work with: federated data systems respecting national sovereignty\n    And I use: differential privacy protecting individual anonymity\n    And I ensure: community data ownership and benefit sharing\n    And I implement: ethical review and consent protocols\n    And I advocate: for open access to research findings\n    And I practice: data justice not data colonialism\n    And My methodology demonstrates: how to study globally while respecting locally\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-global",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Global data infrastructure with privacy and sovereignty protection",
+    "ogDescription": "Global data infrastructure with privacy and sovereignty protection",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-global-global data infrastructure with privacy and sovereignty protection",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Global data infrastructure with privacy and sovereignty protection - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-global-global data infrastructure with privacy and sovereignty protection",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:global-global data infrastructure with privacy and sovereignty protection",
+    "name": "Global data infrastructure with privacy and sovereignty protection",
+    "description": "Global data infrastructure with privacy and sovereignty protection",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-municipality-parent discovers coalition for youth recreation programs",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality-parent discovers coalition for youth recreation programs",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parent discovers coalition for youth recreation programs",
+  "description": "Parent discovers coalition for youth recreation programs",
+  "content": "Scenario: Parent discovers coalition for youth recreation programs\n    Given municipal budget cuts threaten youth sports and rec programs\n    And the parent's child participates in city soccer league\n    When the Observer detects 180 parents whose children use these programs\n    Then parents form rapid coalition to defend youth programs\n    And present coordinated data on program participation and benefits\n    And show economic value of city programs vs private alternatives\n    And municipal budget priorities respond to organized parent power\n    And youth recreation programs are preserved\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,board_member",
+    "related_layers:district,community,educational,ecological",
+    "elohim_agents:public_observer,community_elohim,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parent discovers coalition for youth recreation programs",
+    "ogDescription": "Parent discovers coalition for youth recreation programs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-municipality-parent discovers coalition for youth recreation programs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent discovers coalition for youth recreation programs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-municipality-parent discovers coalition for youth recreation programs",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality-parent discovers coalition for youth recreation programs",
+    "name": "Parent discovers coalition for youth recreation programs",
+    "description": "Parent discovers coalition for youth recreation programs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

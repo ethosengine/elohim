@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-franchise operator role (if staying) transforms from controller to facilitator",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:workplace-organizational-franchise operator role (if staying) transforms from controller to facilitator",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Franchise operator role (if staying) transforms from controller to facilitator",
+  "description": "Franchise operator role (if staying) transforms from controller to facilitator",
+  "content": "Scenario: Franchise operator role (if staying) transforms from controller to facilitator\n    Given James controlled workers because franchise corporate controlled him\n    And hierarchical enforcement was required by franchise agreement\n    When James stays as transition steward facilitating democratic conversion\n    Then his role shifts from implementing corporate mandates to supporting worker autonomy\n    And operational expertise becomes consultation, not commands\n    And workers request his input because it's valuable, not because he's boss\n    And franchise termination liberates him to serve rather than control\n    And workplace_elohim ensures steward role doesn't recreate hierarchy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,supplier,customer]",
+    "related_layers:[individual,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Franchise operator role (if staying) transforms from controller to facilitator",
+    "ogDescription": "Franchise operator role (if staying) transforms from controller to facilitator",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-franchise operator role (if staying) transforms from controller to facilitator",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Franchise operator role (if staying) transforms from controller to facilitator - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-franchise operator role (if staying) transforms from controller to facilitator",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:workplace-organizational-franchise operator role (if staying) transforms from controller to facilitator",
+    "name": "Franchise operator role (if staying) transforms from controller to facilitator",
+    "description": "Franchise operator role (if staying) transforms from controller to facilitator",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

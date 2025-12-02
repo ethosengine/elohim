@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-provincial-state-developer faces accountability for state policy capture",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state-developer faces accountability for state policy capture",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Developer faces accountability for state policy capture",
+  "description": "Developer faces accountability for state policy capture",
+  "content": "Scenario: Developer faces accountability for state policy capture\n    Given a developer lobbies for state law preempting local control\n    And funds astroturf \"affordability advocacy\" groups\n    When the Observer reveals developer funding and advocacy patterns\n    Then citizens see: \"housing advocates\" are developer-funded front groups\n    And state preemption bill eliminates local affordable housing requirements\n    And policy serves developer profit not affordable housing\n    And manufactured grassroots campaigns face exposure\n    And policy debate gains transparency about real interests\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:provincial_state",
+    "related_users:politician,board_member,citizen,activist",
+    "related_layers:municipality,county_regional,ecological",
+    "elohim_agents:public_observer,state_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Developer faces accountability for state policy capture",
+    "ogDescription": "Developer faces accountability for state policy capture",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-provincial-state-developer faces accountability for state policy capture",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer faces accountability for state policy capture - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-provincial-state-developer faces accountability for state policy capture",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state-developer faces accountability for state policy capture",
+    "name": "Developer faces accountability for state policy capture",
+    "description": "Developer faces accountability for state policy capture",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

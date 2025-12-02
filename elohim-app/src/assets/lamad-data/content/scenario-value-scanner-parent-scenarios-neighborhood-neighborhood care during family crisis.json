@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-neighborhood-neighborhood care during family crisis",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:neighborhood-neighborhood care during family crisis",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood care during family crisis",
+  "description": "Neighborhood care during family crisis",
+  "content": "Scenario: Neighborhood care during family crisis\n    Given families sometimes face crisis (illness, job loss, emergency)\n    And neighbors can provide crucial support during crisis\n    When a neighborhood family faces crisis\n    Then the neighborhood_elohim should coordinate mutual aid\n    And it should identify who has capacity to help\n    And it should organize meal trains, childcare, practical support\n    And crisis care should be specially recognized and valued\n    And neighborhood resilience should be built through mutual aid\n    And the system should enable rapid community response\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,child,neighbor,community_member",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood care during family crisis",
+    "ogDescription": "Neighborhood care during family crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-neighborhood-neighborhood care during family crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood care during family crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-neighborhood-neighborhood care during family crisis",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:neighborhood-neighborhood care during family crisis",
+    "name": "Neighborhood care during family crisis",
+    "description": "Neighborhood care during family crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

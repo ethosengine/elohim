@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-community-learning community history and values through participation",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community-learning community history and values through participation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Learning community history and values through participation",
+  "description": "Learning community history and values through participation",
+  "content": "Scenario: Learning community history and values through participation\n    Given Aisha is new to the community\n    And understanding community values takes time\n    When Aisha participates in community care economy\n    Then she should learn community history through engagement\n    And long-term residents should transmit community values\n    And the community_elohim should facilitate cultural transmission\n    And Aisha should understand community context through practice\n    And care economy should teach community membership\n    And participation should integrate newcomers into community culture\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:community",
+    "related_users:adult,worker,student,volunteer",
+    "related_layers:neighborhood,workplace_organizational,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Learning community history and values through participation",
+    "ogDescription": "Learning community history and values through participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-community-learning community history and values through participation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning community history and values through participation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-community-learning community history and values through participation",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community-learning community history and values through participation",
+    "name": "Learning community history and values through participation",
+    "description": "Learning community history and values through participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

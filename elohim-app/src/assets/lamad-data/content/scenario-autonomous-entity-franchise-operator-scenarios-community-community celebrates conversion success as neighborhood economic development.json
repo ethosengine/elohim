@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-community celebrates conversion success as neighborhood economic development",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community-community celebrates conversion success as neighborhood economic development",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community celebrates conversion success as neighborhood economic development",
+  "description": "Community celebrates conversion success as neighborhood economic development",
+  "content": "Scenario: Community celebrates conversion success as neighborhood economic development\n    Given economic development announcements typically celebrate corporate recruitment\n    And franchise conversions deserve equal celebration as community wealth-building\n    When conversions demonstrate success through measurable community benefits\n    Then neighborhood organizations and local media celebrate democratic ownership\n    And community events honor workers' ownership and James's conversion choice\n    And public celebration builds awareness and political support for democratic economy\n    And success story encourages other franchise operators and business owners to consider conversion\n    And community_elohim coordinates celebration events amplifying democratic economy visibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,industry_sector]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community celebrates conversion success as neighborhood economic development",
+    "ogDescription": "Community celebrates conversion success as neighborhood economic development",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-community-community celebrates conversion success as neighborhood economic development",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community celebrates conversion success as neighborhood economic development - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-community-community celebrates conversion success as neighborhood economic development",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community-community celebrates conversion success as neighborhood economic development",
+    "name": "Community celebrates conversion success as neighborhood economic development",
+    "description": "Community celebrates conversion success as neighborhood economic development",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

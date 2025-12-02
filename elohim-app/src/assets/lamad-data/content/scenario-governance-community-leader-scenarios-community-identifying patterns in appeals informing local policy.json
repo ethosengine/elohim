@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-community-identifying patterns in appeals informing local policy",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:community-identifying patterns in appeals informing local policy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Identifying patterns in appeals informing local policy",
+  "description": "Identifying patterns in appeals informing local policy",
+  "content": "Scenario: Identifying patterns in appeals informing local policy\n    Given Constitutional Council has reviewed many Riverside appeals\n    And I observe recurring themes and tensions\n    When I analyze patterns for community improvement\n    Then I see: many adolescent autonomy conflicts emerging\n    And I notice: recurring privacy threshold concerns\n    And I identify: business loan criteria creating frustration\n    And I bring: patterns to city council for policy response\n    And we consider: community-specific protocol calibration\n    And we propose: local ordinance updates if needed\n    And appeals inform: democratic policy making\n    And feedback loop: connects individual recourse to systemic improvement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,appellant,policy_maker,technical_expert,researcher",
+    "related_layers:municipality,district",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-community",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Identifying patterns in appeals informing local policy",
+    "ogDescription": "Identifying patterns in appeals informing local policy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-community-identifying patterns in appeals informing local policy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Identifying patterns in appeals informing local policy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-community-identifying patterns in appeals informing local policy",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:community-identifying patterns in appeals informing local policy",
+    "name": "Identifying patterns in appeals informing local policy",
+    "description": "Identifying patterns in appeals informing local policy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

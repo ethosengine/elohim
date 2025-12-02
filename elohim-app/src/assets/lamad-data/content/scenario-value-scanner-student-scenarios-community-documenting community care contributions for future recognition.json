@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-community-documenting community care contributions for future recognition",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:community-documenting community care contributions for future recognition",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Documenting community care contributions for future recognition",
+  "description": "Documenting community care contributions for future recognition",
+  "content": "Scenario: Documenting community care contributions for future recognition\n    Given Kenji's community care work is currently invisible to traditional economy\n    And his care tokens accumulate throughout college\n    When Kenji graduates and enters workforce\n    Then his care token history should document community leadership and care skills\n    And it should translate community organizing to \"proven leadership capability\"\n    And it should show mutual aid coordination as \"project management expertise\"\n    And community care work should be valuable on employment terms\n    And the system should help Kenji articulate care economy participation professionally\n    And student community work should be recognized as career-relevant experience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:community",
+    "related_users:student,young_adult,adult,community_member",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Documenting community care contributions for future recognition",
+    "ogDescription": "Documenting community care contributions for future recognition",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-community-documenting community care contributions for future recognition",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Documenting community care contributions for future recognition - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-community-documenting community care contributions for future recognition",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:community-documenting community care contributions for future recognition",
+    "name": "Documenting community care contributions for future recognition",
+    "description": "Documenting community care contributions for future recognition",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

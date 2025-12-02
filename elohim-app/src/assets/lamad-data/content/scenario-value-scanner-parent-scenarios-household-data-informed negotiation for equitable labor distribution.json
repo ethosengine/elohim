@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-household-data-informed negotiation for equitable labor distribution",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:household-data-informed negotiation for equitable labor distribution",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Data-informed negotiation for equitable labor distribution",
+  "description": "Data-informed negotiation for equitable labor distribution",
+  "content": "Scenario: Data-informed negotiation for equitable labor distribution\n    Given household labor distribution is currently inequitable\n    And Sarah wants fair partnership without resentment\n    When Sarah and her partner negotiate labor distribution\n    Then the household_elohim should provide specific data\n    And it should show time spent, complexity of tasks, and mental load\n    And it should enable \"Let's talk about the 75/25 split\" conversation\n    And negotiation should be based on reality, not perception\n    And the system should support movement toward equity\n    And care economy principles should guide fair distribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:household",
+    "related_users:partner,child,adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Data-informed negotiation for equitable labor distribution",
+    "ogDescription": "Data-informed negotiation for equitable labor distribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-household-data-informed negotiation for equitable labor distribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Data-informed negotiation for equitable labor distribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-household-data-informed negotiation for equitable labor distribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:household-data-informed negotiation for equitable labor distribution",
+    "name": "Data-informed negotiation for equitable labor distribution",
+    "description": "Data-informed negotiation for equitable labor distribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

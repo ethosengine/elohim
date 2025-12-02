@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-community-accessing community resources based on care contributions",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:community-accessing community resources based on care contributions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Accessing community resources based on care contributions",
+  "description": "Accessing community resources based on care contributions",
+  "content": "Scenario: Accessing community resources based on care contributions\n    Given I contribute significantly to community through my labor\n    And community has food banks, meal programs, and mutual aid resources\n    When I need support due to low wages or difficult circumstances\n    Then the protocol should connect me to community resources\n    And help me access support with dignity (not charity but reciprocity)\n    And recognize that I have standing based on my care contributions\n    And facilitate care economy where workers are supported by the community they serve\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-community",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Accessing community resources based on care contributions",
+    "ogDescription": "Accessing community resources based on care contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-community-accessing community resources based on care contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing community resources based on care contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-community-accessing community resources based on care contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:community-accessing community resources based on care contributions",
+    "name": "Accessing community resources based on care contributions",
+    "description": "Accessing community resources based on care contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

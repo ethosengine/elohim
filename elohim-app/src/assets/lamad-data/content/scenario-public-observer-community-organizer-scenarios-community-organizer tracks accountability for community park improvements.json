@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-community-organizer tracks accountability for community park improvements",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:community-organizer tracks accountability for community park improvements",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Organizer tracks accountability for community park improvements",
+  "description": "Organizer tracks accountability for community park improvements",
+  "content": "Scenario: Organizer tracks accountability for community park improvements\n    Given the organizer led campaign that won park renovation commitment\n    And city promised completion in six months\n    When the Observer tracks implementation progress\n    Then the organizer sees weekly updates on construction status\n    And receives alerts when timeline slips\n    And documents the victory for community to see their power\n    And has evidence to pressure officials if implementation stalls\n    And communities learn their organizing creates real change\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:community",
+    "related_users:citizen,parent,activist,board_member",
+    "related_layers:municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-community",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Organizer tracks accountability for community park improvements",
+    "ogDescription": "Organizer tracks accountability for community park improvements",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-community-organizer tracks accountability for community park improvements",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer tracks accountability for community park improvements - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-community-organizer tracks accountability for community park improvements",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:community-organizer tracks accountability for community park improvements",
+    "name": "Organizer tracks accountability for community park improvements",
+    "description": "Organizer tracks accountability for community park improvements",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

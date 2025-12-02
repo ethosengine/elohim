@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-family-family care labor made visible to prevent invisible burden",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:family-family care labor made visible to prevent invisible burden",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family care labor made visible to prevent invisible burden",
+  "description": "Family care labor made visible to prevent invisible burden",
+  "content": "Scenario: Family care labor made visible to prevent invisible burden\n    Given Helen's daughter Sarah provides substantial weekly care\n    And Sarah also works and has her own children\n    When Sarah assists Helen with shopping, appointments, and household tasks\n    Then the family_elohim should make this care work visible\n    And Sarah's care labor should be recognized with care tokens\n    And the family should see Sarah's contribution quantified\n    And Sarah should not feel guilty about needing recognition\n    And Helen should understand the care Sarah provides\n    And the protocol should prevent invisible exploitation of family caregivers\n    And care work should be valued, not taken for granted\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:family",
+    "related_users:adult_child,grandchild,great_grandchild,caregiver",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family care labor made visible to prevent invisible burden",
+    "ogDescription": "Family care labor made visible to prevent invisible burden",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-family-family care labor made visible to prevent invisible burden",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family care labor made visible to prevent invisible burden - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-family-family care labor made visible to prevent invisible burden",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:family-family care labor made visible to prevent invisible burden",
+    "name": "Family care labor made visible to prevent invisible burden",
+    "description": "Family care labor made visible to prevent invisible burden",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

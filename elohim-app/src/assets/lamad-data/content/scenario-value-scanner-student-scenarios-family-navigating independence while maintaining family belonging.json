@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-family-navigating independence while maintaining family belonging",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:family-navigating independence while maintaining family belonging",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Navigating independence while maintaining family belonging",
+  "description": "Navigating independence while maintaining family belonging",
+  "content": "Scenario: Navigating independence while maintaining family belonging\n    Given Kenji is establishing adult independence\n    And he also wants to remain part of family unit\n    When the family_elohim supports this transition\n    Then it should help family recognize Kenji's emerging adult status\n    And it should maintain his belonging while respecting his autonomy\n    And it should facilitate his transition from dependent child to adult family member\n    And family relationships should evolve without breaking\n    And the system should support healthy independence development\n    And Kenji should participate in family as autonomous adult\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:family",
+    "related_users:parent,adult,young_adult,sibling",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Navigating independence while maintaining family belonging",
+    "ogDescription": "Navigating independence while maintaining family belonging",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-navigating independence while maintaining family belonging",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Navigating independence while maintaining family belonging - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-navigating independence while maintaining family belonging",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:family-navigating independence while maintaining family belonging",
+    "name": "Navigating independence while maintaining family belonging",
+    "description": "Navigating independence while maintaining family belonging",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

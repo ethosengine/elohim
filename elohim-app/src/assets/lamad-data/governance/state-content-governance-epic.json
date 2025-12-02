@@ -1,0 +1,37 @@
+{
+  "entityType": "content",
+  "entityId": "governance-epic",
+  "status": "challenged",
+  "statusBasis": {
+    "method": "community-vote",
+    "reasoning": "Active challenge pending resolution",
+    "deciderId": "challenge-001",
+    "deciderType": "algorithm",
+    "decidedAt": "2025-11-21T00:09:03.481619"
+  },
+  "labels": [
+    {
+      "labelType": "disputed-accuracy",
+      "severity": "advisory",
+      "appliedBy": "system"
+    }
+  ],
+  "reviews": [
+    {
+      "reviewType": "initial",
+      "reviewerId": "steward-governance",
+      "outcome": "approved",
+      "reviewedAt": "2025-09-29T00:09:03.481620"
+    }
+  ],
+  "activeChallenges": [
+    "challenge-001"
+  ],
+  "resolvedChallenges": [],
+  "restrictions": [],
+  "governingElohim": {
+    "level": "community",
+    "elohimId": "elohim-community-learning"
+  },
+  "lastUpdated": "2025-11-22T00:09:03.481622"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-neighborhood-neighborhood beautification and common space maintenance",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:neighborhood-neighborhood beautification and common space maintenance",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood beautification and common space maintenance",
+  "description": "Neighborhood beautification and common space maintenance",
+  "content": "Scenario: Neighborhood beautification and common space maintenance\n    Given Frank has time and skills to contribute to neighborhood spaces\n    And common spaces require ongoing care and maintenance\n    When the neighborhood_elohim coordinates common space work\n    Then it should facilitate Frank's participation in beautification\n    And coordinate neighborhood workdays utilizing his skills\n    And recognize landscaping, repair, and maintenance as care labor\n    And value his contributions to neighborhood quality of life\n    And enable collective ownership of neighborhood commons\n    And Frank should experience meaningful contribution to place\n    And neighborhood should benefit from retired residents' time\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:neighborhood",
+    "related_users:senior,neighbor,volunteer,elder,resident",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood beautification and common space maintenance",
+    "ogDescription": "Neighborhood beautification and common space maintenance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-neighborhood-neighborhood beautification and common space maintenance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood beautification and common space maintenance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-neighborhood-neighborhood beautification and common space maintenance",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:neighborhood-neighborhood beautification and common space maintenance",
+    "name": "Neighborhood beautification and common space maintenance",
+    "description": "Neighborhood beautification and common space maintenance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

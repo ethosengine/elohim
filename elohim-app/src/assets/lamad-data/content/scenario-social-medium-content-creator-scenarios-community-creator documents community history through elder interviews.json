@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-content-creator-scenarios-community-creator documents community history through elder interviews",
+  "did": "did:web:elohim.host:content:social-medium:content-creator:scenarios:community-creator documents community history through elder interviews",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Creator documents community history through elder interviews",
+  "description": "Creator documents community history through elder interviews",
+  "content": "Scenario: Creator documents community history through elder interviews\n    Given Sam is creating an oral history project for Riverside neighborhood\n    When Sam interviews Rose about neighborhood changes over 50 years\n    And creates content preserving her memories and insights\n    Then the content is shared with the Riverside community\n    And community members add their own memories and context\n    And Rose receives recognition for her knowledge contribution\n    And community history is preserved for future generations\n    And the content earns reach to similar history preservation projects\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:content_creator",
+    "governance_layer:community",
+    "related_users:community_moderator,elder,child",
+    "related_layers:neighborhood,district,affinity_network",
+    "elohim_agents:verification_agent,community_value_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/content_creator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-content-creator-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-content-creator-scenarios-community",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Creator documents community history through elder interviews",
+    "ogDescription": "Creator documents community history through elder interviews",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-content-creator-scenarios-community-creator documents community history through elder interviews",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Creator documents community history through elder interviews - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-content-creator-scenarios-community-creator documents community history through elder interviews",
+    "identifier": "did:web:elohim.host:content:social-medium:content-creator:scenarios:community-creator documents community history through elder interviews",
+    "name": "Creator documents community history through elder interviews",
+    "description": "Creator documents community history through elder interviews",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

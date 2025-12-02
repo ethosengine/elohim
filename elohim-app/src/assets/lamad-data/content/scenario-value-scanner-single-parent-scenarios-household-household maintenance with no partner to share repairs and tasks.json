@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-household-household maintenance with no partner to share repairs and tasks",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-household maintenance with no partner to share repairs and tasks",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Household maintenance with no partner to share repairs and tasks",
+  "description": "Household maintenance with no partner to share repairs and tasks",
+  "content": "Scenario: Household maintenance with no partner to share repairs and tasks\n    Given Maria handles all household repairs, maintenance, and problem-solving alone\n    And she has limited time, money, and often limited technical knowledge\n    When household maintenance needs arise\n    Then the household_elohim should provide decision support for repairs\n    And it should help her evaluate DIY versus hiring professionals\n    And it should connect her to affordable service providers when needed\n    And it should coordinate with neighbors for skill-sharing and tool-borrowing\n    And Maria should have support for household maintenance without a partner\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:household",
+    "related_users:parent,child,young_child,preteen,teen",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Household maintenance with no partner to share repairs and tasks",
+    "ogDescription": "Household maintenance with no partner to share repairs and tasks",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-household maintenance with no partner to share repairs and tasks",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household maintenance with no partner to share repairs and tasks - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-household maintenance with no partner to share repairs and tasks",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-household maintenance with no partner to share repairs and tasks",
+    "name": "Household maintenance with no partner to share repairs and tasks",
+    "description": "Household maintenance with no partner to share repairs and tasks",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood collective action on shared concerns",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood collective action on shared concerns",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood collective action on shared concerns",
+  "description": "Neighborhood collective action on shared concerns",
+  "content": "Scenario: Neighborhood collective action on shared concerns\n    Given neighborhood faces shared challenges\n    And individual action is less effective than collective action\n    And Robert has leadership capacity from professional experience\n    When neighborhood_elohim coordinates collective action\n    Then it should facilitate neighborhood organizing around shared concerns\n    And recognize Robert's leadership capabilities\n    And help coordinate neighborhood improvement projects\n    And surface opportunities for collective action\n    And build neighborhood governance capacity\n    And demonstrate that care for place is part of care economy\n    And strengthen neighborhood through collaborative problem-solving\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:neighborhood",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,community,family,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood collective action on shared concerns",
+    "ogDescription": "Neighborhood collective action on shared concerns",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood collective action on shared concerns",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood collective action on shared concerns - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood collective action on shared concerns",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood collective action on shared concerns",
+    "name": "Neighborhood collective action on shared concerns",
+    "description": "Neighborhood collective action on shared concerns",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

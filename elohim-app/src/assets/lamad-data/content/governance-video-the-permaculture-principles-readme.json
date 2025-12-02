@@ -1,0 +1,62 @@
+{
+  "id": "governance-video-the-permaculture-principles-readme",
+  "did": "did:web:elohim.host:content:governance:video:the-permaculture-principles:readme",
+  "contentType": "video",
+  "activityPubType": "Video",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "The Permaculture Principles guide our design decisions and formulate the structure of our Permaculture system. We are using David Holmgren\u2019s 12 principle ver...",
+  "content": "---\nnode_type: video\norg_id: the_permaculture_principles\nname: \"The Permaculture Principles\"\nurl: \"https://youtu.be/0mwRAf3z9ag\"\ngem_id: \"qXY8N5ABHNtFW4BHb43D\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How The Permaculture Principles inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# The Permaculture Principles\n\n## Description\n\nThe Permaculture Principles guide our design decisions and formulate the structure of our Permaculture system. We are using David Holmgren\u2019s 12 principle ver...\n\n**Publisher:** YouTube\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how The Permaculture Principles relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://youtu.be/0mwRAf3z9ag\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "governance",
+    "video"
+  ],
+  "sourcePath": "governance/video/the_permaculture_principles/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "governance",
+    "related_epics": [],
+    "primary_epic": "governance",
+    "url": "https://youtu.be/0mwRAf3z9ag",
+    "name": "The Permaculture Principles",
+    "org_id": "the_permaculture_principles",
+    "gem_id": "qXY8N5ABHNtFW4BHb43D",
+    "node_type": "video",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "YouTube",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How The Permaculture Principles inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "The Permaculture Principles guide our design decisions and formulate the structure of our Permaculture system. We are using David Holmgren\u2019s 12 principle ver...",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/governance-video-the-permaculture-principles-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/video.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "VideoObject",
+    "@id": "https://elohim-protocol.org/content/governance-video-the-permaculture-principles-readme",
+    "identifier": "did:web:elohim.host:content:governance:video:the-permaculture-principles:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "The Permaculture Principles guide our design decisions and formulate the structure of our Permaculture system. We are using David Holmgren\u2019s 12 principle ver...",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

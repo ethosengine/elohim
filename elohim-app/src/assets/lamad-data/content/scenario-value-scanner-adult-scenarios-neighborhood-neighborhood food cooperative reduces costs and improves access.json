@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood food cooperative reduces costs and improves access",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood-neighborhood food cooperative reduces costs and improves access",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood food cooperative reduces costs and improves access",
+  "description": "Neighborhood food cooperative reduces costs and improves access",
+  "content": "Scenario: Neighborhood food cooperative reduces costs and improves access\n    Given Sarah needs to feed family on budget\n    And food costs are significant household expense\n    When neighborhood organizes food cooperative\n    Then the neighborhood_elohim should coordinate bulk purchasing\n    And it should manage cooperative logistics\n    And it should track members' contributions and access\n    And food should be more affordable through collective action\n    And Sarah's family should have better food security\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,worker,caregiver,young_child",
+    "related_layers:household,community,family",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood food cooperative reduces costs and improves access",
+    "ogDescription": "Neighborhood food cooperative reduces costs and improves access",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-neighborhood-neighborhood food cooperative reduces costs and improves access",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood food cooperative reduces costs and improves access - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-neighborhood-neighborhood food cooperative reduces costs and improves access",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood-neighborhood food cooperative reduces costs and improves access",
+    "name": "Neighborhood food cooperative reduces costs and improves access",
+    "description": "Neighborhood food cooperative reduces costs and improves access",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-making visible that food work is care for people and planet",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-making visible that food work is care for people and planet",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Making visible that food work is care for people and planet",
+  "description": "Making visible that food work is care for people and planet",
+  "content": "Scenario: Making visible that food work is care for people and planet\n    Given all food work serves human nourishment and ecological cycles\n    And food workers are caring for people and participating in bioregional systems\n    When the broader culture treats food work as low-value service\n    Then the protocol should make visible that food work is essential care labor\n    And reframe food service as care work for human and ecological flourishing\n    And advocate that food workers deserve dignity, fair compensation, and care-aligned conditions\n    And build consciousness that care economy includes ecological care and all food work serves life\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Making visible that food work is care for people and planet",
+    "ogDescription": "Making visible that food work is care for people and planet",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-making visible that food work is care for people and planet",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Making visible that food work is care for people and planet - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-making visible that food work is care for people and planet",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-making visible that food work is care for people and planet",
+    "name": "Making visible that food work is care for people and planet",
+    "description": "Making visible that food work is care for people and planet",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

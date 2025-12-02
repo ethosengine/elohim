@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-household-household care economy visible to counter narrative of burden",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:household-household care economy visible to counter narrative of burden",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Household care economy visible to counter narrative of burden",
+  "description": "Household care economy visible to counter narrative of burden",
+  "content": "Scenario: Household care economy visible to counter narrative of burden\n    Given society often frames disabled people as burdens on households\n    And Alex contributes substantial household labor\n    When household care contributions are displayed\n    Then Alex's management, coordination, and decision-making should be visible\n    And the household_elohim should quantify Alex's cognitive and emotional labor\n    And data should counter the narrative that Alex is dependent burden\n    And Alex should see themselves as household contributor\n    And visibility should shift cultural understanding of disability and contribution\n    And the protocol should make Alex's care work undeniable\n    And Alex should experience affirmation of their household value\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:household",
+    "related_users:adult,young_adult,elderly,caregiver,support_worker",
+    "related_layers:individual,family,community,workplace_organizational",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Household care economy visible to counter narrative of burden",
+    "ogDescription": "Household care economy visible to counter narrative of burden",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-household-household care economy visible to counter narrative of burden",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household care economy visible to counter narrative of burden - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-household-household care economy visible to counter narrative of burden",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:household-household care economy visible to counter narrative of burden",
+    "name": "Household care economy visible to counter narrative of burden",
+    "description": "Household care economy visible to counter narrative of burden",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

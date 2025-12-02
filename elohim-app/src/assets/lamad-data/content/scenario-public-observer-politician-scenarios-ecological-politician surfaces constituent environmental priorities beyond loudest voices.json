@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-ecological-politician surfaces constituent environmental priorities beyond loudest voices",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:ecological-politician surfaces constituent environmental priorities beyond loudest voices",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Politician surfaces constituent environmental priorities beyond loudest voices",
+  "description": "Politician surfaces constituent environmental priorities beyond loudest voices",
+  "content": "Scenario: Politician surfaces constituent environmental priorities beyond loudest voices\n    Given the politician hears from passionate environmental activists\n    But uncertain whether priorities reflect broader community\n    When the Observer aggregates constituent environmental sentiment\n    Then they see working families prioritize air quality and park access\n    And learn parents care about safe outdoor spaces for children\n    And identify senior concerns about extreme heat vulnerability\n    And understand environmental priorities across diverse constituents\n    And align policy with community environmental needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,scientist,community_organizer,developer_interests",
+    "related_layers:municipality,county_regional,provincial_state,ecological_bioregional",
+    "elohim_agents:public_observer,ecological_elohim,municipal_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Politician surfaces constituent environmental priorities beyond loudest voices",
+    "ogDescription": "Politician surfaces constituent environmental priorities beyond loudest voices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-ecological-politician surfaces constituent environmental priorities beyond loudest voices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician surfaces constituent environmental priorities beyond loudest voices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-ecological-politician surfaces constituent environmental priorities beyond loudest voices",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:ecological-politician surfaces constituent environmental priorities beyond loudest voices",
+    "name": "Politician surfaces constituent environmental priorities beyond loudest voices",
+    "description": "Politician surfaces constituent environmental priorities beyond loudest voices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-customizable interaction modes support diverse capabilities",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-customizable interaction modes support diverse capabilities",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Customizable interaction modes support diverse capabilities",
+  "description": "Customizable interaction modes support diverse capabilities",
+  "content": "Scenario: Customizable interaction modes support diverse capabilities\n    Given Alex's capabilities vary day to day\n    And fatigue, pain, or other factors affect what's accessible\n    When Alex uses the Value Scanner on different days\n    Then Alex should be able to switch between interaction modes easily\n    And voice, touch, keyboard, and switch access should all be available\n    And the system should remember Alex's preferences per context\n    And Alex should not have to repeatedly explain needs\n    And flexible modes should accommodate fluctuating capabilities\n    And the interface should adapt to Alex, not force Alex to adapt\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:individual",
+    "related_users:adult,young_adult,elderly,idd_community,vulnerable_temporary,caregiver",
+    "related_layers:household,family,community,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Customizable interaction modes support diverse capabilities",
+    "ogDescription": "Customizable interaction modes support diverse capabilities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-customizable interaction modes support diverse capabilities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Customizable interaction modes support diverse capabilities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-customizable interaction modes support diverse capabilities",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-customizable interaction modes support diverse capabilities",
+    "name": "Customizable interaction modes support diverse capabilities",
+    "description": "Customizable interaction modes support diverse capabilities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

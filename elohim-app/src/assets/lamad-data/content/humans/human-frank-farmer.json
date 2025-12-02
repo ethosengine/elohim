@@ -1,0 +1,63 @@
+{
+  "id": "human-frank-farmer",
+  "displayName": "Frank",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "Third-generation farmer working the land. Exploring regenerative agriculture and local food systems. Skeptical of tech, but curious.",
+  "avatarUrl": "assets/avatars/human-frank-farmer.jpg",
+  "primaryLocation": {
+    "layer": "county_regional",
+    "displayName": "Valley County",
+    "reach": "community",
+    "type": "county_regional"
+  },
+  "organizationIds": [
+    "org-franks-farm"
+  ],
+  "communityIds": [
+    "community-farmers-market",
+    "community-regen-ag-network"
+  ],
+  "affinityGroupIds": [
+    "affinity-regenerative-agriculture",
+    "affinity-local-food",
+    "affinity-soil-health",
+    "affinity-traditional-farming",
+    "affinity-sustainability"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-regenerative-agriculture",
+    "concept-local-food",
+    "concept-soil-health",
+    "concept-traditional-farming",
+    "concept-sustainability"
+  ],
+  "relationshipIds": [
+    "rel-0010",
+    "rel-0012"
+  ],
+  "trustedConnectionCount": 1,
+  "_metadata": {
+    "category": "local-economy",
+    "governanceLayers": [
+      "community",
+      "workplace",
+      "county_regional"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": null
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

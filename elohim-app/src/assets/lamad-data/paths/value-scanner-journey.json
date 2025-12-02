@@ -1,0 +1,72 @@
+{
+  "id": "value-scanner-journey",
+  "version": "1.0.0",
+  "title": "Value Scanner: Seeing the Invisible",
+  "description": "Learn to recognize and value care work that sustains communities",
+  "purpose": "Understand how the protocol makes invisible work visible",
+  "createdBy": "elohim-curriculum",
+  "contributors": [
+    "steward-curriculum"
+  ],
+  "createdAt": "2025-11-03T00:09:03.478444",
+  "updatedAt": "2025-11-28T00:09:03.478446",
+  "steps": [
+    {
+      "order": 0,
+      "resourceId": "value-scanner-epic",
+      "stepTitle": "The Invisible Economy",
+      "stepNarrative": "Discover the vast landscape of unrecognized care work",
+      "learningObjectives": [
+        "Understand the scale of invisible work",
+        "Learn REA principles for value recognition"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Read the value scanner epic"
+      ],
+      "estimatedTime": "20-30 minutes"
+    },
+    {
+      "order": 1,
+      "resourceId": "quiz-care-economics",
+      "stepTitle": "Care Economics Quiz",
+      "stepNarrative": "Test your understanding of care economy principles",
+      "learningObjectives": [
+        "Validate understanding of care economics"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Complete the quiz"
+      ],
+      "estimatedTime": "10-15 minutes"
+    },
+    {
+      "order": 2,
+      "resourceId": "assessment-personal-values",
+      "stepTitle": "Personal Values Assessment",
+      "stepNarrative": "Reflect on your own values around care and contribution",
+      "learningObjectives": [
+        "Identify your personal values hierarchy",
+        "Connect values to care work recognition"
+      ],
+      "optional": true,
+      "completionCriteria": [
+        "Complete self-assessment"
+      ],
+      "attestationGranted": "values-explorer",
+      "estimatedTime": "20-30 minutes"
+    }
+  ],
+  "tags": [
+    "value-scanner",
+    "care-work",
+    "rea",
+    "economics"
+  ],
+  "difficulty": "beginner",
+  "estimatedDuration": "1-2 hours",
+  "visibility": "public",
+  "attestationsGranted": [
+    "values-explorer"
+  ]
+}

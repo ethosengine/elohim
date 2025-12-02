@@ -1,0 +1,70 @@
+{
+  "id": "feature-value-scanner-adult-scenarios-ecological-bioregional",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Ecological/Bioregional Layer Value Recognition for Adult",
+  "description": "As an adult making consumption choices Operating at the ecological/bioregional governance layer I want to balance cost, nutrition, and environmental impact So that care for people and care for planet are integrated",
+  "content": "@epic:value_scanner\n@user_type:adult\n@governance_layer:ecological_bioregional\n@related_users:parent,caregiver,consumer,community_member,young_child\n@related_layers:household,family,community,municipality\n@elohim_agents:personal_agent,bioregional_elohim\n\nFeature: Ecological/Bioregional Layer Value Recognition for Adult\n  As an adult making consumption choices\n  Operating at the ecological/bioregional governance layer\n  I want to balance cost, nutrition, and environmental impact\n  So that care for people and care for planet are integrated\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the adult user \"Sarah\" is registered in the system\n    And Sarah manages household food purchasing on limited budget\n    And Sarah is teaching children environmental stewardship\n    And the ecological/bioregional governance context is active\n    And the bioregional_elohim coordinates environmental care economy\n    And Sarah's consumption choices affect ecological systems\n\n  Scenario: Balancing ecological impact with household budget constraints\n    Given Sarah wants to make environmentally responsible choices\n    And household budget is $65k/year with tight food budget\n    When Sarah makes purchasing decisions\n    Then the bioregional_elohim should present ecological impact information\n    And it should integrate cost, nutrition, and environmental factors\n    And it should help Sarah make best choices within budget constraints\n    And ecological care should not be only available to wealthy\n    And affordable options should be environmentally informed\n\n  Scenario: Teaching children environmental stewardship through shopping\n    Given Sarah is raising Tommy (5) and Emma (8)\n    And she wants them to learn ecological care\n    When Sarah uses the Value Scanner with children\n    Then the bioregional_elohim should provide age-appropriate environmental education\n    And Tommy should learn concrete care for food (not abstract sustainability)\n    And Emma should learn connections between care for people and planet\n    And shopping should be teaching moment for ecological stewardship\n    And children should internalize environmental care as care work\n\n  Scenario: Local food systems supported through care economy purchases\n    Given Sarah's bioregion has local food producers\n    And supporting local agriculture has environmental and community benefits\n    When Sarah makes food purchasing decisions\n    Then the bioregional_elohim should highlight local options\n    And it should show environmental benefits of local food\n    And it should facilitate connections to local producers\n    And Sarah's purchases should support bioregional food security\n    And care economy should strengthen local food systems\n\n  Scenario: Seasonal eating aligned with bioregional food production\n    Given Sarah's bioregion has seasonal food availability\n    And seasonal eating reduces environmental impact and cost\n    When Sarah plans meals\n    Then the bioregional_elohim should suggest seasonal options\n    And it should educate about bioregional growing patterns\n    And it should help Sarah align purchases with local seasons\n    And seasonal eating should be framed as care for place\n    And bioregional awareness should shape consumption patterns\n\n  Scenario: Environmental impact visible in consumption decisions\n    Given Sarah wants to minimize environmental harm\n    And impact information is often hidden from consumers\n    When Sarah scans products\n    Then the bioregional_elohim should display environmental impact data\n    And it should show carbon footprint, water use, soil health, biodiversity effects\n    And it should make ecological costs visible alongside monetary costs\n    And Sarah should make informed choices about environmental impact\n    And visibility should enable environmentally conscious consumption\n\n  Scenario: Reducing food waste through care economy planning\n    Given household food waste has environmental and economic costs\n    And Sarah wants to minimize waste\n    When Sarah plans shopping and meals\n    Then the bioregional_elohim should help prevent overbuying\n    And it should track household consumption patterns\n    And it should suggest portions appropriate to family size\n    And food waste should be minimized through better planning\n    And care for food should include using what is purchased\n\n  Scenario: Bioregional care economy connects households to land stewardship\n    Given Sarah's household depends on bioregional ecological health\n    And land stewardship is collective care work\n    When Sarah participates in bioregional care economy\n    Then the bioregional_elohim should connect her to land stewardship opportunities\n    And it should link food purchases to regenerative agriculture\n    And it should enable Sarah to support ecological restoration\n    And care for land should be recognized as care work\n    And bioregional care should extend beyond human relationships\n\n  Scenario: Community supported agriculture integrated with care economy\n    Given Sarah's bioregion has CSA (Community Supported Agriculture) programs\n    And CSA supports local farmers and environmental health\n    When Sarah considers food purchasing options\n    Then the bioregional_elohim should highlight CSA opportunities\n    And it should coordinate CSA participation with household budget\n    And it should track CSA contributions as care work\n    And Sarah should support farmers while feeding family\n    And care economy should strengthen community-farmer relationships\n\n  Scenario: Ecological care contributions recognized in care token economy\n    Given Sarah makes environmentally conscious choices\n    And ecological care is care work that benefits everyone\n    When Sarah's care contributions are tracked\n    Then environmental care choices should generate care tokens\n    And Sarah should be recognized for ecological stewardship\n    And care for planet should be valued alongside care for people\n    And care tokens should incentivize environmental care\n    And ecological care should be integrated into care economy\n\n  Scenario: Bioregional resilience built through local care economy networks\n    Given climate change increases need for local resilience\n    And Sarah's bioregion needs to build adaptive capacity\n    When bioregional care economy develops\n    Then the bioregional_elohim should coordinate local resource networks\n    And it should strengthen connections between producers and consumers\n    And it should build bioregional food security\n    And local resilience should be created through care economy practices\n    And climate adaptation should be care economy project\n\n  Scenario: Teaching next generation that ecological care is care work\n    Given Sarah is raising children in care economy\n    And environmental crisis requires cultural transformation\n    When Sarah teaches children about environmental care\n    Then the bioregional_elohim should support ecological education\n    And children should learn that care for planet is care work\n    And environmental stewardship should be integrated into value literacy\n    And next generation should assume ecological care creates value\n    And cultural transformation should include environmental care\n\n  Scenario: Bioregional governance includes care economy participants\n    Given Sarah participates actively in bioregional care economy\n    And bioregional governance affects ecological health\n    When bioregional policy decisions are made\n    Then Sarah's care contributions should give her voice\n    And those who practice ecological care should influence ecological policy\n    And bioregional governance should be informed by care economy data\n    And care for land should create standing in land governance\n    And ecological democracy should include care economy participants\n\n  Scenario: Regenerative consumption replaces extractive consumption patterns\n    Given traditional consumption extracts from ecological systems\n    And Sarah wants to shift to regenerative practices\n    When Sarah makes consumption choices over time\n    Then the bioregional_elohim should guide toward regenerative options\n    And it should educate about regenerative agriculture principles\n    And Sarah's consumption should support ecological health\n    And care economy should enable shift from extraction to regeneration\n    And household consumption should contribute to ecosystem restoration\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,caregiver,consumer,community_member,young_child",
+    "related_layers:household,family,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-balancing ecological impact with household budget constraints",
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-teaching children environmental stewardship through shopping",
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-local food systems supported through care economy purchases",
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-seasonal eating aligned with bioregional food production",
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-environmental impact visible in consumption decisions",
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-reducing food waste through care economy planning",
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-bioregional care economy connects households to land stewardship",
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-community supported agriculture integrated with care economy",
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-ecological care contributions recognized in care token economy",
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-bioregional resilience built through local care economy networks",
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-teaching next generation that ecological care is care work",
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-bioregional governance includes care economy participants",
+    "scenario-value-scanner-adult-scenarios-ecological-bioregional-regenerative consumption replaces extractive consumption patterns",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": "value_scanner",
+    "scenarioCount": 13
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Ecological/Bioregional Layer Value Recognition for Adult",
+    "ogDescription": "As an adult making consumption choices Operating at the ecological/bioregional governance layer I want to balance cost, nutrition, and environmental impact So that care for people and care for planet ",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Ecological/Bioregional Layer Value Recognition for Adult - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional",
+    "name": "Ecological/Bioregional Layer Value Recognition for Adult",
+    "description": "As an adult making consumption choices Operating at the ecological/bioregional governance layer I want to balance cost, nutrition, and environmental impact So that care for people and care for planet are integrated",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

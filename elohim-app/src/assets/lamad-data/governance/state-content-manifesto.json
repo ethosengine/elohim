@@ -1,0 +1,35 @@
+{
+  "entityType": "content",
+  "entityId": "manifesto",
+  "status": "constitutional",
+  "statusBasis": {
+    "method": "constitutional",
+    "reasoning": "Foundational document ratified through governance process",
+    "deciderId": "elohim-protocol-council",
+    "deciderType": "collective",
+    "decidedAt": "2025-06-01T00:09:03.481613"
+  },
+  "labels": [
+    {
+      "labelType": "high-quality",
+      "severity": "informational",
+      "appliedBy": "elohim-community-learning"
+    }
+  ],
+  "reviews": [
+    {
+      "reviewType": "initial",
+      "reviewerId": "elohim-community-learning",
+      "outcome": "approved",
+      "reviewedAt": "2025-06-01T00:09:03.481615"
+    }
+  ],
+  "activeChallenges": [],
+  "resolvedChallenges": [],
+  "restrictions": [],
+  "governingElohim": {
+    "level": "global",
+    "elohimId": "elohim-global"
+  },
+  "lastUpdated": "2025-10-29T00:09:03.481617"
+}

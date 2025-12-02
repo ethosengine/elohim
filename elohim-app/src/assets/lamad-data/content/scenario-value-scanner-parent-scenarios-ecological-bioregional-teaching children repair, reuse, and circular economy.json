@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-teaching children repair, reuse, and circular economy",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-teaching children repair, reuse, and circular economy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teaching children repair, reuse, and circular economy",
+  "description": "Teaching children repair, reuse, and circular economy",
+  "content": "Scenario: Teaching children repair, reuse, and circular economy\n    Given children learn consumption patterns from parents\n    And Sarah wants to teach alternatives to disposable culture\n    When Sarah teaches Tommy and Emma to repair and reuse\n    Then the educational_elohim should recognize anti-consumerist education\n    And teaching circular economy practices should accumulate care tokens\n    And Sarah's work to counter disposable culture should be valued\n    And the system should recognize teaching sustainable practices\n    And next generation should learn to value durability and repair\n    And Sarah's cultural transmission work should be recognized\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,community_member,future_generations",
+    "related_layers:family,community,educational",
+    "elohim_agents:personal_agent,ecological_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teaching children repair, reuse, and circular economy",
+    "ogDescription": "Teaching children repair, reuse, and circular economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-teaching children repair, reuse, and circular economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching children repair, reuse, and circular economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-teaching children repair, reuse, and circular economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-teaching children repair, reuse, and circular economy",
+    "name": "Teaching children repair, reuse, and circular economy",
+    "description": "Teaching children repair, reuse, and circular economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

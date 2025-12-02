@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-affinity-network-activist coordinates rapid response across network",
+  "did": "did:web:elohim.host:content:social-medium:activist:scenarios:affinity-network-activist coordinates rapid response across network",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Activist coordinates rapid response across network",
+  "description": "Activist coordinates rapid response across network",
+  "content": "Scenario: Activist coordinates rapid response across network\n    Given Indigenous land defenders face immediate threat of eviction\n    And the situation requires urgent solidarity action\n    When the land defenders' community issues call for support\n    And the call is verified through network trust relationships\n    Then rapid response protocol activates across affinity network\n    And each community determines its capacity to respond\n    And coordination happens in real-time across time zones\n    And actions are culturally appropriate and locally determined\n    And the network mobilizes pressure while preventing burnout\n    And the land defenders receive coordinated solidarity support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:affinity_network",
+    "related_users:activist,content_creator,refugee,displaced_person",
+    "related_layers:community,nation_state,global,cultural_linguistic",
+    "elohim_agents:coordination_agent,translation_agent,pattern_recognition_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-affinity-network",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-affinity-network",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Activist coordinates rapid response across network",
+    "ogDescription": "Activist coordinates rapid response across network",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-affinity-network-activist coordinates rapid response across network",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist coordinates rapid response across network - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-affinity-network-activist coordinates rapid response across network",
+    "identifier": "did:web:elohim.host:content:social-medium:activist:scenarios:affinity-network-activist coordinates rapid response across network",
+    "name": "Activist coordinates rapid response across network",
+    "description": "Activist coordinates rapid response across network",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-franchise conversion sparks community organizing and economic democracy awareness",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community-franchise conversion sparks community organizing and economic democracy awareness",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Franchise conversion sparks community organizing and economic democracy awareness",
+  "description": "Franchise conversion sparks community organizing and economic democracy awareness",
+  "content": "Scenario: Franchise conversion sparks community organizing and economic democracy awareness\n    Given successful conversion demonstrates economic democracy is possible locally\n    And community members didn't know democratic alternatives to corporate extraction existed\n    When neighborhoods celebrate successful conversion and its benefits\n    Then community organizing emerges advocating for more democratic conversions\n    And residents learn they can influence local economy through supporting democratic businesses\n    And economic democracy becomes part of neighborhood political consciousness\n    And conversion inspires broader community action for economic justice\n    And community_elohim supports emerging community organizing around economic democracy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,industry_sector]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Franchise conversion sparks community organizing and economic democracy awareness",
+    "ogDescription": "Franchise conversion sparks community organizing and economic democracy awareness",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-community-franchise conversion sparks community organizing and economic democracy awareness",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Franchise conversion sparks community organizing and economic democracy awareness - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-community-franchise conversion sparks community organizing and economic democracy awareness",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community-franchise conversion sparks community organizing and economic democracy awareness",
+    "name": "Franchise conversion sparks community organizing and economic democracy awareness",
+    "description": "Franchise conversion sparks community organizing and economic democracy awareness",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

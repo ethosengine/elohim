@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-protecting seniors from municipal surveillance while enabling services",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality-protecting seniors from municipal surveillance while enabling services",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Protecting seniors from municipal surveillance while enabling services",
+  "description": "Protecting seniors from municipal surveillance while enabling services",
+  "content": "Scenario: Protecting seniors from municipal surveillance while enabling services\n    Given Margaret participates in municipal programs\n    And municipal systems collect data\n    When the municipality_elohim manages Margaret's municipal data\n    Then her privacy must be protected from surveillance\n    And service access should not require surrendering privacy\n    And data collection should be minimal and purposeful\n    And Margaret should control what municipal government knows\n    And elder surveillance should be prevented\n    And dignity should be preserved in all municipal interactions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Protecting seniors from municipal surveillance while enabling services",
+    "ogDescription": "Protecting seniors from municipal surveillance while enabling services",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-municipality-protecting seniors from municipal surveillance while enabling services",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Protecting seniors from municipal surveillance while enabling services - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-municipality-protecting seniors from municipal surveillance while enabling services",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality-protecting seniors from municipal surveillance while enabling services",
+    "name": "Protecting seniors from municipal surveillance while enabling services",
+    "description": "Protecting seniors from municipal surveillance while enabling services",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

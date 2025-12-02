@@ -1,0 +1,70 @@
+{
+  "id": "feature-value-scanner-young-adult-scenarios-community",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Community Layer Value Recognition for Young Adult",
+  "description": "As a young adult establishing myself in a new community Operating at the community governance layer I want to access resources and contribute to collective flourishing So that I build my position as an independent adult in community networks",
+  "content": "@epic:value_scanner\n@user_type:young_adult\n@governance_layer:community\n@related_users:adult,worker,student,volunteer\n@related_layers:neighborhood,workplace_organizational,ecological_bioregional\n@elohim_agents:personal_agent,community_elohim\n\nFeature: Community Layer Value Recognition for Young Adult\n  As a young adult establishing myself in a new community\n  Operating at the community governance layer\n  I want to access resources and contribute to collective flourishing\n  So that I build my position as an independent adult in community networks\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the young_adult user \"Aisha\" is registered in the system\n    And Aisha is 23 years old and new to the city\n    And the community governance context is active\n    And the community_elohim coordinates community-level care economy\n    And Aisha is establishing her adult position in community\n\n  Scenario: Accessing community resources as independent adult\n    Given Aisha is now an independent adult community member\n    And community resources are available based on contribution\n    When Aisha accesses community care economy resources\n    Then the community_elohim should recognize her adult status\n    And she should access resources based on care contributions\n    And her participation should be tracked at community level\n    And she should have different access than dependent children\n    And the system should treat her as autonomous adult participant\n    And community resources should support her independence\n\n  Scenario: Building social capital through community contributions\n    Given Aisha is new to the community\n    And she wants to establish herself\n    When Aisha contributes to community initiatives\n    Then the community_elohim should track her contributions\n    And care tokens should accumulate at community level\n    And her care work should build social capital\n    And contributions should establish her community standing\n    And the system should recognize that social capital must be earned\n    And community position should reflect actual care provided\n\n  Scenario: Connecting to community food security programs\n    Given Aisha's budget is tight\n    And community food programs could help\n    When Aisha explores community food resources\n    Then the community_elohim should surface available programs\n    And it should explain how care economy participation enables access\n    And it should connect her to community gardens, food banks, or cooperatives\n    And the system should reduce stigma through care economy framing\n    And community food security should be presented as mutual support\n    And accessing help should be dignified when contributing care\n\n  Scenario: Participating in community governance as young adult\n    Given the community makes collective decisions\n    And Aisha is establishing her adult voice\n    When community governance processes occur\n    Then the community_elohim should facilitate her participation\n    And her voice should count in community decisions\n    And her contributions should give her legitimate standing\n    And the system should help her learn community governance\n    And young adults should be included as full community participants\n    And care economy should enable democratic participation\n\n  Scenario: Community care economy smooths young adult economic vulnerability\n    Given Aisha has adult responsibility without established resources\n    And this is a particularly vulnerable life phase\n    When Aisha participates in community care economy\n    Then the community_elohim should provide safety net\n    And it should connect her to resources during crisis\n    And it should enable access to community support\n    And the system should reduce young adult economic precarity\n    And community care should buffer individual vulnerability\n    And mutual aid should support those in transition\n\n  Scenario: Contributing professional skills to community benefit\n    Given Aisha has professional capabilities from her work\n    And the community could benefit from her skills\n    When Aisha offers professional expertise to community projects\n    Then the community_elohim should recognize the contribution\n    And professional skills shared with community should be valued\n    And care tokens should reflect the expertise provided\n    And the system should facilitate skill sharing for community benefit\n    And Aisha's professional growth should serve community flourishing\n    And mutual benefit should flow from skill exchange\n\n  Scenario: Learning community history and values through participation\n    Given Aisha is new to the community\n    And understanding community values takes time\n    When Aisha participates in community care economy\n    Then she should learn community history through engagement\n    And long-term residents should transmit community values\n    And the community_elohim should facilitate cultural transmission\n    And Aisha should understand community context through practice\n    And care economy should teach community membership\n    And participation should integrate newcomers into community culture\n\n  Scenario: Community mental health support for young adult\n    Given young adulthood is stressful\n    And Aisha sometimes struggles with anxiety\n    When Aisha accesses community mental health resources\n    Then the community_elohim should connect her to support\n    And mental health care should be part of community care economy\n    And accessing help should be destigmatized\n    And community care should include emotional and psychological support\n    And the system should recognize mental health as community concern\n    And mutual care should extend to psychological flourishing\n\n  Scenario: Engaging community-level sustainability initiatives\n    Given the community has environmental goals\n    And collective action is more effective than individual\n    When Aisha participates in community sustainability projects\n    Then the community_elohim should coordinate her involvement\n    And it should connect her to composting, recycling, or energy programs\n    And her environmental care work should be recognized\n    And community-scale sustainability should be facilitated\n    And the system should enable collective environmental stewardship\n    And ecological care should build community bonds\n\n  Scenario: Community care economy provides educational resources\n    Given Aisha wants to develop new skills\n    And community education resources exist\n    When Aisha seeks skill development opportunities\n    Then the community_elohim should surface learning resources\n    And it should connect her to workshops, classes, or mentoring\n    And her care contributions should enable access to education\n    And community knowledge should be shared through care economy\n    And lifelong learning should be supported at community level\n    And skill development should be accessible through care participation\n\n  Scenario: Building peer networks through community care economy\n    Given Aisha's friendships increasingly involve care dimensions\n    And peer support is crucial for young adults\n    When Aisha connects with peers through care economy\n    Then the community_elohim should facilitate peer networks\n    And it should coordinate resource sharing among young adults\n    And it should enable care token exchanges between peers\n    And peer mutual aid should be systematized\n    And friendships should be strengthened through practical care\n    And community should support young adult peer networks\n\n  Scenario: Community care economy connects Aisha to opportunity\n    Given Aisha is building her adult life\n    And community networks provide opportunities\n    When Aisha participates actively in community care\n    Then the community_elohim should surface relevant opportunities\n    And it should connect her to job leads, housing, or collaborations\n    And her care contributions should give her access to community resources\n    And the system should recognize that care builds networks\n    And community care economy should create opportunity pathways\n    And participation should tangibly improve her life prospects\n\n  Scenario: Emergency support through community care network\n    Given Aisha experiences a crisis (job loss, health emergency, etc.)\n    And the community care network could help\n    When Aisha needs emergency assistance\n    Then the community_elohim should connect her to support rapidly\n    And her past contributions should enable access to help\n    And community mutual aid should activate\n    And the system should coordinate emergency care response\n    And community care economy should provide genuine safety net\n    And crises should be buffered by care relationships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:community",
+    "related_users:adult,worker,student,volunteer",
+    "related_layers:neighborhood,workplace_organizational,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-young-adult-scenarios-community-accessing community resources as independent adult",
+    "scenario-value-scanner-young-adult-scenarios-community-building social capital through community contributions",
+    "scenario-value-scanner-young-adult-scenarios-community-connecting to community food security programs",
+    "scenario-value-scanner-young-adult-scenarios-community-participating in community governance as young adult",
+    "scenario-value-scanner-young-adult-scenarios-community-community care economy smooths young adult economic vulnerability",
+    "scenario-value-scanner-young-adult-scenarios-community-contributing professional skills to community benefit",
+    "scenario-value-scanner-young-adult-scenarios-community-learning community history and values through participation",
+    "scenario-value-scanner-young-adult-scenarios-community-community mental health support for young adult",
+    "scenario-value-scanner-young-adult-scenarios-community-engaging community-level sustainability initiatives",
+    "scenario-value-scanner-young-adult-scenarios-community-community care economy provides educational resources",
+    "scenario-value-scanner-young-adult-scenarios-community-building peer networks through community care economy",
+    "scenario-value-scanner-young-adult-scenarios-community-community care economy connects aisha to opportunity",
+    "scenario-value-scanner-young-adult-scenarios-community-emergency support through community care network",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": "value_scanner",
+    "scenarioCount": 13
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community Layer Value Recognition for Young Adult",
+    "ogDescription": "As a young adult establishing myself in a new community Operating at the community governance layer I want to access resources and contribute to collective flourishing So that I build my position as a",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-young-adult-scenarios-community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Community Layer Value Recognition for Young Adult - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-young-adult-scenarios-community",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community",
+    "name": "Community Layer Value Recognition for Young Adult",
+    "description": "As a young adult establishing myself in a new community Operating at the community governance layer I want to access resources and contribute to collective flourishing So that I build my position as an independent adult in community networks",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-individual-rebuilding self-concept after trauma and loss",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-rebuilding self-concept after trauma and loss",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Rebuilding self-concept after trauma and loss",
+  "description": "Rebuilding self-concept after trauma and loss",
+  "content": "Scenario: Rebuilding self-concept after trauma and loss\n    Given my sense of self has been damaged by abuse and crisis\n    And I struggle with self-blame and internalized stigma\n    When I engage with the Value Scanner over time\n    Then the system consistently reflects my worth and capability\n    And makes visible my substantial care contributions\n    And celebrates my strengths and achievements\n    And reframes \"survival\" as sophisticated, valuable work\n    And counters stigmatizing narratives about people in crisis\n    And my personal_agent provides affirming, non-judgmental support\n    And the care economy recognizes me as valuable community member\n    And I see evidence of my competence and contributions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Rebuilding self-concept after trauma and loss",
+    "ogDescription": "Rebuilding self-concept after trauma and loss",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-rebuilding self-concept after trauma and loss",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Rebuilding self-concept after trauma and loss - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-rebuilding self-concept after trauma and loss",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-rebuilding self-concept after trauma and loss",
+    "name": "Rebuilding self-concept after trauma and loss",
+    "description": "Rebuilding self-concept after trauma and loss",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

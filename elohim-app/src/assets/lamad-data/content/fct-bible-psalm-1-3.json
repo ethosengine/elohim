@@ -1,0 +1,60 @@
+{
+  "id": "fct-bible-psalm-1-3",
+  "contentType": "bible-verse",
+  "title": "Psalm 1:3",
+  "description": "Scripture reference used in FCT Module 13",
+  "content": {
+    "reference": "Psalm 1:3",
+    "book": "Psalm",
+    "chapter": 1,
+    "verseStart": 3,
+    "verseEnd": null,
+    "contextInModule": "Psalm 1:3 \\- \"He is like a tree planted by streams of water that yields its fruit in its season, and its leaf does not wither. In all that he does, he prospers.\"\nBalancing Pleasure, Pain, and Meaning:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "psalm",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "thematicContext": "Helping People Thrive"
+  },
+  "createdAt": "2025-11-28T21:10:19.224043",
+  "updatedAt": "2025-11-28T21:10:19.224044",
+  "did": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Psalm 1:3",
+    "ogDescription": "Scripture reference used in FCT Module 13",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-psalm-1-3",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Psalm 1:3 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-psalm-1-3",
+    "identifier": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+    "name": "Psalm 1:3",
+    "description": "Scripture reference used in FCT Module 13",
+    "dateCreated": "2025-11-28T21:10:19.224043",
+    "dateModified": "2025-11-28T21:10:19.224044",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

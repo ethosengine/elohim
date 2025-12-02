@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-community-citizen evaluates development proposal affecting neighborhood",
+  "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:community-citizen evaluates development proposal affecting neighborhood",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Citizen evaluates development proposal affecting neighborhood",
+  "description": "Citizen evaluates development proposal affecting neighborhood",
+  "content": "Scenario: Citizen evaluates development proposal affecting neighborhood\n    Given a developer proposes new construction in their neighborhood\n    And claims it will \"bring community benefits\"\n    When the citizen reviews the Observer analysis\n    Then they see actual value flows (who benefits, who pays)\n    And view the developer's track record from past projects\n    And understand infrastructure impacts (traffic, services, green space)\n    And can challenge claims with evidence not just emotion\n    And make informed decisions about supporting or opposing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:community",
+    "related_users:parent,activist,community_organizer,journalist",
+    "related_layers:municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-community",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Citizen evaluates development proposal affecting neighborhood",
+    "ogDescription": "Citizen evaluates development proposal affecting neighborhood",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-community-citizen evaluates development proposal affecting neighborhood",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Citizen evaluates development proposal affecting neighborhood - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-community-citizen evaluates development proposal affecting neighborhood",
+    "identifier": "did:web:elohim.host:content:public-observer:citizen:scenarios:community-citizen evaluates development proposal affecting neighborhood",
+    "name": "Citizen evaluates development proposal affecting neighborhood",
+    "description": "Citizen evaluates development proposal affecting neighborhood",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

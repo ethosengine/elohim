@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-accessing educational support services for children experiencing trauma",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational-accessing educational support services for children experiencing trauma",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Accessing educational support services for children experiencing trauma",
+  "description": "Accessing educational support services for children experiencing trauma",
+  "content": "Scenario: Accessing educational support services for children experiencing trauma\n    Given my children are exhibiting trauma responses affecting learning\n    And schools have support services (counseling, IEPs, 504 plans, trauma-informed support)\n    When I advocate for educational support for my children\n    Then the Value Scanner helps me identify appropriate educational interventions\n    And provides information about my children's rights to services\n    And helps me navigate IEP or 504 plan processes\n    And coordinates with school counselors and support staff\n    And tracks children's educational support needs and services received\n    And my personal_agent reminds me of educational meetings and deadlines\n    And recognizes educational advocacy as sophisticated parenting work\n    And validates that trauma affects learning and requires support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Accessing educational support services for children experiencing trauma",
+    "ogDescription": "Accessing educational support services for children experiencing trauma",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-educational-accessing educational support services for children experiencing trauma",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing educational support services for children experiencing trauma - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-educational-accessing educational support services for children experiencing trauma",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational-accessing educational support services for children experiencing trauma",
+    "name": "Accessing educational support services for children experiencing trauma",
+    "description": "Accessing educational support services for children experiencing trauma",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

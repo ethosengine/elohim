@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-community-community future planning supports caregiver sustainability",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community-community future planning supports caregiver sustainability",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community future planning supports caregiver sustainability",
+  "description": "Community future planning supports caregiver sustainability",
+  "content": "Scenario: Community future planning supports caregiver sustainability\n    Given James's caregiving could last years or decades\n    And he needs to build future care economy resources\n    When James plans for long-term sustainability\n    Then the community_elohim should track his accumulating care contributions\n    And his care tokens should build toward future when he may need care\n    And community should recognize caregiving as investment in mutual aid\n    And care economy should function across decades, not just immediate needs\n    And James should build care economy standing for his own future vulnerability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:community",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:neighborhood,family,municipality",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community future planning supports caregiver sustainability",
+    "ogDescription": "Community future planning supports caregiver sustainability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-community-community future planning supports caregiver sustainability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community future planning supports caregiver sustainability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-community-community future planning supports caregiver sustainability",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community-community future planning supports caregiver sustainability",
+    "name": "Community future planning supports caregiver sustainability",
+    "description": "Community future planning supports caregiver sustainability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

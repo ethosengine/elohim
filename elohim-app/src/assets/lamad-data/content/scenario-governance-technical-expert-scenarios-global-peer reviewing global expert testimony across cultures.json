@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-global-peer reviewing global expert testimony across cultures",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-peer reviewing global expert testimony across cultures",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Peer reviewing global expert testimony across cultures",
+  "description": "Peer reviewing global expert testimony across cultures",
+  "content": "Scenario: Peer reviewing global expert testimony across cultures\n    Given experts from diverse technical traditions advise convention\n    And peer review must work across different epistemologies\n    When I review testimony from non-Western technical expert\n    Then I respect: different approaches to technical knowledge\n    And I identify: complementary insights from diverse perspectives\n    And I avoid: dismissing unfamiliar technical traditions\n    And I learn: from different ways of understanding AI systems\n    And I strengthen: testimony through cross-cultural dialogue\n    And I demonstrate: epistemic humility and global collaboration\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-global",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Peer reviewing global expert testimony across cultures",
+    "ogDescription": "Peer reviewing global expert testimony across cultures",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-peer reviewing global expert testimony across cultures",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Peer reviewing global expert testimony across cultures - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-peer reviewing global expert testimony across cultures",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-peer reviewing global expert testimony across cultures",
+    "name": "Peer reviewing global expert testimony across cultures",
+    "description": "Peer reviewing global expert testimony across cultures",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

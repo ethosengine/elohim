@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-content-creator-scenarios-community-creator collaborates with activists on community campaign",
+  "did": "did:web:elohim.host:content:social-medium:content-creator:scenarios:community-creator collaborates with activists on community campaign",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Creator collaborates with activists on community campaign",
+  "description": "Creator collaborates with activists on community campaign",
+  "content": "Scenario: Creator collaborates with activists on community campaign\n    Given Riverside is organizing for better public transportation\n    When Sam creates content documenting the transit challenges\n    And activists provide data and community testimonials\n    Then evidence-based storytelling supports the campaign\n    And content earns reach through verified community impact\n    And the campaign builds support through quality documentation\n    And Sam's work serves community organizing without manipulation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:content_creator",
+    "governance_layer:community",
+    "related_users:community_moderator,elder,child",
+    "related_layers:neighborhood,district,affinity_network",
+    "elohim_agents:verification_agent,community_value_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/content_creator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-content-creator-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-content-creator-scenarios-community",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Creator collaborates with activists on community campaign",
+    "ogDescription": "Creator collaborates with activists on community campaign",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-content-creator-scenarios-community-creator collaborates with activists on community campaign",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Creator collaborates with activists on community campaign - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-content-creator-scenarios-community-creator collaborates with activists on community campaign",
+    "identifier": "did:web:elohim.host:content:social-medium:content-creator:scenarios:community-creator collaborates with activists on community campaign",
+    "name": "Creator collaborates with activists on community campaign",
+    "description": "Creator collaborates with activists on community campaign",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

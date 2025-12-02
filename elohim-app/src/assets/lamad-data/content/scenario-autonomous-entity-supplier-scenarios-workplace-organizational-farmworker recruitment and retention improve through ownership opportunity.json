@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farmworker recruitment and retention improve through ownership opportunity",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:workplace-organizational-farmworker recruitment and retention improve through ownership opportunity",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Farmworker recruitment and retention improve through ownership opportunity",
+  "description": "Farmworker recruitment and retention improve through ownership opportunity",
+  "content": "Scenario: Farmworker recruitment and retention improve through ownership opportunity\n    Given agricultural labor traditionally has high turnover due to low pay and poor conditions\n    And farm struggled to retain skilled workers who left for better opportunities\n    When democratic ownership offers farmworkers equity stake and voice\n    Then recruitment improves as workers seek dignified agricultural employment\n    And retention increases dramatically (90%+ vs. previous 40% annual retention)\n    And institutional expertise accumulates through stable workforce\n    And farm benefits from long-term worker commitment and skill development\n    And workplace_elohim tracks retention improvements and workforce stability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,small_business_owner]",
+    "related_layers:[industry_sector,community,ecological_bioregional]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Farmworker recruitment and retention improve through ownership opportunity",
+    "ogDescription": "Farmworker recruitment and retention improve through ownership opportunity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farmworker recruitment and retention improve through ownership opportunity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Farmworker recruitment and retention improve through ownership opportunity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farmworker recruitment and retention improve through ownership opportunity",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:workplace-organizational-farmworker recruitment and retention improve through ownership opportunity",
+    "name": "Farmworker recruitment and retention improve through ownership opportunity",
+    "description": "Farmworker recruitment and retention improve through ownership opportunity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

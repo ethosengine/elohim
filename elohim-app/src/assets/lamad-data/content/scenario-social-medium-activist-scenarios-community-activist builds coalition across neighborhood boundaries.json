@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-community-activist builds coalition across neighborhood boundaries",
+  "did": "did:web:elohim.host:content:social-medium:activist:scenarios:community-activist builds coalition across neighborhood boundaries",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Activist builds coalition across neighborhood boundaries",
+  "description": "Activist builds coalition across neighborhood boundaries",
+  "content": "Scenario: Activist builds coalition across neighborhood boundaries\n    Given multiple neighborhoods face similar housing challenges\n    And the activist has credibility in their own neighborhood\n    When they reach out to activists in adjacent neighborhoods\n    And they propose forming a district-level coalition\n    Then cross-neighborhood connections are negotiated through mutual trust\n    And a district-layer organizing space is created\n    And patterns from successful housing campaigns surface as resources\n    And the coalition coordinates action while respecting local autonomy\n    And each neighborhood maintains its own decision-making process\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:community",
+    "related_users:community_moderator,content_creator,elder,child",
+    "related_layers:individual,neighborhood,district",
+    "elohim_agents:moderation_agent,coordination_agent,protection_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-community",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Activist builds coalition across neighborhood boundaries",
+    "ogDescription": "Activist builds coalition across neighborhood boundaries",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-community-activist builds coalition across neighborhood boundaries",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist builds coalition across neighborhood boundaries - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-community-activist builds coalition across neighborhood boundaries",
+    "identifier": "did:web:elohim.host:content:social-medium:activist:scenarios:community-activist builds coalition across neighborhood boundaries",
+    "name": "Activist builds coalition across neighborhood boundaries",
+    "description": "Activist builds coalition across neighborhood boundaries",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

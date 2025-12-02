@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-building relationships with neighbors despite stigma about circumstances",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood-building relationships with neighbors despite stigma about circumstances",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Building relationships with neighbors despite stigma about circumstances",
+  "description": "Building relationships with neighbors despite stigma about circumstances",
+  "content": "Scenario: Building relationships with neighbors despite stigma about circumstances\n    Given I am living in transitional housing or housing that's visibly \"for\" vulnerable people\n    And I worry about neighborhood stigma and judgment\n    When I interact with neighbors\n    Then the Value Scanner helps me navigate neighborhood relationships\n    And provides strategies for building connections authentically\n    And validates that I am valuable neighbor regardless of circumstances\n    And helps me decide what to disclose about my situation\n    And supports me in resisting internalized shame\n    And my personal_agent coaches me through neighbor interactions\n    And recognizes that building community while vulnerable takes courage\n    And celebrates positive neighbor connections\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Building relationships with neighbors despite stigma about circumstances",
+    "ogDescription": "Building relationships with neighbors despite stigma about circumstances",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-building relationships with neighbors despite stigma about circumstances",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building relationships with neighbors despite stigma about circumstances - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-building relationships with neighbors despite stigma about circumstances",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood-building relationships with neighbors despite stigma about circumstances",
+    "name": "Building relationships with neighbors despite stigma about circumstances",
+    "description": "Building relationships with neighbors despite stigma about circumstances",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

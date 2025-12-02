@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-family-planning for margaret's own future care needs",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:family-planning for margaret's own future care needs",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Planning for Margaret's own future care needs",
+  "description": "Planning for Margaret's own future care needs",
+  "content": "Scenario: Planning for Margaret's own future care needs\n    Given Margaret is providing care now but will need care eventually\n    And she's watching her mother's care requirements\n    When the family_elohim facilitates future care planning\n    Then Margaret's current care contributions should build future care security\n    And family should understand reciprocal care obligations\n    And Margaret's care tokens should represent future care resources\n    And conversations about her eventual needs should be normalized\n    And family should prepare for role reversal\n    And Margaret should have agency in planning her own future care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:family",
+    "related_users:middle_aged,elderly,grandparent,adult_child,grandchild,elderly_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Planning for Margaret's own future care needs",
+    "ogDescription": "Planning for Margaret's own future care needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-family-planning for margaret's own future care needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Planning for Margaret's own future care needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-family-planning for margaret's own future care needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:family-planning for margaret's own future care needs",
+    "name": "Planning for Margaret's own future care needs",
+    "description": "Planning for Margaret's own future care needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

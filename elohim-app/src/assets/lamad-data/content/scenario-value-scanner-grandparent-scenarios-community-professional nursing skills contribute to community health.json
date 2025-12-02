@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-community-professional nursing skills contribute to community health",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-professional nursing skills contribute to community health",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Professional nursing skills contribute to community health",
+  "description": "Professional nursing skills contribute to community health",
+  "content": "Scenario: Professional nursing skills contribute to community health\n    Given Margaret is a retired nurse with valuable expertise\n    And community health initiatives need skilled volunteers\n    When Margaret provides health education or clinic support\n    Then the community_elohim should recognize her professional skills\n    And it should value skilled labor more highly than unskilled\n    And her nursing background should be leveraged for community benefit\n    And professional retirees should be seen as community resources\n    And Margaret's expertise should serve community health\n    And skilled volunteering should accumulate significant care tokens\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:community",
+    "related_users:senior,retired,volunteer,elderly,middle_aged",
+    "related_layers:neighborhood,family,municipality,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Professional nursing skills contribute to community health",
+    "ogDescription": "Professional nursing skills contribute to community health",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-professional nursing skills contribute to community health",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Professional nursing skills contribute to community health - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-professional nursing skills contribute to community health",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-professional nursing skills contribute to community health",
+    "name": "Professional nursing skills contribute to community health",
+    "description": "Professional nursing skills contribute to community health",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

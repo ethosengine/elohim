@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-neighborhood-emergency backup support from trusted neighbors",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood-emergency backup support from trusted neighbors",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Emergency backup support from trusted neighbors",
+  "description": "Emergency backup support from trusted neighbors",
+  "content": "Scenario: Emergency backup support from trusted neighbors\n    Given caregiving emergencies occur unexpectedly\n    And James might need urgent help with David\n    When the neighborhood_elohim coordinates emergency support\n    Then it should identify trusted neighbors for backup\n    And it should ensure neighbors are trained for basic support\n    And emergency contacts should be readily available\n    And neighborhood should provide safety net for crisis\n    And James should have local emergency backup beyond 911\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:neighborhood",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Emergency backup support from trusted neighbors",
+    "ogDescription": "Emergency backup support from trusted neighbors",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-neighborhood-emergency backup support from trusted neighbors",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Emergency backup support from trusted neighbors - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-neighborhood-emergency backup support from trusted neighbors",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood-emergency backup support from trusted neighbors",
+    "name": "Emergency backup support from trusted neighbors",
+    "description": "Emergency backup support from trusted neighbors",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

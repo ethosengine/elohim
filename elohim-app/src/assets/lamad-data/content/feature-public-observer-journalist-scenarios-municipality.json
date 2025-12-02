@@ -1,0 +1,64 @@
+{
+  "id": "feature-public-observer-journalist-scenarios-municipality",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:municipality",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "City Hall Accountability Journalism for Journalist",
+  "description": "As a journalist in the public_observer system Operating at the municipality governance layer I want comprehensive civic surveillance across all municipal bodies So that accountability journalism survives despite newsroom cuts",
+  "content": "@epic:public_observer\n@user_type:journalist\n@governance_layer:municipality\n@related_users:politician,activist,board_member,citizen,journalist\n@related_layers:community,county_regional,provincial_state\n@elohim_agents:public_observer,municipal_elohim,pattern_elohim\n\nFeature: City Hall Accountability Journalism for Journalist\n  As a journalist in the public_observer system\n  Operating at the municipality governance layer\n  I want comprehensive civic surveillance across all municipal bodies\n  So that accountability journalism survives despite newsroom cuts\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the journalist user is registered in the system\n    And the municipality governance context is active\n\n  Scenario: Journalist monitors 12 civic bodies with comprehensive surveillance\n    Given the journalist is sole reporter covering city hall\n    And must cover city council, planning, housing, transit, and 8 other bodies\n    When the Observer monitors all municipal meetings simultaneously\n    Then the journalist reviews every meeting that happened this week\n    And receives alerts prioritizing newsworthy decisions\n    And searches across all bodies for patterns and connections\n    And comprehensive municipal coverage replaces selective attention\n    And one reporter with Observer infrastructure outperforms pre-crisis newsroom\n\n  Scenario: Journalist exposes corruption through pattern recognition\n    Given a developer receives zoning variances in three meetings\n    And each approval seems procedurally normal in isolation\n    When the Observer tracks developer across all city bodies\n    Then the journalist sees developer got 8 variances in 18 months\n    And identifies campaign donations to council members before each vote\n    And finds same developer denied variances in other cities for violations\n    And documents revolving door between planning staff and developer\n    And publishes investigation exposing systematic corruption\n\n  Scenario: Journalist fact-checks mayor's budget claims in real-time\n    Given the mayor gives state of city address with budget claims\n    And the journalist watches speech with deadline pressure\n    When the Observer provides instant fact-checking against city records\n    Then the journalist verifies mayor claims crime is down (true by 3%)\n    And fact-checks claim of record affordable housing investment (false - down 12%)\n    And checks police budget claim against actual spending (misleading framing)\n    And publishes real-time fact-check during speech\n    And rhetoric meets evidence-based accountability immediately\n\n  Scenario: Journalist investigates municipal service delivery disparities\n    Given residents in certain neighborhoods report neglected infrastructure\n    And the journalist suspects systematic discrimination\n    When the Observer analyzes municipal operations by neighborhood\n    Then the journalist sees pothole repairs average 2 days in white areas\n    And same repairs take 47 days in Black neighborhoods\n    And code enforcement targets rental properties in immigrant communities\n    And documents service quality correlating with neighborhood race and income\n    And publishes investigation exposing structural racism in city operations\n\n  Scenario: Journalist tracks city promises to accountability\n    Given city council approved affordable housing plan 3 years ago\n    And the journalist covered initial announcement and then moved on\n    When the Observer alerts on promise implementation timeline\n    Then the journalist investigates and finds only 12% of promised units built\n    And sees budget that was supposed to fund program redirected elsewhere\n    And identifies which council members voted for budget changes\n    And publishes accountability story on broken housing commitments\n    And politicians learn promises will be tracked and verified\n\n  Scenario: Journalist develops whistleblower source on contract fraud\n    Given a city employee witnesses fraudulent contracting\n    And fears retaliation for speaking to press\n    When the Observer provides secure anonymous channel\n    Then the whistleblower shares documents through protected system\n    And journalist receives evidence of no-bid contracts to connected firms\n    And investigates without exposing source identity\n    And publishes investigation based on documents and additional reporting\n    And source protection enables accountability journalism\n\n  Scenario: Journalist compares city policies to neighboring municipalities\n    Given city council debates new approach to homelessness\n    And politicians claim no alternatives exist\n    When the Observer provides comparative policy analysis\n    Then the journalist sees 3 nearby cities using housing-first approach\n    And reviews outcome data showing reduced homelessness\n    And finds cost comparison showing housing cheaper than criminalization\n    And interviews officials in cities with successful programs\n    And publishes story presenting evidence-based alternatives\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:municipality",
+    "related_users:politician,activist,board_member,citizen,journalist",
+    "related_layers:community,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,pattern_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-journalist-scenarios-municipality-journalist monitors 12 civic bodies with comprehensive surveillance",
+    "scenario-public-observer-journalist-scenarios-municipality-journalist exposes corruption through pattern recognition",
+    "scenario-public-observer-journalist-scenarios-municipality-journalist fact-checks mayor's budget claims in real-time",
+    "scenario-public-observer-journalist-scenarios-municipality-journalist investigates municipal service delivery disparities",
+    "scenario-public-observer-journalist-scenarios-municipality-journalist tracks city promises to accountability",
+    "scenario-public-observer-journalist-scenarios-municipality-journalist develops whistleblower source on contract fraud",
+    "scenario-public-observer-journalist-scenarios-municipality-journalist compares city policies to neighboring municipalities",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 7
+  },
+  "openGraphMetadata": {
+    "ogTitle": "City Hall Accountability Journalism for Journalist",
+    "ogDescription": "As a journalist in the public_observer system Operating at the municipality governance layer I want comprehensive civic surveillance across all municipal bodies So that accountability journalism survi",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-journalist-scenarios-municipality",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "City Hall Accountability Journalism for Journalist - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-journalist-scenarios-municipality",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:municipality",
+    "name": "City Hall Accountability Journalism for Journalist",
+    "description": "As a journalist in the public_observer system Operating at the municipality governance layer I want comprehensive civic surveillance across all municipal bodies So that accountability journalism survives despite newsroom cuts",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

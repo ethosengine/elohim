@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-neighborhood-community-level insights appropriate for child understanding",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood-community-level insights appropriate for child understanding",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community-level insights appropriate for child understanding",
+  "description": "Community-level insights appropriate for child understanding",
+  "content": "Scenario: Community-level insights appropriate for child understanding\n    Given neighborhood_elohim aggregates community data\n    And Emma is old enough to understand patterns\n    When Emma receives neighborhood-level information\n    Then insights should be concrete and age-appropriate\n    And the agent should say \"Your neighborhood buys a lot of fresh vegetables\"\n    And abstract data should not be presented\n    And community patterns should be framed in care terms\n    And Emma should learn about collective behavior through simple examples\n    And complexity should be appropriately filtered for age 8\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:neighborhood",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,educational",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community-level insights appropriate for child understanding",
+    "ogDescription": "Community-level insights appropriate for child understanding",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-neighborhood-community-level insights appropriate for child understanding",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community-level insights appropriate for child understanding - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-neighborhood-community-level insights appropriate for child understanding",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood-community-level insights appropriate for child understanding",
+    "name": "Community-level insights appropriate for child understanding",
+    "description": "Community-level insights appropriate for child understanding",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

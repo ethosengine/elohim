@@ -1,0 +1,69 @@
+{
+  "id": "feature-autonomous-entity-customer-scenarios-individual",
+  "did": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Ethical Consumption and Dignified Service for Customer",
+  "description": "As a customer in the autonomous_entity system Operating at the individual governance layer I want consumption aligned with values and genuine human connection So that I support dignity and community rather than extraction",
+  "content": "@epic:autonomous_entity\n@user_type:customer\n@governance_layer:individual\n@related_users:[worker,manager,supplier,community_investor]\n@related_layers:[community]\n@elohim_agents:[community_elohim,workplace_elohim]\n\nFeature: Ethical Consumption and Dignified Service for Customer\n  As a customer in the autonomous_entity system\n  Operating at the individual governance layer\n  I want consumption aligned with values and genuine human connection\n  So that I support dignity and community rather than extraction\n\n  Background:\n    Given the Elohim Protocol is operational\n    And Ms. Johnson is a customer at democratically-converted ChickenMax (now Maria's Kitchen)\n    And the individual governance context is active\n    And democratic ownership transforms customer experience\n\n  Scenario: Customer receives genuine human connection instead of scripted service\n    Given corporate service is performed emotional labor monitored by surveillance\n    And Ms. Johnson wants authentic connection, not corporate performance\n    When democratic ownership frees workers to provide genuine care\n    Then DeShawn's smile is authentic because he's valued and treated with dignity\n    And conversations are unhurried because workers aren't timed on transactions\n    And workers remember Ms. Johnson's preferences through relationship, not data mining\n    And service becomes mutual care: workers provide food and connection, customer provides appreciation\n    And community_elohim supports relationship building without creating surveillance\n\n  Scenario: Customer experiences transparency about where money goes\n    Given corporate spending is opaque\u2014customers don't know how their payment distributes\n    And Ms. Johnson cares about supporting fair wages but had no information\n    When democratic business provides complete value distribution transparency\n    Then she sees exactly: 60% to worker wages and benefits, 30% to community programs, 10% to sustainability\n    And workers earn $18/hour minimum vs. previous corporate $11/hour\n    And her $8.99 meal supports specific visible outcomes\n    And transparency enables ethical consumption through informed choice\n    And community_elohim provides accessible transparency dashboard for interested customers\n\n  Scenario: Customer learns food sourcing story connecting to agricultural labor\n    Given corporate food system obscures where food comes from and who grew it\n    And Ms. Johnson wants to know her food's origin but lacked information\n    When democratic supply chain provides sourcing transparency\n    Then she learns tomatoes come from Johnson Farm where Tom practices regenerative agriculture\n    And she can visit farm during open houses if interested\n    And farmworker conditions and wages are transparent\n    And food becomes connected to human labor and environmental stewardship, not faceless commodity\n    And community_elohim provides supply chain stories and farm connections\n\n  Scenario: Customer notices quality improvement through worker ownership\n    Given corporate model pressured quality cuts for profit maximization\n    And Ms. Johnson accepted mediocre quality as inevitable for fast food\n    When worker ownership aligns incentives with quality\n    Then food tastes better because workers care about product they own\n    And vegetables are fresh (from Johnson Farm, not corporate distributor)\n    And cleanliness improves through worker pride in ownership\n    And quality exceeds previous corporate standards while prices remain affordable\n    And community_elohim documents quality improvements for customer awareness\n\n  Scenario: Customer consumption aligns with values through democratic option\n    Given Ms. Johnson opposed worker exploitation but lacked alternatives\n    And corporate greenwashing made ethical consumption impossible to verify\n    When democratic business provides transparent ethical alternative\n    Then her consumption supports values: worker dignity, fair wages, environmental stewardship, community wealth\n    And alignment between values and consumption reduces moral cognitive dissonance\n    And she feels good about supporting democratic business, not guilty about corporate extraction\n    And ethical consumption becomes real choice, not marketing manipulation\n    And community_elohim helps communicate values alignment opportunities\n\n  Scenario: Customer addresses loneliness through community connection at democratic business\n    Given Ms. Johnson is recently widowed experiencing social isolation\n    And corporate design optimizes transaction speed, discouraging lingering and connection\n    When democratic business welcomes community connection\n    Then space is comfortable for lingering and conversation\n    And workers have time to talk, genuinely caring about her wellbeing\n    And regular customers become acquaintances building social network\n    And business serves social needs beyond food provision\n    And community_elohim identifies isolated customers and facilitates community connection\n\n  Scenario: Customer gains optional participation pathway in stakeholder processes\n    Given corporate businesses treat customers as transaction data, not community members\n    And Ms. Johnson wants deeper engagement but had no pathway\n    When democratic governance offers optional customer stakeholder participation\n    Then she's invited to stakeholder meetings providing input on community programs\n    And her suggestion (senior meal program) is seriously considered and implemented\n    And participation is optional\u2014she can remain simple customer or engage more deeply\n    And voice is advisory not controlling (workers maintain final decision authority)\n    And community_elohim facilitates stakeholder participation while protecting worker autonomy\n\n  Scenario: Customer benefits from community programs funded by value circulation\n    Given corporate extraction left minimal resources for community benefit\n    And Ms. Johnson and neighbors needed community support but lacked access\n    When democratic value distribution funds community programs\n    Then senior meal program provides affordable nutritious food and social connection\n    And subsidized pricing (sliding scale) ensures access across income levels\n    And community space is available for neighborhood organizing\n    And her patronage directly supports programs benefiting her and neighbors\n    And community_elohim manages community programs funded by democratic business\n\n  Scenario: Customer experiences price reduction while worker wages increase\n    Given corporate model claimed low prices required low wages\n    And Ms. Johnson paid $9.99 for meal while workers earned $11/hour\n    When extraction is eliminated through democratic ownership\n    Then meal costs $8.99 (11% price reduction)\n    And workers earn $18/hour (64% wage increase)\n    And both price and wage improvements are possible by eliminating corporate extraction\n    And false trade-off between customer affordability and worker dignity is exposed\n    And community_elohim documents value distribution showing extraction was the real cost\n\n  Scenario: Customer privacy is protected while patterns inform worker decisions\n    Given corporate surveillance tracks customers for manipulative marketing\n    And Ms. Johnson values privacy but also appreciates being known\n    When democratic business respects privacy while valuing relationships\n    Then workers remember her through human relationship, not algorithmic tracking\n    And no customer data is sold or used for manipulation\n    And aggregate patterns (many customers requesting vegan options) inform decisions without individual surveillance\n    And privacy and personalization coexist through human dignity, not data extraction\n    And community_elohim ensures privacy-protecting pattern recognition\n\n  Scenario: Customer discovers consumption as political act building community wealth\n    Given corporate consumption felt powerless and alienating\n    And Ms. Johnson didn't think her spending mattered politically\n    When democratic business makes consumption politically meaningful\n    Then her modest annual spending ($900) supports worker ownership and living wages\n    And money circulates in community rather than extracting to distant shareholders\n    And consumption choice builds democratic economy infrastructure\n    And she understands individual actions aggregate into systemic transformation\n    And community_elohim helps customers see collective impact of consumption choices\n\n  Scenario: Customer loyalty deepens through values alignment and relationship\n    Given corporate loyalty was transactional (rewards programs) or habitual (convenience)\n    And Ms. Johnson's loyalty to ChickenMax was weak and circumstantial\n    When democratic ownership creates genuine basis for loyalty\n    Then loyalty comes from values alignment (supporting worker ownership)\n    And relationships with workers create emotional connection\n    And community commitment makes leaving feel like betraying neighbors\n    And loyalty is authentic, not manufactured through manipulation\n    And community_elohim tracks loyalty through retention, not surveillance rewards programs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:individual",
+    "related_users:[worker,manager,supplier,community_investor]",
+    "related_layers:[community]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "feature"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "scenario-autonomous-entity-customer-scenarios-individual-customer receives genuine human connection instead of scripted service",
+    "scenario-autonomous-entity-customer-scenarios-individual-customer experiences transparency about where money goes",
+    "scenario-autonomous-entity-customer-scenarios-individual-customer learns food sourcing story connecting to agricultural labor",
+    "scenario-autonomous-entity-customer-scenarios-individual-customer notices quality improvement through worker ownership",
+    "scenario-autonomous-entity-customer-scenarios-individual-customer consumption aligns with values through democratic option",
+    "scenario-autonomous-entity-customer-scenarios-individual-customer addresses loneliness through community connection at democratic business",
+    "scenario-autonomous-entity-customer-scenarios-individual-customer gains optional participation pathway in stakeholder processes",
+    "scenario-autonomous-entity-customer-scenarios-individual-customer benefits from community programs funded by value circulation",
+    "scenario-autonomous-entity-customer-scenarios-individual-customer experiences price reduction while worker wages increase",
+    "scenario-autonomous-entity-customer-scenarios-individual-customer privacy is protected while patterns inform worker decisions",
+    "scenario-autonomous-entity-customer-scenarios-individual-customer discovers consumption as political act building community wealth",
+    "scenario-autonomous-entity-customer-scenarios-individual-customer loyalty deepens through values alignment and relationship",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "epic": "autonomous_entity",
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Ethical Consumption and Dignified Service for Customer",
+    "ogDescription": "As a customer in the autonomous_entity system Operating at the individual governance layer I want consumption aligned with values and genuine human connection So that I support dignity and community r",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-autonomous-entity-customer-scenarios-individual",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Ethical Consumption and Dignified Service for Customer - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-autonomous-entity-customer-scenarios-individual",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual",
+    "name": "Ethical Consumption and Dignified Service for Customer",
+    "description": "As a customer in the autonomous_entity system Operating at the individual governance layer I want consumption aligned with values and genuine human connection So that I support dignity and community rather than extraction",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

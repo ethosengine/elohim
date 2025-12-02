@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-educational-developer faces accountability for school impact promises",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:educational-developer faces accountability for school impact promises",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Developer faces accountability for school impact promises",
+  "description": "Developer faces accountability for school impact promises",
+  "content": "Scenario: Developer faces accountability for school impact promises\n    Given a developer claimed previous project would \"support local schools\"\n    And implied tax revenue would benefit education\n    When the Observer tracks actual school impacts\n    Then analysis shows: enrollment increased 120 students\n    And district had to add 6 portable classrooms\n    And property tax revenue was $400K but school costs were $900K annually\n    And promised \"school support\" was marketing not actual benefit\n    And accountability creates pressure for honest impact assessment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:educational",
+    "related_users:parent,teacher,board_member,citizen",
+    "related_layers:municipality,county_regional,community",
+    "elohim_agents:public_observer,educational_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Developer faces accountability for school impact promises",
+    "ogDescription": "Developer faces accountability for school impact promises",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-educational-developer faces accountability for school impact promises",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer faces accountability for school impact promises - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-educational-developer faces accountability for school impact promises",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:educational-developer faces accountability for school impact promises",
+    "name": "Developer faces accountability for school impact promises",
+    "description": "Developer faces accountability for school impact promises",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

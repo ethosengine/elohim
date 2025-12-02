@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-county-regional-developer faces accountability for regional pattern of extraction",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:county-regional-developer faces accountability for regional pattern of extraction",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Developer faces accountability for regional pattern of extraction",
+  "description": "Developer faces accountability for regional pattern of extraction",
+  "content": "Scenario: Developer faces accountability for regional pattern of extraction\n    Given a developer concentrates luxury developments in affluent areas\n    And avoids affordable housing obligations through jurisdictional arbitrage\n    When the Observer reveals regional development patterns\n    Then planning bodies see: 12 luxury projects, zero affordable housing contribution\n    And pattern shows developer plays municipalities against each other\n    And uses weakest regulations to avoid affordable housing requirements\n    And regional coordination can address jurisdictional arbitrage\n    And systematic extraction becomes visible and challengeable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:county_regional",
+    "related_users:politician,board_member,citizen,community_organizer",
+    "related_layers:municipality,provincial_state,ecological",
+    "elohim_agents:public_observer,regional_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Developer faces accountability for regional pattern of extraction",
+    "ogDescription": "Developer faces accountability for regional pattern of extraction",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-county-regional-developer faces accountability for regional pattern of extraction",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer faces accountability for regional pattern of extraction - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-county-regional-developer faces accountability for regional pattern of extraction",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:county-regional-developer faces accountability for regional pattern of extraction",
+    "name": "Developer faces accountability for regional pattern of extraction",
+    "description": "Developer faces accountability for regional pattern of extraction",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-seasonal eating aligned with bioregional food production",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-seasonal eating aligned with bioregional food production",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Seasonal eating aligned with bioregional food production",
+  "description": "Seasonal eating aligned with bioregional food production",
+  "content": "Scenario: Seasonal eating aligned with bioregional food production\n    Given seasonal local food is often more affordable\n    And Marcus needs to maximize his limited budget\n    When Marcus plans meals\n    Then the personal_agent should highlight seasonal options\n    And it should explain what grows locally in current season\n    And it should help him choose foods aligned with bioregional production\n    And economic and ecological goals should align\n    And he should learn that eating seasonally reduces costs and environmental impact\n    And bioregional awareness should develop through practical benefit\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community,educational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Seasonal eating aligned with bioregional food production",
+    "ogDescription": "Seasonal eating aligned with bioregional food production",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-seasonal eating aligned with bioregional food production",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Seasonal eating aligned with bioregional food production - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-seasonal eating aligned with bioregional food production",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-seasonal eating aligned with bioregional food production",
+    "name": "Seasonal eating aligned with bioregional food production",
+    "description": "Seasonal eating aligned with bioregional food production",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

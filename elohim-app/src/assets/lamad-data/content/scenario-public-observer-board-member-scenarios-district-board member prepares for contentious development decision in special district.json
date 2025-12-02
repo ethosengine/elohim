@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-district-board member prepares for contentious development decision in special district",
+  "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:district-board member prepares for contentious development decision in special district",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Board member prepares for contentious development decision in special district",
+  "description": "Board member prepares for contentious development decision in special district",
+  "content": "Scenario: Board member prepares for contentious development decision in special district\n    Given transit district board must decide on major service expansion\n    And developers advocate for routes serving new developments\n    And existing riders advocate for frequency improvements on current routes\n    And staff recommendation favors expansion over frequency\n    When the board member uses Observer decision support\n    Then they receive ridership data showing current overcrowding and reliability issues\n    And see community benefits analysis comparing expansion versus improvement\n    And access transportation equity analysis of who is served by each option\n    And get examples of how peer transit districts approached similar trade-offs\n    And accessible expertise enables informed judgment balancing competing interests\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:district",
+    "related_users:citizen,parent,teacher,politician,activist",
+    "related_layers:municipality,community,educational",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-district",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Board member prepares for contentious development decision in special district",
+    "ogDescription": "Board member prepares for contentious development decision in special district",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-district-board member prepares for contentious development decision in special district",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Board member prepares for contentious development decision in special district - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-district-board member prepares for contentious development decision in special district",
+    "identifier": "did:web:elohim.host:content:public-observer:board-member:scenarios:district-board member prepares for contentious development decision in special district",
+    "name": "Board member prepares for contentious development decision in special district",
+    "description": "Board member prepares for contentious development decision in special district",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "human-pam-polarized",
+  "displayName": "Pam",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "network",
+  "acceptingConnections": true,
+  "bio": "Passionate about truth. Tired of being manipulated by media. Looking for authentic community and honest conversation.",
+  "avatarUrl": "assets/avatars/human-pam-polarized.jpg",
+  "primaryLocation": {
+    "layer": "neighborhood",
+    "displayName": "Tech Valley",
+    "reach": "community",
+    "type": "neighborhood"
+  },
+  "communityIds": [
+    "community-local-church"
+  ],
+  "affinityGroupIds": [
+    "affinity-media-literacy",
+    "affinity-truth-seeking",
+    "affinity-community",
+    "affinity-faith",
+    "affinity-politics"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-media-literacy",
+    "concept-truth-seeking",
+    "concept-community",
+    "concept-faith",
+    "concept-politics"
+  ],
+  "relationshipIds": [
+    "rel-0017",
+    "rel-0018"
+  ],
+  "trustedConnectionCount": 0,
+  "_metadata": {
+    "category": "community",
+    "governanceLayers": [
+      "community",
+      "neighborhood"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": "Representative of someone recovering from information ecosystem damage."
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

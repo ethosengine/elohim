@@ -1,0 +1,69 @@
+{
+  "id": "feature-value-scanner-retired-scenarios-family",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:family",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Family Layer Value Recognition for Retired Person",
+  "description": "As a retired person in the value scanner system Operating at the family governance layer I want to coordinate care flows across generations and life stages So that family care responsibilities honor my contributions and prepare for my future needs",
+  "content": "@epic:value_scanner\n@user_type:retired\n@governance_layer:family\n@related_users:grandparent,senior,adult,parent,elderly\n@related_layers:household,individual,community,neighborhood\n@elohim_agents:personal_agent,family_elohim\n\nFeature: Family Layer Value Recognition for Retired Person\n  As a retired person in the value scanner system\n  Operating at the family governance layer\n  I want to coordinate care flows across generations and life stages\n  So that family care responsibilities honor my contributions and prepare for my future needs\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the retired user \"Frank\" is registered in the system\n    And Frank is 70 years old, retired from construction\n    And his family spans three generations: adult children, grandchildren, and aging mother-in-law\n    And the family governance context is active\n    And family_elohim coordinates multigenerational care economy\n    And Frank contributes care while anticipating future care needs\n\n  Scenario: Multigenerational care coordination across three generations\n    Given Frank provides occasional grandchild care\n    And he helps maintain his mother-in-law's home\n    And he supports his adult children with wisdom and occasional financial help\n    When family_elohim coordinates care across generations\n    Then it should track care flowing from Frank to grandchildren\n    And care flowing from Frank to his mother-in-law\n    And support flowing from Frank to adult children\n    And emerging care flowing from adult children to Frank\n    And all flows should be visible and valued\n    And multigenerational reciprocity should be recognized\n    And Frank should see himself in ongoing care web\n\n  Scenario: Grandparent care valued as substantial family contribution\n    Given Frank provides occasional care for grandchildren\n    And this care enables his adult children to work\n    And grandparent care provides developmental benefits beyond childcare\n    When family_elohim tracks grandparent care contributions\n    Then Frank's care labor should be quantified specifically\n    And the market value of childcare should be calculated\n    And developmental benefits of grandparent relationship should be recognized\n    And care should be valued, not assumed as \"leisure time with grandkids\"\n    And Frank's contributions should create legitimate family care tokens\n    And his care work should be visible to adult children\n    And grandparenting should be recognized as valuable care economy participation\n\n  Scenario: Elder care coordination with spouse for mother-in-law\n    Given Frank and his wife help maintain Frank's mother-in-law's home\n    And they provide transportation and advocacy support\n    And elder care is substantial and skilled labor\n    When family_elohim tracks elder care contributions\n    Then Frank's home maintenance support should be recognized\n    And transportation and medical advocacy should be valued\n    And his construction skills applied to elder care should be quantified\n    And care burden should be monitored for sustainability\n    And family should see Frank's elder care contributions\n    And his care work should accumulate family care tokens\n\n  Scenario: Family care tokens reflect Frank's contributions across family\n    Given care flows in multiple directions across the family\n    And Frank provides grandchild care, elder support, and adult child guidance\n    When family_elohim calculates family care tokens\n    Then it should track care across all three generations\n    And recognize Frank's care for grandchildren and mother-in-law\n    And value his support for adult children\n    And accumulate tokens representing Frank's family contributions\n    And these tokens should create claims on future family support\n    And the complex web of family care reciprocity should be visible\n    And Frank should see his place in lifecycle care flows\n\n  Scenario: Transitioning from provider to receiver in family care economy\n    Given Frank has been primary provider throughout his working life\n    And he's now transitioning to more mutual reciprocity\n    And he'll eventually need more care than he provides\n    When family_elohim tracks the transition\n    Then it should recognize Frank continues substantial provision\n    And it should help him accept receiving care without shame\n    And it should show adult children how to reciprocate care\n    And Frank's lifetime of provision should create legitimate claims\n    And the transition should preserve his dignity and agency\n    And family should prepare for his increasing future needs\n    And care reciprocity across lifecycle should be normalized\n\n  Scenario: Teaching adult children care economy principles through modeling\n    Given Frank's adult children are watching his care contributions\n    And he's modeling post-employment care economy participation\n    When family_elohim surfaces care patterns\n    Then it should help Frank teach care economy to next generation\n    And adult children should see that contribution continues through retirement\n    And they should learn that care flows across generations\n    And Frank's example should prepare them for their own aging\n    And care reciprocity should be transmitted generationally\n    And family care culture should strengthen through visible modeling\n\n  Scenario: Family care coordination prevents burnout and exploitation\n    Given Frank provides substantial family care across contexts\n    And care work can become exploitative even within families\n    When family_elohim monitors Frank's care burden\n    Then it should flag when contributions exceed sustainable levels\n    And surface if family is taking advantage without reciprocation\n    And recognize if Frank is sacrificing his wellbeing for family\n    And prompt discussions about fair distribution\n    And protect Frank from exploitation through visibility\n    And ensure family care operates on reciprocity, not extraction\n    And support Frank in maintaining boundaries\n\n  Scenario: Family financial coordination for retirement on fixed income\n    Given Frank lives on fixed income of $28k/year\n    And he occasionally provides financial support to adult children\n    And he's managing his mother-in-law's care costs\n    When family_elohim coordinates financial flows\n    Then it should track Frank's financial contributions to family\n    And surface when financial support compromises his own security\n    And help family understand his economic constraints\n    And facilitate honest conversations about financial capacity\n    And protect Frank from unsustainable financial requests\n    And ensure his fixed income sustains his own household first\n\n  Scenario: Preparing family for Frank's eventual increased care needs\n    Given Frank is currently more provider than receiver\n    And his care needs will likely increase in next 10-20 years\n    When family_elohim supports care planning\n    Then it should help Frank discuss future care needs with family\n    And prepare adult children for eventual role reversal\n    And surface: \"Frank's contributions now create legitimate claims later\"\n    And facilitate planning conversations that preserve Frank's dignity\n    And help family anticipate and prepare for increasing needs\n    And ensure Frank experiences agency in planning his aging\n    And care reciprocity across time should be made explicit\n\n  Scenario: Family governance includes Frank's voice in his own care planning\n    Given family makes decisions that affect Frank's future\n    And decisions about his care must honor his autonomy\n    When family_elohim facilitates governance decisions\n    Then Frank must have primary voice in his own care planning\n    And adult children should participate but not dominate\n    And Frank's preferences and values must be centered\n    And family should plan with him, not for him\n    And his decades of life experience should be respected\n    And autonomy should be preserved even as needs increase\n    And family governance should empower, never infantilize\n\n  Scenario: Wisdom and experience sharing valued as family contribution\n    Given Frank has 70 years of life experience and decades of construction expertise\n    And his knowledge is valuable family resource\n    When family_elohim tracks knowledge sharing\n    Then Frank's guidance to adult children should be recognized\n    And teaching grandchildren life and practical skills should be valued\n    And sharing construction knowledge should be quantified\n    And wisdom transmission should count as care contribution\n    And family should experience Frank as source of valuable knowledge\n    And his expertise should be actively utilized, not patronized\n    And knowledge sharing should be reciprocal across generations\n\n  Scenario: Family privacy boundaries negotiated with Frank's control\n    Given family coordination requires some information sharing\n    And Frank has legitimate need for privacy\n    When family_elohim manages privacy\n    Then Frank must control what information he shares about himself\n    And he should determine what family knows about his health\n    And he should decide what adult children know about his finances\n    And care coordination should not violate his privacy\n    And family should respect his boundaries\n    And privacy should balance coordination needs with autonomy\n    And Frank's dignity requires control over personal information\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-retired-scenarios-family-multigenerational care coordination across three generations",
+    "scenario-value-scanner-retired-scenarios-family-grandparent care valued as substantial family contribution",
+    "scenario-value-scanner-retired-scenarios-family-elder care coordination with spouse for mother-in-law",
+    "scenario-value-scanner-retired-scenarios-family-family care tokens reflect frank's contributions across family",
+    "scenario-value-scanner-retired-scenarios-family-transitioning from provider to receiver in family care economy",
+    "scenario-value-scanner-retired-scenarios-family-teaching adult children care economy principles through modeling",
+    "scenario-value-scanner-retired-scenarios-family-family care coordination prevents burnout and exploitation",
+    "scenario-value-scanner-retired-scenarios-family-family financial coordination for retirement on fixed income",
+    "scenario-value-scanner-retired-scenarios-family-preparing family for frank's eventual increased care needs",
+    "scenario-value-scanner-retired-scenarios-family-family governance includes frank's voice in his own care planning",
+    "scenario-value-scanner-retired-scenarios-family-wisdom and experience sharing valued as family contribution",
+    "scenario-value-scanner-retired-scenarios-family-family privacy boundaries negotiated with frank's control",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": "value_scanner",
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family Layer Value Recognition for Retired Person",
+    "ogDescription": "As a retired person in the value scanner system Operating at the family governance layer I want to coordinate care flows across generations and life stages So that family care responsibilities honor m",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-retired-scenarios-family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Family Layer Value Recognition for Retired Person - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-retired-scenarios-family",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:family",
+    "name": "Family Layer Value Recognition for Retired Person",
+    "description": "As a retired person in the value scanner system Operating at the family governance layer I want to coordinate care flows across generations and life stages So that family care responsibilities honor my contributions and prepare for my future needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

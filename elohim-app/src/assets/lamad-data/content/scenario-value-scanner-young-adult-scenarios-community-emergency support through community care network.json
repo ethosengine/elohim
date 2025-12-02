@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-community-emergency support through community care network",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community-emergency support through community care network",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Emergency support through community care network",
+  "description": "Emergency support through community care network",
+  "content": "Scenario: Emergency support through community care network\n    Given Aisha experiences a crisis (job loss, health emergency, etc.)\n    And the community care network could help\n    When Aisha needs emergency assistance\n    Then the community_elohim should connect her to support rapidly\n    And her past contributions should enable access to help\n    And community mutual aid should activate\n    And the system should coordinate emergency care response\n    And community care economy should provide genuine safety net\n    And crises should be buffered by care relationships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:community",
+    "related_users:adult,worker,student,volunteer",
+    "related_layers:neighborhood,workplace_organizational,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Emergency support through community care network",
+    "ogDescription": "Emergency support through community care network",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-community-emergency support through community care network",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Emergency support through community care network - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-community-emergency support through community care network",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community-emergency support through community care network",
+    "name": "Emergency support through community care network",
+    "description": "Emergency support through community care network",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

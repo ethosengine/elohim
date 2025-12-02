@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-ecological-bioregional-traditional and indigenous agricultural knowledge is honored and integrated",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:ecological-bioregional-traditional and indigenous agricultural knowledge is honored and integrated",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Traditional and indigenous agricultural knowledge is honored and integrated",
+  "description": "Traditional and indigenous agricultural knowledge is honored and integrated",
+  "content": "Scenario: Traditional and indigenous agricultural knowledge is honored and integrated\n    Given industrial agriculture dismissed traditional ecological knowledge\n    And indigenous and traditional practices often embody sustainable wisdom\n    When democratic bioregional network values diverse agricultural knowledge\n    Then indigenous crop varieties and cultivation methods are preserved and used\n    And traditional ecological knowledge informs climate adaptation and biodiversity\n    And elder farmers and indigenous practitioners share wisdom with network\n    And agricultural knowledge diversity strengthens bioregional resilience\n    And bioregional_elohim documents and preserves traditional agricultural knowledge\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:ecological_bioregional",
+    "related_users:[worker,supplier,community_investor]",
+    "related_layers:[workplace_organizational,industry_sector,community]",
+    "elohim_agents:[bioregional_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Traditional and indigenous agricultural knowledge is honored and integrated",
+    "ogDescription": "Traditional and indigenous agricultural knowledge is honored and integrated",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-ecological-bioregional-traditional and indigenous agricultural knowledge is honored and integrated",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Traditional and indigenous agricultural knowledge is honored and integrated - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-ecological-bioregional-traditional and indigenous agricultural knowledge is honored and integrated",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:ecological-bioregional-traditional and indigenous agricultural knowledge is honored and integrated",
+    "name": "Traditional and indigenous agricultural knowledge is honored and integrated",
+    "description": "Traditional and indigenous agricultural knowledge is honored and integrated",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

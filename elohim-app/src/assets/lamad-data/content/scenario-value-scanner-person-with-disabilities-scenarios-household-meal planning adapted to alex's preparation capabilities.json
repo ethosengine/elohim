@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-household-meal planning adapted to alex's preparation capabilities",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:household-meal planning adapted to alex's preparation capabilities",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Meal planning adapted to Alex's preparation capabilities",
+  "description": "Meal planning adapted to Alex's preparation capabilities",
+  "content": "Scenario: Meal planning adapted to Alex's preparation capabilities\n    Given Alex has specific constraints around meal preparation\n    And some physical tasks are difficult or impossible without assistance\n    When Alex plans weekly meals\n    Then the household_elohim should suggest meals within Alex's capabilities\n    And it should account for what Alex can prepare independently\n    And it should coordinate support worker assistance for complex prep\n    And nutritional needs should be met within preparation constraints\n    And meal planning should feel empowering, not limiting\n    And Alex should maintain choice over their food and nutrition\n    And adaptations should expand options, not restrict them\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:household",
+    "related_users:adult,young_adult,elderly,caregiver,support_worker",
+    "related_layers:individual,family,community,workplace_organizational",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Meal planning adapted to Alex's preparation capabilities",
+    "ogDescription": "Meal planning adapted to Alex's preparation capabilities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-household-meal planning adapted to alex's preparation capabilities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Meal planning adapted to Alex's preparation capabilities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-household-meal planning adapted to alex's preparation capabilities",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:household-meal planning adapted to alex's preparation capabilities",
+    "name": "Meal planning adapted to Alex's preparation capabilities",
+    "description": "Meal planning adapted to Alex's preparation capabilities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

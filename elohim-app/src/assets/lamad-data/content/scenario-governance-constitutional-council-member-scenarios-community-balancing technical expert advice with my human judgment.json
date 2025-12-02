@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-community-balancing technical expert advice with my human judgment",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-balancing technical expert advice with my human judgment",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Balancing technical expert advice with my human judgment",
+  "description": "Balancing technical expert advice with my human judgment",
+  "content": "Scenario: Balancing technical expert advice with my human judgment\n    Given Marcus's case involves complex pattern detection algorithms\n    And I don't understand the technical details\n    When technical expert Dr. Okonkwo explains the agent's reasoning\n    Then she translates: cryptographic proofs into accessible language\n    And she clarifies: what confidence levels mean and their limitations\n    And she acknowledges: uncertainties and competing interpretations\n    And she informs: but doesn't tell us what decision is right\n    And I weigh: her technical knowledge alongside my human wisdom\n    And I judge: whether constitutional principles were honored\n    And I respect: expertise without surrendering my judgment authority\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:community",
+    "related_users:appellant,technical_expert,community_leader,researcher",
+    "related_layers:provincial_state,family,individual",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-community",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Balancing technical expert advice with my human judgment",
+    "ogDescription": "Balancing technical expert advice with my human judgment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-balancing technical expert advice with my human judgment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Balancing technical expert advice with my human judgment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-balancing technical expert advice with my human judgment",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-balancing technical expert advice with my human judgment",
+    "name": "Balancing technical expert advice with my human judgment",
+    "description": "Balancing technical expert advice with my human judgment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

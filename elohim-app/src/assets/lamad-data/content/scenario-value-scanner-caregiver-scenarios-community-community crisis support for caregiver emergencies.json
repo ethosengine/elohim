@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-community-community crisis support for caregiver emergencies",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community-community crisis support for caregiver emergencies",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community crisis support for caregiver emergencies",
+  "description": "Community crisis support for caregiver emergencies",
+  "content": "Scenario: Community crisis support for caregiver emergencies\n    Given caregiving crises can become tragedies quickly\n    And James could reach complete burnout or medical emergency\n    When the community_elohim detects caregiver crisis\n    Then it should provide immediate crisis intervention\n    And emergency respite care should be available immediately\n    And medical support should be accessible for caregiver health\n    And community should have safety net for caregiver collapse\n    And crisis detection should prevent tragedy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:community",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:neighborhood,family,municipality",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community crisis support for caregiver emergencies",
+    "ogDescription": "Community crisis support for caregiver emergencies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-community-community crisis support for caregiver emergencies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community crisis support for caregiver emergencies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-community-community crisis support for caregiver emergencies",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community-community crisis support for caregiver emergencies",
+    "name": "Community crisis support for caregiver emergencies",
+    "description": "Community crisis support for caregiver emergencies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

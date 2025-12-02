@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-individual-protecting individual autonomy under employment pressure",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual-protecting individual autonomy under employment pressure",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Protecting individual autonomy under employment pressure",
+  "description": "Protecting individual autonomy under employment pressure",
+  "content": "Scenario: Protecting individual autonomy under employment pressure\n    Given my employer demands maximum flexibility\n    And employment pressure threatens my autonomy\n    When I need to maintain boundaries for self-care\n    Then my personal_agent should help me recognize when boundaries are violated\n    And support me in protecting essential personal time\n    And remind me that I have rights beyond being a labor unit\n    And provide language for asserting my needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-individual",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Protecting individual autonomy under employment pressure",
+    "ogDescription": "Protecting individual autonomy under employment pressure",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-individual-protecting individual autonomy under employment pressure",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Protecting individual autonomy under employment pressure - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-individual-protecting individual autonomy under employment pressure",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual-protecting individual autonomy under employment pressure",
+    "name": "Protecting individual autonomy under employment pressure",
+    "description": "Protecting individual autonomy under employment pressure",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

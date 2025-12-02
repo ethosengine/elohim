@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-global-explaining cryptographic constitutional proof to global assembly",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-explaining cryptographic constitutional proof to global assembly",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Explaining cryptographic constitutional proof to global assembly",
+  "description": "Explaining cryptographic constitutional proof to global assembly",
+  "content": "Scenario: Explaining cryptographic constitutional proof to global assembly\n    Given delegates need to understand how constitutional verification works\n    And many come from contexts without technical infrastructure\n    When I explain cryptographic alignment proof accessibly\n    Then I use: universal analogies and visual demonstrations\n    And I ensure: translation into dozens of languages\n    And I check: comprehension across educational backgrounds\n    And I avoid: assuming Western technical education\n    And I honor: diverse ways of understanding verification\n    And I enable: informed global deliberation despite technical complexity\n    And I demonstrate: that anyone can understand enough to govern\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-global",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Explaining cryptographic constitutional proof to global assembly",
+    "ogDescription": "Explaining cryptographic constitutional proof to global assembly",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-explaining cryptographic constitutional proof to global assembly",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Explaining cryptographic constitutional proof to global assembly - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-explaining cryptographic constitutional proof to global assembly",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-explaining cryptographic constitutional proof to global assembly",
+    "name": "Explaining cryptographic constitutional proof to global assembly",
+    "description": "Explaining cryptographic constitutional proof to global assembly",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

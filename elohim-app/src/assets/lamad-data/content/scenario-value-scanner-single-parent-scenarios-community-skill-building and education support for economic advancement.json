@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-community-skill-building and education support for economic advancement",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community-skill-building and education support for economic advancement",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Skill-building and education support for economic advancement",
+  "description": "Skill-building and education support for economic advancement",
+  "content": "Scenario: Skill-building and education support for economic advancement\n    Given Maria is stuck in low-wage medical assistant work\n    And she wants to advance economically but has no time or resources for education\n    When Maria seeks opportunities for economic advancement\n    Then the community_elohim should connect her to education and training programs\n    And it should identify programs compatible with single parent constraints\n    And it should help her access support for education costs and childcare during training\n    And skill-building should be realistic pathway to better wages\n    And Maria should have community support for economic mobility despite solo parent limitations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:community",
+    "related_users:parent,single_parent,community_member,caregiver,worker",
+    "related_layers:neighborhood,family,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Skill-building and education support for economic advancement",
+    "ogDescription": "Skill-building and education support for economic advancement",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-community-skill-building and education support for economic advancement",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Skill-building and education support for economic advancement - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-community-skill-building and education support for economic advancement",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community-skill-building and education support for economic advancement",
+    "name": "Skill-building and education support for economic advancement",
+    "description": "Skill-building and education support for economic advancement",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

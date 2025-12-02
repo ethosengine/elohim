@@ -1,0 +1,62 @@
+{
+  "id": "feature-value-scanner-idd-community-scenarios-family",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Family Relationships and Adult Autonomy",
+  "description": "As an adult IDD community member with family connections I want to maintain family relationships while exercising adult autonomy So that I am seen as an adult family member, not a perpetual child",
+  "content": "Feature: Family Relationships and Adult Autonomy\n  As an adult IDD community member with family connections\n  I want to maintain family relationships while exercising adult autonomy\n  So that I am seen as an adult family member, not a perpetual child\n\n  Background:\n    Given Jordan is 26 years old and lives independently in a group home\n    And Jordan has a family of origin (parents and two siblings)\n    And Jordan's family is learning to respect Jordan's adult autonomy\n    And the family_elohim helps coordinate family support with dignity\n\n  Scenario: Maintaining regular family contact on own terms\n    Given Jordan's parents want to stay connected\n    And Jordan values family relationships\n    When Jordan decides how often to communicate with family\n    Then the personal_agent helps Jordan set communication preferences\n    And the interface shows simple options (daily calls, weekly visits, etc.)\n    And Jordan's communication preferences are communicated to family\n    And the family_elohim helps family honor Jordan's boundaries\n    And Jordan experiences autonomy over family connection frequency\n    And Jordan's adult status is respected through choice\n\n  Scenario: Participating in family decisions as adult member\n    Given Jordan's family is planning a vacation together\n    And Jordan is invited to join the family trip\n    When the family discusses vacation options\n    Then Jordan participates in the planning with accessible support\n    And the personal_agent presents destination options visually\n    And Jordan can express preferences about activities and timing\n    And Jordan's vote counts in family decision-making\n    And the family treats Jordan as an adult participant, not a child\n    And Jordan experiences being a valued family member with voice\n\n  Scenario: Managing financial oversight with dignity\n    Given Jordan's parents have financial guardianship\n    And Jordan is learning money management skills\n    When Jordan makes purchases with their allowance\n    Then the personal_agent helps Jordan track spending\n    And parents can monitor for safety without controlling every choice\n    And Jordan has autonomy within appropriate boundaries\n    And the family_elohim balances oversight with independence\n    And Jordan's financial learning is supported, not prevented\n    And Jordan experiences growing financial autonomy\n\n  Scenario: Coordinating family support without infantilization\n    Given Jordan sometimes needs family help with complex tasks\n    And Jordan's mother tends to be over-protective\n    When Jordan requests help with a medical appointment\n    Then the personal_agent sends the help request to family\n    And the family_elohim reminds parents about supported decision-making\n    And Jordan's mother helps Jordan understand options\n    But Jordan makes the final decision with support\n    And Jordan's adult autonomy is preserved through the interaction\n    And the family learns to support without taking over\n\n  Scenario: Celebrating holidays and traditions as adult participant\n    Given Jordan's family celebrates holidays together\n    And Jordan has their own traditions in the group home\n    When Thanksgiving approaches\n    Then Jordan decides where to spend the holiday\n    And the interface helps Jordan weigh options (family vs. housemates)\n    And Jordan's choice is honored by both family and household\n    And if Jordan chooses family, they participate as an adult guest\n    And Jordan's preferences about holiday activities are considered\n    And Jordan experiences adult autonomy in family traditions\n\n  Scenario: Navigating sibling relationships as equals\n    Given Jordan has two younger siblings who are now adults\n    And sibling relationships are evolving\n    When Jordan's siblings gather for a family event\n    Then Jordan participates as a peer adult sibling\n    And the Value Scanner helps coordinate sibling care exchanges\n    And Jordan's contributions to siblings are recognized (encouragement, presence)\n    And siblings treat Jordan as brother/sister, not as someone to manage\n    And the family_elohim helps siblings navigate appropriate support\n    And Jordan experiences adult sibling relationships\n\n  Scenario: Setting boundaries around family involvement\n    Given Jordan's father often visits unannounced at the group home\n    And Jordan values the visits but wants more notice\n    When Jordan expresses desire for planned visits\n    Then the personal_agent helps Jordan communicate boundaries\n    And the interface provides simple language for boundary expression\n    And the family_elohim communicates Jordan's preference to father\n    And Jordan's father learns to respect Jordan's adult boundaries\n    And Jordan's autonomy is supported through boundary maintenance\n    And the relationship improves through mutual respect\n\n  Scenario: Including family in milestone celebrations appropriately\n    Given Jordan is celebrating one year at their library job\n    And Jordan wants family to recognize this achievement\n    When Jordan plans a celebration\n    Then Jordan decides who to invite from family\n    And the personal_agent helps Jordan send invitations\n    And the celebration honors Jordan's accomplishment as a worker\n    And family celebrates Jordan's success, not just their participation\n    And Jordan experiences family recognizing their adult achievements\n    And Jordan's contributions are valued, not just their effort\n\n  Scenario: Receiving family inheritance and gifts with agency\n    Given Jordan's grandmother passed away and left Jordan an inheritance\n    And Jordan has the right to benefit from the inheritance\n    When the family discusses the inheritance\n    Then Jordan participates in decisions about the money\n    And the personal_agent helps Jordan understand inheritance options\n    And if guardianship requires oversight, it's done with dignity\n    And Jordan has voice in how the money is used for their benefit\n    And Jordan's personhood and rights are fully respected\n    And the family_elohim ensures Jordan's interests are protected\n\n  Scenario: Coordinating care during family member illness\n    Given Jordan's mother becomes seriously ill\n    And the family is coordinating care support\n    When the family discusses how to help\n    Then Jordan is included in family care planning\n    And the personal_agent helps Jordan understand the situation\n    And Jordan can offer contributions at their capability (visits, calls)\n    And Jordan's care offerings are recognized and valued\n    And the family doesn't automatically exclude Jordan from caregiving\n    And Jordan experiences being a contributing family member in crisis\n    And Jordan's capacity to give care is honored\n\n  Scenario: Transitioning from child to adult in family system\n    Given Jordan turned 26 and family dynamics are shifting\n    And parents are learning to see Jordan as an adult\n    When family interactions reveal old patterns (treating Jordan as child)\n    Then the family_elohim surfaces the pattern respectfully\n    And the system provides education about adult autonomy for IDD people\n    And Jordan can express feelings about wanting adult treatment\n    And the family receives support for the transition\n    And Jordan's growth toward greater autonomy is celebrated\n    And the family system evolves to honor Jordan's adult status\n\n  Scenario: Managing family crisis with supported participation\n    Given there's a family emergency requiring quick decisions\n    And Jordan's input is important but time is limited\n    When the family gathers to respond to the crisis\n    Then the personal_agent helps Jordan understand the situation quickly\n    And the interface presents information in most accessible format\n    And Jordan's voice is heard even under time pressure\n    And the family doesn't automatically exclude Jordan from decisions\n    And supported decision-making works even in crisis\n    And Jordan's family membership is honored in difficult times\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-idd-community-scenarios-family-maintaining regular family contact on own terms",
+    "scenario-value-scanner-idd-community-scenarios-family-participating in family decisions as adult member",
+    "scenario-value-scanner-idd-community-scenarios-family-managing financial oversight with dignity",
+    "scenario-value-scanner-idd-community-scenarios-family-coordinating family support without infantilization",
+    "scenario-value-scanner-idd-community-scenarios-family-celebrating holidays and traditions as adult participant",
+    "scenario-value-scanner-idd-community-scenarios-family-navigating sibling relationships as equals",
+    "scenario-value-scanner-idd-community-scenarios-family-setting boundaries around family involvement",
+    "scenario-value-scanner-idd-community-scenarios-family-including family in milestone celebrations appropriately",
+    "scenario-value-scanner-idd-community-scenarios-family-receiving family inheritance and gifts with agency",
+    "scenario-value-scanner-idd-community-scenarios-family-coordinating care during family member illness",
+    "scenario-value-scanner-idd-community-scenarios-family-transitioning from child to adult in family system",
+    "scenario-value-scanner-idd-community-scenarios-family-managing family crisis with supported participation"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": null,
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family Relationships and Adult Autonomy",
+    "ogDescription": "As an adult IDD community member with family connections I want to maintain family relationships while exercising adult autonomy So that I am seen as an adult family member, not a perpetual child",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-idd-community-scenarios-family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Family Relationships and Adult Autonomy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-idd-community-scenarios-family",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family",
+    "name": "Family Relationships and Adult Autonomy",
+    "description": "As an adult IDD community member with family connections I want to maintain family relationships while exercising adult autonomy So that I am seen as an adult family member, not a perpetual child",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

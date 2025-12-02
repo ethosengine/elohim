@@ -1,0 +1,51 @@
+{
+  "id": "human-renold-regent",
+  "displayName": "Renold",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "Community leader. Protecting our values and way of life. If you're not with us, you're against us.",
+  "avatarUrl": "assets/avatars/human-renold-regent.jpg",
+  "organizationIds": [
+    "org-pure-valley-association"
+  ],
+  "affinityGroupIds": [
+    "affinity-community-purity",
+    "affinity-traditional-values",
+    "affinity-exclusivity",
+    "affinity-group-loyalty"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-community-purity",
+    "concept-traditional-values",
+    "concept-exclusivity",
+    "concept-group-loyalty"
+  ],
+  "relationshipIds": [],
+  "trustedConnectionCount": 0,
+  "_metadata": {
+    "category": "red-team",
+    "governanceLayers": [
+      "workplace"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": [
+      {
+        "type": "exclusionary-behavior",
+        "reason": "Pattern of rejecting connections based on group identity"
+      }
+    ],
+    "hasFlags": true,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": "Tribal gatekeeper pattern. Exclusionary behavior visible to bridge-builders."
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

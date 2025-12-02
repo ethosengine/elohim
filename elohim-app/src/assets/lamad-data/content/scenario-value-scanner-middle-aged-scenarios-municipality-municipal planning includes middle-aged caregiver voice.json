@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-municipality-municipal planning includes middle-aged caregiver voice",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal planning includes middle-aged caregiver voice",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Municipal planning includes middle-aged caregiver voice",
+  "description": "Municipal planning includes middle-aged caregiver voice",
+  "content": "Scenario: Municipal planning includes middle-aged caregiver voice\n    Given Robert represents large demographic managing multigenerational care\n    And municipal planning often misses caregiver needs\n    And his experience could improve municipal systems\n    When municipal_elohim connects him to planning processes\n    Then it should identify municipal planning opportunities\n    And help him participate in comprehensive planning, transportation planning, and housing policy\n    And surface how planning decisions affect caregivers\n    And advocate for aging-in-place infrastructure, accessible transportation, and multigenerational housing\n    And ensure municipal planning reflects caregiver perspectives\n    And build municipalities that support care economy\n    And recognize that planning should serve actual resident needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:municipality",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:community,neighborhood,workplace_organizational,family",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Municipal planning includes middle-aged caregiver voice",
+    "ogDescription": "Municipal planning includes middle-aged caregiver voice",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal planning includes middle-aged caregiver voice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal planning includes middle-aged caregiver voice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal planning includes middle-aged caregiver voice",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal planning includes middle-aged caregiver voice",
+    "name": "Municipal planning includes middle-aged caregiver voice",
+    "description": "Municipal planning includes middle-aged caregiver voice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

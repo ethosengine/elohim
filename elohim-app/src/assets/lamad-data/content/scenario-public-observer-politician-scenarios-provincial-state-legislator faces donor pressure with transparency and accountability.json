@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-provincial-state-legislator faces donor pressure with transparency and accountability",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-legislator faces donor pressure with transparency and accountability",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Legislator faces donor pressure with transparency and accountability",
+  "description": "Legislator faces donor pressure with transparency and accountability",
+  "content": "Scenario: Legislator faces donor pressure with transparency and accountability\n    Given the politician received campaign contributions from industry\n    And industry lobbyists seek favorable vote on regulation\n    When the Observer documents relationship and voting patterns\n    Then they see campaign finance connections made publicly visible\n    And understand constituents track alignment of votes with donors\n    And face accountability for voting with industry versus constituents\n    And explain votes with policy rationale not donor influence\n    And navigate pressure with transparent evidence-based decision-making\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:provincial_state",
+    "related_users:citizen,activist,community_organizer,journalist,lobbyist",
+    "related_layers:municipality,district,county_regional,educational,ecological,workplace",
+    "elohim_agents:public_observer,regional_elohim,constituent_elohim,legislative_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Legislator faces donor pressure with transparency and accountability",
+    "ogDescription": "Legislator faces donor pressure with transparency and accountability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-legislator faces donor pressure with transparency and accountability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Legislator faces donor pressure with transparency and accountability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-legislator faces donor pressure with transparency and accountability",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-legislator faces donor pressure with transparency and accountability",
+    "name": "Legislator faces donor pressure with transparency and accountability",
+    "description": "Legislator faces donor pressure with transparency and accountability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-community-workers share facility space for community organizing after hours",
+  "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:community-workers share facility space for community organizing after hours",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Workers share facility space for community organizing after hours",
+  "description": "Workers share facility space for community organizing after hours",
+  "content": "Scenario: Workers share facility space for community organizing after hours\n    Given ChickenMax dining space sits empty evenings and weekends\n    And community groups need meeting space\n    When community requests use of space for organizing meetings\n    Then workers democratically decide to share space with community groups\n    And workers establish guidelines for community space use\n    And workers charge minimal fee to cover utilities\n    And community groups organize tenants' rights, immigrant support, etc.\n    And business becomes community hub beyond meal service\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:community",
+    "related_users:[customer,community_investor,supplier,small_business_owner]",
+    "related_layers:[workplace_organizational,individual,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Workers share facility space for community organizing after hours",
+    "ogDescription": "Workers share facility space for community organizing after hours",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-community-workers share facility space for community organizing after hours",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workers share facility space for community organizing after hours - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-community-workers share facility space for community organizing after hours",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:community-workers share facility space for community organizing after hours",
+    "name": "Workers share facility space for community organizing after hours",
+    "description": "Workers share facility space for community organizing after hours",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

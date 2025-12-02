@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-voting on constitutional amendments after deep deliberation",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-voting on constitutional amendments after deep deliberation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Voting on constitutional amendments after deep deliberation",
+  "description": "Voting on constitutional amendments after deep deliberation",
+  "content": "Scenario: Voting on constitutional amendments after deep deliberation\n    Given we have deliberated for months on proposed amendments\n    And I have learned from thousands of fellow citizens\n    When we vote on amendments to global constitution\n    Then my vote: carries equal weight to every other delegate\n    And I vote: based on my judgment informed by deliberation\n    And I know: my decision will affect billions of people\n    And I feel: weight of democratic responsibility\n    And I trust: the collective wisdom of this assembly\n    And I accept: that we might be wrong but must still choose\n    And I participate: in most consequential democratic act of my life\n    And I fulfill: citizenship at planetary scale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Voting on constitutional amendments after deep deliberation",
+    "ogDescription": "Voting on constitutional amendments after deep deliberation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-voting on constitutional amendments after deep deliberation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Voting on constitutional amendments after deep deliberation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-voting on constitutional amendments after deep deliberation",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-voting on constitutional amendments after deep deliberation",
+    "name": "Voting on constitutional amendments after deep deliberation",
+    "description": "Voting on constitutional amendments after deep deliberation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

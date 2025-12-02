@@ -1,0 +1,85 @@
+{
+  "id": "human-ginny-gigworker",
+  "did": "did:web:elohim.host:human:ginny-gigworker",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Ginny",
+  "description": "Freelancer juggling multiple gigs. Rideshare, delivery, odd jobs. Looking for stability and fair pay.",
+  "content": {
+    "displayName": "Ginny",
+    "bio": "Freelancer juggling multiple gigs. Rideshare, delivery, odd jobs. Looking for stability and fair pay.",
+    "profileReach": "community",
+    "isPseudonymous": false,
+    "acceptingConnections": true,
+    "primaryLocation": {
+      "layer": "municipality",
+      "displayName": "Metro City",
+      "reach": "community"
+    },
+    "communities": [
+      "community-gig-workers-alliance",
+      "community-rideshare-drivers"
+    ],
+    "publicAffinities": [
+      "gig-economy",
+      "worker-rights",
+      "portable-benefits",
+      "fair-wages",
+      "platform-cooperatives"
+    ]
+  },
+  "contentFormat": "human-json",
+  "sourcePath": "humans/ginny-gigworker/profile.json",
+  "tags": [
+    "human",
+    "worker-rights",
+    "fair-wages",
+    "platform-cooperatives",
+    "portable-benefits",
+    "local-economy",
+    "gig-economy",
+    "human-graph",
+    "reach-community",
+    "layer-municipality"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "local-economy",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "community",
+      "municipality"
+    ],
+    "communityCount": 2,
+    "designNotes": "Key for demonstrating value scanner (recognizing invisible work)."
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Ginny",
+    "ogDescription": "Freelancer juggling multiple gigs. Rideshare, delivery, odd jobs. Looking for stability and fair pay.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-ginny-gigworker",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-ginny-gigworker.jpg",
+    "ogImageAlt": "Ginny's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-ginny-gigworker",
+    "identifier": "did:web:elohim.host:human:ginny-gigworker",
+    "name": "Ginny",
+    "description": "Freelancer juggling multiple gigs. Rideshare, delivery, odd jobs. Looking for stability and fair pay.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Metro City",
+      "description": "municipality"
+    }
+  },
+  "createdAt": "2025-12-01T20:08:11.328530",
+  "updatedAt": "2025-12-01T20:08:11.328531"
+}

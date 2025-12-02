@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-individual-managing fixed retirement income while providing care",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual-managing fixed retirement income while providing care",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Managing fixed retirement income while providing care",
+  "description": "Managing fixed retirement income while providing care",
+  "content": "Scenario: Managing fixed retirement income while providing care\n    Given Margaret lives on retirement income that cannot be increased\n    And grandparenting sometimes involves expenses (activities, treats, supplies)\n    When Margaret's personal_agent tracks spending related to grandchildren\n    Then it should help her budget for grandparenting costs\n    And it should identify when care provision creates financial burden\n    And it should suggest discussions with family about cost-sharing\n    And it should help Margaret maintain dignity while managing constraints\n    And the system should prevent financial exploitation of grandparents\n    And Margaret should be able to provide care without financial hardship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:individual",
+    "related_users:senior,middle_aged,parent,child,elderly",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Managing fixed retirement income while providing care",
+    "ogDescription": "Managing fixed retirement income while providing care",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-individual-managing fixed retirement income while providing care",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing fixed retirement income while providing care - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-individual-managing fixed retirement income while providing care",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual-managing fixed retirement income while providing care",
+    "name": "Managing fixed retirement income while providing care",
+    "description": "Managing fixed retirement income while providing care",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

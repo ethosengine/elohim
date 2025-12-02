@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-family-alex's chosen family recognized alongside biological family",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family-alex's chosen family recognized alongside biological family",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Alex's chosen family recognized alongside biological family",
+  "description": "Alex's chosen family recognized alongside biological family",
+  "content": "Scenario: Alex's chosen family recognized alongside biological family\n    Given Alex may have close relationships in disability community\n    And chosen family might be more supportive than biological family\n    When the family_elohim defines family relationships\n    Then it should include Alex's chosen family members\n    And disability community bonds should be recognized as family\n    And care flows with chosen family should be tracked and valued\n    And Alex should be able to define their own family\n    And the protocol should honor diverse family structures\n    And biological family should not be privileged over chosen family\n    And Alex's full support network should be acknowledged\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:family",
+    "related_users:adult,parent,sibling,grandparent,elderly",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Alex's chosen family recognized alongside biological family",
+    "ogDescription": "Alex's chosen family recognized alongside biological family",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-family-alex's chosen family recognized alongside biological family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Alex's chosen family recognized alongside biological family - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-family-alex's chosen family recognized alongside biological family",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family-alex's chosen family recognized alongside biological family",
+    "name": "Alex's chosen family recognized alongside biological family",
+    "description": "Alex's chosen family recognized alongside biological family",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

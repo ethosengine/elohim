@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-ecological-bioregional-bulk buying and package reduction practices",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:ecological-bioregional-bulk buying and package reduction practices",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Bulk buying and package reduction practices",
+  "description": "Bulk buying and package reduction practices",
+  "content": "Scenario: Bulk buying and package reduction practices\n    Given Margaret learned to buy bulk to reduce packaging\n    And package reduction serves both budget and ecology\n    When Margaret shops with minimal packaging\n    Then the bioregional_elohim should track packaging reduction\n    And bulk buying should be recognized as ecological practice\n    And Margaret's practices should inform community purchasing\n    And package waste should be minimized\n    And bioregional resource flows should be optimized\n    And frugality should align with ecological goals\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:ecological_bioregional",
+    "related_users:middle_aged,elderly,retired,gardener,steward,elder",
+    "related_layers:individual,household,neighborhood,community,educational",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Bulk buying and package reduction practices",
+    "ogDescription": "Bulk buying and package reduction practices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-ecological-bioregional-bulk buying and package reduction practices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Bulk buying and package reduction practices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-ecological-bioregional-bulk buying and package reduction practices",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:ecological-bioregional-bulk buying and package reduction practices",
+    "name": "Bulk buying and package reduction practices",
+    "description": "Bulk buying and package reduction practices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

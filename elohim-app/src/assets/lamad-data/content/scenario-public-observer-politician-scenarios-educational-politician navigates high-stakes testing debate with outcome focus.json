@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-educational-politician navigates high-stakes testing debate with outcome focus",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:educational-politician navigates high-stakes testing debate with outcome focus",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Politician navigates high-stakes testing debate with outcome focus",
+  "description": "Politician navigates high-stakes testing debate with outcome focus",
+  "content": "Scenario: Politician navigates high-stakes testing debate with outcome focus\n    Given testing requirements create political controversy\n    And both supporters and critics make competing claims\n    When the Observer analyzes testing data and educational impacts\n    Then they see how much instructional time testing consumes\n    And understand what testing reveals versus distorts about learning\n    And identify schools where testing drives harmful practices\n    And review alternative assessment models in other states\n    And balance accountability needs with teaching and learning quality\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,board_member,administrator,activist",
+    "related_layers:district,municipality,provincial_state,school",
+    "elohim_agents:public_observer,education_elohim,district_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Politician navigates high-stakes testing debate with outcome focus",
+    "ogDescription": "Politician navigates high-stakes testing debate with outcome focus",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-educational-politician navigates high-stakes testing debate with outcome focus",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician navigates high-stakes testing debate with outcome focus - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-educational-politician navigates high-stakes testing debate with outcome focus",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:educational-politician navigates high-stakes testing debate with outcome focus",
+    "name": "Politician navigates high-stakes testing debate with outcome focus",
+    "description": "Politician navigates high-stakes testing debate with outcome focus",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

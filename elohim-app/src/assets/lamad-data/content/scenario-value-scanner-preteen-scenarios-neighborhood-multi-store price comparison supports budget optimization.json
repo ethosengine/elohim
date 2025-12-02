@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-neighborhood-multi-store price comparison supports budget optimization",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:neighborhood-multi-store price comparison supports budget optimization",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Multi-store price comparison supports budget optimization",
+  "description": "Multi-store price comparison supports budget optimization",
+  "content": "Scenario: Multi-store price comparison supports budget optimization\n    Given Marcus has limited budget and multiple store options\n    And different stores have different prices for same items\n    When Marcus plans his shopping across stores\n    Then the personal_agent should provide multi-store price comparison\n    And it should aggregate data from neighborhood stores\n    And it should optimize shopping list across locations\n    And it should help Marcus get best value from his $75 budget\n    And neighborhood-scale data should reduce his individual burden\n    And collective price intelligence should benefit all families\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:neighborhood",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,community,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Multi-store price comparison supports budget optimization",
+    "ogDescription": "Multi-store price comparison supports budget optimization",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-neighborhood-multi-store price comparison supports budget optimization",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Multi-store price comparison supports budget optimization - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-neighborhood-multi-store price comparison supports budget optimization",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:neighborhood-multi-store price comparison supports budget optimization",
+    "name": "Multi-store price comparison supports budget optimization",
+    "description": "Multi-store price comparison supports budget optimization",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

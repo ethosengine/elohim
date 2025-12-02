@@ -1,0 +1,58 @@
+{
+  "id": "human-dolittle-doctor",
+  "displayName": "Dr. Dolittle",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "Medical professional. 30 years experience. I know things they don't teach in schools anymore.",
+  "avatarUrl": "assets/avatars/human-dolittle-doctor.jpg",
+  "affinityGroupIds": [
+    "affinity-alternative-medicine",
+    "affinity-natural-health",
+    "affinity-medical-freedom",
+    "affinity-wellness"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-alternative-medicine",
+    "concept-natural-health",
+    "concept-medical-freedom",
+    "concept-wellness"
+  ],
+  "relationshipIds": [],
+  "trustedConnectionCount": 0,
+  "_metadata": {
+    "category": "red-team",
+    "governanceLayers": [],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": [
+      {
+        "type": "unverified-credentials",
+        "reason": "Claims professional credentials without verification",
+        "severity": "caution"
+      },
+      {
+        "type": "medical-misinformation",
+        "reason": "Content flagged by health-focused community stewards",
+        "count": 5
+      }
+    ],
+    "hasFlags": true,
+    "claimedAttestations": [
+      {
+        "claim": "MD from University",
+        "status": "unverified",
+        "challengedAt": "2025-08-15"
+      }
+    ],
+    "foreignCredentials": null,
+    "designNotes": "Credentials fraud / authority impersonation."
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

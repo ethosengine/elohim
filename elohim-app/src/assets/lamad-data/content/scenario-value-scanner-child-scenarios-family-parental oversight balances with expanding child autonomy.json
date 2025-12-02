@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-family-parental oversight balances with expanding child autonomy",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:family-parental oversight balances with expanding child autonomy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parental oversight balances with expanding child autonomy",
+  "description": "Parental oversight balances with expanding child autonomy",
+  "content": "Scenario: Parental oversight balances with expanding child autonomy\n    Given Emma has more freedom than Tommy\n    And she still needs parental guidance at age 8\n    When Emma makes independent scanner decisions\n    Then Sarah should have full visibility into Emma's choices\n    And Sarah should maintain ultimate authority\n    And Emma's autonomy should be genuine within parental bounds\n    And the balance should protect both safety and capability development\n    And Sarah should be supported in letting go appropriately\n    And trust should grow as Emma demonstrates judgment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,neighborhood,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parental oversight balances with expanding child autonomy",
+    "ogDescription": "Parental oversight balances with expanding child autonomy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-family-parental oversight balances with expanding child autonomy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parental oversight balances with expanding child autonomy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-family-parental oversight balances with expanding child autonomy",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:family-parental oversight balances with expanding child autonomy",
+    "name": "Parental oversight balances with expanding child autonomy",
+    "description": "Parental oversight balances with expanding child autonomy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

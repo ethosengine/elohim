@@ -1,0 +1,33 @@
+{
+  "id": "org-ibew-local-123",
+  "did": "did:web:elohim.host:org:ibew-local-123",
+  "contentType": "organization",
+  "activityPubType": "Organization",
+  "title": "IBEW Local 123",
+  "description": "Organization with 1 members",
+  "content": {
+    "name": "IBEW Local 123",
+    "memberCount": 1,
+    "members": [
+      {
+        "humanId": "human-lenny-lineworker",
+        "role": "member"
+      }
+    ]
+  },
+  "contentFormat": "html",
+  "tags": [
+    "organization",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-lenny-lineworker"
+  ],
+  "metadata": {
+    "category": "organization",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z"
+}

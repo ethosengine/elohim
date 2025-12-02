@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-making visible that current conditions prevent care work",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational-making visible that current conditions prevent care work",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Making visible that current conditions prevent care work",
+  "description": "Making visible that current conditions prevent care work",
+  "content": "Scenario: Making visible that current conditions prevent care work\n    Given my 50+ hour work weeks leave no time or energy for self-care or family care\n    When I want to demonstrate that work conditions are unsustainable\n    Then the protocol should help me document how work prevents care\n    And make visible the contradiction between work demands and human needs\n    And provide evidence for advocacy around reduced hours and better conditions\n    And build case that \"labor shortage\" is really \"dignity and compensation shortage\"\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Making visible that current conditions prevent care work",
+    "ogDescription": "Making visible that current conditions prevent care work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-workplace-organizational-making visible that current conditions prevent care work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Making visible that current conditions prevent care work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-workplace-organizational-making visible that current conditions prevent care work",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational-making visible that current conditions prevent care work",
+    "name": "Making visible that current conditions prevent care work",
+    "description": "Making visible that current conditions prevent care work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

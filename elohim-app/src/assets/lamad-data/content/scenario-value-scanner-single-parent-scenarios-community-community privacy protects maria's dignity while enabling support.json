@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-community-community privacy protects maria's dignity while enabling support",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community-community privacy protects maria's dignity while enabling support",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community privacy protects Maria's dignity while enabling support",
+  "description": "Community privacy protects Maria's dignity while enabling support",
+  "content": "Scenario: Community privacy protects Maria's dignity while enabling support\n    Given Maria needs community support but also privacy protection\n    And some aspects of her situation are sensitive and personal\n    When Maria participates in community care economy\n    Then the community_elohim should only share what Maria consents to\n    And her household details should remain private unless she chooses to disclose\n    And support access should not require invasive disclosure\n    And privacy should be protected even while receiving community assistance\n    And Maria should maintain dignity and control over personal information\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:community",
+    "related_users:parent,single_parent,community_member,caregiver,worker",
+    "related_layers:neighborhood,family,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community privacy protects Maria's dignity while enabling support",
+    "ogDescription": "Community privacy protects Maria's dignity while enabling support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-community-community privacy protects maria's dignity while enabling support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community privacy protects Maria's dignity while enabling support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-community-community privacy protects maria's dignity while enabling support",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community-community privacy protects maria's dignity while enabling support",
+    "name": "Community privacy protects Maria's dignity while enabling support",
+    "description": "Community privacy protects Maria's dignity while enabling support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

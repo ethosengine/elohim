@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-community-community care economy demonstrates alternative to extraction economics",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:community-community care economy demonstrates alternative to extraction economics",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community care economy demonstrates alternative to extraction economics",
+  "description": "Community care economy demonstrates alternative to extraction economics",
+  "content": "Scenario: Community care economy demonstrates alternative to extraction economics\n    Given Sarah's community has adopted care economy practices\n    And mainstream economics devalue care work\n    When community care economy becomes visible\n    Then it should demonstrate that alternatives to capitalism are viable\n    And it should show care work creates real value\n    And it should inspire other communities to adopt similar practices\n    And Sarah's community should serve as model\n    And care economy transformation should spread through demonstrated success\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:community",
+    "related_users:parent,worker,educator,caregiver,community_member",
+    "related_layers:neighborhood,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community care economy demonstrates alternative to extraction economics",
+    "ogDescription": "Community care economy demonstrates alternative to extraction economics",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-community-community care economy demonstrates alternative to extraction economics",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community care economy demonstrates alternative to extraction economics - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-community-community care economy demonstrates alternative to extraction economics",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:community-community care economy demonstrates alternative to extraction economics",
+    "name": "Community care economy demonstrates alternative to extraction economics",
+    "description": "Community care economy demonstrates alternative to extraction economics",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

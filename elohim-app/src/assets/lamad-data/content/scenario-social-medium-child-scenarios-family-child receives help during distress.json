@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-child-scenarios-family-child receives help during distress",
+  "did": "did:web:elohim.host:content:social-medium:child:scenarios:family-child receives help during distress",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Child receives help during distress",
+  "description": "Child receives help during distress",
+  "content": "Scenario: Child receives help during distress\n    Given Emma is upset about something that happened at school\n    When she creates a contribution expressing her distress\n    And the guardian agent detects emotional crisis indicators\n    Then her parents are immediately notified with sensitivity\n    And age-appropriate support resources are surfaced\n    And family members can provide comfort and guidance\n    And if needed, connection to counseling resources is offered\n    And Emma experiences the system as safe space to express feelings\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:elder,content_creator",
+    "related_layers:individual,neighborhood",
+    "elohim_agents:guardian_agent,parental_guidance_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-child-scenarios-family",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-child-scenarios-family",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Child receives help during distress",
+    "ogDescription": "Child receives help during distress",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-family-child receives help during distress",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Child receives help during distress - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-family-child receives help during distress",
+    "identifier": "did:web:elohim.host:content:social-medium:child:scenarios:family-child receives help during distress",
+    "name": "Child receives help during distress",
+    "description": "Child receives help during distress",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

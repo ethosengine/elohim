@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-grappling with my influence on decisions affecting millions",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state-grappling with my influence on decisions affecting millions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Grappling with my influence on decisions affecting millions",
+  "description": "Grappling with my influence on decisions affecting millions",
+  "content": "Scenario: Grappling with my influence on decisions affecting millions\n    Given my testimony shapes National Council decisions\n    And those decisions affect millions of people\n    When I reflect on the weight of my responsibility\n    Then I feel: burden of expertise influencing democratic governance\n    And I worry: about errors in my analysis causing harm\n    And I accept: that I must act under uncertainty\n    And I commit: to honesty about my limitations\n    And I trust: democratic process to weigh my input appropriately\n    And I practice: epistemic humility while still providing expertise\n    And I demonstrate: expertise serving democracy despite uncertainty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Grappling with my influence on decisions affecting millions",
+    "ogDescription": "Grappling with my influence on decisions affecting millions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-nation-state-grappling with my influence on decisions affecting millions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Grappling with my influence on decisions affecting millions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-nation-state-grappling with my influence on decisions affecting millions",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state-grappling with my influence on decisions affecting millions",
+    "name": "Grappling with my influence on decisions affecting millions",
+    "description": "Grappling with my influence on decisions affecting millions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

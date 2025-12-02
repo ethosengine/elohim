@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood care exchange coordinates mutual support",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood care exchange coordinates mutual support",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood care exchange coordinates mutual support",
+  "description": "Neighborhood care exchange coordinates mutual support",
+  "content": "Scenario: Neighborhood care exchange coordinates mutual support\n    Given Robert has skills and resources to share\n    And he also needs support managing his care demands\n    And neighbors have complementary needs and capacities\n    When neighborhood_elohim coordinates care exchange\n    Then it should match Robert's capacities with neighborhood needs\n    And connect him to neighbors who can provide support\n    And recognize his contributions: lawn care help for elderly neighbor, professional mentoring\n    And surface opportunities: \"Maria can provide backup childcare when your grandchild visits\"\n    And build reciprocal relationships based on mutual care\n    And demonstrate that neighborhood functions through care exchange\n    And strengthen local social capital\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:neighborhood",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,community,family,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood care exchange coordinates mutual support",
+    "ogDescription": "Neighborhood care exchange coordinates mutual support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood care exchange coordinates mutual support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood care exchange coordinates mutual support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood care exchange coordinates mutual support",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood care exchange coordinates mutual support",
+    "name": "Neighborhood care exchange coordinates mutual support",
+    "description": "Neighborhood care exchange coordinates mutual support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

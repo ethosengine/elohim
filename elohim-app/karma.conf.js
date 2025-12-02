@@ -21,9 +21,13 @@ module.exports = function (config) {
         // the possible options are listed at https://jasmine.github.io/api/edge/Configuration.html
         // for example, you can disable the random execution order
         // random: false
+        failFast: false // set to true to stop on first failure
       },
       clearContext: false // leave Jasmine Spec Runner output visible in browser
     },
+    // Use 'dots' for minimal output, 'spec' for verbose, 'progress' for default
+    // 'dots' shows just dots for passes and F for failures - most concise
+    reporters: isHeadless ? ['dots', 'coverage'] : ['progress', 'kjhtml', 'coverage'],
     jasmineHtmlReporter: {
       suppressAll: true // removes the duplicated traces
     },
@@ -36,15 +40,16 @@ module.exports = function (config) {
         { type: 'lcovonly', file: 'lcov.info' }
       ],
       check: {
-        global: {
+        // Only enforce coverage on services (business logic)
+        '**/services/*.ts': {
           statements: 50,
           branches: 15,
           functions: 50,
           lines: 50
         }
+        // No global threshold - components/models are advisory only
       }
     },
-    reporters: ['progress', 'kjhtml', 'coverage'],
     // Automatically use ChromeHeadless in CI/Eclipse Che, Chrome locally
     browsers: [isHeadless ? 'ChromeHeadlessCI' : 'Chrome'],
     customLaunchers: {

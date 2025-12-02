@@ -1,0 +1,54 @@
+{
+  "id": "fct-module-06-harmful-consequences-story",
+  "contentType": "narrative",
+  "title": "\"Joseph and the Seven Years of Plenty and Famine\"",
+  "description": "Biblical story or example illustrating module concepts",
+  "content": {
+    "narrative": "The story of Joseph interpreting Pharaoh's dreams and managing Egypt's resources in Genesis 41-47 provides an example of Minimizing Harmful Consequences in the bible:\n\n\"Joseph and the Seven Years of Plenty and Famine\"  \nIn this story:  \nPharaoh has dreams of seven fat cows being eaten by seven thin cows, and seven healthy ears of grain being devoured by seven thin ears.  \nJoseph interprets these dreams as a prediction of seven years of abundance followed by seven years of severe famine.  \nJoseph advises Pharaoh to appoint a wise manager to oversee the collection and storage of surplus grain during the seven years of plenty.  \nDuring the abundant years, Joseph implements a system to collect and store one-fifth of the harvest.  \nWhen the famine hits, Egypt is prepared and can provide for its people and even sell grain to neighboring regions.\n\nThis narrative illustrates:  \nExternalities: The future famine is an external factor that would have devastating consequences if not addressed.  \nTragedy of the Commons: Without Joseph's intervention, people might have consumed all the abundant crops, leaving nothing for the lean years \\- similar to overfishing a lake.  \nArms Race: While not explicitly an arms race, the story shows how preparation and wise resource management can prevent a destructive competition for scarce resources during the famine.  \nStewardship: Joseph's management demonstrates responsible stewardship of resources, considering long-term consequences and the common good.  \nProactive Problem-Solving: The story emphasizes the importance of recognizing potential future problems and taking action to mitigate them.\n\nThis biblical narrative can be used to discuss how foresight, wise management, and consideration of long-term consequences are crucial in technology development and use. It also demonstrates how addressing potential \"tragedies of the commons\" can benefit not just one group, but surrounding communities as well.",
+    "narrativeType": "biblical-example"
+  },
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "tags": [
+    "story",
+    "narrative",
+    "fct",
+    "biblical-example",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-06-harmful-consequences"
+  ],
+  "metadata": {
+    "category": "fct-narrative",
+    "sourceModule": "fct-module-06-harmful-consequences"
+  },
+  "createdAt": "2025-11-28T21:10:19.207000",
+  "updatedAt": "2025-11-28T21:10:19.207001",
+  "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "\"Joseph and the Seven Years of Plenty and Famine\"",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "\"Joseph and the Seven Years of Plenty and Famine\" - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences-story",
+    "identifier": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+    "name": "\"Joseph and the Seven Years of Plenty and Famine\"",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.207000",
+    "dateModified": "2025-11-28T21:10:19.207001",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

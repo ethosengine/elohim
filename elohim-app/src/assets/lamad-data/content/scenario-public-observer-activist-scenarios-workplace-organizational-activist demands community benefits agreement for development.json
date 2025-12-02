@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-workplace-organizational-activist demands community benefits agreement for development",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:workplace-organizational-activist demands community benefits agreement for development",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Activist demands community benefits agreement for development",
+  "description": "Activist demands community benefits agreement for development",
+  "content": "Scenario: Activist demands community benefits agreement for development\n    Given a developer seeks public subsidies for project\n    And claims it will \"create jobs\"\n    When the Observer analyzes developer's labor track record\n    Then the activist shows previous projects created mostly temp low-wage work\n    And demonstrates few jobs went to local community members\n    And reveals history of labor violations and union-busting\n    And organizes coalition demanding binding labor standards\n    And economic development serves workers not just capital\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,community_organizer,politician",
+    "related_layers:municipality,industry_sector,provincial_state",
+    "elohim_agents:public_observer,workplace_elohim,economic_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Activist demands community benefits agreement for development",
+    "ogDescription": "Activist demands community benefits agreement for development",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-workplace-organizational-activist demands community benefits agreement for development",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist demands community benefits agreement for development - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-workplace-organizational-activist demands community benefits agreement for development",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:workplace-organizational-activist demands community benefits agreement for development",
+    "name": "Activist demands community benefits agreement for development",
+    "description": "Activist demands community benefits agreement for development",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

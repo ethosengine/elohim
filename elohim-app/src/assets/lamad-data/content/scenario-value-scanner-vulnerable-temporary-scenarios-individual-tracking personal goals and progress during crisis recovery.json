@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-individual-tracking personal goals and progress during crisis recovery",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-tracking personal goals and progress during crisis recovery",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Tracking personal goals and progress during crisis recovery",
+  "description": "Tracking personal goals and progress during crisis recovery",
+  "content": "Scenario: Tracking personal goals and progress during crisis recovery\n    Given I am rebuilding my life after leaving an abusive relationship\n    And I have set personal goals for stability and independence\n    When I make progress toward my goals (even small steps)\n    Then the Value Scanner celebrates my achievements\n    And tracks my progress without imposing external timelines\n    And helps me identify next steps at my pace\n    And recognizes setbacks as normal parts of recovery\n    And maintains my focus on my vision for my future\n    And counters institutional pressure to recover \"faster\" or \"properly\"\n    And my personal_agent reminds me of how far I've come\n    And validates that my timeline is the right timeline\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Tracking personal goals and progress during crisis recovery",
+    "ogDescription": "Tracking personal goals and progress during crisis recovery",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-tracking personal goals and progress during crisis recovery",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Tracking personal goals and progress during crisis recovery - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-tracking personal goals and progress during crisis recovery",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-tracking personal goals and progress during crisis recovery",
+    "name": "Tracking personal goals and progress during crisis recovery",
+    "description": "Tracking personal goals and progress during crisis recovery",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-educational-nutrition and cooking education for changing health needs",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational-nutrition and cooking education for changing health needs",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Nutrition and cooking education for changing health needs",
+  "description": "Nutrition and cooking education for changing health needs",
+  "content": "Scenario: Nutrition and cooking education for changing health needs\n    Given Margaret's dietary needs are changing with age\n    And cooking knowledge supports health and budget\n    When the educational_elohim provides nutrition education\n    Then senior-specific nutrition information should be accessible\n    And cooking for health conditions should be taught\n    And Margaret's existing knowledge should be built upon\n    And education should support health management through diet\n    And practical cooking skills should address budget constraints\n    And nutrition education should empower health agency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:educational",
+    "related_users:middle_aged,elderly,retired,teacher,mentor,student,learner",
+    "related_layers:individual,family,community,neighborhood",
+    "elohim_agents:personal_agent,community_elohim,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Nutrition and cooking education for changing health needs",
+    "ogDescription": "Nutrition and cooking education for changing health needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-educational-nutrition and cooking education for changing health needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Nutrition and cooking education for changing health needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-educational-nutrition and cooking education for changing health needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational-nutrition and cooking education for changing health needs",
+    "name": "Nutrition and cooking education for changing health needs",
+    "description": "Nutrition and cooking education for changing health needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

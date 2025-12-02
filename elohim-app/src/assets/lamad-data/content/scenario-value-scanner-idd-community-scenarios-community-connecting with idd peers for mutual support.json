@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-community-connecting with idd peers for mutual support",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community-connecting with idd peers for mutual support",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Connecting with IDD peers for mutual support",
+  "description": "Connecting with IDD peers for mutual support",
+  "content": "Scenario: Connecting with IDD peers for mutual support\n    Given Jordan wants to meet other IDD community members\n    And peer connection is essential for Jordan's wellbeing\n    When Jordan uses the peer connection feature\n    Then the interface shows nearby IDD peers with similar interests\n    And profiles use accessible format (pictures, simple descriptions)\n    And Jordan can express interest in connecting\n    And the community_elohim facilitates introductions with support\n    And Jordan builds friendships with people who truly understand\n    And Jordan experiences IDD community belonging and pride\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-community",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Connecting with IDD peers for mutual support",
+    "ogDescription": "Connecting with IDD peers for mutual support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-community-connecting with idd peers for mutual support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connecting with IDD peers for mutual support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-community-connecting with idd peers for mutual support",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community-connecting with idd peers for mutual support",
+    "name": "Connecting with IDD peers for mutual support",
+    "description": "Connecting with IDD peers for mutual support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

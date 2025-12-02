@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-symptom tracking supports accurate reporting to providers",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-symptom tracking supports accurate reporting to providers",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Symptom tracking supports accurate reporting to providers",
+  "description": "Symptom tracking supports accurate reporting to providers",
+  "content": "Scenario: Symptom tracking supports accurate reporting to providers\n    Given David's Alzheimer's symptoms fluctuate and progress\n    And accurate symptom reporting is essential for care\n    When the healthcare_elohim tracks symptoms\n    Then it should maintain detailed symptom logs\n    And it should identify patterns and changes over time\n    And it should prepare symptom summaries for appointments\n    And provider understanding should be improved by detailed tracking\n    And caregiver observation should enhance medical accuracy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,healthcare_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Symptom tracking supports accurate reporting to providers",
+    "ogDescription": "Symptom tracking supports accurate reporting to providers",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-symptom tracking supports accurate reporting to providers",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Symptom tracking supports accurate reporting to providers - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-symptom tracking supports accurate reporting to providers",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-symptom tracking supports accurate reporting to providers",
+    "name": "Symptom tracking supports accurate reporting to providers",
+    "description": "Symptom tracking supports accurate reporting to providers",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

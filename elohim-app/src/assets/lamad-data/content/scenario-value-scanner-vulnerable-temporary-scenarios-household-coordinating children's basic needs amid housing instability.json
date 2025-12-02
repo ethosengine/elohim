@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-household-coordinating children's basic needs amid housing instability",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:household-coordinating children's basic needs amid housing instability",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Coordinating children's basic needs amid housing instability",
+  "description": "Coordinating children's basic needs amid housing instability",
+  "content": "Scenario: Coordinating children's basic needs amid housing instability\n    Given I am in transitional housing with uncertain future\n    And my children need stability, routine, and predictability\n    When I plan daily and weekly household operations\n    Then the Value Scanner helps me maintain consistency where possible\n    And tracks children's schedules, needs, and preferences\n    And helps me create portable routines that work across housing changes\n    And surfaces strategies for stability even in unstable circumstances\n    And coordinates meal planning with catastrophically limited budget\n    And my personal_agent reminds me of important household tasks\n    And recognizes my household management as substantial care work\n    And celebrates the stability I'm providing under impossible conditions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-household",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating children's basic needs amid housing instability",
+    "ogDescription": "Coordinating children's basic needs amid housing instability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-household-coordinating children's basic needs amid housing instability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating children's basic needs amid housing instability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-household-coordinating children's basic needs amid housing instability",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:household-coordinating children's basic needs amid housing instability",
+    "name": "Coordinating children's basic needs amid housing instability",
+    "description": "Coordinating children's basic needs amid housing instability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

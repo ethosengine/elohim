@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-neighborhood-neighborhood watch and safety network for single-parent families",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:neighborhood-neighborhood watch and safety network for single-parent families",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood watch and safety network for single-parent families",
+  "description": "Neighborhood watch and safety network for single-parent families",
+  "content": "Scenario: Neighborhood watch and safety network for single-parent families\n    Given Maria worries about household and child safety as solo parent\n    And she cannot be everywhere at once\n    When neighborhood safety networks operate\n    Then the neighborhood_elohim should coordinate neighborhood watch efforts\n    And neighbors should look out for each other's children and properties\n    And Maria should feel enhanced security through community vigilance\n    And single-parent households should benefit from neighborhood collective care\n    And safety should be community responsibility, not solo parent burden\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,community_member,single_parent",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood watch and safety network for single-parent families",
+    "ogDescription": "Neighborhood watch and safety network for single-parent families",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-neighborhood-neighborhood watch and safety network for single-parent families",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood watch and safety network for single-parent families - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-neighborhood-neighborhood watch and safety network for single-parent families",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:neighborhood-neighborhood watch and safety network for single-parent families",
+    "name": "Neighborhood watch and safety network for single-parent families",
+    "description": "Neighborhood watch and safety network for single-parent families",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

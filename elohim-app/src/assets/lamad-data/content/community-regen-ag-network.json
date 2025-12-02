@@ -1,0 +1,30 @@
+{
+  "id": "community-regen-ag-network",
+  "did": "did:web:elohim.host:community:regen-ag-network",
+  "contentType": "organization",
+  "activityPubType": "Group",
+  "title": "Regen Ag Network",
+  "description": "Community with 1 members",
+  "content": {
+    "name": "Regen Ag Network",
+    "memberCount": 1,
+    "memberIds": [
+      "human-frank-farmer"
+    ]
+  },
+  "contentFormat": "html",
+  "tags": [
+    "community",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-frank-farmer"
+  ],
+  "metadata": {
+    "category": "community",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher connects working conditions to student learning",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational-teacher connects working conditions to student learning",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teacher connects working conditions to student learning",
+  "description": "Teacher connects working conditions to student learning",
+  "content": "Scenario: Teacher connects working conditions to student learning\n    Given administrators claim teacher working conditions are \"employee issues\"\n    And dismiss working condition advocacy as self-interested\n    When teachers document connection between conditions and student outcomes\n    Then data shows schools with better planning time have better student results\n    And adequate support staff correlates with student wellbeing\n    And sustainable teacher workload predicts teacher retention and student consistency\n    And working conditions advocacy is reframed as student-centered\n    And labor rights and educational quality become aligned not opposed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:workplace_organizational",
+    "related_users:union_representative,administrator,board_member,worker",
+    "related_layers:district,school,provincial_state",
+    "elohim_agents:public_observer,union_elohim,workplace_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teacher connects working conditions to student learning",
+    "ogDescription": "Teacher connects working conditions to student learning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-workplace-organizational-teacher connects working conditions to student learning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher connects working conditions to student learning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-workplace-organizational-teacher connects working conditions to student learning",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational-teacher connects working conditions to student learning",
+    "name": "Teacher connects working conditions to student learning",
+    "description": "Teacher connects working conditions to student learning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -176,6 +176,11 @@
     }
   },
   "cli": {
-    "analytics": "2a39cc9e-9733-4e33-a46f-e13912b39062"
+    "analytics": "2a39cc9e-9733-4e33-a46f-e13912b39062",
+    "cache": {
+      "enabled": true,
+      "path": ".angular/cache",
+      "environment": "local"
+    }
   }
 }

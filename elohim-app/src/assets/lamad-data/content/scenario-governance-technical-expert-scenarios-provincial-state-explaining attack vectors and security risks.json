@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-provincial-state-explaining attack vectors and security risks",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state-explaining attack vectors and security risks",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Explaining attack vectors and security risks",
+  "description": "Explaining attack vectors and security risks",
+  "content": "Scenario: Explaining attack vectors and security risks\n    Given appellant claims agent could be manipulated\n    And council needs to understand vulnerability\n    When I explain potential attack vectors\n    Then I describe: how agents could be corrupted or gamed\n    And I assess: likelihood and impact of different attacks\n    And I explain: defense mechanisms in place\n    And I acknowledge: residual risks that remain\n    And I avoid: either dismissing concerns or creating panic\n    And I provide: realistic risk assessment\n    And council can: judge if security is adequate for constitutional governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,appellant,policy_maker,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Explaining attack vectors and security risks",
+    "ogDescription": "Explaining attack vectors and security risks",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-provincial-state-explaining attack vectors and security risks",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Explaining attack vectors and security risks - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-provincial-state-explaining attack vectors and security risks",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state-explaining attack vectors and security risks",
+    "name": "Explaining attack vectors and security risks",
+    "description": "Explaining attack vectors and security risks",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

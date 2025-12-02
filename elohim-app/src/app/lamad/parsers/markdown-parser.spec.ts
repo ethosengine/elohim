@@ -1,5 +1,4 @@
 import { MarkdownParser } from './markdown-parser';
-import { NodeType } from '../models';
 
 describe('MarkdownParser', () => {
   describe('parseEpic', () => {

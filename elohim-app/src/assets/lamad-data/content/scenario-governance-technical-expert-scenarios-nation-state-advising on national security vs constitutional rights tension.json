@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-advising on national security vs constitutional rights tension",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state-advising on national security vs constitutional rights tension",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Advising on national security vs constitutional rights tension",
+  "description": "Advising on national security vs constitutional rights tension",
+  "content": "Scenario: Advising on national security vs constitutional rights tension\n    Given appeal involves claimed national security justification\n    And technical assessment is needed of security claims\n    When I evaluate security-rights tradeoff technically\n    Then I assess: whether claimed vulnerability is technically legitimate\n    And I explore: whether less rights-violating technical alternatives exist\n    And I examine: whether proposed security measure would actually work\n    And I clarify: technical reality vs security theater\n    And I avoid: dismissing security needs or exaggerating threats\n    And I provide: honest technical assessment\n    And I let: council judge values tradeoff given technical facts\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Advising on national security vs constitutional rights tension",
+    "ogDescription": "Advising on national security vs constitutional rights tension",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-nation-state-advising on national security vs constitutional rights tension",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advising on national security vs constitutional rights tension - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-nation-state-advising on national security vs constitutional rights tension",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state-advising on national security vs constitutional rights tension",
+    "name": "Advising on national security vs constitutional rights tension",
+    "description": "Advising on national security vs constitutional rights tension",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}
