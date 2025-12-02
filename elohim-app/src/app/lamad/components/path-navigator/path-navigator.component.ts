@@ -6,7 +6,7 @@ import { takeUntil } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '../../services/agent.service';
 import { PathStepView, LearningPath } from '../../models/learning-path.model';
-import { BloomMasteryLevel } from '../../models/content-mastery.model';
+import { MasteryLevel } from '../../models/content-mastery.model';
 import { RendererRegistryService, ContentRenderer } from '../../renderers/renderer-registry.service';
 
 interface SidebarStep {
@@ -57,8 +57,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   currentChapterId: string | null = null;
 
   // Bloom's Mastery State (Prototype)
-  currentBloomLevel: BloomMasteryLevel = 'not_started';
-  readonly BLOOM_LEVELS: BloomMasteryLevel[] = [
+  currentBloomLevel: MasteryLevel = 'not_started';
+  readonly BLOOM_LEVELS: MasteryLevel[] = [
     'not_started',
     'seen',
     'remember',

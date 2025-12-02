@@ -8,7 +8,7 @@ import { SessionHumanService } from '../../services/session-human.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { SessionHuman, SessionActivity, SessionPathProgress } from '../../models/session-human.model';
 import { MasteryStats } from '../../models/content-mastery.model';
-import { BloomMasteryLevel } from '../../models/agent.model';
+import { MasteryLevel } from '../../models/agent.model';
 
 /**
  * ProfilePageComponent - Session Human profile management.
@@ -45,7 +45,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   activityHistory: SessionActivity[] = [];
 
   // Mastery breakdown
-  masteryByLevel: { level: BloomMasteryLevel; count: number; label: string }[] = [];
+  masteryByLevel: { level: MasteryLevel; count: number; label: string }[] = [];
 
   // Activity filter
   activityFilter: 'all' | 'view' | 'affinity' | 'path-start' | 'path-complete' | 'step-complete' = 'all';
@@ -67,7 +67,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   // Level labels for display
-  readonly levelLabels: Record<BloomMasteryLevel, string> = {
+  readonly levelLabels: Record<MasteryLevel, string> = {
     not_started: 'Not Started',
     seen: 'Seen',
     remember: 'Remember',
@@ -137,7 +137,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   }
 
   private computeMasteryBreakdown(stats: MasteryStats): void {
-    const levels: BloomMasteryLevel[] = [
+    const levels: MasteryLevel[] = [
       'seen', 'remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'
     ];
 
@@ -301,8 +301,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     return `${days} days`;
   }
 
-  getMasteryLevelColor(level: BloomMasteryLevel): string {
-    const colors: Record<BloomMasteryLevel, string> = {
+  getMasteryLevelColor(level: MasteryLevel): string {
+    const colors: Record<MasteryLevel, string> = {
       not_started: '#9e9e9e',
       seen: '#90caf9',
       remember: '#81c784',

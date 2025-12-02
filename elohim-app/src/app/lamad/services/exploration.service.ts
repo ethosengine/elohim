@@ -359,104 +359,126 @@ export class ExplorationService {
     startTime: number
   ): GraphView {
     const focusNode = graph.nodes.get(query.focus)!;
-    const neighbors = new Map<number, ContentNode[]>();
-    const edges: GraphEdge[] = [];
-    const visited = new Set<string>([query.focus]);
+    const ctx: BfsContext = {
+      graph,
+      query,
+      neighbors: new Map(),
+      edges: [],
+      visited: new Set([query.focus]),
+      nodesTraversed: 1,
+      edgesExamined: 0
+    };
 
-    // Initialize with focus at depth 0
     let currentFrontier = [query.focus];
-    let nodesTraversed = 1;
-    let edgesExamined = 0;
 
     for (let depth = 1; depth <= query.depth && currentFrontier.length > 0; depth++) {
-      const nextFrontier: string[] = [];
-      const nodesAtDepth: ContentNode[] = [];
-
-      for (const nodeId of currentFrontier) {
-        // Get adjacent nodes
-        const adjacentIds = graph.adjacency.get(nodeId) || new Set();
-
-        for (const adjacentId of adjacentIds) {
-          edgesExamined++;
-
-          // Get the relationship
-          const relationship = this.findRelationship(graph, nodeId, adjacentId);
-
-          // Apply relationship filter if specified
-          if (query.relationshipFilter) {
-            const filters = Array.isArray(query.relationshipFilter)
-              ? query.relationshipFilter
-              : [query.relationshipFilter];
-            if (relationship && !filters.includes(relationship.relationshipType)) {
-              continue;
-            }
-          }
-
-          // Add edge
-          if (relationship) {
-            edges.push({
-              source: nodeId,
-              target: adjacentId,
-              relationshipType: relationship.relationshipType
-            });
-          }
-
-          // Process unvisited nodes
-          if (!visited.has(adjacentId)) {
-            visited.add(adjacentId);
-            nodesTraversed++;
-
-            const node = graph.nodes.get(adjacentId);
-            if (node) {
-              // Optionally strip content for performance
-              const nodeToAdd = query.includeContent === false
-                ? this.stripContent(node)
-                : node;
-              nodesAtDepth.push(nodeToAdd);
-              nextFrontier.push(adjacentId);
-            }
-
-            // Check max nodes limit
-            if (query.maxNodes && visited.size >= query.maxNodes) {
-              break;
-            }
-          }
-        }
-
-        if (query.maxNodes && visited.size >= query.maxNodes) {
-          break;
-        }
+      const result = this.processBfsDepth(currentFrontier, depth, ctx);
+      if (result.nodesAtDepth.length > 0) {
+        ctx.neighbors.set(depth, result.nodesAtDepth);
       }
-
-      if (nodesAtDepth.length > 0) {
-        neighbors.set(depth, nodesAtDepth);
-      }
-      currentFrontier = nextFrontier;
+      currentFrontier = result.nextFrontier;
+      if (result.maxReached) break;
     }
 
     const computeTimeMs = Date.now() - startTime;
+    const maxDepth = ctx.neighbors.size > 0 ? Math.max(...ctx.neighbors.keys()) : 0;
 
     return {
       focus: focusNode,
-      neighbors,
-      edges,
+      neighbors: ctx.neighbors,
+      edges: ctx.edges,
       metadata: {
-        nodesReturned: visited.size,
-        depthTraversed: Math.min(query.depth, neighbors.size > 0 ? Math.max(...neighbors.keys()) : 0),
+        nodesReturned: ctx.visited.size,
+        depthTraversed: Math.min(query.depth, maxDepth),
         computeTimeMs,
-        resourceCredits: this.calculateCredits(query.depth, visited.size),
-        nodesTraversed,
-        edgesExamined,
+        resourceCredits: this.calculateCredits(query.depth, ctx.visited.size),
+        nodesTraversed: ctx.nodesTraversed,
+        edgesExamined: ctx.edgesExamined,
         queriedAt: new Date().toISOString()
       }
     };
+  }
+
+  /** Process one depth level of BFS */
+  private processBfsDepth(
+    frontier: string[],
+    depth: number,
+    ctx: BfsContext
+  ): { nextFrontier: string[]; nodesAtDepth: ContentNode[]; maxReached: boolean } {
+    const nextFrontier: string[] = [];
+    const nodesAtDepth: ContentNode[] = [];
+
+    for (const nodeId of frontier) {
+      const adjacentIds = ctx.graph.adjacency.get(nodeId) || new Set();
+      for (const adjacentId of adjacentIds) {
+        ctx.edgesExamined++;
+        if (this.processAdjacentNode(nodeId, adjacentId, nodesAtDepth, nextFrontier, ctx)) {
+          if (ctx.query.maxNodes && ctx.visited.size >= ctx.query.maxNodes) {
+            return { nextFrontier, nodesAtDepth, maxReached: true };
+          }
+        }
+      }
+      if (ctx.query.maxNodes && ctx.visited.size >= ctx.query.maxNodes) {
+        return { nextFrontier, nodesAtDepth, maxReached: true };
+      }
+    }
+    return { nextFrontier, nodesAtDepth, maxReached: false };
+  }
+
+  /** Process a single adjacent node during BFS */
+  private processAdjacentNode(
+    sourceId: string,
+    targetId: string,
+    nodesAtDepth: ContentNode[],
+    nextFrontier: string[],
+    ctx: BfsContext
+  ): boolean {
+    const relationship = this.findRelationship(ctx.graph, sourceId, targetId);
+
+    // Apply relationship filter
+    if (!this.passesRelationshipFilter(relationship, ctx.query.relationshipFilter)) {
+      return false;
+    }
+
+    // Add edge
+    if (relationship) {
+      ctx.edges.push({
+        source: sourceId,
+        target: targetId,
+        relationshipType: relationship.relationshipType
+      });
+    }
+
+    // Process unvisited nodes
+    if (ctx.visited.has(targetId)) return false;
+
+    ctx.visited.add(targetId);
+    ctx.nodesTraversed++;
+
+    const node = ctx.graph.nodes.get(targetId);
+    if (node) {
+      const nodeToAdd = ctx.query.includeContent === false ? this.stripContent(node) : node;
+      nodesAtDepth.push(nodeToAdd);
+      nextFrontier.push(targetId);
+    }
+    return true;
+  }
+
+  /** Check if relationship passes the filter */
+  private passesRelationshipFilter(
+    relationship: ContentRelationship | null,
+    filter: string | string[] | undefined
+  ): boolean {
+    if (!filter) return true;
+    if (!relationship) return true;
+    const filters = Array.isArray(filter) ? filter : [filter];
+    return filters.includes(relationship.relationshipType);
   }
 
   /**
    * Find relationship between two nodes.
    */
   private findRelationship(graph: ContentGraph, sourceId: string, targetId: string): ContentRelationship | null {
-    // Try direct relationship
     for (const [, rel] of graph.relationships) {
       if (rel.sourceNodeId === sourceId && rel.targetNodeId === targetId) {
         return rel;
@@ -487,66 +509,137 @@ export class ExplorationService {
     query: PathfindingQuery,
     startTime: number
   ): PathResult | null {
-    const distances = new Map<string, number>();
-    const previous = new Map<string, string>();
-    const unvisited = new Set<string>(graph.nodes.keys());
-    let nodesTraversed = 0;
-    let edgesExamined = 0;
+    const ctx = this.initPathfindingContext(graph, query);
+    this.runDijkstra(ctx, () => 1); // Uniform weight of 1
+    return this.buildPathResult(graph, query, ctx, startTime);
+  }
 
-    // Initialize distances
+  /** Initialize pathfinding context */
+  private initPathfindingContext(graph: ContentGraph, query: PathfindingQuery): PathfindingContext {
+    const distances = new Map<string, number>();
     for (const nodeId of graph.nodes.keys()) {
       distances.set(nodeId, nodeId === query.from ? 0 : Infinity);
     }
+    return {
+      graph,
+      query,
+      distances,
+      previous: new Map(),
+      unvisited: new Set(graph.nodes.keys()),
+      nodesTraversed: 0,
+      edgesExamined: 0
+    };
+  }
 
-    while (unvisited.size > 0) {
-      // Find minimum distance node
-      let minDist = Infinity;
-      let current: string | null = null;
+  /** Run Dijkstra's algorithm with custom weight function */
+  private runDijkstra(
+    ctx: PathfindingContext,
+    getWeight: (rel: ContentRelationship | null, neighborId: string) => number
+  ): void {
+    while (ctx.unvisited.size > 0) {
+      const result = this.findMinDistanceNode(ctx);
+      if (!result) break;
 
-      for (const nodeId of unvisited) {
-        const dist = distances.get(nodeId)!;
-        if (dist < minDist) {
-          minDist = dist;
-          current = nodeId;
-        }
-      }
+      const { nodeId: current, distance: minDist } = result;
+      if (current === ctx.query.to) break;
 
-      if (!current || minDist === Infinity) break;
-      if (current === query.to) break;
+      ctx.unvisited.delete(current);
+      ctx.nodesTraversed++;
 
-      unvisited.delete(current);
-      nodesTraversed++;
+      if (ctx.query.maxHops && minDist >= ctx.query.maxHops) continue;
 
-      // Check max hops
-      if (query.maxHops && minDist >= query.maxHops) continue;
+      this.updateNeighborDistances(current, minDist, ctx, getWeight);
+    }
+  }
 
-      // Update neighbors
-      const neighbors = graph.adjacency.get(current) || new Set();
-      for (const neighborId of neighbors) {
-        edgesExamined++;
-        if (!unvisited.has(neighborId)) continue;
+  /** Find the unvisited node with minimum distance */
+  private findMinDistanceNode(ctx: PathfindingContext): { nodeId: string; distance: number } | null {
+    let minDist = Infinity;
+    let minNode: string | null = null;
 
-        const newDist = minDist + 1;
-        if (newDist < distances.get(neighborId)!) {
-          distances.set(neighborId, newDist);
-          previous.set(neighborId, current);
-        }
+    for (const nodeId of ctx.unvisited) {
+      const dist = ctx.distances.get(nodeId)!;
+      if (dist < minDist) {
+        minDist = dist;
+        minNode = nodeId;
       }
     }
 
-    // Reconstruct path
-    if (!previous.has(query.to) && query.from !== query.to) {
+    return (minNode && minDist < Infinity) ? { nodeId: minNode, distance: minDist } : null;
+  }
+
+  /** Update distances to neighbors */
+  private updateNeighborDistances(
+    current: string,
+    currentDist: number,
+    ctx: PathfindingContext,
+    getWeight: (rel: ContentRelationship | null, neighborId: string) => number
+  ): void {
+    const neighbors = ctx.graph.adjacency.get(current) || new Set();
+    for (const neighborId of neighbors) {
+      ctx.edgesExamined++;
+      if (!ctx.unvisited.has(neighborId)) continue;
+
+      const rel = this.findRelationship(ctx.graph, current, neighborId);
+      const weight = getWeight(rel, neighborId);
+      const newDist = currentDist + weight;
+
+      if (newDist < ctx.distances.get(neighborId)!) {
+        ctx.distances.set(neighborId, newDist);
+        ctx.previous.set(neighborId, current);
+      }
+    }
+  }
+
+  /** Build path result from pathfinding context */
+  private buildPathResult(
+    graph: ContentGraph,
+    query: PathfindingQuery,
+    ctx: PathfindingContext,
+    startTime: number,
+    semanticScore?: number
+  ): PathResult | null {
+    if (!ctx.previous.has(query.to) && query.from !== query.to) {
       return null;
     }
 
+    const path = this.reconstructPath(query.to, ctx.previous);
+    const edges = this.buildPathEdges(graph, path);
+    const computeTimeMs = Date.now() - startTime;
+
+    const result: PathResult = {
+      path,
+      edges,
+      length: path.length - 1,
+      metadata: {
+        nodesReturned: path.length,
+        depthTraversed: path.length - 1,
+        computeTimeMs,
+        resourceCredits: 10,
+        nodesTraversed: ctx.nodesTraversed,
+        edgesExamined: ctx.edgesExamined,
+        queriedAt: new Date().toISOString()
+      }
+    };
+    if (semanticScore !== undefined) {
+      result.semanticScore = semanticScore;
+    }
+    return result;
+  }
+
+  /** Reconstruct path from previous map */
+  private reconstructPath(target: string, previous: Map<string, string>): string[] {
     const path: string[] = [];
-    let current: string | undefined = query.to;
+    let current: string | undefined = target;
     while (current) {
       path.unshift(current);
       current = previous.get(current);
     }
+    return path;
+  }
 
-    // Build edges along path
+  /** Build edges array for a path */
+  private buildPathEdges(graph: ContentGraph, path: string[]): GraphEdge[] {
     const edges: GraphEdge[] = [];
     for (let i = 0; i < path.length - 1; i++) {
       const rel = this.findRelationship(graph, path[i], path[i + 1]);
@@ -556,23 +649,7 @@ export class ExplorationService {
         relationshipType: rel?.relationshipType ?? 'unknown'
       });
     }
-
-    const computeTimeMs = Date.now() - startTime;
-
-    return {
-      path,
-      edges,
-      length: path.length - 1,
-      metadata: {
-        nodesReturned: path.length,
-        depthTraversed: path.length - 1,
-        computeTimeMs,
-        resourceCredits: 10,
-        nodesTraversed,
-        edgesExamined,
-        queriedAt: new Date().toISOString()
-      }
-    };
+    return edges;
   }
 
   /**
@@ -583,7 +660,6 @@ export class ExplorationService {
     query: PathfindingQuery,
     startTime: number
   ): PathResult | null {
-    // For prototype: use weighted Dijkstra with relationship type preferences
     const relationshipWeights: Record<string, number> = {
       'BELONGS_TO': 1,
       'RELATES_TO': 2,
@@ -592,105 +668,20 @@ export class ExplorationService {
       'EXTENDS': 1.5
     };
 
-    const distances = new Map<string, number>();
-    const previous = new Map<string, string>();
-    const unvisited = new Set<string>(graph.nodes.keys());
-    let nodesTraversed = 0;
-    let edgesExamined = 0;
+    const ctx = this.initPathfindingContext(graph, query);
 
-    for (const nodeId of graph.nodes.keys()) {
-      distances.set(nodeId, nodeId === query.from ? 0 : Infinity);
-    }
+    // Run Dijkstra with semantic weights
+    this.runDijkstra(ctx, (rel) => {
+      const baseWeight = rel ? (relationshipWeights[rel.relationshipType] || 2) : 2;
+      const preferred = query.preferredRelationships?.includes(rel?.relationshipType ?? '');
+      return preferred ? baseWeight * 0.5 : baseWeight;
+    });
 
-    while (unvisited.size > 0) {
-      let minDist = Infinity;
-      let current: string | null = null;
-
-      for (const nodeId of unvisited) {
-        const dist = distances.get(nodeId)!;
-        if (dist < minDist) {
-          minDist = dist;
-          current = nodeId;
-        }
-      }
-
-      if (!current || minDist === Infinity) break;
-      if (current === query.to) break;
-
-      unvisited.delete(current);
-      nodesTraversed++;
-
-      const neighbors = graph.adjacency.get(current) || new Set();
-      for (const neighborId of neighbors) {
-        edgesExamined++;
-        if (!unvisited.has(neighborId)) continue;
-
-        // Get relationship weight
-        const rel = this.findRelationship(graph, current, neighborId);
-        const weight = rel
-          ? (relationshipWeights[rel.relationshipType] || 2)
-          : 2;
-
-        // Prefer relationships specified in query
-        let adjustedWeight = weight;
-        if (query.preferredRelationships && rel) {
-          if (query.preferredRelationships.includes(rel.relationshipType)) {
-            adjustedWeight *= 0.5; // Prefer these relationships
-          }
-        }
-
-        const newDist = minDist + adjustedWeight;
-        if (newDist < distances.get(neighborId)!) {
-          distances.set(neighborId, newDist);
-          previous.set(neighborId, current);
-        }
-      }
-    }
-
-    // Reconstruct path
-    if (!previous.has(query.to) && query.from !== query.to) {
-      return null;
-    }
-
-    const path: string[] = [];
-    let current: string | undefined = query.to;
-    while (current) {
-      path.unshift(current);
-      current = previous.get(current);
-    }
-
-    // Build edges along path
-    const edges: GraphEdge[] = [];
-    for (let i = 0; i < path.length - 1; i++) {
-      const rel = this.findRelationship(graph, path[i], path[i + 1]);
-      edges.push({
-        source: path[i],
-        target: path[i + 1],
-        relationshipType: rel?.relationshipType ?? 'unknown'
-      });
-    }
-
-    const computeTimeMs = Date.now() - startTime;
-
-    // Calculate semantic score (lower is better, invert for display)
-    const totalDistance = distances.get(query.to) ?? Infinity;
+    // Calculate semantic score
+    const totalDistance = ctx.distances.get(query.to) ?? Infinity;
     const semanticScore = totalDistance < Infinity ? 1 / totalDistance : 0;
 
-    return {
-      path,
-      edges,
-      length: path.length - 1,
-      semanticScore,
-      metadata: {
-        nodesReturned: path.length,
-        depthTraversed: path.length - 1,
-        computeTimeMs,
-        resourceCredits: 10,
-        nodesTraversed,
-        edgesExamined,
-        queriedAt: new Date().toISOString()
-      }
-    };
+    return this.buildPathResult(graph, query, ctx, startTime, semanticScore);
   }
 
   // =========================================================================
@@ -936,4 +927,24 @@ interface AgentRateLimitState {
   windowStart: number;
   explorationCount: number;
   pathfindingCount: number;
+}
+
+interface BfsContext {
+  graph: ContentGraph;
+  query: GraphExplorationQuery;
+  neighbors: Map<number, ContentNode[]>;
+  edges: GraphEdge[];
+  visited: Set<string>;
+  nodesTraversed: number;
+  edgesExamined: number;
+}
+
+interface PathfindingContext {
+  graph: ContentGraph;
+  query: PathfindingQuery;
+  distances: Map<string, number>;
+  previous: Map<string, string>;
+  unvisited: Set<string>;
+  nodesTraversed: number;
+  edgesExamined: number;
 }

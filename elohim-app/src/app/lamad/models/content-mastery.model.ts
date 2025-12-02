@@ -6,7 +6,7 @@
  * to active contribution.
  *
  * Key concepts:
- * - BloomMasteryLevel: 8-level progression (not_started → create)
+ * - MasteryLevel: 8-level progression (not_started → create)
  * - Attestation Gate: "apply" level unlocks participation privileges
  * - Freshness: Mastery decays based on time and graph evolution
  * - Expertise Discovery: Graph reveals who knows what
@@ -14,11 +14,14 @@
  * Reference: Anderson & Krathwohl (2001), Bloom's Revised Taxonomy
  */
 
-import type { BloomMasteryLevel } from './agent.model';
+import type { MasteryLevel } from './agent.model';
 
 // Re-export for convenience
-export type { BloomMasteryLevel } from './agent.model';
-export { BLOOM_LEVEL_VALUES, ATTESTATION_GATE_LEVEL } from './agent.model';
+export type { MasteryLevel } from './agent.model';
+export { MASTERY_LEVEL_VALUES, ATTESTATION_GATE_LEVEL } from './agent.model';
+
+/** @deprecated Use MASTERY_LEVEL_VALUES instead */
+export { BLOOM_LEVEL_VALUES } from './agent.model';
 
 /**
  * ContentMastery - A human's mastery state for a specific content node.
@@ -39,8 +42,8 @@ export interface ContentMastery {
   /** Human/agent ID */
   humanId: string;
 
-  /** Current Bloom's level achieved */
-  level: BloomMasteryLevel;
+  /** Current mastery level achieved (Bloom's taxonomy) */
+  level: MasteryLevel;
 
   /** When this level was achieved */
   levelAchievedAt: string; // ISO 8601
@@ -111,8 +114,8 @@ export type EngagementType =
  * LevelProgressionEvent - Record of mastery level change.
  */
 export interface LevelProgressionEvent {
-  fromLevel: BloomMasteryLevel;
-  toLevel: BloomMasteryLevel;
+  fromLevel: MasteryLevel;
+  toLevel: MasteryLevel;
   timestamp: string;
   trigger: 'assessment' | 'engagement' | 'contribution' | 'decay' | 'refresh';
   evidence?: string; // Assessment ID, contribution ID, etc.
@@ -126,7 +129,7 @@ export interface AssessmentEvidence {
   assessmentType: 'recall' | 'comprehension' | 'application' | 'analysis';
   score: number; // 0.0-1.0
   passedAt: string;
-  contributesToLevel: BloomMasteryLevel;
+  contributesToLevel: MasteryLevel;
 }
 
 /**
@@ -134,7 +137,7 @@ export interface AssessmentEvidence {
  */
 export interface PeerEvaluation {
   evaluatorId: string;
-  evaluatorLevel: BloomMasteryLevel;
+  evaluatorLevel: MasteryLevel;
   rating: number; // 0.0-1.0
   feedback?: string;
   timestamp: string;
@@ -157,7 +160,7 @@ export interface ContentContribution {
 export interface ContentPrivilege {
   privilege: PrivilegeType;
   grantedAt: string;
-  grantedByLevel: BloomMasteryLevel;
+  grantedByLevel: MasteryLevel;
   active: boolean;
   suspendedReason?: 'freshness_decay' | 'moderation' | 'content_change';
 }
@@ -185,7 +188,7 @@ export type PrivilegeType =
 /**
  * Map of privileges to minimum required Bloom's level.
  */
-export const PRIVILEGE_REQUIREMENTS: Record<PrivilegeType, BloomMasteryLevel> = {
+export const PRIVILEGE_REQUIREMENTS: Record<PrivilegeType, MasteryLevel> = {
   view: 'not_started',
   practice: 'not_started',
   comment: 'analyze',
@@ -212,7 +215,7 @@ export interface MasteryStats {
   totalMasteredNodes: number;
 
   /** Distribution by level */
-  levelDistribution: Record<BloomMasteryLevel, number>;
+  levelDistribution: Record<MasteryLevel, number>;
 
   /** Nodes at or above attestation gate */
   nodesAboveGate: number;
@@ -258,7 +261,7 @@ export interface TypeMasteryStats {
  */
 export interface ContentMasterySnapshot {
   contentId: string;
-  level: BloomMasteryLevel;
+  level: MasteryLevel;
   freshness: number;
   levelAchievedAt: string;
   hasGatePrivileges: boolean; // Is at or above apply level?
@@ -303,7 +306,7 @@ export const FRESHNESS_THRESHOLDS = {
  * Decay rates by mastery level (lambda for exponential decay).
  * Higher levels decay slower when actively used.
  */
-export const DECAY_RATES: Record<BloomMasteryLevel, number> = {
+export const DECAY_RATES: Record<MasteryLevel, number> = {
   not_started: 0, // No decay
   seen: 0.05, // Fast decay - just viewing
   remember: 0.03, // Moderate decay

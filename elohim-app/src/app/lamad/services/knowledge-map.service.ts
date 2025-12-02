@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
-import { map, switchMap } from 'rxjs/operators';
+import { map, switchMap, tap } from 'rxjs/operators';
 
 import { DataLoaderService } from './data-loader.service';
 import { ElohimAgentService } from './elohim-agent.service';
@@ -593,14 +593,18 @@ export class KnowledgeMapService {
 
   /**
    * Recalculate affinity for domain map based on mastery levels.
+   * Uses Bloom's Taxonomy levels (not_started → create).
    */
   private recalculateDomainAffinity(m: DomainKnowledgeMap): void {
     const masteryWeights: Record<MasteryLevel, number> = {
-      'not-started': 0,
-      'struggling': 0.15,
-      'learning': 0.35,
-      'practicing': 0.6,
-      'mastered': 1.0
+      'not_started': 0,
+      'seen': 0.1,
+      'remember': 0.2,
+      'understand': 0.35,
+      'apply': 0.5,      // Attestation gate
+      'analyze': 0.7,
+      'evaluate': 0.85,
+      'create': 1.0
     };
 
     if (m.masteryLevels.size === 0) {
@@ -700,9 +704,9 @@ export class KnowledgeMapService {
       overallAffinity: 0.7,
       contentGraphId: 'elohim-protocol-graph',
       masteryLevels: new Map([
-        ['manifesto', 'practicing'],
-        ['governance-epic', 'learning'],
-        ['hardware-spec', 'not-started']
+        ['manifesto', 'apply'],
+        ['governance-epic', 'understand'],
+        ['hardware-spec', 'not_started']
       ]),
       createdAt: now,
       updatedAt: now

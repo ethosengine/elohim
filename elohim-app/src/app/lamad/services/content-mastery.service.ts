@@ -15,7 +15,7 @@ import {
   LevelProgressionEvent,
 } from '../models/content-mastery.model';
 import {
-  BloomMasteryLevel,
+  MasteryLevel,
   isAboveGate,
   compareMasteryLevels,
 } from '../models/agent.model';
@@ -115,7 +115,7 @@ export class ContentMasteryService {
     return {
       contentId: content.contentId,
       humanId: entry.authorAgent,
-      level: content.level as BloomMasteryLevel,
+      level: content.level as MasteryLevel,
       levelAchievedAt: content.levelAchievedAt,
       levelHistory: [],  // Would need to query all entries for full history
       lastEngagementAt: content.lastEngagementAt,
@@ -124,7 +124,7 @@ export class ContentMasteryService {
       freshness: content.freshness,
       needsRefresh: false,
       assessmentEvidence: [],
-      privileges: this.computePrivileges(content.level as BloomMasteryLevel),
+      privileges: this.computePrivileges(content.level as MasteryLevel),
     };
   }
 
@@ -151,7 +151,7 @@ export class ContentMasteryService {
   /**
    * Get mastery level for content.
    */
-  getMasteryLevel(contentId: string): Observable<BloomMasteryLevel> {
+  getMasteryLevel(contentId: string): Observable<MasteryLevel> {
     return this.mastery$.pipe(
       map(cache => cache.get(contentId)?.level ?? 'not_started')
     );
@@ -160,7 +160,7 @@ export class ContentMasteryService {
   /**
    * Get mastery level synchronously.
    */
-  getMasteryLevelSync(contentId: string): BloomMasteryLevel {
+  getMasteryLevelSync(contentId: string): MasteryLevel {
     return this.masteryCache.get(contentId)?.level ?? 'not_started';
   }
 
@@ -218,7 +218,7 @@ export class ContentMasteryService {
     contentId: string,
     assessmentType: AssessmentEvidence['assessmentType'],
     score: number
-  ): BloomMasteryLevel {
+  ): MasteryLevel {
     const current = this.getMasteryLevelSync(contentId);
     let newLevel = current;
 
@@ -254,7 +254,7 @@ export class ContentMasteryService {
    */
   setMasteryLevel(
     contentId: string,
-    level: BloomMasteryLevel,
+    level: MasteryLevel,
     engagementType: EngagementType = 'view'
   ): void {
     const now = new Date().toISOString();
@@ -371,7 +371,7 @@ export class ContentMasteryService {
   /**
    * Compute privileges for a level.
    */
-  private computePrivileges(level: BloomMasteryLevel): ContentPrivilege[] {
+  private computePrivileges(level: MasteryLevel): ContentPrivilege[] {
     const privileges: ContentPrivilege[] = [];
     const now = new Date().toISOString();
 
@@ -493,7 +493,7 @@ export class ContentMasteryService {
   /**
    * Get the higher of two mastery levels.
    */
-  private maxLevel(a: BloomMasteryLevel, b: BloomMasteryLevel): BloomMasteryLevel {
+  private maxLevel(a: MasteryLevel, b: MasteryLevel): MasteryLevel {
     return compareMasteryLevels(a, b) >= 0 ? a : b;
   }
 

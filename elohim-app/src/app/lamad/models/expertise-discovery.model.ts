@@ -14,7 +14,7 @@
  * - "Who's on the shortlist for X?"
  */
 
-import { BloomMasteryLevel } from './agent.model';
+import { MasteryLevel } from './agent.model';
 
 /**
  * ExpertiseQuery - Parameters for finding experts.
@@ -24,7 +24,7 @@ export interface ExpertiseQuery {
   domains: string[];
 
   /** Minimum mastery level required */
-  minLevel?: BloomMasteryLevel;
+  minLevel?: MasteryLevel;
 
   /** Minimum freshness required (0.0-1.0) */
   minFreshness?: number;
@@ -109,7 +109,7 @@ export interface ExpertiseScoreBreakdown {
 export interface ExpertiseNodeSummary {
   contentId: string;
   contentTitle: string;
-  level: BloomMasteryLevel;
+  level: MasteryLevel;
   freshness: number;
   contributionCount: number;
   lastEngagement: string;
@@ -244,7 +244,7 @@ export interface MentorMatchQuery {
   learningContentIds: string[];
 
   /** Learner's current levels for context */
-  currentLevels: Record<string, BloomMasteryLevel>;
+  currentLevels: Record<string, MasteryLevel>;
 
   /** Prefer mentors with teaching experience */
   preferTeachers?: boolean;

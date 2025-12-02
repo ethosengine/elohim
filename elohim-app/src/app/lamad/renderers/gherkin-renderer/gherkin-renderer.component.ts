@@ -200,202 +200,214 @@ export class GherkinRendererComponent implements OnChanges {
 
     try {
       const lines = this.content.split('\n');
-      const feature: GherkinFeature = {
-        name: '',
-        description: '',
-        tags: [],
-        scenarios: []
-      };
-
-      let currentTags: string[] = [];
-      let currentScenario: GherkinScenario | null = null;
-      let currentExample: { name: string; table: string[][] } | null = null;
-      let inDocString = false;
-      let docStringContent: string[] = [];
-      let inDescription = false;
-      let descriptionLines: string[] = [];
+      const ctx = this.createParseContext();
 
       for (const line of lines) {
-        const trimmed = line.trim();
-
-        // Skip empty lines (unless in doc string)
-        if (!trimmed && !inDocString) {
-          if (inDescription) {
-            inDescription = false;
-          }
-          continue;
-        }
-
-        // Doc string handling
-        if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
-          if (inDocString) {
-            // End doc string
-            if (currentScenario && currentScenario.steps.length > 0) {
-              currentScenario.steps[currentScenario.steps.length - 1].docString = docStringContent.join('\n');
-            }
-            docStringContent = [];
-            inDocString = false;
-          } else {
-            // Start doc string
-            inDocString = true;
-          }
-          continue;
-        }
-
-        if (inDocString) {
-          docStringContent.push(line);
-          continue;
-        }
-
-        // Tags
-        if (trimmed.startsWith('@')) {
-          const tags = trimmed.split(/\s+/).filter(t => t.startsWith('@'));
-          currentTags.push(...tags);
-          continue;
-        }
-
-        // Feature
-        if (trimmed.startsWith('Feature:')) {
-          feature.name = trimmed.substring(8).trim();
-          feature.tags = [...currentTags];
-          currentTags = [];
-          inDescription = true;
-          continue;
-        }
-
-        // Feature description (lines after Feature: before first Scenario/Background)
-        if (inDescription && !trimmed.startsWith('Scenario') && !trimmed.startsWith('Background')) {
-          descriptionLines.push(trimmed);
-          continue;
-        }
-
-        // Background
-        if (trimmed.startsWith('Background:')) {
-          inDescription = false;
-          feature.description = descriptionLines.join(' ').trim();
-          descriptionLines = [];
-
-          currentScenario = {
-            type: 'background',
-            name: trimmed.substring(11).trim(),
-            tags: [],
-            steps: [],
-            collapsed: false
-          };
-          feature.background = currentScenario;
-          continue;
-        }
-
-        // Scenario / Scenario Outline
-        if (trimmed.startsWith('Scenario Outline:') || trimmed.startsWith('Scenario Template:')) {
-          inDescription = false;
-          if (!feature.description && descriptionLines.length) {
-            feature.description = descriptionLines.join(' ').trim();
-            descriptionLines = [];
-          }
-
-          this.saveCurrentScenario(feature, currentScenario);
-          currentScenario = {
-            type: 'scenario_outline',
-            name: trimmed.replace(/^Scenario (Outline|Template):/, '').trim(),
-            tags: [...currentTags],
-            steps: [],
-            examples: [],
-            collapsed: false
-          };
-          currentTags = [];
-          currentExample = null;
-          continue;
-        }
-
-        if (trimmed.startsWith('Scenario:')) {
-          inDescription = false;
-          if (!feature.description && descriptionLines.length) {
-            feature.description = descriptionLines.join(' ').trim();
-            descriptionLines = [];
-          }
-
-          this.saveCurrentScenario(feature, currentScenario);
-          currentScenario = {
-            type: 'scenario',
-            name: trimmed.substring(9).trim(),
-            tags: [...currentTags],
-            steps: [],
-            collapsed: false
-          };
-          currentTags = [];
-          currentExample = null;
-          continue;
-        }
-
-        // Examples
-        if (trimmed.startsWith('Examples:')) {
-          currentExample = {
-            name: trimmed.substring(9).trim(),
-            table: []
-          };
-          if (currentScenario?.examples) {
-            currentScenario.examples.push(currentExample);
-          }
-          continue;
-        }
-
-        // Steps
-        const stepRegex = /^(Given|When|Then|And|But|\*)\s+(.+)$/;
-        const stepMatch = stepRegex.exec(trimmed);
-        if (stepMatch && currentScenario) {
-          currentScenario.steps.push({
-            keyword: stepMatch[1] + ' ',
-            text: stepMatch[2]
-          });
-          continue;
-        }
-
-        // Data table row
-        if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-          const cells = trimmed
-            .slice(1, -1)
-            .split('|')
-            .map(c => c.trim());
-
-          if (currentExample) {
-            currentExample.table.push(cells);
-          } else if (currentScenario && currentScenario.steps.length > 0) {
-            const lastStep = currentScenario.steps[currentScenario.steps.length - 1];
-            lastStep.dataTable ??= [];
-            lastStep.dataTable.push(cells);
-          }
-        }
+        this.parseLine(line, ctx);
       }
 
-      // Save final scenario
-      this.saveCurrentScenario(feature, currentScenario);
-
-      // Set description if not already set
-      if (!feature.description && descriptionLines.length) {
-        feature.description = descriptionLines.join(' ').trim();
-      }
-
-      // Handle standalone scenarios (missing Feature: line)
-      // If we found scenarios but no feature name, valid case for standalone scenarios
-      if (!feature.name && feature.scenarios.length > 0) {
-        // Use the title from the node if available, or first scenario name
-        feature.name = this.node?.title || feature.scenarios[0].name || 'Untitled Feature';
-      }
-
-      // Calculate total steps
-      this.totalSteps = feature.scenarios.reduce((sum, s) => sum + s.steps.length, 0);
-      if (feature.background) {
-        this.totalSteps += feature.background.steps.length;
-      }
-
-      // Valid if it has a name (found or inferred) and scenarios
-      this.feature = (feature.name || feature.scenarios.length > 0) ? feature : null;
-
+      this.finalizeFeature(ctx);
     } catch (error) {
       console.warn('Failed to parse Gherkin:', error);
       this.feature = null;
     }
+  }
+
+  /** Create initial parsing context */
+  private createParseContext(): ParseContext {
+    return {
+      feature: { name: '', description: '', tags: [], scenarios: [] },
+      currentTags: [],
+      currentScenario: null,
+      currentExample: null,
+      inDocString: false,
+      docStringContent: [],
+      inDescription: false,
+      descriptionLines: []
+    };
+  }
+
+  /** Parse a single line of Gherkin */
+  private parseLine(line: string, ctx: ParseContext): void {
+    const trimmed = line.trim();
+
+    // Handle doc strings first (they can contain anything)
+    if (this.handleDocString(line, trimmed, ctx)) return;
+
+    // Skip empty lines outside doc strings
+    if (!trimmed) {
+      ctx.inDescription = false;
+      return;
+    }
+
+    // Try each line type in order
+    if (this.handleTags(trimmed, ctx)) return;
+    if (this.handleFeature(trimmed, ctx)) return;
+    if (this.handleDescription(trimmed, ctx)) return;
+    if (this.handleBackground(trimmed, ctx)) return;
+    if (this.handleScenarioOutline(trimmed, ctx)) return;
+    if (this.handleScenario(trimmed, ctx)) return;
+    if (this.handleExamples(trimmed, ctx)) return;
+    if (this.handleStep(trimmed, ctx)) return;
+    this.handleDataTable(trimmed, ctx);
+  }
+
+  /** Handle doc string delimiters and content */
+  private handleDocString(line: string, trimmed: string, ctx: ParseContext): boolean {
+    if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
+      if (ctx.inDocString) {
+        // End doc string
+        if (ctx.currentScenario?.steps.length) {
+          ctx.currentScenario.steps[ctx.currentScenario.steps.length - 1].docString = ctx.docStringContent.join('\n');
+        }
+        ctx.docStringContent = [];
+        ctx.inDocString = false;
+      } else {
+        ctx.inDocString = true;
+      }
+      return true;
+    }
+    if (ctx.inDocString) {
+      ctx.docStringContent.push(line);
+      return true;
+    }
+    return false;
+  }
+
+  /** Handle @tag lines */
+  private handleTags(trimmed: string, ctx: ParseContext): boolean {
+    if (!trimmed.startsWith('@')) return false;
+    const tags = trimmed.split(/\s+/).filter(t => t.startsWith('@'));
+    ctx.currentTags.push(...tags);
+    return true;
+  }
+
+  /** Handle Feature: line */
+  private handleFeature(trimmed: string, ctx: ParseContext): boolean {
+    if (!trimmed.startsWith('Feature:')) return false;
+    ctx.feature.name = trimmed.substring(8).trim();
+    ctx.feature.tags = [...ctx.currentTags];
+    ctx.currentTags = [];
+    ctx.inDescription = true;
+    return true;
+  }
+
+  /** Handle feature description lines */
+  private handleDescription(trimmed: string, ctx: ParseContext): boolean {
+    if (!ctx.inDescription) return false;
+    if (trimmed.startsWith('Scenario') || trimmed.startsWith('Background')) return false;
+    ctx.descriptionLines.push(trimmed);
+    return true;
+  }
+
+  /** Handle Background: line */
+  private handleBackground(trimmed: string, ctx: ParseContext): boolean {
+    if (!trimmed.startsWith('Background:')) return false;
+    this.finalizeDescription(ctx);
+    ctx.currentScenario = {
+      type: 'background',
+      name: trimmed.substring(11).trim(),
+      tags: [],
+      steps: [],
+      collapsed: false
+    };
+    ctx.feature.background = ctx.currentScenario;
+    return true;
+  }
+
+  /** Handle Scenario Outline: or Scenario Template: */
+  private handleScenarioOutline(trimmed: string, ctx: ParseContext): boolean {
+    if (!trimmed.startsWith('Scenario Outline:') && !trimmed.startsWith('Scenario Template:')) return false;
+    this.finalizeDescription(ctx);
+    this.saveCurrentScenario(ctx.feature, ctx.currentScenario);
+    ctx.currentScenario = {
+      type: 'scenario_outline',
+      name: trimmed.replace(/^Scenario (Outline|Template):/, '').trim(),
+      tags: [...ctx.currentTags],
+      steps: [],
+      examples: [],
+      collapsed: false
+    };
+    ctx.currentTags = [];
+    ctx.currentExample = null;
+    return true;
+  }
+
+  /** Handle Scenario: line */
+  private handleScenario(trimmed: string, ctx: ParseContext): boolean {
+    if (!trimmed.startsWith('Scenario:')) return false;
+    this.finalizeDescription(ctx);
+    this.saveCurrentScenario(ctx.feature, ctx.currentScenario);
+    ctx.currentScenario = {
+      type: 'scenario',
+      name: trimmed.substring(9).trim(),
+      tags: [...ctx.currentTags],
+      steps: [],
+      collapsed: false
+    };
+    ctx.currentTags = [];
+    ctx.currentExample = null;
+    return true;
+  }
+
+  /** Handle Examples: line */
+  private handleExamples(trimmed: string, ctx: ParseContext): boolean {
+    if (!trimmed.startsWith('Examples:')) return false;
+    ctx.currentExample = { name: trimmed.substring(9).trim(), table: [] };
+    ctx.currentScenario?.examples?.push(ctx.currentExample);
+    return true;
+  }
+
+  /** Handle step lines (Given/When/Then/And/But) */
+  private handleStep(trimmed: string, ctx: ParseContext): boolean {
+    const stepMatch = /^(Given|When|Then|And|But|\*)\s+(.+)$/.exec(trimmed);
+    if (!stepMatch || !ctx.currentScenario) return false;
+    ctx.currentScenario.steps.push({ keyword: stepMatch[1] + ' ', text: stepMatch[2] });
+    return true;
+  }
+
+  /** Handle data table rows */
+  private handleDataTable(trimmed: string, ctx: ParseContext): void {
+    if (!trimmed.startsWith('|') || !trimmed.endsWith('|')) return;
+    const cells = trimmed.slice(1, -1).split('|').map(c => c.trim());
+    if (ctx.currentExample) {
+      ctx.currentExample.table.push(cells);
+    } else if (ctx.currentScenario?.steps.length) {
+      const lastStep = ctx.currentScenario.steps[ctx.currentScenario.steps.length - 1];
+      lastStep.dataTable ??= [];
+      lastStep.dataTable.push(cells);
+    }
+  }
+
+  /** Finalize description when entering scenario/background */
+  private finalizeDescription(ctx: ParseContext): void {
+    ctx.inDescription = false;
+    if (!ctx.feature.description && ctx.descriptionLines.length) {
+      ctx.feature.description = ctx.descriptionLines.join(' ').trim();
+      ctx.descriptionLines = [];
+    }
+  }
+
+  /** Finalize feature after parsing all lines */
+  private finalizeFeature(ctx: ParseContext): void {
+    this.saveCurrentScenario(ctx.feature, ctx.currentScenario);
+
+    if (!ctx.feature.description && ctx.descriptionLines.length) {
+      ctx.feature.description = ctx.descriptionLines.join(' ').trim();
+    }
+
+    // Handle standalone scenarios without Feature: line
+    if (!ctx.feature.name && ctx.feature.scenarios.length > 0) {
+      ctx.feature.name = this.node?.title || ctx.feature.scenarios[0].name || 'Untitled Feature';
+    }
+
+    // Calculate total steps
+    this.totalSteps = ctx.feature.scenarios.reduce((sum, s) => sum + s.steps.length, 0);
+    if (ctx.feature.background) {
+      this.totalSteps += ctx.feature.background.steps.length;
+    }
+
+    this.feature = (ctx.feature.name || ctx.feature.scenarios.length > 0) ? ctx.feature : null;
   }
 
   private saveCurrentScenario(feature: GherkinFeature, scenario: GherkinScenario | null): void {
@@ -403,4 +415,16 @@ export class GherkinRendererComponent implements OnChanges {
       feature.scenarios.push(scenario);
     }
   }
+}
+
+/** Internal parsing context */
+interface ParseContext {
+  feature: GherkinFeature;
+  currentTags: string[];
+  currentScenario: GherkinScenario | null;
+  currentExample: { name: string; table: string[][] } | null;
+  inDocString: boolean;
+  docStringContent: string[];
+  inDescription: boolean;
+  descriptionLines: string[];
 }

@@ -223,7 +223,7 @@ export class ProfileService {
         name: this.formatAttestationName(attestationId),
         description: `Earned through completing learning path`,
         earnedAt: new Date().toISOString(), // Would come from attestation metadata
-        level: 'learning' as const,
+        level: 'apply' as const, // Bloom's Taxonomy: demonstrates practical application
         icon: '🏅',
       }))
     );

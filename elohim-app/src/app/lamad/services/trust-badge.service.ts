@@ -566,10 +566,10 @@ export class TrustBadgeService {
   ): ContentAttestationType[] {
     const nextReach = this.getNextReachLevel(currentReach);
     if (!nextReach) {
-      return []; // Already at max
+      // Already at max reach level
+      return [];
     }
 
-    // Map of reach levels to required attestations
     const requirements: Record<ContentReach, ContentAttestationType[]> = {
       'private': [],
       'invited': ['author-verified'],

@@ -311,7 +311,7 @@ export interface HumanProfileContent {
  */
 export interface MasteryRecordContent {
   contentId: string;
-  level: string;  // BloomMasteryLevel
+  level: string;  // MasteryLevel (Bloom's Taxonomy: not_started → create)
   levelAchievedAt: string;
   freshness: number;
   lastEngagementAt: string;

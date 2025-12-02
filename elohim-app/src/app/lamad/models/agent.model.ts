@@ -137,7 +137,7 @@ export type AttestationCategory =
   | 'achievement';      // One-time participation recognition
 
 /**
- * BloomMasteryLevel - Content mastery based on Bloom's Taxonomy.
+ * MasteryLevel - Content mastery based on Bloom's Taxonomy.
  *
  * Progression from passive consumption to active contribution.
  * The 'apply' level is the attestation gate - crossing it unlocks
@@ -155,7 +155,7 @@ export type AttestationCategory =
  *
  * Reference: Anderson & Krathwohl (2001), Bloom's Revised Taxonomy
  */
-export type BloomMasteryLevel =
+export type MasteryLevel =
   | 'not_started' // 0 - No engagement
   | 'seen' // 1 - Content viewed
   | 'remember' // 2 - Basic recall demonstrated
@@ -166,9 +166,9 @@ export type BloomMasteryLevel =
   | 'create'; // 7 - Can author, derive, synthesize
 
 /**
- * Numeric value for BloomMasteryLevel for comparison and persistence.
+ * Numeric value for MasteryLevel for comparison and persistence.
  */
-export const BLOOM_LEVEL_VALUES: Record<BloomMasteryLevel, number> = {
+export const MASTERY_LEVEL_VALUES: Record<MasteryLevel, number> = {
   not_started: 0,
   seen: 1,
   remember: 2,
@@ -180,17 +180,22 @@ export const BLOOM_LEVEL_VALUES: Record<BloomMasteryLevel, number> = {
 };
 
 /**
+ * @deprecated Use MASTERY_LEVEL_VALUES instead.
+ */
+export const BLOOM_LEVEL_VALUES = MASTERY_LEVEL_VALUES;
+
+/**
  * The level at which participation privileges unlock.
  * Below this: passive learning (practice anything, no contribution privileges)
  * At/above this: active participation (comment, review, create)
  */
-export const ATTESTATION_GATE_LEVEL: BloomMasteryLevel = 'apply';
+export const ATTESTATION_GATE_LEVEL: MasteryLevel = 'apply';
 
 /**
  * Check if a mastery level is at or above the attestation gate.
  */
-export function isAboveGate(level: BloomMasteryLevel): boolean {
-  return BLOOM_LEVEL_VALUES[level] >= BLOOM_LEVEL_VALUES[ATTESTATION_GATE_LEVEL];
+export function isAboveGate(level: MasteryLevel): boolean {
+  return MASTERY_LEVEL_VALUES[level] >= MASTERY_LEVEL_VALUES[ATTESTATION_GATE_LEVEL];
 }
 
 /**
@@ -198,27 +203,16 @@ export function isAboveGate(level: BloomMasteryLevel): boolean {
  * Returns negative if a < b, zero if equal, positive if a > b.
  */
 export function compareMasteryLevels(
-  a: BloomMasteryLevel,
-  b: BloomMasteryLevel
+  a: MasteryLevel,
+  b: MasteryLevel
 ): number {
-  return BLOOM_LEVEL_VALUES[a] - BLOOM_LEVEL_VALUES[b];
+  return MASTERY_LEVEL_VALUES[a] - MASTERY_LEVEL_VALUES[b];
 }
 
 /**
- * @deprecated Use BloomMasteryLevel instead.
- * Old MasteryLevel mapped to new levels:
- * - 'not-started' → 'not_started'
- * - 'struggling' → 'remember' (attempting recall)
- * - 'learning' → 'understand'
- * - 'practicing' → 'apply'
- * - 'mastered' → 'create' (full mastery includes creation)
+ * @deprecated Use MasteryLevel instead. This is the old type alias kept for backwards compatibility.
  */
-export type MasteryLevel =
-  | 'not-started'
-  | 'struggling'
-  | 'learning'
-  | 'practicing'
-  | 'mastered';
+export type BloomMasteryLevel = MasteryLevel;
 
 /**
  * NewAttestation - Refined attestation model for v2

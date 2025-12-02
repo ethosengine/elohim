@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { ContentMasteryService } from './content-mastery.service';
 import { LocalSourceChainService } from './local-source-chain.service';
 import { SessionHumanService } from './session-human.service';
-import { BloomMasteryLevel } from '../models/agent.model';
+import { MasteryLevel } from '../models/agent.model';
 import { FRESHNESS_THRESHOLDS } from '../models/content-mastery.model';
 import { BehaviorSubject } from 'rxjs';
 import { SessionHuman } from '../models/session-human.model';
@@ -345,7 +345,7 @@ describe('ContentMasteryService', () => {
       const oldMastery = {
         contentId: TEST_CONTENT_ID,
         humanId: TEST_SESSION_ID,
-        level: 'understand' as BloomMasteryLevel,
+        level: 'understand' as MasteryLevel,
         levelAchievedAt: '2025-01-01T00:00:00.000Z',
         levelHistory: [],
         lastEngagementAt: '2024-01-01T00:00:00.000Z',  // 1 year ago

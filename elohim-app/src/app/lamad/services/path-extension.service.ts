@@ -444,7 +444,26 @@ export class PathExtensionService {
   private resolveExtension(path: LearningPath, ext: PathExtension): ApplyExtensionResult {
     const warnings: ExtensionWarning[] = [];
 
-    // Check version compatibility
+    this.checkVersionCompatibility(path, ext, warnings);
+
+    // Start with base steps (deep copy)
+    let effectiveSteps = JSON.parse(JSON.stringify(path.steps)) as PathStep[];
+    const indexMapping = new Map<number, string>();
+    effectiveSteps.forEach((_, i) => indexMapping.set(i, `base-${i}`));
+
+    // Apply modifications in order
+    const excludedIndices = this.processExclusions(ext.exclusions, effectiveSteps.length, warnings);
+    effectiveSteps = this.applyReorderings(effectiveSteps, ext.reorderings, indexMapping, warnings);
+    effectiveSteps = this.applyInsertions(effectiveSteps, ext.insertions, indexMapping, warnings);
+    effectiveSteps = this.removeExcludedSteps(effectiveSteps, excludedIndices, indexMapping);
+
+    const annotationsMap = this.buildAnnotationsMap(ext.annotations, indexMapping);
+
+    return { effectiveSteps, indexMapping, annotations: annotationsMap, warnings };
+  }
+
+  /** Check version compatibility */
+  private checkVersionCompatibility(path: LearningPath, ext: PathExtension, warnings: ExtensionWarning[]): void {
     if (path.version !== ext.basePathVersion) {
       warnings.push({
         type: 'version-mismatch',
@@ -452,18 +471,17 @@ export class PathExtensionService {
         affectedItems: [ext.id]
       });
     }
+  }
 
-    // Start with base steps (deep copy)
-    let effectiveSteps = JSON.parse(JSON.stringify(path.steps)) as PathStep[];
-    const indexMapping = new Map<number, string>();
-
-    // Initialize index mapping
-    effectiveSteps.forEach((_, i) => indexMapping.set(i, `base-${i}`));
-
-    // Apply exclusions first (mark steps to skip)
+  /** Process exclusions and return excluded indices */
+  private processExclusions(
+    exclusions: StepExclusion[],
+    stepCount: number,
+    warnings: ExtensionWarning[]
+  ): Set<number> {
     const excludedIndices = new Set<number>();
-    for (const exclusion of ext.exclusions) {
-      if (exclusion.stepIndex < effectiveSteps.length) {
+    for (const exclusion of exclusions) {
+      if (exclusion.stepIndex < stepCount) {
         excludedIndices.add(exclusion.stepIndex);
       } else {
         warnings.push({
@@ -473,11 +491,19 @@ export class PathExtensionService {
         });
       }
     }
+    return excludedIndices;
+  }
 
-    // Apply reorderings
+  /** Apply step reorderings */
+  private applyReorderings(
+    steps: PathStep[],
+    reorderings: StepReorder[],
+    indexMapping: Map<number, string>,
+    warnings: ExtensionWarning[]
+  ): PathStep[] {
     const reorderMap = new Map<number, number>();
-    for (const reorder of ext.reorderings) {
-      if (reorder.fromIndex < effectiveSteps.length) {
+    for (const reorder of reorderings) {
+      if (reorder.fromIndex < steps.length) {
         reorderMap.set(reorder.fromIndex, reorder.toIndex);
       } else {
         warnings.push({
@@ -488,56 +514,53 @@ export class PathExtensionService {
       }
     }
 
-    // Build reordered step list
-    if (reorderMap.size > 0) {
-      const reorderedSteps: PathStep[] = [];
-      const reorderedMapping = new Map<number, string>();
+    if (reorderMap.size === 0) return steps;
 
-      // Get steps in new order
-      const usedIndices = new Set<number>();
-      for (let i = 0; i < effectiveSteps.length; i++) {
-        const targetIndex = reorderMap.get(i);
-        if (targetIndex !== undefined) {
-          // This step was reordered
-          reorderedSteps[targetIndex] = effectiveSteps[i];
-          reorderedMapping.set(targetIndex, `base-${i}`);
-          usedIndices.add(targetIndex);
-        }
+    const reorderedSteps: PathStep[] = [];
+    const usedIndices = new Set<number>();
+
+    // Place reordered steps at their target positions
+    for (let i = 0; i < steps.length; i++) {
+      const targetIndex = reorderMap.get(i);
+      if (targetIndex !== undefined) {
+        reorderedSteps[targetIndex] = steps[i];
+        indexMapping.set(targetIndex, `base-${i}`);
+        usedIndices.add(targetIndex);
       }
-
-      // Fill in non-reordered steps
-      let nextFreeIndex = 0;
-      for (let i = 0; i < effectiveSteps.length; i++) {
-        if (!reorderMap.has(i)) {
-          while (usedIndices.has(nextFreeIndex)) nextFreeIndex++;
-          reorderedSteps[nextFreeIndex] = effectiveSteps[i];
-          reorderedMapping.set(nextFreeIndex, `base-${i}`);
-          usedIndices.add(nextFreeIndex);
-          nextFreeIndex++;
-        }
-      }
-
-      effectiveSteps = reorderedSteps.filter(s => s !== undefined);
-      reorderedMapping.forEach((v, k) => indexMapping.set(k, v));
     }
 
-    // Apply insertions (sorted by position to handle correctly)
-    const sortedInsertions = [...ext.insertions].sort((a, b) => a.afterStepIndex - b.afterStepIndex);
+    // Fill remaining steps in available slots
+    let nextFreeIndex = 0;
+    for (let i = 0; i < steps.length; i++) {
+      if (!reorderMap.has(i)) {
+        while (usedIndices.has(nextFreeIndex)) nextFreeIndex++;
+        reorderedSteps[nextFreeIndex] = steps[i];
+        indexMapping.set(nextFreeIndex, `base-${i}`);
+        usedIndices.add(nextFreeIndex);
+        nextFreeIndex++;
+      }
+    }
+
+    return reorderedSteps.filter(s => s !== undefined);
+  }
+
+  /** Apply step insertions */
+  private applyInsertions(
+    steps: PathStep[],
+    insertions: StepInsertion[],
+    indexMapping: Map<number, string>,
+    warnings: ExtensionWarning[]
+  ): PathStep[] {
+    const sortedInsertions = [...insertions].sort((a, b) => a.afterStepIndex - b.afterStepIndex);
     let insertionOffset = 0;
 
     for (const insertion of sortedInsertions) {
       const insertAt = insertion.afterStepIndex + 1 + insertionOffset;
-
-      if (insertAt <= effectiveSteps.length) {
-        // Insert the steps
-        effectiveSteps.splice(insertAt, 0, ...insertion.steps);
-
-        // Update index mapping for inserted steps
+      if (insertAt <= steps.length) {
+        steps.splice(insertAt, 0, ...insertion.steps);
         for (let i = 0; i < insertion.steps.length; i++) {
           indexMapping.set(insertAt + i, `insertion-${insertion.id}-${i}`);
         }
-
-        // Shift subsequent mappings
         insertionOffset += insertion.steps.length;
       } else {
         warnings.push({
@@ -547,23 +570,33 @@ export class PathExtensionService {
         });
       }
     }
+    return steps;
+  }
 
-    // Remove excluded steps
-    if (excludedIndices.size > 0) {
-      effectiveSteps = effectiveSteps.filter((_, i) => {
-        const baseRef = indexMapping.get(i);
-        if (baseRef?.startsWith('base-')) {
-          const baseIndex = parseInt(baseRef.split('-')[1], 10);
-          return !excludedIndices.has(baseIndex);
-        }
-        return true;
-      });
-    }
+  /** Remove excluded steps */
+  private removeExcludedSteps(
+    steps: PathStep[],
+    excludedIndices: Set<number>,
+    indexMapping: Map<number, string>
+  ): PathStep[] {
+    if (excludedIndices.size === 0) return steps;
+    return steps.filter((_, i) => {
+      const baseRef = indexMapping.get(i);
+      if (baseRef?.startsWith('base-')) {
+        const baseIndex = parseInt(baseRef.split('-')[1], 10);
+        return !excludedIndices.has(baseIndex);
+      }
+      return true;
+    });
+  }
 
-    // Build annotations map
+  /** Build annotations map from extension annotations */
+  private buildAnnotationsMap(
+    annotations: PathStepAnnotation[],
+    indexMapping: Map<number, string>
+  ): Map<number, PathStepAnnotation[]> {
     const annotationsMap = new Map<number, PathStepAnnotation[]>();
-    for (const annotation of ext.annotations) {
-      // Find the effective index for this annotation's step
+    for (const annotation of annotations) {
       for (const [effectiveIdx, baseRef] of indexMapping.entries()) {
         if (baseRef === `base-${annotation.stepIndex}`) {
           const existing = annotationsMap.get(effectiveIdx) ?? [];
@@ -573,13 +606,7 @@ export class PathExtensionService {
         }
       }
     }
-
-    return {
-      effectiveSteps,
-      indexMapping,
-      annotations: annotationsMap,
-      warnings
-    };
+    return annotationsMap;
   }
 
   // =========================================================================

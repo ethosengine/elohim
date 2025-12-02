@@ -267,7 +267,8 @@ export interface FeedbackResponse {
   reasoning?: string;
   respondedAt: string;
   responderId: string;
-  public: boolean;  // Is this response visible to others?
+  /** Is this response visible to others? */
+  public: boolean;
 }
 
 export interface FeedbackAggregateView {
@@ -404,8 +405,10 @@ export interface ProposalResults {
     optionId: string;
     votes: number;
     percentage: number;
-    score?: number;  // For score voting
-    rank?: number;   // For ranked choice
+    /** For score voting */
+    score?: number;
+    /** For ranked choice */
+    rank?: number;
   }>;
 
   /** For consent: any blocks? */
@@ -463,7 +466,8 @@ export interface SensemakingVisualization {
 
 export interface OpinionCluster {
   id: string;
-  name?: string;  // Auto-generated or human-labeled
+  /** Auto-generated or human-labeled */
+  name?: string;
   participantCount: number;
   participantPercentage: number;
 
@@ -471,7 +475,8 @@ export interface OpinionCluster {
   characteristicStatements: Array<{
     statementId: string;
     text: string;
-    agreementLevel: number;  // How much this cluster agrees
+    /** How much this cluster agrees */
+    agreementLevel: number;
   }>;
 
   /** Centroid position for visualization */
@@ -496,12 +501,14 @@ export interface ConsensusStatement {
 export interface DivisiveStatement {
   id: string;
   text: string;
-  variance: number;  // How spread out the opinions are
+  /** How spread out the opinions are */
+  variance: number;
 
   /** How each cluster feels */
   clusterPositions: Array<{
     clusterId: string;
-    position: number;  // -1 to 1
+    /** Range: -1 to 1 */
+    position: number;
   }>;
 }
 
@@ -511,7 +518,8 @@ export interface ClusterVisualizationData {
 
   /** Points for rendering */
   points: Array<{
-    participantId: string;  // Anonymous or identified
+    /** Anonymous or identified */
+    participantId: string;
     x: number;
     y: number;
     clusterId: string;

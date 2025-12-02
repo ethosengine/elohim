@@ -356,7 +356,7 @@ export interface RoleMetadata {
    * Minimum mastery level required across the attestation path.
    * Default is 'apply' (attestation gate) - demonstrates practical application.
    */
-  requiredMasteryLevel: import('./agent.model').BloomMasteryLevel;
+  requiredMasteryLevel: import('./agent.model').MasteryLevel;
 
   /**
    * Skills/competencies this role encompasses.
