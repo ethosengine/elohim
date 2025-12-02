@@ -4,7 +4,8 @@ import {
   OnDestroy,
   ViewChild,
   ViewContainerRef,
-  ComponentRef
+  ComponentRef,
+  inject
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -13,6 +14,7 @@ import { takeUntil, catchError } from 'rxjs/operators';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { ContentService } from '../../services/content.service';
 import { DataLoaderService } from '../../services/data-loader.service';
+import { SeoService } from '../../../services/seo.service';
 import { ContentNode } from '../../models/content-node.model';
 import {
   RendererRegistryService,
@@ -62,6 +64,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
   private nodeId: string | null = null;
+  private readonly seoService = inject(SeoService);
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -185,6 +188,18 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
         // Set ContentNode
         this.node = contentNode;
 
+        // Update SEO metadata for this content
+        this.seoService.updateForContent({
+          id: contentNode.id,
+          title: contentNode.title,
+          summary: contentNode.description,
+          contentType: contentNode.contentType,
+          thumbnailUrl: contentNode.metadata?.['thumbnailUrl'],
+          authors: contentNode.metadata?.['authors'],
+          createdAt: contentNode.createdAt,
+          updatedAt: contentNode.updatedAt
+        });
+
         // Get current affinity
         this.affinity = this.affinityService.getAffinity(nodeId);
 
@@ -206,10 +221,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
         // Use setTimeout to ensure ViewChild is available after view updates
         setTimeout(() => this.loadRenderer(), 0);
       },
-      error: (err) => {
+      error: () => {
         this.error = 'Failed to load content';
         this.isLoading = false;
-        console.error('Error loading content:', err);
       },
     });
   }
@@ -228,8 +242,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
           this.containingPaths = paths;
           this.loadingPaths = false;
         },
-        error: (err) => {
-          console.error('Error loading containing paths:', err);
+        error: () => {
           this.loadingPaths = false;
         }
       });
@@ -249,8 +262,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
           this.trustBadge = badge;
           this.isLoadingTrust = false;
         },
-        error: (err) => {
-          console.error('Error loading trust badge:', err);
+        error: () => {
           this.isLoadingTrust = false;
         }
       });
@@ -269,9 +281,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   handleAction(action: any): void {
     if (action.route) {
       this.router.navigate([action.route]);
-    } else {
-      console.log('Action clicked:', action.label);
     }
+    // Actions without routes are no-ops (e.g., placeholder actions)
   }
 
   /**

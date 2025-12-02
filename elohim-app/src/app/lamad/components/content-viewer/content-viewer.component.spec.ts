@@ -7,6 +7,7 @@ import { AffinityTrackingService } from '../../services/affinity-tracking.servic
 import { ContentService } from '../../services/content.service';
 import { DataLoaderService } from '../../services/data-loader.service';
 import { TrustBadgeService } from '../../services/trust-badge.service';
+import { SeoService } from '../../../services/seo.service';
 import { RendererRegistryService } from '../../renderers/renderer-registry.service';
 import { ContentNode } from '../../models/content-node.model';
 
@@ -57,6 +58,7 @@ describe('ContentViewerComponent', () => {
     const trustBadgeSpyObj = jasmine.createSpyObj('TrustBadgeService', ['getBadge']);
     const rendererRegistrySpyObj = jasmine.createSpyObj('RendererRegistryService', ['getRenderer']);
     const routerSpyObj = jasmine.createSpyObj('Router', ['navigate']);
+    const seoServiceSpyObj = jasmine.createSpyObj('SeoService', ['updateForContent', 'updateSeo', 'setTitle']);
 
     await TestBed.configureTestingModule({
       imports: [ContentViewerComponent],
@@ -73,7 +75,8 @@ describe('ContentViewerComponent', () => {
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
         { provide: TrustBadgeService, useValue: trustBadgeSpyObj },
         { provide: RendererRegistryService, useValue: rendererRegistrySpyObj },
-        { provide: Router, useValue: routerSpyObj }
+        { provide: Router, useValue: routerSpyObj },
+        { provide: SeoService, useValue: seoServiceSpyObj }
       ]
     }).compileComponents();
 
@@ -369,10 +372,10 @@ describe('ContentViewerComponent', () => {
       expect(routerSpy.navigate).toHaveBeenCalledWith(['/some/route']);
     });
 
-    it('should log action without route', () => {
-      spyOn(console, 'log');
-      component.handleAction({ label: 'No Route Action' });
-      expect(console.log).toHaveBeenCalledWith('Action clicked:', 'No Route Action');
+    it('should handle action without route gracefully', () => {
+      // Actions without routes are no-ops
+      expect(() => component.handleAction({ label: 'No Route Action' })).not.toThrow();
+      expect(routerSpy.navigate).not.toHaveBeenCalled();
     });
   });
 

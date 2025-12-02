@@ -333,9 +333,8 @@ export class AgentService {
   /**
    * Grant an attestation to the current agent.
    */
-  grantAttestation(attestationId: string, earnedVia: string): void {
+  grantAttestation(attestationId: string, _earnedVia: string): void {
     this.attestations.add(attestationId);
-    console.log(`[AgentService] Attestation granted: ${attestationId} via ${earnedVia}`);
   }
 
   /**

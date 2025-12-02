@@ -183,10 +183,9 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
             this.renderGraph();
           }
         },
-        error: (err) => {
+        error: () => {
           this.error = 'Failed to load graph overview';
           this.isLoading = false;
-          console.error('[GraphExplorer] Failed to load overview:', err);
         }
       });
   }
@@ -221,10 +220,9 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
           this.isLoading = false;
           this.renderGraph();
         },
-        error: (err) => {
+        error: () => {
           this.error = `Failed to load ${epicTitle} details`;
           this.isLoading = false;
-          console.error('[GraphExplorer] Failed to load epic detail:', err);
         }
       });
   }

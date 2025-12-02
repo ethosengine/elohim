@@ -1,10 +1,11 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Subject, forkJoin } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '../../services/agent.service';
+import { SeoService } from '../../../services/seo.service';
 import { LearningPath, PathStep, PathChapter } from '../../models/learning-path.model';
 import { AgentProgress } from '../../models/agent.model';
 import { ContentNode } from '../../models/content-node.model';
@@ -80,6 +81,8 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
+  private readonly seoService = inject(SeoService);
+
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
@@ -118,6 +121,16 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
         this.accessibleSteps = accessible;
         this.pathCompletion = completion;
         this.conceptProgress = concepts;
+
+        // Update SEO metadata for this path
+        this.seoService.updateForPath({
+          id: path.id,
+          title: path.title,
+          description: path.description,
+          thumbnailUrl: path.thumbnailUrl,
+          difficulty: path.difficulty,
+          estimatedDuration: path.estimatedDuration
+        });
         
         // Map all steps to EnrichedStep format
         const enrichedSteps: EnrichedStep[] = allSteps.map((s, i) => ({
@@ -159,7 +172,6 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       error: err => {
         this.error = err.message ?? 'Failed to load path';
         this.isLoading = false;
-        console.error('[PathOverview] Failed to load path:', err);
       }
     });
   }

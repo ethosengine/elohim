@@ -4,6 +4,7 @@ import { of, throwError, BehaviorSubject, NEVER } from 'rxjs';
 import { PathNavigatorComponent } from './path-navigator.component';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '../../services/agent.service';
+import { SeoService } from '../../../services/seo.service';
 import { PathStepView, LearningPath } from '../../models/learning-path.model';
 
 describe('PathNavigatorComponent', () => {
@@ -95,6 +96,7 @@ describe('PathNavigatorComponent', () => {
   beforeEach(async () => {
     const pathServiceSpy = jasmine.createSpyObj('PathService', ['getPath', 'getPathStep', 'getAllStepsWithCompletionStatus']);
     const agentServiceSpy = jasmine.createSpyObj('AgentService', ['completeStep']);
+    const seoServiceSpy = jasmine.createSpyObj('SeoService', ['updateSeo', 'updateForPath', 'setTitle']);
 
     paramsSubject = new BehaviorSubject({ pathId: 'test-path', stepIndex: '1' });
 
@@ -104,6 +106,7 @@ describe('PathNavigatorComponent', () => {
         provideRouter([]),
         { provide: PathService, useValue: pathServiceSpy },
         { provide: AgentService, useValue: agentServiceSpy },
+        { provide: SeoService, useValue: seoServiceSpy },
         {
           provide: ActivatedRoute,
           useValue: { params: paramsSubject.asObservable() }

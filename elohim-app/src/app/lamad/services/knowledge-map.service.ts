@@ -430,8 +430,6 @@ export class KnowledgeMapService {
 
         // In production: send notification to subject
         // For prototype: auto-approve after delay
-        console.log(`Consent request sent for map ${mapId} with scope ${scope}`);
-
         return of(undefined);
       })
     );

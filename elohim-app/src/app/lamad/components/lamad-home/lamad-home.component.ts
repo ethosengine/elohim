@@ -122,10 +122,9 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
         this.isLoading = false;
       },
-      error: err => {
+      error: () => {
         this.error = 'Unable to load learning paths';
         this.isLoading = false;
-        console.error('[LamadHome] Failed to load paths:', err);
       }
     });
   }

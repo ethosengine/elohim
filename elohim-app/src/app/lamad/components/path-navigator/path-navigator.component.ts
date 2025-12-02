@@ -1,10 +1,11 @@
-import { Component, OnInit, OnDestroy, ViewChild, ViewContainerRef, ComponentRef, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ViewContainerRef, ComponentRef, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Subject, Subscription } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '../../services/agent.service';
+import { SeoService } from '../../../services/seo.service';
 import { PathStepView, LearningPath } from '../../models/learning-path.model';
 import { MasteryLevel } from '../../models/content-mastery.model';
 import { RendererRegistryService, ContentRenderer } from '../../renderers/renderer-registry.service';
@@ -84,6 +85,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   hasRegisteredRenderer = false;
 
   private readonly destroy$ = new Subject<void>();
+  private readonly seoService = inject(SeoService);
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -181,7 +183,30 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
           this.pathService.getPathStep(this.pathId, this.stepIndex).subscribe({
             next: (stepView) => {
               this.stepView = stepView;
-              
+
+              // Update SEO metadata for this step
+              const stepTitle = stepView.content?.title ?? stepView.step.stepTitle;
+              const pathTitle = path.title;
+              this.seoService.updateSeo({
+                title: `${stepTitle} - ${pathTitle}`,
+                description: stepView.content?.description ?? `Step ${this.stepIndex + 1} of ${pathTitle}`,
+                openGraph: {
+                  ogType: 'article',
+                  ogImage: stepView.content?.metadata?.['thumbnailUrl'] ?? path.thumbnailUrl,
+                  articleSection: 'Learning'
+                },
+                jsonLd: {
+                  '@context': 'https://schema.org',
+                  '@type': 'LearningResource',
+                  name: stepTitle,
+                  isPartOf: {
+                    '@type': 'Course',
+                    name: pathTitle
+                  },
+                  position: this.stepIndex + 1
+                }
+              });
+
               // Initialize Bloom level based on completion status (Prototype)
               if (stepView.isCompleted) {
                 // If already completed, assume at least 'apply' for demo purposes
@@ -211,7 +236,6 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   private handleError(err: any): void {
     this.error = err.message ?? 'Failed to load learning path';
     this.isLoading = false;
-    console.error('[PathNavigator] Error:', err);
   }
 
   /**
@@ -329,8 +353,6 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     const currentIndex = this.BLOOM_LEVELS.indexOf(this.currentBloomLevel);
     const nextIndex = (currentIndex + 1) % this.BLOOM_LEVELS.length;
     this.currentBloomLevel = this.BLOOM_LEVELS[nextIndex];
-
-    console.log(`[Prototype] Mastery Level: ${this.currentBloomLevel}`);
 
     // Persist basic completion to backend if we reach a 'completed' state
     // For prototype, let's say 'remember' is enough to mark the step complete navigation-wise

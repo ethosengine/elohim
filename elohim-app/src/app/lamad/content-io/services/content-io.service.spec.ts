@@ -48,7 +48,7 @@ describe('ContentIOService', () => {
     canImport: false,
     canExport: true,
     canValidate: false,
-    import: jasmine.createSpy('import').and.returnValue(Promise.reject(new Error('Not supported'))),
+    import: jasmine.createSpy('import').and.callFake(() => Promise.reject(new Error('Not supported'))),
     export: jasmine.createSpy('export').and.returnValue(Promise.resolve('exported')),
     validate: jasmine.createSpy('validate').and.returnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
     getFormatMetadata: () => ({

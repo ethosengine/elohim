@@ -40,12 +40,10 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Verify data is loadable by fetching the content index
     this.dataLoader.getContentIndex().pipe(takeUntil(this.destroy$)).subscribe({
-      next: (index) => {
-        console.log('Lamad data ready:', index.nodes?.length ?? 0, 'content nodes');
+      next: () => {
         this.isReady = true;
       },
-      error: (err: Error) => {
-        console.error('Failed to load Lamad data:', err);
+      error: () => {
         this.isReady = true; // Still mark ready to show error state
       }
     });
