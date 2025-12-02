@@ -318,39 +318,39 @@ export interface BridgingOpportunity {
 export interface DeliberationProposal {
   id: string;
 
-  /** Proposal type determines voting rules */
+  // Proposal type determines voting rules
   type: ProposalType;
 
-  /** What entity does this proposal concern? */
+  // Target entity
   targetType: GovernableEntityType;
   targetId: string;
 
-  /** Proposal content */
+  // Proposal content
   title: string;
   description: string;
   proposedAction: string;
 
-  /** Who proposed this? */
+  // Proposer info
   proposerId: string;
   proposedAt: string;
 
-  /** Timeline */
+  // Timeline
   discussionEndsAt?: string;
   votingEndsAt: string;
 
-  /** Current phase */
+  // Current phase
   phase: ProposalPhase;
 
-  /** Discussion thread */
+  // Discussion thread
   discussionThreadId: string;
 
-  /** Voting configuration */
+  // Voting configuration
   votingConfig: VotingConfiguration;
 
-  /** Current results */
+  // Current results
   results?: ProposalResults;
 
-  /** Outcome (when decided) */
+  // Outcome (when decided)
   outcome?: ProposalOutcome;
 }
 
@@ -400,24 +400,22 @@ export interface ProposalResults {
   participationRate: number;
   quorumMet: boolean;
 
-  /** Results by option */
+  // Results by option
   optionResults: Array<{
     optionId: string;
     votes: number;
     percentage: number;
-    /** For score voting */
-    score?: number;
-    /** For ranked choice */
-    rank?: number;
+    score?: number;      // For score voting
+    rank?: number;       // For ranked choice
   }>;
 
-  /** For consent: any blocks? */
+  // For consent: any blocks?
   blocks?: Array<{
     voterId: string;
     reason: string;
   }>;
 
-  /** Current recommendation based on results */
+  // Current recommendation based on results
   recommendation: 'pass' | 'fail' | 'unclear' | 'blocked';
 }
 
@@ -441,45 +439,43 @@ export interface ProposalOutcome {
  * what divides them, and what bridges them.
  */
 export interface SensemakingVisualization {
-  /** What's being sense-made */
+  // What's being sense-made
   targetType: GovernableEntityType;
   targetId: string;
   topic: string;
 
-  /** Participant stats */
+  // Participant stats
   participantCount: number;
   statementCount: number;
   voteCount: number;
 
-  /** Opinion clusters */
+  // Opinion clusters
   clusters: OpinionCluster[];
 
-  /** Cross-cluster consensus (bridging statements) */
+  // Cross-cluster consensus (bridging statements)
   consensusStatements: ConsensusStatement[];
 
-  /** Most divisive statements */
+  // Most divisive statements
   divisiveStatements: DivisiveStatement[];
 
-  /** Visualization data for rendering */
+  // Visualization data for rendering
   visualizationData: ClusterVisualizationData;
 }
 
 export interface OpinionCluster {
   id: string;
-  /** Auto-generated or human-labeled */
-  name?: string;
+  name?: string;  // Auto-generated or human-labeled
   participantCount: number;
   participantPercentage: number;
 
-  /** What characterizes this cluster? */
+  // What characterizes this cluster?
   characteristicStatements: Array<{
     statementId: string;
     text: string;
-    /** How much this cluster agrees */
-    agreementLevel: number;
+    agreementLevel: number;  // How much this cluster agrees
   }>;
 
-  /** Centroid position for visualization */
+  // Centroid position for visualization
   centroid: { x: number; y: number };
 }
 
@@ -488,44 +484,39 @@ export interface ConsensusStatement {
   text: string;
   overallAgreement: number;
 
-  /** Agreement level per cluster */
+  // Agreement level per cluster
   clusterAgreement: Array<{
     clusterId: string;
     agreement: number;
   }>;
 
-  /** Why this matters */
-  bridgingPotential: string;
+  bridgingPotential: string;  // Why this matters
 }
 
 export interface DivisiveStatement {
   id: string;
   text: string;
-  /** How spread out the opinions are */
-  variance: number;
+  variance: number;  // How spread out the opinions are
 
-  /** How each cluster feels */
+  // How each cluster feels
   clusterPositions: Array<{
     clusterId: string;
-    /** Range: -1 to 1 */
-    position: number;
+    position: number;  // Range: -1 to 1
   }>;
 }
 
 export interface ClusterVisualizationData {
-  /** 2D projection of high-dimensional opinion space */
-  projection: 'pca' | 'tsne' | 'umap';
+  projection: 'pca' | 'tsne' | 'umap';  // 2D projection of high-dimensional opinion space
 
-  /** Points for rendering */
+  // Points for rendering
   points: Array<{
-    /** Anonymous or identified */
-    participantId: string;
+    participantId: string;  // Anonymous or identified
     x: number;
     y: number;
     clusterId: string;
   }>;
 
-  /** Cluster boundaries */
+  // Cluster boundaries
   clusterBoundaries: Array<{
     clusterId: string;
     polygon: Array<{ x: number; y: number }>;
@@ -542,15 +533,14 @@ export interface ClusterVisualizationData {
  * Like Wikipedia's combination of Edit History, Talk Page, and Protection Log.
  */
 export interface GovernanceHistoryView {
-  /** Entity being viewed */
+  // Entity being viewed
   entityType: GovernableEntityType;
   entityId: string;
   entityTitle: string;
 
-  /** Active tab */
   activeTab: HistoryTab;
 
-  /** Tab-specific data */
+  // Tab-specific data
   tabs: {
     summary: HistorySummaryTab;
     versions: HistoryVersionsTab;
@@ -559,10 +549,8 @@ export interface GovernanceHistoryView {
     engagement: HistoryEngagementTab;
   };
 
-  /** Filters */
   filters: HistoryFilters;
 
-  /** Pagination */
   pagination: {
     currentPage: number;
     pageSize: number;
@@ -621,10 +609,9 @@ export interface HistoryDiscussionsTab {
 }
 
 export interface HistoryGovernanceTab {
-  /** Current labels */
   activeLabels: GovernanceLabel[];
 
-  /** Label history */
+  // Label history
   labelHistory: Array<{
     label: GovernanceLabel;
     action: 'added' | 'removed' | 'challenged';
@@ -632,35 +619,32 @@ export interface HistoryGovernanceTab {
     actor: string;
   }>;
 
-  /** Challenges */
   challenges: {
     active: Challenge[];
     resolved: Challenge[];
   };
 
-  /** Appeals */
   appeals: Appeal[];
 
-  /** Relevant precedents */
   relevantPrecedents: Precedent[];
 }
 
 export interface HistoryEngagementTab {
-  /** Time series data */
+  // Time series data
   timeSeries: {
     views: Array<{ date: string; count: number }>;
     affinityMarks: Array<{ date: string; count: number }>;
     citations: Array<{ date: string; count: number }>;
   };
 
-  /** Top engagers (anonymized if needed) */
+  // Top engagers (anonymized if needed)
   topEngagers: Array<{
     engagerId: string;
     engagementScore: number;
     lastEngaged: string;
   }>;
 
-  /** Citation network */
+  // Citation network
   citations: {
     citedBy: Array<{ entityId: string; entityTitle: string }>;
     cites: Array<{ entityId: string; entityTitle: string }>;
