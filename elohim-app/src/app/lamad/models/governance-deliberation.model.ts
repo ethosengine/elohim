@@ -321,36 +321,36 @@ export interface DeliberationProposal {
   // Proposal type determines voting rules
   type: ProposalType;
 
-  // *Target entity
+  // (!)Target entity
   targetType: GovernableEntityType;
   targetId: string;
 
-  /// *Proposal content
+  /// (!)Proposal content
   title: string;
   description: string;
   proposedAction: string;
 
-  // *Proposer info
+  // (!)Proposer info
   proposerId: string;
   proposedAt: string;
 
-  // *Timeline
+  // (!)Timeline
   discussionEndsAt?: string;
   votingEndsAt: string;
 
-  // *Current phase
+  // (!)Current phase
   phase: ProposalPhase;
 
-  // *Discussion thread
+  // (!)Discussion thread
   discussionThreadId: string;
 
-  // *Voting configuration
+  // (!)Voting configuration
   votingConfig: VotingConfiguration;
 
-  // *Current results
+  // (!)Current results
   results?: ProposalResults;
 
-  // *Outcome (when decided)
+  // (!)Outcome (when decided)
   outcome?: ProposalOutcome;
 }
 
@@ -400,7 +400,7 @@ export interface ProposalResults {
   participationRate: number;
   quorumMet: boolean;
 
-  // *query results by option
+  // (!)query results by option
   optionResults: Array<{
     optionId: string;
     votes: number;
@@ -470,7 +470,7 @@ export interface OpinionCluster {
   characteristicStatements: Array<{
     statementId: string;
     text: string;
-    agreementLevel: number;  // *How much this cluster agrees
+    agreementLevel: number;  // (!)How much this cluster agrees
   }>;
 
   // Centroid position for visualization
@@ -482,7 +482,7 @@ export interface ConsensusStatement {
   text: string;
   overallAgreement: number;
 
-  // *Agreement level per cluster
+  // (!)Agreement level per cluster
   clusterAgreement: Array<{
     clusterId: string;
     agreement: number;
@@ -494,7 +494,7 @@ export interface ConsensusStatement {
 export interface DivisiveStatement {
   id: string;
   text: string;
-  variance: number;  // *How spread out the opinions are
+  variance: number;  // (!)How spread out the opinions are
 
   // How each cluster feels
   clusterPositions: Array<{
@@ -719,38 +719,38 @@ export const GOVERNANCE_ROUTES = {
  * GovernanceDeliberationService - Service contract for governance deliberation components.
  */
 export interface GovernanceDeliberationService {
-  // *Context menu
+  // (!)Context menu
   getContextMenu(entityType: string, entityId: string): Promise<GovernanceContextMenu>;
 
-  // *Feedback
+  // (!)Feedback
   getFeedbackSelector(entityType: string, entityId: string, context: FeedbackContext): Promise<GraduatedFeedbackSelector>;
   submitFeedback(entityType: string, entityId: string, context: FeedbackContext, response: FeedbackResponse): Promise<void>;
   getFeedbackAggregate(entityType: string, entityId: string, context: FeedbackContext): Promise<FeedbackAggregateView>;
 
-  // *Deliberation
+  // (!)Deliberation
   getProposals(entityType: string, entityId: string, filters?: { phase?: ProposalPhase }): Promise<DeliberationProposal[]>;
   getProposal(proposalId: string): Promise<DeliberationProposal>;
   createProposal(proposal: Omit<DeliberationProposal, 'id' | 'proposedAt' | 'phase' | 'results'>): Promise<DeliberationProposal>;
   voteOnProposal(proposalId: string, vote: unknown): Promise<void>;
 
-  // *Sensemaking
+  // (!)Sensemaking
   getSensemakingVisualization(entityType: string, entityId: string): Promise<SensemakingVisualization>;
   submitStatement(entityType: string, entityId: string, statement: string): Promise<string>;
   voteOnStatement(statementId: string, vote: 'agree' | 'disagree' | 'pass'): Promise<void>;
 
-  // *History
+  // (!)History
   getHistoryView(entityType: string, entityId: string, tab: HistoryTab, filters?: HistoryFilters): Promise<GovernanceHistoryView>;
 
-  // *Discussions
+  // (!)Discussions
   getDiscussionThread(threadId: string): Promise<DiscussionThread>;
   createDiscussionThread(entityType: string, entityId: string, category: DiscussionCategory, topic: string, initialMessage: string): Promise<DiscussionThread>;
   postMessage(threadId: string, message: Omit<DiscussionMessage, 'id' | 'timestamp' | 'reactions' | 'edited' | 'hidden'>): Promise<DiscussionMessage>;
 
-  // *Challenges
+  // (!)Challenges
   fileChallenge(challenge: Omit<Challenge, 'id' | 'filedAt' | 'state'>): Promise<Challenge>;
   respondToChallenge(challengeId: string, response: unknown): Promise<void>;
 
-  // *Subscriptions
+  // (!)Subscriptions
   subscribeToEntity(entityType: string, entityId: string, events: AlertType[]): Promise<void>;
   unsubscribeFromEntity(entityType: string, entityId: string): Promise<void>;
 }
