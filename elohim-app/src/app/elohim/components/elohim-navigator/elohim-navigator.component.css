@@ -1,0 +1,779 @@
+/* ============================================================================
+   Elohim Navigator - Unified Navigation Component
+   ============================================================================ */
+
+/* Header */
+.elohim-header {
+  background: var(--lamad-surface);
+  border-bottom: 1px solid var(--lamad-border);
+  padding: 0.5rem 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+}
+
+.header-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* ============================================================================
+   Context Switcher (Left)
+   ============================================================================ */
+
+.context-switcher-container {
+  position: relative;
+}
+
+.app-logo-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.app-logo-btn:hover {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: var(--lamad-border);
+}
+
+.app-icon {
+  font-size: 1.25rem;
+}
+
+.app-name {
+  font-size: 1rem;
+  font-weight: 600;
+  background: var(--lamad-accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dropdown-arrow {
+  font-size: 0.6rem;
+  color: var(--lamad-text-muted);
+  transition: transform 0.2s;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* Context Switcher Dropdown */
+.context-switcher-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  min-width: 280px;
+  background: var(--lamad-surface);
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  animation: slideDown 0.15s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-header {
+  padding: 0.75rem 1rem 0.5rem;
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.dropdown-title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--lamad-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.context-apps-list {
+  padding: 0.5rem;
+}
+
+.context-app-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.context-app-item:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.context-app-item.coming-soon {
+  opacity: 0.7;
+}
+
+.app-item-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.app-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.app-item-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--lamad-text-primary);
+}
+
+.app-item-tagline {
+  font-size: 0.75rem;
+  color: var(--lamad-text-muted);
+}
+
+.coming-soon-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--lamad-accent-primary);
+  border-radius: 0.25rem;
+  text-transform: uppercase;
+}
+
+.dropdown-footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--lamad-border);
+  text-align: center;
+}
+
+.protocol-link {
+  font-size: 0.75rem;
+  color: var(--lamad-text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.protocol-link:hover {
+  color: var(--lamad-accent-primary);
+}
+
+/* ============================================================================
+   Search (Center)
+   ============================================================================ */
+
+.search-container {
+  flex: 1;
+  max-width: 400px;
+}
+
+.search-form {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.search-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: var(--lamad-bg-secondary);
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.5rem;
+  color: var(--lamad-text-secondary);
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--lamad-accent-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.search-input::placeholder {
+  color: var(--lamad-text-muted);
+}
+
+.search-button {
+  padding: 0.5rem 0.75rem;
+  background: var(--lamad-accent-gradient);
+  border: none;
+  border-radius: 0.5rem;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.search-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.search-icon {
+  font-size: 0.875rem;
+}
+
+/* ============================================================================
+   Profile Bubble (Right) - Imago Dei / Traveler
+   ============================================================================ */
+
+.profile-bubble-container {
+  position: relative;
+}
+
+.profile-bubble {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--lamad-accent-gradient);
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.profile-bubble:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.profile-avatar {
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+/* Profile Tray Dropdown */
+.profile-tray {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 280px;
+  background: var(--lamad-surface);
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  animation: slideDown 0.15s ease-out;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(99, 102, 241, 0.05);
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.profile-avatar-large {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: var(--lamad-accent-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.profile-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--lamad-text-primary);
+}
+
+.profile-stats {
+  font-size: 0.75rem;
+  color: var(--lamad-text-muted);
+}
+
+/* Profile Actions */
+.profile-actions {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.profile-action {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.profile-action:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.action-icon {
+  font-size: 1rem;
+  opacity: 0.7;
+}
+
+.action-label {
+  font-size: 0.875rem;
+  color: var(--lamad-text-secondary);
+}
+
+/* Settings Section */
+.settings-section {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.settings-header {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--lamad-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-label {
+  font-size: 0.85rem;
+  color: var(--lamad-text-secondary);
+}
+
+/* Theme toggle styling within settings */
+.settings-row ::ng-deep .theme-toggle {
+  position: static;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.375rem;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid var(--lamad-border);
+  box-shadow: none;
+}
+
+.settings-row ::ng-deep .theme-toggle:hover {
+  background: rgba(99, 102, 241, 0.2);
+  transform: none;
+}
+
+.settings-row ::ng-deep .theme-icon {
+  font-size: 1rem;
+}
+
+/* Profile Footer */
+.profile-footer {
+  padding: 0.75rem 1rem;
+  text-align: center;
+}
+
+.session-indicator {
+  font-size: 0.7rem;
+  color: var(--lamad-text-muted);
+  font-style: italic;
+}
+
+/* ============================================================================
+   Upgrade Banner
+   ============================================================================ */
+
+.upgrade-banner {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+  border-bottom: 1px solid var(--lamad-border);
+  padding: 0.5rem 1rem;
+}
+
+.upgrade-banner-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.upgrade-icon {
+  font-size: 1.25rem;
+}
+
+.upgrade-text {
+  flex: 1;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+
+.upgrade-text strong {
+  color: var(--lamad-accent-primary);
+}
+
+.upgrade-text span {
+  color: var(--lamad-text-secondary);
+}
+
+.upgrade-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-upgrade {
+  padding: 0.25rem 0.75rem;
+  background: var(--lamad-accent-gradient);
+  border: none;
+  border-radius: 0.25rem;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-upgrade:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.btn-dismiss {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: var(--lamad-text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.btn-dismiss:hover {
+  opacity: 1;
+}
+
+/* ============================================================================
+   Main Content Area
+   ============================================================================ */
+
+.elohim-main {
+  flex: 1;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ============================================================================
+   Upgrade Modal
+   ============================================================================ */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  border: none;
+}
+
+.upgrade-modal {
+  background: var(--lamad-surface);
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  color: var(--lamad-text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.modal-close:hover {
+  opacity: 1;
+}
+
+.modal-header {
+  padding: 2rem 2rem 1rem;
+  text-align: center;
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.modal-header h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+  background: var(--lamad-accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.modal-subtitle {
+  margin: 0;
+  color: var(--lamad-text-secondary);
+  font-size: 0.9rem;
+}
+
+.modal-body {
+  padding: 1.5rem 2rem;
+}
+
+.upgrade-benefits h3,
+.upgrade-how h3,
+.session-summary h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: var(--lamad-text-secondary);
+}
+
+.upgrade-benefits ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem;
+}
+
+.upgrade-benefits li {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.upgrade-benefits li:last-child {
+  border-bottom: none;
+}
+
+.benefit-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.upgrade-benefits strong {
+  display: block;
+  color: var(--lamad-text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.upgrade-benefits p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--lamad-text-muted);
+}
+
+.upgrade-how {
+  margin-bottom: 1.5rem;
+}
+
+.upgrade-how ol {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.upgrade-how li {
+  padding: 0.5rem 0;
+  color: var(--lamad-text-secondary);
+}
+
+.session-summary {
+  background: rgba(99, 102, 241, 0.05);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--lamad-border);
+}
+
+.summary-stats {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--lamad-accent-primary);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--lamad-text-muted);
+}
+
+.summary-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--lamad-text-muted);
+  font-style: italic;
+}
+
+.modal-footer {
+  padding: 1.5rem 2rem;
+  border-top: 1px solid var(--lamad-border);
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.btn-secondary {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.5rem;
+  color: var(--lamad-text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: rgba(99, 102, 241, 0.05);
+  border-color: var(--lamad-accent-primary);
+}
+
+.btn-primary {
+  padding: 0.5rem 1rem;
+  background: var(--lamad-accent-gradient);
+  border: none;
+  border-radius: 0.5rem;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   Responsive
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .header-content {
+    gap: 0.5rem;
+  }
+
+  .app-name {
+    display: none;
+  }
+
+  .search-container {
+    display: none;
+  }
+
+  .context-switcher-dropdown,
+  .profile-tray {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    border-radius: 1rem 1rem 0 0;
+    max-height: 80vh;
+  }
+
+  .upgrade-banner-content {
+    flex-wrap: wrap;
+  }
+
+  .upgrade-text {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .modal-overlay {
+    padding: 1rem;
+  }
+
+  .upgrade-modal {
+    border-radius: 0.75rem;
+  }
+
+  .modal-header {
+    padding: 1.5rem 1.5rem 1rem;
+  }
+
+  .modal-body {
+    padding: 1rem 1.5rem;
+  }
+
+  .modal-footer {
+    padding: 1rem 1.5rem;
+    flex-direction: column-reverse;
+  }
+
+  .modal-footer button {
+    width: 100%;
+  }
+
+  .summary-stats {
+    gap: 1rem;
+  }
+}

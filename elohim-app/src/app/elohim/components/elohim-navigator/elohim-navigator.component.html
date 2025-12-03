@@ -1,0 +1,229 @@
+<!-- Elohim Navigator Header -->
+<header class="elohim-header">
+  <div class="header-content">
+    <!-- Left: Context App Logo -->
+    <div class="context-switcher-container">
+      <button
+        class="app-logo-btn"
+        (click)="toggleContextSwitcher($event)"
+        [attr.aria-expanded]="showContextSwitcher"
+        aria-haspopup="true"
+        title="Switch context"
+      >
+        <span class="app-icon">{{ currentApp.icon }}</span>
+        <span class="app-name">{{ currentApp.name }}</span>
+        <span class="dropdown-arrow" [class.open]="showContextSwitcher">&#x25BC;</span>
+      </button>
+
+      <!-- Context Switcher Dropdown -->
+      <div class="context-switcher-dropdown" *ngIf="showContextSwitcher" role="menu">
+        <div class="dropdown-header">
+          <span class="dropdown-title">Switch to</span>
+        </div>
+        <div class="context-apps-list">
+          <button
+            *ngFor="let app of otherApps"
+            class="context-app-item"
+            [class.coming-soon]="!app.available"
+            (click)="switchContext(app)"
+            role="menuitem"
+          >
+            <span class="app-item-icon">{{ app.icon }}</span>
+            <div class="app-item-info">
+              <span class="app-item-name">{{ app.name }}</span>
+              <span class="app-item-tagline">{{ app.tagline }}</span>
+            </div>
+            <span *ngIf="!app.available" class="coming-soon-badge">Soon</span>
+          </button>
+        </div>
+        <div class="dropdown-footer">
+          <a routerLink="/" class="protocol-link">Elohim Protocol</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Search (optional) -->
+    <div class="search-container" *ngIf="showSearch">
+      <form (ngSubmit)="onSearch()" class="search-form">
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          name="search"
+          placeholder="Search {{ currentApp.name }}..."
+          class="search-input"
+        />
+        <button type="submit" class="search-button" aria-label="Search">
+          <span class="search-icon">&#x1F50D;</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Right: Profile Bubble (Imago Dei / Traveler) -->
+    <div class="profile-bubble-container">
+      <button
+        class="profile-bubble"
+        (click)="toggleProfileTray($event)"
+        [attr.aria-expanded]="showProfileTray"
+        aria-haspopup="true"
+        title="Your profile and settings"
+      >
+        <span class="profile-avatar">{{ getInitials() }}</span>
+      </button>
+
+      <!-- Profile Tray Dropdown -->
+      <div class="profile-tray" *ngIf="showProfileTray" role="menu">
+        <!-- Identity Header -->
+        <div class="profile-header">
+          <div class="profile-avatar-large">{{ getInitials() }}</div>
+          <div class="profile-info">
+            <span class="profile-name">{{ getDisplayName() }}</span>
+            <span class="profile-stats">{{ getStatsSummary() }}</span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="profile-actions">
+          <button class="profile-action" (click)="goToProfile()" role="menuitem">
+            <span class="action-icon">&#x1F464;</span>
+            <span class="action-label">View Profile</span>
+          </button>
+          <button class="profile-action" (click)="onJoinNetwork()" role="menuitem">
+            <span class="action-icon">&#x1F517;</span>
+            <span class="action-label">Join Network</span>
+          </button>
+        </div>
+
+        <!-- Settings Section -->
+        <div class="settings-section">
+          <div class="settings-header">Settings</div>
+          <div class="settings-row">
+            <span class="settings-label">Theme</span>
+            <app-theme-toggle></app-theme-toggle>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="profile-footer">
+          <span class="session-indicator">Session-based identity</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Upgrade Prompt Banner -->
+<div *ngIf="activeUpgradePrompt && !showUpgradeModal" class="upgrade-banner">
+  <div class="upgrade-banner-content">
+    <span class="upgrade-icon">&#x2728;</span>
+    <div class="upgrade-text">
+      <strong>{{ activeUpgradePrompt.title }}</strong>
+      <span>{{ activeUpgradePrompt.message }}</span>
+    </div>
+    <div class="upgrade-actions">
+      <button class="btn-upgrade" (click)="onJoinNetwork()">Learn More</button>
+      <button class="btn-dismiss" (click)="dismissUpgradePrompt()" aria-label="Dismiss">&#x2715;</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content Area -->
+<main class="elohim-main">
+  <ng-content></ng-content>
+</main>
+
+<!-- Upgrade Modal -->
+<dialog
+  *ngIf="showUpgradeModal"
+  class="modal-overlay"
+  (click)="closeUpgradeModal()"
+  (keydown.escape)="closeUpgradeModal()"
+  open
+  aria-labelledby="upgrade-modal-title"
+>
+  <div class="upgrade-modal" (click)="$event.stopPropagation()">
+    <button class="modal-close" (click)="closeUpgradeModal()" aria-label="Close">&#x2715;</button>
+
+    <div class="modal-header">
+      <h2 id="upgrade-modal-title">Join the Elohim Network</h2>
+      <p class="modal-subtitle">Save your progress permanently and connect with other learners</p>
+    </div>
+
+    <div class="modal-body">
+      <div class="upgrade-benefits">
+        <h3>What you'll get:</h3>
+        <ul>
+          <li>
+            <span class="benefit-icon">&#x1F4BE;</span>
+            <div>
+              <strong>Permanent Progress</strong>
+              <p>Your learning journey is stored securely, never lost</p>
+            </div>
+          </li>
+          <li>
+            <span class="benefit-icon">&#x1F504;</span>
+            <div>
+              <strong>Sync Across Devices</strong>
+              <p>Continue learning from any device</p>
+            </div>
+          </li>
+          <li>
+            <span class="benefit-icon">&#x1F91D;</span>
+            <div>
+              <strong>Join the Community</strong>
+              <p>Connect with fellow humans on the same paths</p>
+            </div>
+          </li>
+          <li>
+            <span class="benefit-icon">&#x1F396;</span>
+            <div>
+              <strong>Earn Attestations</strong>
+              <p>Verifiable credentials for your achievements</p>
+            </div>
+          </li>
+          <li>
+            <span class="benefit-icon">&#x1F310;</span>
+            <div>
+              <strong>Decentralized Network</strong>
+              <p>Own your data on a peer-to-peer network</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="upgrade-how">
+        <h3>How it works:</h3>
+        <ol>
+          <li>Install the Elohim app (available soon)</li>
+          <li>Your session progress migrates automatically</li>
+          <li>You join the p2p network and receive updates</li>
+        </ol>
+      </div>
+
+      <div class="session-summary" *ngIf="session">
+        <h3>Your Current Session:</h3>
+        <div class="summary-stats">
+          <div class="stat">
+            <span class="stat-value">{{ session.stats.nodesViewed }}</span>
+            <span class="stat-label">Content Explored</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ session.stats.pathsStarted }}</span>
+            <span class="stat-label">Paths Started</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ session.stats.stepsCompleted }}</span>
+            <span class="stat-label">Steps Completed</span>
+          </div>
+        </div>
+        <p class="summary-note">This progress will migrate when you join.</p>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="closeUpgradeModal()">Continue as Visitor</button>
+      <button class="btn-primary" disabled title="Coming soon!">
+        Get Notified When Available
+      </button>
+    </div>
+  </div>
+</dialog>
