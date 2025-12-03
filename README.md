@@ -43,27 +43,59 @@ This manifesto proposes technology that actively defends against corruption whil
 ## Repository Structure
 
 ```
-elohim-app/             # Angular application (Main Platform)
-├── src/app/components/ # Feature components
-│   ├── hero/           # Protocol introduction
-│   ├── crisis/         # Analysis of current failures
-│   ├── elohim-host/    # Autonomous AI guardians
-│   ├── vision/         # Future possibilities
-│   ├── design-principles/ # Technical implementation
-│   ├── learning-success/  # Proven models
-│   ├── path-forward/      # Implementation steps
-│   ├── call-to-action/    # The choice ahead
-│   └── footer/         # Closing message
-├── src/styles.css      # Global design system
-└── devfile.yaml        # Development environment config
-
-elohim-library/         # Angular Workspace for Shared Libraries
-└── projects/
-    └── lamad-ui/       # "Lamad" UI Pattern Library (Hexagon Grid, etc.)
-
-elohim-ui-playground/   # Component Showcase & Pattern Library App
-└── src/app/            # Demos for shared library components
+├── devfile.yaml              # Eclipse Che workspace configuration
+├── Jenkinsfile               # CI/CD pipeline definition
+├── VERSION                   # Semantic versioning (1.0.0)
+│
+├── elohim-app/               # Angular application (Main Platform)
+│   └── src/app/
+│       ├── components/       # Feature components
+│       │   ├── hero/         # Protocol introduction
+│       │   ├── crisis/       # Analysis of current failures
+│       │   ├── elohim-host/  # Autonomous AI guardians
+│       │   ├── vision/       # Future possibilities
+│       │   ├── design-principles/ # Technical implementation
+│       │   ├── learning-success/  # Proven models
+│       │   ├── path-forward/      # Implementation steps
+│       │   ├── call-to-action/    # The choice ahead
+│       │   ├── footer/       # Closing message
+│       │   ├── home/         # Home page container
+│       │   ├── theme-toggle/ # Dark/light theme switcher
+│       │   ├── debug-bar/    # Development debugging tools
+│       │   └── not-found/    # 404 page
+│       ├── lamad/            # Learning infrastructure module
+│       │   ├── models/       # Data models (Territory, Journey, Traveler)
+│       │   ├── services/     # Business logic & navigation
+│       │   ├── components/   # Learning UI components
+│       │   ├── renderers/    # Content type renderers
+│       │   └── parsers/      # Content ingestion tools
+│       └── services/         # App-wide services (SEO, analytics, theme)
+│
+├── elohim-library/           # Angular Workspace for Shared Libraries
+│   └── projects/
+│       └── lamad-ui/         # Lamad UI Pattern Library
+│
+├── elohim-ui-playground/     # Component Showcase & Pattern Library App
+│
+├── data/                     # Content and documentation
+│   ├── content/              # Learning content organized by domain
+│   └── humans/               # Human-readable documentation
+│
+└── manifests/                # Kubernetes deployment manifests
+    ├── *-deployment.yaml     # Environment-specific deployments
+    ├── ingress.yaml          # Ingress configuration
+    └── service.yaml          # Service definitions
 ```
+
+## Lamad Learning System
+
+**Lamad** (לָמַד - Hebrew: "to learn/teach") is the path-centric learning infrastructure for the Elohim Protocol. It enables structured learning experiences through:
+
+- **Territory (ContentNode)**: Immutable units of knowledge - videos, docs, simulations
+- **Journey (LearningPath)**: Curated paths that add narrative meaning and sequence
+- **Traveler (Agent)**: Sovereign agents whose progress and attestations shape their experience
+
+See [`elohim-app/src/app/lamad/README.md`](./elohim-app/src/app/lamad/README.md) for detailed documentation.
 
 ## Development
 
@@ -86,9 +118,11 @@ The application will be available at `http://localhost:4200/`
 ### Environment Configuration
 
 The project includes:
-- **devfile.yaml**: Eclipse Che workspace configuration
+- **devfile.yaml**: Eclipse Che workspace configuration (root level)
+- **Jenkinsfile**: CI/CD pipeline for automated builds, testing, and deployment
 - **Angular dev server**: Configured for remote development with host checking disabled
 - **NPM environment**: Optimized for containerized development with `/tmp` directories
+- **Kubernetes manifests**: Production deployment configurations in `manifests/`
 
 ## Philosophy
 
