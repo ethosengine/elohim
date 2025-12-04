@@ -26,10 +26,10 @@
  */
 
 // Re-export shared types from protocol-core
-import { IntimacyLevel, ConsentState } from '@app/elohim';
+import { IntimacyLevel, ConsentState } from '@app/elohim/models/protocol-core.model';
 
 // Re-export for convenience
-export { IntimacyLevel, ConsentState };
+export type { IntimacyLevel, ConsentState };
 
 // =========================================================================
 // Intimacy Levels (helpers)

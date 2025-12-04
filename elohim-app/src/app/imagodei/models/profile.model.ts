@@ -13,9 +13,9 @@
 
 // Models from lamad pillar
 import { ContentType } from '../../lamad/models/content-node.model';
-import { OpenGraphMetadata } from '../../lamad/models/open-graph.model';
-import { JsonLdMetadata } from '../../lamad/models/json-ld.model';
-// Models from elohim pillar
+// Models from elohim pillar (canonical location for shared types)
+import { OpenGraphMetadata } from '../../elohim/models/open-graph.model';
+import { JsonLdMetadata } from '../../elohim/models/json-ld.model';
 import { MasteryLevel } from '../../elohim/models/agent.model';
 
 /**

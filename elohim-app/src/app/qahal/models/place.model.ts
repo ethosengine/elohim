@@ -22,8 +22,9 @@
 
 // Import content types from lamad (content pillar)
 import type { ContentReach, ContentMetadata, ContentFlag } from '../../lamad/models/content-node.model';
-import { OpenGraphMetadata } from '../../lamad/models/open-graph.model';
-import { JsonLdMetadata } from '../../lamad/models/json-ld.model';
+// Import infrastructure types from elohim (canonical location)
+import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
+import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
 
 // ============================================================================
 // PLACE TYPE CLASSIFICATION
