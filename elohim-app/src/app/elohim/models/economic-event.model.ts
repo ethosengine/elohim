@@ -34,8 +34,9 @@
 import {
   REAAction,
   Measure,
-  ResourceClassification
-} from './rea-bridge.model';
+  ResourceClassification,
+  AccountingScope
+} from '@app/elohim/models/rea-bridge.model';
 
 // ============================================================================
 // Economic Event
@@ -67,8 +68,15 @@ export interface EconomicEvent {
   /** What type of resource (if conforming to spec) */
   resourceConformsTo?: string; // ResourceSpecification.id
 
-  /** Specific resource affected (if inventoried) */
+  /** Specific resource affected (if inventoried) - provider side */
   resourceInventoriedAs?: string; // EconomicResource.id
+
+  /**
+   * Resource on the receiving side of a transfer or move.
+   * For transfers between agents, this is the destination resource.
+   * Required for transfer and move actions.
+   */
+  toResourceInventoriedAs?: string; // EconomicResource.id
 
   /** For new resources: classification */
   resourceClassifiedAs?: ResourceClassification[];
@@ -107,14 +115,23 @@ export interface EconomicEvent {
   // Commitment/Agreement Context
   // ─────────────────────────────────────────────────────────────────
 
-  /** Commitment this fulfills (if any) */
-  fulfills?: string; // Commitment.id
+  /** Commitment(s) this event fulfills */
+  fulfills?: string[]; // Commitment.id[]
 
   /** Agreement this operates under */
   realizationOf?: string; // Agreement.id
 
-  /** Satisfies an intent */
-  satisfies?: string; // Intent.id
+  /** Reference to an agreement governing this event (URI) */
+  agreedIn?: string;
+
+  /** Intent(s) this event satisfies */
+  satisfies?: string[]; // Intent.id[]
+
+  /**
+   * Accounting scope(s) this event falls within.
+   * Used for grouping, reporting, and access control.
+   */
+  inScopeOf?: AccountingScope[];
 
   // ─────────────────────────────────────────────────────────────────
   // Metadata
@@ -341,7 +358,7 @@ export function createEventFromRequest(
     },
     hasPointInTime: timestamp,
     inputOf: request.processId,
-    fulfills: request.commitmentId,
+    fulfills: request.commitmentId ? [request.commitmentId] : undefined,
     note: request.note,
     state: 'pending',
     metadata: {

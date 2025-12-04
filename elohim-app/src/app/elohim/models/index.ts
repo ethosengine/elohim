@@ -11,6 +11,15 @@
 // Protocol Core - Shared primitives
 export * from './protocol-core.model';
 
+// REA Bridge - hREA/ValueFlows economic coordination
+export * from './rea-bridge.model';
+
+// Economic Event - Immutable value flow records
+export * from './economic-event.model';
+
+// Contributor Presence - Stewardship lifecycle for absent contributors
+export * from './contributor-presence.model';
+
 // Agent types
 export * from './agent.model';
 export * from './elohim-agent.model';

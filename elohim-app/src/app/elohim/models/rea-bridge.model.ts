@@ -53,8 +53,10 @@ import {
 /**
  * REAAction - The verb of an economic event.
  *
- * From ValueFlows specification, adapted for Lamad context.
+ * From ValueFlows specification, fully aligned with hREA action vocabulary.
  * Each action describes what happened to resources.
+ *
+ * See: https://www.valueflo.ws/concepts/actions/
  */
 export type REAAction =
   // Input actions (consume/use resources)
@@ -65,10 +67,13 @@ export type REAAction =
   // Output actions (create/produce resources)
   | 'produce'       // Create new resource (author content, synthesize map)
   | 'raise'         // Increase quantity (accumulate recognition)
+  | 'lower'         // Decrease quantity (reduce holdings)
 
   // Transfer actions (move between agents)
-  | 'transfer'      // Move resource to another agent
+  | 'transfer'      // Move resource to another agent (ownership transfer)
   | 'transfer-custody' // Move custody without ownership change
+  | 'transfer-all-rights' // Transfer all rights to resource
+  | 'move'          // Move resource between locations (same agent)
 
   // Modification actions
   | 'modify'        // Change resource properties
@@ -79,31 +84,67 @@ export type REAAction =
   | 'work'          // Contribute labor (stewardship, review, curation)
   | 'deliver-service' // Provide service (Elohim synthesis, tutoring)
 
+  // Logistics actions (for physical resource handling)
+  | 'pickup'        // Take custody of a resource at a location
+  | 'dropoff'       // Release custody of a resource at a location
+
+  // Exchange actions
+  | 'give'          // Give a resource (one side of exchange)
+  | 'take'          // Take a resource (other side of exchange)
+
   // Acceptance actions
-  | 'accept'        // Accept a transfer or commitment (claim presence)
-  | 'dropoff'       // Complete a transfer (finalize handoff);
+  | 'accept';       // Accept a transfer or commitment (claim presence)
 
 /**
  * Action effects on resources - used for validation.
+ *
+ * Aligned with ValueFlows action semantics:
+ * - resourceEffect: How the action affects resource quantity
+ * - inputOutput: Whether action is input to process, output from process, or both
+ * - onhandEffect: How the action affects onhand quantity (for custody tracking)
+ * - pairsWith: For paired actions (give/take, pickup/dropoff)
  */
 export const REA_ACTION_EFFECTS: Record<REAAction, {
-  resourceEffect: 'increment' | 'decrement' | 'no-effect';
+  resourceEffect: 'increment' | 'decrement' | 'no-effect' | 'decrement-increment';
   inputOutput: 'input' | 'output' | 'both' | 'na';
+  onhandEffect?: 'increment' | 'decrement' | 'no-effect';
+  pairsWith?: REAAction;
 }> = {
+  // Input actions
   'use': { resourceEffect: 'no-effect', inputOutput: 'input' },
-  'consume': { resourceEffect: 'decrement', inputOutput: 'input' },
+  'consume': { resourceEffect: 'decrement', inputOutput: 'input', onhandEffect: 'decrement' },
   'cite': { resourceEffect: 'no-effect', inputOutput: 'input' },
-  'produce': { resourceEffect: 'increment', inputOutput: 'output' },
-  'raise': { resourceEffect: 'increment', inputOutput: 'output' },
-  'transfer': { resourceEffect: 'no-effect', inputOutput: 'both' },
-  'transfer-custody': { resourceEffect: 'no-effect', inputOutput: 'both' },
+
+  // Output actions
+  'produce': { resourceEffect: 'increment', inputOutput: 'output', onhandEffect: 'increment' },
+  'raise': { resourceEffect: 'increment', inputOutput: 'na', onhandEffect: 'increment' },
+  'lower': { resourceEffect: 'decrement', inputOutput: 'na', onhandEffect: 'decrement' },
+
+  // Transfer actions
+  'transfer': { resourceEffect: 'decrement-increment', inputOutput: 'na' },
+  'transfer-custody': { resourceEffect: 'no-effect', inputOutput: 'na', onhandEffect: 'decrement' },
+  'transfer-all-rights': { resourceEffect: 'decrement-increment', inputOutput: 'na' },
+  'move': { resourceEffect: 'no-effect', inputOutput: 'na' },
+
+  // Modification actions
   'modify': { resourceEffect: 'no-effect', inputOutput: 'both' },
-  'combine': { resourceEffect: 'decrement', inputOutput: 'input' },
-  'separate': { resourceEffect: 'increment', inputOutput: 'output' },
+  'combine': { resourceEffect: 'decrement', inputOutput: 'input', onhandEffect: 'decrement' },
+  'separate': { resourceEffect: 'increment', inputOutput: 'output', onhandEffect: 'increment' },
+
+  // Work actions
   'work': { resourceEffect: 'no-effect', inputOutput: 'input' },
   'deliver-service': { resourceEffect: 'no-effect', inputOutput: 'output' },
+
+  // Logistics actions (paired)
+  'pickup': { resourceEffect: 'no-effect', inputOutput: 'na', onhandEffect: 'increment', pairsWith: 'dropoff' },
+  'dropoff': { resourceEffect: 'no-effect', inputOutput: 'na', onhandEffect: 'decrement', pairsWith: 'pickup' },
+
+  // Exchange actions (paired)
+  'give': { resourceEffect: 'decrement', inputOutput: 'na', onhandEffect: 'decrement', pairsWith: 'take' },
+  'take': { resourceEffect: 'increment', inputOutput: 'na', onhandEffect: 'increment', pairsWith: 'give' },
+
+  // Acceptance
   'accept': { resourceEffect: 'no-effect', inputOutput: 'na' },
-  'dropoff': { resourceEffect: 'no-effect', inputOutput: 'na' },
 };
 
 // ============================================================================
@@ -185,11 +226,30 @@ export const CLASSIFICATION_TO_TOKEN_TYPE: Partial<Record<ResourceClassification
 
 /**
  * Unit - Measurement units for quantities.
+ *
+ * Aligned with hREA Unit type and OM2 (Ontology of units of Measure).
+ * See: http://www.ontology-of-units-of-measure.org/resource/om-2
  */
 export interface Unit {
+  /** Unique identifier */
   id: string;
+
+  /** Human-readable label (potentially language-specific) */
   label: string;
+
+  /** Standard display symbol */
   symbol: string;
+
+  /**
+   * OM2 identifier for the unit.
+   * Maps to standard ontology for interoperability.
+   * Examples: 'om:one', 'om:minute', 'om:hour'
+   * For custom units, use URIs like 'elohim:affinity'
+   */
+  omUnitIdentifier: string;
+
+  /** Optional classification for the unit */
+  classifiedAs?: string;
 }
 
 /**
@@ -204,30 +264,32 @@ export type LamadUnitName =
 
 /**
  * Standard units for Lamad resources.
+ * OM2 identifiers follow the pattern 'om:{unit}' for standard units
+ * and 'elohim:{unit}' for domain-specific units.
  */
 export const LAMAD_UNITS: Record<LamadUnitName, Unit> = {
   // Attention units
-  view: { id: 'unit-view', label: 'View', symbol: 'view' },
-  minute: { id: 'unit-minute', label: 'Minute', symbol: 'min' },
-  session: { id: 'unit-session', label: 'Session', symbol: 'sess' },
+  view: { id: 'unit-view', label: 'View', symbol: 'view', omUnitIdentifier: 'elohim:view' },
+  minute: { id: 'unit-minute', label: 'Minute', symbol: 'min', omUnitIdentifier: 'om:minute' },
+  session: { id: 'unit-session', label: 'Session', symbol: 'sess', omUnitIdentifier: 'elohim:session' },
 
   // Recognition units
-  affinity: { id: 'unit-affinity', label: 'Affinity Point', symbol: 'aff' },
-  endorsement: { id: 'unit-endorsement', label: 'Endorsement', symbol: 'end' },
-  attestation: { id: 'unit-attestation', label: 'Attestation', symbol: 'att' },
+  affinity: { id: 'unit-affinity', label: 'Affinity Point', symbol: 'aff', omUnitIdentifier: 'elohim:affinity' },
+  endorsement: { id: 'unit-endorsement', label: 'Endorsement', symbol: 'end', omUnitIdentifier: 'elohim:endorsement' },
+  attestation: { id: 'unit-attestation', label: 'Attestation', symbol: 'att', omUnitIdentifier: 'elohim:attestation' },
 
   // Content units
-  node: { id: 'unit-node', label: 'Content Node', symbol: 'node' },
-  step: { id: 'unit-step', label: 'Path Step', symbol: 'step' },
-  path: { id: 'unit-path', label: 'Learning Path', symbol: 'path' },
+  node: { id: 'unit-node', label: 'Content Node', symbol: 'node', omUnitIdentifier: 'elohim:contentNode' },
+  step: { id: 'unit-step', label: 'Path Step', symbol: 'step', omUnitIdentifier: 'elohim:pathStep' },
+  path: { id: 'unit-path', label: 'Learning Path', symbol: 'path', omUnitIdentifier: 'elohim:learningPath' },
 
   // Compute units (for Elohim/Unyt)
-  token: { id: 'unit-token', label: 'Token', symbol: 'tok' },
-  cycle: { id: 'unit-cycle', label: 'Compute Cycle', symbol: 'cyc' },
+  token: { id: 'unit-token', label: 'Token', symbol: 'tok', omUnitIdentifier: 'elohim:token' },
+  cycle: { id: 'unit-cycle', label: 'Compute Cycle', symbol: 'cyc', omUnitIdentifier: 'elohim:computeCycle' },
 
-  // Generic
-  each: { id: 'unit-each', label: 'Each', symbol: 'ea' },
-  one: { id: 'unit-one', label: 'One', symbol: '1' },
+  // Generic (standard OM2 units)
+  each: { id: 'unit-each', label: 'Each', symbol: 'ea', omUnitIdentifier: 'om:one' },
+  one: { id: 'unit-one', label: 'One', symbol: '1', omUnitIdentifier: 'om:one' },
 };
 
 // ============================================================================
@@ -431,6 +493,37 @@ export type AgentRelationshipType =
   | 'delegate-of';       // Agent acts on behalf of another
 
 // ============================================================================
+// Accounting Scope (hREA inScopeOf)
+// ============================================================================
+
+/**
+ * AccountingScope - Defines boundaries for economic accounting.
+ *
+ * In hREA, inScopeOf creates groupings for documentation, accounting, and planning.
+ * This can be an Agent (organization) or any other entity that defines a boundary.
+ *
+ * Examples in Lamad:
+ * - A community (Qahal) as scope for all its economic activity
+ * - A learning cohort as scope for collaborative processes
+ * - An Elohim as scope for stewardship activities
+ *
+ * Note: We intentionally avoid "network-wide" scope as it lacks the specificity
+ * needed to provide meaningful accounting boundaries.
+ */
+export type AccountingScope = string; // Agent ID or other scope identifier
+
+/**
+ * ScopeType - Classification of accounting scopes.
+ */
+export type ScopeType =
+  | 'organization'    // Formal organization boundary
+  | 'community'       // Community (Qahal) boundary
+  | 'project'         // Project or initiative scope
+  | 'cohort'          // Learning cohort
+  | 'family'          // Family economic unit
+  | 'constitutional'; // Constitutional governance scope (e.g., dignity floor enforcement)
+
+// ============================================================================
 // Process (Learning as Value Creation)
 // ============================================================================
 
@@ -467,6 +560,12 @@ export interface Process {
 
   /** Outputs from this process (events that came out) */
   outputs?: string[]; // EconomicEvent IDs
+
+  /**
+   * Accounting scope(s) this process falls within.
+   * Used for grouping, reporting, and access control.
+   */
+  inScopeOf?: AccountingScope[];
 
   /** For learning paths: the path ID */
   pathId?: string;
@@ -525,17 +624,23 @@ export interface Intent {
   /** Unique identifier */
   id: string;
 
+  /** Human-readable name (optional) */
+  name?: string;
+
   /** What action is intended */
   action: REAAction;
 
   /** Who is expressing this intent */
-  provider?: string; // Agent ID (who will give)
+  provider?: string; // Agent ID (who will give - implies offer)
 
   /** Who is the intended recipient */
-  receiver?: string; // Agent ID (who will receive)
+  receiver?: string; // Agent ID (who will receive - implies request)
 
   /** What resource type */
   resourceConformsTo?: string; // ResourceSpecification.id
+
+  /** Specific resource (if known) */
+  resourceInventoriedAs?: string; // EconomicResource.id
 
   /** How much */
   resourceQuantity?: Measure;
@@ -543,23 +648,43 @@ export interface Intent {
   /** For effort-based: how much effort */
   effortQuantity?: Measure;
 
+  /** Total quantity available (for offers) */
+  availableQuantity?: Measure;
+
   /** When intended */
   hasPointInTime?: string;
 
   /** Available from */
-  availableFrom?: string;
+  hasBeginning?: string;
 
   /** Available until */
-  availableUntil?: string;
+  hasEnd?: string;
+
+  /** Time something is expected to be complete */
+  due?: string;
 
   /** Description */
   note?: string;
 
   /** Is this satisfied by commitments? */
-  satisfied: boolean;
+  finished: boolean;
 
-  /** Classification */
+  /**
+   * Accounting scope(s) this intent falls within.
+   */
+  inScopeOf?: AccountingScope[];
+
+  /** If this intent is an input to a process */
+  inputOf?: string; // Process.id
+
+  /** If this intent is an output of a process */
+  outputOf?: string; // Process.id
+
+  /** Classification URIs */
   classifiedAs?: string[];
+
+  /** Image relevant to the intent */
+  image?: string;
 }
 
 /**
@@ -587,11 +712,23 @@ export interface Commitment {
   /** Specific resource (if known) */
   resourceInventoriedAs?: string; // EconomicResource.id
 
+  /** Classification URIs for the resource */
+  resourceClassifiedAs?: string[];
+
   /** How much committed */
   resourceQuantity?: Measure;
 
   /** For effort-based: how much effort */
   effortQuantity?: Measure;
+
+  /** Planned beginning of the commitment */
+  hasBeginning?: string;
+
+  /** Planned end of the commitment */
+  hasEnd?: string;
+
+  /** Planned date/time for the commitment */
+  hasPointInTime?: string;
 
   /** When due */
   due?: string;
@@ -599,9 +736,20 @@ export interface Commitment {
   /** Part of what agreement */
   clauseOf?: string; // Agreement.id
 
+  /** Reference to an agreement governing this commitment */
+  agreedIn?: string; // URI
+
   /** Part of what process */
   inputOf?: string; // Process.id
   outputOf?: string; // Process.id
+
+  /** Intent this commitment satisfies */
+  satisfies?: string; // Intent.id
+
+  /**
+   * Accounting scope(s) this commitment falls within.
+   */
+  inScopeOf?: AccountingScope[];
 
   /** Description */
   note?: string;
@@ -674,6 +822,94 @@ export type AgreementClassification =
   | 'attestation-grant';  // Attestation issuance terms
 
 // ============================================================================
+// Proposal (Offer/Request Matching)
+// ============================================================================
+
+/**
+ * Proposal - Published intents for matching offers and requests.
+ *
+ * In hREA, Proposals publish one or more Intents to find matches.
+ * A Proposal can contain primary intents (what is offered/requested)
+ * and reciprocal intents (what is expected in return).
+ *
+ * In Lamad:
+ * - "I offer to review content" (publishes Intent with action: 'work')
+ * - "I want a mentor for X" (publishes Intent with action: 'deliver-service')
+ * - Reciprocal: "In exchange for recognition tokens"
+ */
+export interface Proposal {
+  /** Unique identifier */
+  id: string;
+
+  /** Human-readable name */
+  name?: string;
+
+  /** Description of the proposal */
+  note?: string;
+
+  /** When the proposal becomes active */
+  hasBeginning?: string;
+
+  /** When the proposal expires */
+  hasEnd?: string;
+
+  /** When the proposal was created */
+  created?: string;
+
+  /**
+   * Primary intents published in this proposal.
+   * These are what is being offered or requested.
+   */
+  publishes: string[]; // Intent IDs
+
+  /**
+   * Reciprocal intents - what is expected in return.
+   * For exchanges, this defines the other side of the trade.
+   */
+  reciprocal?: string[]; // Intent IDs
+
+  /**
+   * Agents to whom this proposal is directed.
+   * If empty, the proposal is public/open.
+   */
+  proposedTo?: string[]; // Agent IDs
+
+  /**
+   * Accounting scope(s) this proposal falls within.
+   */
+  inScopeOf?: AccountingScope[];
+
+  /**
+   * Is this proposal unit-based?
+   * If true, quantities in intents represent per-unit pricing.
+   */
+  unitBased?: boolean;
+
+  /** Classification */
+  classifiedAs?: string[];
+}
+
+/**
+ * ProposedIntent - Links an Intent to a Proposal with additional metadata.
+ *
+ * This allows the same Intent to be published in multiple Proposals
+ * with different terms.
+ */
+export interface ProposedIntent {
+  /** Unique identifier */
+  id: string;
+
+  /** The proposal this belongs to */
+  publishedIn: string; // Proposal.id
+
+  /** The intent being published */
+  publishes: string; // Intent.id
+
+  /** Is this a reciprocal intent? */
+  reciprocal: boolean;
+}
+
+// ============================================================================
 // Appreciation (Recognition Flows)
 // ============================================================================
 
@@ -708,11 +944,14 @@ export interface Appreciation {
 }
 
 // ============================================================================
-// Claim (Entitlements)
+// Claim & Settlement (hREA Pattern)
 // ============================================================================
 
 /**
- * Claim - An entitlement arising from economic activity.
+ * Claim - A claim for a future economic event.
+ *
+ * In hREA, Claims represent entitlements that arise from economic activity,
+ * which can be settled by future economic events.
  *
  * In Lamad: claims to recognition that has accumulated at a presence.
  */
@@ -720,32 +959,72 @@ export interface Claim {
   /** Unique identifier */
   id: string;
 
-  /** What event triggered this claim */
+  /** The action associated with the claim (e.g., transfer, give) */
+  action: REAAction;
+
+  /** The economic event that triggered this claim */
   triggeredBy: string; // EconomicEvent.id
 
-  /** Who has the claim */
-  claimant: string; // Agent ID
+  /** Who has the claim (provider in the future event) */
+  provider?: string; // Agent ID
 
-  /** Against whom/what */
-  claimAgainst: string; // Agent ID or Resource ID
+  /** Against whom the claim is made (receiver in the future event) */
+  receiver?: string; // Agent ID
 
-  /** What is claimed */
+  /** What type of resource is claimed */
   resourceConformsTo?: string; // ResourceSpecification.id
 
-  /** How much is claimed */
+  /** Classification URIs for the resource */
+  resourceClassifiedAs?: string[];
+
+  /** How much resource is claimed */
   resourceQuantity?: Measure;
 
+  /** How much effort is claimed (for work/service actions) */
+  effortQuantity?: Measure;
+
+  /** When the claim is expected to be settled */
+  due?: string;
+
   /** When the claim was created */
-  createdAt: string;
+  created?: string;
 
-  /** When the claim was settled */
-  settledAt?: string;
+  /** Is this claim fully settled? */
+  finished: boolean;
 
-  /** Is this claim settled? */
-  settled: boolean;
+  /** Reference to an agreement governing this claim */
+  agreedIn?: string; // URI
 
-  /** How it was settled */
-  settledBy?: string; // EconomicEvent.id
+  /** Note */
+  note?: string;
+
+  /**
+   * Accounting scope(s) this claim falls within.
+   */
+  inScopeOf?: AccountingScope[];
+}
+
+/**
+ * Settlement - Records the settlement of a claim.
+ *
+ * In hREA, Settlements link Claims to the EconomicEvents that fulfill them.
+ * A Claim can be partially or fully settled by multiple Settlements.
+ */
+export interface Settlement {
+  /** Unique identifier */
+  id: string;
+
+  /** The claim being settled */
+  settles: string; // Claim.id
+
+  /** The economic event that settles the claim */
+  settledBy: string; // EconomicEvent.id
+
+  /** Resource quantity settled by this settlement */
+  resourceQuantity?: Measure;
+
+  /** Effort quantity settled by this settlement */
+  effortQuantity?: Measure;
 
   /** Note */
   note?: string;
@@ -913,26 +1192,29 @@ export const TOKEN_RESOURCE_SPECS: Record<string, ResourceSpecification> = {
 };
 
 // ============================================================================
-// Constitutional Flow Control
+// Value Flow Constitutional Control
 // ============================================================================
 
 /**
- * ConstitutionalLayer - The four-layer governance for value flows.
+ * ValueFlowLayer - The four-layer governance for economic value flows.
  *
  * These layers define constitutional constraints on value flow:
  * 1. Dignity Floor - Basic needs, care labor recognition, cannot be extracted
  * 2. Attribution - Value flows to creators, accumulates in trust for absent contributors
  * 3. Circulation - Tokens must circulate, demurrage on hoarding
  * 4. Sustainability - Portion flows to next community liberation
+ *
+ * Note: This is specific to REA/ValueFlows economic constraints.
+ * For general protocol-wide constraints, see ConstitutionalConstraint in protocol-core.model.ts.
  */
-export type ConstitutionalLayer =
+export type ValueFlowLayer =
   | 'dignity_floor'    // Layer 1: Existential minimums
   | 'attribution'      // Layer 2: Contribution recognition
   | 'circulation'      // Layer 3: Community velocity
   | 'sustainability';  // Layer 4: Network development
 
 /**
- * ConstitutionalConstraint - Inviolable constraints on value flow.
+ * ValueFlowConstraint - Inviolable constraints on economic value flow.
  *
  * Core constraints:
  * - No accumulation without responsibility
@@ -940,13 +1222,16 @@ export type ConstitutionalLayer =
  * - Demurrage on hoarding
  * - Attribution persistence
  * - Anti-capture
+ *
+ * Note: This is specific to REA/ValueFlows economic constraints.
+ * For general protocol-wide constraints, see ConstitutionalConstraint in protocol-core.model.ts.
  */
-export interface ConstitutionalConstraint {
+export interface ValueFlowConstraint {
   /** Unique identifier */
   id: string;
 
-  /** Which constitutional layer this constraint belongs to */
-  layer: ConstitutionalLayer;
+  /** Which value flow layer this constraint belongs to */
+  layer: ValueFlowLayer;
 
   /** Human-readable name */
   name: string;
@@ -996,8 +1281,8 @@ export interface CommonsPool {
   /** Total attributed but unclaimed */
   attributedUnclaimed: Measure;
 
-  /** Constitutional layer this pool serves */
-  constitutionalLayer: ConstitutionalLayer;
+  /** Value flow layer this pool serves */
+  valueFlowLayer: ValueFlowLayer;
 
   /** Governance layer that manages this pool */
   governedBy: GovernanceLayer;

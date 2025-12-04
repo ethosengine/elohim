@@ -43,8 +43,8 @@ import {
   EconomicResource,
   Commitment,
   Measure
-} from './rea-bridge.model';
-import { OpenGraphMetadata } from './open-graph.model';
+} from '@app/elohim/models/rea-bridge.model';
+import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
 
 // ============================================================================
 // Presence State
