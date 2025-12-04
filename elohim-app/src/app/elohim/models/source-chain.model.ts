@@ -398,7 +398,7 @@ export interface HumanConsentContent {
   intimacyLevel: 'recognition' | 'connection' | 'trusted' | 'intimate';
 
   /** State of consent */
-  consentState: 'not_required' | 'pending' | 'accepted' | 'declined' | 'revoked';
+  consentState: 'not_required' | 'pending' | 'accepted' | 'declined' | 'revoked' | 'expired';
 
   /** When consent state was last updated */
   updatedAt: string;
