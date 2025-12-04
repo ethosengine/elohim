@@ -8,13 +8,11 @@ import {
   SessionMigration,
   HolochainUpgradePrompt,
   UpgradeTrigger,
-} from '../models/session-human.model';
-import {
   ContentAccessMetadata,
   AccessCheckResult,
   AccessLevel,
-  AccessAction,
-} from '../models/content-access.model';
+  AccessAction
+} from '../models';
 
 /**
  * SessionHumanService - Manages temporary session identity for MVP.

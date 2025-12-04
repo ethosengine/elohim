@@ -3,9 +3,7 @@ import { Observable, forkJoin, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { DataLoaderService } from './data-loader.service';
 import { AgentService } from './agent.service';
-import { LearningPath, PathStep, PathStepView, PathIndex, PathChapter } from '../models/learning-path.model';
-import { ContentNode } from '../models/content-node.model';
-import { AgentProgress } from '../models/agent.model';
+import { LearningPath, PathStep, PathStepView, PathIndex, PathChapter, ContentNode, AgentProgress } from '../models';
 
 /**
  * Access check result for fog-of-war system.

@@ -2,12 +2,20 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, forkJoin } from 'rxjs';
 import { catchError, map, shareReplay } from 'rxjs/operators';
-import { LearningPath, PathIndex } from '../models/learning-path.model';
-import { ContentNode, ContentGraph, ContentGraphMetadata } from '../models/content-node.model';
-import { Agent, AgentProgress } from '../models/agent.model';
-import { ContentAttestation } from '../models/content-attestation.model';
-import { KnowledgeMapIndex, KnowledgeMap } from '../models/knowledge-map.model';
-import { PathExtensionIndex, PathExtension } from '../models/path-extension.model';
+import {
+  LearningPath,
+  PathIndex,
+  ContentNode,
+  ContentGraph,
+  ContentGraphMetadata,
+  Agent,
+  AgentProgress,
+  ContentAttestation,
+  KnowledgeMapIndex,
+  KnowledgeMap,
+  PathExtensionIndex,
+  PathExtension
+} from '../models';
 
 // Assessment types (inline until models are expanded)
 export interface AssessmentIndex {

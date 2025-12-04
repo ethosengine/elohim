@@ -2,8 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { ProgressMigrationService } from './progress-migration.service';
 import { DataLoaderService } from './data-loader.service';
-import { AgentProgress } from '../models/agent.model';
-import { LearningPath, PathStep } from '../models/learning-path.model';
+import { AgentProgress, LearningPath, PathStep } from '../models';
 
 describe('ProgressMigrationService', () => {
   let service: ProgressMigrationService;

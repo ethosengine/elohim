@@ -13,16 +13,12 @@ import {
   DECAY_RATES,
   AssessmentEvidence,
   LevelProgressionEvent,
-} from '../models/content-mastery.model';
-import {
   MasteryLevel,
   isAboveGate,
   compareMasteryLevels,
-} from '../models/agent.model';
-import {
   MasteryRecordContent,
-  SourceChainEntry,
-} from '../models/source-chain.model';
+  SourceChainEntry
+} from '../models';
 
 /**
  * ContentMasteryService - Manages Bloom's Taxonomy mastery tracking.

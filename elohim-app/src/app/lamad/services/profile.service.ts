@@ -21,8 +21,9 @@ import {
   PathWithProgress,
   PathsOverview,
   ProfileSummaryCompact,
-} from '../models/profile.model';
-import { SessionPathProgress, SessionActivity } from '../models/session-human.model';
+  SessionPathProgress,
+  SessionActivity
+} from '../models';
 
 /**
  * ProfileService - Human-Centered Identity View

@@ -6,9 +6,7 @@ import { PathService } from './path.service';
 import { SessionHumanService } from './session-human.service';
 import { AffinityTrackingService } from './affinity-tracking.service';
 import { AgentService } from './agent.service';
-import { LearningPath, PathStep } from '../models/learning-path.model';
-import { ContentNode } from '../models/content-node.model';
-import { SessionPathProgress, SessionActivity } from '../models/session-human.model';
+import { LearningPath, PathStep, ContentNode, SessionPathProgress, SessionActivity } from '../models';
 
 describe('ProfileService', () => {
   let service: ProfileService;

@@ -3,9 +3,7 @@ import { of, BehaviorSubject } from 'rxjs';
 import { AgentService } from './agent.service';
 import { DataLoaderService } from './data-loader.service';
 import { SessionHumanService } from './session-human.service';
-import { Agent, AgentProgress, FrontierItem } from '../models/agent.model';
-import { SessionHuman } from '../models/session-human.model';
-import { AccessLevel, ContentAccessMetadata } from '../models/content-access.model';
+import { Agent, AgentProgress, FrontierItem, SessionHuman, AccessLevel, ContentAccessMetadata } from '../models';
 
 describe('AgentService', () => {
   let service: AgentService;

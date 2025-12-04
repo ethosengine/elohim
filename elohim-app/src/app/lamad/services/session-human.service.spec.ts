@@ -5,7 +5,7 @@ import {
   SessionActivity,
   SessionPathProgress,
   HolochainUpgradePrompt,
-} from '../models/session-human.model';
+} from '../models';
 
 describe('SessionHumanService', () => {
   let service: SessionHumanService;

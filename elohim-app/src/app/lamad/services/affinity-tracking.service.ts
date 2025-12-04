@@ -6,8 +6,8 @@ import {
   AffinityChangeEvent,
   CategoryAffinityStats,
   TypeAffinityStats,
-} from '../models/human-affinity.model';
-import { ContentNode } from '../models/content-node.model';
+  ContentNode
+} from '../models';
 import { SessionHumanService } from './session-human.service';
 
 /**

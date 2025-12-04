@@ -15,7 +15,7 @@ import {
   ContentReviewResult,
   AttestationRecommendationParams,
   AttestationRecommendation
-} from '../models/elohim-agent.model';
+} from '../models';
 
 /**
  * ElohimAgentService - Interface to autonomous constitutional guardians.

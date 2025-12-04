@@ -1,9 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { DataLoaderService } from './data-loader.service';
-import { LearningPath, PathIndex } from '../models/learning-path.model';
-import { ContentNode } from '../models/content-node.model';
-import { AgentProgress } from '../models/agent.model';
+import { LearningPath, PathIndex, ContentNode, AgentProgress } from '../models';
 
 describe('DataLoaderService', () => {
   let service: DataLoaderService;

@@ -3,9 +3,7 @@ import { of, throwError } from 'rxjs';
 import { PathService, AccessCheckResult } from './path.service';
 import { DataLoaderService } from './data-loader.service';
 import { AgentService } from './agent.service';
-import { LearningPath, PathStep, PathStepView, PathIndex } from '../models/learning-path.model';
-import { ContentNode } from '../models/content-node.model';
-import { AgentProgress } from '../models/agent.model';
+import { LearningPath, PathStep, PathStepView, PathIndex, ContentNode, AgentProgress } from '../models';
 
 describe('PathService', () => {
   let service: PathService;

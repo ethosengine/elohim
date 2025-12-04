@@ -7,7 +7,7 @@ import {
   LamadLinkType,
   MasteryRecordContent,
   HumanProfileContent,
-} from '../models/source-chain.model';
+} from '../models';
 
 describe('LocalSourceChainService', () => {
   let service: LocalSourceChainService;
