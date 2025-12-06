@@ -149,7 +149,7 @@ export class KuzuDataService {
         content STRING,
         contentFormat STRING,
         tags STRING[],
-        relatedNodeIds STRING[],
+        relatedNodeIds STRING[] DEFAULT [],
         authorId STRING,
         reach STRING,
         trustScore DOUBLE DEFAULT 0.0,
