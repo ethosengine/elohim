@@ -20,6 +20,7 @@ export interface ContextAppConfig {
   id: ContextApp;
   name: string;
   icon: string;
+  logo?: boolean;
   route: string;
   tagline: string;
   available: boolean;
@@ -66,6 +67,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       id: 'lamad',
       name: 'Lamad',
       icon: '📚',
+      logo: true,
       route: '/lamad',
       tagline: 'Learning & Content',
       available: true
@@ -74,6 +76,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       id: 'community',
       name: 'Qahal',
       icon: '👥',
+      logo: true,
       route: '/community',
       tagline: 'Community & Governance',
       available: true
@@ -82,6 +85,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       id: 'shefa',
       name: 'Shefa',
       icon: '✨',
+      logo: true,
       route: '/shefa',
       tagline: 'Economics of Flourishing',
       available: true
@@ -157,6 +161,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    * Switch to a different context app
    */
   switchContext(app: ContextAppConfig): void {
+    if (!app.available) return;
     this.showContextSwitcher = false;
     this.router.navigate([app.route]);
   }
@@ -268,7 +273,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   /**
    * Close all dropdown trays
    */
-  private closeAllTrays(): void {
+  public closeAllTrays(): void {
     this.showProfileTray = false;
     this.showContextSwitcher = false;
   }

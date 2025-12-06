@@ -46,14 +46,8 @@ for (const file of pathFiles) {
   }
   const tagsStr = tags.length > 0 ? '[' + tags.map(t => '"' + t + '"').join(', ') + ']' : '[]';
 
-  // Extract step resourceIds as relatedNodeIds
-  const relatedIds = (json.steps || [])
-    .filter(s => s.resourceId)
-    .map(s => escapeCypher(s.resourceId));
-  const relatedIdsStr = relatedIds.length > 0 ? '[' + relatedIds.map(id => '"' + id + '"').join(', ') + ']' : '[]';
-
   contentStatements.push(
-    `CREATE (:ContentNode {id: '${escapeCypher(contentId)}', contentType: 'path', title: '${title}', description: '${description}', content: '${content}', contentFormat: 'markdown', tags: ${tagsStr}, relatedNodeIds: ${relatedIdsStr}});`
+    `CREATE (:ContentNode {id: '${escapeCypher(contentId)}', contentType: 'path', title: '${title}', description: '${description}', content: '${content}', contentFormat: 'markdown', tags: ${tagsStr}});`
   );
 
   console.log(`Created: ${contentId}`);

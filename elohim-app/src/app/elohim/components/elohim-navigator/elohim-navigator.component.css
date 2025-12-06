@@ -2,11 +2,30 @@
    Elohim Navigator - Unified Navigation Component
    ============================================================================ */
 
+/* Theme-based Logo URL */
+:root {
+  --elohim-logo-url: url('/images/elohim_logo_light.png');
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --elohim-logo-url: url('/images/elohim_logo_dark.png');
+  }
+}
+
+:host-context(body[data-theme="light"]) {
+  --elohim-logo-url: url('/images/elohim_logo_dark.png');
+}
+
+:host-context(body[data-theme="dark"]) {
+  --elohim-logo-url: url('/images/elohim_logo_light.png');
+}
+
 /* Header */
 .elohim-header {
   background: var(--lamad-surface);
   border-bottom: 1px solid var(--lamad-border);
-  padding: 0.5rem 1rem;
+  padding: 0.375rem 1rem;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -23,36 +42,59 @@
 }
 
 /* ============================================================================
-   Context Switcher (Left)
+   Left Nav Group (Logo + Context Switcher)
    ============================================================================ */
 
-.context-switcher-container {
-  position: relative;
-}
-
-.app-logo-btn {
+.left-nav-group {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.375rem 0.75rem;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: all 0.2s;
 }
 
-.app-logo-btn:hover {
+/* App Logo Link */
+.app-logo-link {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  text-decoration: none;
+  border-radius: 0.375rem;
+  transition: background 0.2s;
+}
+
+.app-logo-link:hover {
   background: rgba(99, 102, 241, 0.1);
-  border-color: var(--lamad-border);
+}
+
+/* App Logo Image */
+.app-logo-image {
+  width: 24px;
+  height: 24px;
+  background-image: var(--elohim-logo-url);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.4));
+  transition: filter 0.2s;
+}
+
+.app-logo-link:hover .app-logo-image {
+  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.6));
+}
+
+.app-logo-image.small {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
 }
 
 .app-icon {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
+  line-height: 1;
 }
 
 .app-name {
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 600;
   background: var(--lamad-accent-gradient);
   -webkit-background-clip: text;
@@ -60,14 +102,58 @@
   background-clip: text;
 }
 
+/* Context Switcher */
+.context-switcher-container {
+  position: relative;
+  /* On desktop, this is grouped with the logo */
+}
+
+.context-switch-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.context-switch-btn:hover {
+  background: rgba(99, 102, 241, 0.15);
+}
+
 .dropdown-arrow {
-  font-size: 0.6rem;
+  width: 12px;
+  height: 12px;
   color: var(--lamad-text-muted);
   transition: transform 0.2s;
 }
 
 .dropdown-arrow.open {
   transform: rotate(180deg);
+}
+
+/* Header Separator */
+.header-separator {
+  color: var(--lamad-border);
+  font-size: 0.75rem;
+  margin: 0 0.125rem;
+}
+
+/* Protocol Link in Header */
+.protocol-link {
+  font-size: 0.7rem;
+  color: var(--lamad-text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.protocol-link:hover {
+  color: var(--lamad-accent-primary);
 }
 
 /* Context Switcher Dropdown */
@@ -126,7 +212,7 @@
   transition: all 0.2s;
 }
 
-.context-app-item:hover {
+.context-app-item:hover:not([disabled]) {
   background: rgba(99, 102, 241, 0.1);
 }
 
@@ -134,9 +220,14 @@
   opacity: 0.7;
 }
 
+.context-app-item[disabled] {
+  cursor: not-allowed;
+}
+
 .app-item-icon {
   font-size: 1.5rem;
   flex-shrink: 0;
+  line-height: 1;
 }
 
 .app-item-info {
@@ -167,22 +258,7 @@
   text-transform: uppercase;
 }
 
-.dropdown-footer {
-  padding: 0.75rem 1rem;
-  border-top: 1px solid var(--lamad-border);
-  text-align: center;
-}
-
-.protocol-link {
-  font-size: 0.75rem;
-  color: var(--lamad-text-muted);
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-.protocol-link:hover {
-  color: var(--lamad-accent-primary);
-}
+/* Note: dropdown-footer removed - protocol link now in header */
 
 /* ============================================================================
    Search (Center)
@@ -220,6 +296,9 @@
 }
 
 .search-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.5rem 0.75rem;
   background: var(--lamad-accent-gradient);
   border: none;
@@ -235,7 +314,8 @@
 }
 
 .search-icon {
-  font-size: 0.875rem;
+  width: 16px;
+  height: 16px;
 }
 
 /* ============================================================================
@@ -348,7 +428,8 @@
 }
 
 .action-icon {
-  font-size: 1rem;
+  width: 18px;
+  height: 18px;
   opacity: 0.7;
 }
 
@@ -434,7 +515,8 @@
 }
 
 .upgrade-icon {
-  font-size: 1.25rem;
+  width: 20px;
+  height: 20px;
 }
 
 .upgrade-text {
@@ -477,6 +559,9 @@
 }
 
 .btn-dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.25rem;
   background: transparent;
   border: none;
@@ -538,10 +623,12 @@
   background: transparent;
   border: none;
   color: var(--lamad-text-muted);
-  font-size: 1.25rem;
   cursor: pointer;
   opacity: 0.6;
   transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal-close:hover {
@@ -599,8 +686,13 @@
 }
 
 .benefit-icon {
-  font-size: 1.25rem;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lamad-accent-primary);
 }
 
 .upgrade-benefits strong {
@@ -715,19 +807,63 @@
    Responsive
    ============================================================================ */
 
+/* Mobile Backdrop */
+.mobile-menu-backdrop {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .header-content {
+    display: grid; /* Use grid for mobile layout */
+    grid-template-columns: auto 1fr auto; /* Left, Center (flexible), Right */
+    align-items: center;
     gap: 0.5rem;
   }
 
+  /* Left Nav Group (containing Logo and Context Switcher) */
+  .left-nav-group {
+    display: flex;
+    justify-content: center; /* Center the app-logo-link */
+    align-items: center;
+    grid-column: 2; /* Place in the center column */
+  }
+
+  /* App Name (hidden on mobile) */
   .app-name {
     display: none;
   }
 
+  /* Context Switcher (leftmost on mobile) */
+  .context-switcher-container {
+    grid-column: 1; /* Place in the first column */
+    justify-self: start; /* Align to the start of the column */
+  }
+
+  /* Profile Bubble (rightmost on mobile) */
+  .profile-bubble-container {
+    grid-column: 3; /* Place in the third column */
+    justify-self: end; /* Align to the end of the column */
+  }
+
+  /* Hide elements not needed on mobile */
+  .header-separator,
+  .protocol-link,
   .search-container {
     display: none;
   }
 
+  /* Mobile Backdrop */
+  .mobile-menu-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    z-index: 99;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  /* Bottom Sheet Styles for Trays */
   .context-switcher-dropdown,
   .profile-tray {
     position: fixed;
@@ -735,10 +871,47 @@
     bottom: 0;
     left: 0;
     right: 0;
-    border-radius: 1rem 1rem 0 0;
-    max-height: 80vh;
+    width: 100%;
+    min-width: 0; /* Override desktop min-width */
+    max-height: 85vh;
+    border-radius: 1.5rem 1.5rem 0 0;
+    border: none;
+    box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.15);
+    z-index: 101; /* Above backdrop */
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    padding-bottom: env(safe-area-inset-bottom); /* Handle iPhone home bar */
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto; /* Enable scrolling for content */
   }
 
+  /* Add a "handle" visual for bottom sheets */
+  .context-switcher-dropdown::before,
+  .profile-tray::before {
+    content: '';
+    display: block;
+    width: 32px;
+    height: 4px;
+    background: var(--lamad-border);
+    border-radius: 2px;
+    margin: 0.75rem auto 0;
+    flex-shrink: 0;
+  }
+
+  /* Adjust internal padding for bottom sheets */
+  .dropdown-header,
+  .profile-header {
+    border-bottom: none; /* Cleaner look on mobile */
+    padding-top: 0.5rem;
+  }
+
+  /* Larger touch targets */
+  .context-app-item,
+  .profile-action {
+    padding: 1rem;
+  }
+
+  /* Upgrade Banner Mobile */
   .upgrade-banner-content {
     flex-wrap: wrap;
   }
@@ -748,12 +921,15 @@
     gap: 0.25rem;
   }
 
+  /* Modal Mobile */
   .modal-overlay {
     padding: 1rem;
+    align-items: flex-end; /* Sheet-like on mobile too? Or center. Center is fine. */
   }
 
   .upgrade-modal {
-    border-radius: 0.75rem;
+    border-radius: 1rem;
+    max-height: 85vh;
   }
 
   .modal-header {
@@ -771,9 +947,29 @@
 
   .modal-footer button {
     width: 100%;
+    padding: 0.75rem; /* Larger touch target */
   }
 
   .summary-stats {
     gap: 1rem;
+    justify-content: space-around;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
