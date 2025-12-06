@@ -5,7 +5,7 @@ import {
   DataLoaderService,
   AssessmentIndex,
   AssessmentIndexEntry
-} from './data-loader.service';
+} from '@app/elohim/services/data-loader.service';
 import { ContentNode } from '../models/content-node.model';
 import { SessionHumanService } from './session-human.service';
 

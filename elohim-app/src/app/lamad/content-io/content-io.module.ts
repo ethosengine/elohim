@@ -1,52 +1,65 @@
-import { NgModule, ModuleWithProviders } from '@angular/core';
+import { NgModule, ModuleWithProviders, APP_INITIALIZER, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 // Core services
-import { ContentIORegistryService } from './services/content-io-registry.service';
+import { ContentFormatRegistryService } from './services/content-format-registry.service';
+import { ContentEditorService } from './services/content-editor.service';
 import { ContentIOService } from './services/content-io.service';
 
 // Components
 import { ContentDownloadComponent } from './components/content-download/content-download.component';
+import { DefaultCodeEditorComponent } from './components/default-code-editor/default-code-editor.component';
 
-// Built-in plugins
-import { MarkdownIOModule } from './plugins/markdown/markdown-io.module';
-import { GherkinIOModule } from './plugins/gherkin/gherkin-io.module';
+// Unified format plugins
+import { MarkdownFormatPlugin } from './plugins/markdown/markdown-format.plugin';
+import { GherkinFormatPlugin } from './plugins/gherkin/gherkin-format.plugin';
+
+/**
+ * Factory function to register unified format plugins at app initialization.
+ * This ensures plugins are registered before any component tries to use them.
+ */
+function initializeFormatPlugins(): () => void {
+  const registry = inject(ContentFormatRegistryService);
+  return () => {
+    // Register built-in unified plugins
+    registry.register(new MarkdownFormatPlugin());
+    registry.register(new GherkinFormatPlugin());
+  };
+}
 
 /**
  * Content I/O Module
  *
- * Provides content import/export functionality with a plugin architecture.
+ * Provides content import/export/editing functionality with a unified plugin architecture.
+ *
+ * Each ContentFormatPlugin provides:
+ * - Rendering (how to display content)
+ * - I/O operations (import/export/validate)
+ * - Editing (optional custom editor component)
  *
  * Usage:
  * ```typescript
  * @NgModule({
  *   imports: [
- *     ContentIOModule.forRoot()  // Includes built-in plugins
+ *     ContentIOModule.forRoot()  // Includes built-in plugins (Markdown, Gherkin)
  *   ]
  * })
  * export class AppModule {}
- * ```
- *
- * Or import specific plugins:
- * ```typescript
- * @NgModule({
- *   imports: [
- *     ContentIOModule,
- *     MarkdownIOModule,  // Only markdown support
- *   ]
- * })
  * ```
  */
 @NgModule({
   imports: [
     CommonModule,
-    ContentDownloadComponent
+    ContentDownloadComponent,
+    DefaultCodeEditorComponent
   ],
   exports: [
-    ContentDownloadComponent
+    ContentDownloadComponent,
+    DefaultCodeEditorComponent
   ],
   providers: [
-    ContentIORegistryService,
+    ContentFormatRegistryService,
+    ContentEditorService,
     ContentIOService
   ]
 })
@@ -58,8 +71,15 @@ export class ContentIOModule {
     return {
       ngModule: ContentIOModuleWithPlugins,
       providers: [
-        ContentIORegistryService,
-        ContentIOService
+        ContentFormatRegistryService,
+        ContentEditorService,
+        ContentIOService,
+        // Register unified plugins at app initialization
+        {
+          provide: APP_INITIALIZER,
+          useFactory: initializeFormatPlugins,
+          multi: true
+        }
       ]
     };
   }
@@ -70,9 +90,7 @@ export class ContentIOModule {
  */
 @NgModule({
   imports: [
-    ContentIOModule,
-    MarkdownIOModule,
-    GherkinIOModule
+    ContentIOModule
   ],
   exports: [
     ContentIOModule

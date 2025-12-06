@@ -1,7 +1,7 @@
 import { Injectable, Optional } from '@angular/core';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { map, tap, switchMap, take } from 'rxjs/operators';
-import { DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { SessionHumanService } from './session-human.service';
 import { Agent, AgentProgress, FrontierItem } from '../models';
 import { AccessLevel, ContentAccessMetadata, AccessCheckResult } from '../models/content-access.model';

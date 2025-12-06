@@ -22,6 +22,9 @@ export { PathService } from './path.service';
 // Content access
 export { ContentService } from './content.service';
 
+// Kuzu embedded database (WASM) - re-exported from elohim
+export { KuzuDataService } from '@app/elohim/services/kuzu-data.service';
+
 // Graph exploration
 export { ExplorationService } from './exploration.service';
 
@@ -30,6 +33,9 @@ export { KnowledgeMapService } from './knowledge-map.service';
 
 // Path extensions
 export { PathExtensionService } from './path-extension.service';
+
+// Path-graph integration (paths as ContentNodes)
+export { PathGraphService } from './path-graph.service';
 
 // Search
 export { SearchService } from './search.service';

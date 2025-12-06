@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError, BehaviorSubject } from 'rxjs';
 import { ProfileService } from './profile.service';
-import { DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { PathService } from './path.service';
 import { SessionHumanService } from './session-human.service';
 import { AffinityTrackingService } from './affinity-tracking.service';

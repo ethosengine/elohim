@@ -1,0 +1,44 @@
+{
+  "id": "scenario-governance-policy-maker-addressing-protocoltax-law-integration-questions",
+  "contentType": "scenario",
+  "title": "Addressing protocol-tax law integration questions",
+  "description": "protocol creates novel economic relationships; tax implications are unclear; I work with revenue department on clarification... (10 steps total)",
+  "content": "Given protocol creates novel economic relationships\nAnd tax implications are unclear\nWhen I work with revenue department on clarification\nThen we determine: tax treatment of care tokens\nAnd we address: property tax implications of resource sharing\nAnd we clarify: whether mutual aid counts for social safety net\nAnd we create: certainty enabling protocol to function\nAnd we avoid: creating impossible tax burdens\nAnd we ensure: tax policy doesn't undermine protocol benefits\nAnd legal clarity: supports implementation",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "governance",
+    "user_type",
+    "policy_maker",
+    "governance_layer",
+    "provincial_state",
+    "related_users",
+    "constitutional_council_member",
+    "related_layers",
+    "nation_state",
+    "elohim_agents",
+    "regional_elohim",
+    "policy-maker",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/governance/policy_maker/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-provincial-state",
+    "source-governance-policy-maker-provincial-state"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "governance",
+    "userType": "policy_maker",
+    "featureId": "feature-governance-policy-maker-provincial-state",
+    "stepCount": 10,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-governance-policy-maker-provincial-state",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.232Z",
+  "updatedAt": "2025-12-05T18:41:24.232Z"
+}

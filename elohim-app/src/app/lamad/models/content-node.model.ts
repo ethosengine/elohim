@@ -312,7 +312,8 @@ export type ContentType =
   | 'organization'
   | 'book-chapter'
   | 'tool'
-  | 'role'; // Capability attestation target (e.g., "TypeScript Developer", "FCT Facilitator")
+  | 'role' // Capability attestation target (e.g., "TypeScript Developer", "FCT Facilitator")
+  | 'path'; // Learning path - curated journey through content nodes
 
 /**
  * RoleMetadata - Extended metadata for role-type ContentNodes.

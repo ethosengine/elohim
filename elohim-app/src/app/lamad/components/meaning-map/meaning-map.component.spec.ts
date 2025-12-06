@@ -3,7 +3,7 @@ import { MeaningMapComponent } from './meaning-map.component';
 import { provideHttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
-import { DataLoaderService } from '../../services/data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { ContentNode } from '../../models/content-node.model';
 

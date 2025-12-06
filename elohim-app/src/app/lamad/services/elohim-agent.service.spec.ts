@@ -1,7 +1,7 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { ElohimAgentService } from './elohim-agent.service';
-import { DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { ElohimRequest, ElohimCapability, Agent } from '../models';
 
 describe('ElohimAgentService', () => {

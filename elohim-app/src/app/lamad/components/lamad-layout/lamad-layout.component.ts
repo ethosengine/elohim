@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
-import { DataLoaderService } from '../../services/data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { RendererInitializerService } from '../../renderers/renderer-initializer.service';
 import { ElohimNavigatorComponent } from '../../../elohim/components/elohim-navigator/elohim-navigator.component';
 

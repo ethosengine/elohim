@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { GovernanceService, ChallengeSubmission, ProposalSubmission, Vote, DiscussionMessage } from './governance.service';
-import { DataLoaderService, GovernanceIndex, ChallengeRecord, ProposalRecord, PrecedentRecord, DiscussionRecord, GovernanceStateRecord } from './data-loader.service';
+import { DataLoaderService, GovernanceIndex, ChallengeRecord, ProposalRecord, PrecedentRecord, DiscussionRecord, GovernanceStateRecord } from '@app/elohim/services/data-loader.service';
 import { SessionHumanService } from './session-human.service';
 
 describe('GovernanceService', () => {

@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { ContentIORegistryService } from './content-io-registry.service';
+import { ContentFormatRegistryService } from './content-format-registry.service';
 import {
   ContentIOImportResult,
   ContentIOExportInput
@@ -10,14 +10,14 @@ import { FormatMetadata } from '../interfaces/format-metadata.interface';
 /**
  * High-level service for content import/export operations.
  *
- * Orchestrates operations across plugins registered in the ContentIORegistry.
+ * Orchestrates operations across plugins registered in the ContentFormatRegistry.
  * Provides convenience methods for common operations like download and clipboard.
  */
 @Injectable({
   providedIn: 'root'
 })
 export class ContentIOService {
-  constructor(private readonly registry: ContentIORegistryService) {}
+  constructor(private readonly registry: ContentFormatRegistryService) {}
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Import Operations

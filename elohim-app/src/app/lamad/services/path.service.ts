@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
-import { DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AgentService } from './agent.service';
 import { LearningPath, PathStep, PathStepView, PathIndex, PathChapter, ContentNode, AgentProgress } from '../models';
 

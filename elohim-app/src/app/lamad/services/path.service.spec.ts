@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { PathService, AccessCheckResult } from './path.service';
-import { DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AgentService } from './agent.service';
 import { LearningPath, PathStep, PathStepView, PathIndex, ContentNode, AgentProgress } from '../models';
 

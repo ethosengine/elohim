@@ -9,7 +9,7 @@ import {
   PrecedentRecord,
   DiscussionRecord,
   GovernanceStateRecord
-} from './data-loader.service';
+} from '@app/elohim/services/data-loader.service';
 import { SessionHumanService } from './session-human.service';
 
 /**
