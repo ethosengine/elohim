@@ -17,9 +17,9 @@ import {
   ProposedPathStructure,
   isNegotiationActive,
   isNegotiationResolved,
-} from '../models/path-negotiation.model';
-import { hasMinimumIntimacy } from '../models/human-consent.model';
-import { PathNegotiationContent } from '../models/source-chain.model';
+  PathNegotiationContent
+} from '../models';
+import { hasMinimumIntimacy } from '@app/qahal/models/human-consent.model';
 
 /**
  * PathNegotiationService - Placeholder for Elohim-to-Elohim path negotiation.

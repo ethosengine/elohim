@@ -1,9 +1,8 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { ElohimAgentService } from './elohim-agent.service';
-import { DataLoaderService } from './data-loader.service';
-import { ElohimRequest, ElohimCapability } from '../models/elohim-agent.model';
-import { Agent } from '../models/agent.model';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { ElohimRequest, ElohimCapability, Agent } from '../models';
 
 describe('ElohimAgentService', () => {
   let service: ElohimAgentService;

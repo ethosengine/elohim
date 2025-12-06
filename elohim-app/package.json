@@ -27,6 +27,7 @@
     "@angular/platform-browser": "^19.2.0",
     "@angular/platform-browser-dynamic": "^19.2.0",
     "@angular/router": "^19.2.0",
+    "@kuzu/kuzu-wasm": "^0.7.0",
     "@types/d3": "^7.4.3",
     "d3": "^7.9.0",
     "highlight.js": "^11.11.1",

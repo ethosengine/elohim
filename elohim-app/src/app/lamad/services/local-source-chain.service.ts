@@ -9,7 +9,7 @@ import {
   LinkQuery,
   ChainMetadata,
   ChainMigrationPackage,
-} from '../models/source-chain.model';
+} from '../models';
 
 /**
  * LocalSourceChainService - Agent-centric source chain simulation using localStorage.

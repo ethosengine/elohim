@@ -1,0 +1,44 @@
+{
+  "id": "scenario-governance-policy-maker-commissioning-independent-research-on-protocol-eff",
+  "contentType": "scenario",
+  "title": "Commissioning independent research on protocol effectiveness",
+  "description": "I need evidence for policy evaluation; research must be independent to be credible; I establish national research program... (10 steps total)",
+  "content": "Given I need evidence for policy evaluation\nAnd research must be independent to be credible\nWhen I establish national research program\nThen I fund: rigorous evaluation by independent researchers\nAnd I require: open access publication\nAnd I support: longitudinal studies tracking long-term outcomes\nAnd I enable: replication and peer review\nAnd I demand: honest reporting including null results\nAnd evidence base: supports informed democratic choice\nAnd public funding: serves public knowledge",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "governance",
+    "user_type",
+    "policy_maker",
+    "governance_layer",
+    "nation_state",
+    "related_users",
+    "constitutional_council_member",
+    "related_layers",
+    "provincial_state",
+    "elohim_agents",
+    "national_elohim",
+    "policy-maker",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-nation-state",
+    "source-governance-policy-maker-nation-state"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "governance",
+    "userType": "policy_maker",
+    "featureId": "feature-governance-policy-maker-nation-state",
+    "stepCount": 10,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-governance-policy-maker-nation-state",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.232Z",
+  "updatedAt": "2025-12-05T18:41:24.232Z"
+}

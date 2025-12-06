@@ -1,0 +1,43 @@
+{
+  "id": "scenario-social-medium-activist-activist-coordinates-planetary-climate-strike",
+  "contentType": "scenario",
+  "title": "Activist coordinates planetary climate strike",
+  "description": "youth activists worldwide demand emergency climate action; they want coordinated strikes across all continents; the network establishes a coordinated action date... (11 steps total)",
+  "content": "Given youth activists worldwide demand emergency climate action\nAnd they want coordinated strikes across all continents\nWhen the network establishes a coordinated action date\nAnd local groups plan context-appropriate actions\nAnd the coordination respects different hemispheres, cultures, and capacities\nThen each community organizes autonomously within global framework\nAnd the translation agents enable real-time cross-language coordination\nAnd traditional media amplification is earned through demonstrated scale\nAnd the collective action maintains coherence without centralized control\nAnd impact is measured through network-wide participation tracking\nAnd the strike demonstrates viable model for global coordination",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "social_medium",
+    "user_type",
+    "activist",
+    "governance_layer",
+    "global",
+    "related_users",
+    "refugee",
+    "related_layers",
+    "nation_state",
+    "elohim_agents",
+    "translation_agent",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/social_medium/activist/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-global",
+    "source-social-medium-activist-global"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "social_medium",
+    "userType": "activist",
+    "featureId": "feature-social-medium-activist-global",
+    "stepCount": 11,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-social-medium-activist-global",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.259Z",
+  "updatedAt": "2025-12-05T18:41:24.259Z"
+}

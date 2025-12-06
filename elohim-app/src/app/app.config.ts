@@ -4,16 +4,15 @@ import { provideHttpClient } from '@angular/common/http';
 
 import { routes } from './app.routes';
 
-// Content I/O plugins - these register themselves when imported
-import { MarkdownIOModule } from './lamad/content-io/plugins/markdown/markdown-io.module';
-import { GherkinIOModule } from './lamad/content-io/plugins/gherkin/gherkin-io.module';
+// Content I/O module with unified format plugins
+import { ContentIOModuleWithPlugins } from './lamad/content-io/content-io.module';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(),
-    // Import Content I/O plugin modules to ensure they self-register
-    importProvidersFrom(MarkdownIOModule, GherkinIOModule)
+    // Import ContentIO module with built-in format plugins (Markdown, Gherkin)
+    importProvidersFrom(ContentIOModuleWithPlugins)
   ]
 };

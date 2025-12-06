@@ -1,0 +1,119 @@
+<div class="code-editor" [class.readonly]="readonly">
+  <!-- Toolbar -->
+  <header class="editor-toolbar" *ngIf="config.toolbar?.enabled">
+    <div class="toolbar-left">
+      <span class="format-badge">{{ node.contentFormat || 'text' }}</span>
+      <span class="dirty-indicator" *ngIf="isDirty">*</span>
+    </div>
+
+    <div class="toolbar-actions">
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="onSave()"
+        [disabled]="readonly || isSaving"
+        title="Save (Ctrl+S)">
+        <span *ngIf="isSaving">Saving...</span>
+        <span *ngIf="!isSaving">Save</span>
+      </button>
+      <button
+        type="button"
+        class="btn btn-secondary"
+        (click)="onCancel()"
+        title="Cancel (Escape)">
+        Cancel
+      </button>
+    </div>
+  </header>
+
+  <!-- Validation Errors -->
+  <div class="validation-errors" *ngIf="validationErrors.length > 0">
+    <div class="error" *ngFor="let error of validationErrors">
+      {{ error }}
+    </div>
+  </div>
+
+  <!-- Save Error -->
+  <div class="save-error" *ngIf="saveError">
+    {{ saveError }}
+  </div>
+
+  <!-- Metadata Section -->
+  <section class="metadata-section">
+    <div class="form-group">
+      <label for="title">Title</label>
+      <input
+        id="title"
+        type="text"
+        class="form-input"
+        [(ngModel)]="title"
+        (ngModelChange)="onMetadataChange()"
+        [disabled]="readonly"
+        placeholder="Enter title..."
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="description">Description</label>
+      <textarea
+        id="description"
+        class="form-input description-input"
+        [(ngModel)]="description"
+        (ngModelChange)="onMetadataChange()"
+        [disabled]="readonly"
+        placeholder="Brief description..."
+        rows="2"
+      ></textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="tags">Tags</label>
+      <input
+        id="tags"
+        type="text"
+        class="form-input"
+        [(ngModel)]="tagsInput"
+        (ngModelChange)="onMetadataChange()"
+        [disabled]="readonly"
+        placeholder="tag1, tag2, tag3..."
+      />
+      <span class="input-hint">Separate tags with commas</span>
+    </div>
+  </section>
+
+  <!-- Content Editor -->
+  <section class="content-section">
+    <label>Content</label>
+    <div class="editor-wrapper">
+      <!-- Line Numbers -->
+      <div class="line-numbers" *ngIf="config.showLineNumbers">
+        <span *ngFor="let num of lineNumbers" class="line-number">{{ num }}</span>
+      </div>
+
+      <!-- Text Area -->
+      <textarea
+        #contentArea
+        class="content-textarea"
+        [class.with-line-numbers]="config.showLineNumbers"
+        [style.word-wrap]="config.wordWrap ? 'break-word' : 'normal'"
+        [(ngModel)]="content"
+        (input)="onContentInput()"
+        (keydown)="onKeyDown($event)"
+        [disabled]="readonly"
+        placeholder="Enter content..."
+        spellcheck="false"
+      ></textarea>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="editor-footer">
+    <div class="footer-stats">
+      <span class="stat">{{ lineNumbers.length }} lines</span>
+      <span class="stat">{{ content.length }} characters</span>
+    </div>
+    <div class="footer-hint" *ngIf="!readonly">
+      Press <kbd>Ctrl+S</kbd> to save, <kbd>Escape</kbd> to cancel
+    </div>
+  </footer>
+</div>

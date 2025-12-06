@@ -1,0 +1,44 @@
+{
+  "id": "scenario-governance-policy-maker-advocating-for-protocol-sovereignty-in-internation",
+  "contentType": "scenario",
+  "title": "Advocating for protocol sovereignty in international forums",
+  "description": "international organizations discuss AI regulation; some proposals would mandate centralization; I advocate for democratic governance principles... (10 steps total)",
+  "content": "Given international organizations discuss AI regulation\nAnd some proposals would mandate centralization\nWhen I advocate for democratic governance principles\nThen I argue: governments shouldn't mandate protocol architecture\nAnd I promote: community sovereignty as democratic principle\nAnd I defend: right of communities to adopt or reject protocol\nAnd I present: evidence that protocol sovereignty works\nAnd I resist: international regulation enabling authoritarian capture\nAnd I build: coalition of democratic nations supporting autonomy\nAnd I protect: space for democratic AI governance globally",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "governance",
+    "user_type",
+    "policy_maker",
+    "governance_layer",
+    "global",
+    "related_users",
+    "constitutional_council_member",
+    "related_layers",
+    "nation_state",
+    "elohim_agents",
+    "global_constitutional_agent",
+    "policy-maker",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-global",
+    "source-governance-policy-maker-global"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "governance",
+    "userType": "policy_maker",
+    "featureId": "feature-governance-policy-maker-global",
+    "stepCount": 10,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-governance-policy-maker-global",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.232Z",
+  "updatedAt": "2025-12-05T18:41:24.232Z"
+}

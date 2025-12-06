@@ -1,0 +1,42 @@
+{
+  "id": "scenario-social-medium-activist-activist-coordinates-rapid-response-across-network",
+  "contentType": "scenario",
+  "title": "Activist coordinates rapid response across network",
+  "description": "Indigenous land defenders face immediate threat of eviction; the situation requires urgent solidarity action; the land defenders' community issues call for support... (10 steps total)",
+  "content": "Given Indigenous land defenders face immediate threat of eviction\nAnd the situation requires urgent solidarity action\nWhen the land defenders' community issues call for support\nAnd the call is verified through network trust relationships\nThen rapid response protocol activates across affinity network\nAnd each community determines its capacity to respond\nAnd coordination happens in real-time across time zones\nAnd actions are culturally appropriate and locally determined\nAnd the network mobilizes pressure while preventing burnout\nAnd the land defenders receive coordinated solidarity support",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "social_medium",
+    "user_type",
+    "activist",
+    "governance_layer",
+    "affinity_network",
+    "related_users",
+    "related_layers",
+    "community",
+    "elohim_agents",
+    "coordination_agent",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/social_medium/activist/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-affinity-network",
+    "source-social-medium-activist-affinity-network"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "social_medium",
+    "userType": "activist",
+    "featureId": "feature-social-medium-activist-affinity-network",
+    "stepCount": 10,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-social-medium-activist-affinity-network",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.259Z",
+  "updatedAt": "2025-12-05T18:41:24.259Z"
+}

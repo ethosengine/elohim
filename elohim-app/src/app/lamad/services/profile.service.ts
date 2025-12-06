@@ -2,7 +2,7 @@ import { Injectable, Optional } from '@angular/core';
 import { Observable, of, forkJoin, combineLatest } from 'rxjs';
 import { map, switchMap, catchError } from 'rxjs/operators';
 
-import { DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { PathService } from './path.service';
 import { SessionHumanService } from './session-human.service';
 import { AffinityTrackingService } from './affinity-tracking.service';
@@ -21,8 +21,9 @@ import {
   PathWithProgress,
   PathsOverview,
   ProfileSummaryCompact,
-} from '../models/profile.model';
-import { SessionPathProgress, SessionActivity } from '../models/session-human.model';
+  SessionPathProgress,
+  SessionActivity
+} from '../models';
 
 /**
  * ProfileService - Human-Centered Identity View

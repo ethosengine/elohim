@@ -21,8 +21,8 @@
  */
 
 import type { ContentReach, ContentMetadata, ContentFlag } from './content-node.model';
-import { OpenGraphMetadata } from './open-graph.model';
-import { JsonLdMetadata } from './json-ld.model';
+import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
+import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
 
 // ============================================================================
 // PLACE TYPE CLASSIFICATION

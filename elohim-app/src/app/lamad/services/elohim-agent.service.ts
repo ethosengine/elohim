@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, timer } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
-import { DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import {
   ElohimAgent,
   ElohimCapability,
@@ -15,7 +15,7 @@ import {
   ContentReviewResult,
   AttestationRecommendationParams,
   AttestationRecommendation
-} from '../models/elohim-agent.model';
+} from '../models';
 
 /**
  * ElohimAgentService - Interface to autonomous constitutional guardians.

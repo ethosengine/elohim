@@ -46,9 +46,15 @@
           <span *ngFor="let tag of node.tags" class="tag">#{{ tag }}</span>
         </div>
 
-        <!-- Download button -->
+        <!-- Content actions -->
         <div class="content-actions">
           <app-content-download [node]="node"></app-content-download>
+          <a
+            *ngIf="canEditContent"
+            [routerLink]="['/lamad/resource', node.id, 'edit']"
+            class="btn-edit">
+            ✏️ Edit
+          </a>
         </div>
       </div>
 

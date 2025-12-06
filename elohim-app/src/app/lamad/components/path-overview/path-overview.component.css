@@ -564,3 +564,26 @@
   margin: 0;
   font-size: 1rem;
 }
+
+/* View Resource Link */
+.view-resource-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--lamad-accent-primary, #6366f1);
+  text-decoration: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.view-resource-link:hover {
+  background-color: rgba(99, 102, 241, 0.1);
+  text-decoration: underline;
+}
+
+.view-resource-link .icon {
+  font-size: 0.75rem;
+  line-height: 1;
+}

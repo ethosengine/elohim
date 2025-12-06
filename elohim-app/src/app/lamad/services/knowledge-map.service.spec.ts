@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { KnowledgeMapService } from './knowledge-map.service';
-import { DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { ElohimAgentService } from './elohim-agent.service';
 import { KnowledgeMapType, MasteryLevel } from '../models/knowledge-map.model';
 

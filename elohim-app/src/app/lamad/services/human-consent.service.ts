@@ -8,13 +8,15 @@ import {
   HumanConsent,
   IntimacyLevel,
   ConsentState,
-  ElevationRequest,
-  hasMinimumIntimacy,
-  isConsentActive,
-  canElevate,
-} from '../models/human-consent.model';
-import { HumanConsentContent } from '../models/source-chain.model';
-import type { LearningPath, PathVisibility } from '../models/learning-path.model';
+  HumanConsentContent,
+  LearningPath,
+  PathVisibility
+} from '../models';
+// These functions are in qahal human-consent model
+import { hasMinimumIntimacy, isConsentActive } from '@app/qahal/models/human-consent.model';
+// ElevationRequest and canElevate need to be imported from qahal
+import type { ElevationRequest } from '@app/qahal/models/human-consent.model';
+import { canElevate } from '@app/qahal/models/human-consent.model';
 
 /**
  * HumanConsentService - Manages consent-based relationships between humans.

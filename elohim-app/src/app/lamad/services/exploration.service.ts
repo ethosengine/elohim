@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 import { map, switchMap, catchError, take } from 'rxjs/operators';
 
-import { DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import {
   ContentNode,
   ContentGraph,
@@ -463,6 +463,18 @@ export class ExplorationService {
 
     const node = ctx.graph.nodes.get(targetId);
     if (node) {
+      // Apply content type filter
+      if (!this.passesContentTypeFilter(
+        node,
+        ctx.query.contentTypeFilter,
+        ctx.query.excludeContentTypes
+      )) {
+        // Node is filtered out, but we still add it to frontier for traversal
+        // This allows traversing THROUGH filtered nodes to reach others
+        nextFrontier.push(targetId);
+        return true;
+      }
+
       const nodeToAdd = ctx.query.includeContent === false ? this.stripContent(node) : node;
       nodesAtDepth.push(nodeToAdd);
       nextFrontier.push(targetId);
@@ -479,6 +491,23 @@ export class ExplorationService {
     if (!relationship) return true;
     const filters = Array.isArray(filter) ? filter : [filter];
     return filters.includes(relationship.relationshipType);
+  }
+
+  /** Check if a node passes content type filters */
+  private passesContentTypeFilter(
+    node: ContentNode,
+    includeFilter: string | string[] | undefined,
+    excludeFilter: string[] | undefined
+  ): boolean {
+    // Check exclusion first
+    if (excludeFilter && excludeFilter.includes(node.contentType)) {
+      return false;
+    }
+
+    // Check inclusion filter
+    if (!includeFilter) return true;
+    const filters = Array.isArray(includeFilter) ? includeFilter : [includeFilter];
+    return filters.includes(node.contentType);
   }
 
   /**

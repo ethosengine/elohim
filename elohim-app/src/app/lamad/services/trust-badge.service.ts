@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, forkJoin } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { ContentService } from './content.service';
 import { AgentService } from './agent.service';
 import { ContentNode, ContentReach, ContentFlag } from '../models/content-node.model';

@@ -1,0 +1,44 @@
+{
+  "id": "scenario-governance-policy-maker-addressing-global-inequality-in-protocol-access",
+  "contentType": "scenario",
+  "title": "Addressing global inequality in protocol access",
+  "description": "research shows protocol adoption correlates with national wealth; poor nations lack infrastructure for implementation; I advocate for global equity in access... (10 steps total)",
+  "content": "Given research shows protocol adoption correlates with national wealth\nAnd poor nations lack infrastructure for implementation\nWhen I advocate for global equity in access\nThen I promote: international funding mechanisms\nAnd I support: technology transfer without strings attached\nAnd I push: for open source hardware and software\nAnd I challenge: intellectual property barriers to adoption\nAnd I ensure: protocol doesn't exacerbate global inequality\nAnd I work: for democratic AI governance as universal right\nAnd I recognize: justice requires addressing structural barriers",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "governance",
+    "user_type",
+    "policy_maker",
+    "governance_layer",
+    "global",
+    "related_users",
+    "constitutional_council_member",
+    "related_layers",
+    "nation_state",
+    "elohim_agents",
+    "global_constitutional_agent",
+    "policy-maker",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-global",
+    "source-governance-policy-maker-global"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "governance",
+    "userType": "policy_maker",
+    "featureId": "feature-governance-policy-maker-global",
+    "stepCount": 10,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-governance-policy-maker-global",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.232Z",
+  "updatedAt": "2025-12-05T18:41:24.232Z"
+}

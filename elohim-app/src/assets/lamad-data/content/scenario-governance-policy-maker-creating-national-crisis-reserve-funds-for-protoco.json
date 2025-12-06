@@ -1,0 +1,44 @@
+{
+  "id": "scenario-governance-policy-maker-creating-national-crisis-reserve-funds-for-protoco",
+  "contentType": "scenario",
+  "title": "Creating national crisis reserve funds for protocol resilience",
+  "description": "crises may threaten protocol infrastructure; rapid response funding is needed; I establish emergency reserves... (9 steps total)",
+  "content": "Given crises may threaten protocol infrastructure\nAnd rapid response funding is needed\nWhen I establish emergency reserves\nThen I fund: rapid scaling for refugee crises\nAnd I support: attack response against corporate or authoritarian threats\nAnd I provide: disaster recovery for damaged infrastructure\nAnd reserves ensure: protocol survives shocks\nAnd resilience: is built into national support\nAnd democratic governance: can weather emergencies",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "governance",
+    "user_type",
+    "policy_maker",
+    "governance_layer",
+    "nation_state",
+    "related_users",
+    "constitutional_council_member",
+    "related_layers",
+    "provincial_state",
+    "elohim_agents",
+    "national_elohim",
+    "policy-maker",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-nation-state",
+    "source-governance-policy-maker-nation-state"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "governance",
+    "userType": "policy_maker",
+    "featureId": "feature-governance-policy-maker-nation-state",
+    "stepCount": 9,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-governance-policy-maker-nation-state",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.232Z",
+  "updatedAt": "2025-12-05T18:41:24.232Z"
+}

@@ -1,0 +1,43 @@
+{
+  "id": "scenario-social-medium-activist-activist-builds-crossborder-solidarity-network",
+  "contentType": "scenario",
+  "title": "Activist builds cross-border solidarity network",
+  "description": "labor activists in 15 countries face similar corporate exploitation; they want to coordinate against multinational corporation practices; they form a global labor solidarity network... (10 steps total)",
+  "content": "Given labor activists in 15 countries face similar corporate exploitation\nAnd they want to coordinate against multinational corporation practices\nWhen they form a global labor solidarity network\nAnd they establish protocols respecting different legal contexts\nAnd translation agents enable communication across 12 languages\nThen the global network creates shared understanding of corporate tactics\nAnd each national group maintains autonomy over local strategy\nAnd pattern recognition surfaces successful resistance campaigns\nAnd coordination happens through verified trust relationships\nAnd legal risks are minimized through jurisdictional awareness",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "social_medium",
+    "user_type",
+    "activist",
+    "governance_layer",
+    "global",
+    "related_users",
+    "refugee",
+    "related_layers",
+    "nation_state",
+    "elohim_agents",
+    "translation_agent",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/social_medium/activist/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-global",
+    "source-social-medium-activist-global"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "social_medium",
+    "userType": "activist",
+    "featureId": "feature-social-medium-activist-global",
+    "stepCount": 10,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-social-medium-activist-global",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.259Z",
+  "updatedAt": "2025-12-05T18:41:24.259Z"
+}

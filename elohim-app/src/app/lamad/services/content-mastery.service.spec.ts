@@ -2,10 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { ContentMasteryService } from './content-mastery.service';
 import { LocalSourceChainService } from './local-source-chain.service';
 import { SessionHumanService } from './session-human.service';
-import { MasteryLevel } from '../models/agent.model';
-import { FRESHNESS_THRESHOLDS } from '../models/content-mastery.model';
+import { MasteryLevel, FRESHNESS_THRESHOLDS, SessionHuman } from '../models';
 import { BehaviorSubject } from 'rxjs';
-import { SessionHuman } from '../models/session-human.model';
 
 describe('ContentMasteryService', () => {
   let service: ContentMasteryService;

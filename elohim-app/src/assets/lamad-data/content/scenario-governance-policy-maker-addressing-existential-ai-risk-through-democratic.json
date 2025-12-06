@@ -1,0 +1,44 @@
+{
+  "id": "scenario-governance-policy-maker-addressing-existential-ai-risk-through-democratic",
+  "contentType": "scenario",
+  "title": "Addressing existential AI risk through democratic governance",
+  "description": "superintelligent AI poses existential threat; democratic oversight might mitigate this risk; I participate in global existential risk discussions... (10 steps total)",
+  "content": "Given superintelligent AI poses existential threat\nAnd democratic oversight might mitigate this risk\nWhen I participate in global existential risk discussions\nThen I argue: constitutional accountability reduces AI risk\nAnd I present: evidence that sortition prevents elite capture\nAnd I promote: transparency enabling global democratic oversight\nAnd I support: recourse mechanisms providing adaptation\nAnd I advocate: for protocol's distributed architecture increasing resilience\nAnd I acknowledge: uncertainties about whether this suffices\nAnd I work: toward governance frameworks for humanity's survival",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "governance",
+    "user_type",
+    "policy_maker",
+    "governance_layer",
+    "global",
+    "related_users",
+    "constitutional_council_member",
+    "related_layers",
+    "nation_state",
+    "elohim_agents",
+    "global_constitutional_agent",
+    "policy-maker",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-global",
+    "source-governance-policy-maker-global"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "governance",
+    "userType": "policy_maker",
+    "featureId": "feature-governance-policy-maker-global",
+    "stepCount": 10,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-governance-policy-maker-global",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.232Z",
+  "updatedAt": "2025-12-05T18:41:24.232Z"
+}

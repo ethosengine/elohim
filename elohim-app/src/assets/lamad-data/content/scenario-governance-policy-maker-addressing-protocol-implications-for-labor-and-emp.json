@@ -1,0 +1,44 @@
+{
+  "id": "scenario-governance-policy-maker-addressing-protocol-implications-for-labor-and-emp",
+  "contentType": "scenario",
+  "title": "Addressing protocol implications for labor and employment law",
+  "description": "protocol affects work and value recognition; care work generates care tokens; I update labor law for protocol economy... (9 steps total)",
+  "content": "Given protocol affects work and value recognition\nAnd care work generates care tokens\nWhen I update labor law for protocol economy\nThen I clarify: status of care tokens vs traditional wages\nAnd I address: worker protections in protocol-mediated work\nAnd I ensure: fair labor standards apply\nAnd I update: social insurance for protocol participants\nAnd I protect: workers while enabling innovation\nAnd law adapts: to new forms of value creation",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "governance",
+    "user_type",
+    "policy_maker",
+    "governance_layer",
+    "nation_state",
+    "related_users",
+    "constitutional_council_member",
+    "related_layers",
+    "provincial_state",
+    "elohim_agents",
+    "national_elohim",
+    "policy-maker",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-nation-state",
+    "source-governance-policy-maker-nation-state"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "governance",
+    "userType": "policy_maker",
+    "featureId": "feature-governance-policy-maker-nation-state",
+    "stepCount": 9,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-governance-policy-maker-nation-state",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.232Z",
+  "updatedAt": "2025-12-05T18:41:24.232Z"
+}

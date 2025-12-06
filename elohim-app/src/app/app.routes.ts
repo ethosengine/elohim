@@ -11,6 +11,16 @@ export const routes: Routes = [
     loadChildren: () =>
       import('./lamad/lamad.routes').then(m => m.LAMAD_ROUTES)
   },
+  {
+    path: 'community',
+    loadChildren: () =>
+      import('./qahal/community.routes').then(m => m.COMMUNITY_ROUTES)
+  },
+  {
+    path: 'shefa',
+    loadChildren: () =>
+      import('./shefa/shefa.routes').then(m => m.SHEFA_ROUTES)
+  },
   // 404 catch-all - must be last
   {
     path: '**',

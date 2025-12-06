@@ -14,7 +14,7 @@
  * - "Who's on the shortlist for X?"
  */
 
-import { MasteryLevel } from './agent.model';
+import { MasteryLevel } from '@app/elohim/models/agent.model';
 
 /**
  * ExpertiseQuery - Parameters for finding experts.

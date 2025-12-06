@@ -6,9 +6,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { SessionHumanService } from '../../services/session-human.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
-import { SessionHuman, SessionActivity, SessionPathProgress } from '../../models/session-human.model';
-import { MasteryStats } from '../../models/content-mastery.model';
-import { MasteryLevel } from '../../models/agent.model';
+import { SessionHuman, SessionActivity, SessionPathProgress, MasteryStats, MasteryLevel } from '../../models';
 
 /**
  * ProfilePageComponent - Session Human profile management.
