@@ -4,8 +4,7 @@
     <div class="left-nav-group">
       <!-- App Logo - links to context home -->
       <a [routerLink]="currentApp.route" class="app-logo-link" [title]="currentApp.name + ' Home'">
-        <div *ngIf="currentApp.logo" class="app-logo-image"></div>
-        <span *ngIf="!currentApp.logo" class="app-icon">{{ currentApp.icon }}</span>
+        <span class="app-icon">{{ currentApp.icon }}</span>
         <span class="app-name">{{ currentApp.name }}</span>
       </a>
 
@@ -28,23 +27,24 @@
           <div class="dropdown-header">
             <span class="dropdown-title">Switch to</span>
           </div>
-          <div class="context-apps-list">
-            <button
-              *ngFor="let app of otherApps"
-              class="context-app-item"
-              [class.coming-soon]="!app.available"
-              (click)="switchContext(app)"
-              role="menuitem"
-              [disabled]="!app.available"
-            >
-              <div *ngIf="app.logo" class="app-logo-image small"></div>
-              <span *ngIf="!app.logo" class="app-item-icon">{{ app.icon }}</span>
-              <div class="app-item-info">
-                <span class="app-item-name">{{ app.name }}</span>
-                <span class="app-item-tagline">{{ app.tagline }}</span>
-              </div>
-              <span *ngIf="!app.available" class="coming-soon-badge">Soon</span>
-            </button>
+          <div class="scrollable-content-wrapper">
+            <div class="context-apps-list">
+              <button
+                *ngFor="let app of otherApps"
+                class="context-app-item"
+                [class.coming-soon]="!app.available"
+                (click)="switchContext(app)"
+                role="menuitem"
+                [disabled]="!app.available"
+              >
+                <span class="app-item-icon">{{ app.icon }}</span>
+                <div class="app-item-info">
+                  <span class="app-item-name">{{ app.name }}</span>
+                  <span class="app-item-tagline">{{ app.tagline }}</span>
+                </div>
+                <span *ngIf="!app.available" class="coming-soon-badge">Soon</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -98,36 +98,38 @@
           </div>
         </div>
 
-        <!-- Actions -->
-        <div class="profile-actions">
-          <button class="profile-action" (click)="goToProfile()" role="menuitem">
-            <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            <span class="action-label">View Profile</span>
-          </button>
-          <button class="profile-action" (click)="onJoinNetwork()" role="menuitem">
-            <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-            </svg>
-            <span class="action-label">Join Network</span>
-          </button>
-        </div>
-
-        <!-- Settings Section -->
-        <div class="settings-section">
-          <div class="settings-header">Settings</div>
-          <div class="settings-row">
-            <span class="settings-label">Theme</span>
-            <app-theme-toggle></app-theme-toggle>
+        <div class="scrollable-content-wrapper">
+          <!-- Actions -->
+          <div class="profile-actions">
+            <button class="profile-action" (click)="goToProfile()" role="menuitem">
+              <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <span class="action-label">View Profile</span>
+            </button>
+            <button class="profile-action" (click)="onJoinNetwork()" role="menuitem">
+              <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </svg>
+              <span class="action-label">Join Network</span>
+            </button>
           </div>
-        </div>
 
-        <!-- Footer -->
-        <div class="profile-footer">
-          <span class="session-indicator">Session-based identity</span>
+          <!-- Settings Section -->
+          <div class="settings-section">
+            <div class="settings-header">Settings</div>
+            <div class="settings-row">
+              <span class="settings-label">Theme</span>
+              <app-theme-toggle></app-theme-toggle>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="profile-footer">
+            <span class="session-indicator">Session-based identity</span>
+          </div>
         </div>
       </div>
     </div>

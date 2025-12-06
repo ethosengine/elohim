@@ -13,84 +13,8 @@ import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-tog
  */
 export type ContextApp = 'lamad' | 'community' | 'shefa';
 
-/**
- * Context app configuration
- */
-export interface ContextAppConfig {
-  id: ContextApp;
-  name: string;
-  icon: string;
-  logo?: boolean;
-  route: string;
-  tagline: string;
-  available: boolean;
-}
-
-/**
- * ElohimNavigatorComponent - Unified navigation for all context apps
- *
- * Implements the "Google Account" pattern:
- * - Imago Dei as the identity layer (profile bubble / Traveler)
- * - Lamad/Qahal/Shefa as context apps (like YouTube/Gmail/News)
- * - Settings tray accessible from profile bubble
- * - Context switcher (app tray) for navigating between pillars
- */
-@Component({
-  selector: 'app-elohim-navigator',
-  standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, ThemeToggleComponent],
-  templateUrl: './elohim-navigator.component.html',
-  styleUrls: ['./elohim-navigator.component.css']
-})
-export class ElohimNavigatorComponent implements OnInit, OnDestroy {
-  /** Current context app */
-  @Input() context: ContextApp = 'lamad';
-
-  /** Whether to show search bar */
-  @Input() showSearch = true;
-
-  /** Search query */
-  searchQuery = '';
-
-  /** Session human state */
-  session: SessionHuman | null = null;
-  activeUpgradePrompt: HolochainUpgradePrompt | null = null;
-
-  /** UI state */
-  showProfileTray = false;
-  showContextSwitcher = false;
-  showUpgradeModal = false;
-
-  /** Available context apps */
-  readonly contextApps: ContextAppConfig[] = [
-    {
-      id: 'lamad',
-      name: 'Lamad',
-      icon: '📚',
-      logo: true,
-      route: '/lamad',
-      tagline: 'Learning & Content',
-      available: true
-    },
-    {
-      id: 'community',
-      name: 'Qahal',
-      icon: '👥',
-      logo: true,
-      route: '/community',
-      tagline: 'Community & Governance',
-      available: true
-    },
-    {
-      id: 'shefa',
-      name: 'Shefa',
-      icon: '✨',
-      logo: true,
-      route: '/shefa',
-      tagline: 'Economics of Flourishing',
-      available: true
-    }
-  ];
+/**\n * Context app configuration\n */\nexport interface ContextAppConfig {\n  id: ContextApp;\n  name: string;\n  icon: string;\n  route: string;\n  tagline: string;\n  available: boolean;\n}\n\n/**\n * ElohimNavigatorComponent - Unified navigation for all context apps\n *\n * Implements the \"Google Account\" pattern:\n * - Imago Dei as the identity layer (profile bubble / Traveler)\n * - Lamad/Qahal/Shefa as context apps (like YouTube/Gmail/News)\n * - Settings tray accessible from profile bubble\n * - Context switcher (app tray) for navigating between pillars\n */\n@Component({\n  selector: \'app-elohim-navigator\',\n  standalone: true,\n  imports: [CommonModule, RouterLink, FormsModule, ThemeToggleComponent],\n  templateUrl: \'./elohim-navigator.component.html\',\n  styleUrls: [\'./elohim-navigator.component.css\']\n})\nexport class ElohimNavigatorComponent implements OnInit, OnDestroy {\n  /** Current context app */\n  @Input() context: ContextApp = \'lamad\';\n\n  /** Whether to show search bar */\n  @Input() showSearch = true;\n\n  /** Search query */\n  searchQuery = \'\';\n\n  /** Session human state */\n  session: SessionHuman | null = null;\n  activeUpgradePrompt: HolochainUpgradePrompt | null = null;\n\n  /** UI state */\n  showProfileTray = false;\n  showContextSwitcher = false;\n  showUpgradeModal = false;\n\n  /** Available context apps */\n  readonly contextApps: ContextAppConfig[] = [\n    {\n      id: \'lamad\',\n      name: \'Lamad\',\n      icon: \'📚\',\n      route: \'/lamad\',\n      tagline: \'Learning & Content\',\n      available: true\n    },\n    {\n      id: \'community\',\n      name: \'Qahal\',\n      icon: \'👥\',\n      route: \'/community\',\n      tagline: \'Community & Governance\',\n      available: true\n    },\
+    {\n      id: \'shefa\',\n      name: \'Shefa\',\n      icon: \'✨\',\n      route: \'/shefa\',\n      tagline: \'Economics of Flourishing\',\n      available: true\n    }\n  ];
 
   private readonly destroy$ = new Subject<void>();
 

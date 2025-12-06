@@ -2,34 +2,19 @@
    Elohim Navigator - Unified Navigation Component
    ============================================================================ */
 
-/* Theme-based Logo URL */
-:root {
-  --elohim-logo-url: url('/images/elohim_logo_light.png');
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --elohim-logo-url: url('/images/elohim_logo_dark.png');
-  }
-}
-
-:host-context(body[data-theme="light"]) {
-  --elohim-logo-url: url('/images/elohim_logo_dark.png');
-}
-
-:host-context(body[data-theme="dark"]) {
-  --elohim-logo-url: url('/images/elohim_logo_light.png');
-}
-
 /* Header */
 .elohim-header {
-  background: var(--lamad-surface);
+  background: rgba(30, 41, 59, 0.95); /* High opacity solid-ish background */
   border-bottom: 1px solid var(--lamad-border);
   padding: 0.375rem 1rem;
   position: sticky;
   top: 0;
   z-index: 100;
-  backdrop-filter: blur(10px);
+  /* backdrop-filter removed to fix mobile tray fixed positioning */
+}
+
+:host-context(body[data-theme="light"]) .elohim-header {
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .header-content {
@@ -66,31 +51,13 @@
   background: rgba(99, 102, 241, 0.1);
 }
 
-/* App Logo Image */
-.app-logo-image {
-  width: 24px;
-  height: 24px;
-  background-image: var(--elohim-logo-url);
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-  filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.4));
-  transition: filter 0.2s;
-}
-
-.app-logo-link:hover .app-logo-image {
-  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.6));
-}
-
-.app-logo-image.small {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-}
-
 .app-icon {
   font-size: 1.125rem;
   line-height: 1;
+  background: var(--lamad-accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .app-name {
@@ -112,24 +79,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 2rem; /* Increased from 1.25rem */
+  height: 2rem; /* Increased from 1.25rem */
   padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 0.25rem;
+  background: rgba(255, 255, 255, 0.05); /* Slight background */
+  border: 1px solid var(--lamad-border); /* Add border */
+  border-radius: 0.375rem; /* Slightly larger radius */
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s;
 }
 
 .context-switch-btn:hover {
-  background: rgba(99, 102, 241, 0.15);
+  background: rgba(99, 102, 241, 0.1);
+  border-color: var(--lamad-accent-primary);
 }
 
 .dropdown-arrow {
-  width: 12px;
-  height: 12px;
-  color: var(--lamad-text-muted);
+  width: 14px; /* Slightly larger */
+  height: 14px;
+  color: var(--lamad-text-secondary); /* brighter color */
   transition: transform 0.2s;
 }
 
@@ -162,12 +130,15 @@
   top: calc(100% + 0.5rem);
   left: 0;
   min-width: 280px;
-  background: var(--lamad-surface);
+  background: var(--lamad-bg-secondary); /* Solid background */
   border: 1px solid var(--lamad-border);
   border-radius: 0.75rem;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25); /* Stronger shadow */
   overflow: hidden;
   animation: slideDown 0.15s ease-out;
+  z-index: 1000; /* Ensure high z-index on desktop too */
+  display: flex;
+  flex-direction: column; /* Enable flex for proper content distribution */
 }
 
 @keyframes slideDown {
@@ -184,6 +155,181 @@
 .dropdown-header {
   padding: 0.75rem 1rem 0.5rem;
   border-bottom: 1px solid var(--lamad-border);
+  flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+.dropdown-title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--lamad-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.scrollable-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* for smoother scrolling on iOS */
+  padding: 0.5rem;
+}
+
+.context-apps-list {
+  padding: 0.5rem;
+}
+
+.context-app-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.context-app-item:hover:not([disabled]) {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.context-app-item.coming-soon {
+  opacity: 0.7;
+}
+
+.context-app-item[disabled] {
+  cursor: not-allowed;
+}
+
+.app-item-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  line-height: 1;
+  background: var(--lamad-accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.app-item-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--lamad-text-primary);
+}
+
+.app-item-tagline {
+  font-size: 0.75rem;
+  color: var(--lamad-text-muted);
+}
+
+.coming-soon-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--lamad-accent-primary);
+  border-radius: 0.25rem;
+  text-transform: uppercase;
+}
+
+/* Context Switcher */
+.context-switcher-container {
+  position: relative;
+  /* On desktop, this is grouped with the logo */
+}
+
+.context-switch-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem; /* Increased from 1.25rem */
+  height: 2rem; /* Increased from 1.25rem */
+  padding: 0;
+  background: rgba(255, 255, 255, 0.05); /* Slight background */
+  border: 1px solid var(--lamad-border); /* Add border */
+  border-radius: 0.375rem; /* Slightly larger radius */
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.context-switch-btn:hover {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: var(--lamad-accent-primary);
+}
+
+.dropdown-arrow {
+  width: 14px; /* Slightly larger */
+  height: 14px;
+  color: var(--lamad-text-secondary); /* brighter color */
+  transition: transform 0.2s;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* Header Separator */
+.header-separator {
+  color: var(--lamad-border);
+  font-size: 0.75rem;
+  margin: 0 0.125rem;
+}
+
+/* Protocol Link in Header */
+.protocol-link {
+  font-size: 0.7rem;
+  color: var(--lamad-text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.protocol-link:hover {
+  color: var(--lamad-accent-primary);
+}
+
+/* Context Switcher Dropdown */
+.context-switcher-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  min-width: 280px;
+  background: var(--lamad-bg-secondary); /* Solid background */
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25); /* Stronger shadow */
+  overflow: hidden;
+  animation: slideDown 0.15s ease-out;
+  z-index: 1000; /* Ensure high z-index on desktop too */
+  display: flex;
+  flex-direction: column; /* Enable flex for proper content distribution */
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-header {
+  padding: 0.75rem 1rem 0.5rem;
+  border-bottom: 1px solid var(--lamad-border);
+  flex-shrink: 0; /* Prevent header from shrinking */
 }
 
 .dropdown-title {
@@ -195,6 +341,15 @@
 }
 
 .context-apps-list {
+  padding: 0.5rem;
+}
+
+.scrollable-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* for smoother scrolling on iOS */
   padding: 0.5rem;
 }
 
@@ -356,12 +511,15 @@
   top: calc(100% + 0.5rem);
   right: 0;
   min-width: 280px;
-  background: var(--lamad-surface);
+  background: var(--lamad-bg-secondary); /* Solid background */
   border: 1px solid var(--lamad-border);
   border-radius: 0.75rem;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25); /* Stronger shadow */
   overflow: hidden;
   animation: slideDown 0.15s ease-out;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column; /* Enable flex for proper content distribution */
 }
 
 .profile-header {
@@ -371,6 +529,7 @@
   padding: 1rem;
   background: rgba(99, 102, 241, 0.05);
   border-bottom: 1px solid var(--lamad-border);
+  flex-shrink: 0; /* Prevent header from shrinking */
 }
 
 .profile-avatar-large {
@@ -442,6 +601,7 @@
 .settings-section {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--lamad-border);
+  flex-shrink: 0;
 }
 
 .settings-header {
@@ -488,6 +648,7 @@
 .profile-footer {
   padding: 0.75rem 1rem;
   text-align: center;
+  flex-shrink: 0; /* Prevent footer from shrinking */
 }
 
 .session-indicator {
@@ -828,9 +989,24 @@
     grid-column: 2; /* Place in the center column */
   }
 
-  /* App Name (hidden on mobile) */
+  /* App Logo Link - Mobile Specific Ordering */
+  .app-logo-link {
+    flex-direction: row-reverse; /* Put logo on the right */
+    gap: 0.25rem; /* Adjust gap for mobile */
+    padding: 0.25rem; /* Adjust padding for mobile */
+  }
+
+  /* App Logo Image - Mobile Sizing */
+  /* No longer needed as we are using text icons */
+  /* .app-logo-image { */
+  /*   width: 28px; */
+  /*   height: 28px; */
+  /* } */
+
+  /* App Name */
   .app-name {
-    display: none;
+    display: block; /* Show name on mobile */
+    font-size: 1rem; /* Adjust font size if needed */
   }
 
   /* Context Switcher (leftmost on mobile) */
@@ -874,15 +1050,16 @@
     width: 100%;
     min-width: 0; /* Override desktop min-width */
     max-height: 85vh;
+    background: var(--lamad-bg-secondary); /* Solid background */
     border-radius: 1.5rem 1.5rem 0 0;
     border: none;
     box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.15);
     z-index: 101; /* Above backdrop */
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     padding-bottom: env(safe-area-inset-bottom); /* Handle iPhone home bar */
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto; /* Enable scrolling for content */
+    display: flex; /* Ensure flex container */
+    flex-direction: column; /* Stack children vertically */
+    /* overflow-y: auto;  Removed from parent, now handled by scrollable-content-wrapper */
   }
 
   /* Add a "handle" visual for bottom sheets */
@@ -903,12 +1080,20 @@
   .profile-header {
     border-bottom: none; /* Cleaner look on mobile */
     padding-top: 0.5rem;
+    flex-shrink: 0; /* Prevent header from shrinking */
   }
 
   /* Larger touch targets */
   .context-app-item,
   .profile-action {
     padding: 1rem;
+  }
+
+  /* Profile Actions and Settings Section need flex-shrink: 0 too */
+  .profile-actions,
+  .settings-section,
+  .profile-footer {
+    flex-shrink: 0;
   }
 
   /* Upgrade Banner Mobile */
@@ -955,6 +1140,7 @@
     justify-content: space-around;
   }
 }
+
 
 @keyframes slideUp {
   from {
