@@ -33,3 +33,4 @@ dist/
 tmp/
 out-tsc/
 *.log
+output/
