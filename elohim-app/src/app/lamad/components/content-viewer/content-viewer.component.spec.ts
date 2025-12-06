@@ -1,11 +1,11 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { ContentViewerComponent } from './content-viewer.component';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { ContentService } from '../../services/content.service';
-import { DataLoaderService } from '../../services/data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { TrustBadgeService } from '../../services/trust-badge.service';
 import { SeoService } from '../../../services/seo.service';
 import { RendererRegistryService } from '../../renderers/renderer-registry.service';
@@ -64,6 +64,7 @@ describe('ContentViewerComponent', () => {
       imports: [ContentViewerComponent],
       providers: [
         provideHttpClient(),
+        provideRouter([]), // Provide empty routes for RouterLink support
         {
           provide: ActivatedRoute,
           useValue: {
@@ -75,7 +76,6 @@ describe('ContentViewerComponent', () => {
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
         { provide: TrustBadgeService, useValue: trustBadgeSpyObj },
         { provide: RendererRegistryService, useValue: rendererRegistrySpyObj },
-        { provide: Router, useValue: routerSpyObj },
         { provide: SeoService, useValue: seoServiceSpyObj }
       ]
     }).compileComponents();
@@ -85,7 +85,8 @@ describe('ContentViewerComponent', () => {
     dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
     trustBadgeServiceSpy = TestBed.inject(TrustBadgeService) as jasmine.SpyObj<TrustBadgeService>;
     rendererRegistrySpy = TestBed.inject(RendererRegistryService) as jasmine.SpyObj<RendererRegistryService>;
-    routerSpy = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+    routerSpy = TestBed.inject(Router) as any; // Use real router from provideRouter
+    spyOn(routerSpy, 'navigate');
 
     // Default spy returns
     affinityServiceSpy.getAffinity.and.returnValue(0.5);

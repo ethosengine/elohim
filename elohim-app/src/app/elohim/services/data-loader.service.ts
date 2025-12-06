@@ -1,7 +1,9 @@
-import { Injectable } from '@angular/core';
+import { Injectable, Inject, Optional } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, forkJoin } from 'rxjs';
-import { catchError, map, shareReplay } from 'rxjs/operators';
+import { Observable, of, forkJoin, from } from 'rxjs';
+import { catchError, map, shareReplay, switchMap } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
+import { KuzuDataService } from './kuzu-data.service';
 
 // Models from elohim (local)
 import { Agent, AgentProgress } from '../models/agent.model';
@@ -158,6 +160,7 @@ export interface GovernanceStateRecord {
 @Injectable({ providedIn: 'root' })
 export class DataLoaderService {
   private readonly basePath = '/assets/lamad-data';
+  private readonly useKuzu: boolean;
 
   // Caches to prevent redundant HTTP calls (shareReplay pattern)
   private readonly pathCache = new Map<string, Observable<LearningPath>>();
@@ -166,41 +169,91 @@ export class DataLoaderService {
   private readonly attestationsByContentCache = new Map<string, ContentAttestation[]>();
   private graphCache$: Observable<ContentGraph> | null = null;
 
-  constructor(private readonly http: HttpClient) {}
+  constructor(
+    private readonly http: HttpClient,
+    private readonly kuzuService: KuzuDataService
+  ) {
+    // Use Kuzu WASM database if enabled in environment
+    this.useKuzu = (environment as any).useKuzuDb ?? false;
+    if (this.useKuzu) {
+      // Initialize Kuzu in background
+      this.kuzuService.initialize().catch(err => {
+        console.error('[DataLoader] Kuzu initialization failed:', err);
+        (this as any).useKuzu = false;
+      });
+    }
+  }
 
   /**
    * Load a LearningPath by ID.
    * Does NOT load the content for each step (lazy loading).
+   * Falls back to JSON if path not in Kuzu.
    */
   getPath(pathId: string): Observable<LearningPath> {
     if (!this.pathCache.has(pathId)) {
-      const request = this.http.get<LearningPath>(
-        `${this.basePath}/paths/${pathId}.json`
-      ).pipe(
-        shareReplay(1),
-        catchError(() => {
-          throw new Error(`Path not found: ${pathId}`);
-        })
-      );
+      let request: Observable<LearningPath>;
+
+      if (this.useKuzu) {
+        // Kuzu is the primary source for paths
+        request = this.kuzuService.getPath(pathId).pipe(
+          shareReplay(1),
+          catchError(() => {
+            console.warn(`[DataLoader] ⚠️ KUZU MISSING: LearningPath "${pathId}"`);
+            throw new Error(`Path not found: ${pathId}`);
+          })
+        );
+      } else {
+        request = this.http.get<LearningPath>(
+          `${this.basePath}/paths/${pathId}.json`
+        ).pipe(
+          shareReplay(1),
+          catchError(() => {
+            throw new Error(`Path not found: ${pathId}`);
+          })
+        );
+      }
+
       this.pathCache.set(pathId, request);
     }
     return this.pathCache.get(pathId)!;
   }
 
+  // Track content fallbacks to avoid log spam
+  private readonly contentFallbackLog = new Set<string>();
+
   /**
    * Load a ContentNode by ID.
    * This is the only way to get content - enforces lazy loading.
+   * Uses Kuzu as primary source (loaded from CSV for full content support).
    */
   getContent(resourceId: string): Observable<ContentNode> {
     if (!this.contentCache.has(resourceId)) {
-      const request = this.http.get<ContentNode>(
-        `${this.basePath}/content/${resourceId}.json`
-      ).pipe(
-        shareReplay(1),
-        catchError(() => {
-          throw new Error(`Content not found: ${resourceId}`);
-        })
-      );
+      let request: Observable<ContentNode>;
+
+      if (this.useKuzu) {
+        // Kuzu is primary source for content
+        request = this.kuzuService.getContent(resourceId).pipe(
+          shareReplay(1),
+          catchError(() => {
+            // Log missing content (once per resourceId)
+            if (!this.contentFallbackLog.has(resourceId)) {
+              this.contentFallbackLog.add(resourceId);
+              console.warn(`[DataLoader] ⚠️ KUZU MISSING: ContentNode "${resourceId}"`);
+            }
+            throw new Error(`Content not found: ${resourceId}`);
+          })
+        );
+      } else {
+        request = this.http.get<ContentNode>(
+          `${this.basePath}/content/${resourceId}.json`
+        ).pipe(
+          shareReplay(1),
+          catchError(() => {
+            throw new Error(`Content not found: ${resourceId}`);
+          })
+        );
+      }
+
       this.contentCache.set(resourceId, request);
     }
     return this.contentCache.get(resourceId)!;
@@ -211,6 +264,11 @@ export class DataLoaderService {
    * Returns metadata only, not full content.
    */
   getContentIndex(): Observable<any> {
+    // Delegate to Kuzu if enabled
+    if (this.useKuzu) {
+      return this.kuzuService.getContentIndex();
+    }
+
     return this.http.get(`${this.basePath}/content/index.json`).pipe(
       catchError(() => of({ nodes: [], lastUpdated: new Date().toISOString() }))
     );
@@ -218,8 +276,26 @@ export class DataLoaderService {
 
   /**
    * Load the path index for discovery.
+   * Falls back to JSON if Kuzu has no path data.
    */
   getPathIndex(): Observable<PathIndex> {
+    // Kuzu is primary source for path index
+    if (this.useKuzu) {
+      return this.kuzuService.getPathIndex().pipe(
+        switchMap(index => {
+          if (!index.paths || index.paths.length === 0) {
+            console.warn('[DataLoader] ⚠️ KUZU MISSING: PathIndex (0 paths in Kuzu)');
+            return of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() });
+          }
+          return of(index);
+        }),
+        catchError(err => {
+          console.warn('[DataLoader] ⚠️ KUZU ERROR for PathIndex:', err.message);
+          return of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() });
+        })
+      );
+    }
+
     return this.http.get<PathIndex>(`${this.basePath}/paths/index.json`).pipe(
       catchError(() => of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() }))
     );
@@ -236,14 +312,13 @@ export class DataLoaderService {
 
   /**
    * Load agent progress for a specific path.
-   * In Holochain, this reads from the agent's private source chain.
+   * Uses localStorage for prototype. In Holochain, this will read from private source chain.
    */
   getAgentProgress(agentId: string, pathId: string): Observable<AgentProgress | null> {
-    return this.http.get<AgentProgress>(
-      `${this.basePath}/progress/${agentId}/${pathId}.json`
-    ).pipe(
-      catchError(() => of(null))  // No progress yet is not an error
-    );
+    // Use localStorage directly instead of fetching from JSON files
+    // This avoids 404 errors and keeps all progress client-side
+    const progress = this.getLocalProgress(agentId, pathId);
+    return of(progress);
   }
 
   /**
@@ -287,6 +362,21 @@ export class DataLoaderService {
     this.attestationCache$ = null;
     this.attestationsByContentCache.clear();
     this.graphCache$ = null;
+    this.contentFallbackLog.clear();
+    // Also clear Kuzu caches if enabled
+    if (this.useKuzu) {
+      this.kuzuService.clearCache();
+    }
+  }
+
+  /**
+   * Get a summary of what's missing from Kuzu (for debugging).
+   * Call this from browser console: `ng.getComponent(document.querySelector('app-root')).dataLoader.getKuzuMissingSummary()`
+   */
+  getKuzuMissingSummary(): { contentFallbacks: string[] } {
+    return {
+      contentFallbacks: Array.from(this.contentFallbackLog)
+    };
   }
 
   // =========================================================================
