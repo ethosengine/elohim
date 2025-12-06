@@ -149,6 +149,7 @@ export class KuzuDataService {
         content STRING,
         contentFormat STRING,
         tags STRING[],
+        relatedNodeIds STRING[],
         authorId STRING,
         reach STRING,
         trustScore DOUBLE DEFAULT 0.0,
@@ -455,7 +456,7 @@ export class KuzuDataService {
     const result = await this.query<any>(
       `MATCH (c:ContentNode) WHERE c.id = "${resourceId}"
        RETURN c.id, c.contentType, c.title, c.description, c.content, c.contentFormat,
-              c.tags, c.authorId, c.reach, c.trustScore, c.metadata, c.sourcePath,
+              c.tags, c.relatedNodeIds, c.authorId, c.reach, c.trustScore, c.metadata, c.sourcePath,
               c.createdAt, c.updatedAt`
     );
 
@@ -486,7 +487,7 @@ export class KuzuDataService {
       content,
       contentFormat: row['c.contentFormat'] || 'markdown',
       tags: row['c.tags'] || [],
-      relatedNodeIds: [],
+      relatedNodeIds: row['c.relatedNodeIds'] || [],
       authorId: row['c.authorId'],
       reach: row['c.reach'] || 'commons',
       trustScore: row['c.trustScore'],
