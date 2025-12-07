@@ -3,7 +3,7 @@ import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 import { map, switchMap, tap } from 'rxjs/operators';
 
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { ElohimAgentService } from './elohim-agent.service';
+import { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
 import {
   KnowledgeMap,
   KnowledgeMapType,
