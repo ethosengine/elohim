@@ -514,12 +514,10 @@ export class KuzuDataService {
       }
 
       // Sort by index and concatenate
-      const sortedChunks = chunkResult.toSorted(
-        (a: any, b: any) => a['ch.chunkIndex'] - b['ch.chunkIndex']
-      );
+      chunkResult.sort((a: any, b: any) => a['ch.chunkIndex'] - b['ch.chunkIndex']);
 
       // Concatenate chunks and unescape Cypher string escapes
-      const rawContent = sortedChunks.map((c: any) => c['ch.content'] ?? '').join('');
+      const rawContent = chunkResult.map((c: any) => c['ch.content'] ?? '').join('');
       const content = this.unescapeCypher(rawContent);
       return content;
     } catch (err) {
