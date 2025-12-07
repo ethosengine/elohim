@@ -3,11 +3,10 @@ import { Observable, forkJoin, of } from 'rxjs';
 import { map, switchMap, shareReplay, catchError } from 'rxjs/operators';
 
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { ContentNode, ContentRelationshipType, ContentMetadata } from '../models/content-node.model';
+import { ContentNode, ContentMetadata } from '../models/content-node.model';
 import {
   LearningPath,
   PathStep,
-  PathChapter,
   PathContentMetadata,
   PathReference
 } from '../models/learning-path.model';
@@ -232,11 +231,9 @@ export class PathGraphService {
    * This uses the graph's nodesByType index for efficient filtering.
    */
   loadPathNodes(): Observable<Map<string, ContentNode>> {
-    if (!this.pathNodesCache$) {
-      this.pathNodesCache$ = this.buildPathNodesFromIndex().pipe(
-        shareReplay(1)
-      );
-    }
+    this.pathNodesCache$ ??= this.buildPathNodesFromIndex().pipe(
+      shareReplay(1)
+    );
     return this.pathNodesCache$;
   }
 

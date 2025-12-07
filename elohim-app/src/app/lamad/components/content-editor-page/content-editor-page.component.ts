@@ -9,9 +9,8 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { Subject } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { takeUntil, switchMap, catchError } from 'rxjs/operators';
-import { of } from 'rxjs';
 
 import { ContentNode } from '../../models/content-node.model';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
@@ -93,7 +92,7 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
         this.error = '';
         return this.dataLoader.getContent(this.resourceId).pipe(
           catchError(err => {
-            this.error = err.message || 'Failed to load content';
+            this.error = err.message ?? 'Failed to load content';
             return of(null);
           })
         );
@@ -222,17 +221,17 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
               this.saveSuccess = '';
             }, 3000);
           } else {
-            this.saveError = result.error || 'Failed to save';
+            this.saveError = result.error ?? 'Failed to save';
           }
         },
         error: (err: Error) => {
           this.isSaving = false;
-          this.saveError = err.message || 'Failed to save';
+          this.saveError = err.message ?? 'Failed to save';
         }
       });
     } catch (err) {
       this.isSaving = false;
-      this.saveError = (err as Error).message || 'Failed to save';
+      this.saveError = (err as Error).message ?? 'Failed to save';
     }
   }
 }

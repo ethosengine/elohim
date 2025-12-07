@@ -13,10 +13,7 @@ import {
   PathVisibility
 } from '../models';
 // These functions are in qahal human-consent model
-import { hasMinimumIntimacy, isConsentActive } from '@app/qahal/models/human-consent.model';
-// ElevationRequest and canElevate need to be imported from qahal
-import type { ElevationRequest } from '@app/qahal/models/human-consent.model';
-import { canElevate } from '@app/qahal/models/human-consent.model';
+import { hasMinimumIntimacy, isConsentActive, canElevate, type ElevationRequest } from '@app/qahal/models/human-consent.model';
 
 /**
  * HumanConsentService - Manages consent-based relationships between humans.

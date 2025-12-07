@@ -500,7 +500,7 @@ export class ExplorationService {
     excludeFilter: string[] | undefined
   ): boolean {
     // Check exclusion first
-    if (excludeFilter && excludeFilter.includes(node.contentType)) {
+    if (excludeFilter?.includes(node.contentType)) {
       return false;
     }
 
