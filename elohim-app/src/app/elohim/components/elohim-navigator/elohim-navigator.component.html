@@ -137,9 +137,11 @@
 </header>
 
 <!-- Mobile Menu Backdrop -->
-<div class="mobile-menu-backdrop" 
+<div class="mobile-menu-backdrop"
      *ngIf="showContextSwitcher || showProfileTray"
      (click)="closeAllTrays()"
+     (keydown.enter)="closeAllTrays()"
+     (keydown.space)="closeAllTrays()"
      aria-hidden="true">
 </div>
 
@@ -179,7 +181,7 @@
   open
   aria-labelledby="upgrade-modal-title"
 >
-  <div class="upgrade-modal" (click)="$event.stopPropagation()">
+  <div class="upgrade-modal" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
     <button class="modal-close" (click)="closeUpgradeModal()" aria-label="Close">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="18" y1="6" x2="6" y2="18"></line>
