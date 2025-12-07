@@ -1,2 +1,1 @@
-export * from './gherkin-io.plugin';
-export * from './gherkin-io.module';
+export * from './gherkin-format.plugin';

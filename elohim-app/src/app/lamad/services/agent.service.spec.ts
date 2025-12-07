@@ -1,11 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { of, BehaviorSubject } from 'rxjs';
-import { AgentService } from './agent.service';
-import { DataLoaderService } from './data-loader.service';
-import { SessionHumanService } from './session-human.service';
-import { Agent, AgentProgress, FrontierItem } from '../models/agent.model';
-import { SessionHuman } from '../models/session-human.model';
-import { AccessLevel, ContentAccessMetadata } from '../models/content-access.model';
+import { AgentService } from '@app/elohim/services/agent.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { Agent, AgentProgress, FrontierItem, SessionHuman, AccessLevel, ContentAccessMetadata } from '../models';
 
 describe('AgentService', () => {
   let service: AgentService;

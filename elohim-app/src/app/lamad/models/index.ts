@@ -1,6 +1,16 @@
 /**
  * Barrel export for Lamad models
  *
+ * Lamad is the Content/Learning pillar of the Elohim Protocol.
+ * This barrel re-exports types from other pillars for backward compatibility.
+ *
+ * Pillar Structure:
+ * - elohim/: Protocol-core (shared primitives, agents, attestations)
+ * - imagodei/: Identity (profile, session, human nodes)
+ * - lamad/: Content (nodes, paths, exploration, mastery)
+ * - qahal/: Community (consent, governance, affinity, places)
+ * - shefa/: Economy (REA, economic events, contributor presence)
+ *
  * Six-layer architecture:
  * - Territory: ContentNode (the knowledge graph)
  * - Journey: LearningPath, PathStep (curated sequences)
@@ -8,60 +18,13 @@
  * - Maps: KnowledgeMap (polymorphic: domain, self, person, collective)
  * - Economic: REA value flows and contributor recognition
  * - Governance: Constitutional moderation, deliberation, feedback profiles
- *
- * Mastery System (Bloom's Taxonomy):
- * - ContentMastery: Per-node mastery tracking (not_started → create)
- * - Attestation Gate: "apply" level unlocks participation privileges
- * - ContentLifecycle: Refresh policies, deprecation, "right to be forgotten"
- * - ExpertiseDiscovery: Graph-emergent expertise without gamified scores
- *
- * Trust Model (Bidirectional Attestations):
- * - Agent attestations: Earned credentials for accessing gated content
- * - Content attestations: Earned trust for reaching broader audiences
- * - Symmetric accountability: Both agents AND content need trust to participate
- *
- * IMPORTANT - Three distinct Attestation models:
- * 1. Agent Attestations (attestations.model.ts):
- *    - Credentials earned by humans/agents
- *    - Granted after completing learning paths
- *    - Example: "4th grade math mastery", "Trauma Support Capacity"
- *
- * 2. Content Attestations (content-attestation.model.ts):
- *    - Trust credentials granted TO content
- *    - Determines reach (private → commons)
- *    - Example: "governance-ratified", "steward-approved"
- *
- * 3. Content Access (content-access.model.ts):
- *    - Access tier requirements (visitor/member/attested)
- *    - Determines WHO can view content
- *    - Example: "requires member status", "requires CSAM training attestation"
- *
- * Date Field Convention:
- * - All timestamp fields use ISO 8601 string format (not Date objects)
- * - Ensures JSON serialization, Holochain compatibility, timezone safety
- *
- * Elohim Agents:
- * - Autonomous constitutional guardians (not controllable utilities)
- * - Layer-specific (global, community, family, individual)
- * - Capability-based invocation with constitutional reasoning
- *
- * REA Economic Coordination (hREA/Unyt integration):
- * - REA Bridge: ValueFlows ontology types (Agent, Resource, Event, Process)
- * - Contributor Presence: Stewardship lifecycle for absent contributors
- * - Economic Event: Immutable audit trail of value flows
- * - Recognition Economics: Value accumulates at presences until claimed
- *
- * Governance & Feedback:
- * - Governance Feedback: Constitutional moderation, challenges, appeals, precedent
- * - Governance Deliberation: Loomio/Polis/Wikipedia-inspired deliberation
- * - Feedback Profile: Virality as privilege, emotional reaction constraints
- *
- * Extensions:
- * - PathExtension: Learner-owned mutations to paths
- * - CollaborativePath: Multi-author path creation
  */
 
-// Territory models (Content)
+// ============================================================================
+// LAMAD-SPECIFIC MODELS (Content/Learning)
+// ============================================================================
+
+// Territory models (Content Graph)
 export type {
   ContentNode,
   ContentMetadata,
@@ -76,35 +39,85 @@ export type {
 } from './content-node.model';
 export { ContentRelationshipType } from './content-node.model';
 
-// Open Graph models (Platform-agnostic social sharing metadata)
-export * from './open-graph.model';
-
-// JSON-LD models (Linked Data structure alignment for semantic web)
-export * from './json-ld.model';
-
-// Verifiable Credentials models (W3C VC structure alignment for attestations)
-export * from './verifiable-credential.model';
-
 // Content Attestation models (Trust credentials granted TO content)
-// Determines ContentReach: private → invited → local → community → federated → commons
 export * from './content-attestation.model';
 
 // Journey models (Learning Path)
 export * from './learning-path.model';
 
-// Traveler models (Agent & Progress)
-export * from './agent.model';
-
-// Agent Attestation models (Credentials earned BY humans/agents)
-// AttestationAccessRequirement: What attestations unlock which content
-// NOTE: Distinct from ContentAccessRequirement in content-access.model.ts
-export * from './attestations.model';
-
-// Elohim Agent models (Autonomous constitutional guardians)
-export * from './elohim-agent.model';
-
 // Knowledge Map models (Polymorphic: Domain, Person, Collective)
-export * from './knowledge-map.model';
+// Export selectively to avoid RelationshipType collision
+export type {
+  KnowledgeMapType,
+  MapSubject,
+  KnowledgeMap,
+  KnowledgeNode,
+  KnowledgeSource,
+  DomainKnowledgeMap,
+  DomainGoal,
+  SelfKnowledgeMap,
+  ImagoDeiDimension,
+  SelfInsight,
+  InsightSource,
+  PersonalValue,
+  LifeChapter,
+  LifeEvent,
+  DiscoveredGift,
+  GiftCategory,
+  ShadowArea,
+  VocationalClarity,
+  DomainReflection,
+  AssessmentInstrument,
+  InstrumentContributor,
+  ContributorRole,
+  InstrumentDerivation,
+  InstrumentRecognitionModel,
+  AssessmentPathStructure,
+  AssessmentStep,
+  InstrumentSection,
+  AssessmentQuestion,
+  QuestionType,
+  QuestionOption,
+  AssessmentAttestation,
+  AssessmentAttestationType,
+  AssessmentAttestationRequirement,
+  AssessmentPrerequisite,
+  AssessmentDomain,
+  InstrumentValidation,
+  InstrumentLicense,
+  AssessmentResult,
+  AssessmentInterpretation,
+  SubscaleResult,
+  LongitudinalChange,
+  SelfKnowledgeLink,
+  ResponseQuality,
+  PatternAlert,
+  PatternType,
+  PatternEvidence,
+  SuggestedAction,
+  PatternResponse,
+  ResearchConsent,
+  ResearchConsentScope,
+  ContributionRecognition,
+  CrisisProtocol,
+  CrisisResource,
+  PersonKnowledgeMap,
+  SubjectConsent,
+  ConsentScope,
+  PersonKnowledgeCategory,
+  PersonKnowledgeCategoryType,
+  RelationshipMetrics,
+  CollectiveKnowledgeMap,
+  CollectiveMember,
+  CollectiveGovernance,
+  CollectiveDomain,
+  KnowledgeMapIndexEntry,
+  KnowledgeMapIndex,
+  KnowledgeMapUpdate,
+  MapMergeRequest
+} from './knowledge-map.model';
+// Export RelationshipType with alias to avoid collision
+export type { RelationshipType as PersonRelationshipType } from './knowledge-map.model';
 
 // Path Extension models (Learner customization)
 export * from './path-extension.model';
@@ -112,68 +125,169 @@ export * from './path-extension.model';
 // Exploration models (Graph traversal and discovery)
 export * from './exploration.model';
 
-// Trust Badge models (UI-ready trust display)
-export * from './trust-badge.model';
-
 // Search models (enhanced search with scoring and facets)
 export * from './search.model';
 
-// Session Human models (MVP temporary identity)
-export * from './session-human.model';
-
 // Content Access models (visitor/member/attested tiers)
-// ContentAccessRequirement: What access level is required for content
-// NOTE: Distinct from AttestationAccessRequirement in attestations.model.ts
 export * from './content-access.model';
 
-// Profile models (human-centered identity, Imago Dei aligned)
-export * from './profile.model';
+// Content Mastery models (Bloom's Taxonomy progression)
+export * from './content-mastery.model';
 
-// REA Bridge models (ValueFlows/hREA integration)
-export * from './rea-bridge.model';
-
-// Contributor Presence models (stewardship lifecycle for absent contributors)
-export * from './contributor-presence.model';
-
-// Economic Event models (immutable value flow records)
-export * from './economic-event.model';
-
-// Governance & Feedback models (the protocol's immune system)
-export * from './governance-feedback.model';
-
-// Governance Deliberation models (context-aware feedback, deliberation, sensemaking)
-export * from './governance-deliberation.model';
+// Content Lifecycle models (refresh policies, deprecation, archival)
+export * from './content-lifecycle.model';
 
 // Feedback Profile models (virality as privilege, emotional reaction constraints)
 export * from './feedback-profile.model';
 
-// Content Mastery models (Bloom's Taxonomy progression)
-// Tracks mastery level from passive (seen → apply) to active (analyze → create)
-// The "apply" level is the attestation gate for participation privileges
-export * from './content-mastery.model';
-
-// Content Lifecycle models (refresh policies, deprecation, archival)
-// Implements "the right to be forgotten" - content has natural lifecycles
-export * from './content-lifecycle.model';
-
-// Human Affinity models (engagement depth tracking)
-export * from './human-affinity.model';
-
-// Human Consent models (graduated intimacy and consent-based relationships)
-export * from './human-consent.model';
-
-// Path Negotiation models (agent-to-agent path customization)
+// Path Negotiation models (collaborative path creation)
 export * from './path-negotiation.model';
 
-// Source Chain models (Holochain-compatible agent-centric data)
-export * from './source-chain.model';
+// Human Node models (humans in the graph - stays in lamad for graph integration)
+// Export selectively to avoid collisions
+export type {
+  HumanNode,
+  HumanReach,
+  HumanRelationship
+} from './human-node.model';
+export type { RelationshipType as HumanRelationshipType } from './human-node.model';
+export {
+  RELATIONSHIP_LAYER_MAP,
+  RELATIONSHIP_DEFAULT_INTIMACY,
+  getRelationshipLayer,
+  getDefaultIntimacy,
+  isFamilyRelationship,
+  isWorkplaceRelationship,
+  isHighTrustRelationship
+} from './human-node.model';
 
-// Place models (bioregional and jurisdictional grounding)
-export * from './place.model';
+// ============================================================================
+// RE-EXPORTS FROM ELOHIM (Protocol-Core)
+// ============================================================================
 
-// Human Node models (humans as graph nodes in the social layer)
-export * from './human-node.model';
+// Protocol-core primitives
+export * from '@app/elohim/models/protocol-core.model';
 
-// BACKLOGGED: Expertise Discovery models (finding experts in domains)
-// See BACKLOG.md - expertise-discovery.model.ts exists but not yet integrated
-// export * from './expertise-discovery.model';
+// REA Bridge models (ValueFlows/hREA integration - canonical location)
+export * from '@app/elohim/models/rea-bridge.model';
+
+// Agent models (Traveler state)
+export * from '@app/elohim/models/agent.model';
+
+// Elohim Agent models (Autonomous constitutional guardians)
+export * from '@app/elohim/models/elohim-agent.model';
+
+// Trust Badge models (UI-ready trust display)
+// Export selectively to avoid ContentAttestationType collision
+export type {
+  TrustBadge,
+  BadgeDisplay,
+  BadgeType,
+  BadgeColor,
+  TrustLevel,
+  BadgeWarning,
+  TrustIndicator,
+  IndicatorSource,
+  TrustIndicatorSet,
+  BadgeAction,
+  CompactTrustBadge
+} from '@app/elohim/models/trust-badge.model';
+export {
+  badgeToIndicator,
+  warningToIndicator,
+  ATTESTATION_PRIORITY,
+  ATTESTATION_BADGE_CONFIG,
+  REACH_BADGE_CONFIG,
+  WARNING_CONFIG,
+  calculateTrustLevel,
+  generateTrustSummary,
+  generateAriaLabel,
+  toCompactBadge
+} from '@app/elohim/models/trust-badge.model';
+
+// Infrastructure models (JSON-LD, Open Graph, Verifiable Credentials, Source Chain)
+export * from '@app/elohim/models/json-ld.model';
+export * from '@app/elohim/models/open-graph.model';
+export * from '@app/elohim/models/verifiable-credential.model';
+export * from '@app/elohim/models/source-chain.model';
+
+// ============================================================================
+// RE-EXPORTS FROM IMAGODEI (Identity)
+// ============================================================================
+
+// Session Human models (MVP temporary identity)
+export * from '@app/imagodei/models/session-human.model';
+
+// Profile models (human-centered identity, Imago Dei aligned)
+export * from '@app/imagodei/models/profile.model';
+
+// Agent Attestation models (Credentials earned BY humans/agents)
+// Export selectively to avoid Attestation/AttestationType collision with protocol-core
+export type {
+  Attestation as ImagodeiAttestation,
+  AttestationJourney,
+  Endorsement,
+  AttestationRequirement as ImagodeiAttestationRequirement,
+  AttestationAccessRequirement,
+  UserAttestations,
+  AttestationProgress
+} from '@app/imagodei/models/attestations.model';
+
+// ============================================================================
+// RE-EXPORTS FROM ELOHIM (Economy - canonical location)
+// ============================================================================
+
+// Economic Event models
+export * from '@app/elohim/models/economic-event.model';
+
+// Contributor Presence models (stewardship lifecycle for absent contributors)
+export * from '@app/elohim/models/contributor-presence.model';
+
+// ============================================================================
+// RE-EXPORTS FROM QAHAL (Community)
+// ============================================================================
+
+// Human Affinity models (engagement depth tracking)
+export * from '@app/qahal/models/human-affinity.model';
+
+// Human Consent models (graduated intimacy)
+// Export selectively to avoid collision with protocol-core
+export type {
+  HumanConsent,
+  ConsentRequest
+} from '@app/qahal/models/human-consent.model';
+
+// Governance & Feedback models (the protocol's immune system)
+export * from '@app/qahal/models/governance-feedback.model';
+
+// Governance Deliberation models (context-aware feedback, deliberation, sensemaking)
+export * from '@app/qahal/models/governance-deliberation.model';
+
+// Place models (bioregional awareness)
+// Export selectively to avoid collision with protocol-core GeographicContext
+export type {
+  Place,
+  PlaceType,
+  PlaceTypeCategory,
+  PlaceNameType,
+  PlaceNameDisputeStatus,
+  PlaceName,
+  BoundaryType,
+  GeoJSONGeometry,
+  PlaceGeography,
+  EcologicalRelationshipType,
+  EcologicalRelationship,
+  CulturalContext,
+  GeographicReach,
+  GeographicDeterminationMethod,
+  GeographicDetermination,
+  EcologicalLimitType,
+  EcologicalLimit,
+  BioregionalAuthority,
+  PlaceCapability,
+  PlaceAwareElohim,
+  PlaceHierarchy,
+  PlaceHierarchyNode,
+  PlaceServiceInterface
+} from '@app/qahal/models/place.model';
+export { PLACE_TYPE_CATEGORIES } from '@app/qahal/models/place.model';

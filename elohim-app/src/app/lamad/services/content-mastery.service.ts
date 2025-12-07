@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, map } from 'rxjs';
 import { LocalSourceChainService } from './local-source-chain.service';
-import { SessionHumanService } from './session-human.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import {
   ContentMastery,
   EngagementType,
@@ -13,16 +13,12 @@ import {
   DECAY_RATES,
   AssessmentEvidence,
   LevelProgressionEvent,
-} from '../models/content-mastery.model';
-import {
   MasteryLevel,
   isAboveGate,
   compareMasteryLevels,
-} from '../models/agent.model';
-import {
   MasteryRecordContent,
-  SourceChainEntry,
-} from '../models/source-chain.model';
+  SourceChainEntry
+} from '../models';
 
 /**
  * ContentMasteryService - Manages Bloom's Taxonomy mastery tracking.

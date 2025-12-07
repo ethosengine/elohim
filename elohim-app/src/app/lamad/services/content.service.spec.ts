@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { ContentService, ContentIndexEntry, PathReference, ContentAccessResult } from './content.service';
-import { DataLoaderService } from './data-loader.service';
-import { AgentService } from './agent.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { AgentService } from '@app/elohim/services/agent.service';
 import { ContentNode, ContentType } from '../models/content-node.model';
 
 describe('ContentService', () => {

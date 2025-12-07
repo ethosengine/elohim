@@ -11,9 +11,9 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Subject, Subscription, forkJoin, of } from 'rxjs';
 import { takeUntil, catchError } from 'rxjs/operators';
-import { AffinityTrackingService } from '../../services/affinity-tracking.service';
+import { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
 import { ContentService } from '../../services/content.service';
-import { DataLoaderService } from '../../services/data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { SeoService } from '../../../services/seo.service';
 import { ContentNode } from '../../models/content-node.model';
 import {
@@ -22,11 +22,12 @@ import {
   RendererCompletionEvent
 } from '../../renderers/renderer-registry.service';
 
-import { TrustBadgeService } from '../../services/trust-badge.service';
+import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
 import { TrustBadge } from '../../models/trust-badge.model';
 
 // Content I/O for download functionality
 import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';
+import { ContentEditorService } from '../../content-io/services/content-editor.service';
 
 @Component({
   selector: 'app-content-viewer',
@@ -53,6 +54,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   containingPaths: Array<{ pathId: string; pathTitle: string; stepIndex: number }> = [];
   loadingPaths = false;
 
+  // Edit capability
+  canEditContent = false;
+
   // Dynamic renderer hosting
   @ViewChild('rendererHost', { read: ViewContainerRef, static: false })
   rendererHost!: ViewContainerRef;
@@ -73,7 +77,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
     private readonly rendererRegistry: RendererRegistryService,
     private readonly contentService: ContentService,
     private readonly dataLoader: DataLoaderService,
-    private readonly trustBadgeService: TrustBadgeService
+    private readonly trustBadgeService: TrustBadgeService,
+    private readonly editorService: ContentEditorService
   ) {}
 
   ngOnInit(): void {
@@ -187,6 +192,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
 
         // Set ContentNode
         this.node = contentNode;
+
+        // Check if content is editable
+        this.canEditContent = this.editorService.canEdit(contentNode);
 
         // Update SEO metadata for this content
         this.seoService.updateForContent({

@@ -30,12 +30,12 @@
 import {
   type ReachLevel,
   type GeographicContext,
-} from './protocol-core.model';
-import type { Place } from './place.model';
-import { JsonLdMetadata } from './json-ld.model';
+} from '@app/elohim/models/protocol-core.model';
+import type { Place } from '@app/qahal/models/place.model';
+import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
 
 // Re-export GeographicContext for backward compatibility
-export type { GeographicContext } from './protocol-core.model';
+export type { GeographicContext } from '@app/elohim/models/protocol-core.model';
 
 export interface ContentNode {
   /** Unique identifier (ActionHash in Holochain) */
@@ -312,7 +312,8 @@ export type ContentType =
   | 'organization'
   | 'book-chapter'
   | 'tool'
-  | 'role'; // Capability attestation target (e.g., "TypeScript Developer", "FCT Facilitator")
+  | 'role' // Capability attestation target (e.g., "TypeScript Developer", "FCT Facilitator")
+  | 'path'; // Learning path - curated journey through content nodes
 
 /**
  * RoleMetadata - Extended metadata for role-type ContentNodes.
@@ -356,7 +357,7 @@ export interface RoleMetadata {
    * Minimum mastery level required across the attestation path.
    * Default is 'apply' (attestation gate) - demonstrates practical application.
    */
-  requiredMasteryLevel: import('./agent.model').MasteryLevel;
+  requiredMasteryLevel: import('@app/elohim/models/agent.model').MasteryLevel;
 
   /**
    * Skills/competencies this role encompasses.

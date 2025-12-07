@@ -31,8 +31,8 @@ components:
   - name: tools
     container:
       image:  harbor.ethosengine.com/devspaces/udi-plus-angular:latest
-      memoryLimit: 4G
-      memoryRequest: 1G
+      memoryLimit: 6G
+      memoryRequest: 2G
       mountSources: true
       env:
         - name: CLAUDE_CONFIG_DIR
