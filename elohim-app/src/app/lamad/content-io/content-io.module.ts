@@ -1,4 +1,4 @@
-import { NgModule, ModuleWithProviders, APP_INITIALIZER, inject } from '@angular/core';
+import { NgModule, ModuleWithProviders, inject, ENVIRONMENT_INITIALIZER } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 // Core services
@@ -15,16 +15,14 @@ import { MarkdownFormatPlugin } from './plugins/markdown/markdown-format.plugin'
 import { GherkinFormatPlugin } from './plugins/gherkin/gherkin-format.plugin';
 
 /**
- * Factory function to register unified format plugins at app initialization.
+ * Initializer function to register unified format plugins.
  * This ensures plugins are registered before any component tries to use them.
  */
-function initializeFormatPlugins(): () => void {
+function initializeFormatPlugins(): void {
   const registry = inject(ContentFormatRegistryService);
-  return () => {
-    // Register built-in unified plugins
-    registry.register(new MarkdownFormatPlugin());
-    registry.register(new GherkinFormatPlugin());
-  };
+  // Register built-in unified plugins
+  registry.register(new MarkdownFormatPlugin());
+  registry.register(new GherkinFormatPlugin());
 }
 
 /**
@@ -74,10 +72,10 @@ export class ContentIOModule {
         ContentFormatRegistryService,
         ContentEditorService,
         ContentIOService,
-        // Register unified plugins at app initialization
+        // Register unified plugins at environment initialization
         {
-          provide: APP_INITIALIZER,
-          useFactory: initializeFormatPlugins,
+          provide: ENVIRONMENT_INITIALIZER,
+          useValue: () => initializeFormatPlugins(),
           multi: true
         }
       ]
