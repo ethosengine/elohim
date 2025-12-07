@@ -16,6 +16,7 @@ import {
   extractRelatedUsers,
   extractGovernanceScope
 } from '../parsers/markdown-parser';
+import { normalizeId, buildBaseMetadata, addProvenanceMetadata, addGovernanceScopeMetadata, buildContentNode, titleCase } from '../utils';
 
 /**
  * Transform archetype content into a role ContentNode
@@ -41,15 +42,11 @@ export function transformArchetype(
     category: 'archetype',
     epic: parsed.pathMeta.epic,
     userType: parsed.pathMeta.userType,
-    source: 'elohim-import',
-    sourceVersion: '1.0.0'
+    ...buildBaseMetadata()
   };
 
   // Add provenance link
-  if (sourceNodeId) {
-    metadata.derivedFrom = sourceNodeId;
-    metadata.extractionMethod = 'direct-import';
-  }
+  addProvenanceMetadata(metadata, sourceNodeId);
 
   // Add frontmatter fields
   if (parsed.frontmatter.archetype_name) {
@@ -60,10 +57,7 @@ export function transformArchetype(
   }
 
   // Add governance scope if present
-  const governanceScope = extractGovernanceScope(parsed.frontmatter);
-  if (governanceScope.length > 0) {
-    metadata.governanceScope = governanceScope;
-  }
+  addGovernanceScopeMetadata(metadata, parsed.frontmatter);
 
   // Extract related users for graph connections
   const relatedNodeIds = extractRelatedUsers(parsed.frontmatter);
@@ -79,7 +73,7 @@ export function transformArchetype(
     relatedNodeIds.push(epicNodeId);
   }
 
-  return {
+  return buildContentNode({
     id,
     contentType: 'role',
     title: extractArchetypeTitle(parsed),
@@ -90,10 +84,8 @@ export function transformArchetype(
     sourcePath: parsed.pathMeta.fullPath,
     relatedNodeIds,
     metadata,
-    reach: 'commons',
-    createdAt: now,
-    updatedAt: now
-  };
+    createdAt: now
+  });
 }
 
 /**
@@ -113,11 +105,7 @@ function generateArchetypeId(parsed: ParsedContent): string {
   }
 
   // Normalize and join
-  return parts
-    .map(p => p.toLowerCase().replace(/[^a-z0-9]/g, '-'))
-    .join('-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+  return normalizeId(parts);
 }
 
 /**
@@ -151,10 +139,7 @@ function extractArchetypeTitle(parsed: ParsedContent): string {
  * Format user type for display
  */
 function formatUserType(userType: string): string {
-  return userType
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  return titleCase(userType);
 }
 
 /**

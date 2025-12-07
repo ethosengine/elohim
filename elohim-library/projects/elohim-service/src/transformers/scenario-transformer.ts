@@ -11,6 +11,7 @@
 import { ContentNode } from '../models/content-node.model';
 import { ParsedContent, ParsedScenario } from '../models/import-context.model';
 import { extractGherkinTags, extractGherkinDescription } from '../parsers/gherkin-parser';
+import { normalizeId, buildBaseMetadata, addProvenanceMetadata, buildContentNode } from '../utils';
 
 /**
  * Transform Gherkin feature into scenario ContentNodes
@@ -63,14 +64,10 @@ function createFeatureNode(
     epic: parsed.pathMeta.epic,
     userType: parsed.pathMeta.userType,
     scenarioCount: parsed.scenarios?.length || 0,
-    source: 'elohim-import',
-    sourceVersion: '1.0.0'
+    ...buildBaseMetadata()
   };
 
-  if (sourceNodeId) {
-    metadata.derivedFrom = sourceNodeId;
-    metadata.extractionMethod = 'gherkin-parse';
-  }
+  addProvenanceMetadata(metadata, sourceNodeId, 'gherkin-parse');
 
   // Add frontmatter fields from Gherkin tags
   if (parsed.frontmatter.priority) {
@@ -99,7 +96,7 @@ function createFeatureNode(
     relatedNodeIds.push(archetypeNodeId);
   }
 
-  return {
+  return buildContentNode({
     id,
     contentType: 'scenario',
     title: parsed.title,
@@ -110,10 +107,8 @@ function createFeatureNode(
     sourcePath: parsed.pathMeta.fullPath,
     relatedNodeIds,
     metadata,
-    reach: 'commons',
-    createdAt: timestamp,
-    updatedAt: timestamp
-  };
+    createdAt: timestamp
+  });
 }
 
 /**
@@ -147,14 +142,10 @@ function createScenarioNode(
     userType: parsed.pathMeta.userType,
     featureId: featureNodeId,
     stepCount: scenario.steps.length,
-    source: 'elohim-import',
-    sourceVersion: '1.0.0'
+    ...buildBaseMetadata()
   };
 
-  if (sourceNodeId) {
-    metadata.derivedFrom = sourceNodeId;
-    metadata.extractionMethod = 'gherkin-parse';
-  }
+  addProvenanceMetadata(metadata, sourceNodeId, 'gherkin-parse');
 
   const relatedNodeIds: string[] = [featureNodeId];
 
@@ -162,7 +153,7 @@ function createScenarioNode(
     relatedNodeIds.push(sourceNodeId);
   }
 
-  return {
+  return buildContentNode({
     id,
     contentType: 'scenario',
     title: scenario.title,
@@ -173,10 +164,8 @@ function createScenarioNode(
     sourcePath: parsed.pathMeta.fullPath,
     relatedNodeIds,
     metadata,
-    reach: 'commons',
-    createdAt: timestamp,
-    updatedAt: timestamp
-  };
+    createdAt: timestamp
+  });
 }
 
 /**
@@ -197,11 +186,7 @@ function generateFeatureId(parsed: ParsedContent): string {
   const baseName = parsed.pathMeta.baseName.toLowerCase();
   parts.push(baseName);
 
-  return parts
-    .map(p => p.toLowerCase().replace(/[^a-z0-9]/g, '-'))
-    .join('-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+  return normalizeId(parts);
 }
 
 /**

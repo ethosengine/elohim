@@ -16,6 +16,7 @@ import {
   extractRelatedUsers,
   extractGovernanceScope
 } from '../parsers/markdown-parser';
+import { normalizeId, buildBaseMetadata, addProvenanceMetadata, addGovernanceScopeMetadata, buildContentNode, titleCaseWithSuffix } from '../utils';
 
 /**
  * Transform epic content into an epic ContentNode
@@ -41,15 +42,11 @@ export function transformEpic(
     category: 'epic',
     epicName: parsed.pathMeta.epic,
     domain: parsed.pathMeta.domain,
-    source: 'elohim-import',
-    sourceVersion: '1.0.0'
+    ...buildBaseMetadata()
   };
 
   // Add provenance link
-  if (sourceNodeId) {
-    metadata.derivedFrom = sourceNodeId;
-    metadata.extractionMethod = 'direct-import';
-  }
+  addProvenanceMetadata(metadata, sourceNodeId);
 
   // Add frontmatter fields
   if (parsed.frontmatter.epic_domain) {
@@ -63,10 +60,7 @@ export function transformEpic(
   }
 
   // Add governance scope if present
-  const governanceScope = extractGovernanceScope(parsed.frontmatter);
-  if (governanceScope.length > 0) {
-    metadata.governanceScope = governanceScope;
-  }
+  addGovernanceScopeMetadata(metadata, parsed.frontmatter);
 
   // Extract related users for graph connections
   const relatedNodeIds = extractRelatedUsers(parsed.frontmatter);
@@ -76,7 +70,7 @@ export function transformEpic(
     relatedNodeIds.push(sourceNodeId);
   }
 
-  return {
+  return buildContentNode({
     id,
     contentType: 'epic',
     title: extractEpicTitle(parsed),
@@ -87,10 +81,8 @@ export function transformEpic(
     sourcePath: parsed.pathMeta.fullPath,
     relatedNodeIds,
     metadata,
-    reach: 'commons',
-    createdAt: now,
-    updatedAt: now
-  };
+    createdAt: now
+  });
 }
 
 /**
@@ -107,11 +99,7 @@ function generateEpicId(parsed: ParsedContent): string {
   }
 
   // Normalize and join
-  return parts
-    .map(p => p.toLowerCase().replace(/[^a-z0-9]/g, '-'))
-    .join('-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+  return normalizeId(parts);
 }
 
 /**
@@ -145,10 +133,7 @@ function extractEpicTitle(parsed: ParsedContent): string {
  * Format epic name for display
  */
 function formatEpicName(epic: string): string {
-  return epic
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ') + ' Epic';
+  return titleCaseWithSuffix(epic, 'Epic');
 }
 
 /**
