@@ -4,6 +4,6 @@
  * Affinity tracking, consent management, and governance services.
  */
 
-export * from './affinity-tracking.service';
-export * from './human-consent.service';
-export * from './governance.service';
+export { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
+export { HumanConsentService } from '@app/shared/services/human-consent.service';
+export { GovernanceService } from '@app/shared/services/governance.service';

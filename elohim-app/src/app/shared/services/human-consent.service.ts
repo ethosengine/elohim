@@ -2,18 +2,22 @@ import { Injectable } from '@angular/core';
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
-import { LocalSourceChainService } from './local-source-chain.service';
+// Services
+import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+
+// Models
 import {
   HumanConsent,
   IntimacyLevel,
   ConsentState,
-  HumanConsentContent,
-  LearningPath,
-  PathVisibility
-} from '../models';
-// These functions are in qahal human-consent model
-import { hasMinimumIntimacy, isConsentActive, canElevate, type ElevationRequest } from '@app/qahal/models/human-consent.model';
+  ElevationRequest,
+  hasMinimumIntimacy,
+  isConsentActive,
+  canElevate,
+} from '@app/qahal/models/human-consent.model';
+import { HumanConsentContent } from '@app/elohim/models/source-chain.model';
+import type { LearningPath, PathVisibility } from '@app/lamad/models/learning-path.model';
 
 /**
  * HumanConsentService - Manages consent-based relationships between humans.

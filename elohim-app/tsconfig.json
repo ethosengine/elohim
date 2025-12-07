@@ -5,6 +5,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@app/shared": ["src/app/shared/index.ts"],
+      "@app/shared/*": ["src/app/shared/*"],
       "@app/elohim": ["src/app/elohim/index.ts"],
       "@app/elohim/*": ["src/app/elohim/*"],
       "@app/imagodei": ["src/app/imagodei/index.ts"],

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, combineLatest } from 'rxjs';
 import { map, shareReplay } from 'rxjs/operators';
+// Services
 import {
   DataLoaderService,
   GovernanceIndex,

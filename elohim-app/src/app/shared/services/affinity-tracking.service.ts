@@ -6,8 +6,8 @@ import {
   AffinityChangeEvent,
   CategoryAffinityStats,
   TypeAffinityStats,
-  ContentNode
-} from '../models';
+} from '@app/qahal/models/human-affinity.model';
+import { ContentNode } from '@app/lamad/models/content-node.model';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
 /**

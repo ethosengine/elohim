@@ -99,7 +99,7 @@ export { ProfileService } from '@app/imagodei/services/profile.service';
 // ============================================================================
 
 // Learning state / affinity tracking
-export { AffinityTrackingService } from '@app/qahal/services/affinity-tracking.service';
+export { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
 
 // Human consent (graduated intimacy)
 export { HumanConsentService } from '@app/qahal/services/human-consent.service';

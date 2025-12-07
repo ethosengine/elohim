@@ -509,8 +509,9 @@ export type AgentRelationshipType =
  *
  * Note: We intentionally avoid "network-wide" scope as it lacks the specificity
  * needed to provide meaningful accounting boundaries.
+ *
+ * Type: string - Agent ID or other scope identifier
  */
-export type AccountingScope = string; // Agent ID or other scope identifier
 
 /**
  * ScopeType - Classification of accounting scopes.
@@ -565,7 +566,7 @@ export interface Process {
    * Accounting scope(s) this process falls within.
    * Used for grouping, reporting, and access control.
    */
-  inScopeOf?: AccountingScope[];
+  inScopeOf?: string[];
 
   /** For learning paths: the path ID */
   pathId?: string;
@@ -672,7 +673,7 @@ export interface Intent {
   /**
    * Accounting scope(s) this intent falls within.
    */
-  inScopeOf?: AccountingScope[];
+  inScopeOf?: string[];
 
   /** If this intent is an input to a process */
   inputOf?: string; // Process.id
@@ -749,7 +750,7 @@ export interface Commitment {
   /**
    * Accounting scope(s) this commitment falls within.
    */
-  inScopeOf?: AccountingScope[];
+  inScopeOf?: string[];
 
   /** Description */
   note?: string;
@@ -877,7 +878,7 @@ export interface Proposal {
   /**
    * Accounting scope(s) this proposal falls within.
    */
-  inScopeOf?: AccountingScope[];
+  inScopeOf?: string[];
 
   /**
    * Is this proposal unit-based?
@@ -1001,7 +1002,7 @@ export interface Claim {
   /**
    * Accounting scope(s) this claim falls within.
    */
-  inScopeOf?: AccountingScope[];
+  inScopeOf?: string[];
 }
 
 /**
