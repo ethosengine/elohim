@@ -3,7 +3,7 @@ import { Observable, of, forkJoin } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { ContentService } from './content.service';
-import { AgentService } from './agent.service';
+import { AgentService } from '@app/elohim/services/agent.service';
 import { ContentNode, ContentReach, ContentFlag } from '../models/content-node.model';
 import {
   ContentAttestation,

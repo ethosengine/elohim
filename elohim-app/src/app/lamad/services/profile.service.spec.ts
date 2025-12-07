@@ -3,9 +3,9 @@ import { of, throwError, BehaviorSubject } from 'rxjs';
 import { ProfileService } from './profile.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { PathService } from './path.service';
-import { SessionHumanService } from './session-human.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { AffinityTrackingService } from './affinity-tracking.service';
-import { AgentService } from './agent.service';
+import { AgentService } from '@app/elohim/services/agent.service';
 import { LearningPath, PathStep, ContentNode, SessionPathProgress, SessionActivity } from '../models';
 
 describe('ProfileService', () => {

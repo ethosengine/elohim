@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { ContentMasteryService } from './content-mastery.service';
 import { LocalSourceChainService } from './local-source-chain.service';
-import { SessionHumanService } from './session-human.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { MasteryLevel, FRESHNESS_THRESHOLDS, SessionHuman } from '../models';
 import { BehaviorSubject } from 'rxjs';
 

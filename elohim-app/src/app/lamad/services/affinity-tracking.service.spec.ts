@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { BehaviorSubject } from 'rxjs';
 import { AffinityTrackingService } from './affinity-tracking.service';
-import { SessionHumanService } from './session-human.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { ContentNode } from '../models/content-node.model';
 
 describe('AffinityTrackingService', () => {
