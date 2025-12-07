@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { LamadHomeComponent } from './lamad-home.component';
 import { PathService } from '../../services/path.service';
-import { ProfileService } from '../../services/profile.service';
+import { ProfileService } from '@app/shared/services/profile.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 
