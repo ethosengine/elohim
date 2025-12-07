@@ -20,6 +20,7 @@ import {
   extractGovernanceScope
 } from '../parsers/markdown-parser';
 import { extractGherkinTags, extractGherkinDescription } from '../parsers/gherkin-parser';
+import { normalizeId, buildContentNode } from '../utils';
 
 /**
  * Transform parsed content into a source ContentNode
@@ -74,7 +75,7 @@ export function transformToSourceNode(parsed: ParsedContent): ContentNode {
   // Extract related users for graph connections
   const relatedNodeIds = extractRelatedUsers(parsed.frontmatter);
 
-  return {
+  return buildContentNode({
     id,
     contentType: 'source',
     title: `${parsed.title} (Source)`,
@@ -85,10 +86,8 @@ export function transformToSourceNode(parsed: ParsedContent): ContentNode {
     sourcePath: parsed.pathMeta.fullPath,
     relatedNodeIds,
     metadata,
-    reach: 'commons',
-    createdAt: now,
-    updatedAt: now
-  };
+    createdAt: now
+  });
 }
 
 /**
@@ -118,11 +117,7 @@ function generateSourceId(parsed: ParsedContent): string {
   }
 
   // Normalize and join
-  return parts
-    .map(p => p.toLowerCase().replace(/[^a-z0-9]/g, '-'))
-    .join('-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+  return normalizeId(parts);
 }
 
 /**

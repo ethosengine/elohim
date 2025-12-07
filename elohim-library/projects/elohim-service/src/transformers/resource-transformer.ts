@@ -14,6 +14,7 @@ import {
   extractTags,
   extractDescription
 } from '../parsers/markdown-parser';
+import { normalizeId, buildBaseMetadata, addProvenanceMetadata, buildContentNode, formatWithDelimiters } from '../utils';
 
 /**
  * Resource type mapping to content types
@@ -67,15 +68,11 @@ export function transformResource(
     resourceType,
     epic: parsed.pathMeta.epic,
     userType: parsed.pathMeta.userType,
-    source: 'elohim-import',
-    sourceVersion: '1.0.0'
+    ...buildBaseMetadata()
   };
 
   // Add provenance link
-  if (sourceNodeId) {
-    metadata.derivedFrom = sourceNodeId;
-    metadata.extractionMethod = 'direct-import';
-  }
+  addProvenanceMetadata(metadata, sourceNodeId);
 
   // Extract resource-specific frontmatter
   if (parsed.frontmatter.author) {
@@ -137,7 +134,7 @@ export function transformResource(
     }
   }
 
-  return {
+  return buildContentNode({
     id,
     contentType,
     title: extractResourceTitle(parsed),
@@ -148,10 +145,8 @@ export function transformResource(
     sourcePath: parsed.pathMeta.fullPath,
     relatedNodeIds,
     metadata,
-    reach: 'commons',
-    createdAt: now,
-    updatedAt: now
-  };
+    createdAt: now
+  });
 }
 
 /**
@@ -174,11 +169,7 @@ function generateResourceId(parsed: ParsedContent): string {
   parts.push(baseName);
 
   // Normalize and join
-  return parts
-    .map(p => p.toLowerCase().replace(/[^a-z0-9]/g, '-'))
-    .join('-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+  return normalizeId(parts);
 }
 
 /**
@@ -208,11 +199,7 @@ function extractResourceTitle(parsed: ParsedContent): string {
  * Format base name for display
  */
 function formatBaseName(baseName: string): string {
-  return baseName
-    .replace(/[-_]/g, ' ')
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  return formatWithDelimiters(baseName);
 }
 
 /**
