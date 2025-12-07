@@ -83,7 +83,7 @@
 
   <!-- Content Editor -->
   <section class="content-section">
-    <label>Content</label>
+    <label for="content-textarea">Content</label>
     <div class="editor-wrapper">
       <!-- Line Numbers -->
       <div class="line-numbers" *ngIf="config.showLineNumbers">
@@ -92,6 +92,7 @@
 
       <!-- Text Area -->
       <textarea
+        id="content-textarea"
         #contentArea
         class="content-textarea"
         [class.with-line-numbers]="config.showLineNumbers"
