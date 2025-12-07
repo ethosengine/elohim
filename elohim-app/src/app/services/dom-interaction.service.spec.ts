@@ -35,9 +35,9 @@ describe('DomInteractionService', () => {
 
       const elementRef = new ElementRef(mockElement);
       const scrollSpy = spyOn(window, 'scrollTo');
-      let clickHandler: () => void;
+      let clickHandler: (event: any) => void;
 
-      mockRenderer.listen.and.callFake((element: any, event: string, handler: () => void) => {
+      mockRenderer.listen.and.callFake((element: any, event: string, handler: (event: any) => void) => {
         if (event === 'click') {
           clickHandler = handler;
         }
@@ -51,13 +51,13 @@ describe('DomInteractionService', () => {
 
         // Trigger the click handler
         if (clickHandler!) {
-          clickHandler();
+          clickHandler({});
         }
 
-        expect(scrollSpy).toHaveBeenCalledWith({
-          top: window.innerHeight,
-          behavior: 'smooth'
-        });
+        expect(scrollSpy).toHaveBeenCalled();
+        const callArgs = scrollSpy.calls.mostRecent().args[0] as ScrollToOptions;
+        expect(callArgs.top).toBe(window.innerHeight);
+        expect(callArgs.behavior).toBe('smooth');
 
         done();
       }, 10);
@@ -86,9 +86,9 @@ describe('DomInteractionService', () => {
       mockElement.appendChild(heroSection);
 
       const elementRef = new ElementRef(mockElement);
-      let clickHandler: () => void;
+      let clickHandler: (event: any) => void;
 
-      mockRenderer.listen.and.callFake((element: any, event: string, handler: () => void) => {
+      mockRenderer.listen.and.callFake((element: any, event: string, handler: (event: any) => void) => {
         if (event === 'click') {
           clickHandler = handler;
         }
@@ -106,7 +106,7 @@ describe('DomInteractionService', () => {
 
         // Trigger the click handler
         if (clickHandler!) {
-          clickHandler();
+          clickHandler({});
         }
 
         expect(mockRenderer.setStyle).toHaveBeenCalledWith(heroTitle, 'animation', 'none');
