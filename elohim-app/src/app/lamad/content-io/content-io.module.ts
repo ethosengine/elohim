@@ -1,4 +1,4 @@
-import { NgModule, ModuleWithProviders, inject, ENVIRONMENT_INITIALIZER } from '@angular/core';
+import { NgModule, ModuleWithProviders, inject, provideAppInitializer } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 // Core services
@@ -73,11 +73,7 @@ export class ContentIOModule {
         ContentEditorService,
         ContentIOService,
         // Register unified plugins at environment initialization
-        {
-          provide: ENVIRONMENT_INITIALIZER,
-          useValue: () => initializeFormatPlugins(),
-          multi: true
-        }
+        provideAppInitializer(initializeFormatPlugins)
       ]
     };
   }

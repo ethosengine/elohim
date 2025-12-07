@@ -34,8 +34,7 @@
 import {
   REAAction,
   Measure,
-  ResourceClassification,
-  AccountingScope
+  ResourceClassification
 } from '@app/elohim/models/rea-bridge.model';
 
 // ============================================================================
@@ -131,7 +130,7 @@ export interface EconomicEvent {
    * Accounting scope(s) this event falls within.
    * Used for grouping, reporting, and access control.
    */
-  inScopeOf?: AccountingScope[];
+  inScopeOf?: string[];
 
   // ─────────────────────────────────────────────────────────────────
   // Metadata
