@@ -6,7 +6,7 @@ import { map, switchMap, catchError } from 'rxjs/operators';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { PathService } from '@app/lamad/services/path.service';
-import { AffinityTrackingService } from '@app/qahal/services/affinity-tracking.service';
+import { AffinityTrackingService } from './affinity-tracking.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
 // Models

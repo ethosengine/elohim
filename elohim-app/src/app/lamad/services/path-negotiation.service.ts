@@ -4,7 +4,7 @@ import { tap, switchMap } from 'rxjs/operators';
 
 import { LocalSourceChainService } from './local-source-chain.service';
 import { HumanConsentService } from './human-consent.service';
-import { AffinityTrackingService } from './affinity-tracking.service';
+import { AffinityTrackingService } from '@app/qahal/services/affinity-tracking.service';
 import {
   PathNegotiation,
   NegotiationStatus,

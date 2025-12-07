@@ -3,7 +3,7 @@ import { of } from 'rxjs';
 import { PathNegotiationService } from './path-negotiation.service';
 import { LocalSourceChainService } from './local-source-chain.service';
 import { HumanConsentService } from './human-consent.service';
-import { AffinityTrackingService } from './affinity-tracking.service';
+import { AffinityTrackingService } from '@app/qahal/services/affinity-tracking.service';
 import { HumanConsent, IntimacyLevel, ConsentState } from '../models/human-consent.model';
 import { NegotiationStatus, BridgingStrategy } from '../models/path-negotiation.model';
 
