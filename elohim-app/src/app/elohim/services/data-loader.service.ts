@@ -187,12 +187,10 @@ export class DataLoaderService {
       return;
     }
 
-    if (!this.kuzuInitPromise) {
-      this.kuzuInitPromise = this.kuzuService.initialize().catch(err => {
-        console.error('[DataLoader] Kuzu initialization failed:', err);
-        this.useKuzu = false;
-      });
-    }
+    this.kuzuInitPromise ??= this.kuzuService.initialize().catch(err => {
+      console.error('[DataLoader] Kuzu initialization failed:', err);
+      this.useKuzu = false;
+    });
 
     return this.kuzuInitPromise;
   }

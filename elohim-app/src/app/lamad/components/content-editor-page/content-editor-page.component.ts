@@ -156,9 +156,7 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
       this.registry.getEditorComponent(formatId);
 
     // Fall back to default if no specialized editor
-    if (!EditorComponent) {
-      EditorComponent = DefaultCodeEditorComponent;
-    }
+    EditorComponent ??= DefaultCodeEditorComponent;
 
     // Create the editor component
     this.editorRef = this.editorHost.createComponent(EditorComponent);
