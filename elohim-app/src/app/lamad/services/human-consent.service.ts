@@ -3,7 +3,7 @@ import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
 import { LocalSourceChainService } from './local-source-chain.service';
-import { SessionHumanService } from './session-human.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import {
   HumanConsent,
   IntimacyLevel,

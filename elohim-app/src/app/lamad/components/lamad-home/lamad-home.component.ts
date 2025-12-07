@@ -5,7 +5,7 @@ import { Subject, forkJoin, of } from 'rxjs';
 import { takeUntil, catchError } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
 import { ProfileService } from '../../services/profile.service';
-import { AgentService } from '../../services/agent.service';
+import { AgentService } from '@app/elohim/services/agent.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 import { CurrentFocus } from '../../models/profile.model';
 

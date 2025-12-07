@@ -10,7 +10,7 @@ import {
   DiscussionRecord,
   GovernanceStateRecord
 } from '@app/elohim/services/data-loader.service';
-import { SessionHumanService } from './session-human.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
 /**
  * Challenge submission from a user.

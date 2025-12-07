@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { GovernanceService, ChallengeSubmission, ProposalSubmission, Vote, DiscussionMessage } from './governance.service';
 import { DataLoaderService, GovernanceIndex, ChallengeRecord, ProposalRecord, PrecedentRecord, DiscussionRecord, GovernanceStateRecord } from '@app/elohim/services/data-loader.service';
-import { SessionHumanService } from './session-human.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
 describe('GovernanceService', () => {
   let service: GovernanceService;

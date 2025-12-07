@@ -31,7 +31,7 @@ import {
   type ReachLevel,
   type GeographicContext,
 } from '@app/elohim/models/protocol-core.model';
-import type { Place } from './place.model';
+import type { Place } from '@app/qahal/models/place.model';
 import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
 
 // Re-export GeographicContext for backward compatibility

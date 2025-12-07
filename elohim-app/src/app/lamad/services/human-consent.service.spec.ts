@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HumanConsentService } from './human-consent.service';
 import { LocalSourceChainService } from './local-source-chain.service';
-import { SessionHumanService } from './session-human.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { IntimacyLevel, ConsentState } from '../models/human-consent.model';
 import { LearningPath } from '../models/learning-path.model';
 

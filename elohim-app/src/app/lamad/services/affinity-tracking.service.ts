@@ -8,7 +8,7 @@ import {
   TypeAffinityStats,
   ContentNode
 } from '../models';
-import { SessionHumanService } from './session-human.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
 /**
  * Service for tracking human affinity (relationship strength) to content nodes.
