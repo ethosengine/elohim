@@ -159,6 +159,21 @@ export * from './content-lifecycle.model';
 // Human Affinity models (engagement depth tracking)
 export * from './human-affinity.model';
 
+// Human Consent models (graduated intimacy and consent-based relationships)
+export * from './human-consent.model';
+
+// Path Negotiation models (agent-to-agent path customization)
+export * from './path-negotiation.model';
+
+// Source Chain models (Holochain-compatible agent-centric data)
+export * from './source-chain.model';
+
+// Place models (bioregional and jurisdictional grounding)
+export * from './place.model';
+
+// Human Node models (humans as graph nodes in the social layer)
+export * from './human-node.model';
+
 // BACKLOGGED: Expertise Discovery models (finding experts in domains)
 // See BACKLOG.md - expertise-discovery.model.ts exists but not yet integrated
 // export * from './expertise-discovery.model';

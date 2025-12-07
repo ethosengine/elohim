@@ -72,3 +72,18 @@ export type { AssessmentResult, AssessmentSession, QuestionResponse } from './as
 // Governance (challenges, proposals, precedents, deliberation)
 export { GovernanceService } from './governance.service';
 export type { ChallengeSubmission, ProposalSubmission, Vote, DiscussionMessage } from './governance.service';
+
+// Source chain (Holochain-compatible agent-centric data storage)
+export { LocalSourceChainService } from './local-source-chain.service';
+
+// Content mastery (Bloom's Taxonomy progression tracking)
+export { ContentMasteryService } from './content-mastery.service';
+
+// Human consent (graduated intimacy relationships)
+export { HumanConsentService } from './human-consent.service';
+
+// Path negotiation (agent-to-agent path customization)
+export { PathNegotiationService } from './path-negotiation.service';
+
+// Progress migration (localStorage to source chain migration)
+export { ProgressMigrationService } from './progress-migration.service';
