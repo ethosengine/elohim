@@ -1,6 +1,6 @@
-import { Injectable, Inject, Optional } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, forkJoin, from } from 'rxjs';
+import { Observable, of, forkJoin, from, defer } from 'rxjs';
 import { catchError, map, shareReplay, switchMap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { KuzuDataService } from './kuzu-data.service';
@@ -160,7 +160,8 @@ export interface GovernanceStateRecord {
 @Injectable({ providedIn: 'root' })
 export class DataLoaderService {
   private readonly basePath = '/assets/lamad-data';
-  private readonly useKuzu: boolean;
+  private useKuzu: boolean;
+  private kuzuInitPromise: Promise<void> | null = null;
 
   // Caches to prevent redundant HTTP calls (shareReplay pattern)
   private readonly pathCache = new Map<string, Observable<LearningPath>>();
@@ -175,13 +176,25 @@ export class DataLoaderService {
   ) {
     // Use Kuzu WASM database if enabled in environment
     this.useKuzu = (environment as any).useKuzuDb ?? false;
-    if (this.useKuzu) {
-      // Initialize Kuzu in background
-      this.kuzuService.initialize().catch(err => {
+  }
+
+  /**
+   * Ensures Kuzu is initialized before use (lazy initialization).
+   * Returns a promise that resolves when initialization is complete.
+   */
+  private async ensureKuzuInitialized(): Promise<void> {
+    if (!this.useKuzu) {
+      return;
+    }
+
+    if (!this.kuzuInitPromise) {
+      this.kuzuInitPromise = this.kuzuService.initialize().catch(err => {
         console.error('[DataLoader] Kuzu initialization failed:', err);
-        (this as any).useKuzu = false;
+        this.useKuzu = false;
       });
     }
+
+    return this.kuzuInitPromise;
   }
 
   /**
@@ -194,8 +207,9 @@ export class DataLoaderService {
       let request: Observable<LearningPath>;
 
       if (this.useKuzu) {
-        // Kuzu is the primary source for paths
-        request = this.kuzuService.getPath(pathId).pipe(
+        // Kuzu is the primary source for paths - ensure initialization first
+        request = defer(() => from(this.ensureKuzuInitialized())).pipe(
+          switchMap(() => this.kuzuService.getPath(pathId)),
           shareReplay(1),
           catchError(() => {
             console.warn(`[DataLoader] ⚠️ KUZU MISSING: LearningPath "${pathId}"`);
@@ -231,8 +245,9 @@ export class DataLoaderService {
       let request: Observable<ContentNode>;
 
       if (this.useKuzu) {
-        // Kuzu is primary source for content
-        request = this.kuzuService.getContent(resourceId).pipe(
+        // Kuzu is primary source for content - ensure initialization first
+        request = defer(() => from(this.ensureKuzuInitialized())).pipe(
+          switchMap(() => this.kuzuService.getContent(resourceId)),
           shareReplay(1),
           catchError(() => {
             // Log missing content (once per resourceId)
@@ -264,9 +279,11 @@ export class DataLoaderService {
    * Returns metadata only, not full content.
    */
   getContentIndex(): Observable<any> {
-    // Delegate to Kuzu if enabled
+    // Delegate to Kuzu if enabled - ensure initialization first
     if (this.useKuzu) {
-      return this.kuzuService.getContentIndex();
+      return defer(() => from(this.ensureKuzuInitialized())).pipe(
+        switchMap(() => this.kuzuService.getContentIndex())
+      );
     }
 
     return this.http.get(`${this.basePath}/content/index.json`).pipe(
@@ -279,9 +296,10 @@ export class DataLoaderService {
    * Falls back to JSON if Kuzu has no path data.
    */
   getPathIndex(): Observable<PathIndex> {
-    // Kuzu is primary source for path index
+    // Kuzu is primary source for path index - ensure initialization first
     if (this.useKuzu) {
-      return this.kuzuService.getPathIndex().pipe(
+      return defer(() => from(this.ensureKuzuInitialized())).pipe(
+        switchMap(() => this.kuzuService.getPathIndex()),
         switchMap(index => {
           if (!index.paths || index.paths.length === 0) {
             console.warn('[DataLoader] ⚠️ KUZU MISSING: PathIndex (0 paths in Kuzu)');

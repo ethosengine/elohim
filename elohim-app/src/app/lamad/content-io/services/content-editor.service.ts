@@ -1,6 +1,5 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, throwError } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
 import { ContentNode } from '../../models/content-node.model';
 import { ContentFormatRegistryService } from './content-format-registry.service';
 import { ContentIOExportInput } from '../interfaces/content-io-plugin.interface';
@@ -56,7 +55,7 @@ export class ContentEditorService {
     }
 
     // In prototype, all content is editable
-    // TODO: Implement proper permission checks when auth is added
+    // Future: Implement proper permission checks when auth is added
 
     // Don't allow editing dynamically generated step content
     // These have IDs like "path-{pathId}-step-{index}" and are generated at runtime
@@ -242,7 +241,7 @@ export class ContentEditorService {
     draft.isDirty = false;
     draft.updatedAt = Date.now();
 
-    // TODO: In production, this would:
+    // Future: In production, this would:
     // 1. Validate content
     // 2. Call HolochainService.createEntry() or updateEntry()
     // 3. Update cache in DataLoaderService
@@ -311,7 +310,7 @@ export class ContentEditorService {
     return title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
+      .replace(/(?:^-|-$)/g, '')
       .substring(0, 50);
   }
 }

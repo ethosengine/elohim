@@ -174,7 +174,7 @@ export class ContentFormatRegistryService {
    */
   getRendererComponent(formatId: string): Type<ContentRenderer> | null {
     const plugin = this.plugins.get(formatId);
-    if (!plugin || !plugin.canRender) {
+    if (!plugin?.canRender) {
       return null;
     }
     return plugin.getRendererComponent();

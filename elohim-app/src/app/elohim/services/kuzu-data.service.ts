@@ -14,10 +14,10 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, from, of, BehaviorSubject } from 'rxjs';
-import { map, switchMap, shareReplay, catchError, tap } from 'rxjs/operators';
+import { shareReplay, catchError } from 'rxjs/operators';
 // Models from lamad pillar (content-specific)
 import { LearningPath, PathIndex } from '../../lamad/models/learning-path.model';
-import { ContentNode, ContentGraph, ContentGraphMetadata } from '../../lamad/models/content-node.model';
+import { ContentNode, ContentGraph } from '../../lamad/models/content-node.model';
 
 // Local type definitions for kuzu-wasm high-level API
 // The module exposes Database() and Connection() async factory functions
@@ -83,7 +83,7 @@ export class KuzuDataService {
     const kuzuModule = await import(/* @vite-ignore */ moduleUrl);
 
     // The default export is a factory function that returns the initialized kuzu instance
-    const kuzuFactory = kuzuModule.default || kuzuModule;
+    const kuzuFactory = kuzuModule.default ?? kuzuModule;
 
     // Call the factory with locateFile to find WASM in our assets folder
     const kuzu = await kuzuFactory({
@@ -217,7 +217,7 @@ export class KuzuDataService {
 
     for (const ddl of schema) {
       try {
-        await this.conn!.execute(ddl);
+        await this.conn.execute(ddl);
       } catch {
         // Table might already exist - ignore
       }
@@ -249,7 +249,7 @@ export class KuzuDataService {
       for (const stmt of statements) {
         if (stmt.trim()) {
           try {
-            await this.conn!.execute(stmt.trim() + ';');
+            await this.conn.execute(stmt.trim() + ';');
           } catch (err) {
             failCount++;
             // Log first few failures for debugging
@@ -295,7 +295,7 @@ export class KuzuDataService {
       for (const stmt of statements) {
         if (stmt.trim()) {
           try {
-            await this.conn!.execute(stmt.trim() + ';');
+            await this.conn.execute(stmt.trim() + ';');
           } catch (err) {
             chunkFail++;
             if (chunkFail <= 3) {
@@ -399,10 +399,10 @@ export class KuzuDataService {
 
     const steps = stepsResult.map((s: any) => ({
       order: s['s.orderIndex'],
-      stepType: s['s.stepType'] || 'content',
+      stepType: s['s.stepType'] ?? 'content',
       resourceId: s['s.resourceId'],
-      stepTitle: this.unescapeCypher(s['s.stepTitle'] || ''),
-      stepNarrative: this.unescapeCypher(s['s.stepNarrative'] || ''),
+      stepTitle: this.unescapeCypher(s['s.stepTitle'] ?? ''),
+      stepNarrative: this.unescapeCypher(s['s.stepNarrative'] ?? ''),
       optional: s['s.isOptional'],
       attestationRequired: s['s.attestationRequired'],
       attestationGranted: s['s.attestationGranted'],
@@ -414,20 +414,20 @@ export class KuzuDataService {
     return {
       id: row['p.id'],
       version: row['p.version'],
-      title: this.unescapeCypher(row['p.title'] || ''),
-      description: this.unescapeCypher(row['p.description'] || ''),
-      purpose: this.unescapeCypher(row['p.purpose'] || ''),
+      title: this.unescapeCypher(row['p.title'] ?? ''),
+      description: this.unescapeCypher(row['p.description'] ?? ''),
+      purpose: this.unescapeCypher(row['p.purpose'] ?? ''),
       createdBy: row['p.createdBy'],
-      contributors: [], // TODO: Load contributors
+      contributors: [], // Future: Load contributors from graph
       difficulty: row['p.difficulty'],
       estimatedDuration: row['p.estimatedDuration'],
-      visibility: row['p.visibility'] || 'public',
+      visibility: row['p.visibility'] ?? 'public',
       pathType: row['p.pathType'],
-      tags: row['p.tags'] || [],
-      thumbnailUrl: row['p.thumbnailUrl'] || undefined,
-      thumbnailAlt: row['p.thumbnailAlt'] || undefined,
+      tags: row['p.tags'] ?? [],
+      thumbnailUrl: row['p.thumbnailUrl'] ?? undefined,
+      thumbnailAlt: row['p.thumbnailAlt'] ?? undefined,
       steps,
-      chapters: [], // TODO: Load chapters
+      chapters: [], // Future: Load chapters from graph
       createdAt: row['p.createdAt'],
       updatedAt: row['p.updatedAt']
     };
@@ -464,7 +464,7 @@ export class KuzuDataService {
     }
 
     const row = result[0];
-    let content = row['c.content'] || '';
+    let content = row['c.content'] ?? '';
 
     // Check if this content has chunks (for large content that was split)
     // If content is empty or marked as chunked, try to reassemble from chunks
@@ -481,14 +481,14 @@ export class KuzuDataService {
     return {
       id: row['c.id'],
       contentType: row['c.contentType'],
-      title: this.unescapeCypher(row['c.title'] || ''),
-      description: this.unescapeCypher(row['c.description'] || ''),
+      title: this.unescapeCypher(row['c.title'] ?? ''),
+      description: this.unescapeCypher(row['c.description'] ?? ''),
       content,
-      contentFormat: row['c.contentFormat'] || 'markdown',
-      tags: row['c.tags'] || [],
+      contentFormat: row['c.contentFormat'] ?? 'markdown',
+      tags: row['c.tags'] ?? [],
       relatedNodeIds: [],
       authorId: row['c.authorId'],
-      reach: row['c.reach'] || 'commons',
+      reach: row['c.reach'] ?? 'commons',
       trustScore: row['c.trustScore'],
       metadata: row['c.metadata'] ? JSON.parse(row['c.metadata']) : {},
       sourcePath: row['c.sourcePath'],
@@ -514,12 +514,12 @@ export class KuzuDataService {
       }
 
       // Sort by index and concatenate
-      const sortedChunks = chunkResult.sort(
+      const sortedChunks = chunkResult.toSorted(
         (a: any, b: any) => a['ch.chunkIndex'] - b['ch.chunkIndex']
       );
 
       // Concatenate chunks and unescape Cypher string escapes
-      const rawContent = sortedChunks.map((c: any) => c['ch.content'] || '').join('');
+      const rawContent = sortedChunks.map((c: any) => c['ch.content'] ?? '').join('');
       const content = this.unescapeCypher(rawContent);
       return content;
     } catch (err) {
@@ -567,10 +567,10 @@ export class KuzuDataService {
       difficulty: row['p.difficulty'],
       estimatedDuration: row['p.estimatedDuration'],
       stepCount: 0, // Would need a count query
-      tags: row['p.tags'] || [],
+      tags: row['p.tags'] ?? [],
       pathType: row['p.pathType'],
-      thumbnailUrl: row['p.thumbnailUrl'] || undefined,
-      thumbnailAlt: row['p.thumbnailAlt'] || undefined
+      thumbnailUrl: row['p.thumbnailUrl'] ?? undefined,
+      thumbnailAlt: row['p.thumbnailAlt'] ?? undefined
     }));
 
     return {
@@ -601,7 +601,7 @@ export class KuzuDataService {
       contentType: row['c.contentType'],
       title: row['c.title'],
       description: row['c.description'],
-      tags: row['c.tags'] || [],
+      tags: row['c.tags'] ?? [],
       content: '',
       contentFormat: 'markdown' as const,
       relatedNodeIds: [],
@@ -642,10 +642,10 @@ export class KuzuDataService {
       title: row['c.title'],
       description: row['c.description'],
       content: row['c.content'],
-      contentFormat: row['c.contentFormat'] || 'markdown',
-      tags: row['c.tags'] || [],
+      contentFormat: row['c.contentFormat'] ?? 'markdown',
+      tags: row['c.tags'] ?? [],
       relatedNodeIds: [],
-      reach: row['c.reach'] || 'commons',
+      reach: row['c.reach'] ?? 'commons',
       metadata: {}
     }));
   }
@@ -673,10 +673,10 @@ export class KuzuDataService {
       title: row['c.title'],
       description: row['c.description'],
       content: row['c.content'],
-      contentFormat: row['c.contentFormat'] || 'markdown',
-      tags: row['c.tags'] || [],
+      contentFormat: row['c.contentFormat'] ?? 'markdown',
+      tags: row['c.tags'] ?? [],
       relatedNodeIds: [],
-      reach: row['c.reach'] || 'commons',
+      reach: row['c.reach'] ?? 'commons',
       metadata: {}
     }));
   }
@@ -693,9 +693,9 @@ export class KuzuDataService {
   /**
    * Close the database.
    */
-  async close(): Promise<void> {
+  close(): void {
     if (this.db) {
-      await this.db.close();
+      this.db.close();
       this.db = null;
       this.ready$.next(false);
     }
