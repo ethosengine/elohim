@@ -9,3 +9,4 @@ export { ProfileService } from './profile.service';
 export { HumanConsentService } from './human-consent.service';
 export { GovernanceService } from './governance.service';
 export { AffinityTrackingService } from './affinity-tracking.service';
+export { LocalSourceChainService } from './local-source-chain.service';

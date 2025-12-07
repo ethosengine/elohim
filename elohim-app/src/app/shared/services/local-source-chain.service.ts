@@ -9,7 +9,7 @@ import {
   LinkQuery,
   ChainMetadata,
   ChainMigrationPackage,
-} from '../models';
+} from '@app/elohim/models/source-chain.model';
 
 /**
  * LocalSourceChainService - Agent-centric source chain simulation using localStorage.

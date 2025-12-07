@@ -51,7 +51,7 @@ export { PathNegotiationService } from './path-negotiation.service';
 export { ContentMasteryService } from './content-mastery.service';
 
 // Local source chain (Holochain-style agent-centric storage)
-export { LocalSourceChainService } from './local-source-chain.service';
+export { LocalSourceChainService } from '@app/shared/services/local-source-chain.service';
 
 // Progress migration
 export { ProgressMigrationService } from './progress-migration.service';
