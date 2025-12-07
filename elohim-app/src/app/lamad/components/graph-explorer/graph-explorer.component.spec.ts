@@ -3,7 +3,7 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { RouterTestingModule } from '@angular/router/testing';
 import { Router } from '@angular/router';
 import { GraphExplorerComponent } from './graph-explorer.component';
-import { AffinityTrackingService } from '@app/qahal/services/affinity-tracking.service';
+import { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
 import { ElementRef } from '@angular/core';
 
 describe('GraphExplorerComponent', () => {

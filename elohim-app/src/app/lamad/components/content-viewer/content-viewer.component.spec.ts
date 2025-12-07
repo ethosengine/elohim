@@ -3,7 +3,7 @@ import { ContentViewerComponent } from './content-viewer.component';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
-import { AffinityTrackingService } from '@app/qahal/services/affinity-tracking.service';
+import { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
 import { ContentService } from '../../services/content.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
