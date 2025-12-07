@@ -5,5 +5,5 @@
  */
 
 export * from './affinity-tracking.service';
-export * from './human-consent.service';
+export { HumanConsentService } from '@app/shared/services/human-consent.service';
 export * from './governance.service';

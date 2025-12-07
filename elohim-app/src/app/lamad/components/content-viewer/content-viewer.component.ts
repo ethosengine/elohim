@@ -22,7 +22,7 @@ import {
   RendererCompletionEvent
 } from '../../renderers/renderer-registry.service';
 
-import { TrustBadgeService } from '../../services/trust-badge.service';
+import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
 import { TrustBadge } from '../../models/trust-badge.model';
 
 // Content I/O for download functionality

@@ -3,4 +3,4 @@
  */
 
 export { SessionHumanService } from './session-human.service';
-export { ProfileService } from './profile.service';
+export { ProfileService } from '@app/shared/services/profile.service';

@@ -2,17 +2,14 @@ import { Injectable, Optional } from '@angular/core';
 import { Observable, of, forkJoin, combineLatest } from 'rxjs';
 import { map, switchMap, catchError } from 'rxjs/operators';
 
-// Services from elohim pillar
-import { DataLoaderService } from '../../elohim/services/data-loader.service';
-import { AgentService } from '../../elohim/services/agent.service';
-// Services from lamad pillar
-import { PathService } from '../../lamad/services/path.service';
-// Services from qahal pillar
-import { AffinityTrackingService } from '../../qahal/services/affinity-tracking.service';
-// Local services
-import { SessionHumanService } from './session-human.service';
+// Services
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { AgentService } from '@app/elohim/services/agent.service';
+import { PathService } from '@app/lamad/services/path.service';
+import { AffinityTrackingService } from '@app/qahal/services/affinity-tracking.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
-// Local models
+// Models
 import {
   HumanProfile,
   JourneyStats,
@@ -26,10 +23,9 @@ import {
   PathWithProgress,
   PathsOverview,
   ProfileSummaryCompact,
-} from '../models/profile.model';
-import { SessionPathProgress, SessionActivity } from '../models/session-human.model';
-// Models from lamad pillar
-import type { LearningPath } from '../../lamad/models/learning-path.model';
+} from '@app/imagodei/models/profile.model';
+import { SessionPathProgress, SessionActivity } from '@app/imagodei/models/session-human.model';
+import type { LearningPath } from '@app/lamad/models/learning-path.model';
 
 /**
  * ProfileService - Human-Centered Identity View
