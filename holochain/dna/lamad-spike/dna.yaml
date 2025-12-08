@@ -5,7 +5,6 @@ name: lamad_spike
 integrity:
   network_seed: ~
   properties: ~
-  origin_time: 1733702400000000  # 2024-12-09T00:00:00Z
   zomes:
     - name: content_store_integrity
       bundled: "../../target/wasm32-unknown-unknown/release/content_store_integrity.wasm"
