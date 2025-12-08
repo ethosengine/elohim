@@ -7,11 +7,11 @@ integrity:
   properties: ~
   zomes:
     - name: content_store_integrity
-      bundled: "../../target/wasm32-unknown-unknown/release/content_store_integrity.wasm"
+      bundled: "target/wasm32-unknown-unknown/release/content_store_integrity.wasm"
 
 coordinator:
   zomes:
     - name: content_store
-      bundled: "../../target/wasm32-unknown-unknown/release/content_store.wasm"
+      bundled: "target/wasm32-unknown-unknown/release/content_store.wasm"
       dependencies:
         - name: content_store_integrity
