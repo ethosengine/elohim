@@ -48,16 +48,25 @@ spec:
           volumeMounts:
             - name: holochain-data
               mountPath: /data
+          # Use exec probe since conductor binds to localhost
           livenessProbe:
-            tcpSocket:
-              port: 4444
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "nc -z 127.0.0.1 4444 || exit 1"
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "nc -z 127.0.0.1 4444 || exit 1"
             initialDelaySeconds: 30
             periodSeconds: 10
-          readinessProbe:
-            tcpSocket:
-              port: 4444
-            initialDelaySeconds: 10
-            periodSeconds: 5
+            failureThreshold: 3
       volumes:
         - name: holochain-data
           emptyDir:
