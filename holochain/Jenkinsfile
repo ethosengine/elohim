@@ -452,17 +452,5 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             echo "Holochain infrastructure pipeline failed"
             echo "If this is a first-time build, it may need more time/resources for Nix cache population"
         }
-        always {
-            // Report resource usage for tuning
-            container('nix') {
-                sh '''
-                    echo "=== Nix store size ==="
-                    du -sh /nix/store 2>/dev/null || echo "N/A"
-                    echo ""
-                    echo "=== Cargo cache size ==="
-                    du -sh /root/.cargo 2>/dev/null || echo "N/A"
-                '''
-            }
-        }
     }
 }
