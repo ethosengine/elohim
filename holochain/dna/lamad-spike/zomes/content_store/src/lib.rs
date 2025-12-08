@@ -71,10 +71,10 @@ pub fn get_content(action_hash: ActionHash) -> ExternResult<Option<ContentOutput
 /// List all content created by the current agent
 #[hdk_extern]
 pub fn get_my_content(_: ()) -> ExternResult<Vec<ContentOutput>> {
-    let query = ChainQueryFilter::new()
+    let filter = ChainQueryFilter::new()
         .entry_type(UnitEntryTypes::Content.try_into()?);
 
-    let records = query(query)?;
+    let records = query(filter)?;
 
     let mut results = Vec::new();
     for record in records {
