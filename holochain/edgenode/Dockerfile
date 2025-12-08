@@ -2,15 +2,15 @@
 #
 # Based on Holo Edge Node, adds:
 # - Custom conductor config for elohim bootstrap server
-# - Pre-installed hApp (when available)
+# - Pre-installed hApp
 
 FROM ghcr.io/holo-host/edgenode:latest
 
 # Copy custom conductor config
 COPY conductor-config.yaml /etc/holochain/conductor-config.yaml
 
-# Copy hApp if present (optional - can be installed at runtime)
-COPY *.happ /opt/holochain/ 2>/dev/null || true
+# Copy hApp bundle
+COPY lamad-spike.happ /opt/holochain/
 
 # Expose WebSocket ports
 EXPOSE 4444 4445
