@@ -15,7 +15,7 @@ import {
   hasMinimumIntimacy,
   isConsentActive,
   canElevate,
-} from '@app/qahal/models/human-consent.model';
+} from '@app/elohim/models/human-consent.model';
 import { HumanConsentContent } from '@app/elohim/models/source-chain.model';
 import type { LearningPath, PathVisibility } from '@app/lamad/models/learning-path.model';
 

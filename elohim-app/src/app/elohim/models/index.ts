@@ -27,6 +27,9 @@ export * from './elohim-agent.model';
 // Trust system
 export * from './trust-badge.model';
 
+// Human consent and relationships
+export * from './human-consent.model';
+
 // Infrastructure
 export * from './source-chain.model';
 export * from './json-ld.model';

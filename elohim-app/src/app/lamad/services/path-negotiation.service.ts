@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 import { tap, switchMap } from 'rxjs/operators';
 
-import { LocalSourceChainService } from './local-source-chain.service';
+import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 import { HumanConsentService } from '@app/shared/services/human-consent.service';
 import { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
 import {
@@ -19,7 +19,7 @@ import {
   isNegotiationResolved,
   PathNegotiationContent
 } from '../models';
-import { hasMinimumIntimacy } from '@app/qahal/models/human-consent.model';
+import { hasMinimumIntimacy } from '@app/elohim/models/human-consent.model';
 
 /**
  * PathNegotiationService - Placeholder for Elohim-to-Elohim path negotiation.

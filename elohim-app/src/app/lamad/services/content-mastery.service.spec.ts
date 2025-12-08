@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ContentMasteryService } from './content-mastery.service';
-import { LocalSourceChainService } from './local-source-chain.service';
+import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { MasteryLevel, FRESHNESS_THRESHOLDS, SessionHuman } from '../models';
 import { BehaviorSubject } from 'rxjs';

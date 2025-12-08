@@ -9,7 +9,7 @@
  */
 
 import { ContentType, ContentReach } from './content-node.model';
-import { TrustLevel } from './trust-badge.model';
+import { TrustLevel } from '@app/elohim/models/trust-badge.model';
 
 // ============================================================================
 // Search Query
