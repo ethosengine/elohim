@@ -23,7 +23,7 @@ export function canView(entity: AccessControlEntity, currentAgentId: string): bo
   }
 
   // Owner can always view
-  const ownerId = entity.ownerId || entity.extendedBy;
+  const ownerId = entity.ownerId ?? entity.extendedBy;
   if (ownerId === currentAgentId) {
     return true;
   }
@@ -49,7 +49,7 @@ export function canView(entity: AccessControlEntity, currentAgentId: string): bo
  */
 export function canEdit(entity: AccessControlEntity, currentAgentId: string): boolean {
   // Owner can always edit
-  const ownerId = entity.ownerId || entity.extendedBy;
+  const ownerId = entity.ownerId ?? entity.extendedBy;
   if (ownerId === currentAgentId) {
     return true;
   }
@@ -72,7 +72,7 @@ export function canEdit(entity: AccessControlEntity, currentAgentId: string): bo
  */
 export function canDelete(entity: AccessControlEntity, currentAgentId: string): boolean {
   // Only owner can delete
-  const ownerId = entity.ownerId || entity.extendedBy;
+  const ownerId = entity.ownerId ?? entity.extendedBy;
   if (ownerId === currentAgentId) {
     return true;
   }
