@@ -275,6 +275,11 @@ export class ContentService {
       return true;
     }
 
+    // Private content is only accessible to the author (already checked above)
+    if (contentReach === 'private') {
+      return false;
+    }
+
     // Compare reach hierarchy
     const contentReachIndex = REACH_HIERARCHY.indexOf(contentReach);
     const agentReachIndex = REACH_HIERARCHY.indexOf(agentReach);
