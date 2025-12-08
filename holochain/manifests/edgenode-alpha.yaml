@@ -49,21 +49,22 @@ spec:
             - name: holochain-data
               mountPath: /data
           # Use exec probe since conductor binds to localhost
+          # bash supports /dev/tcp, ash/sh does not
           livenessProbe:
             exec:
               command:
-                - /bin/sh
+                - bash
                 - -c
-                - "nc -z 127.0.0.1 4444 || exit 1"
+                - "echo > /dev/tcp/127.0.0.1/4444"
             initialDelaySeconds: 60
             periodSeconds: 30
             failureThreshold: 5
           readinessProbe:
             exec:
               command:
-                - /bin/sh
+                - bash
                 - -c
-                - "nc -z 127.0.0.1 4444 || exit 1"
+                - "echo > /dev/tcp/127.0.0.1/4444"
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 3
