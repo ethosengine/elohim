@@ -5,7 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import * as d3 from 'd3';
-import { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
+import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 
 /**
  * Graph node state for visualization

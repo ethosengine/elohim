@@ -3,7 +3,7 @@ import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 import { map, switchMap, tap } from 'rxjs/operators';
 
 import { PathService } from './path.service';
-import { generateExtensionId } from '@app/shared/utils';
+import { generateExtensionId } from '@app/elohim/utils';
 import { PathStep, LearningPath } from '../models/learning-path.model';
 import {
   PathExtension,

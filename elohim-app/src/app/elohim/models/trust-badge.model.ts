@@ -22,7 +22,7 @@ import {
   ATTESTATION_BADGE_CONFIG,
   REACH_BADGE_CONFIG,
   WARNING_CONFIG
-} from '@app/shared/models/trust-badge-config';
+} from './trust-badge-config';
 
 // ContentAttestationType is lamad-specific - we define a minimal type here
 // for cross-pillar trust display. Full type lives in @app/lamad.

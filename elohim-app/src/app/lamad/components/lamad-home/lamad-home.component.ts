@@ -4,7 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 import { Subject, forkJoin, of } from 'rxjs';
 import { takeUntil, catchError } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
-import { ProfileService } from '@app/shared/services/profile.service';
+import { ProfileService } from '@app/elohim/services/profile.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 import { CurrentFocus } from '../../models/profile.model';

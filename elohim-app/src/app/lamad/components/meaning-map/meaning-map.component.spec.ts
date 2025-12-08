@@ -4,7 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
+import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { ContentNode } from '../../models/content-node.model';
 
 describe('MeaningMapComponent', () => {

@@ -4,7 +4,7 @@ import { map, switchMap, tap } from 'rxjs/operators';
 
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
-import { generateMapId } from '@app/shared/utils';
+import { generateMapId } from '@app/elohim/utils';
 import {
   KnowledgeMap,
   KnowledgeMapType,

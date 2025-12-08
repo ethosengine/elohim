@@ -191,7 +191,7 @@ Each pillar has its own API specification:
 // Import from canonical location
 import { DataLoaderService } from '@app/elohim/services';
 import { ContentNode } from '@app/lamad/models';
-import { GovernanceService } from '@app/shared/services';
+import { GovernanceService } from '@app/elohim/services';
 ```
 
 ### Acceptable: Barrel Re-export

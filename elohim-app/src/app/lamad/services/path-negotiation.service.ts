@@ -3,8 +3,8 @@ import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 import { tap, switchMap } from 'rxjs/operators';
 
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
-import { HumanConsentService } from '@app/shared/services/human-consent.service';
-import { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
+import { HumanConsentService } from '@app/elohim/services/human-consent.service';
+import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import {
   PathNegotiation,
   NegotiationStatus,

@@ -1519,9 +1519,9 @@ The governance service manages the constitutional feedback layer. It provides:
 - Subscriptions and notifications
 - Feedback profile management
 
-**Import from shared:**
+**Import from elohim (protocol core):**
 ```typescript
-import { GovernanceService } from '@app/shared/services';
+import { GovernanceService } from '@app/elohim/services';
 ```
 
 ---

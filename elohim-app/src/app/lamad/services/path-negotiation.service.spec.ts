@@ -2,8 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { PathNegotiationService } from './path-negotiation.service';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
-import { HumanConsentService } from '@app/shared/services/human-consent.service';
-import { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
+import { HumanConsentService } from '@app/elohim/services/human-consent.service';
+import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { HumanConsent, IntimacyLevel, ConsentState } from '@app/elohim/models/human-consent.model';
 import { NegotiationStatus, BridgingStrategy } from '../models/path-negotiation.model';
 
