@@ -128,6 +128,8 @@ spec:
     environment {
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
         HAPP_NAME = "lamad-spike"
+        // Nix PATH not inherited from Dockerfile in Jenkins shell steps
+        PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
     }
 
     options {
