@@ -1,0 +1,467 @@
+/**
+ * Holochain Infrastructure Pipeline
+ *
+ * Builds DNA/hApp and deploys Edge Node to dev/alpha environments.
+ * Triggered on changes to holochain/** directory.
+ *
+ * Resource Requirements (Nix + Rust/WASM compilation):
+ *   - Memory: 8-16GB (Rust compiler is memory-hungry)
+ *   - Disk: 30-50GB for /nix store (with Cachix, much less needed)
+ *   - CPU: 4+ cores recommended for parallel compilation
+ *
+ * Caching Strategy:
+ *   - Cachix (holochain-ci): Pre-built Holochain binaries
+ *   - PVC for /nix: Persistent store across builds (avoids re-download)
+ *
+ * Environments:
+ *   - dev: holochain-dev.elohim.host (for Che workspace development)
+ *   - alpha: holochain-alpha.elohim.host (for integration testing)
+ *
+ * @see https://github.com/holochain/holonix
+ * @see https://app.cachix.org/cache/holochain-ci
+ */
+
+def loadBuildVars() {
+    def rootEnv = "${env.WORKSPACE}/build.env"
+    def path = fileExists(rootEnv) ? rootEnv : 'build.env'
+
+    if (!fileExists(path)) {
+        error "build.env not found at ${path}"
+    }
+
+    return readProperties(file: path)
+}
+
+def withBuildVars(props, Closure body) {
+    withEnv([
+        "BASE_VERSION=${props.BASE_VERSION ?: ''}",
+        "GIT_COMMIT_HASH=${props.GIT_COMMIT_HASH ?: ''}",
+        "IMAGE_TAG=${props.IMAGE_TAG ?: ''}",
+        "BRANCH_NAME=${props.BRANCH_NAME ?: env.BRANCH_NAME}"
+    ]) {
+        body()
+    }
+}
+
+pipeline {
+    agent {
+        kubernetes {
+            cloud 'kubernetes'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccount: jenkins-deployer
+  # Holochain/Nix builds need 8+ cores and 16GB RAM
+  # operations node (Intel NUC i5) is best fit
+  nodeSelector:
+    node-type: operations
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "build"
+      effect: "NoSchedule"
+  volumes:
+    - name: containerd-sock
+      hostPath:
+        path: /var/snap/microk8s/common/run/containerd.sock
+        type: Socket
+    - name: buildkit-run
+      emptyDir: {}
+    # Persistent Nix store - survives across builds
+    # PVC created by holochain/manifests/nix-cache-pvc.yaml
+    - name: nix-store
+      persistentVolumeClaim:
+        claimName: nix-cache-holochain
+    # Cargo cache for Rust builds
+    - name: cargo-cache
+      persistentVolumeClaim:
+        claimName: cargo-cache-holochain
+  containers:
+    - name: builder
+      image: harbor.ethosengine.com/ethosengine/ci-builder:latest
+      command: [cat]
+      tty: true
+      resources:
+        requests:
+          memory: "1Gi"
+          cpu: "500m"
+          ephemeral-storage: "2Gi"
+        limits:
+          memory: "2Gi"
+          cpu: "2"
+          ephemeral-storage: "5Gi"
+      volumeMounts:
+        - name: containerd-sock
+          mountPath: /run/containerd/containerd.sock
+        - name: buildkit-run
+          mountPath: /run/buildkit
+    - name: nix
+      image: nixos/nix:2.24.10
+      command: [cat]
+      tty: true
+      resources:
+        # Operations node: Intel NUC i5 (8 cores, 16GB RAM)
+        # Leave headroom for system + other containers
+        requests:
+          memory: "10Gi"
+          cpu: "4"
+          ephemeral-storage: "5Gi"
+        limits:
+          memory: "14Gi"
+          cpu: "7"
+          ephemeral-storage: "10Gi"
+      volumeMounts:
+        - name: nix-store
+          mountPath: /nix
+        - name: cargo-cache
+          mountPath: /root/.cargo
+      env:
+        - name: NIX_CONFIG
+          value: |
+            experimental-features = nix-command flakes
+            # Trust the Holochain binary cache
+            substituters = https://cache.nixos.org https://holochain-ci.cachix.org
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= holochain-ci.cachix.org-1:5IUSkZc0aoRS53rfkvH9Kid40NpyjwCMCzwRTXy+QN8=
+        # Increase Nix build parallelism (operations node has 8 cores)
+        - name: NIX_BUILD_CORES
+          value: "6"
+        # Keep builds from getting killed
+        - name: GC_DONT_GC
+          value: "1"
+    - name: buildkitd
+      image: moby/buildkit:v0.12.5
+      securityContext:
+        privileged: true
+      resources:
+        requests:
+          memory: "512Mi"
+          cpu: "250m"
+        limits:
+          memory: "2Gi"
+          cpu: "2"
+      args:
+        - --addr
+        - unix:///run/buildkit/buildkitd.sock
+        - --oci-worker=true
+        - --containerd-worker=false
+      volumeMounts:
+        - name: containerd-sock
+          mountPath: /run/containerd/containerd.sock
+        - name: buildkit-run
+          mountPath: /run/buildkit
+'''
+        }
+    }
+
+    environment {
+        BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
+        HAPP_NAME = "lamad-spike"
+    }
+
+    options {
+        // Nix builds can take a while, especially first time
+        timeout(time: 60, unit: 'MINUTES')
+        // Don't run multiple Holochain builds simultaneously (resource contention)
+        disableConcurrentBuilds()
+    }
+
+    stages {
+        stage('Checkout') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'staging'
+                    branch 'dev'
+                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                    changeset "holochain/**"
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        sh 'git config --global --add safe.directory "*"'
+                        checkout scm
+                        sh 'git clean -fdx'
+                        sh 'git reset --hard HEAD'
+
+                        echo "Building Holochain infrastructure for branch: ${env.BRANCH_NAME}"
+                    }
+                }
+            }
+        }
+
+        stage('Setup Version') {
+            steps {
+                container('builder') {
+                    script {
+                        sh 'git config --global --add safe.directory "*"'
+
+                        def baseVersion = readFile('VERSION').trim()
+                        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                        def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+
+                        def imageTag = (env.BRANCH_NAME == 'main')
+                            ? baseVersion
+                            : "${baseVersion}-${sanitizedBranch}-${gitHash}"
+
+                        def buildEnvContent = """BASE_VERSION=${baseVersion}
+GIT_COMMIT_HASH=${gitHash}
+IMAGE_TAG=${imageTag}
+BRANCH_NAME=${env.BRANCH_NAME}"""
+
+                        writeFile file: "${env.WORKSPACE}/build.env", text: buildEnvContent
+                        archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
+                    }
+                }
+            }
+        }
+
+        stage('Setup Nix Cache') {
+            steps {
+                container('nix') {
+                    script {
+                        echo 'Configuring Nix with Holochain Cachix...'
+
+                        // Verify Nix is working and cache is configured
+                        sh '''
+                            nix --version
+                            echo "Nix config:"
+                            nix show-config | grep -E "(substituters|trusted-public-keys)" || true
+
+                            echo ""
+                            echo "Testing cache connectivity..."
+                            nix-store --query --requisites /nix/store/*.drv 2>/dev/null | head -5 || echo "Cache ready"
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Build DNA') {
+            when {
+                anyOf {
+                    changeset "holochain/dna/**"
+                    expression { return !fileExists('/tmp/lamad-spike.happ') }
+                }
+            }
+            steps {
+                container('nix') {
+                    dir('holochain/dna/lamad-spike') {
+                        script {
+                            echo 'Building Holochain DNA with Nix...'
+                            echo 'First build may take 20-40 minutes. Subsequent builds use cache.'
+
+                            // Enter nix shell and build
+                            sh '''#!/usr/bin/env bash
+                                set -euo pipefail
+
+                                echo "=== Entering Nix development shell ==="
+                                echo "This will download/build Holochain toolchain from Cachix..."
+
+                                # Use nix develop to enter the flake environment and build
+                                nix develop --command bash -c '
+                                    set -euo pipefail
+
+                                    echo "=== Holochain toolchain ready ==="
+                                    hc --version
+                                    rustc --version
+                                    cargo --version
+
+                                    echo ""
+                                    echo "=== Building zomes (Rust -> WASM) ==="
+                                    cargo build --release --target wasm32-unknown-unknown
+
+                                    echo ""
+                                    echo "=== Packaging DNA ==="
+                                    hc dna pack . -o lamad_spike.dna
+
+                                    echo ""
+                                    echo "=== Packaging hApp ==="
+                                    hc app pack workdir -o lamad-spike.happ
+
+                                    echo ""
+                                    echo "=== Build artifacts ==="
+                                    ls -lh *.dna *.happ
+                                '
+                            '''
+
+                            // Archive the hApp
+                            archiveArtifacts artifacts: '*.happ,*.dna', allowEmptyArchive: false
+                            stash name: 'happ-bundle', includes: '*.happ'
+
+                            echo 'DNA build complete!'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Edge Node Image') {
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Building Edge Node image: ${IMAGE_TAG}"
+
+                            // Unstash hApp if it was built
+                            try {
+                                dir('holochain/edgenode') {
+                                    unstash 'happ-bundle'
+                                }
+                                echo "hApp bundle included in image"
+                            } catch (Exception e) {
+                                echo "No hApp bundle stashed - Edge Node will need runtime installation"
+                            }
+
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                cd holochain/edgenode
+
+                                # Build custom Edge Node with config baked in
+                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                    nerdctl -n k8s.io build \\
+                                    -t elohim-edgenode:${IMAGE_TAG} \\
+                                    -f Dockerfile .
+
+                                nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} elohim-edgenode:${GIT_COMMIT_HASH}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Push to Harbor') {
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
+                                sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
+
+                                sh """
+                                    nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
+                                    nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
+
+                                    nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
+                                    nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
+                                """
+
+                                if (env.BRANCH_NAME == 'dev') {
+                                    sh """
+                                        nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
+                                    """
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Edge Node - Dev') {
+            when {
+                anyOf {
+                    branch 'dev'
+                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Deploying Edge Node to Dev: ${IMAGE_TAG}"
+
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-dev.yaml > holochain/manifests/edgenode-dev-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f holochain/manifests/edgenode-dev-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-edgenode-dev -n ethosengine"
+                            sh "kubectl rollout status deployment/elohim-edgenode-dev -n ethosengine --timeout=300s"
+
+                            echo "Edge Node Dev deployed: https://holochain-dev.elohim.host"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Edge Node - Alpha') {
+            when {
+                anyOf {
+                    branch 'dev'
+                    expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Deploying Edge Node to Alpha: ${IMAGE_TAG}"
+
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-alpha.yaml > holochain/manifests/edgenode-alpha-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f holochain/manifests/edgenode-alpha-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-edgenode-alpha -n ethosengine"
+                            sh "kubectl rollout status deployment/elohim-edgenode-alpha -n ethosengine --timeout=300s"
+
+                            echo "Edge Node Alpha deployed: https://holochain-alpha.elohim.host"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            sh """
+                                nerdctl -n k8s.io rmi elohim-edgenode:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io system prune -af --volumes || true
+                            """
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Holochain infrastructure pipeline completed successfully"
+        }
+        failure {
+            echo "Holochain infrastructure pipeline failed"
+            echo "If this is a first-time build, it may need more time/resources for Nix cache population"
+        }
+        always {
+            // Report resource usage for tuning
+            container('nix') {
+                sh '''
+                    echo "=== Nix store size ==="
+                    du -sh /nix/store 2>/dev/null || echo "N/A"
+                    echo ""
+                    echo "=== Cargo cache size ==="
+                    du -sh /root/.cargo 2>/dev/null || echo "N/A"
+                '''
+            }
+        }
+    }
+}

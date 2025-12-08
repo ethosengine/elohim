@@ -1,0 +1,123 @@
+# Edge Node Alpha Deployment
+#
+# Integration testing environment for Holochain connectivity.
+# Accessible at: holochain-alpha.elohim.host
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elohim-edgenode-alpha
+  namespace: ethosengine
+  labels:
+    app: elohim-edgenode
+    environment: alpha
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elohim-edgenode
+      environment: alpha
+  template:
+    metadata:
+      labels:
+        app: elohim-edgenode
+        environment: alpha
+    spec:
+      nodeSelector:
+        node-type: operations
+      containers:
+        - name: edgenode
+          image: harbor.ethosengine.com/ethosengine/elohim-edgenode:BUILD_NUMBER_PLACEHOLDER
+          ports:
+            - name: admin-ws
+              containerPort: 4444
+              protocol: TCP
+            - name: app-ws
+              containerPort: 4445
+              protocol: TCP
+          env:
+            - name: CONDUCTOR_MODE
+              value: "true"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: holochain-data
+              mountPath: /data
+          livenessProbe:
+            tcpSocket:
+              port: 4445
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 4445
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: holochain-data
+          emptyDir:
+            sizeLimit: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elohim-edgenode-alpha
+  namespace: ethosengine
+  labels:
+    app: elohim-edgenode
+    environment: alpha
+spec:
+  type: ClusterIP
+  ports:
+    - name: admin-ws
+      port: 4444
+      targetPort: 4444
+      protocol: TCP
+    - name: app-ws
+      port: 4445
+      targetPort: 4445
+      protocol: TCP
+  selector:
+    app: elohim-edgenode
+    environment: alpha
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: elohim-edgenode-alpha
+  namespace: ethosengine
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
+    nginx.ingress.kubernetes.io/websocket-services: "elohim-edgenode-alpha"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - holochain-alpha.elohim.host
+      secretName: holochain-alpha-tls
+  rules:
+    - host: holochain-alpha.elohim.host
+      http:
+        paths:
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: elohim-edgenode-alpha
+                port:
+                  number: 4444
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: elohim-edgenode-alpha
+                port:
+                  number: 4445

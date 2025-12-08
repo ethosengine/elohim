@@ -1,0 +1,12 @@
+[package]
+name = "content_store_integrity"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "content_store_integrity"
+
+[dependencies]
+hdi.workspace = true
+serde.workspace = true

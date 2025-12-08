@@ -1,0 +1,44 @@
+# Elohim Protocol Edge Node - Docker Compose Configuration
+#
+# This runs a Holochain conductor that the browser can connect to via WebSocket.
+# Architecture: Browser (Angular) -> WebSocket -> Edge Node -> DHT Network
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f edgenode
+#
+# Ports:
+#   4444: Admin WebSocket (for conductor management)
+#   4445: App WebSocket (for zome calls, created dynamically)
+#
+# Your bootstrap server: holostrap.elohim.host
+
+services:
+  edgenode:
+    image: ghcr.io/holo-host/edgenode:latest
+    container_name: elohim-edgenode
+    restart: unless-stopped
+    ports:
+      # Admin interface - browser connects here first to setup app
+      - "4444:4444"
+      # App interface - browser connects here for zome calls
+      # This port is created dynamically by adminWs.attachAppInterface()
+      - "4445:4445"
+    volumes:
+      # Persistent data (Holochain DB, logs, keys)
+      - ./data:/data
+      # Custom conductor config (overrides default bootstrap)
+      - ./conductor-config.yaml:/etc/holochain/conductor-config.yaml:ro
+    environment:
+      # Start the conductor (set to "false" for interactive shell)
+      - CONDUCTOR_MODE=true
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "4444"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# Named volumes for persistence across container rebuilds
+volumes:
+  edgenode-data:

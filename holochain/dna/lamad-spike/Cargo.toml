@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "zomes/content_store_integrity",
+    "zomes/content_store",
+]
+resolver = "2"
+
+[workspace.dependencies]
+hdi = "0.5"
+hdk = "0.4"
+serde = "1"

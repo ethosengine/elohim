@@ -1,0 +1,43 @@
+# Holochain Conductor Configuration for Elohim Protocol
+#
+# This configuration is optimized for web-first development:
+# - Admin interface on port 4444 (allows any origin for dev)
+# - Uses your existing bootstrap server: holostrap.elohim.host
+# - WebRTC networking via tx5/Kitsune2
+#
+# In production, restrict allowed_origins to your domain.
+
+# Admin interface for conductor management
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 4444
+      # Allow any origin during development
+      # In production: restrict to ['https://elohim.host']
+      allowed_origins: "*"
+
+# Network configuration
+network:
+  # Your bootstrap server for peer discovery
+  bootstrap_url: "https://holostrap.elohim.host"
+  signal_url: "wss://holostrap.elohim.host"
+
+  # Disable mDNS (not needed for web deployment)
+  mdns: false
+
+  # Enable WebRTC relaying for NAT traversal
+  enable_relaying: true
+
+  # STUN servers for WebRTC connection establishment
+  webrtc_config:
+    stun_urls:
+      - "stun:stun.cloudflare.com:3478"
+      - "stun:stun.l.google.com:19302"
+
+# Data storage
+data_root_path: "/var/local/lib/holochain"
+
+# Keystore (Lair) - manages agent keys
+keystore:
+  type: lair_server_in_proc
+  root: "/var/local/lib/holochain/ks"

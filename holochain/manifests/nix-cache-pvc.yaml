@@ -1,0 +1,53 @@
+# Persistent Nix Store for Holochain builds
+#
+# This PVC stores the /nix directory across builds to avoid re-downloading
+# the Holochain toolchain from Cachix on every build.
+#
+# Storage class: openebs-jiva-csi-default (replicated, network-attached)
+#   - Replicated across nodes for availability
+#   - Accessible from any node (important: builds run on operations node)
+#   - Data stored on storage node (hp-micro10, 4TB)
+#   - Slightly higher latency than hostpath, but flexible scheduling
+#
+# Size: 50Gi
+#   - Holochain toolchain: ~15-20GB
+#   - Rust target cache: ~5-10GB
+#   - Buffer for multiple versions: ~15-20GB
+#
+# Build node: operations (Intel NUC i5, 8 cores, 16GB RAM)
+# Storage node: storage (hp-micro10, 4TB disk)
+#
+# To apply: kubectl apply -f holochain/manifests/nix-cache-pvc.yaml
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nix-cache-holochain
+  namespace: ethosengine
+  labels:
+    app: holochain-build
+    purpose: nix-store-cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-jiva-csi-default
+  resources:
+    requests:
+      storage: 50Gi
+---
+# Cargo cache for Rust builds (smaller, faster churn)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cargo-cache-holochain
+  namespace: ethosengine
+  labels:
+    app: holochain-build
+    purpose: cargo-cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-jiva-csi-default
+  resources:
+    requests:
+      storage: 20Gi

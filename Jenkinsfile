@@ -192,6 +192,19 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
         
         stage('Install Dependencies') {
+            when {
+                anyOf {
+                    // Run for main branches (full build)
+                    branch 'main'
+                    branch 'staging'
+                    branch 'dev'
+                    // Run when app-related files change
+                    changeset "elohim-app/**"
+                    changeset "elohim-library/**"
+                    changeset "Jenkinsfile"
+                    changeset "VERSION"
+                }
+            }
             steps {
                 container('builder'){
                     dir('elohim-app') {
@@ -203,8 +216,19 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 }
             }
         }
-        
+
         stage('Build App') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'staging'
+                    branch 'dev'
+                    changeset "elohim-app/**"
+                    changeset "elohim-library/**"
+                    changeset "Jenkinsfile"
+                    changeset "VERSION"
+                }
+            }
             steps {
                 container('builder'){
                     dir('elohim-app') {
@@ -233,6 +257,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Unit Test') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'staging'
+                    branch 'dev'
+                    changeset "elohim-app/**"
+                    changeset "elohim-library/**"
+                }
+            }
             steps {
                 container('builder'){
                     dir('elohim-app') {
@@ -316,8 +349,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 # Create build context
                                 mkdir -p /tmp/build-context
                                 cp -r elohim-app /tmp/build-context/
-                                cp images/Dockerfile /tmp/build-context/
-                                cp images/nginx.conf /tmp/build-context/
+                                cp elohim-app/images/Dockerfile /tmp/build-context/
+                                cp elohim-app/images/nginx.conf /tmp/build-context/
                                 
                                 # Build image
                                 cd /tmp/build-context
@@ -438,8 +471,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     anyOf {
                         changeset "elohim-library/**"
                         changeset "elohim-ui-playground/**"
-                        changeset "images/Dockerfile.ui-playground"
-                        changeset "images/nginx-ui-playground.conf"
+                        changeset "elohim-ui-playground/images/Dockerfile.ui-playground"
+                        changeset "elohim-ui-playground/images/nginx-ui-playground.conf"
                     }
                 }
             }
@@ -465,8 +498,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     anyOf {
                         changeset "elohim-library/**"
                         changeset "elohim-ui-playground/**"
-                        changeset "images/Dockerfile.ui-playground"
-                        changeset "images/nginx-ui-playground.conf"
+                        changeset "elohim-ui-playground/images/Dockerfile.ui-playground"
+                        changeset "elohim-ui-playground/images/nginx-ui-playground.conf"
                     }
                 }
             }
@@ -496,8 +529,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     anyOf {
                         changeset "elohim-library/**"
                         changeset "elohim-ui-playground/**"
-                        changeset "images/Dockerfile.ui-playground"
-                        changeset "images/nginx-ui-playground.conf"
+                        changeset "elohim-ui-playground/images/Dockerfile.ui-playground"
+                        changeset "elohim-ui-playground/images/nginx-ui-playground.conf"
                     }
                 }
             }
@@ -519,8 +552,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 # Create build context
                                 mkdir -p /tmp/build-context-playground
                                 cp -r elohim-library /tmp/build-context-playground/
-                                cp images/Dockerfile.ui-playground /tmp/build-context-playground/Dockerfile
-                                cp images/nginx-ui-playground.conf /tmp/build-context-playground/
+                                cp elohim-ui-playground/images/Dockerfile.ui-playground /tmp/build-context-playground/Dockerfile
+                                cp elohim-ui-playground/images/nginx-ui-playground.conf /tmp/build-context-playground/
 
                                 # Build image
                                 cd /tmp/build-context-playground
@@ -552,8 +585,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     anyOf {
                         changeset "elohim-library/**"
                         changeset "elohim-ui-playground/**"
-                        changeset "images/Dockerfile.ui-playground"
-                        changeset "images/nginx-ui-playground.conf"
+                        changeset "elohim-ui-playground/images/Dockerfile.ui-playground"
+                        changeset "elohim-ui-playground/images/nginx-ui-playground.conf"
                     }
                 }
             }
@@ -591,6 +624,32 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        // Holochain infrastructure is built separately due to different resource requirements
+        // (needs operations node with 8 cores, 16GB RAM, Nix container, PVC mounts)
+        // This stage triggers the holochain/Jenkinsfile as a child build
+        stage('Build Holochain Infrastructure') {
+            when {
+                anyOf {
+                    changeset "holochain/**"
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        echo 'Holochain files changed - triggering Holochain infrastructure build'
+
+                        // Trigger the holochain pipeline
+                        // Note: Requires a separate Jenkins job configured with:
+                        //   Script Path: holochain/Jenkinsfile
+                        //   Job Name: elohim-holochain
+                        build job: "elohim-holochain/${env.BRANCH_NAME.replace('/', '%2F')}",
+                              wait: true,
+                              propagate: true
+                    }
+                }
+            }
+        }
+
         stage('Deploy to Staging') {
             when {
                 anyOf {
@@ -616,17 +675,17 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             '''
 
                             // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/staging-deployment.yaml > manifests/staging-deployment-${IMAGE_TAG}.yaml"
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' elohim-app/manifests/staging-deployment.yaml > elohim-app/manifests/staging-deployment-${IMAGE_TAG}.yaml"
 
                             // Verify the image tag in the manifest
                             sh """
                                 echo '==== Deployment manifest preview ===='
-                                grep 'image:' manifests/staging-deployment-${IMAGE_TAG}.yaml
+                                grep 'image:' elohim-app/manifests/staging-deployment-${IMAGE_TAG}.yaml
                                 echo '===================================='
                             """
 
                             // Deploy
-                            sh "kubectl apply -f manifests/staging-deployment-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f elohim-app/manifests/staging-deployment-${IMAGE_TAG}.yaml"
                             sh "kubectl rollout restart deployment/elohim-site-staging -n ethosengine"
                             sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
 
@@ -675,17 +734,17 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             '''
 
                             // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/alpha-deployment.yaml > manifests/alpha-deployment-${IMAGE_TAG}.yaml"
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' elohim-app/manifests/alpha-deployment.yaml > elohim-app/manifests/alpha-deployment-${IMAGE_TAG}.yaml"
 
                             // Verify the image tag in the manifest
                             sh """
                                 echo '==== Deployment manifest preview ===='
-                                grep 'image:' manifests/alpha-deployment-${IMAGE_TAG}.yaml
+                                grep 'image:' elohim-app/manifests/alpha-deployment-${IMAGE_TAG}.yaml
                                 echo '===================================='
                             """
 
                             // Deploy
-                            sh "kubectl apply -f manifests/alpha-deployment-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f elohim-app/manifests/alpha-deployment-${IMAGE_TAG}.yaml"
                             sh "kubectl rollout restart deployment/elohim-site-alpha -n ethosengine"
                             sh 'kubectl rollout status deployment/elohim-site-alpha -n ethosengine --timeout=300s'
 
@@ -720,9 +779,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     anyOf {
                         changeset "elohim-library/**"
                         changeset "elohim-ui-playground/**"
-                        changeset "images/Dockerfile.ui-playground"
-                        changeset "images/nginx-ui-playground.conf"
-                        changeset "manifests/alpha-deployment-ui-playground.yaml"
+                        changeset "elohim-ui-playground/images/Dockerfile.ui-playground"
+                        changeset "elohim-ui-playground/images/nginx-ui-playground.conf"
+                        changeset "elohim-ui-playground/manifests/alpha-deployment-ui-playground.yaml"
                     }
                 }
             }
@@ -735,10 +794,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             echo "Deploying UI Playground to Alpha: ${IMAGE_TAG}"
 
                             // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/alpha-deployment-ui-playground.yaml > manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' elohim-ui-playground/manifests/alpha-deployment-ui-playground.yaml > elohim-ui-playground/manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
 
                             // Deploy
-                            sh "kubectl apply -f manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f elohim-ui-playground/manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
                             sh "kubectl rollout restart deployment/elohim-ui-playground-alpha -n ethosengine"
                             sh 'kubectl rollout status deployment/elohim-ui-playground-alpha -n ethosengine --timeout=300s'
 
@@ -1022,8 +1081,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             // Deploy
 
                             // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/prod-deployment.yaml > manifests/prod-deployment-${IMAGE_TAG}.yaml"
-                            sh "kubectl apply -f manifests/prod-deployment-${IMAGE_TAG}.yaml"
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' elohim-app/manifests/prod-deployment.yaml > elohim-app/manifests/prod-deployment-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f elohim-app/manifests/prod-deployment-${IMAGE_TAG}.yaml"
                             sh "kubectl rollout restart deployment/elohim-site -n ethosengine"
                             sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
 
