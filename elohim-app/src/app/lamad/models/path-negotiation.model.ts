@@ -17,7 +17,7 @@
  * This is the technical foundation for relationships built on shared learning.
  */
 
-import type { IntimacyLevel } from './human-consent.model';
+import type { IntimacyLevel } from '@app/elohim/models/human-consent.model';
 
 // =========================================================================
 // Negotiation Status

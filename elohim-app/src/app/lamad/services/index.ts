@@ -50,8 +50,8 @@ export { PathNegotiationService } from './path-negotiation.service';
 // Content mastery
 export { ContentMasteryService } from './content-mastery.service';
 
-// Local source chain (Holochain-style agent-centric storage)
-export { LocalSourceChainService } from './local-source-chain.service';
+// Local source chain (Holochain-style agent-centric storage) - re-exported from elohim
+export { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 
 // Progress migration
 export { ProgressMigrationService } from './progress-migration.service';

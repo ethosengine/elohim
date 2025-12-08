@@ -23,7 +23,7 @@ import {
 } from '../../renderers/renderer-registry.service';
 
 import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
-import { TrustBadge } from '../../models/trust-badge.model';
+import { TrustBadge } from '@app/elohim/models/trust-badge.model';
 
 // Content I/O for download functionality
 import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';

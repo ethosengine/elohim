@@ -250,12 +250,12 @@ export * from '@app/elohim/models/contributor-presence.model';
 // Human Affinity models (engagement depth tracking)
 export * from '@app/qahal/models/human-affinity.model';
 
-// Human Consent models (graduated intimacy)
+// Human Consent models (graduated intimacy) - re-exported from elohim
 // Export selectively to avoid collision with protocol-core
 export type {
   HumanConsent,
   ConsentRequest
-} from '@app/qahal/models/human-consent.model';
+} from '@app/elohim/models/human-consent.model';
 
 // Governance & Feedback models (the protocol's immune system)
 export * from '@app/qahal/models/governance-feedback.model';
