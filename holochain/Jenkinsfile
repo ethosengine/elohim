@@ -96,8 +96,8 @@ spec:
           mountPath: /run/containerd/containerd.sock
         - name: buildkit-run
           mountPath: /run/buildkit
-        - name: nix-store
-          mountPath: /nix
+        # Note: /nix PVC mount removed - it was hiding the Nix installation from the image
+        # The image has Nix pre-installed; PVC caching can be added later with proper setup
         - name: cargo-cache
           mountPath: /root/.cargo
     - name: buildkitd
