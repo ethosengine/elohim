@@ -54,12 +54,12 @@ spec:
               mountPath: /data
           livenessProbe:
             tcpSocket:
-              port: 4445
+              port: 4444
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             tcpSocket:
-              port: 4445
+              port: 4444
             initialDelaySeconds: 10
             periodSeconds: 5
       volumes:
