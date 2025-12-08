@@ -98,7 +98,7 @@ spec:
           mountPath: /run/buildkit
     - name: nix
       image: nixos/nix:2.24.10
-      command: ["/bin/sh", "-c", "while true; do sleep 86400; done"]
+      command: ["sleep", "infinity"]
       tty: true
       resources:
         # Operations node: Intel NUC i5 (8 cores, 16GB RAM)
