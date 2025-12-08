@@ -28,13 +28,6 @@ spec:
       containers:
         - name: edgenode
           image: harbor.ethosengine.com/ethosengine/elohim-edgenode:BUILD_NUMBER_PLACEHOLDER
-          ports:
-            - name: admin-ws
-              containerPort: 4444
-              protocol: TCP
-            - name: app-ws
-              containerPort: 4445
-              protocol: TCP
           env:
             - name: CONDUCTOR_MODE
               value: "true"
@@ -68,6 +61,28 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 3
+        # Sidecar proxy to expose localhost-bound conductor to the pod network
+        - name: ws-proxy
+          image: alpine/socat:latest
+          args:
+            - "TCP-LISTEN:8444,fork,reuseaddr"
+            - "TCP:127.0.0.1:4444"
+          ports:
+            - name: admin-ws
+              containerPort: 8444
+              protocol: TCP
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+          readinessProbe:
+            tcpSocket:
+              port: 8444
+            initialDelaySeconds: 5
+            periodSeconds: 5
       volumes:
         - name: holochain-data
           emptyDir:
@@ -86,11 +101,7 @@ spec:
   ports:
     - name: admin-ws
       port: 4444
-      targetPort: 4444
-      protocol: TCP
-    - name: app-ws
-      port: 4445
-      targetPort: 4445
+      targetPort: 8444  # socat proxy port
       protocol: TCP
   selector:
     app: elohim-edgenode
@@ -117,17 +128,10 @@ spec:
     - host: holochain-alpha.elohim.host
       http:
         paths:
-          - path: /admin
-            pathType: Prefix
-            backend:
-              service:
-                name: elohim-edgenode-alpha
-                port:
-                  number: 4444
           - path: /
             pathType: Prefix
             backend:
               service:
                 name: elohim-edgenode-alpha
                 port:
-                  number: 4445
+                  number: 4444
