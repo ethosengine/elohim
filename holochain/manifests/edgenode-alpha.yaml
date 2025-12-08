@@ -50,12 +50,12 @@ spec:
               mountPath: /data
           livenessProbe:
             tcpSocket:
-              port: 4445
+              port: 4444
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             tcpSocket:
-              port: 4445
+              port: 4444
             initialDelaySeconds: 10
             periodSeconds: 5
       volumes:
@@ -96,9 +96,9 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
     nginx.ingress.kubernetes.io/websocket-services: "elohim-edgenode-alpha"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/cluster-issuer: letsencrypt-production
 spec:
-  ingressClassName: nginx
+  ingressClassName: public
   tls:
     - hosts:
         - holochain-alpha.elohim.host
