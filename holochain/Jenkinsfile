@@ -102,14 +102,15 @@ spec:
       tty: true
       resources:
         # Operations node: Intel NUC i5 (8 cores, 16GB RAM)
-        # Leave headroom for system + other containers
+        # Account for Che, observability, ingress already running
+        # Available: ~4 cores, ~8GB after system overhead
         requests:
-          memory: "10Gi"
-          cpu: "4"
+          memory: "4Gi"
+          cpu: "2"
           ephemeral-storage: "5Gi"
         limits:
-          memory: "14Gi"
-          cpu: "7"
+          memory: "8Gi"
+          cpu: "4"
           ephemeral-storage: "10Gi"
       volumeMounts:
         - name: nix-store
