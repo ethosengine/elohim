@@ -2,6 +2,9 @@
 
 Content graph, learning paths, mastery tracking, knowledge maps.
 
+**Specification:** `LAMAD_API_SPECIFICATION_v1.0.md`
+**Architecture:** `elohim/ELOHIM_PROTOCOL_ARCHITECTURE.md`
+
 ## Architecture
 
 ```

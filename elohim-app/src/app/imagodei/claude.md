@@ -2,6 +2,8 @@
 
 Human identity layer aligned with "Image of God" framework.
 
+**Architecture:** `elohim/ELOHIM_PROTOCOL_ARCHITECTURE.md`
+
 ## Philosophy
 
 Four dimensions of human identity:

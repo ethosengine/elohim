@@ -4,6 +4,9 @@ Community relationships, consent, governance, and deliberation.
 
 *Qahal (קהל) = Hebrew for assembly/congregation*
 
+**Specification:** `QAHAL_API_SPECIFICATION_v1.0.md`
+**Architecture:** `elohim/ELOHIM_PROTOCOL_ARCHITECTURE.md`
+
 ## Models
 
 | Model | Purpose |

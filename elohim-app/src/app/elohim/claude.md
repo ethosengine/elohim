@@ -2,6 +2,8 @@
 
 Infrastructure layer: data loading, agents, trust, source chain.
 
+**Architecture:** `ELOHIM_PROTOCOL_ARCHITECTURE.md`
+
 ## Models
 
 | Model | Purpose |
