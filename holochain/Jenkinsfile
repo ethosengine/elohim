@@ -79,31 +79,10 @@ spec:
         claimName: cargo-cache-holochain
   containers:
     - name: builder
-      image: harbor.ethosengine.com/ethosengine/ci-builder:latest
+      image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
       command: [cat]
       tty: true
       resources:
-        requests:
-          memory: "256Mi"
-          cpu: "100m"
-          ephemeral-storage: "1Gi"
-        limits:
-          memory: "1Gi"
-          cpu: "1"
-          ephemeral-storage: "3Gi"
-      volumeMounts:
-        - name: containerd-sock
-          mountPath: /run/containerd/containerd.sock
-        - name: buildkit-run
-          mountPath: /run/buildkit
-    - name: nix
-      image: nixos/nix:2.24.10
-      command: ["sleep", "infinity"]
-      tty: true
-      resources:
-        # Operations node: Intel NUC i5 (8 cores, 16GB RAM)
-        # Account for Che, observability, ingress already running
-        # Available: ~4 cores, ~8GB after system overhead
         requests:
           memory: "4Gi"
           cpu: "2"
@@ -113,23 +92,14 @@ spec:
           cpu: "4"
           ephemeral-storage: "10Gi"
       volumeMounts:
+        - name: containerd-sock
+          mountPath: /run/containerd/containerd.sock
+        - name: buildkit-run
+          mountPath: /run/buildkit
         - name: nix-store
           mountPath: /nix
         - name: cargo-cache
           mountPath: /root/.cargo
-      env:
-        - name: NIX_CONFIG
-          value: |
-            experimental-features = nix-command flakes
-            # Trust the Holochain binary cache
-            substituters = https://cache.nixos.org https://holochain-ci.cachix.org
-            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= holochain-ci.cachix.org-1:5IUSkZc0aoRS53rfkvH9Kid40NpyjwCMCzwRTXy+QN8=
-        # Increase Nix build parallelism (operations node has 8 cores)
-        - name: NIX_BUILD_CORES
-          value: "6"
-        # Keep builds from getting killed
-        - name: GC_DONT_GC
-          value: "1"
     - name: buildkitd
       image: moby/buildkit:v0.12.5
       securityContext:
@@ -221,7 +191,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Setup Nix Cache') {
             steps {
-                container('nix') {
+                container('builder') {
                     script {
                         echo 'Configuring Nix with Holochain Cachix...'
 
@@ -248,7 +218,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 }
             }
             steps {
-                container('nix') {
+                container('builder') {
                     dir('holochain/dna/lamad-spike') {
                         script {
                             echo 'Building Holochain DNA with Nix...'
