@@ -7,7 +7,7 @@ import { Injectable, ElementRef, Renderer2, RendererFactory2 } from '@angular/co
   providedIn: 'root'
 })
 export class DomInteractionService {
-  private renderer: Renderer2;
+  private readonly renderer: Renderer2;
 
   constructor(rendererFactory: RendererFactory2) {
     this.renderer = rendererFactory.createRenderer(null, null);
