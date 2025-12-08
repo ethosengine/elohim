@@ -41,15 +41,6 @@ pub fn create_content(input: CreateContentInput) -> ExternResult<ActionHash> {
     // Create the entry
     let action_hash = create_entry(&EntryTypes::Content(content.clone()))?;
 
-    // Create a link from ID hash to content for lookup by ID
-    let id_hash = hash_entry(&input.id)?;
-    create_link(
-        id_hash,
-        action_hash.clone(),
-        LinkTypes::IdToContent,
-        (),
-    )?;
-
     Ok(action_hash)
 }
 
@@ -77,34 +68,13 @@ pub fn get_content(action_hash: ActionHash) -> ExternResult<Option<ContentOutput
     }
 }
 
-/// Get content by its ID (string identifier)
-#[hdk_extern]
-pub fn get_content_by_id(id: String) -> ExternResult<Option<ContentOutput>> {
-    let id_hash = hash_entry(&id)?;
-    let links = get_links(
-        GetLinksInputBuilder::try_new(id_hash, LinkTypes::IdToContent)?.build(),
-    )?;
-
-    // Return the most recent content with this ID
-    if let Some(link) = links.first() {
-        let action_hash = link.target.clone().into_action_hash()
-            .ok_or(wasm_error!(WasmErrorInner::Guest(
-                "Link target is not an ActionHash".to_string()
-            )))?;
-        return get_content(action_hash);
-    }
-
-    Ok(None)
-}
-
 /// List all content created by the current agent
 #[hdk_extern]
 pub fn get_my_content(_: ()) -> ExternResult<Vec<ContentOutput>> {
-    let agent_info = agent_info()?;
     let query = ChainQueryFilter::new()
         .entry_type(UnitEntryTypes::Content.try_into()?);
 
-    let records = query_mine(query)?;
+    let records = query(query)?;
 
     let mut results = Vec::new();
     for record in records {
@@ -124,9 +94,4 @@ pub fn get_my_content(_: ()) -> ExternResult<Vec<ContentOutput>> {
     }
 
     Ok(results)
-}
-
-/// Query this agent's source chain for entries
-fn query_mine(filter: ChainQueryFilter) -> ExternResult<Vec<Record>> {
-    query(filter)
 }
