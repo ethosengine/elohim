@@ -1,23 +1,67 @@
 /**
  * Barrel export for Lamad services
  *
- * Service Categories:
- * - Data Loading: DataLoaderService (JSON data access, Holochain adapter point)
- * - Path: PathService (learning path navigation)
- * - Content: ContentService (content access with reach checking)
- * - Agent: AgentService, ElohimAgentService (agent state and AI guardians)
- * - Exploration: ExplorationService (attestation-gated graph traversal)
- * - Maps: KnowledgeMapService (polymorphic knowledge maps)
- * - Extensions: PathExtensionService (learner path mutations)
- * - Trust: TrustBadgeService (UI-ready trust indicators)
- * - Search: SearchService (enhanced search with scoring and facets)
- * - Affinity: AffinityTrackingService (learner engagement tracking)
- * - Assessment: AssessmentService (psychometric instruments and self-knowledge)
- * - Governance: GovernanceService (challenges, proposals, precedents)
+ * Lamad is the Content/Learning pillar of the Elohim Protocol.
+ * This barrel re-exports services from other pillars for backward compatibility.
+ *
+ * Pillar Structure:
+ * - elohim/: Protocol-core (data loading, agents, trust)
+ * - imagodei/: Identity (session, profile)
+ * - lamad/: Content (paths, content, exploration, maps)
+ * - qahal/: Community (affinity, consent, governance)
+ * - shefa/: Economy (future)
  */
 
+// ============================================================================
+// LAMAD-SPECIFIC SERVICES (Content/Learning)
+// ============================================================================
+
+// Path navigation
+export { PathService } from './path.service';
+
+// Content access
+export { ContentService } from './content.service';
+
+// Kuzu embedded database (WASM) - re-exported from elohim
+export { KuzuDataService } from '@app/elohim/services/kuzu-data.service';
+
+// Graph exploration
+export { ExplorationService } from './exploration.service';
+
+// Knowledge maps
+export { KnowledgeMapService } from './knowledge-map.service';
+
+// Path extensions
+export { PathExtensionService } from './path-extension.service';
+
+// Path-graph integration (paths as ContentNodes)
+export { PathGraphService } from './path-graph.service';
+
+// Search
+export { SearchService } from './search.service';
+
+// Assessments (psychometric instruments, self-knowledge)
+export { AssessmentService } from './assessment.service';
+export type { AssessmentResult, AssessmentSession, QuestionResponse } from './assessment.service';
+
+// Path negotiation
+export { PathNegotiationService } from './path-negotiation.service';
+
+// Content mastery
+export { ContentMasteryService } from './content-mastery.service';
+
+// Local source chain (Holochain-style agent-centric storage) - re-exported from elohim
+export { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
+
+// Progress migration
+export { ProgressMigrationService } from './progress-migration.service';
+
+// ============================================================================
+// RE-EXPORTS FROM ELOHIM (Protocol-Core)
+// ============================================================================
+
 // Data loading
-export { DataLoaderService } from './data-loader.service';
+export { DataLoaderService } from '@app/elohim/services/data-loader.service';
 
 // Also export data types for consumers
 export type {
@@ -29,46 +73,37 @@ export type {
   PrecedentRecord,
   DiscussionRecord,
   GovernanceStateRecord
-} from './data-loader.service';
-
-// Path navigation
-export { PathService } from './path.service';
-
-// Content access
-export { ContentService } from './content.service';
+} from '@app/elohim/services/data-loader.service';
 
 // Agent management
-export { AgentService } from './agent.service';
-export { ElohimAgentService } from './elohim-agent.service';
+export { AgentService } from '@app/elohim/services/agent.service';
 
-// Graph exploration
-export { ExplorationService } from './exploration.service';
-
-// Knowledge maps
-export { KnowledgeMapService } from './knowledge-map.service';
-
-// Path extensions
-export { PathExtensionService } from './path-extension.service';
+// Elohim agent (AI guardians)
+export { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
 
 // Trust indicators
-export { TrustBadgeService } from './trust-badge.service';
+export { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
 
-// Search
-export { SearchService } from './search.service';
-
-// Learning state
-export { AffinityTrackingService } from './affinity-tracking.service';
+// ============================================================================
+// RE-EXPORTS FROM IMAGODEI (Identity)
+// ============================================================================
 
 // Session human (MVP temporary identity)
-export { SessionHumanService } from './session-human.service';
+export { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
 // Profile (human-centered identity view, Imago Dei aligned)
-export { ProfileService } from './profile.service';
+export { ProfileService } from '@app/imagodei/services/profile.service';
 
-// Assessments (psychometric instruments, self-knowledge)
-export { AssessmentService } from './assessment.service';
-export type { AssessmentResult, AssessmentSession, QuestionResponse } from './assessment.service';
+// ============================================================================
+// RE-EXPORTS FROM QAHAL (Community)
+// ============================================================================
+
+// Learning state / affinity tracking
+export { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
+
+// Human consent (graduated intimacy)
+export { HumanConsentService } from '@app/qahal/services/human-consent.service';
 
 // Governance (challenges, proposals, precedents, deliberation)
-export { GovernanceService } from './governance.service';
-export type { ChallengeSubmission, ProposalSubmission, Vote, DiscussionMessage } from './governance.service';
+export { GovernanceService } from '@app/qahal/services/governance.service';
+export type { ChallengeSubmission, ProposalSubmission, Vote, DiscussionMessage } from '@app/qahal/services/governance.service';

@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { ExplorationService } from './exploration.service';
-import { DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { ContentNode, ContentGraph, ContentGraphMetadata } from '../models/content-node.model';
 import { RATE_LIMIT_CONFIGS } from '../models/exploration.model';
 

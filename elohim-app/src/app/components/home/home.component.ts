@@ -11,6 +11,7 @@ import { FooterComponent } from '../footer/footer.component';
 import { DebugBarComponent } from '../debug-bar/debug-bar.component';
 import { ConfigService } from '../../services/config.service';
 import { AnalyticsService } from '../../services/analytics.service';
+import { DomInteractionService } from '../../services/dom-interaction.service';
 
 @Component({
   selector: 'app-home',
@@ -40,15 +41,16 @@ export class HomeComponent implements OnInit, OnDestroy {
     private readonly el: ElementRef,
     private readonly renderer: Renderer2,
     private readonly configService: ConfigService,
-    private readonly analyticsService: AnalyticsService
+    private readonly analyticsService: AnalyticsService,
+    private readonly domInteractionService: DomInteractionService
   ) {}
 
   ngOnInit() {
     this.configService.getConfig().subscribe(() => {
       this.setupParallaxScrolling();
       this.setupIntersectionObserver();
-      this.setupScrollIndicator();
-      this.setupHeroTitleInteraction();
+      this.domInteractionService.setupScrollIndicator(this.el);
+      this.domInteractionService.setupHeroTitleAnimation(this.el);
     });
   }
 
@@ -132,35 +134,6 @@ export class HomeComponent implements OnInit, OnDestroy {
       sections.forEach((section: HTMLElement) => {
         this.intersectionObserver?.observe(section);
       });
-    }, 0);
-  }
-
-  private setupScrollIndicator() {
-    setTimeout(() => {
-      const scrollIndicator = this.el.nativeElement.querySelector('.scroll-indicator');
-      if (scrollIndicator) {
-        this.renderer.listen(scrollIndicator, 'click', () => {
-          window.scrollTo({
-            top: window.innerHeight,
-            behavior: 'smooth'
-          });
-        });
-      }
-    }, 0);
-  }
-
-  private setupHeroTitleInteraction() {
-    setTimeout(() => {
-      const heroTitle = this.el.nativeElement.querySelector('.hero h1');
-      if (heroTitle) {
-        this.renderer.setStyle(heroTitle, 'cursor', 'pointer');
-        this.renderer.listen(heroTitle, 'click', () => {
-          this.renderer.setStyle(heroTitle, 'animation', 'none');
-          setTimeout(() => {
-            this.renderer.setStyle(heroTitle, 'animation', 'float 6s ease-in-out infinite');
-          }, 10);
-        });
-      }
     }, 0);
   }
 }

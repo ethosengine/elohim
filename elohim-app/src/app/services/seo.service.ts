@@ -3,8 +3,8 @@ import { Title, Meta } from '@angular/platform-browser';
 import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
 import { DOCUMENT } from '@angular/common';
 import { filter, map, mergeMap } from 'rxjs/operators';
-import { OpenGraphMetadata } from '../lamad/models/open-graph.model';
-import { JsonLdMetadata } from '../lamad/models/json-ld.model';
+import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
+import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
 
 /**
  * SEO configuration for a page

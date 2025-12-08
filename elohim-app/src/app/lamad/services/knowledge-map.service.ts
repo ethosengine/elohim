@@ -2,8 +2,9 @@ import { Injectable } from '@angular/core';
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 import { map, switchMap, tap } from 'rxjs/operators';
 
-import { DataLoaderService } from './data-loader.service';
-import { ElohimAgentService } from './elohim-agent.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
+import { generateMapId } from '@app/shared/utils';
 import {
   KnowledgeMap,
   KnowledgeMapType,
@@ -180,7 +181,7 @@ export class KnowledgeMapService {
     description?: string;
     visibility?: KnowledgeMap['visibility'];
   }): Observable<DomainKnowledgeMap> {
-    const mapId = `map-domain-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`; // NOSONAR - Non-cryptographic map ID generation
+    const mapId = generateMapId('domain');
     const now = new Date().toISOString();
 
     const newMap: DomainKnowledgeMap = {
@@ -222,7 +223,7 @@ export class KnowledgeMapService {
     description?: string;
     visibility?: KnowledgeMap['visibility'];
   }): Observable<PersonKnowledgeMap> {
-    const mapId = `map-person-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`; // NOSONAR - Non-cryptographic map ID generation
+    const mapId = generateMapId('person');
     const now = new Date().toISOString();
 
     const newMap: PersonKnowledgeMap = {
@@ -264,7 +265,7 @@ export class KnowledgeMapService {
     visibility?: KnowledgeMap['visibility'];
     governance?: CollectiveKnowledgeMap['governance'];
   }): Observable<CollectiveKnowledgeMap> {
-    const mapId = `map-collective-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`; // NOSONAR - Non-cryptographic map ID generation
+    const mapId = generateMapId('collective');
     const now = new Date().toISOString();
 
     const newMap: CollectiveKnowledgeMap = {

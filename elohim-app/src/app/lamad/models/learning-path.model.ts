@@ -1,6 +1,6 @@
 import { ContentNode } from './content-node.model';
-import { OpenGraphMetadata } from './open-graph.model';
-import { JsonLdMetadata } from './json-ld.model';
+import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
+import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
 
 /**
  * LearningPath - A curated journey through Territory resources.
@@ -410,6 +410,116 @@ export interface PathIndex {
   lastUpdated: string;
   totalCount: number;
   paths: PathIndexEntry[];
+}
+
+// =========================================================================
+// Path as ContentNode (Graph Integration)
+// =========================================================================
+
+/**
+ * PathContentMetadata - Metadata for paths represented as ContentNodes on the graph.
+ *
+ * When a LearningPath is registered on the Content Graph, it becomes a ContentNode
+ * with contentType: 'path'. This interface defines the metadata structure stored
+ * in the ContentNode.metadata field.
+ *
+ * This enables:
+ * - Graph traversal to discover paths containing specific content
+ * - Paths can be found via "what paths cover topic X?" queries
+ * - Paths participate in the attestation/governance system
+ * - Unified search across content and paths
+ *
+ * The ContentNode with type 'path' links to the full LearningPath via pathId,
+ * which contains the complete step definitions. The ContentNode is a lightweight
+ * index entry for graph discoverability.
+ */
+export interface PathContentMetadata {
+  /** Reference to the full LearningPath definition */
+  pathId: string;
+
+  /** Difficulty level for filtering */
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+
+  /** Human-readable estimated duration (e.g., "2-3 hours") */
+  estimatedDuration: string;
+
+  /** Total number of steps in the path */
+  stepCount: number;
+
+  /** Number of chapters (if path uses chapter organization) */
+  chapterCount?: number;
+
+  /**
+   * Content node IDs referenced by this path's steps.
+   * Enables reverse lookup: "which paths contain this content?"
+   *
+   * This is a flattened list of all resourceIds from steps/chapters.
+   * Nested paths (stepType: 'path') are NOT expanded - only direct content.
+   */
+  contentNodeIds: string[];
+
+  /**
+   * Nested path IDs (for stepType: 'path' steps).
+   * Enables path composition graph: "which paths include this path?"
+   */
+  nestedPathIds?: string[];
+
+  /**
+   * Creator information for branded paths.
+   * Links to the ContributorPresence for economic attribution.
+   */
+  creatorInfo?: {
+    /** ContributorPresence ID for the creator */
+    presenceId: string;
+
+    /** Brand name for display (e.g., "Bare Marriage") */
+    brandName?: string;
+
+    /** Brand logo URL for path cards */
+    brandLogoUrl?: string;
+  };
+
+  /**
+   * If this path was forked from another, link to the original.
+   * Enables fork tree visualization and attribution.
+   */
+  forkedFromPathId?: string;
+
+  /**
+   * Fork generation (0 = original, 1 = direct fork, 2 = fork of fork, etc.)
+   */
+  forkGeneration?: number;
+
+  /**
+   * Canonical status for governance.
+   * - 'draft': Author working copy
+   * - 'community': Community-endorsed but not canonical
+   * - 'canonical': Officially ratified path
+   */
+  canonicalStatus?: 'draft' | 'community' | 'canonical';
+
+  /** Path type hint for UI rendering */
+  pathType?: 'journey' | 'quest' | 'expedition' | 'practice';
+
+  /** Attestations granted upon path completion */
+  attestationsGranted?: string[];
+}
+
+/**
+ * PathReference - Lightweight reference to a path, used in graph queries.
+ */
+export interface PathReference {
+  /** Path node ID (the ContentNode ID, not the LearningPath ID) */
+  nodeId: string;
+
+  /** The underlying LearningPath ID */
+  pathId: string;
+
+  /** Path title */
+  title: string;
+
+  /** Relationship type (how this path relates to the query) */
+  relationship: 'contains' | 'references' | 'requires';
 }
 
 // =========================================================================
