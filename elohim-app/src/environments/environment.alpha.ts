@@ -5,9 +5,10 @@ export const environment = {
   logLevel: 'debug' as LogLevel,
   environment: 'alpha',
   gitHash: 'GIT_HASH_PLACEHOLDER',
+  useKuzuDb: true,
   // Holochain Edge Node configuration
   holochain: {
-    adminUrl: 'wss://holochain-alpha.elohim.host/admin',
-    appUrl: 'wss://holochain-alpha.elohim.host',
+    adminUrl: 'wss://holochain-dev.elohim.host',
+    appUrl: 'wss://holochain-dev.elohim.host',
   }
 };

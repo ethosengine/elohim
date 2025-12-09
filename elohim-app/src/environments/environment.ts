@@ -9,11 +9,10 @@ export const environment = {
   // Loaded via script tag injection from /assets/wasm/kuzu-wasm.js
   useKuzuDb: true,
   // Holochain Edge Node configuration
+  // For local dev with port-forward: kubectl port-forward -n ethosengine deploy/elohim-edgenode-dev 4444:4444
+  // For Che workspace or deployed testing, use: wss://holochain-dev.elohim.host
   holochain: {
-    adminUrl: 'ws://localhost:4444',
-    appUrl: 'ws://localhost:4445',
-    // For Che workspace, use deployed Edge Node instead:
-    // adminUrl: 'wss://holochain-dev.elohim.host/admin',
-    // appUrl: 'wss://holochain-dev.elohim.host',
+    adminUrl: 'wss://holochain-dev.elohim.host',
+    appUrl: 'wss://holochain-dev.elohim.host',
   }
 };
