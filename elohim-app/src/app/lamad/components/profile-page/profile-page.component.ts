@@ -1,10 +1,12 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { RouterModule, ActivatedRoute } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SovereigntyService } from '@app/imagodei/services/sovereignty.service';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { SessionHuman, SessionActivity, SessionPathProgress, MasteryStats, MasteryLevel } from '../../models';
 
@@ -15,13 +17,15 @@ import { SessionHuman, SessionActivity, SessionPathProgress, MasteryStats, Maste
  * 1. Overview - Resume point, current focus, capabilities, journey stats
  * 2. Paths - In progress, completed, suggested
  * 3. Timeline - Chronological events with type filter
- * 4. Settings - Profile editing, export, reset
+ * 4. Network - Sovereignty status, data residency, connection details
+ * 5. Settings - Profile editing, export, reset
  *
  * Features:
  * - Editable display name, bio, interests
  * - Session badge with "Upgrade to save permanently" prompt
  * - Quick stats summary
  * - Avatar support (URL-based for MVP)
+ * - Sovereignty/data residency visualization
  */
 @Component({
   selector: 'app-profile-page',
@@ -31,8 +35,20 @@ import { SessionHuman, SessionActivity, SessionPathProgress, MasteryStats, Maste
   styleUrls: ['./profile-page.component.css']
 })
 export class ProfilePageComponent implements OnInit, OnDestroy {
+  // Injected services for sovereignty/network tab
+  private readonly sovereigntyService = inject(SovereigntyService);
+  private readonly holochainService = inject(HolochainClientService);
+  private readonly route = inject(ActivatedRoute);
+
   // Tab management
-  activeTab: 'overview' | 'paths' | 'timeline' | 'settings' = 'overview';
+  activeTab: 'overview' | 'paths' | 'timeline' | 'network' | 'settings' = 'overview';
+
+  // Sovereignty state (reactive)
+  readonly sovereigntyState = this.sovereigntyService.sovereigntyState;
+  readonly stageInfo = this.sovereigntyService.stageInfo;
+  readonly connectionStatus = this.sovereigntyService.connectionStatus;
+  readonly canUpgrade = this.sovereigntyService.canUpgrade;
+  readonly edgeNodeInfo = computed(() => this.holochainService.getDisplayInfo());
 
   // Session data
   session: SessionHuman | null = null;
@@ -83,6 +99,13 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadData();
+
+    // Handle fragment navigation (e.g., #network from sovereignty badge)
+    this.route.fragment.pipe(takeUntil(this.destroy$)).subscribe(fragment => {
+      if (fragment === 'network') {
+        this.activeTab = 'network';
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -152,7 +175,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   // TAB NAVIGATION
   // =========================================================================
 
-  setActiveTab(tab: 'overview' | 'paths' | 'timeline' | 'settings'): void {
+  setActiveTab(tab: 'overview' | 'paths' | 'timeline' | 'network' | 'settings'): void {
     this.activeTab = tab;
 
     // Refresh data when switching tabs
@@ -311,5 +334,75 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
       create: '#4fc3f7'
     };
     return colors[level];
+  }
+
+  // =========================================================================
+  // NETWORK / SOVEREIGNTY HELPERS
+  // =========================================================================
+
+  /**
+   * Get CSS class for sovereignty stage badge.
+   */
+  getStageBadgeClass(): string {
+    const stage = this.sovereigntyState().currentStage;
+    return `stage-badge--${stage}`;
+  }
+
+  /**
+   * Get CSS class for connection status dot.
+   */
+  getStatusDotClass(): string {
+    const status = this.connectionStatus().state;
+    return `status-dot--${status}`;
+  }
+
+  /**
+   * Get icon for data location.
+   */
+  getLocationIcon(location: string): string {
+    const icons: Record<string, string> = {
+      'browser-memory': 'memory',
+      'browser-storage': 'storage',
+      'hosted-server': 'cloud',
+      'local-holochain': 'smartphone',
+      'dht': 'lan',
+      'encrypted-backup': 'lock'
+    };
+    return icons[location] ?? 'folder';
+  }
+
+  /**
+   * Truncate hash for display.
+   */
+  truncateHash(hash: string | null): string {
+    if (!hash) return 'N/A';
+    if (hash.length <= 16) return hash;
+    return `${hash.substring(0, 8)}...${hash.substring(hash.length - 4)}`;
+  }
+
+  /**
+   * Copy value to clipboard.
+   */
+  async copyToClipboard(value: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch (err) {
+      console.warn('Failed to copy to clipboard:', err);
+    }
+  }
+
+  /**
+   * Reconnect to network.
+   */
+  async reconnect(): Promise<void> {
+    await this.holochainService.disconnect();
+    await this.holochainService.connect();
+  }
+
+  /**
+   * Check if connected to network.
+   */
+  isConnected(): boolean {
+    return this.connectionStatus().state === 'connected';
   }
 }

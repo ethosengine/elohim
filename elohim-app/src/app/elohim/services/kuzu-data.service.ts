@@ -61,6 +61,7 @@ export class KuzuDataService {
   private conn: KuzuConnection | null = null;
   private readonly ready$ = new BehaviorSubject<boolean>(false);
   private initPromise: Promise<void> | null = null;
+  private initError: string | null = null;
 
   // Caches
   private readonly pathCache = new Map<string, Observable<LearningPath>>();
@@ -109,30 +110,46 @@ export class KuzuDataService {
   private async doInitialize(): Promise<void> {
     try {
       // Check for Cross-Origin Isolation (required for SharedArrayBuffer)
+      // Kuzu WASM uses pthreads which need Web Workers + SharedArrayBuffer
       if (typeof crossOriginIsolated !== 'undefined' && !crossOriginIsolated) {
-        console.warn('[KuzuData] Cross-Origin Isolation not enabled. Kuzu WASM requires COOP/COEP headers.');
-        console.warn('[KuzuData] Add these headers to your server:');
-        console.warn('  Cross-Origin-Opener-Policy: same-origin');
-        console.warn('  Cross-Origin-Embedder-Policy: require-corp');
-        throw new Error('Cross-Origin Isolation required for Kuzu WASM');
+        console.error('[KuzuData] ❌ Cross-Origin Isolation not enabled.');
+        console.error('[KuzuData] Kuzu WASM requires SharedArrayBuffer + Web Workers (pthreads).');
+        console.error('[KuzuData] Required HTTP headers on your server:');
+        console.error('  Cross-Origin-Opener-Policy: same-origin');
+        console.error('  Cross-Origin-Embedder-Policy: require-corp');
+        console.error('[KuzuData] Current value: crossOriginIsolated =', crossOriginIsolated);
+        this.initError = 'Cross-Origin Isolation required for Kuzu WASM (missing COOP/COEP headers)';
+        throw new Error(this.initError);
       }
+
+      console.log('[KuzuData] Cross-Origin Isolation check passed ✓');
 
       // Load kuzu from assets via dynamic import
       // The module exposes Database() and Connection() async factory functions
+      console.log('[KuzuData] Loading Kuzu WASM module...');
       const kuzuModule = await this.loadKuzuModule();
       this.kuzu = kuzuModule;
+      console.log('[KuzuData] Kuzu module loaded ✓');
 
       // Create in-memory database and connection using async factory functions
+      console.log('[KuzuData] Creating database...');
       this.db = await this.kuzu.Database();
+      console.log('[KuzuData] Database created ✓');
+
+      console.log('[KuzuData] Creating connection...');
       this.conn = await this.kuzu.Connection(this.db);
+      console.log('[KuzuData] Connection created ✓');
 
       // Create schema and load seed data
       await this.createSchema();
       await this.loadSeedData();
 
       this.ready$.next(true);
+      console.log('[KuzuData] ✅ Initialization complete');
     } catch (err) {
-      console.error('[KuzuData] Initialization failed:', err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[KuzuData] ❌ Initialization failed:', message);
+      this.initError = message;
       throw err;
     }
   }
@@ -321,6 +338,20 @@ export class KuzuDataService {
    */
   isReady(): boolean {
     return this.ready$.value;
+  }
+
+  /**
+   * Check if initialization failed with an error.
+   */
+  hasInitError(): boolean {
+    return this.initError !== null;
+  }
+
+  /**
+   * Get initialization error message (if any).
+   */
+  getInitError(): string | null {
+    return this.initError;
   }
 
   /**

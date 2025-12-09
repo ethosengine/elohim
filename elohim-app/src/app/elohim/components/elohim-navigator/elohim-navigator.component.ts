@@ -7,6 +7,9 @@ import { filter, takeUntil } from 'rxjs/operators';
 import { SessionHumanService } from '../../../imagodei/services/session-human.service';
 import { SessionHuman, HolochainUpgradePrompt } from '../../../imagodei/models/session-human.model';
 import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
+import { HolochainClientService } from '../../services/holochain-client.service';
+import { EdgeNodeDisplayInfo } from '../../models/holochain-connection.model';
+import { SovereigntyBadgeComponent } from '../../../lamad/components/sovereignty-badge/sovereignty-badge.component';
 
 /**
  * Context app identifiers for the Elohim Protocol
@@ -37,7 +40,7 @@ export interface ContextAppConfig {
 @Component({
   selector: 'app-elohim-navigator',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, ThemeToggleComponent],
+  imports: [CommonModule, RouterLink, FormsModule, ThemeToggleComponent, SovereigntyBadgeComponent],
   templateUrl: './elohim-navigator.component.html',
   styleUrls: ['./elohim-navigator.component.css']
 })
@@ -59,6 +62,12 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   showProfileTray = false;
   showContextSwitcher = false;
   showUpgradeModal = false;
+
+  /** Edge Node section state */
+  edgeNodeExpanded = false;
+
+  /** Copy feedback state */
+  copiedField: string | null = null;
 
   /** Available context apps */
   readonly contextApps: ContextAppConfig[] = [
@@ -92,7 +101,8 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly sessionHumanService: SessionHumanService,
-    private readonly router: Router
+    private readonly router: Router,
+    readonly holochainService: HolochainClientService
   ) {}
 
   ngOnInit(): void {
@@ -282,5 +292,100 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
     if (!target.closest('.profile-bubble-container') && !target.closest('.context-switcher-container')) {
       this.closeAllTrays();
     }
+  }
+
+  // =========================================================================
+  // Edge Node Methods
+  // =========================================================================
+
+  /**
+   * Toggle Edge Node section visibility
+   */
+  toggleEdgeNode(): void {
+    this.edgeNodeExpanded = !this.edgeNodeExpanded;
+  }
+
+  /**
+   * Get Edge Node display info (from service)
+   */
+  get edgeNodeInfo(): EdgeNodeDisplayInfo {
+    return this.holochainService.getDisplayInfo();
+  }
+
+  /**
+   * Get status indicator CSS class
+   */
+  getStatusClass(): string {
+    const state = this.holochainService.state();
+    switch (state) {
+      case 'connected':
+        return 'status-connected';
+      case 'connecting':
+      case 'authenticating':
+        return 'status-connecting';
+      case 'error':
+        return 'status-error';
+      default:
+        return 'status-disconnected';
+    }
+  }
+
+  /**
+   * Get human-readable status text
+   */
+  getStatusText(): string {
+    const state = this.holochainService.state();
+    switch (state) {
+      case 'connected':
+        return 'Connected';
+      case 'connecting':
+        return 'Connecting...';
+      case 'authenticating':
+        return 'Authenticating...';
+      case 'error':
+        return 'Error';
+      default:
+        return 'Disconnected';
+    }
+  }
+
+  /**
+   * Copy value to clipboard with feedback
+   */
+  async copyToClipboard(value: string, fieldName: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(value);
+      this.copiedField = fieldName;
+      setTimeout(() => {
+        this.copiedField = null;
+      }, 2000);
+    } catch (err) {
+      console.warn('Failed to copy to clipboard:', err);
+    }
+  }
+
+  /**
+   * Format date for display
+   */
+  formatConnectedTime(date: Date | null): string {
+    if (!date) return 'N/A';
+    return date.toLocaleString();
+  }
+
+  /**
+   * Truncate hash for display (first 8 + last 4 chars)
+   */
+  truncateHash(hash: string | null): string {
+    if (!hash) return 'N/A';
+    if (hash.length <= 16) return hash;
+    return `${hash.substring(0, 8)}...${hash.substring(hash.length - 4)}`;
+  }
+
+  /**
+   * Manually trigger reconnect
+   */
+  async reconnect(): Promise<void> {
+    await this.holochainService.disconnect();
+    await this.holochainService.connect();
   }
 }

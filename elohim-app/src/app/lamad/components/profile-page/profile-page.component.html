@@ -74,6 +74,13 @@
     </button>
     <button
       class="tab-btn"
+      [class.active]="activeTab === 'network'"
+      (click)="setActiveTab('network')"
+    >
+      Network
+    </button>
+    <button
+      class="tab-btn"
       [class.active]="activeTab === 'settings'"
       (click)="setActiveTab('settings')"
     >
@@ -274,6 +281,238 @@
               </div>
             }
           </div>
+        }
+      </div>
+    }
+
+    <!-- Network Tab -->
+    @if (activeTab === 'network') {
+      <div class="tab-panel network-panel">
+        <!-- Sovereignty Stage Card -->
+        <section class="sovereignty-stage-card">
+          <div class="stage-header">
+            <span class="material-icons stage-icon">{{ stageInfo().icon }}</span>
+            <div class="stage-info">
+              <span class="stage-badge" [class]="getStageBadgeClass()">
+                {{ stageInfo().label }}
+              </span>
+              <span class="stage-tagline">{{ stageInfo().tagline }}</span>
+            </div>
+            <div class="connection-status">
+              <span class="status-dot" [class]="getStatusDotClass()"></span>
+              <span class="status-label">{{ connectionStatus().label }}</span>
+            </div>
+          </div>
+          <p class="stage-description">{{ stageInfo().description }}</p>
+
+          <!-- Stage Benefits & Limitations -->
+          <div class="stage-details">
+            <div class="benefits">
+              <h4>Benefits</h4>
+              <ul>
+                @for (benefit of stageInfo().benefits; track benefit) {
+                  <li>
+                    <span class="material-icons benefit-icon">check_circle</span>
+                    {{ benefit }}
+                  </li>
+                }
+              </ul>
+            </div>
+            <div class="limitations">
+              <h4>Current Limitations</h4>
+              <ul>
+                @for (limitation of stageInfo().limitations; track limitation) {
+                  <li>
+                    <span class="material-icons limitation-icon">info</span>
+                    {{ limitation }}
+                  </li>
+                }
+              </ul>
+            </div>
+          </div>
+
+          <!-- Upgrade CTA -->
+          @if (canUpgrade()) {
+            <div class="upgrade-cta">
+              <span class="material-icons">arrow_upward</span>
+              <span>Ready to upgrade? Move to <strong>{{ sovereigntyState().migrationTarget }}</strong> for more control.</span>
+              <button class="btn-primary">Learn About Upgrading</button>
+            </div>
+          }
+        </section>
+
+        <!-- Data Residency Section -->
+        <section class="data-residency-section">
+          <h2 class="section-title">
+            <span class="material-icons">storage</span>
+            Where Your Data Lives
+          </h2>
+          <p class="section-description">
+            Understanding where your data is stored helps you make informed decisions about your digital sovereignty.
+          </p>
+
+          <div class="residency-grid">
+            @for (item of sovereigntyState().dataResidency; track item.category) {
+              <div class="residency-card">
+                <div class="residency-header">
+                  <span class="material-icons residency-icon">{{ item.icon }}</span>
+                  <div class="residency-info">
+                    <span class="residency-label">{{ item.label }}</span>
+                    <span class="residency-location">{{ item.locationLabel }}</span>
+                  </div>
+                  <span class="material-icons location-icon">{{ getLocationIcon(item.location) }}</span>
+                </div>
+                <p class="residency-description">{{ item.description }}</p>
+                <div class="residency-meta">
+                  <span class="meta-item" [class.exportable]="item.exportable">
+                    <span class="material-icons">{{ item.exportable ? 'download' : 'block' }}</span>
+                    {{ item.exportable ? 'Exportable' : 'Not Exportable' }}
+                  </span>
+                  <span class="meta-item" [class.deletable]="item.deletable">
+                    <span class="material-icons">{{ item.deletable ? 'delete' : 'lock' }}</span>
+                    {{ item.deletable ? 'Deletable' : 'Permanent' }}
+                  </span>
+                  <span class="meta-item controller">
+                    Controlled by: {{ item.controlledBy }}
+                  </span>
+                </div>
+              </div>
+            }
+          </div>
+        </section>
+
+        <!-- Connection Details Section (when connected) -->
+        @if (isConnected()) {
+          <section class="connection-section">
+            <h2 class="section-title">
+              <span class="material-icons">lan</span>
+              Connection Details
+            </h2>
+
+            <div class="connection-grid">
+              <div class="connection-row">
+                <span class="connection-label">Admin URL</span>
+                <span class="connection-value monospace">{{ edgeNodeInfo().adminUrl }}</span>
+              </div>
+
+              @if (edgeNodeInfo().agentPubKey) {
+                <div class="connection-row">
+                  <span class="connection-label">Agent Public Key</span>
+                  <div class="connection-value-with-copy">
+                    <code class="truncated" [title]="edgeNodeInfo().agentPubKey">
+                      {{ truncateHash(edgeNodeInfo().agentPubKey) }}
+                    </code>
+                    <button
+                      class="copy-btn"
+                      (click)="copyToClipboard(edgeNodeInfo().agentPubKey!)"
+                      title="Copy full key"
+                    >
+                      <span class="material-icons">content_copy</span>
+                    </button>
+                  </div>
+                </div>
+              }
+
+              @if (edgeNodeInfo().dnaHash) {
+                <div class="connection-row">
+                  <span class="connection-label">DNA Hash</span>
+                  <div class="connection-value-with-copy">
+                    <code class="truncated" [title]="edgeNodeInfo().dnaHash">
+                      {{ truncateHash(edgeNodeInfo().dnaHash) }}
+                    </code>
+                    <button
+                      class="copy-btn"
+                      (click)="copyToClipboard(edgeNodeInfo().dnaHash!)"
+                      title="Copy full hash"
+                    >
+                      <span class="material-icons">content_copy</span>
+                    </button>
+                  </div>
+                </div>
+              }
+
+              @if (edgeNodeInfo().connectedAt) {
+                <div class="connection-row">
+                  <span class="connection-label">Connected Since</span>
+                  <span class="connection-value">{{ edgeNodeInfo().connectedAt?.toLocaleString() }}</span>
+                </div>
+              }
+
+              <div class="connection-row">
+                <span class="connection-label">Credentials</span>
+                <span class="connection-value" [class.stored]="edgeNodeInfo().hasStoredCredentials">
+                  {{ edgeNodeInfo().hasStoredCredentials ? 'Stored in browser' : 'Not stored' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="connection-actions">
+              <button class="btn-secondary" (click)="reconnect()">
+                <span class="material-icons">refresh</span>
+                Reconnect
+              </button>
+            </div>
+          </section>
+        }
+
+        <!-- Keys Section -->
+        @if (sovereigntyState().keys.length > 0) {
+          <section class="keys-section">
+            <h2 class="section-title">
+              <span class="material-icons">vpn_key</span>
+              Your Keys
+            </h2>
+
+            <div class="keys-grid">
+              @for (key of sovereigntyState().keys; track key.type) {
+                <div class="key-card">
+                  <div class="key-header">
+                    <span class="key-label">{{ key.label }}</span>
+                    <span class="key-type">{{ key.type }}</span>
+                  </div>
+                  <div class="key-value">
+                    <code [title]="key.value">{{ key.truncated }}</code>
+                    @if (key.canExport) {
+                      <button
+                        class="copy-btn"
+                        (click)="copyToClipboard(key.value)"
+                        title="Copy"
+                      >
+                        <span class="material-icons">content_copy</span>
+                      </button>
+                    }
+                  </div>
+                  <div class="key-actions">
+                    @if (key.canExport) {
+                      <span class="key-action exportable">
+                        <span class="material-icons">download</span> Exportable
+                      </span>
+                    }
+                    @if (key.canRevoke) {
+                      <span class="key-action revokable">
+                        <span class="material-icons">cancel</span> Revokable
+                      </span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </section>
+        }
+
+        <!-- Not Connected State -->
+        @if (!isConnected() && connectionStatus().state !== 'connecting') {
+          <section class="not-connected-section">
+            <div class="not-connected-card">
+              <span class="material-icons not-connected-icon">cloud_off</span>
+              <h3>Not Connected to Network</h3>
+              <p>{{ connectionStatus().description }}</p>
+              <button class="btn-primary" (click)="reconnect()">
+                <span class="material-icons">wifi</span>
+                Connect to Network
+              </button>
+            </div>
+          </section>
         }
       </div>
     }
