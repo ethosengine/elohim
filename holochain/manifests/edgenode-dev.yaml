@@ -123,7 +123,7 @@ spec:
             - "TCP-LISTEN:8444,fork,reuseaddr"
             - "TCP:127.0.0.1:4444"
           ports:
-            - name: admin-ws-internal
+            - name: admin-ws-int
               containerPort: 8444
               protocol: TCP
           resources:
@@ -201,7 +201,7 @@ spec:
   type: ClusterIP
   ports:
     # Internal socat proxy (for kubectl port-forward or pod-to-pod)
-    - name: admin-ws-internal
+    - name: admin-ws-int
       port: 4444
       targetPort: 8444
       protocol: TCP
