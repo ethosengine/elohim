@@ -3,6 +3,42 @@
 # Integration testing environment for Holochain connectivity.
 # Accessible at: holochain-alpha.elohim.host
 ---
+# ConfigMap for conductor configuration with restricted origins
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elohim-edgenode-alpha-config
+  namespace: ethosengine
+data:
+  conductor-config.yaml: |
+    # Holochain Conductor Configuration for Elohim Protocol
+    admin_interfaces:
+      - driver:
+          type: websocket
+          port: 4444
+          # Restrict to Elohim domains only
+          allowed_origins:
+            - "https://elohim.host"
+            - "https://alpha.elohim.host"
+            - "https://staging.elohim.host"
+            - "https://holochain-dev.elohim.host"
+            - "https://holochain-alpha.elohim.host"
+            - "http://localhost:4200"
+            - "http://localhost:8080"
+    network:
+      bootstrap_url: "https://holostrap.elohim.host"
+      signal_url: "wss://holostrap.elohim.host"
+      enable_mdns: false
+      enable_relaying: true
+      webrtc_config:
+        ice_servers:
+          - urls: ["stun:stun.cloudflare.com:3478"]
+          - urls: ["stun:stun.l.google.com:19302"]
+    data_root_path: "/data/holochain/var"
+    keystore:
+      type: lair_server_in_proc
+      lair_root: "/data/holochain/var/ks"
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -41,6 +77,9 @@ spec:
           volumeMounts:
             - name: holochain-data
               mountPath: /data
+            - name: conductor-config
+              mountPath: /etc/holochain/conductor-config.yaml
+              subPath: conductor-config.yaml
           # Use exec probe since conductor binds to localhost
           # bash supports /dev/tcp, ash/sh does not
           livenessProbe:
@@ -87,6 +126,9 @@ spec:
         - name: holochain-data
           emptyDir:
             sizeLimit: 5Gi
+        - name: conductor-config
+          configMap:
+            name: elohim-edgenode-alpha-config
 ---
 apiVersion: v1
 kind: Service
