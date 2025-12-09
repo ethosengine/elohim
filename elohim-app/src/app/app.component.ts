@@ -1,8 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { filter } from 'rxjs/operators';
 import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
+import { HolochainClientService } from './elohim/services/holochain-client.service';
+import { environment } from '../environments/environment';
 
 @Component({
   selector: 'app-root',
@@ -14,6 +16,8 @@ export class AppComponent implements OnInit {
   title = 'elohim-app';
   /** Show floating theme toggle only on root landing page */
   showFloatingToggle = false;
+
+  private readonly holochainService = inject(HolochainClientService);
 
   constructor(private readonly router: Router) {}
 
@@ -27,6 +31,31 @@ export class AppComponent implements OnInit {
 
     // Check initial route
     this.showFloatingToggle = this.isRootLandingPage(this.router.url);
+
+    // Auto-connect to Edge Node if holochain config is available
+    this.initializeHolochainConnection();
+  }
+
+  /**
+   * Initialize Holochain connection on app startup.
+   * Runs in background without blocking app initialization.
+   */
+  private async initializeHolochainConnection(): Promise<void> {
+    // Only attempt connection if holochain config exists
+    if (!environment.holochain?.adminUrl) {
+      console.log('[Holochain] Config not found, skipping auto-connect');
+      return;
+    }
+
+    try {
+      console.log('[Holochain] Auto-connecting to Edge Node...');
+      await this.holochainService.connect();
+      console.log('[Holochain] Edge Node connection established');
+    } catch (err) {
+      // Log error but don't crash the app - connection is optional
+      console.warn('[Holochain] Edge Node auto-connect failed:', err);
+      // Connection state will be 'error' and visible in the UI
+    }
   }
 
   /** Check if URL is the root landing page (/ or empty) */

@@ -4,18 +4,87 @@
 
 The Elohim Protocol requires a distributed computing architecture that enables families and communities to own their digital infrastructure while participating in a global network. This document consolidates all hardware requirements across the protocol's various applications.
 
+## Progressive Sovereignty: The Onboarding Journey
+
+The Elohim Protocol meets users where they are, providing a gradual path from curious visitor to fully sovereign node operator. This progressive model ensures no one is excluded due to technical barriers or resource constraints, while incentivizing deeper participation over time.
+
+### The Four Stages of Digital Sovereignty
+
+| Stage | Hardware Required | Identity Model | Network Role |
+|-------|-------------------|----------------|--------------|
+| **1. Visitor** | Any browser | Anonymous session | Consumer |
+| **2. Hosted User** | Any browser | Custodial keys (hosted) | Participant |
+| **3. App User** | Tier 1 (Consumer Device) | Self-sovereign (local) | Intermittent peer |
+| **4. Node Operator** | Tier 1 (lightweight) or Tier 3 (full) | Self-sovereign (always-on) | Infrastructure provider |
+
+*Note: Stage 4 hardware requirements depend on the hApp. Lightweight apps (messaging, identity) can run on mobile. Heavy workloads (media storage, AI inference, community hub) need Tier 3.*
+
+### Stage 1: Visitor
+Users access public content through any web browser. No account, no commitment. "Commons" content is served by DNS-exposed nodes operated by Stage 4 participants. This is the entry point for discovery.
+
+### Stage 2: Hosted User
+Users create an account on elohim.host. The platform generates and manages cryptographic keys on their behalf (custodial model). Users gain full DHT participation, can create content, build reputation, and join communities. Keys can be exported later for migration to Stage 3.
+
+**Why custodial?** Most people aren't ready to manage cryptographic keys. Hosting provides a familiar account-based experience while still participating in the decentralized network. The key innovation: migration is always possible. No lock-in.
+
+### Stage 3: App User (Hub-and-Spoke)
+Users install the Elohim desktop app on their laptop or PC (Tier 1 hardware). Keys are stored locally, providing self-sovereignty without requiring always-on infrastructure. The app syncs with the DHT when online.
+
+**The Hub-and-Spoke Model**: Inspired by [Learning Equality](https://learningequality.org), this stage serves communities with intermittent connectivity:
+- A church, school, or community center operates an always-on "hub" (Stage 4)
+- Members run the app on personal devices as "spokes"
+- Content syncs when spokes connect to the hub
+- Offline access to previously synced content
+
+**Limitations**: Stage 3 users cannot:
+- Serve as DHT shard holders (not always available)
+- Act as bootstrap/signal nodes
+- Host public content reliably
+
+### Stage 4: Node Operator
+Users deploy always-on infrastructure—ideally the Elohim Family Node (Tier 3). This enables full network participation: DHT hosting, bootstrap services, public content via DNS, and backup services for their trust network (family, church, neighborhood).
+
+**The Relational Backup Model**: Stage 4 operators don't just serve themselves. They provide redundancy for their relational network:
+- Backup data for family members (even those at Stage 2 or 3)
+- Host custodial keys for less technical relatives
+- Serve as geographic redundancy points
+- Expose "commons" content to the public web
+
+### Migration Preserves Everything
+
+Moving between stages preserves:
+- **Identity**: Same cryptographic keys, same agent pub key
+- **Content**: All DHT entries remain accessible
+- **Reputation**: Contribution history and trust relationships
+- **History**: Complete source chain migrates with you
+
+```
+Browser Only → Hosted Account → Desktop App → Family Node
+   (Stage 1)      (Stage 2)       (Stage 3)     (Stage 4)
+```
+
+This progressive model means:
+- No one is forced to buy hardware before they understand the value
+- Communities can start participating with zero infrastructure investment
+- Technical users can skip directly to Stage 3 or 4
+- The network grows organically as participants increase commitment
+
 ## Core Hardware Tiers
 
 ### Tier 1: Consumer Devices (Existing Hardware)
+**Supports**: Stage 1-3, and Stage 4 for lightweight apps
+
 **Mobile Devices**
 - iOS/Android smartphones with camera, microphone, NFC
 - Tablets for enhanced interface experiences
 - Standard specifications sufficient for scanner apps and lightweight Elohim agents
+- **Stage 3/4 capability**: Modern smartphones can run local Holochain conductor for lightweight hApps (messaging, identity, small data footprint apps). Intermittent connectivity acceptable for many use cases.
 
-**Desktop/Laptop Computing** 
+**Desktop/Laptop Computing**
 - Standard consumer hardware for development work
 - Minimum 8GB RAM, modern CPU for local web interfaces
 - Used primarily for content creation and administrative tasks
+- **Stage 3/4 capability**: Can run local Holochain conductor for self-sovereign participation. Full Stage 4 for lightweight apps; Stage 3 (intermittent) for heavier workloads.
 
 **Smart Home Integration**
 - WiFi security cameras (privacy-focused models preferred)
@@ -23,6 +92,7 @@ The Elohim Protocol requires a distributed computing architecture that enables f
 - Standard IoT devices for home automation integration
 
 ### Tier 2: Elohim Public Observer
+**Supports**: Specialized civic function (any stage user can deploy)
 **Purpose**: Civic transparency and democratic participation
 **Form Factor**: Portable meeting room deployment
 
@@ -35,10 +105,19 @@ The Elohim Protocol requires a distributed computing architecture that enables f
 - Estimated cost: $200-500
 
 ### Tier 3: Elohim Family Node (Core Infrastructure)
+**Supports**: Stage 4 (Node Operator) - Full network participation
 **Purpose**: Family digital sovereignty and AI inference
 **Form Factor**: Mini-rack system, approximately refrigerator-sized
 
 This represents the heart of the Elohim ecosystem - a substantial computing investment that replaces dozens of cloud subscriptions while providing true data sovereignty.
+
+**Network Roles Enabled**:
+- DHT shard hosting (always-on availability)
+- Bootstrap and signal node services
+- Public content hosting via DNS exposure
+- Custodial key hosting for Stage 2 family/community members
+- Relational backup services for trust network
+- Hub node for Stage 3 spoke communities
 
 ## Elohim Family Node: Detailed Specifications
 
