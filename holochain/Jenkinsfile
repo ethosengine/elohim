@@ -271,6 +271,49 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        stage('Build Admin Proxy') {
+            when {
+                anyOf {
+                    changeset "holochain/admin-proxy/**"
+                    changeset "holochain/manifests/edgenode-*.yaml"
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Building Admin Proxy: ${IMAGE_TAG}"
+
+                            dir('holochain/admin-proxy') {
+                                sh '''
+                                    npm ci
+                                    npm run build
+                                    npm test
+                                '''
+                            }
+
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                cd holochain/admin-proxy
+
+                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                    nerdctl -n k8s.io build \\
+                                    -t elohim-admin-proxy:${IMAGE_TAG} \\
+                                    -f Dockerfile .
+
+                                nerdctl -n k8s.io tag elohim-admin-proxy:${IMAGE_TAG} elohim-admin-proxy:${GIT_COMMIT_HASH}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Build Edge Node Image') {
             steps {
                 container('builder') {
@@ -321,6 +364,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                                 sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
 
+                                // Push Edge Node image
                                 sh """
                                     nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
                                     nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
@@ -329,10 +373,29 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
                                 """
 
+                                // Push Admin Proxy image (if it was built)
+                                sh """
+                                    if nerdctl -n k8s.io images | grep -q "elohim-admin-proxy.*${IMAGE_TAG}"; then
+                                        echo "Pushing Admin Proxy image..."
+                                        nerdctl -n k8s.io tag elohim-admin-proxy:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-admin-proxy:${IMAGE_TAG}
+                                        nerdctl -n k8s.io tag elohim-admin-proxy:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-admin-proxy:${GIT_COMMIT_HASH}
+
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-admin-proxy:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-admin-proxy:${GIT_COMMIT_HASH}
+                                    else
+                                        echo "Admin Proxy image not found, skipping push"
+                                    fi
+                                """
+
                                 if (env.BRANCH_NAME == 'dev') {
                                     sh """
                                         nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
                                         nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
+
+                                        if nerdctl -n k8s.io images | grep -q "elohim-admin-proxy.*${IMAGE_TAG}"; then
+                                            nerdctl -n k8s.io tag elohim-admin-proxy:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-admin-proxy:dev-latest
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-admin-proxy:dev-latest
+                                        fi
                                     """
                                 }
                             }
@@ -407,6 +470,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             sh """
                                 nerdctl -n k8s.io rmi elohim-edgenode:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi elohim-admin-proxy:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-admin-proxy:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io system prune -af --volumes || true
                             """
                         }
