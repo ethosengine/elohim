@@ -16,6 +16,10 @@ import type {
   InstalledAppId,
 } from '@holochain/client';
 import { environment } from '../../../environments/environment';
+import type { HolochainEnvironmentConfig } from '../../../environments/environment.types';
+
+// Cast to include optional properties from the type definition
+const holochainConfig = environment.holochain as HolochainEnvironmentConfig | undefined;
 
 /**
  * Connection state machine
@@ -31,7 +35,7 @@ export type HolochainConnectionState =
  * Configuration for connecting to Holochain conductor
  */
 export interface HolochainConfig {
-  /** Admin WebSocket URL (e.g., ws://localhost:4444) */
+  /** Admin WebSocket URL (e.g., wss://holochain-proxy-dev.elohim.host) */
   adminUrl: string;
 
   /** App WebSocket URL (e.g., ws://localhost:4445) */
@@ -45,6 +49,9 @@ export interface HolochainConfig {
 
   /** Path to hApp file (for installation) */
   happPath?: string;
+
+  /** API key for admin proxy authentication (if using proxy) */
+  proxyApiKey?: string;
 }
 
 /**
@@ -139,11 +146,12 @@ export interface HolochainContentOutput {
  * Default configuration from environment
  */
 export const DEFAULT_HOLOCHAIN_CONFIG: HolochainConfig = {
-  adminUrl: environment.holochain?.adminUrl ?? 'ws://localhost:4444',
-  appUrl: environment.holochain?.appUrl ?? 'ws://localhost:4445',
+  adminUrl: holochainConfig?.adminUrl ?? 'ws://localhost:4444',
+  appUrl: holochainConfig?.appUrl ?? 'ws://localhost:4445',
   origin: 'elohim-app',
   appId: 'lamad-spike',
   happPath: '/opt/holochain/lamad-spike.happ',
+  proxyApiKey: holochainConfig?.proxyApiKey,
 };
 
 /**
@@ -162,3 +170,42 @@ export const INITIAL_CONNECTION_STATE: HolochainConnection = {
   cellId: null,
   appInfo: null,
 };
+
+/**
+ * Display-friendly connection information for UI rendering
+ * Used by the Edge Node settings section in the profile tray
+ */
+export interface EdgeNodeDisplayInfo {
+  /** Current connection state */
+  state: HolochainConnectionState;
+
+  /** Admin WebSocket URL from config */
+  adminUrl: string;
+
+  /** App WebSocket URL from config */
+  appUrl: string;
+
+  /** Agent public key (full base64 encoded) */
+  agentPubKey: string | null;
+
+  /** Cell ID display [DnaHash, AgentPubKey] */
+  cellId: { dnaHash: string; agentPubKey: string } | null;
+
+  /** App ID from config */
+  appId: string;
+
+  /** DNA hash extracted from cell ID */
+  dnaHash: string | null;
+
+  /** When connection was established */
+  connectedAt: Date | null;
+
+  /** Whether signing credentials are stored in localStorage */
+  hasStoredCredentials: boolean;
+
+  /** Network seed if available from appInfo */
+  networkSeed: string | null;
+
+  /** Error message if in error state */
+  error: string | null;
+}

@@ -9,10 +9,11 @@ export const environment = {
   // Loaded via script tag injection from /assets/wasm/kuzu-wasm.js
   useKuzuDb: true,
   // Holochain Edge Node configuration
-  // For local dev with port-forward: kubectl port-forward -n ethosengine deploy/elohim-edgenode-dev 4444:4444
-  // For Che workspace or deployed testing, use: wss://holochain-dev.elohim.host
+  // Admin access through authenticated proxy (publicly accessible)
+  // App WebSocket still uses direct connection after auth token is issued
   holochain: {
-    adminUrl: 'wss://holochain-dev.elohim.host',
+    adminUrl: 'wss://holochain-proxy-dev.elohim.host',
     appUrl: 'wss://holochain-dev.elohim.host',
+    proxyApiKey: 'dev-elohim-auth-2024',  // Authenticated access (not admin)
   }
 };

@@ -29,6 +29,7 @@ import {
   type ZomeCallResult,
   type ZomeCallInput,
   type StoredSigningCredentials,
+  type EdgeNodeDisplayInfo,
   DEFAULT_HOLOCHAIN_CONFIG,
   INITIAL_CONNECTION_STATE,
   SIGNING_CREDENTIALS_KEY,
@@ -70,9 +71,14 @@ export class HolochainClientService {
     this.updateState({ state: 'connecting' });
 
     try {
-      // Step 1: Connect to Admin WebSocket
+      // Step 1: Connect to Admin WebSocket (optionally through proxy)
+      // If proxyApiKey is set, append it to the URL for authentication
+      const adminUrl = this.config.proxyApiKey
+        ? `${this.config.adminUrl}?apiKey=${encodeURIComponent(this.config.proxyApiKey)}`
+        : this.config.adminUrl;
+
       const adminWs = await AdminWebsocket.connect({
-        url: new URL(this.config.adminUrl),
+        url: new URL(adminUrl),
         wsClientOptions: {
           origin: this.config.origin,
         },
@@ -310,7 +316,7 @@ export class HolochainClientService {
   }
 
   /**
-   * Encode agent public key for display
+   * Encode agent public key for display (truncated)
    */
   private encodeAgentPubKey(key: AgentPubKey): string {
     return this.uint8ArrayToBase64(key).substring(0, 12) + '...';
@@ -319,7 +325,67 @@ export class HolochainClientService {
   /**
    * Convert Uint8Array to base64
    */
-  private uint8ArrayToBase64(arr: Uint8Array): string {
+  public uint8ArrayToBase64(arr: Uint8Array): string {
     return btoa(String.fromCharCode.apply(null, Array.from(arr)));
+  }
+
+  // =========================================================================
+  // Public Utility Methods for UI Display
+  // =========================================================================
+
+  /**
+   * Get current configuration (for displaying URLs in UI)
+   */
+  public getConfig(): HolochainConfig {
+    return this.config;
+  }
+
+  /**
+   * Check if signing credentials exist in localStorage
+   */
+  public hasStoredCredentials(): boolean {
+    try {
+      const stored = localStorage.getItem(SIGNING_CREDENTIALS_KEY);
+      return stored !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get display-friendly connection info for UI rendering
+   */
+  public getDisplayInfo(): EdgeNodeDisplayInfo {
+    const conn = this.connectionSignal();
+    const config = this.config;
+
+    let cellIdDisplay: { dnaHash: string; agentPubKey: string } | null = null;
+    let dnaHash: string | null = null;
+
+    if (conn.cellId) {
+      dnaHash = this.uint8ArrayToBase64(conn.cellId[0]);
+      cellIdDisplay = {
+        dnaHash,
+        agentPubKey: this.uint8ArrayToBase64(conn.cellId[1]),
+      };
+    }
+
+    // Extract network seed from appInfo if available
+    // AppInfo structure may have network_seed in manifest_network_seed
+    const networkSeed = (conn.appInfo as { manifest_network_seed?: string })?.manifest_network_seed ?? null;
+
+    return {
+      state: conn.state,
+      adminUrl: config.adminUrl,
+      appUrl: config.appUrl,
+      agentPubKey: conn.agentPubKey ? this.uint8ArrayToBase64(conn.agentPubKey) : null,
+      cellId: cellIdDisplay,
+      appId: config.appId,
+      dnaHash,
+      connectedAt: conn.connectedAt ?? null,
+      hasStoredCredentials: this.hasStoredCredentials(),
+      networkSeed,
+      error: conn.error ?? null,
+    };
   }
 }
