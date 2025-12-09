@@ -49,36 +49,34 @@ This manifesto proposes technology that actively defends against corruption whil
 │
 ├── elohim-app/               # Angular application (Main Platform)
 │   └── src/app/
-│       ├── components/       # Feature components
-│       │   ├── hero/         # Protocol introduction
-│       │   ├── crisis/       # Analysis of current failures
-│       │   ├── elohim-host/  # Autonomous AI guardians
-│       │   ├── vision/       # Future possibilities
-│       │   ├── design-principles/ # Technical implementation
-│       │   ├── learning-success/  # Proven models
-│       │   ├── path-forward/      # Implementation steps
-│       │   ├── call-to-action/    # The choice ahead
-│       │   ├── footer/       # Closing message
-│       │   ├── home/         # Home page container
-│       │   ├── theme-toggle/ # Dark/light theme switcher
-│       │   ├── debug-bar/    # Development debugging tools
-│       │   └── not-found/    # 404 page
+│       ├── components/       # Landing page components
+│       ├── elohim/           # Core infrastructure services
+│       │   ├── models/       # Holochain connection, protocol types
+│       │   ├── services/     # Holochain client, Kuzu graph DB
+│       │   └── components/   # Navigator, settings tray
+│       ├── imagodei/         # Human identity & sovereignty
+│       │   ├── models/       # Sovereignty stages, data residency
+│       │   └── services/     # Session management, sovereignty state
 │       ├── lamad/            # Learning infrastructure module
-│       │   ├── models/       # Data models (Territory, Journey, Traveler)
-│       │   ├── services/     # Business logic & navigation
-│       │   ├── components/   # Learning UI components
-│       │   ├── renderers/    # Content type renderers
-│       │   └── parsers/      # Content ingestion tools
-│       └── services/         # App-wide services (SEO, analytics, theme)
+│       │   ├── models/       # ContentNode, LearningPath, mastery
+│       │   ├── services/     # Data loading, progress tracking
+│       │   ├── components/   # Path navigator, content viewer
+│       │   └── renderers/    # Markdown, video, assessment
+│       ├── qahal/            # Community governance (planned)
+│       └── shefa/            # Resource flows (planned)
 │
-├── elohim-library/           # Angular Workspace for Shared Libraries
+├── elohim-library/           # Shared Libraries & Services
 │   └── projects/
-│       └── lamad-ui/         # Lamad UI Pattern Library
+│       ├── elohim-service/   # Import pipeline, content models
+│       └── lamad-ui/         # UI Pattern Library
 │
-├── elohim-ui-playground/     # Component Showcase & Pattern Library App
+├── holochain/                # Holochain Edge Node Infrastructure
+│   ├── admin-proxy/          # Authenticated WebSocket proxy
+│   ├── manifests/            # K8s deployments for Edge Nodes
+│   └── Jenkinsfile           # CI/CD for Holochain components
 │
 ├── data/                     # Content and documentation
-│   ├── content/              # Learning content organized by domain
+│   ├── content/              # Learning content by domain
 │   └── humans/               # Human-readable documentation
 │
 └── manifests/                # Kubernetes deployment manifests
@@ -86,6 +84,30 @@ This manifesto proposes technology that actively defends against corruption whil
     ├── ingress.yaml          # Ingress configuration
     └── service.yaml          # Service definitions
 ```
+
+## Progressive Sovereignty
+
+The Elohim Protocol meets users where they are, providing a gradual path from curious visitor to fully sovereign node operator:
+
+| Stage | Description | Data Location |
+|-------|-------------|---------------|
+| **Visitor** | Anonymous browsing, no account | Browser memory only |
+| **Hosted User** | Account on elohim.host, custodial keys | DHT network (hosted) |
+| **App User** | Desktop app, self-sovereign keys | Local device + DHT |
+| **Node Operator** | Always-on infrastructure | Self-hosted + DHT |
+
+This progressive model ensures no one is excluded due to technical barriers, while incentivizing deeper participation over time. Keys can always be exported for migration between stages.
+
+## Holochain Infrastructure
+
+The protocol runs on [Holochain](https://holochain.org/), a framework for distributed applications without global consensus. Each user maintains their own source chain, validated by peers through a distributed hash table (DHT).
+
+**Edge Nodes** provide the network infrastructure:
+- Run the Holochain conductor with the Lamad hApp
+- Serve as DHT shard holders and bootstrap nodes
+- Enable web browsers to connect via authenticated WebSocket proxy
+
+See [`holochain/claude.md`](./holochain/claude.md) for Edge Node setup and configuration.
 
 ## Lamad Learning System
 
