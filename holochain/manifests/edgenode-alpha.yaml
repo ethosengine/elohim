@@ -36,11 +36,9 @@ data:
       - driver:
           type: websocket
           port: 4444
-          # Conductor only accepts connections from localhost (proxy sidecar)
+          # Allow any origin - conductor only binds to localhost anyway
           # The admin proxy handles external authentication
-          allowed_origins:
-            - "http://localhost:8080"
-            - "http://127.0.0.1:8080"
+          allowed_origins: "*"
     network:
       bootstrap_url: "https://holostrap.elohim.host"
       signal_url: "wss://holostrap.elohim.host"

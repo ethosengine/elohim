@@ -327,6 +327,48 @@ For communities with intermittent connectivity or limited infrastructure:
 - Content available offline after sync
 - Ideal for schools, churches, rural communities
 
+### Community Web Gateway (Stage 4 + DNS)
+
+A Stage 4 node operator can enable public DNS to serve as a **Community Web Gateway** - providing a traditional web presence backed by DHT data:
+
+```
+Public Internet                         Community Node (Stage 4)
+
+https://mycommunity.org  ─────────────► Content Viewer
+                                              │
+                                              ▼
+                                        Local Conductor
+                                              │
+                                              ▼
+                                        DHT (P2P network)
+```
+
+**What this enables:**
+- **SEO-friendly presence** - Search engines index public content
+- **Stage 1 access** - Anonymous visitors browse without Holochain knowledge
+- **Progressive engagement** - Static view → Stage 2 account → Stage 3 app
+- **Data sovereignty** - Content lives in DHT, website is a read-through view
+- **No vendor lock-in** - Community controls DNS, can migrate operators
+
+**Multiple communities, same network:**
+```
+elohim.host          → Elohim Foundation node
+localchurch.org      → Church's Family Node
+neighborhood.net     → Neighborhood collective
+```
+
+All communities read from the same DHT but present their own curated view and branding.
+
+**Infrastructure that outlives individuals:**
+
+Traditional websites depend on whoever manages the server. When that person moves on, the site often dies. With Holochain:
+- **Data persists** in the DHT regardless of any single node
+- **Config is declarative** - stored in version control, not someone's head
+- **Stewardship transfers** - new operator picks up where old one left off
+- **Community governed** - no single point of failure
+
+This solves the "bus factor" problem for small organizations (churches, nonprofits, local groups) who need persistent web presence but can't afford dedicated technical staff.
+
 ### Security Considerations by Stage
 
 | Stage | Key Location | Signing | Risk Level |
@@ -336,7 +378,7 @@ For communities with intermittent connectivity or limited infrastructure:
 | 3 | Local device | Local | Low (device security) |
 | 4 | Local node | Local | Lowest (full control) |
 
-The Admin Proxy (future) will handle Stage 2 security by:
+The Admin Proxy handles Stage 2 security by:
 - Whitelisting safe operations
 - Requiring authentication
 - Audit logging all actions
