@@ -4,8 +4,14 @@
  * Manages WebSocket connections to a Holochain conductor (Edge Node).
  * Handles authentication, signing credentials, and zome calls.
  *
- * Architecture:
- *   Browser → WebSocket → Edge Node (conductor) → DHT
+ * Architecture (Stage 2 - Hosted User):
+ *   Browser → Admin Proxy (wss://holochain-*.elohim.host) → Conductor → DHT
+ *
+ * The admin proxy authenticates requests and forwards to the conductor.
+ * App interface proxying (for zome calls) is Phase 2 work.
+ *
+ * For Stage 3+ (local app), the client connects directly to localhost
+ * without going through a proxy.
  *
  * @see https://github.com/holochain/holochain-client-js
  */
@@ -54,7 +60,61 @@ export class HolochainClientService {
   private config: HolochainConfig = DEFAULT_HOLOCHAIN_CONFIG;
 
   /**
-   * Connect to Holochain conductor
+   * Test connection to admin proxy (Phase 1)
+   *
+   * Verifies we can reach the proxy and list apps.
+   * Does NOT establish app interface (that's Phase 2).
+   */
+  async testAdminConnection(config?: Partial<HolochainConfig>): Promise<{
+    success: boolean;
+    apps?: string[];
+    error?: string;
+  }> {
+    if (config) {
+      this.config = { ...DEFAULT_HOLOCHAIN_CONFIG, ...config };
+    }
+
+    this.updateState({ state: 'connecting' });
+
+    try {
+      const adminUrl = this.config.proxyApiKey
+        ? `${this.config.adminUrl}?apiKey=${encodeURIComponent(this.config.proxyApiKey)}`
+        : this.config.adminUrl;
+
+      // Browser uses native WebSocket - wsClientOptions.origin is for Node.js ws library only
+      // In browser, omit wsClientOptions to avoid passing it as WebSocket subprotocol
+      const adminWs = await AdminWebsocket.connect({ url: new URL(adminUrl) });
+
+      this.updateState({ adminWs });
+
+      // List apps to verify connection works
+      const apps = await adminWs.listApps({});
+      const appIds = apps.map((app) => app.installed_app_id);
+
+      this.updateState({
+        state: 'connected',
+        connectedAt: new Date(),
+        error: undefined,
+      });
+
+      console.log('Admin proxy connection successful', { apps: appIds });
+
+      return { success: true, apps: appIds };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Connection failed';
+      console.error('Admin proxy connection failed:', errorMessage);
+
+      this.updateState({
+        state: 'error',
+        error: errorMessage,
+      });
+
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Connect to Holochain conductor (full flow)
    *
    * Connection flow:
    * 1. Connect to AdminWebsocket
@@ -62,6 +122,9 @@ export class HolochainClientService {
    * 3. Install app (if not already installed)
    * 4. Attach app interface and get auth token
    * 5. Connect to AppWebsocket with token
+   *
+   * NOTE: Step 5 currently fails from browser because attachAppInterface
+   * returns a localhost port. Phase 2 will add app interface proxying.
    */
   async connect(config?: Partial<HolochainConfig>): Promise<void> {
     if (config) {
@@ -77,12 +140,9 @@ export class HolochainClientService {
         ? `${this.config.adminUrl}?apiKey=${encodeURIComponent(this.config.proxyApiKey)}`
         : this.config.adminUrl;
 
-      const adminWs = await AdminWebsocket.connect({
-        url: new URL(adminUrl),
-        wsClientOptions: {
-          origin: this.config.origin,
-        },
-      });
+      // Browser uses native WebSocket - wsClientOptions.origin is for Node.js ws library only
+      // In browser, omit wsClientOptions to avoid passing it as WebSocket subprotocol
+      const adminWs = await AdminWebsocket.connect({ url: new URL(adminUrl) });
 
       this.updateState({ adminWs });
 
@@ -166,11 +226,10 @@ export class HolochainClientService {
       });
 
       // Step 9: Connect to App WebSocket
+      // NOTE: This will fail from browser - localhost:port is the conductor's localhost, not browser's
+      // Phase 2 will add app interface proxying to solve this
       const appWs = await AppWebsocket.connect({
         url: new URL(`ws://localhost:${appPort}`),
-        wsClientOptions: {
-          origin: this.config.origin,
-        },
         token: issuedToken.token,
       });
 

@@ -35,10 +35,10 @@ export type HolochainConnectionState =
  * Configuration for connecting to Holochain conductor
  */
 export interface HolochainConfig {
-  /** Admin WebSocket URL (e.g., wss://holochain-proxy-dev.elohim.host) */
+  /** Admin WebSocket URL (e.g., wss://holochain-dev.elohim.host for proxy) */
   adminUrl: string;
 
-  /** App WebSocket URL (e.g., ws://localhost:4445) */
+  /** App WebSocket URL (same as adminUrl when using proxy, localhost when local) */
   appUrl: string;
 
   /** Origin for CORS (must match conductor config) */

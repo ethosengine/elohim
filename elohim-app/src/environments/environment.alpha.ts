@@ -7,8 +7,10 @@ export const environment = {
   gitHash: 'GIT_HASH_PLACEHOLDER',
   useKuzuDb: true,
   // Holochain Edge Node configuration
+  // Single proxy URL handles admin operations with authentication
   holochain: {
-    adminUrl: 'wss://holochain-dev.elohim.host',
-    appUrl: 'wss://holochain-dev.elohim.host',
+    adminUrl: 'wss://holochain-alpha.elohim.host',
+    appUrl: 'wss://holochain-alpha.elohim.host',
+    proxyApiKey: 'alpha-elohim-auth-2024',
   }
 };

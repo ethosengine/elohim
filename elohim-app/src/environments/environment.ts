@@ -9,11 +9,11 @@ export const environment = {
   // Loaded via script tag injection from /assets/wasm/kuzu-wasm.js
   useKuzuDb: true,
   // Holochain Edge Node configuration
-  // Admin access through authenticated proxy (publicly accessible)
-  // App WebSocket still uses direct connection after auth token is issued
+  // Single proxy URL handles admin operations with authentication
+  // App interface proxying will be added in Phase 2
   holochain: {
-    adminUrl: 'wss://holochain-proxy-dev.elohim.host',
-    appUrl: 'wss://holochain-dev.elohim.host',
+    adminUrl: 'wss://holochain-dev.elohim.host',
+    appUrl: 'wss://holochain-dev.elohim.host',  // Same URL - proxy will route both
     proxyApiKey: 'dev-elohim-auth-2024',  // Authenticated access (not admin)
   }
 };
