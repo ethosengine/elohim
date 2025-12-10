@@ -93,8 +93,9 @@ spec:
           volumeMounts:
             - name: holochain-data
               mountPath: /data
+            # Mount to template path - entrypoint.sh copies this to /etc/holochain/
             - name: conductor-config
-              mountPath: /etc/holochain/conductor-config.yaml
+              mountPath: /usr/local/share/holochain/conductor-config.template.yaml
               subPath: conductor-config.yaml
           # Use exec probe since conductor binds to localhost
           # bash supports /dev/tcp, ash/sh does not
@@ -214,38 +215,7 @@ spec:
     app: elohim-edgenode
     environment: dev
 ---
-# Public Ingress for Admin Proxy (authenticated WebSocket access)
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: elohim-admin-proxy-dev
-  namespace: ethosengine
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
-    nginx.ingress.kubernetes.io/websocket-services: "elohim-edgenode-dev"
-    cert-manager.io/cluster-issuer: letsencrypt-production
-spec:
-  ingressClassName: public
-  tls:
-    - hosts:
-        - holochain-proxy-dev.elohim.host
-      secretName: holochain-proxy-dev-tls
-  rules:
-    - host: holochain-proxy-dev.elohim.host
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: elohim-edgenode-dev
-                port:
-                  number: 8080
----
-# Internal-only Ingress for direct conductor access (IP whitelisted)
-# Kept for backwards compatibility and kubectl port-forward alternative
+# Public Ingress - routes all traffic through authenticated Admin Proxy
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -257,8 +227,6 @@ metadata:
     nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
     nginx.ingress.kubernetes.io/websocket-services: "elohim-edgenode-dev"
     cert-manager.io/cluster-issuer: letsencrypt-production
-    # Whitelist: only allow access from within cluster (not usable from browsers)
-    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 spec:
   ingressClassName: public
   tls:
@@ -275,4 +243,4 @@ spec:
               service:
                 name: elohim-edgenode-dev
                 port:
-                  number: 4444
+                  number: 8080

@@ -2,6 +2,26 @@
 #
 # Integration testing environment for Holochain connectivity.
 # Accessible at: holochain-alpha.elohim.host
+#
+# Architecture:
+#   Browser -> Admin Proxy (auth + whitelist) -> Conductor (localhost)
+#
+# Ports:
+#   - 4444: Conductor Admin WebSocket (localhost only)
+#   - 8444: socat proxy (pod-internal, for legacy/direct access)
+#   - 8080: Admin Proxy (public, authenticated)
+---
+# Secret for Admin Proxy API keys
+apiVersion: v1
+kind: Secret
+metadata:
+  name: elohim-admin-proxy-alpha-secrets
+  namespace: ethosengine
+type: Opaque
+stringData:
+  # IMPORTANT: Change these in production!
+  api-key-authenticated: "alpha-elohim-auth-2024"
+  api-key-admin: "alpha-elohim-admin-2024"
 ---
 # ConfigMap for conductor configuration with restricted origins
 apiVersion: v1
@@ -16,15 +36,11 @@ data:
       - driver:
           type: websocket
           port: 4444
-          # Restrict to Elohim domains only
+          # Conductor only accepts connections from localhost (proxy sidecar)
+          # The admin proxy handles external authentication
           allowed_origins:
-            - "https://elohim.host"
-            - "https://alpha.elohim.host"
-            - "https://staging.elohim.host"
-            - "https://holochain-dev.elohim.host"
-            - "https://holochain-alpha.elohim.host"
-            - "http://localhost:4200"
             - "http://localhost:8080"
+            - "http://127.0.0.1:8080"
     network:
       bootstrap_url: "https://holostrap.elohim.host"
       signal_url: "wss://holostrap.elohim.host"
@@ -77,8 +93,9 @@ spec:
           volumeMounts:
             - name: holochain-data
               mountPath: /data
+            # Mount to template path - entrypoint.sh copies this to /etc/holochain/
             - name: conductor-config
-              mountPath: /etc/holochain/conductor-config.yaml
+              mountPath: /usr/local/share/holochain/conductor-config.template.yaml
               subPath: conductor-config.yaml
           # Use exec probe since conductor binds to localhost
           # bash supports /dev/tcp, ash/sh does not
@@ -100,14 +117,14 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 3
-        # Sidecar proxy to expose localhost-bound conductor to the pod network
+        # Socat proxy for direct pod-internal access (legacy, not publicly exposed)
         - name: ws-proxy
           image: alpine/socat:latest
           args:
             - "TCP-LISTEN:8444,fork,reuseaddr"
             - "TCP:127.0.0.1:4444"
           ports:
-            - name: admin-ws
+            - name: admin-ws-int
               containerPort: 8444
               protocol: TCP
           resources:
@@ -122,6 +139,49 @@ spec:
               port: 8444
             initialDelaySeconds: 5
             periodSeconds: 5
+        # Admin Proxy - authenticates and filters admin operations
+        - name: admin-proxy
+          image: harbor.ethosengine.com/ethosengine/elohim-admin-proxy:BUILD_NUMBER_PLACEHOLDER
+          ports:
+            - name: proxy-ws
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: CONDUCTOR_URL
+              value: "ws://localhost:4444"
+            - name: PORT
+              value: "8080"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: API_KEY_AUTHENTICATED
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-admin-proxy-alpha-secrets
+                  key: api-key-authenticated
+            - name: API_KEY_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-admin-proxy-alpha-secrets
+                  key: api-key-admin
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
       volumes:
         - name: holochain-data
           emptyDir:
@@ -141,14 +201,21 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - name: admin-ws
+    # Internal socat proxy (for kubectl port-forward or pod-to-pod)
+    - name: admin-ws-int
       port: 4444
-      targetPort: 8444  # socat proxy port
+      targetPort: 8444
+      protocol: TCP
+    # Admin Proxy (for public authenticated access)
+    - name: proxy-ws
+      port: 8080
+      targetPort: 8080
       protocol: TCP
   selector:
     app: elohim-edgenode
     environment: alpha
 ---
+# Public Ingress - routes all traffic through authenticated Admin Proxy
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -176,4 +243,4 @@ spec:
               service:
                 name: elohim-edgenode-alpha
                 port:
-                  number: 4444
+                  number: 8080
