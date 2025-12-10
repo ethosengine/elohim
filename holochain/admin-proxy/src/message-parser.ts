@@ -1,7 +1,19 @@
 import { decode, encode } from '@msgpack/msgpack';
 
 /**
+ * Envelope format used by @holochain/client
+ * The client wraps all requests in this structure:
+ * { id: number, type: "request", data: <encoded AdminRequest> }
+ */
+interface ClientEnvelope {
+  id: number;
+  type: string;
+  data: Uint8Array;
+}
+
+/**
  * Tagged message format used by Holochain admin API
+ * The inner AdminRequest has: { type: "list_apps", data: {...} }
  */
 export interface TaggedMessage {
   type: string;
@@ -10,20 +22,44 @@ export interface TaggedMessage {
 
 /**
  * Parse a MessagePack-encoded Holochain admin message.
+ * The @holochain/client double-encodes messages:
+ * - Outer: { id, type: "request", data: <encoded inner> }
+ * - Inner: { type: "list_apps", data: {...} }
+ *
  * Returns null if parsing fails.
  */
 export function parseMessage(data: Buffer): TaggedMessage | null {
   try {
-    const decoded = decode(data);
+    const envelope = decode(data) as ClientEnvelope;
 
-    // Holochain messages are objects with 'type' field
+    // Check for client envelope format
     if (
-      typeof decoded === 'object' &&
-      decoded !== null &&
-      'type' in decoded &&
-      typeof (decoded as Record<string, unknown>).type === 'string'
+      typeof envelope === 'object' &&
+      envelope !== null &&
+      envelope.type === 'request' &&
+      envelope.data instanceof Uint8Array
     ) {
-      return decoded as TaggedMessage;
+      // Decode the inner AdminRequest
+      const innerRequest = decode(envelope.data);
+
+      if (
+        typeof innerRequest === 'object' &&
+        innerRequest !== null &&
+        'type' in innerRequest &&
+        typeof (innerRequest as Record<string, unknown>).type === 'string'
+      ) {
+        return innerRequest as TaggedMessage;
+      }
+    }
+
+    // Fallback: try direct parsing (for other clients)
+    if (
+      typeof envelope === 'object' &&
+      envelope !== null &&
+      'type' in envelope &&
+      typeof (envelope as unknown as Record<string, unknown>).type === 'string'
+    ) {
+      return envelope as unknown as TaggedMessage;
     }
 
     return null;
