@@ -38,6 +38,10 @@ export class AppComponent implements OnInit {
 
   /**
    * Initialize Holochain connection on app startup.
+   *
+   * Phase 1: Tests admin proxy connectivity (list_apps only)
+   * Phase 2: Will add full app interface proxying for zome calls
+   *
    * Runs in background without blocking app initialization.
    */
   private async initializeHolochainConnection(): Promise<void> {
@@ -48,9 +52,20 @@ export class AppComponent implements OnInit {
     }
 
     try {
-      console.log('[Holochain] Auto-connecting to Edge Node...');
-      await this.holochainService.connect();
-      console.log('[Holochain] Edge Node connection established');
+      console.log('[Holochain] Testing admin proxy connection (Phase 1)...');
+
+      // Phase 1: Test admin connection only (list_apps)
+      // Full connect() requires ADMIN permission for install_app
+      // and app interface proxying which isn't implemented yet
+      const result = await this.holochainService.testAdminConnection();
+
+      if (result.success) {
+        console.log('[Holochain] Admin proxy connection successful', {
+          apps: result.apps
+        });
+      } else {
+        console.warn('[Holochain] Admin proxy connection failed:', result.error);
+      }
     } catch (err) {
       // Log error but don't crash the app - connection is optional
       console.warn('[Holochain] Edge Node auto-connect failed:', err);
