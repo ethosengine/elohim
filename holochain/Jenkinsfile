@@ -274,6 +274,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Admin Proxy') {
             when {
                 anyOf {
+                    // Always build on main/staging/dev branches to ensure image exists
+                    // These are the primary branches that may deploy to environments
+                    branch 'main'
+                    branch 'staging'
+                    branch 'dev'
+                    // Also rebuild when admin-proxy code or manifests change
                     changeset "holochain/admin-proxy/**"
                     changeset "holochain/manifests/edgenode-*.yaml"
                 }
