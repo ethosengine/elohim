@@ -11,6 +11,7 @@ export interface ProxyOptions {
   permissionLevel: PermissionLevel;
   conductorUrl: string;
   clientId: string;
+  clientOrigin?: string;
   onClose?: () => void;
 }
 
@@ -19,16 +20,19 @@ export interface ProxyOptions {
  * Filters operations based on the client's permission level.
  */
 export function createProxy(options: ProxyOptions): void {
-  const { clientWs, permissionLevel, conductorUrl, clientId, onClose } =
+  const { clientWs, permissionLevel, conductorUrl, clientId, clientOrigin, onClose } =
     options;
 
   const levelName = getPermissionLevelName(permissionLevel);
   console.log(
-    `[${clientId}] Creating proxy to ${conductorUrl} with ${levelName} access`
+    `[${clientId}] Creating proxy to ${conductorUrl} with ${levelName} access (origin: ${clientOrigin ?? 'none'})`
   );
 
-  // Connect to conductor
-  const conductorWs = new WebSocket(conductorUrl);
+  // Connect to conductor - must include Origin header (Holochain requirement)
+  // Pass through client's origin, or fall back to proxy origin
+  const conductorWs = new WebSocket(conductorUrl, {
+    origin: clientOrigin ?? 'http://localhost:8080',
+  });
 
   let conductorReady = false;
   const pendingMessages: RawData[] = [];

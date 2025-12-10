@@ -68,12 +68,16 @@ function handleUpgrade(
   console.log(`[${clientId}] Authenticated with ${levelName} access`);
 
   // Accept the WebSocket connection
+  // Pass through client's Origin header to conductor
+  const clientOrigin = request.headers.origin;
+
   wss.handleUpgrade(request, socket, head, (ws: WebSocket) => {
     createProxy({
       clientWs: ws,
       permissionLevel,
       conductorUrl: config.conductorUrl,
       clientId,
+      clientOrigin,
       onClose: () => {
         console.log(`[${clientId}] Proxy closed`);
       },
