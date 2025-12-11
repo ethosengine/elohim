@@ -52,6 +52,9 @@ export interface HolochainConfig {
 
   /** API key for admin proxy authentication (if using proxy) */
   proxyApiKey?: string;
+
+  /** Use local dev-proxy for Che environment (auto-detected, but can be forced) */
+  useLocalProxy?: boolean;
 }
 
 /**
@@ -406,6 +409,7 @@ export const DEFAULT_HOLOCHAIN_CONFIG: HolochainConfig = {
   appId: 'lamad-spike',
   happPath: '/opt/holochain/lamad-spike.happ',
   proxyApiKey: holochainConfig?.proxyApiKey,
+  useLocalProxy: holochainConfig?.useLocalProxy ?? true, // Auto-detect Che and use dev-proxy
 };
 
 /**

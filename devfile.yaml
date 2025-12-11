@@ -14,7 +14,7 @@ metadata:
     - Angular
     - Node.js
     - Java
-    - ubi9
+    - ubi10
     - Claude
   projectType: holochain
   language: Polyglot
@@ -44,6 +44,9 @@ components:
           value: user
         - name: RUST_BACKTRACE
           value: '1'
+        # Nix experimental features (required for flakes and nix develop)
+        - name: NIX_CONFIG
+          value: 'experimental-features = nix-command flakes'
         # XDG directories - use /nix-xdg subdirs (persists in nix PVC)
         - name: XDG_CACHE_HOME
           value: /nix-xdg/cache
@@ -65,6 +68,10 @@ components:
           value: /usr/local/bin/chrome
         - name: CHROME_PATH
           value: /opt/chrome-linux64/chrome
+        # PATH: Ensure holochain binaries and helper scripts are available everywhere
+        # (not just interactive shells that source .bashrc)
+        - name: PATH
+          value: '/opt/holochain/bin:/home/user/bin:/home/user/.nix-profile/bin:/home/user/.local/bin:${PATH}'
       endpoints:
         - name: angular-dev
           targetPort: 4200
@@ -74,13 +81,12 @@ components:
           targetPort: 4201
           exposure: public
           protocol: http
-        - name: hc-app
-          targetPort: 8080
+        # Holochain Dev Proxy - unified path-based routing for all conductor access
+        # Routes: /admin → :4444, /app/:port → :port, /health, /status
+        - name: hc-dev
+          targetPort: 8888
           exposure: public
           protocol: https
-        - name: hc-admin
-          targetPort: 8888
-          exposure: internal
       volumeMounts:
         - name: nix-store
           path: /nix
@@ -138,11 +144,11 @@ commands:
           --env SONARQUBE_TOKEN="$SONARQUBE_TOKEN" \
           --env SONARQUBE_URL="$SONARQUBE_URL" \
           -- java -jar /opt/mcp/sonarqube-mcp.jar
-        
+
         claude mcp remove jenkins 2>/dev/null || true
-        
+
         export JENKINS_AUTH=$(echo -n "$JENKINS_USERNAME:$JENKINS_TOKEN" | base64)
-        
+
         # Add Jenkins MCP server using HTTP transport,
         # connection might fail if the jenkins user (token owner) does not have an active oidc session
         claude mcp add jenkins "$JENKINS_URL/mcp-server/mcp" \
@@ -150,7 +156,14 @@ commands:
           --header "Authorization: Basic $JENKINS_AUTH" \
           --env JENKINS_URL="$JENKINS_URL" \
           --env JENKINS_USERNAME="$JENKINS_USERNAME" \
-          --env JENKINS_TOKEN="$JENKINS_TOKEN"     
+          --env JENKINS_TOKEN="$JENKINS_TOKEN"
+
+  - id: start-hc-dev-proxy
+    exec:
+      component: tools
+      workingDir: /projects/elohim/holochain/dev-proxy
+      commandLine: |
+        npm install && npm run build && npm start     
            
 #events:
 #  postStart:

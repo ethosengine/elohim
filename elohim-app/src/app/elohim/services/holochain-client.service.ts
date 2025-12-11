@@ -4,14 +4,17 @@
  * Manages WebSocket connections to a Holochain conductor (Edge Node).
  * Handles authentication, signing credentials, and zome calls.
  *
- * Architecture (Stage 2 - Hosted User):
- *   Browser → Admin Proxy (wss://holochain-*.elohim.host) → Conductor → DHT
+ * Architecture supports multiple environments:
  *
- * The admin proxy authenticates requests and forwards to the conductor.
- * App interface proxying (for zome calls) is Phase 2 work.
+ * 1. Eclipse Che (dev-proxy):
+ *    Browser → Dev Proxy (wss://hc-dev-...devspaces/) → Conductor (local)
+ *    Routes: /admin → :4444, /app/:port → :port
  *
- * For Stage 3+ (local app), the client connects directly to localhost
- * without going through a proxy.
+ * 2. Deployed (admin-proxy):
+ *    Browser → Admin Proxy (wss://holochain-*.elohim.host) → Conductor → DHT
+ *
+ * 3. Local development:
+ *    Browser → Conductor (ws://localhost:4444)
  *
  * @see https://github.com/holochain/holochain-client-js
  */
@@ -60,6 +63,82 @@ export class HolochainClientService {
   private config: HolochainConfig = DEFAULT_HOLOCHAIN_CONFIG;
 
   /**
+   * Detect if running in Eclipse Che environment.
+   * Checks for known Che URL patterns.
+   */
+  private isCheEnvironment(): boolean {
+    return (
+      window.location.hostname.includes('.devspaces.') ||
+      window.location.hostname.includes('.code.ethosengine.com')
+    );
+  }
+
+  /**
+   * Get the dev proxy base URL in Che environment.
+   * Looks for the hc-dev endpoint URL.
+   */
+  private getCheDevProxyUrl(): string | null {
+    if (!this.isCheEnvironment()) return null;
+
+    // In Che, each endpoint gets a unique URL like:
+    // https://<workspace>-<endpoint>.code.ethosengine.com
+    // Example: mbd06b-gmail-com-elohim-devspace-angular-dev.code.ethosengine.com
+    // We need to replace the endpoint suffix (angular-dev) with (hc-dev)
+    const currentUrl = new URL(window.location.href);
+
+    // Replace '-angular-dev' suffix with '-hc-dev' in the hostname
+    const hostname = currentUrl.hostname.replace(/-angular-dev\./, '-hc-dev.');
+
+    console.log('[Holochain] Che URL resolution:', {
+      currentHostname: currentUrl.hostname,
+      resolvedHostname: hostname,
+      devProxyUrl: `wss://${hostname}`,
+    });
+
+    return `wss://${hostname}`;
+  }
+
+  /**
+   * Resolve admin URL based on environment.
+   */
+  private resolveAdminUrl(): string {
+    const cheProxy = this.getCheDevProxyUrl();
+
+    if (cheProxy && this.config.useLocalProxy) {
+      // Che environment: use path-based routing through dev-proxy
+      const url = `${cheProxy}/admin`;
+      console.log('[Holochain] Admin URL resolved (Che dev-proxy):', url);
+      return url;
+    }
+
+    // Default: use configured URL with optional API key
+    const url = this.config.proxyApiKey
+      ? `${this.config.adminUrl}?apiKey=${encodeURIComponent(this.config.proxyApiKey)}`
+      : this.config.adminUrl;
+    console.log('[Holochain] Admin URL resolved (direct):', url);
+    return url;
+  }
+
+  /**
+   * Resolve app interface URL based on environment and port.
+   */
+  private resolveAppUrl(port: number): string {
+    const cheProxy = this.getCheDevProxyUrl();
+
+    if (cheProxy && this.config.useLocalProxy) {
+      // Che environment: use path-based routing with port through dev-proxy
+      const url = `${cheProxy}/app/${port}`;
+      console.log('[Holochain] App URL resolved (Che dev-proxy):', url);
+      return url;
+    }
+
+    // Default: direct localhost connection (works for local dev)
+    const url = `ws://localhost:${port}`;
+    console.log('[Holochain] App URL resolved (direct):', url);
+    return url;
+  }
+
+  /**
    * Test connection to admin proxy (Phase 1)
    *
    * Verifies we can reach the proxy and list apps.
@@ -74,12 +153,14 @@ export class HolochainClientService {
       this.config = { ...DEFAULT_HOLOCHAIN_CONFIG, ...config };
     }
 
+    const isChe = this.isCheEnvironment();
+    const mode = isChe && this.config.useLocalProxy ? 'Che dev-proxy' : 'direct';
+    console.log(`[Holochain] Testing admin connection (${mode})...`);
+
     this.updateState({ state: 'connecting' });
 
     try {
-      const adminUrl = this.config.proxyApiKey
-        ? `${this.config.adminUrl}?apiKey=${encodeURIComponent(this.config.proxyApiKey)}`
-        : this.config.adminUrl;
+      const adminUrl = this.resolveAdminUrl();
 
       // Browser uses native WebSocket - wsClientOptions.origin is for Node.js ws library only
       // In browser, omit wsClientOptions to avoid passing it as WebSocket subprotocol
@@ -97,12 +178,15 @@ export class HolochainClientService {
         error: undefined,
       });
 
-      console.log('Admin proxy connection successful', { apps: appIds });
+      console.log(`[Holochain] Connection successful (${mode})`, {
+        url: adminUrl,
+        apps: appIds,
+      });
 
       return { success: true, apps: appIds };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Connection failed';
-      console.error('Admin proxy connection failed:', errorMessage);
+      console.error(`[Holochain] Connection failed (${mode}):`, errorMessage);
 
       this.updateState({
         state: 'error',
@@ -134,11 +218,9 @@ export class HolochainClientService {
     this.updateState({ state: 'connecting' });
 
     try {
-      // Step 1: Connect to Admin WebSocket (optionally through proxy)
-      // If proxyApiKey is set, append it to the URL for authentication
-      const adminUrl = this.config.proxyApiKey
-        ? `${this.config.adminUrl}?apiKey=${encodeURIComponent(this.config.proxyApiKey)}`
-        : this.config.adminUrl;
+      // Step 1: Connect to Admin WebSocket (through proxy or direct)
+      const adminUrl = this.resolveAdminUrl();
+      console.log('Connecting to admin:', adminUrl, { isChe: this.isCheEnvironment() });
 
       // Browser uses native WebSocket - wsClientOptions.origin is for Node.js ws library only
       // In browser, omit wsClientOptions to avoid passing it as WebSocket subprotocol
@@ -226,10 +308,13 @@ export class HolochainClientService {
       });
 
       // Step 9: Connect to App WebSocket
-      // NOTE: This will fail from browser - localhost:port is the conductor's localhost, not browser's
-      // Phase 2 will add app interface proxying to solve this
+      // In Che: routes through dev-proxy path-based URL
+      // Local: connects directly to localhost:port
+      const appUrl = this.resolveAppUrl(appPort);
+      console.log('Connecting to app interface:', appUrl);
+
       const appWs = await AppWebsocket.connect({
-        url: new URL(`ws://localhost:${appPort}`),
+        url: new URL(appUrl),
         token: issuedToken.token,
       });
 

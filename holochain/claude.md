@@ -1,3 +1,4 @@
+
 # Holochain Infrastructure
 
 This directory contains the Holochain P2P infrastructure for the Elohim Protocol, enabling browser-to-DHT connectivity via Edge Nodes.

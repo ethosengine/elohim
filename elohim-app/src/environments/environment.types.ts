@@ -17,6 +17,8 @@ export interface HolochainEnvironmentConfig {
   appUrl: string;
   /** API key for admin proxy authentication */
   proxyApiKey?: string;
+  /** Use local dev-proxy in Eclipse Che (auto-detected if true) */
+  useLocalProxy?: boolean;
 }
 
 /**
