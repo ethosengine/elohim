@@ -4,11 +4,9 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Subject, forkJoin } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
-import { AgentService } from '../../services/agent.service';
+import { AgentService } from '@app/elohim/services/agent.service';
 import { SeoService } from '../../../services/seo.service';
-import { LearningPath, PathStep, PathChapter } from '../../models/learning-path.model';
-import { AgentProgress } from '../../models/agent.model';
-import { ContentNode } from '../../models/content-node.model';
+import { LearningPath, PathStep, PathChapter, AgentProgress, ContentNode } from '../../models';
 
 interface EnrichedStep {
   step: PathStep;

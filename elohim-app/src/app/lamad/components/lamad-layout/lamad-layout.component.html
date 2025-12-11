@@ -1,168 +1,20 @@
 <div class="lamad-container">
-  <!-- Header -->
-  <header class="lamad-header">
-    <div class="lamad-header-content">
-      <div class="lamad-logo">
-        <a routerLink="/lamad" class="logo-link">
-          <h1>📚 Lamad</h1>
-        </a>
-      </div>
-
-      <nav class="lamad-nav">
-        <a routerLink="/" class="back-link">by Elohim Protocol</a>
-      </nav>
-
-      <!-- Search Bar -->
-      <div class="search-container">
-        <form (ngSubmit)="onSearch()" class="search-form">
-          <input
-            type="text"
-            [(ngModel)]="searchQuery"
-            name="search"
-            placeholder="Search..."
-            class="search-input"
-          />
-          <button type="submit" class="search-button">🔍</button>
-        </form>
-      </div>
-
-      <!-- Session Human Info -->
-      <div class="session-human-info" *ngIf="session">
-        <a routerLink="/lamad/human" class="human-display human-display-link" title="View your profile">
-          <span class="human-icon">👤</span>
-          <span class="human-name">{{ getDisplayName() }}</span>
-          <span class="human-stats">{{ getStatsSummary() }}</span>
-        </a>
-        <button class="btn-join-network" (click)="onJoinNetwork()" title="Save your progress permanently">
-          Join Network
-        </button>
-      </div>
-
-      <!-- Theme Toggle -->
-      <div class="toolbar-theme-toggle">
-        <app-theme-toggle></app-theme-toggle>
-      </div>
+  <!-- Elohim Navigator (unified header) -->
+  <app-elohim-navigator [context]="'lamad'" [showSearch]="true">
+    <!-- Loading State -->
+    <div *ngIf="!isReady" class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading content...</p>
     </div>
-  </header>
 
-  <!-- Upgrade Prompt Banner -->
-  <div *ngIf="activeUpgradePrompt && !showUpgradeModal" class="upgrade-banner">
-    <div class="upgrade-banner-content">
-      <span class="upgrade-icon">✨</span>
-      <div class="upgrade-text">
-        <strong>{{ activeUpgradePrompt.title }}</strong>
-        <span>{{ activeUpgradePrompt.message }}</span>
-      </div>
-      <div class="upgrade-actions">
-        <button class="btn-upgrade" (click)="onJoinNetwork()">Learn More</button>
-        <button class="btn-dismiss" (click)="dismissUpgradePrompt()">✕</button>
-      </div>
+    <!-- Main Content -->
+    <div class="lamad-main" *ngIf="isReady">
+      <router-outlet></router-outlet>
     </div>
-  </div>
-
-  <!-- Loading State -->
-  <div *ngIf="!isReady" class="loading-state">
-    <div class="spinner"></div>
-    <p>Loading content...</p>
-  </div>
-
-  <!-- Main Content -->
-  <main class="lamad-main" *ngIf="isReady">
-    <router-outlet></router-outlet>
-  </main>
+  </app-elohim-navigator>
 
   <!-- Footer -->
   <footer class="lamad-footer">
     <p>Lamad Learning Platform | Where Understanding is Earned | <a routerLink="/" class="footer-link">Powered by Elohim Protocol</a></p>
   </footer>
-
-  <!-- Upgrade Modal -->
-  <dialog *ngIf="showUpgradeModal" class="modal-overlay" (click)="closeUpgradeModal()" (keydown.escape)="closeUpgradeModal()" (keydown.enter)="closeUpgradeModal()" open aria-labelledby="upgrade-modal-title">
-    <div class="upgrade-modal" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
-      <button class="modal-close" (click)="closeUpgradeModal()">✕</button>
-
-      <div class="modal-header">
-        <h2 id="upgrade-modal-title">Join the Elohim Network</h2>
-        <p class="modal-subtitle">Save your progress permanently and connect with other learners</p>
-      </div>
-
-      <div class="modal-body">
-        <div class="upgrade-benefits">
-          <h3>What you'll get:</h3>
-          <ul>
-            <li>
-              <span class="benefit-icon">💾</span>
-              <div>
-                <strong>Permanent Progress</strong>
-                <p>Your learning journey is stored securely, never lost</p>
-              </div>
-            </li>
-            <li>
-              <span class="benefit-icon">🔄</span>
-              <div>
-                <strong>Sync Across Devices</strong>
-                <p>Continue learning from any device</p>
-              </div>
-            </li>
-            <li>
-              <span class="benefit-icon">🤝</span>
-              <div>
-                <strong>Join the Community</strong>
-                <p>Connect with fellow humans on the same paths</p>
-              </div>
-            </li>
-            <li>
-              <span class="benefit-icon">🎖️</span>
-              <div>
-                <strong>Earn Attestations</strong>
-                <p>Verifiable credentials for your achievements</p>
-              </div>
-            </li>
-            <li>
-              <span class="benefit-icon">🌐</span>
-              <div>
-                <strong>Decentralized Network</strong>
-                <p>Own your data on a peer-to-peer network</p>
-              </div>
-            </li>
-          </ul>
-        </div>
-
-        <div class="upgrade-how">
-          <h3>How it works:</h3>
-          <ol>
-            <li>Install the Elohim app (available soon)</li>
-            <li>Your session progress migrates automatically</li>
-            <li>You join the p2p network and receive updates</li>
-          </ol>
-        </div>
-
-        <div class="session-summary" *ngIf="session">
-          <h3>Your Current Session:</h3>
-          <div class="summary-stats">
-            <div class="stat">
-              <span class="stat-value">{{ session.stats.nodesViewed }}</span>
-              <span class="stat-label">Content Explored</span>
-            </div>
-            <div class="stat">
-              <span class="stat-value">{{ session.stats.pathsStarted }}</span>
-              <span class="stat-label">Paths Started</span>
-            </div>
-            <div class="stat">
-              <span class="stat-value">{{ session.stats.stepsCompleted }}</span>
-              <span class="stat-label">Steps Completed</span>
-            </div>
-          </div>
-          <p class="summary-note">This progress will migrate when you join.</p>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn-secondary" (click)="closeUpgradeModal()">Continue as Visitor</button>
-        <button class="btn-primary" disabled title="Coming soon!">
-          Get Notified When Available
-        </button>
-      </div>
-    </div>
-  </dialog>
 </div>

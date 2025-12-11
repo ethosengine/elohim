@@ -5,9 +5,9 @@ import {
   DataLoaderService,
   AssessmentIndex,
   AssessmentIndexEntry
-} from './data-loader.service';
+} from '@app/elohim/services/data-loader.service';
 import { ContentNode } from '../models/content-node.model';
-import { SessionHumanService } from './session-human.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
 /**
  * Assessment result stored in localStorage (MVP) or source chain (Holochain).

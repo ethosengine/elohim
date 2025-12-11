@@ -1,11 +1,11 @@
 import { TestBed } from '@angular/core/testing';
-import { SessionHumanService } from './session-human.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import {
   SessionHuman,
   SessionActivity,
   SessionPathProgress,
   HolochainUpgradePrompt,
-} from '../models/session-human.model';
+} from '../models';
 
 describe('SessionHumanService', () => {
   let service: SessionHumanService;

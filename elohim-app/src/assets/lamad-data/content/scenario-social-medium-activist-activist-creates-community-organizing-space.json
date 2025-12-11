@@ -1,0 +1,43 @@
+{
+  "id": "scenario-social-medium-activist-activist-creates-community-organizing-space",
+  "contentType": "scenario",
+  "title": "Activist creates community organizing space",
+  "description": "the activist wants to address local housing affordability; they create a housing justice organizing space; they invite community members through trusted connections... (9 steps total)",
+  "content": "Given the activist wants to address local housing affordability\nWhen they create a housing justice organizing space\nAnd they invite community members through trusted connections\nAnd they establish space charter emphasizing transparency and consensus\nThen the organizing space is created at community layer\nAnd invitations travel through web of trust\nAnd the space has tools for decision-making and coordination\nAnd community members can contribute safely within the space\nAnd the moderation agent helps maintain healthy dialogue",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "social_medium",
+    "user_type",
+    "activist",
+    "governance_layer",
+    "community",
+    "related_users",
+    "community_moderator",
+    "related_layers",
+    "individual",
+    "elohim_agents",
+    "moderation_agent",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/social_medium/activist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-community",
+    "source-social-medium-activist-community"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "social_medium",
+    "userType": "activist",
+    "featureId": "feature-social-medium-activist-community",
+    "stepCount": 9,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-social-medium-activist-community",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.259Z",
+  "updatedAt": "2025-12-05T18:41:24.259Z"
+}

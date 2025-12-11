@@ -1,6 +1,9 @@
+import { LogLevel } from './environment.types';
+
 export const environment = {
   production: true,
-  logLevel: 'error' as 'debug' | 'info' | 'error',
+  logLevel: 'error' as LogLevel,
   environment: 'production',
-  gitHash: 'GIT_HASH_PLACEHOLDER'
+  gitHash: 'GIT_HASH_PLACEHOLDER',
+  useKuzuDb: true  // Use embedded Kuzu WASM database
 };

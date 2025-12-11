@@ -1,10 +1,10 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, forkJoin } from 'rxjs';
 import { map, switchMap, catchError } from 'rxjs/operators';
-import { DataLoaderService } from './data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { ContentNode, ContentType, ContentReach, ContentPreview } from '../models/content-node.model';
 import { LearningPath } from '../models/learning-path.model';
-import { AgentService } from './agent.service';
+import { AgentService } from '@app/elohim/services/agent.service';
 
 /**
  * Content index entry (metadata only).
@@ -273,6 +273,11 @@ export class ContentService {
     // Check if agent is in invited list
     if (contentReach === 'invited' && content.invitedAgentIds?.includes(currentAgentId)) {
       return true;
+    }
+
+    // Private content is only accessible to the author (already checked above)
+    if (contentReach === 'private') {
+      return false;
     }
 
     // Compare reach hierarchy

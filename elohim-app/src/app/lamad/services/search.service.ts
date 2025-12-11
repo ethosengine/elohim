@@ -1,10 +1,10 @@
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { DataLoaderService } from './data-loader.service';
-import { TrustBadgeService } from './trust-badge.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
 import { ContentType, ContentReach } from '../models/content-node.model';
-import { TrustLevel, calculateTrustLevel } from '../models/trust-badge.model';
+import { TrustLevel, calculateTrustLevel } from '@app/elohim/models/trust-badge.model';
 import { ContentIndexEntry } from './content.service';
 import {
   SearchQuery,

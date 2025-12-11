@@ -40,6 +40,12 @@ export interface GraphExplorationQuery {
   /** Optional: Filter by relationship type */
   relationshipFilter?: ContentRelationshipType | ContentRelationshipType[];
 
+  /** Optional: Filter by content type (e.g., only show 'path' nodes) */
+  contentTypeFilter?: string | string[];
+
+  /** Optional: Exclude certain content types from results */
+  excludeContentTypes?: string[];
+
   /** How to display results (used by UI, service returns data for all views) */
   view?: 'graph' | 'list' | 'tree';
 
@@ -48,6 +54,13 @@ export interface GraphExplorationQuery {
 
   /** Optional: Include content body or just metadata */
   includeContent?: boolean;
+
+  /**
+   * Optional: When exploring FROM a path node, expand to show contained content.
+   * If true, path nodes' relatedNodeIds are included in traversal.
+   * Default: true (paths are transparent containers)
+   */
+  expandPaths?: boolean;
 }
 
 /**

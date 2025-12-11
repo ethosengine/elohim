@@ -1,0 +1,110 @@
+{
+  "description": "Defines relationships between files that should stay in sync for the Elohim project",
+  "version": "1.0.0",
+  "relationships": {
+    "elohim-import": {
+      "description": "Elohim import pipeline - skill, CLI, and all related models/services",
+      "skill": ".claude/skills/elohim-import/SKILL.md",
+      "cli": "elohim-library/projects/elohim-service/src/cli/import.ts",
+      "models": {
+        "service": [
+          "elohim-library/projects/elohim-service/src/models/content-node.model.ts",
+          "elohim-library/projects/elohim-service/src/models/path-metadata.model.ts",
+          "elohim-library/projects/elohim-service/src/models/manifest.model.ts",
+          "elohim-library/projects/elohim-service/src/models/import-context.model.ts"
+        ],
+        "app": [
+          "elohim-app/src/app/lamad/models/content-node.model.ts",
+          "elohim-app/src/app/lamad/models/learning-path.model.ts",
+          "elohim-app/src/app/lamad/models/exploration.model.ts",
+          "elohim-app/src/app/lamad/models/human-node.model.ts",
+          "elohim-app/src/app/lamad/models/content-attestation.model.ts",
+          "elohim-app/src/app/lamad/models/trust-badge.model.ts",
+          "elohim-app/src/app/lamad/models/content-mastery.model.ts",
+          "elohim-app/src/app/lamad/models/content-lifecycle.model.ts",
+          "elohim-app/src/app/lamad/models/content-access.model.ts",
+          "elohim-app/src/app/lamad/models/knowledge-map.model.ts"
+        ]
+      },
+      "services": [
+        "elohim-library/projects/elohim-service/src/services/import-pipeline.service.ts",
+        "elohim-library/projects/elohim-service/src/services/human.service.ts",
+        "elohim-library/projects/elohim-service/src/services/standards.service.ts",
+        "elohim-library/projects/elohim-service/src/services/trust.service.ts",
+        "elohim-library/projects/elohim-service/src/services/scaffold.service.ts",
+        "elohim-library/projects/elohim-service/src/services/manifest.service.ts",
+        "elohim-library/projects/elohim-service/src/services/relationship-extractor.service.ts"
+      ],
+      "sync_rules": [
+        {
+          "trigger_pattern": "elohim-service/src/cli/import.ts",
+          "notify": ["skill"],
+          "message": "CLI commands changed - update SKILL.md documentation"
+        },
+        {
+          "trigger_pattern": "elohim-service/src/models/*.model.ts",
+          "notify": ["skill", "cli"],
+          "message": "Service model changed - may affect CLI options and skill documentation"
+        },
+        {
+          "trigger_pattern": "elohim-service/src/services/*.service.ts",
+          "notify": ["cli", "skill"],
+          "message": "Service API changed - may require CLI command updates"
+        },
+        {
+          "trigger_pattern": "elohim-app/src/app/lamad/models/*.model.ts",
+          "notify": ["skill"],
+          "message": "App model changed - update skill schema documentation"
+        },
+        {
+          "trigger_pattern": ".claude/skills/elohim-import/SKILL.md",
+          "notify": [],
+          "message": "Skill updated - no action needed"
+        }
+      ]
+    },
+    "model-sync": {
+      "description": "ContentNode models must stay in sync between service and app",
+      "pairs": [
+        {
+          "source": "elohim-library/projects/elohim-service/src/models/content-node.model.ts",
+          "target": "elohim-app/src/app/lamad/models/content-node.model.ts",
+          "sync_direction": "service-to-app",
+          "message": "ContentNode model in elohim-service changed - ensure elohim-app model is compatible"
+        }
+      ]
+    }
+  },
+  "schemas": {
+    "ContentNode": {
+      "description": "Core content unit in lamad system",
+      "definedIn": "elohim-library/projects/elohim-service/src/models/content-node.model.ts",
+      "usedBy": ["import-pipeline", "human.service", "standards.service"],
+      "fields": ["id", "contentType", "title", "description", "content", "contentFormat", "tags", "relatedNodeIds", "metadata"]
+    },
+    "PathMetadata": {
+      "description": "Metadata extracted from file system paths",
+      "definedIn": "elohim-library/projects/elohim-service/src/models/path-metadata.model.ts",
+      "usedBy": ["import-pipeline"],
+      "fields": ["fullPath", "relativePath", "domain", "epic", "userType", "contentCategory"]
+    },
+    "ContentManifest": {
+      "description": "Tracks imported content for incremental updates",
+      "definedIn": "elohim-library/projects/elohim-service/src/models/manifest.model.ts",
+      "usedBy": ["manifest.service", "import-pipeline"],
+      "fields": ["manifestVersion", "schemaVersion", "sourceHashes", "nodeHashes", "migrations"]
+    },
+    "ImportOptions": {
+      "description": "Configuration for import pipeline execution",
+      "definedIn": "elohim-library/projects/elohim-service/src/models/import-context.model.ts",
+      "usedBy": ["cli", "import-pipeline"],
+      "fields": ["mode", "sourceDir", "outputDir", "domains", "epics", "dryRun", "verbose", "skipRelationships"]
+    },
+    "Human": {
+      "description": "Human persona in the network",
+      "definedIn": "elohim-library/projects/elohim-service/src/services/human.service.ts",
+      "usedBy": ["cli"],
+      "fields": ["id", "displayName", "bio", "category", "profileReach", "location", "affinities"]
+    }
+  }
+}
