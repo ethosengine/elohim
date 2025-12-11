@@ -3,17 +3,344 @@
 
 This directory contains the Holochain P2P infrastructure for the Elohim Protocol, enabling browser-to-DHT connectivity via Edge Nodes.
 
-## Architecture
+## Development & Deployment Modes
+
+The Elohim app supports three distinct modes for connecting to Holochain, each serving different use cases:
+
+| Mode | Use Case | Conductor Location | DNS Required |
+|------|----------|-------------------|--------------|
+| **Local Dev (Eclipse Che)** | Development & testing | Local sandbox in Che | No (dev-proxy) |
+| **Remote Edge Node** | Deployed infrastructure | Kubernetes cluster | Yes |
+| **Device-Local (Packaged App)** | End-user installation | User's device | No |
+
+---
+
+## Mode 1: Local Development (Eclipse Che)
+
+**Architecture:**
+```
+Browser (Angular) → Che Endpoint (hc-dev) → Dev Proxy (:8888) → Local Conductor
+                                                                     │
+                                               ┌─────────────────────┴─────────────────────┐
+                                               │                                           │
+                                         Admin (:4444)                              App (:4445+)
+```
+
+**When to use:** Active development, debugging, testing zome calls, Playground introspection.
+
+### Starting the Local Stack
+
+```bash
+# 1. Create sandbox (first time only, from holochain/local-dev/)
+cd /projects/elohim/holochain/local-dev
+hc sandbox create --in-process-lair -d conductor1
+
+# 2. Start conductor (requires --piped for non-TTY environments like Che)
+echo "" | holochain -c /tmp/conductor1/conductor-config.yaml --piped &
+
+# 3. Attach app interface (after conductor is running)
+hc sandbox call -r 4444 add-app-ws 4445
+
+# 4. Start dev-proxy
+cd /projects/elohim/holochain/dev-proxy
+npm install && npm run build && npm start &
+
+# 5. (Optional) Start Holochain Playground
+npx @holochain-playground/cli ws://localhost:8888/admin &
+```
+
+### Dev Proxy Routes
+
+The dev-proxy provides path-based WebSocket routing:
+
+| Path | Target | Purpose |
+|------|--------|---------|
+| `/admin` | `ws://localhost:4444` | Admin interface (install apps, generate keys) |
+| `/app/:port` | `ws://localhost:port` | App interfaces (zome calls), port range 4445-4500 |
+| `/health` | HTTP 200 | Health check |
+| `/status` | JSON | Active connections, config |
+
+### Accessing from Browser
+
+The Angular app auto-detects Che environment and routes through dev-proxy:
+
+```typescript
+// HolochainClientService automatically resolves URLs:
+// - Detects *.devspaces.* or *.code.ethosengine.com hostname
+// - Replaces endpoint suffix: -angular-dev → -hc-dev
+// - Routes: wss://<workspace>-hc-dev.code.ethosengine.com/admin
+```
+
+**Che Endpoints:**
+- `angular-dev` (4200) → Angular app
+- `hc-dev` (8888) → Dev proxy (admin + app interfaces)
+- `ui-playground` (4201) → Holochain Playground (if bound)
+
+### Testing Connections
+
+```bash
+# Health check
+curl http://localhost:8888/health
+
+# Status (shows active WebSocket connections)
+curl http://localhost:8888/status | jq .
+
+# Test admin via @holochain/client
+node -e "
+const { AdminWebsocket } = require('@holochain/client');
+(async () => {
+  const admin = await AdminWebsocket.connect({ url: new URL('ws://localhost:8888/admin') });
+  console.log('Apps:', await admin.listApps({}));
+  await admin.client.close();
+})();
+"
+```
+
+### Holochain Playground
+
+Visual introspection tool for DHT state:
+
+```bash
+# Start (requires stub xdg-open in PATH for headless environments)
+mkdir -p ~/.local/bin
+echo '#!/bin/bash\necho "Would open: $1"' > ~/.local/bin/xdg-open
+chmod +x ~/.local/bin/xdg-open
+PATH="$HOME/.local/bin:$PATH" npx @holochain-playground/cli ws://localhost:8888/admin
+```
+
+Access at `http://localhost:8282` or via Che `ui-playground` endpoint.
+
+---
+
+## Mode 2: Remote Edge Node (Deployed)
+
+**Architecture:**
+```
+Browser → Admin Proxy (wss://holochain-*.elohim.host) → Conductor → DHT
+                              │
+                        IP Whitelist
+                    (internal network only)
+```
+
+**When to use:** Testing against shared infrastructure, integration testing, staging.
+
+### Endpoints
+
+| Environment | URL | Access |
+|-------------|-----|--------|
+| Dev | `wss://holochain-dev.elohim.host` | Internal network (IP whitelist) |
+| Alpha | `wss://holochain-alpha.elohim.host` | Internal network (IP whitelist) |
+
+### Connecting from Che
+
+The Angular app can connect directly to remote edge nodes from Che (internal network):
+
+```typescript
+// environment.ts - for remote mode
+holochain: {
+  adminUrl: 'wss://holochain-dev.elohim.host',
+  appUrl: 'wss://holochain-dev.elohim.host',
+  proxyApiKey: 'dev-elohim-auth-2024',
+  useLocalProxy: false,  // Disable dev-proxy, connect directly
+}
+```
+
+### Connecting from External Network
+
+External access requires port-forward (edge nodes are IP-whitelisted):
+
+```bash
+# Port forward to local machine
+kubectl port-forward -n ethosengine deploy/elohim-edgenode-dev 4444:8444
+
+# Then connect to ws://localhost:4444
+```
+
+### Dev Proxy Remote Mode
+
+The dev-proxy can also proxy to a remote conductor (useful for debugging remote issues):
+
+```bash
+# Start dev-proxy in remote mode
+CONDUCTOR_URL=wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024 npm start
+
+# Or use the npm script
+npm run start:remote
+```
+
+---
+
+## Mode 3: Device-Local (Packaged App)
+
+**Architecture:**
+```
+Packaged App (Electron/Tauri)
+         │
+         ├── Angular UI (localhost:4200 or file://)
+         │
+         └── Embedded Conductor
+                   │
+                   ├── Admin (:4444)
+                   ├── App (:4445)
+                   └── DHT (P2P via holostrap.elohim.host)
+```
+
+**When to use:** End-user installation, offline-capable apps, self-sovereign operation.
+
+### Key Differences from Cloud Deployment
+
+| Aspect | Cloud (Edge Node) | Device-Local |
+|--------|-------------------|--------------|
+| **DNS** | Required (`holochain-*.elohim.host`) | Not required |
+| **Discovery** | Via DNS + ingress | Via bootstrap/signal servers |
+| **Keys** | Custodial (server-managed) | Self-sovereign (device-local) |
+| **Always-on** | Yes (K8s keeps it running) | No (runs when app is open) |
+| **DHT Role** | Full participant, shard holder | Intermittent participant |
+| **Admin Access** | Restricted (proxy + auth) | Full local access |
+
+### Packaging Requirements
+
+1. **Holochain Binary**: Bundle `holochain` binary for target platform
+2. **Lair Keystore**: Bundle `lair-keystore` or use in-process lair
+3. **Conductor Config**: Generate at first launch with:
+   - Admin interface on localhost:4444
+   - App interface on localhost:4445
+   - Bootstrap/signal URLs for DHT discovery (holostrap.elohim.host)
+4. **hApp Bundle**: Include `.happ` file to install on first run
+
+### Conductor Configuration for Device-Local
+
+```yaml
+# conductor-config.yaml (generated at app startup)
+data_root_path: ~/.elohim/conductor
+keystore:
+  type: lair_server_in_proc
+  lair_root: ~/.elohim/conductor/ks
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 4444
+      allowed_origins: '*'
+network:
+  bootstrap_url: https://holostrap.elohim.host/
+  signal_url: wss://holostrap.elohim.host/
+  target_arc_factor: 1
+```
+
+### Angular Integration for Device-Local
+
+```typescript
+// environment.prod.ts - for packaged app
+holochain: {
+  adminUrl: 'ws://localhost:4444',   // Direct localhost, no proxy
+  appUrl: 'ws://localhost:4445',
+  proxyApiKey: undefined,            // No auth needed locally
+  useLocalProxy: false,
+}
+```
+
+### Startup Sequence for Packaged App
+
+```typescript
+// Pseudocode for Electron/Tauri main process
+async function startHolochain() {
+  // 1. Check if conductor data exists
+  const dataDir = path.join(app.getPath('userData'), 'conductor');
+  const configPath = path.join(dataDir, 'conductor-config.yaml');
+
+  // 2. Generate config if first run
+  if (!fs.existsSync(configPath)) {
+    await generateConductorConfig(configPath);
+  }
+
+  // 3. Start conductor process
+  const conductor = spawn('holochain', ['-c', configPath, '--piped'], {
+    stdio: ['pipe', 'inherit', 'inherit']
+  });
+  conductor.stdin.end(); // Close stdin for --piped mode
+
+  // 4. Wait for conductor ready (poll admin interface)
+  await waitForConductor('ws://localhost:4444');
+
+  // 5. Install hApp if not already installed
+  const admin = await AdminWebsocket.connect({ url: new URL('ws://localhost:4444') });
+  const apps = await admin.listApps({});
+  if (!apps.find(a => a.installed_app_id === 'elohim')) {
+    await admin.installApp({
+      path: path.join(process.resourcesPath, 'elohim.happ'),
+      installed_app_id: 'elohim',
+      agent_key: await admin.generateAgentPubKey(),
+    });
+    await admin.enableApp({ installed_app_id: 'elohim' });
+  }
+
+  // 6. Attach app interface if needed
+  const interfaces = await admin.listAppInterfaces();
+  if (!interfaces.find(i => i.port === 4445)) {
+    await admin.attachAppInterface({ port: 4445 });
+  }
+
+  // 7. Ready - launch UI
+  createWindow();
+}
+```
+
+### P2P Discovery Without DNS
+
+Device-local apps discover peers via Elohim's bootstrap infrastructure:
+
+1. **Bootstrap Server**: Initial peer discovery (`holostrap.elohim.host`)
+2. **Signal Server**: WebRTC signaling for NAT traversal (`holostrap.elohim.host`)
+3. **DHT Gossip**: Once connected, peers share knowledge of other peers
+
+No DNS required for the app itself - only the bootstrap/signal server needs DNS.
+
+### Offline Capability
+
+Device-local apps work offline with limitations:
+- **Source chain**: Local writes always succeed
+- **DHT reads**: Cached data available, new data unavailable
+- **DHT writes**: Queued, synced when online
+- **Validation**: Deferred until peers available
+
+---
+
+## Architecture Overview
 
 ```
-Browser → WebSocket → Edge Node (K8s) → DHT (Holochain network)
-                          ↓
-                    socat sidecar (0.0.0.0:8444)
-                          ↓
-                    Conductor (127.0.0.1:4444)
+                                    ┌─────────────────────────────────────────┐
+                                    │           DHT (P2P Network)             │
+                                    │  ┌─────┐  ┌─────┐  ┌─────┐  ┌─────┐   │
+                                    │  │Node │  │Node │  │Node │  │Node │   │
+                                    │  └──┬──┘  └──┬──┘  └──┬──┘  └──┬──┘   │
+                                    │     │       │        │        │       │
+                                    └─────┼───────┼────────┼────────┼───────┘
+                                          │       │        │        │
+            ┌─────────────────────────────┼───────┼────────┼────────┘
+            │                             │       │        │
+            ▼                             ▼       ▼        ▼
+   ┌─────────────────┐           ┌─────────────────┐    ┌─────────────────┐
+   │  Edge Node (K8s) │           │  Edge Node (K8s) │    │ Device-Local    │
+   │  holochain-dev   │           │  holochain-alpha │    │ (User's device) │
+   └────────┬────────┘           └────────┬────────┘    └────────┬────────┘
+            │                             │                      │
+            │ wss://                       │ wss://               │ ws://localhost
+            ▼                             ▼                      ▼
+   ┌─────────────────┐           ┌─────────────────┐    ┌─────────────────┐
+   │  Admin Proxy    │           │  Admin Proxy    │    │  Direct Access  │
+   │  (IP whitelist) │           │  (IP whitelist) │    │  (no auth)      │
+   └────────┬────────┘           └────────┬────────┘    └────────┬────────┘
+            │                             │                      │
+            ▼                             ▼                      ▼
+   ┌─────────────────┐           ┌─────────────────┐    ┌─────────────────┐
+   │  Browser/Che    │           │  Browser/Che    │    │  Packaged App   │
+   │  (internal net) │           │  (internal net) │    │  (Electron/etc) │
+   └─────────────────┘           └─────────────────┘    └─────────────────┘
 ```
 
-### Security Model
+---
+
+## Security Model
 
 **IMPORTANT:** The Admin WebSocket is protected by **IP whitelist** on the Ingress. Only internal network IPs can access it:
 - `10.0.0.0/8` - Kubernetes pod network
