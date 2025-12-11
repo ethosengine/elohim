@@ -1,7 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ContentIOService } from '../../services/content-io.service';
-import { ContentFormatRegistryService } from '../../services/content-format-registry.service';
+import { ContentIORegistryService } from '../../services/content-io-registry.service';
 import { ContentNode } from '../../../models/content-node.model';
 
 /**
@@ -69,7 +69,7 @@ export class ContentDownloadComponent {
 
   constructor(
     private readonly contentIO: ContentIOService,
-    private readonly registry: ContentFormatRegistryService
+    private readonly registry: ContentIORegistryService
   ) {}
 
   /**

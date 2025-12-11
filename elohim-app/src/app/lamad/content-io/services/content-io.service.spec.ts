@@ -1,14 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import { ContentIOService } from './content-io.service';
-import { ContentFormatRegistryService } from './content-format-registry.service';
-import { ContentFormatPlugin } from '../interfaces/content-format-plugin.interface';
+import { ContentIORegistryService } from './content-io-registry.service';
+import { ContentIOPlugin } from '../interfaces/content-io-plugin.interface';
 import { FormatMetadata } from '../interfaces/format-metadata.interface';
 
 describe('ContentIOService', () => {
   let service: ContentIOService;
-  let registrySpy: jasmine.SpyObj<ContentFormatRegistryService>;
+  let registrySpy: jasmine.SpyObj<ContentIORegistryService>;
 
-  const mockPlugin: Partial<ContentFormatPlugin> = {
+  const mockPlugin: ContentIOPlugin = {
     formatId: 'markdown',
     displayName: 'Markdown',
     fileExtensions: ['.md'],
@@ -40,7 +40,7 @@ describe('ContentIOService', () => {
     })
   };
 
-  const mockPluginNoImport: Partial<ContentFormatPlugin> = {
+  const mockPluginNoImport: ContentIOPlugin = {
     formatId: 'readonly',
     displayName: 'Read Only',
     fileExtensions: ['.ro'],
@@ -66,7 +66,7 @@ describe('ContentIOService', () => {
   };
 
   beforeEach(() => {
-    const registrySpyObj = jasmine.createSpyObj('ContentFormatRegistryService', [
+    const registrySpyObj = jasmine.createSpyObj('ContentIORegistryService', [
       'detectFormat',
       'detectFormatFromContent',
       'getPlugin',
@@ -78,15 +78,15 @@ describe('ContentIOService', () => {
     TestBed.configureTestingModule({
       providers: [
         ContentIOService,
-        { provide: ContentFormatRegistryService, useValue: registrySpyObj }
+        { provide: ContentIORegistryService, useValue: registrySpyObj }
       ]
     });
 
     service = TestBed.inject(ContentIOService);
-    registrySpy = TestBed.inject(ContentFormatRegistryService) as jasmine.SpyObj<ContentFormatRegistryService>;
+    registrySpy = TestBed.inject(ContentIORegistryService) as jasmine.SpyObj<ContentIORegistryService>;
 
     // Default spy returns
-    registrySpy.getPlugin.and.returnValue(mockPlugin as ContentFormatPlugin);
+    registrySpy.getPlugin.and.returnValue(mockPlugin);
     registrySpy.detectFormat.and.returnValue(Promise.resolve('markdown'));
     registrySpy.detectFormatFromContent.and.returnValue('markdown');
   });
@@ -132,7 +132,7 @@ describe('ContentIOService', () => {
     });
 
     it('should throw error if plugin does not support import', async () => {
-      registrySpy.getPlugin.and.returnValue(mockPluginNoImport as ContentFormatPlugin);
+      registrySpy.getPlugin.and.returnValue(mockPluginNoImport);
       const file = new File(['content'], 'test.ro');
 
       await expectAsync(service.importFileAs(file, 'readonly')).toBeRejectedWithError("Plugin 'readonly' does not support import");
@@ -154,7 +154,7 @@ describe('ContentIOService', () => {
     });
 
     it('should throw error if plugin does not support import', async () => {
-      registrySpy.getPlugin.and.returnValue(mockPluginNoImport as ContentFormatPlugin);
+      registrySpy.getPlugin.and.returnValue(mockPluginNoImport);
 
       await expectAsync(service.importString('content', 'readonly')).toBeRejectedWithError("Plugin 'readonly' does not support import");
     });
@@ -193,7 +193,7 @@ describe('ContentIOService', () => {
 
     it('should throw error if plugin does not support export', async () => {
       const noExportPlugin = { ...mockPlugin, canExport: false };
-      registrySpy.getPlugin.and.returnValue(noExportPlugin as ContentFormatPlugin);
+      registrySpy.getPlugin.and.returnValue(noExportPlugin);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'markdown' };
 
       await expectAsync(service.exportToFormat(node, 'markdown')).toBeRejectedWithError("Plugin 'markdown' does not support export");
@@ -202,7 +202,7 @@ describe('ContentIOService', () => {
     it('should return Blob directly if export returns Blob', async () => {
       const blob = new Blob(['test'], { type: 'text/plain' });
       const blobPlugin = { ...mockPlugin, export: jasmine.createSpy('export').and.returnValue(Promise.resolve(blob)) };
-      registrySpy.getPlugin.and.returnValue(blobPlugin as ContentFormatPlugin);
+      registrySpy.getPlugin.and.returnValue(blobPlugin);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'markdown' };
 
       const result = await service.exportToFormat(node, 'markdown');
@@ -268,7 +268,7 @@ describe('ContentIOService', () => {
     });
 
     it('should return warning if plugin does not support validation', async () => {
-      registrySpy.getPlugin.and.returnValue(mockPluginNoImport as ContentFormatPlugin);
+      registrySpy.getPlugin.and.returnValue(mockPluginNoImport);
       const file = new File(['content'], 'test.ro');
 
       const result = await service.validateFileAs(file, 'readonly');
@@ -295,7 +295,7 @@ describe('ContentIOService', () => {
     });
 
     it('should return warning if plugin does not support validation', async () => {
-      registrySpy.getPlugin.and.returnValue(mockPluginNoImport as ContentFormatPlugin);
+      registrySpy.getPlugin.and.returnValue(mockPluginNoImport);
 
       const result = await service.validateString('content', 'readonly');
 
@@ -361,7 +361,7 @@ describe('ContentIOService', () => {
 
     it('should return false if plugin does not support export', () => {
       const noExportPlugin = { ...mockPlugin, canExport: false };
-      registrySpy.getPlugin.and.returnValue(noExportPlugin as ContentFormatPlugin);
+      registrySpy.getPlugin.and.returnValue(noExportPlugin);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'markdown' };
 
       const result = service.canExport(node);
@@ -403,7 +403,7 @@ describe('ContentIOService', () => {
 
     it('should return null if plugin does not support export', async () => {
       const noExportPlugin = { ...mockPlugin, canExport: false };
-      registrySpy.getPlugin.and.returnValue(noExportPlugin as ContentFormatPlugin);
+      registrySpy.getPlugin.and.returnValue(noExportPlugin);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'markdown' };
 
       const result = await service.getExportedContent(node);

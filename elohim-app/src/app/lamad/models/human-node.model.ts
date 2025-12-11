@@ -45,7 +45,7 @@ import {
   type GovernanceLayer,
   type ReachLevel,
   type GeographicContext,
-} from '@app/elohim/models/protocol-core.model';
+} from './protocol-core.model';
 
 // Re-export core types for convenience
 export type { IntimacyLevel, ConsentState, GovernanceLayer, ReachLevel, GeographicContext };

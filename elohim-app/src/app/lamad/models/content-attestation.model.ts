@@ -21,7 +21,7 @@
  * - Revocation: creates new entry with revoked status, doesn't delete
  */
 
-import { REACH_LEVEL_VALUES } from '@app/elohim/models/protocol-core.model';
+import { REACH_LEVEL_VALUES } from './protocol-core.model';
 import type { ContentReach } from './content-node.model';
 
 // Re-export ContentReach for backward compatibility

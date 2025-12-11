@@ -45,87 +45,54 @@ describe('AppComponent', () => {
     expect(compiled.querySelector('router-outlet')).toBeTruthy();
   });
 
-  it('should show floating toggle on root landing page (/)', () => {
-    mockRouter.url = '/';
-    const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-
-    app.ngOnInit();
-
-    expect(app.showFloatingToggle).toBe(true);
-  });
-
-  it('should hide floating toggle on lamad routes', () => {
+  it('should initialize isLamadRoute based on current URL', () => {
     mockRouter.url = '/lamad/home';
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
 
     app.ngOnInit();
 
-    expect(app.showFloatingToggle).toBe(false);
+    expect(app.isLamadRoute).toBe(true);
   });
 
-  it('should hide floating toggle on shefa routes', () => {
-    mockRouter.url = '/shefa';
+  it('should set isLamadRoute to false for non-lamad routes', () => {
+    mockRouter.url = '/home';
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
 
     app.ngOnInit();
 
-    expect(app.showFloatingToggle).toBe(false);
+    expect(app.isLamadRoute).toBe(false);
   });
 
-  it('should hide floating toggle on qahal routes', () => {
-    mockRouter.url = '/qahal';
+  it('should update isLamadRoute when navigating to lamad route', () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
 
     app.ngOnInit();
-
-    expect(app.showFloatingToggle).toBe(false);
-  });
-
-  it('should update showFloatingToggle when navigating away from root', () => {
-    mockRouter.url = '/';
-    const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-
-    app.ngOnInit();
-    expect(app.showFloatingToggle).toBe(true);
 
     routerEventsSubject.next(new NavigationEnd(1, '/lamad/search', '/lamad/search'));
 
-    expect(app.showFloatingToggle).toBe(false);
+    expect(app.isLamadRoute).toBe(true);
   });
 
-  it('should update showFloatingToggle when navigating to root', () => {
+  it('should update isLamadRoute when navigating from lamad route', () => {
     mockRouter.url = '/lamad/home';
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
 
     app.ngOnInit();
-    expect(app.showFloatingToggle).toBe(false);
+    expect(app.isLamadRoute).toBe(true);
 
-    routerEventsSubject.next(new NavigationEnd(2, '/', '/'));
+    routerEventsSubject.next(new NavigationEnd(2, '/home', '/home'));
 
-    expect(app.showFloatingToggle).toBe(true);
+    expect(app.isLamadRoute).toBe(false);
   });
 
-  it('should render theme toggle component on root page', () => {
-    mockRouter.url = '/';
+  it('should render theme toggle component', () => {
     const fixture = TestBed.createComponent(AppComponent);
-    fixture.componentInstance.ngOnInit();
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('app-theme-toggle')).toBeTruthy();
-  });
-
-  it('should not render theme toggle component on non-root pages', () => {
-    mockRouter.url = '/lamad';
-    const fixture = TestBed.createComponent(AppComponent);
-    fixture.componentInstance.ngOnInit();
-    fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('app-theme-toggle')).toBeFalsy();
   });
 });
