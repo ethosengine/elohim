@@ -1,1 +1,2 @@
-export * from './markdown-format.plugin';
+export * from './markdown-io.plugin';
+export * from './markdown-io.module';

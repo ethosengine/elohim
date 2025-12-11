@@ -1,18 +1,19 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter, ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { of, throwError, BehaviorSubject } from 'rxjs';
 import { PathOverviewComponent } from './path-overview.component';
 import { PathService } from '../../services/path.service';
-import { AgentService } from '@app/elohim/services/agent.service';
+import { AgentService } from '../../services/agent.service';
 import { SeoService } from '../../../services/seo.service';
-import { LearningPath, AgentProgress } from '../../models';
+import { LearningPath } from '../../models/learning-path.model';
+import { AgentProgress } from '../../models/agent.model';
 
 describe('PathOverviewComponent', () => {
   let component: PathOverviewComponent;
   let fixture: ComponentFixture<PathOverviewComponent>;
   let pathService: jasmine.SpyObj<PathService>;
   let agentService: jasmine.SpyObj<AgentService>;
-  let router: Router;
+  let router: jasmine.SpyObj<Router>;
   let paramsSubject: BehaviorSubject<any>;
 
   const mockPath: LearningPath = {
@@ -124,6 +125,7 @@ describe('PathOverviewComponent', () => {
       'getChapterFirstStep'
     ]);
     const agentServiceSpy = jasmine.createSpyObj('AgentService', ['getProgressForPath']);
+    const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
     const seoServiceSpy = jasmine.createSpyObj('SeoService', ['updateForPath', 'updateSeo', 'setTitle']);
 
     paramsSubject = new BehaviorSubject({ pathId: 'test-path' });
@@ -131,9 +133,9 @@ describe('PathOverviewComponent', () => {
     await TestBed.configureTestingModule({
       imports: [PathOverviewComponent],
       providers: [
-        provideRouter([]),
         { provide: PathService, useValue: pathServiceSpy },
         { provide: AgentService, useValue: agentServiceSpy },
+        { provide: Router, useValue: routerSpy },
         { provide: SeoService, useValue: seoServiceSpy },
         {
           provide: ActivatedRoute,
@@ -144,8 +146,7 @@ describe('PathOverviewComponent', () => {
 
     pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
     agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
-    router = TestBed.inject(Router);
-    spyOn(router, 'navigate');
+    router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
 
     pathService.getPath.and.returnValue(of(mockPath));
     agentService.getProgressForPath.and.returnValue(of(mockProgress));

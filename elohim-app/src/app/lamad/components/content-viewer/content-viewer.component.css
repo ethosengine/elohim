@@ -180,34 +180,12 @@
   border: 1px solid rgba(99, 102, 241, 0.2);
 }
 
-/* Content actions (download, edit, etc.) */
+/* Content actions (download, etc.) */
 .content-actions {
   margin-top: 1.5rem;
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
-}
-
-.btn-edit {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: var(--lamad-bg-tertiary, #f5f5f5);
-  color: var(--lamad-text-primary, #333);
-  border: 1px solid var(--lamad-border, #ddd);
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s;
-}
-
-.btn-edit:hover {
-  background: var(--lamad-primary, #6366f1);
-  color: white;
-  border-color: var(--lamad-primary, #6366f1);
 }
 
 /* Affinity panel */

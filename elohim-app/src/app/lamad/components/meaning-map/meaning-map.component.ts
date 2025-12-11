@@ -3,9 +3,10 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { Subject, combineLatest } from 'rxjs';
 import { takeUntil, map } from 'rxjs/operators';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
-import { ContentNode, CategoryAffinityStats } from '../../models';
+import { DataLoaderService } from '../../services/data-loader.service';
+import { AffinityTrackingService } from '../../services/affinity-tracking.service';
+import { ContentNode } from '../../models/content-node.model';
+import { CategoryAffinityStats } from '../../models/human-affinity.model';
 
 interface CategorySection {
   name: string;

@@ -4,9 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHumanService } from '../../services/session-human.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
-import { SessionHuman, SessionActivity, SessionPathProgress, MasteryStats, MasteryLevel } from '../../models';
+import { SessionHuman, SessionActivity, SessionPathProgress } from '../../models/session-human.model';
+import { MasteryStats } from '../../models/content-mastery.model';
+import { MasteryLevel } from '../../models/agent.model';
 
 /**
  * ProfilePageComponent - Session Human profile management.

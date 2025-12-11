@@ -3,21 +3,6 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@app/shared": ["src/app/shared/index.ts"],
-      "@app/shared/*": ["src/app/shared/*"],
-      "@app/elohim": ["src/app/elohim/index.ts"],
-      "@app/elohim/*": ["src/app/elohim/*"],
-      "@app/imagodei": ["src/app/imagodei/index.ts"],
-      "@app/imagodei/*": ["src/app/imagodei/*"],
-      "@app/lamad": ["src/app/lamad/index.ts"],
-      "@app/lamad/*": ["src/app/lamad/*"],
-      "@app/qahal": ["src/app/qahal/index.ts"],
-      "@app/qahal/*": ["src/app/qahal/*"],
-      "@app/shefa": ["src/app/shefa/index.ts"],
-      "@app/shefa/*": ["src/app/shefa/*"]
-    },
     "outDir": "./dist/out-tsc",
     "strict": true,
     "noImplicitOverride": true,

@@ -5,22 +5,16 @@ import { of } from 'rxjs';
 import { HomeComponent } from './home.component';
 import { ConfigService } from '../../services/config.service';
 import { AnalyticsService } from '../../services/analytics.service';
-import { DomInteractionService } from '../../services/dom-interaction.service';
 
 describe('HomeComponent', () => {
   let component: HomeComponent;
   let fixture: ComponentFixture<HomeComponent>;
   let mockConfigService: jasmine.SpyObj<ConfigService>;
   let mockAnalyticsService: jasmine.SpyObj<AnalyticsService>;
-  let mockDomInteractionService: jasmine.SpyObj<DomInteractionService>;
 
   beforeEach(async () => {
     mockConfigService = jasmine.createSpyObj('ConfigService', ['getConfig']);
     mockAnalyticsService = jasmine.createSpyObj('AnalyticsService', ['trackEvent']);
-    mockDomInteractionService = jasmine.createSpyObj('DomInteractionService', [
-      'setupScrollIndicator',
-      'setupHeroTitleAnimation'
-    ]);
 
     mockConfigService.getConfig.and.returnValue(of({
       logLevel: 'info' as const,
@@ -32,7 +26,6 @@ describe('HomeComponent', () => {
       providers: [
         { provide: ConfigService, useValue: mockConfigService },
         { provide: AnalyticsService, useValue: mockAnalyticsService },
-        { provide: DomInteractionService, useValue: mockDomInteractionService },
         provideRouter([]),
         provideHttpClient()
       ]
@@ -54,6 +47,8 @@ describe('HomeComponent', () => {
   it('should setup scroll listeners on init', (done) => {
     const scrollSpy = spyOn<any>(component, 'setupParallaxScrolling');
     const observerSpy = spyOn<any>(component, 'setupIntersectionObserver');
+    const scrollIndicatorSpy = spyOn<any>(component, 'setupScrollIndicator');
+    const heroTitleSpy = spyOn<any>(component, 'setupHeroTitleInteraction');
 
     fixture.detectChanges();
 
@@ -61,8 +56,8 @@ describe('HomeComponent', () => {
     setTimeout(() => {
       expect(scrollSpy).toHaveBeenCalled();
       expect(observerSpy).toHaveBeenCalled();
-      expect(mockDomInteractionService.setupScrollIndicator).toHaveBeenCalled();
-      expect(mockDomInteractionService.setupHeroTitleAnimation).toHaveBeenCalled();
+      expect(scrollIndicatorSpy).toHaveBeenCalled();
+      expect(heroTitleSpy).toHaveBeenCalled();
       done();
     }, 100);
   });

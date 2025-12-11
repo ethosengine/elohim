@@ -1,28 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { KuzuDataService } from '@app/elohim/services/kuzu-data.service';
-import { LearningPath, PathIndex, ContentNode, AgentProgress } from '../models';
-import { of, throwError } from 'rxjs';
-
-// Override environment for tests to disable Kuzu
-import { environment } from '../../../environments/environment';
+import { DataLoaderService } from './data-loader.service';
+import { LearningPath, PathIndex } from '../models/learning-path.model';
+import { ContentNode } from '../models/content-node.model';
+import { AgentProgress } from '../models/agent.model';
 
 describe('DataLoaderService', () => {
   let service: DataLoaderService;
   let httpMock: HttpTestingController;
-  let originalUseKuzuDb: boolean;
   const basePath = '/assets/lamad-data';
-
-  // Mock KuzuDataService to prevent actual WASM initialization in tests
-  const mockKuzuDataService = {
-    initialize: jasmine.createSpy('initialize').and.returnValue(Promise.resolve()),
-    getPath: jasmine.createSpy('getPath'),
-    getContent: jasmine.createSpy('getContent'),
-    getPathIndex: jasmine.createSpy('getPathIndex'),
-    getContentIndex: jasmine.createSpy('getContentIndex'),
-    clearCache: jasmine.createSpy('clearCache')
-  };
 
   const mockPath: LearningPath = {
     id: 'test-path',
@@ -83,32 +69,13 @@ describe('DataLoaderService', () => {
   };
 
   beforeEach(() => {
-    // Disable Kuzu for tests - force JSON fallback
-    originalUseKuzuDb = (environment as any).useKuzuDb;
-    (environment as any).useKuzuDb = false;
-
-    // Reset spies between tests
-    Object.values(mockKuzuDataService).forEach(spy => {
-      if (spy && typeof spy.calls !== 'undefined') {
-        spy.calls.reset();
-      }
-    });
-
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [
-        DataLoaderService,
-        { provide: KuzuDataService, useValue: mockKuzuDataService }
-      ]
+      providers: [DataLoaderService]
     });
 
     service = TestBed.inject(DataLoaderService);
     httpMock = TestBed.inject(HttpTestingController);
-  });
-
-  afterEach(() => {
-    // Restore original environment value
-    (environment as any).useKuzuDb = originalUseKuzuDb;
   });
 
   afterEach(() => {
@@ -238,24 +205,24 @@ describe('DataLoaderService', () => {
   });
 
   describe('getAgentProgress', () => {
-    it('should load agent progress from localStorage', (done) => {
-      const progressJson = JSON.stringify(mockProgress);
-      spyOn(localStorage, 'getItem').and.returnValue(progressJson);
-
+    it('should load agent progress', (done) => {
       service.getAgentProgress('test-agent', 'test-path').subscribe(progress => {
         expect(progress).toEqual(mockProgress);
-        expect(localStorage.getItem).toHaveBeenCalledWith('lamad-progress-test-agent-test-path');
         done();
       });
+
+      const req = httpMock.expectOne(`${basePath}/progress/test-agent/test-path.json`);
+      req.flush(mockProgress);
     });
 
-    it('should return null if progress not in localStorage', (done) => {
-      spyOn(localStorage, 'getItem').and.returnValue(null);
-
+    it('should return null if progress not found', (done) => {
       service.getAgentProgress('test-agent', 'missing-path').subscribe(progress => {
         expect(progress).toBeNull();
         done();
       });
+
+      const req = httpMock.expectOne(`${basePath}/progress/test-agent/missing-path.json`);
+      req.error(new ProgressEvent('error'), { status: 404 });
     });
   });
 

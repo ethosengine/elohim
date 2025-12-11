@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { AssessmentService, AssessmentSession, AssessmentResult } from './assessment.service';
-import { DataLoaderService, AssessmentIndex, AssessmentIndexEntry } from '@app/elohim/services/data-loader.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { DataLoaderService, AssessmentIndex, AssessmentIndexEntry } from './data-loader.service';
+import { SessionHumanService } from './session-human.service';
 import { ContentNode } from '../models/content-node.model';
 
 describe('AssessmentService', () => {

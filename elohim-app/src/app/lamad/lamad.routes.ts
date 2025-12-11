@@ -71,23 +71,6 @@ export const LAMAD_ROUTES: Routes = [
           )
       },
 
-      // Content Editor - edit existing content
-      {
-        path: 'resource/:resourceId/edit',
-        loadComponent: () =>
-          import('./components/content-editor-page/content-editor-page.component').then(
-            m => m.ContentEditorPageComponent
-          ),
-        data: {
-          title: 'Edit Content',
-          seo: {
-            title: 'Edit Content',
-            description: 'Edit content in the knowledge graph.',
-            openGraph: { ogType: 'website' }
-          }
-        }
-      },
-
       // ============================================
       // AGENT CONTEXT
       // ============================================

@@ -2,9 +2,9 @@ import { Injectable } from '@angular/core';
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 import { tap, switchMap } from 'rxjs/operators';
 
-import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
-import { HumanConsentService } from '@app/shared/services/human-consent.service';
-import { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
+import { LocalSourceChainService } from './local-source-chain.service';
+import { HumanConsentService } from './human-consent.service';
+import { AffinityTrackingService } from './affinity-tracking.service';
 import {
   PathNegotiation,
   NegotiationStatus,
@@ -17,9 +17,9 @@ import {
   ProposedPathStructure,
   isNegotiationActive,
   isNegotiationResolved,
-  PathNegotiationContent
-} from '../models';
-import { hasMinimumIntimacy } from '@app/elohim/models/human-consent.model';
+} from '../models/path-negotiation.model';
+import { hasMinimumIntimacy } from '../models/human-consent.model';
+import { PathNegotiationContent } from '../models/source-chain.model';
 
 /**
  * PathNegotiationService - Placeholder for Elohim-to-Elohim path negotiation.

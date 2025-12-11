@@ -12,27 +12,19 @@ import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.com
 })
 export class AppComponent implements OnInit {
   title = 'elohim-app';
-  /** Show floating theme toggle only on root landing page */
-  showFloatingToggle = false;
+  isLamadRoute = false;
 
   constructor(private readonly router: Router) {}
 
   ngOnInit(): void {
-    // Track route changes to show floating toggle only on root landing page
+    // Track route changes to hide floating toggle on lamad routes
     this.router.events
       .pipe(filter(event => event instanceof NavigationEnd))
       .subscribe((event: NavigationEnd) => {
-        this.showFloatingToggle = this.isRootLandingPage(event.url);
+        this.isLamadRoute = event.url.startsWith('/lamad');
       });
 
     // Check initial route
-    this.showFloatingToggle = this.isRootLandingPage(this.router.url);
-  }
-
-  /** Check if URL is the root landing page (/ or empty) */
-  private isRootLandingPage(url: string): boolean {
-    // Strip query params and fragments
-    const path = url.split('?')[0].split('#')[0];
-    return path === '/' || path === '';
+    this.isLamadRoute = this.router.url.startsWith('/lamad');
   }
 }

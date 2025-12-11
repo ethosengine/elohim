@@ -14,14 +14,14 @@
  * Reference: Anderson & Krathwohl (2001), Bloom's Revised Taxonomy
  */
 
-import type { MasteryLevel } from '@app/elohim/models/agent.model';
+import type { MasteryLevel } from './agent.model';
 
 // Re-export for convenience
-export type { MasteryLevel } from '@app/elohim/models/agent.model';
-export { MASTERY_LEVEL_VALUES, ATTESTATION_GATE_LEVEL } from '@app/elohim/models/agent.model';
+export type { MasteryLevel } from './agent.model';
+export { MASTERY_LEVEL_VALUES, ATTESTATION_GATE_LEVEL } from './agent.model';
 
 /** @deprecated Use MASTERY_LEVEL_VALUES instead */
-export { BLOOM_LEVEL_VALUES } from '@app/elohim/models/agent.model';
+export { BLOOM_LEVEL_VALUES } from './agent.model';
 
 /**
  * ContentMastery - A human's mastery state for a specific content node.

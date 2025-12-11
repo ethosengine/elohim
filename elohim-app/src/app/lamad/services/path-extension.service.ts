@@ -3,7 +3,6 @@ import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 import { map, switchMap, tap } from 'rxjs/operators';
 
 import { PathService } from './path.service';
-import { generateExtensionId } from '@app/shared/utils';
 import { PathStep, LearningPath } from '../models/learning-path.model';
 import {
   PathExtension,
@@ -150,7 +149,7 @@ export class PathExtensionService {
           return throwError(() => ({ code: 'NOT_FOUND', message: 'Base path not found' }));
         }
 
-        const extensionId = generateExtensionId();
+        const extensionId = `ext-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`; // NOSONAR - Non-cryptographic extension ID generation
         const now = new Date().toISOString();
 
         const newExtension: PathExtension = {
@@ -190,7 +189,7 @@ export class PathExtensionService {
           return throwError(() => ({ code: 'NOT_FOUND', message: 'Extension not found' }));
         }
 
-        const forkedId = generateExtensionId();
+        const forkedId = `ext-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`; // NOSONAR - Non-cryptographic extension ID generation
         const now = new Date().toISOString();
 
         const forkedExtension: PathExtension = {

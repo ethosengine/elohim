@@ -1,8 +1,6 @@
-import { LogLevel } from './environment.types';
-
 export const environment = {
   production: false,
-  logLevel: 'debug' as LogLevel,
+  logLevel: 'debug' as 'debug' | 'info' | 'error',
   environment: 'alpha',
   gitHash: 'GIT_HASH_PLACEHOLDER'
 };
