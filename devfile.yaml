@@ -1,54 +1,70 @@
 schemaVersion: 2.2.0
 metadata:
   name: elohim-devspace
-  displayName: Che Image and Workspace Development
+  displayName: Holochain + Angular Development Environment
   description: >-
-    Universal Developer Image provides various programming languages tools and
-    runtimes for instant coding, plus ai utilities
+    Full-stack development with Holochain (Rust/Nix) backend and Angular frontend,
+    plus Claude AI utilities
   icon: >-
     https://raw.githubusercontent.com/devfile/devfile-web/main/apps/landing-page/public/pwa-192x192.png
   tags:
-    - Java
-    - Maven
-    - Scala
-    - PHP
-    - .NET
+    - Rust
+    - Nix
+    - Holochain
+    - Angular
     - Node.js
-    - Go
-    - Python
-    - Pip
+    - Java
     - ubi9
     - Claude
-  projectType: universal
+  projectType: holochain
   language: Polyglot
-  version: 1.0.0
-  projects:
-  - name: che-devworkspaces
+  version: 2.0.0
+
+projects:
+  - name: elohim
     git:
       remotes:
-        origin: https://github.com/ethosengine/che-devworkspaces.git
+        origin: https://github.com/ethosengine/elohim.git
+
 components:
   - name: tools
     container:
-      image:  harbor.ethosengine.com/devspaces/udi-plus-angular:latest
-      memoryLimit: 4G
-      memoryRequest: 1G
+      image: harbor.ethosengine.com/devspaces/rust-nix-dev:latest
+      memoryLimit: 8Gi
+      memoryRequest: 2Gi
+      cpuLimit: '2'
+      cpuRequest: '500m'
       mountSources: true
+      sourceMapping: /projects
       env:
+        # Claude and general config
         - name: CLAUDE_CONFIG_DIR
           value: /projects/.claude-config
+        - name: USER
+          value: user
+        - name: RUST_BACKTRACE
+          value: '1'
+        # XDG directories - use /nix-xdg subdirs (persists in nix PVC)
+        - name: XDG_CACHE_HOME
+          value: /nix-xdg/cache
+        - name: XDG_DATA_HOME
+          value: /nix-xdg/data
+        - name: XDG_STATE_HOME
+          value: /nix-xdg/state
         - name: XDG_CONFIG_HOME
-          value: /projects/.config
+          value: /nix-xdg/config
         - name: NPM_CONFIG_CACHE
-          value: /tmp/npm-cache
+          value: /nix-xdg/cache/npm
         - name: CYPRESS_CACHE_FOLDER
-          value: /tmp/cypress-cache
+          value: /nix-xdg/cache/cypress
+        # Jenkins integration
         - name: JENKINS_URL
           value: "https://jenkins.ethosengine.com"
+        # Chrome for Angular testing
         - name: CHROME_BIN
           value: /usr/local/bin/chrome
         - name: CHROME_PATH
-          value: /opt/chrome-linux64/chrome  
+          value: /opt/chrome-linux64/chrome
       endpoints:
         - name: angular-dev
           targetPort: 4200
@@ -58,6 +74,39 @@ components:
           targetPort: 4201
           exposure: public
           protocol: http
+        - name: hc-app
+          targetPort: 8080
+          exposure: public
+          protocol: https
+        - name: hc-admin
+          targetPort: 8888
+          exposure: internal
+      volumeMounts:
+        - name: nix-store
+          path: /nix
+        - name: nix-xdg
+          path: /nix-xdg
+        - name: cargo-cache
+          path: /home/user/.cargo
+        - name: rustup-cache
+          path: /home/user/.rustup
+
+  # Nix store volume - required for Nix/Holochain tooling
+  - name: nix-store
+    volume:
+      size: 25Gi
+  # XDG directories for Nix cache/config
+  - name: nix-xdg
+    volume:
+      size: 2Gi
+  # Cargo cache - dependency artifacts and incremental builds
+  - name: cargo-cache
+    volume:
+      size: 3Gi
+  # Rustup toolchain cache
+  - name: rustup-cache
+    volume:
+      size: 2Gi
 commands:
   - id: setup-npm-env
     exec:
@@ -101,10 +150,10 @@ commands:
           --header "Authorization: Basic $JENKINS_AUTH" \
           --env JENKINS_URL="$JENKINS_URL" \
           --env JENKINS_USERNAME="$JENKINS_USERNAME" \
-          --env JENKINS_TOKEN="$JENKINS_TOKEN"      
+          --env JENKINS_TOKEN="$JENKINS_TOKEN"     
            
-events:
-  postStart:
-    - setup-vscode-cli
-    - setup-npm-env
-    - setup-claude-mcp
+#events:
+#  postStart:
+#    - setup-vscode-cli
+#    - setup-npm-env
+#   - setup-claude-mcp
