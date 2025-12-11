@@ -9,6 +9,8 @@
 export { DataLoaderService } from './data-loader.service';
 export { KuzuDataService } from './kuzu-data.service';
 export { LocalSourceChainService } from './local-source-chain.service';
+export { HolochainClientService } from './holochain-client.service';
+export { HolochainContentService } from './holochain-content.service';
 
 // Agent & Trust
 export { AgentService } from './agent.service';

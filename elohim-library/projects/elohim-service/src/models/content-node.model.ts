@@ -40,6 +40,17 @@ export type ContentFormat =
   | 'assessment-json';
 
 /**
+ * Content reach level - visibility scope
+ */
+export type ContentReach =
+  | 'private'
+  | 'invited'
+  | 'local'
+  | 'community'
+  | 'federated'
+  | 'commons';
+
+/**
  * Relationship types between content nodes
  */
 export enum ContentRelationshipType {
@@ -159,7 +170,7 @@ export interface ContentNode {
   authorId?: string;
 
   /** Reach level (defaults to 'commons' for imported content) */
-  reach?: 'private' | 'invited' | 'local' | 'community' | 'federated' | 'commons';
+  reach?: ContentReach;
 
   /** Creation timestamp (ISO 8601) */
   createdAt: string;

@@ -34,3 +34,8 @@ tmp/
 out-tsc/
 *.log
 output/
+
+# Rust/Holochain
+target/
+*.happ
+*.dna
