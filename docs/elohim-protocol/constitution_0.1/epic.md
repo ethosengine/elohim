@@ -3,6 +3,10 @@
 
 *"Where your treasure is, there your heart will be also."* — Matthew 6:21
 
+*"Take my heart now, take and seal it, seal it for thy courts above."* — Robert Robinson, "Come Thou Fount of Every Blessing"
+
+Robert Robinson wrote that hymn knowing his own heart's tendency to wander—and asking for it to be sealed to something permanent. That's exactly what the constitutional architecture does. Not trusting our hearts to stay true on their own, but anchoring them to commitments we made when we were at our best.
+
 ---
 
 ## Executive Summary
