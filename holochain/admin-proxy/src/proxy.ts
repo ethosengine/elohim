@@ -12,20 +12,25 @@ export interface ProxyOptions {
   conductorUrl: string;
   clientId: string;
   clientOrigin?: string;
+  /** Skip message parsing and filtering (dev mode) */
+  passthrough?: boolean;
   onClose?: () => void;
 }
 
 /**
  * Creates a bidirectional WebSocket proxy between client and Holochain conductor.
  * Filters operations based on the client's permission level.
+ *
+ * In passthrough mode (dev), skips message parsing and filtering entirely.
  */
 export function createProxy(options: ProxyOptions): void {
-  const { clientWs, permissionLevel, conductorUrl, clientId, clientOrigin, onClose } =
+  const { clientWs, permissionLevel, conductorUrl, clientId, clientOrigin, passthrough, onClose } =
     options;
 
   const levelName = getPermissionLevelName(permissionLevel);
+  const mode = passthrough ? 'passthrough' : 'filtered';
   console.log(
-    `[${clientId}] Creating proxy to ${conductorUrl} with ${levelName} access (origin: ${clientOrigin ?? 'none'})`
+    `[${clientId}] Creating ${mode} proxy to ${conductorUrl} with ${levelName} access (origin: ${clientOrigin ?? 'none'})`
   );
 
   // Connect to conductor - must include Origin header (Holochain requirement)
@@ -53,36 +58,48 @@ export function createProxy(options: ProxyOptions): void {
     clientWs.close(1011, 'Conductor connection error');
   });
 
-  // Client -> Conductor (with filtering)
-  clientWs.on('message', (data: RawData) => {
-    const buffer = toBuffer(data);
-    const message = parseMessage(buffer);
+  // Client -> Conductor
+  if (passthrough) {
+    // Dev mode: simple passthrough without parsing/filtering
+    clientWs.on('message', (data: RawData) => {
+      if (conductorReady) {
+        conductorWs.send(data);
+      } else {
+        pendingMessages.push(data);
+      }
+    });
+  } else {
+    // Production mode: parse and filter messages
+    clientWs.on('message', (data: RawData) => {
+      const buffer = toBuffer(data);
+      const message = parseMessage(buffer);
 
-    if (!message) {
-      console.warn(`[${clientId}] Failed to parse message, blocking`);
-      clientWs.send(encodeError('Invalid message format'));
-      return;
-    }
+      if (!message) {
+        console.warn(`[${clientId}] Failed to parse message, blocking`);
+        clientWs.send(encodeError('Invalid message format'));
+        return;
+      }
 
-    const { type } = message;
+      const { type } = message;
 
-    if (!isOperationAllowed(type, permissionLevel)) {
-      console.warn(
-        `[${clientId}] BLOCKED operation '${type}' (requires higher than ${levelName})`
-      );
-      clientWs.send(encodeError(`Operation '${type}' not permitted`));
-      return;
-    }
+      if (!isOperationAllowed(type, permissionLevel)) {
+        console.warn(
+          `[${clientId}] BLOCKED operation '${type}' (requires higher than ${levelName})`
+        );
+        clientWs.send(encodeError(`Operation '${type}' not permitted`));
+        return;
+      }
 
-    console.log(`[${clientId}] ALLOWED operation '${type}'`);
+      console.log(`[${clientId}] ALLOWED operation '${type}'`);
 
-    if (conductorReady) {
-      conductorWs.send(data);
-    } else {
-      // Queue message until conductor is ready
-      pendingMessages.push(data);
-    }
-  });
+      if (conductorReady) {
+        conductorWs.send(data);
+      } else {
+        // Queue message until conductor is ready
+        pendingMessages.push(data);
+      }
+    });
+  }
 
   // Conductor -> Client (no filtering needed for responses)
   conductorWs.on('message', (data: RawData) => {
@@ -137,17 +154,35 @@ export interface AppProxyOptions {
   appPort: number;
   clientId: string;
   clientOrigin?: string;
+  /** Original request URL (to forward query params like token) */
+  originalUrl?: string;
   onClose?: () => void;
 }
 
 /**
  * Creates a simple passthrough proxy for app interface connections.
  * No message filtering - app interfaces don't need permission checks.
+ * Forwards query parameters (like auth token) to the conductor.
  */
 export function createAppProxy(options: AppProxyOptions): void {
-  const { clientWs, appPort, clientId, clientOrigin, onClose } = options;
+  const { clientWs, appPort, clientId, clientOrigin, originalUrl, onClose } = options;
 
-  const appUrl = `ws://localhost:${appPort}`;
+  // Build app URL, forwarding query params (except apiKey which is for our proxy)
+  let appUrl = `ws://localhost:${appPort}`;
+  if (originalUrl) {
+    try {
+      const url = new URL(originalUrl, 'http://localhost');
+      // Remove our apiKey param, keep others (like token)
+      url.searchParams.delete('apiKey');
+      const queryString = url.searchParams.toString();
+      if (queryString) {
+        appUrl += `?${queryString}`;
+      }
+    } catch {
+      // Ignore URL parsing errors
+    }
+  }
+
   console.log(`[${clientId}] Creating app proxy to ${appUrl} (origin: ${clientOrigin ?? 'none'})`);
 
   // Connect to conductor app interface

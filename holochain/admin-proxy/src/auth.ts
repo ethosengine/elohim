@@ -4,11 +4,18 @@ import type { Config } from './config.js';
 /**
  * Validates an API key and returns the corresponding permission level.
  * Returns null if the key is invalid.
+ *
+ * In dev mode, grants ADMIN access to all connections (no key required).
  */
 export function validateApiKey(
   apiKey: string | null,
   config: Config
 ): PermissionLevel | null {
+  // Dev mode: grant full access to everyone
+  if (config.devMode) {
+    return PermissionLevel.ADMIN;
+  }
+
   // No API key = public access (read-only)
   // Empty string is treated as invalid (user tried to provide key but it's empty)
   if (apiKey === null) {

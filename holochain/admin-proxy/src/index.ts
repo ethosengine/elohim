@@ -1,14 +1,31 @@
+/**
+ * Elohim Holochain Proxy
+ *
+ * Unified proxy for both development and production use.
+ *
+ * Routes:
+ *   /          → Conductor admin interface
+ *   /admin     → Conductor admin interface
+ *   /app/:port → Conductor app interface (dynamic port)
+ *   /health    → Health check endpoint
+ *   /status    → Proxy status and active connections
+ *
+ * Modes:
+ *   DEV_MODE=true  → No auth, passthrough all operations
+ *   DEV_MODE=false → API key auth, operation filtering
+ */
+
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { loadConfig, Config } from './config.js';
+import { loadConfig, Config, isCheEnvironment, getCheInfo } from './config.js';
 import { validateApiKey, extractApiKey } from './auth.js';
 import { createProxy, createAppProxy } from './proxy.js';
-import { getPermissionLevelName, PermissionLevel } from './permissions.js';
+import { getPermissionLevelName } from './permissions.js';
 import type { Duplex } from 'stream';
 
-// App interface port range (matches dev-proxy)
-const APP_PORT_MIN = 4445;
-const APP_PORT_MAX = 65535;
+let config: Config;
+let connectionCounter = 0;
+const activeConnections = new Map<string, { route: string; startedAt: Date }>();
 
 /**
  * Parse URL path to determine route type
@@ -18,7 +35,7 @@ function parseRoute(url: string): { type: 'admin' } | { type: 'app'; port: numbe
   const appMatch = url.match(/^\/app\/(\d+)/);
   if (appMatch) {
     const port = parseInt(appMatch[1], 10);
-    if (port >= APP_PORT_MIN && port <= APP_PORT_MAX) {
+    if (port >= config.appPortMin && port <= config.appPortMax) {
       return { type: 'app', port };
     }
     return null; // Invalid port
@@ -32,9 +49,6 @@ function parseRoute(url: string): { type: 'admin' } | { type: 'app'; port: numbe
   return null;
 }
 
-let config: Config;
-let connectionCounter = 0;
-
 /**
  * Generate a unique client ID for logging
  */
@@ -47,11 +61,42 @@ function generateClientId(): string {
  */
 function handleHealthCheck(res: ServerResponse): void {
   res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
+  res.end(JSON.stringify({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    mode: config.devMode ? 'development' : 'production',
+    che: isCheEnvironment(),
+  }));
 }
 
 /**
- * Handle HTTP requests (health checks only)
+ * Status endpoint showing active connections and configuration
+ */
+function handleStatus(res: ServerResponse): void {
+  const connections = Array.from(activeConnections.entries()).map(
+    ([id, info]) => ({
+      id,
+      route: info.route,
+      startedAt: info.startedAt.toISOString(),
+    })
+  );
+
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    activeConnections: connections.length,
+    connections,
+    config: {
+      mode: config.devMode ? 'development' : 'production',
+      port: config.port,
+      conductorUrl: config.conductorUrl,
+      appPortRange: `${config.appPortMin}-${config.appPortMax}`,
+    },
+    che: getCheInfo(),
+  }));
+}
+
+/**
+ * Handle HTTP requests (health checks, status)
  */
 function handleRequest(req: IncomingMessage, res: ServerResponse): void {
   if (req.url === '/health' || req.url === '/healthz') {
@@ -59,9 +104,17 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     return;
   }
 
+  if (req.url === '/status') {
+    handleStatus(res);
+    return;
+  }
+
   // Return 404 for all other HTTP requests
-  res.writeHead(404);
-  res.end('Not Found');
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    error: 'Not Found',
+    hint: 'Use WebSocket connection to /admin or /app/:port',
+  }));
 }
 
 /**
@@ -88,7 +141,7 @@ function handleUpgrade(
     return;
   }
 
-  // Extract and validate API key
+  // Extract and validate API key (skipped in dev mode)
   const apiKey = extractApiKey(url, host);
   const permissionLevel = validateApiKey(apiKey, config);
 
@@ -100,35 +153,46 @@ function handleUpgrade(
   }
 
   const levelName = getPermissionLevelName(permissionLevel);
-  console.log(`[${clientId}] Authenticated with ${levelName} access, route: ${route.type}`);
+  const routeDesc = route.type === 'app' ? `app:${route.port}` : 'admin';
+  console.log(`[${clientId}] Authenticated with ${levelName} access, route: ${routeDesc}`);
 
   // Pass through client's Origin header to conductor
   const clientOrigin = request.headers.origin;
 
   // Accept the WebSocket connection and create appropriate proxy
   wss.handleUpgrade(request, socket, head, (ws: WebSocket) => {
+    // Track active connection
+    activeConnections.set(clientId, {
+      route: routeDesc,
+      startedAt: new Date(),
+    });
+
+    const onClose = () => {
+      activeConnections.delete(clientId);
+      console.log(`[${clientId}] Proxy closed`);
+    };
+
     if (route.type === 'app') {
       // App interface - simple passthrough proxy
+      // Forward original URL to preserve query params (like token)
       createAppProxy({
         clientWs: ws,
         appPort: route.port,
         clientId,
         clientOrigin,
-        onClose: () => {
-          console.log(`[${clientId}] App proxy closed`);
-        },
+        originalUrl: url,
+        onClose,
       });
     } else {
-      // Admin interface - filtered proxy with permission checks
+      // Admin interface - filtered proxy (or passthrough in dev mode)
       createProxy({
         clientWs: ws,
         permissionLevel,
         conductorUrl: config.conductorUrl,
         clientId,
         clientOrigin,
-        onClose: () => {
-          console.log(`[${clientId}] Admin proxy closed`);
-        },
+        passthrough: config.devMode,
+        onClose,
       });
     }
   });
@@ -145,10 +209,22 @@ function main(): void {
     process.exit(1);
   }
 
-  console.log('Elohim Admin Proxy starting...');
-  console.log(`  Conductor URL: ${config.conductorUrl}`);
+  const mode = config.devMode ? 'DEVELOPMENT' : 'PRODUCTION';
+  console.log('Elohim Holochain Proxy starting...');
+  console.log(`  Mode: ${mode}`);
   console.log(`  Port: ${config.port}`);
+  console.log(`  Conductor URL: ${config.conductorUrl}`);
+  console.log(`  App port range: ${config.appPortMin}-${config.appPortMax}`);
   console.log(`  Log level: ${config.logLevel}`);
+
+  if (config.devMode) {
+    console.log('  ⚠️  Dev mode: Auth disabled, all operations allowed');
+  }
+
+  if (isCheEnvironment()) {
+    const cheInfo = getCheInfo();
+    console.log(`  Eclipse Che detected: ${cheInfo?.workspaceName ?? 'unknown'}`);
+  }
 
   // Create HTTP server for health checks
   const server = createServer(handleRequest);
@@ -161,9 +237,25 @@ function main(): void {
     handleUpgrade(wss, request, socket as Duplex, head);
   });
 
+  // Handle server errors (e.g., port already in use)
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n❌ Port ${config.port} is already in use.`);
+      console.error(`   Another proxy instance may be running.`);
+      process.exit(1);
+    }
+    console.error('❌ Server error:', err.message);
+    process.exit(1);
+  });
+
   // Start listening
   server.listen(config.port, () => {
-    console.log(`Elohim Admin Proxy listening on port ${config.port}`);
+    console.log(`\n✅ Elohim Holochain Proxy listening on port ${config.port}`);
+    console.log('Routes:');
+    console.log(`  /admin     → ${config.conductorUrl}`);
+    console.log(`  /app/:port → ws://localhost:port (range ${config.appPortMin}-${config.appPortMax})`);
+    console.log('  /health    → Health check');
+    console.log('  /status    → Active connections');
   });
 
   // Graceful shutdown
