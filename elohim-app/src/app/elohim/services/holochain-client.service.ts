@@ -322,8 +322,10 @@ export class HolochainClientService {
         console.log(`[Holochain] Using existing app interface on port ${appPort}`);
       } else {
         // No existing interface, create one
+        // Use "*" for allowed_origins because the proxy handles authentication
+        // and may connect with different origins (browser origin, localhost, etc.)
         const { port } = await adminWs.attachAppInterface({
-          allowed_origins: this.config.origin,
+          allowed_origins: '*',
         });
         appPort = port;
         console.log(`[Holochain] Created new app interface on port ${appPort}`);
