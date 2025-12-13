@@ -8,8 +8,8 @@ WORKDIR /app
 # Copy package files
 COPY elohim-app/package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies (including devDependencies needed for build)
+RUN npm ci
 
 # Copy source code
 COPY elohim-app/ ./
