@@ -128,7 +128,8 @@ else
     echo "🚀 Starting admin-proxy with admin port $ADMIN_PORT (dev mode)..."
     cd "$HC_DIR/admin-proxy"
     # Pass the dynamic admin port via CONDUCTOR_URL, enable DEV_MODE for no auth
-    DEV_MODE=true CONDUCTOR_URL="ws://localhost:$ADMIN_PORT" npm start &
+    # PORT=8888 to match devfile.yaml endpoint configuration
+    DEV_MODE=true PORT=8888 CONDUCTOR_URL="ws://localhost:$ADMIN_PORT" npm start &
 
     # Wait for proxy to be ready
     echo "⏳ Waiting for proxy to start..."

@@ -167,7 +167,7 @@ commands:
       component: tools
       workingDir: /projects/elohim/holochain/admin-proxy
       commandLine: |
-        DEV_MODE=true npm install && npm run build && npm start
+        DEV_MODE=true PORT=8888 npm install && npm run build && npm start
 
   - id: build-happ
     exec:
