@@ -138,8 +138,9 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 5
         # Admin Proxy - authenticates and filters admin operations
+        # Uses dev-latest tag since admin-proxy changes infrequently
         - name: admin-proxy
-          image: harbor.ethosengine.com/ethosengine/elohim-admin-proxy:BUILD_NUMBER_PLACEHOLDER
+          image: harbor.ethosengine.com/ethosengine/elohim-admin-proxy:dev-latest
           ports:
             - name: proxy-ws
               containerPort: 8080
@@ -181,8 +182,9 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 30
         # hApp Installer - installs the hApp on conductor startup
+        # Uses dev-latest tag - rebuilds when DNA or installer code changes
         - name: happ-installer
-          image: harbor.ethosengine.com/ethosengine/elohim-happ-installer:BUILD_NUMBER_PLACEHOLDER
+          image: harbor.ethosengine.com/ethosengine/elohim-happ-installer:dev-latest
           env:
             - name: CONDUCTOR_URL
               value: "ws://localhost:4444"
