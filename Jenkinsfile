@@ -640,31 +640,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        // Holochain infrastructure is built separately due to different resource requirements
-        // (needs operations node with 8 cores, 16GB RAM, Nix container, PVC mounts)
-        // This stage triggers the holochain/Jenkinsfile as a child build
-        stage('Build Holochain Infrastructure') {
-            when {
-                anyOf {
-                    changeset "holochain/**"
-                }
-            }
-            steps {
-                container('builder') {
-                    script {
-                        echo 'Holochain files changed - triggering Holochain infrastructure build'
-
-                        // Trigger the holochain pipeline
-                        // Note: Requires a separate Jenkins job configured with:
-                        //   Script Path: holochain/Jenkinsfile
-                        //   Job Name: elohim-holochain
-                        build job: "elohim-holochain/${env.BRANCH_NAME.replace('/', '%2F')}",
-                              wait: true,
-                              propagate: true
-                    }
-                }
-            }
-        }
+        // Note: Holochain infrastructure (holochain/**) is built by a separate pipeline
+        // (elohim-holochain) that triggers independently via webhook when holochain files change.
+        // This avoids duplicate builds and allows parallel execution.
 
         stage('Deploy to Staging') {
             when {

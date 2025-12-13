@@ -142,14 +142,9 @@ spec:
     stages {
         stage('Checkout') {
             when {
-                anyOf {
-                    branch 'main'
-                    branch 'staging'
-                    branch 'dev'
-                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                    changeset "holochain/**"
-                }
+                // Only build when holochain files actually changed
+                // This prevents duplicate builds when webhook fires for non-holochain commits
+                changeset "holochain/**"
             }
             steps {
                 container('builder') {
@@ -166,6 +161,9 @@ spec:
         }
 
         stage('Setup Version') {
+            when {
+                changeset "holochain/**"
+            }
             steps {
                 container('builder') {
                     script {
@@ -192,6 +190,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Setup Nix Cache') {
+            when {
+                changeset "holochain/**"
+            }
             steps {
                 container('builder') {
                     script {
@@ -273,13 +274,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Build Admin Proxy') {
             when {
+                // Build when admin-proxy code or manifests change
                 anyOf {
-                    // Always build on main/staging/dev branches to ensure image exists
-                    // These are the primary branches that may deploy to environments
-                    branch 'main'
-                    branch 'staging'
-                    branch 'dev'
-                    // Also rebuild when admin-proxy code or manifests change
                     changeset "holochain/admin-proxy/**"
                     changeset "holochain/manifests/edgenode-*.yaml"
                 }
@@ -321,6 +317,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Edge Node Image') {
+            when {
+                changeset "holochain/**"
+            }
             steps {
                 container('builder') {
                     script {
@@ -361,6 +360,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build hApp Installer') {
+            when {
+                changeset "holochain/**"
+            }
             steps {
                 container('builder') {
                     script {
@@ -401,6 +403,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Push to Harbor') {
+            when {
+                changeset "holochain/**"
+            }
             steps {
                 container('builder') {
                     script {
@@ -472,10 +477,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Deploy Edge Node - Dev') {
             when {
-                anyOf {
-                    branch 'dev'
-                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                allOf {
+                    changeset "holochain/**"
+                    anyOf {
+                        branch 'dev'
+                        expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                        expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                    }
                 }
             }
             steps {
@@ -500,9 +508,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Deploy Edge Node - Alpha') {
             when {
-                anyOf {
-                    branch 'dev'
-                    expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
+                allOf {
+                    changeset "holochain/**"
+                    anyOf {
+                        branch 'dev'
+                        expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
+                    }
                 }
             }
             steps {
@@ -526,6 +537,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Cleanup') {
+            when {
+                changeset "holochain/**"
+            }
             steps {
                 container('builder') {
                     script {
