@@ -1,27 +1,11 @@
-# Multi-stage build for Angular app
+# Simple nginx container for pre-built Angular app
+# The Angular build happens in Jenkins with the correct configuration
+# This Dockerfile just packages the pre-built artifacts
 
-# Stage 1: Build the Angular application
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
-# Copy package files
-COPY elohim-app/package*.json ./
-
-# Install all dependencies (including devDependencies needed for build)
-RUN npm ci
-
-# Copy source code
-COPY elohim-app/ ./
-
-# Build the application for production
-RUN npm run build
-
-# Stage 2: Serve with nginx
 FROM nginx:alpine
 
-# Copy built application from builder stage
-COPY --from=builder /app/dist/elohim-app/browser /usr/share/nginx/html
+# Copy pre-built application (built by Jenkins with correct config)
+COPY elohim-app/dist/elohim-app/browser /usr/share/nginx/html
 
 # Copy nginx configuration for SPA routing
 COPY nginx.conf /etc/nginx/conf.d/default.conf
