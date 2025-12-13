@@ -4,7 +4,7 @@
 # - Custom conductor config for elohim bootstrap server
 # - Pre-installed hApp
 
-FROM ghcr.io/holo-host/edgenode:latest
+FROM ghcr.io/holo-host/edgenode:v0.0.8-alpha30
 
 # Copy custom conductor config
 COPY conductor-config.yaml /etc/holochain/conductor-config.yaml

@@ -232,7 +232,7 @@ Path-based WebSocket router for Eclipse Che:
 
 ### Edge Node (`holochain/edgenode/`)
 Kubernetes-deployed Holochain conductor:
-- **Base image:** `ghcr.io/holo-host/edgenode:latest` (Holochain 0.5.6)
+- **Base image:** `ghcr.io/holo-host/edgenode:v0.0.8-alpha30` (Holochain 0.6.0)
 - **Ports:** 4444 (admin, localhost-only), 8444 (socat proxy), 8080 (admin-proxy)
 - **Storage:** emptyDir (ephemeral)
 - **Network:** holostrap.elohim.host for bootstrap/signal
