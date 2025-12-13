@@ -414,9 +414,9 @@ export class HolochainClientService {
   async callZome<T>(input: ZomeCallInput): Promise<ZomeCallResult<T>> {
     let { appWs, cellId, state } = this.connectionSignal();
 
-    // If not connected yet, wait for connection
+    // If not connected yet, wait for connection (only if actively connecting)
     if (!appWs || !cellId) {
-      if (state === 'connecting' || state === 'authenticating' || state === 'disconnected') {
+      if (state === 'connecting' || state === 'authenticating') {
         console.log('[HolochainClient] Waiting for connection before zome call...');
         const connected = await this.waitForConnection();
         if (!connected) {

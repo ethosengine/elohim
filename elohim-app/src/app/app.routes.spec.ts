@@ -18,7 +18,7 @@ describe('App Routes', () => {
   });
 
   it('should have correct number of routes', () => {
-    expect(routes.length).toBe(5); // home, lamad, community, shefa, and 404 catch-all
+    expect(routes.length).toBe(6); // home, lamad, community, shefa, identity, and 404 catch-all
   });
 
   it('should have a community lazy loaded route', () => {
@@ -31,6 +31,12 @@ describe('App Routes', () => {
     const shefaRoute = routes.find(r => r.path === 'shefa');
     expect(shefaRoute).toBeDefined();
     expect(shefaRoute?.loadChildren).toBeDefined();
+  });
+
+  it('should have an identity lazy loaded route', () => {
+    const identityRoute = routes.find(r => r.path === 'identity');
+    expect(identityRoute).toBeDefined();
+    expect(identityRoute?.loadChildren).toBeDefined();
   });
 
   it('should have a 404 catch-all route as last route', () => {
