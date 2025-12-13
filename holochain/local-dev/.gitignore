@@ -1,0 +1,8 @@
+# Holochain sandbox files
+.hc
+.hc_ports
+.hc_wrapper.sh
+.sandbox_log
+
+# Sandbox data directories
+**/
