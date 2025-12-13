@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { filter } from 'rxjs/operators';
 import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
+import { HolochainContentService } from './elohim/services/holochain-content.service';
 import { environment } from '../environments/environment';
 
 @Component({
@@ -18,6 +19,7 @@ export class AppComponent implements OnInit {
   showFloatingToggle = false;
 
   private readonly holochainService = inject(HolochainClientService);
+  private readonly holochainContent = inject(HolochainContentService);
 
   constructor(private readonly router: Router) {}
 
@@ -39,8 +41,12 @@ export class AppComponent implements OnInit {
   /**
    * Initialize Holochain connection on app startup.
    *
-   * Phase 1: Tests admin proxy connectivity (list_apps only)
-   * Phase 2: Will add full app interface proxying for zome calls
+   * Attempts full connection flow:
+   * 1. Connect to admin interface (via dev-proxy in Che)
+   * 2. Discover existing app interfaces
+   * 3. Authorize signing credentials
+   * 4. Connect to app interface for zome calls
+   * 5. Test content service availability
    *
    * Runs in background without blocking app initialization.
    */
@@ -52,24 +58,27 @@ export class AppComponent implements OnInit {
     }
 
     try {
-      console.log('[Holochain] Testing admin proxy connection (Phase 1)...');
+      console.log('[Holochain] Initializing full connection...');
 
-      // Phase 1: Test admin connection only (list_apps)
-      // Full connect() requires ADMIN permission for install_app
-      // and app interface proxying which isn't implemented yet
-      const result = await this.holochainService.testAdminConnection();
+      // Attempt full connection (admin + app interface)
+      await this.holochainService.connect();
 
-      if (result.success) {
-        console.log('[Holochain] Admin proxy connection successful', {
-          apps: result.apps
-        });
-      } else {
-        console.warn('[Holochain] Admin proxy connection failed:', result.error);
+      if (this.holochainService.isConnected()) {
+        console.log('[Holochain] Connection successful, testing content availability...');
+
+        // Test if content service can make zome calls
+        const contentAvailable = await this.holochainContent.testAvailability();
+
+        if (contentAvailable) {
+          console.log('[Holochain] Content service available - Holochain data ready!');
+        } else {
+          console.warn('[Holochain] Connected but content service unavailable');
+        }
       }
     } catch (err) {
-      // Log error but don't crash the app - connection is optional
-      console.warn('[Holochain] Edge Node auto-connect failed:', err);
-      // Connection state will be 'error' and visible in the UI
+      // Holochain connection is required - no fallback
+      console.error('[Holochain] Connection failed:', err);
+      throw err;
     }
   }
 

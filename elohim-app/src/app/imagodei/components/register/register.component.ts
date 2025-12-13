@@ -1,0 +1,248 @@
+/**
+ * RegisterComponent - Network identity registration.
+ *
+ * Features:
+ * - Display name, bio, affinities input
+ * - Profile reach selection
+ * - Migration from session (if session exists)
+ * - Post-registration redirect to return URL
+ */
+
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, ActivatedRoute, RouterModule } from '@angular/router';
+import { IdentityService } from '../../services/identity.service';
+import { SessionHumanService } from '../../services/session-human.service';
+import { SessionMigrationService } from '../../services/session-migration.service';
+import { HolochainClientService } from '../../../elohim/services/holochain-client.service';
+import {
+  type RegisterHumanRequest,
+  type ProfileReach,
+  ProfileReachLevels,
+  getReachLabel,
+  getReachDescription,
+} from '../../models/identity.model';
+
+@Component({
+  selector: 'app-register',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterModule],
+  templateUrl: './register.component.html',
+  styleUrls: ['./register.component.css'],
+})
+export class RegisterComponent implements OnInit {
+  private readonly identityService = inject(IdentityService);
+  private readonly sessionHumanService = inject(SessionHumanService);
+  private readonly migrationService = inject(SessionMigrationService);
+  private readonly holochainClient = inject(HolochainClientService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+
+  // ==========================================================================
+  // Form State
+  // ==========================================================================
+
+  form = {
+    displayName: '',
+    bio: '',
+    affinities: '',
+    profileReach: 'community' as ProfileReach,
+    location: '',
+  };
+
+  // ==========================================================================
+  // Component State
+  // ==========================================================================
+
+  readonly isRegistering = signal(false);
+  readonly isMigrating = signal(false);
+  readonly error = signal<string | null>(null);
+
+  /** Return URL after successful registration */
+  private returnUrl = '/';
+
+  // ==========================================================================
+  // Computed State
+  // ==========================================================================
+
+  /** Whether connected to network */
+  readonly isConnected = this.holochainClient.isConnected;
+
+  /** Whether user has an existing session */
+  readonly hasSession = computed(() => this.sessionHumanService.hasSession());
+
+  /** Session stats for migration preview */
+  readonly sessionStats = computed(() => {
+    const session = this.sessionHumanService.getSession();
+    return session?.stats ?? null;
+  });
+
+  /** Session display name for pre-fill */
+  readonly sessionDisplayName = computed(() => {
+    const session = this.sessionHumanService.getSession();
+    return session?.displayName ?? 'Traveler';
+  });
+
+  /** Whether migration is available */
+  readonly canMigrate = this.migrationService.canMigrate;
+
+  /** Migration state */
+  readonly migrationState = this.migrationService.state;
+
+  /** Profile reach options */
+  readonly reachOptions: { value: ProfileReach; label: string; description: string }[] = [
+    { value: 'community', label: getReachLabel('community'), description: getReachDescription('community') },
+    { value: 'public', label: getReachLabel('public'), description: getReachDescription('public') },
+    { value: 'trusted', label: getReachLabel('trusted'), description: getReachDescription('trusted') },
+    { value: 'private', label: getReachLabel('private'), description: getReachDescription('private') },
+  ];
+
+  // ==========================================================================
+  // Lifecycle
+  // ==========================================================================
+
+  ngOnInit(): void {
+    // Get return URL from query params
+    this.route.queryParams.subscribe(params => {
+      this.returnUrl = params['returnUrl'] ?? '/';
+    });
+
+    // Pre-fill from session if available
+    if (this.hasSession()) {
+      const session = this.sessionHumanService.getSession();
+      if (session) {
+        this.form.displayName = session.displayName !== 'Traveler' ? session.displayName : '';
+        this.form.bio = session.bio ?? '';
+        this.form.affinities = session.interests?.join(', ') ?? '';
+      }
+    }
+
+    // Check if already authenticated - redirect if so
+    const mode = this.identityService.mode();
+    const isNetworkMode = mode === 'hosted' || mode === 'self-sovereign';
+    if (isNetworkMode && this.identityService.isAuthenticated()) {
+      this.router.navigate([this.returnUrl]);
+    }
+  }
+
+  // ==========================================================================
+  // Actions
+  // ==========================================================================
+
+  /**
+   * Register new identity.
+   */
+  async onRegister(): Promise<void> {
+    if (!this.isConnected()) {
+      this.error.set('Not connected to network. Please wait for connection.');
+      return;
+    }
+
+    if (!this.form.displayName.trim()) {
+      this.error.set('Please enter a display name.');
+      return;
+    }
+
+    this.isRegistering.set(true);
+    this.error.set(null);
+
+    try {
+      const request: RegisterHumanRequest = {
+        displayName: this.form.displayName.trim(),
+        bio: this.form.bio.trim() || undefined,
+        affinities: this.parseAffinities(this.form.affinities),
+        profileReach: this.form.profileReach,
+        location: this.form.location.trim() || undefined,
+      };
+
+      await this.identityService.registerHuman(request);
+
+      // Success - navigate to return URL
+      this.router.navigate([this.returnUrl]);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Registration failed';
+      this.error.set(errorMessage);
+    } finally {
+      this.isRegistering.set(false);
+    }
+  }
+
+  /**
+   * Migrate from session to network identity.
+   */
+  async onMigrate(): Promise<void> {
+    if (!this.canMigrate()) {
+      this.error.set('Migration not available. Check network connection.');
+      return;
+    }
+
+    this.isMigrating.set(true);
+    this.error.set(null);
+
+    try {
+      // Use form overrides if provided
+      const overrides: Partial<RegisterHumanRequest> = {};
+      if (this.form.displayName.trim()) {
+        overrides.displayName = this.form.displayName.trim();
+      }
+      if (this.form.bio.trim()) {
+        overrides.bio = this.form.bio.trim();
+      }
+      if (this.form.affinities.trim()) {
+        overrides.affinities = this.parseAffinities(this.form.affinities);
+      }
+      overrides.profileReach = this.form.profileReach;
+
+      const result = await this.migrationService.migrate(overrides);
+
+      if (result.success) {
+        // Success - navigate to return URL
+        this.router.navigate([this.returnUrl]);
+      } else {
+        this.error.set(result.error ?? 'Migration failed');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Migration failed';
+      this.error.set(errorMessage);
+    } finally {
+      this.isMigrating.set(false);
+    }
+  }
+
+  /**
+   * Clear error message.
+   */
+  clearError(): void {
+    this.error.set(null);
+  }
+
+  // ==========================================================================
+  // Helpers
+  // ==========================================================================
+
+  /**
+   * Parse comma-separated affinities string to array.
+   */
+  private parseAffinities(input: string): string[] {
+    return input
+      .split(',')
+      .map(s => s.trim().toLowerCase())
+      .filter(s => s.length > 0);
+  }
+
+  /**
+   * Get formatted session stats for display.
+   */
+  getSessionStatsDisplay(): string {
+    const stats = this.sessionStats();
+    if (!stats) return '';
+
+    const parts: string[] = [];
+    if (stats.nodesViewed > 0) parts.push(`${stats.nodesViewed} nodes viewed`);
+    if (stats.pathsStarted > 0) parts.push(`${stats.pathsStarted} paths started`);
+    if (stats.stepsCompleted > 0) parts.push(`${stats.stepsCompleted} steps completed`);
+
+    return parts.join(', ') || 'No progress yet';
+  }
+}

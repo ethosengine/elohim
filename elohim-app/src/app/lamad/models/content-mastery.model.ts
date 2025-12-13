@@ -316,3 +316,158 @@ export const DECAY_RATES: Record<MasteryLevel, number> = {
   evaluate: 0.008, // Very slow - ongoing participation
   create: 0.005, // Slowest - creating maintains mastery
 };
+
+// =============================================================================
+// Holochain Zome Types
+// =============================================================================
+// Types for communication with the Holochain content_store zome.
+// These mirror the Rust types in content_store_integrity.
+
+/** Generic action hash from Holochain */
+export type ActionHash = Uint8Array;
+
+/**
+ * ContentMastery wire format (snake_case for zome communication).
+ * Use ContentMastery for app logic.
+ */
+export interface ContentMasteryWire {
+  id: string;
+  human_id: string;
+  content_id: string;
+  mastery_level: string;
+  mastery_level_index: number;
+  freshness_score: number;
+  needs_refresh: boolean;
+  engagement_count: number;
+  last_engagement_type: string;
+  last_engagement_at: string;
+  level_achieved_at: string;
+  content_version_at_mastery: string | null;
+  assessment_evidence_json: string;
+  privileges_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Output wrapper for content mastery from zome */
+export interface ContentMasteryOutput {
+  action_hash: ActionHash;
+  mastery: ContentMasteryWire;
+}
+
+/** Input for initializing mastery tracking */
+export interface InitializeMasteryInput {
+  content_id: string;
+}
+
+/** Input for recording engagement */
+export interface RecordEngagementInput {
+  content_id: string;
+  engagement_type: string;
+  duration_seconds?: number;
+  metadata_json?: string;
+}
+
+/** Input for recording assessment (quiz/test) */
+export interface RecordAssessmentInput {
+  content_id: string;
+  assessment_type: string;
+  score: number;
+  passing_threshold: number;
+  time_spent_seconds: number;
+  question_count: number;
+  correct_count: number;
+  evidence_json?: string;
+}
+
+/** Input for querying mastery */
+export interface QueryMasteryInput {
+  human_id: string;
+  content_ids?: string[];
+  min_level?: string;
+}
+
+/** Input for checking privilege access */
+export interface CheckPrivilegeInput {
+  content_id: string;
+  privilege: string;
+}
+
+/** Result of privilege check */
+export interface PrivilegeCheckResult {
+  has_privilege: boolean;
+  current_level: string;
+  current_level_index: number;
+  required_level: string;
+  required_level_index: number;
+  gap: number;
+  privilege: string;
+}
+
+/** Compact mastery snapshot for missions view (Khan Academy style) */
+export interface MasterySnapshot {
+  content_id: string;
+  level: string;
+  level_index: number;
+  freshness: number;
+  needs_refresh: boolean;
+}
+
+/** Path mastery overview for missions view */
+export interface PathMasteryOverview {
+  path_id: string;
+  path_title: string;
+  total_content: number;
+  mastery_snapshots: MasterySnapshot[];
+  level_counts: Record<string, number>;
+  completion_percentage: number;
+  mastery_percentage: number;
+}
+
+/** Mastery statistics dashboard (wire format) */
+export interface MasteryStatsWire {
+  total_tracked: number;
+  level_distribution: Record<string, number>;
+  above_gate_count: number;
+  fresh_count: number;
+  stale_count: number;
+  needs_refresh_count: number;
+}
+
+// =============================================================================
+// Transformation Helpers
+// =============================================================================
+
+/**
+ * Transform wire format to app ContentMastery.
+ */
+export function transformMasteryFromWire(wire: ContentMasteryWire): ContentMastery {
+  let assessmentEvidence: AssessmentEvidence[] = [];
+  try {
+    assessmentEvidence = JSON.parse(wire.assessment_evidence_json || '[]');
+  } catch {
+    // Ignore parse errors
+  }
+
+  let privileges: ContentPrivilege[] = [];
+  try {
+    privileges = JSON.parse(wire.privileges_json || '[]');
+  } catch {
+    // Ignore parse errors
+  }
+
+  return {
+    contentId: wire.content_id,
+    humanId: wire.human_id,
+    level: wire.mastery_level as MasteryLevel,
+    levelAchievedAt: wire.level_achieved_at,
+    levelHistory: [], // Not stored in wire format
+    lastEngagementAt: wire.last_engagement_at,
+    lastEngagementType: wire.last_engagement_type as EngagementType,
+    contentVersionAtMastery: wire.content_version_at_mastery || '',
+    freshness: wire.freshness_score,
+    needsRefresh: wire.needs_refresh,
+    assessmentEvidence,
+    privileges,
+  };
+}

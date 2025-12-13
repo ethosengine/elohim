@@ -1,0 +1,230 @@
+<div class="presence-list-container">
+  <div class="presence-list-card">
+    <!-- Header -->
+    <div class="list-header">
+      <div class="header-title">
+        <h1>Contributor Presences</h1>
+        <p class="subtitle">Honor absent contributors by establishing their presence in the network</p>
+      </div>
+      @if (isAuthenticated()) {
+        <button type="button" class="btn btn-primary" (click)="openCreateForm()">
+          + Create Presence
+        </button>
+      }
+    </div>
+
+    <!-- Success Message -->
+    @if (successMessage()) {
+      <div class="success-banner" (click)="clearMessages()">
+        <span class="success-icon">✓</span>
+        <span>{{ successMessage() }}</span>
+      </div>
+    }
+
+    <!-- Error Display -->
+    @if (error()) {
+      <div class="error-banner" (click)="clearMessages()">
+        <span class="error-icon">✕</span>
+        <span>{{ error() }}</span>
+      </div>
+    }
+
+    <!-- Create Form Modal -->
+    @if (showCreateForm()) {
+      <div class="modal-overlay" (click)="closeCreateForm()">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+          <h2>Create Contributor Presence</h2>
+          <p class="modal-subtitle">
+            Create a presence for a contributor who isn't yet in the network.
+            Recognition will accumulate until they claim their presence.
+          </p>
+
+          <form class="create-form" (ngSubmit)="createPresence()">
+            <div class="form-group">
+              <label for="presenceDisplayName">Contributor Name *</label>
+              <input
+                id="presenceDisplayName"
+                type="text"
+                [(ngModel)]="createForm.displayName"
+                name="displayName"
+                placeholder="e.g., Alan Turing"
+                required
+                maxlength="100"
+                [disabled]="isCreating()"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="presenceNote">Note</label>
+              <textarea
+                id="presenceNote"
+                [(ngModel)]="createForm.note"
+                name="note"
+                placeholder="Why are you creating this presence? What content establishes them?"
+                rows="3"
+                maxlength="500"
+                [disabled]="isCreating()"
+              ></textarea>
+            </div>
+
+            <div class="modal-actions">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                (click)="closeCreateForm()"
+                [disabled]="isCreating()"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                class="btn btn-primary"
+                [disabled]="isCreating() || !createForm.displayName.trim()"
+              >
+                @if (isCreating()) {
+                  <span class="spinner"></span>
+                  Creating...
+                } @else {
+                  Create Presence
+                }
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    }
+
+    <!-- Filters -->
+    <div class="filters">
+      @for (option of filterOptions; track option.value) {
+        <button
+          type="button"
+          class="filter-btn"
+          [class.active]="filter() === option.value"
+          (click)="setFilter(option.value)"
+        >
+          {{ option.label }}
+          <span class="filter-count">{{ stateCounts()[option.value] }}</span>
+        </button>
+      }
+    </div>
+
+    <!-- My Stewarded Section -->
+    @if (myStewardedPresences().length > 0) {
+      <div class="stewarded-section">
+        <h2 class="section-title">Presences You're Stewarding</h2>
+        <div class="presence-grid">
+          @for (presence of myStewardedPresences(); track presence.id) {
+            <div class="presence-card stewarded-card">
+              <div class="presence-header">
+                <span class="presence-name">{{ presence.displayName }}</span>
+                <span [class]="getStateBadgeClass(presence.presenceState)">
+                  {{ getStateLabel(presence.presenceState) }}
+                </span>
+              </div>
+              <div class="presence-stats">
+                <div class="stat">
+                  <span class="stat-value">{{ presence.recognitionScore | number:'1.0-0' }}</span>
+                  <span class="stat-label">Recognition</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-value">{{ presence.uniqueEngagers || 0 }}</span>
+                  <span class="stat-label">Engagers</span>
+                </div>
+              </div>
+              @if (presence.stewardshipStartedAt) {
+                <div class="presence-meta">
+                  Stewarding since {{ formatDate(presence.stewardshipStartedAt) }}
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Loading State -->
+    @if (isLoading()) {
+      <div class="loading-state">
+        <span class="spinner"></span>
+        <span>Loading presences...</span>
+      </div>
+    }
+
+    <!-- Presence List -->
+    @if (!isLoading()) {
+      @if (filteredPresences().length === 0) {
+        <div class="empty-state">
+          <div class="empty-icon">👤</div>
+          <p>No presences found</p>
+          @if (filter() !== 'all') {
+            <button type="button" class="btn btn-secondary" (click)="setFilter('all')">
+              View All
+            </button>
+          }
+        </div>
+      } @else {
+        <div class="presence-grid">
+          @for (presence of filteredPresences(); track presence.id) {
+            <div class="presence-card" [class.is-mine]="isMyStewarded(presence)">
+              <div class="presence-header">
+                <span class="presence-name">{{ presence.displayName }}</span>
+                <span [class]="getStateBadgeClass(presence.presenceState)">
+                  {{ getStateLabel(presence.presenceState) }}
+                </span>
+              </div>
+
+              @if (presence.note) {
+                <p class="presence-note">{{ presence.note }}</p>
+              }
+
+              <div class="presence-stats">
+                <div class="stat">
+                  <span class="stat-value">{{ presence.recognitionScore | number:'1.0-0' }}</span>
+                  <span class="stat-label">Recognition</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-value">{{ presence.affinityTotal | number:'1.0-0' }}</span>
+                  <span class="stat-label">Affinity</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-value">{{ presence.citationCount || 0 }}</span>
+                  <span class="stat-label">Citations</span>
+                </div>
+              </div>
+
+              <div class="presence-meta">
+                @if (presence.presenceState === 'stewarded' && presence.stewardId) {
+                  @if (isMyStewarded(presence)) {
+                    <span class="steward-badge mine">You are stewarding</span>
+                  } @else {
+                    <span class="steward-badge">Has steward</span>
+                  }
+                }
+                <span class="date">Est. {{ formatDate(presence.establishedAt) }}</span>
+              </div>
+
+              <!-- Actions -->
+              @if (isAuthenticated() && presence.presenceState === 'unclaimed') {
+                <div class="presence-actions">
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    [disabled]="actionInProgress() === presence.id"
+                    (click)="beginStewardship(presence)"
+                  >
+                    @if (actionInProgress() === presence.id) {
+                      <span class="spinner"></span>
+                    } @else {
+                      Become Steward
+                    }
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
+</div>

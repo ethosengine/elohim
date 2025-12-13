@@ -64,11 +64,226 @@ pub struct QueryByIdInput {
     pub id: String,
 }
 
+// =============================================================================
+// Input/Output Types for Relationships
+// =============================================================================
+
+/// Input for creating a relationship
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateRelationshipInput {
+    pub source_id: String,
+    pub target_id: String,
+    pub relationship_type: String,  // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
+    pub confidence: f64,            // 0.0 - 1.0
+    pub inference_source: String,   // explicit, path, tag, semantic
+    pub metadata_json: Option<String>,
+}
+
+/// Output for relationship
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RelationshipOutput {
+    pub action_hash: ActionHash,
+    pub relationship: Relationship,
+}
+
+/// Input for querying relationships
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetRelationshipsInput {
+    pub content_id: String,
+    pub direction: String,  // outgoing, incoming, both
+}
+
+/// Input for querying related content
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryRelatedContentInput {
+    pub content_id: String,
+    pub relationship_types: Option<Vec<String>>,
+    pub depth: Option<u32>,
+}
+
+/// Content graph node for tree traversal
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ContentGraphNode {
+    pub content: ContentOutput,
+    pub relationship_type: String,
+    pub confidence: f64,
+    pub children: Vec<ContentGraphNode>,
+}
+
+/// Content graph output
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ContentGraph {
+    pub root: Option<ContentOutput>,
+    pub related: Vec<ContentGraphNode>,
+    pub total_nodes: u32,
+}
+
+// =============================================================================
+// Input/Output Types for Humans
+// =============================================================================
+
+/// Input for creating a human
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateHumanInput {
+    pub id: String,
+    pub display_name: String,
+    pub bio: Option<String>,
+    pub affinities: Vec<String>,
+    pub profile_reach: String,
+    pub location: Option<String>,
+}
+
+/// Output for human
+#[derive(Serialize, Deserialize, Debug)]
+pub struct HumanOutput {
+    pub action_hash: ActionHash,
+    pub human: Human,
+}
+
+/// Input for querying humans by affinity
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryHumansByAffinityInput {
+    pub affinities: Vec<String>,
+    pub limit: Option<u32>,
+}
+
+/// Input for recording content completion
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RecordCompletionInput {
+    pub human_id: String,
+    pub path_id: String,
+    pub content_id: String,
+}
+
 /// Content statistics output
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ContentStats {
     pub total_count: u32,
     pub by_type: HashMap<String, u32>,
+}
+
+// =============================================================================
+// Input/Output Types for Agent (Expanded Identity Model)
+// =============================================================================
+
+/// Input for creating an agent
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateAgentInput {
+    pub id: String,
+    pub agent_type: String,           // human, organization, ai-agent, elohim
+    pub display_name: String,
+    pub bio: Option<String>,
+    pub avatar: Option<String>,
+    pub affinities: Vec<String>,
+    pub visibility: String,           // public, connections, private
+    pub location: Option<String>,
+    pub did: Option<String>,
+    pub activity_pub_type: Option<String>,
+}
+
+/// Output for agent
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AgentOutput {
+    pub action_hash: ActionHash,
+    pub agent: Agent,
+}
+
+/// Input for querying agents
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryAgentsInput {
+    pub agent_type: Option<String>,
+    pub affinities: Option<Vec<String>>,
+    pub limit: Option<u32>,
+}
+
+// =============================================================================
+// Input/Output Types for AgentProgress
+// =============================================================================
+
+/// Input for creating agent progress
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateAgentProgressInput {
+    pub agent_id: String,
+    pub path_id: String,
+}
+
+/// Output for agent progress
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AgentProgressOutput {
+    pub action_hash: ActionHash,
+    pub progress: AgentProgress,
+}
+
+/// Input for updating agent progress
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateAgentProgressInput {
+    pub agent_id: String,
+    pub path_id: String,
+    pub current_step_index: Option<u32>,
+    pub completed_step_index: Option<u32>,
+    pub completed_content_id: Option<String>,
+    pub step_affinity: Option<(u32, f64)>,  // (step_index, affinity_score)
+    pub step_note: Option<(u32, String)>,   // (step_index, note)
+}
+
+// =============================================================================
+// Input/Output Types for ContentMastery
+// =============================================================================
+
+/// Input for creating/updating content mastery
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpsertMasteryInput {
+    pub human_id: String,
+    pub content_id: String,
+    pub mastery_level: String,
+    pub engagement_type: String,
+}
+
+/// Output for content mastery
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ContentMasteryOutput {
+    pub action_hash: ActionHash,
+    pub mastery: ContentMastery,
+}
+
+/// Input for querying mastery
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryMasteryInput {
+    pub human_id: String,
+    pub content_ids: Option<Vec<String>>,
+    pub min_level: Option<String>,
+}
+
+// =============================================================================
+// Input/Output Types for Attestation
+// =============================================================================
+
+/// Input for creating an attestation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateAttestationInput {
+    pub agent_id: String,
+    pub category: String,
+    pub attestation_type: String,
+    pub display_name: String,
+    pub description: String,
+    pub icon_url: Option<String>,
+    pub tier: Option<String>,
+    pub earned_via_json: String,
+}
+
+/// Output for attestation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AttestationOutput {
+    pub action_hash: ActionHash,
+    pub attestation: Attestation,
+}
+
+/// Input for querying attestations
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryAttestationsInput {
+    pub agent_id: Option<String>,
+    pub category: Option<String>,
+    pub limit: Option<u32>,
 }
 
 // =============================================================================
@@ -94,12 +309,24 @@ pub struct CreatePathInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AddPathStepInput {
     pub path_id: String,
+    pub chapter_id: Option<String>,      // If part of a chapter
     pub order_index: u32,
-    pub step_type: String,
+    pub step_type: String,               // content, path, external, checkpoint, reflection
     pub resource_id: String,
     pub step_title: Option<String>,
     pub step_narrative: Option<String>,
     pub is_optional: bool,
+    // Learning objectives and engagement
+    pub learning_objectives: Option<Vec<String>>,
+    pub reflection_prompts: Option<Vec<String>>,
+    pub practice_exercises: Option<Vec<String>>,
+    // Completion and gating
+    pub estimated_minutes: Option<u32>,
+    pub completion_criteria: Option<String>,
+    pub attestation_required: Option<String>,
+    pub attestation_granted: Option<String>,
+    pub mastery_threshold: Option<u32>,
+    pub metadata_json: Option<String>,
 }
 
 /// Output for learning path with steps
@@ -115,6 +342,248 @@ pub struct PathWithSteps {
 pub struct PathStepOutput {
     pub action_hash: ActionHash,
     pub step: PathStep,
+}
+
+/// Input for creating a chapter
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateChapterInput {
+    pub path_id: String,
+    pub order_index: u32,
+    pub title: String,
+    pub description: Option<String>,
+    pub learning_objectives: Vec<String>,
+    pub estimated_minutes: Option<u32>,
+    pub is_optional: bool,
+    pub attestation_granted: Option<String>,
+    pub mastery_threshold: Option<u32>,
+    pub metadata_json: Option<String>,
+}
+
+/// Output for a chapter
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ChapterOutput {
+    pub action_hash: ActionHash,
+    pub chapter: PathChapter,
+}
+
+/// Output for a chapter with its steps
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ChapterWithSteps {
+    pub action_hash: ActionHash,
+    pub chapter: PathChapter,
+    pub steps: Vec<PathStepOutput>,
+}
+
+/// Output for a full path with chapters and steps
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PathWithChaptersAndSteps {
+    pub action_hash: ActionHash,
+    pub path: LearningPath,
+    pub chapters: Vec<ChapterWithSteps>,
+    pub ungrouped_steps: Vec<PathStepOutput>,  // Steps not in any chapter
+}
+
+/// Input for updating a path
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdatePathInput {
+    pub path_id: String,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub purpose: Option<String>,
+    pub difficulty: Option<String>,
+    pub estimated_duration: Option<String>,
+    pub visibility: Option<String>,
+    pub tags: Option<Vec<String>>,
+}
+
+/// Input for updating a chapter
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateChapterInput {
+    pub chapter_id: String,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub learning_objectives: Option<Vec<String>>,
+    pub estimated_minutes: Option<u32>,
+    pub is_optional: Option<bool>,
+    pub order_index: Option<u32>,
+    pub attestation_granted: Option<String>,
+    pub mastery_threshold: Option<u32>,
+}
+
+/// Input for updating a step
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateStepInput {
+    pub step_id: String,
+    pub step_title: Option<String>,
+    pub step_narrative: Option<String>,
+    pub is_optional: Option<bool>,
+    pub order_index: Option<u32>,
+    pub chapter_id: Option<String>,
+    pub learning_objectives: Option<Vec<String>>,
+    pub reflection_prompts: Option<Vec<String>>,
+    pub practice_exercises: Option<Vec<String>>,
+    pub estimated_minutes: Option<u32>,
+    pub completion_criteria: Option<String>,
+    pub attestation_required: Option<String>,
+    pub attestation_granted: Option<String>,
+    pub mastery_threshold: Option<u32>,
+}
+
+// =============================================================================
+// Input/Output Types for Progress Tracking
+// =============================================================================
+
+/// Input for starting path progress
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StartPathProgressInput {
+    pub path_id: String,
+}
+
+// Note: AgentProgressOutput is defined earlier in the file (line ~212)
+
+/// Input for completing a step
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CompleteStepInput {
+    pub path_id: String,
+    pub step_index: u32,
+    pub content_id: Option<String>,
+    pub affinity_score: Option<u32>,  // 0-10: How much did the learner enjoy this content?
+    pub notes: Option<String>,
+    pub reflection_responses: Option<Vec<String>>,
+}
+
+/// Input for querying progress
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryProgressInput {
+    pub status: Option<String>,  // in_progress, completed, abandoned
+    pub path_id: Option<String>,
+    pub limit: Option<u32>,
+}
+
+/// Summary of a learner's progress
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ProgressSummary {
+    pub path_id: String,
+    pub path_title: String,
+    pub total_steps: u32,
+    pub completed_steps: u32,
+    pub current_step_index: u32,
+    pub is_completed: bool,
+    pub attestations_earned: Vec<String>,
+    pub started_at: String,
+    pub last_activity_at: String,
+    pub completed_at: Option<String>,
+}
+
+/// Input for granting attestation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GrantAttestationInput {
+    pub path_id: String,
+    pub attestation_id: String,       // The attestation type being granted
+    pub reason: String,               // e.g., "Completed Chapter 1", "Passed mastery quiz"
+    pub source_type: String,          // "step", "chapter", "path"
+    pub source_id: String,            // step_id, chapter_id, or path_id
+}
+
+// =============================================================================
+// Input/Output Types for Content Mastery
+// =============================================================================
+
+/// Mastery levels (Bloom's Taxonomy)
+pub const MASTERY_LEVELS: [&str; 8] = [
+    "not_started",  // 0 - No engagement
+    "seen",         // 1 - Content viewed
+    "remember",     // 2 - Basic recall demonstrated
+    "understand",   // 3 - Comprehension demonstrated
+    "apply",        // 4 - Application in novel contexts (ATTESTATION GATE)
+    "analyze",      // 5 - Can break down, connect, contribute analysis
+    "evaluate",     // 6 - Can assess, critique, peer review
+    "create",       // 7 - Can author, derive, synthesize
+];
+
+/// Engagement types for mastery tracking
+pub const ENGAGEMENT_TYPES: [&str; 8] = [
+    "view",         // Viewed content
+    "quiz",         // Completed quiz
+    "practice",     // Did practice exercise
+    "comment",      // Added comment/discussion
+    "review",       // Peer reviewed content
+    "contribute",   // Contributed to content
+    "path_step",    // Completed as path step
+    "refresh",      // Refreshed stale mastery
+];
+
+/// Input for initializing mastery tracking
+#[derive(Serialize, Deserialize, Debug)]
+pub struct InitializeMasteryInput {
+    pub content_id: String,
+}
+
+/// Input for recording engagement
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RecordEngagementInput {
+    pub content_id: String,
+    pub engagement_type: String,      // view, quiz, practice, etc.
+    pub duration_seconds: Option<u32>,
+    pub metadata_json: Option<String>,
+}
+
+/// Input for recording assessment (quiz/test)
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RecordAssessmentInput {
+    pub content_id: String,
+    pub assessment_type: String,      // recall, comprehension, application, analysis
+    pub score: f64,                   // 0.0-1.0
+    pub passing_threshold: f64,       // Usually 0.7
+    pub time_spent_seconds: u32,
+    pub question_count: u32,
+    pub correct_count: u32,
+    pub evidence_json: Option<String>, // Detailed evidence
+}
+
+/// Input for leveling up mastery
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LevelUpMasteryInput {
+    pub content_id: String,
+    pub target_level: String,         // The level to advance to
+    pub evidence_type: String,        // assessment, peer_review, contribution
+    pub evidence_json: String,        // Proof of level achievement
+}
+
+/// Mastery statistics for dashboard
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MasteryStats {
+    pub total_tracked: u32,
+    pub level_distribution: HashMap<String, u32>,
+    pub above_gate_count: u32,        // >= apply level
+    pub fresh_count: u32,
+    pub stale_count: u32,
+    pub needs_refresh_count: u32,
+}
+
+/// Query input for mastery by level
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MasteryByLevelQueryInput {
+    pub level: Option<String>,
+    pub needs_refresh: Option<bool>,
+    pub content_type: Option<String>,
+    pub limit: Option<u32>,
+}
+
+/// Privilege check input
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CheckPrivilegeInput {
+    pub content_id: String,
+    pub privilege: String,            // comment, suggest_edit, peer_review, contribute, etc.
+}
+
+/// Privilege check result
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PrivilegeCheckResult {
+    pub has_privilege: bool,
+    pub required_level: String,
+    pub current_level: String,
+    pub current_level_index: u32,
 }
 
 // =============================================================================
@@ -231,10 +700,9 @@ pub fn get_content(action_hash: ActionHash) -> ExternResult<Option<ContentOutput
 pub fn get_content_by_id(input: QueryByIdInput) -> ExternResult<Option<ContentOutput>> {
     let anchor = StringAnchor::new("content_id", &input.id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let links = get_links(
-        GetLinksInputBuilder::try_new(anchor_hash, LinkTypes::IdToContent)?
-            .build(),
-    )?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
         let action_hash = ActionHash::try_from(link.target.clone())
@@ -250,10 +718,9 @@ pub fn get_content_by_id(input: QueryByIdInput) -> ExternResult<Option<ContentOu
 pub fn get_content_by_type(input: QueryByTypeInput) -> ExternResult<Vec<ContentOutput>> {
     let anchor = StringAnchor::new("content_type", &input.content_type);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let links = get_links(
-        GetLinksInputBuilder::try_new(anchor_hash, LinkTypes::TypeToContent)?
-            .build(),
-    )?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::TypeToContent)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let limit = input.limit.unwrap_or(100) as usize;
     let mut results = Vec::new();
@@ -275,10 +742,9 @@ pub fn get_content_by_type(input: QueryByTypeInput) -> ExternResult<Vec<ContentO
 pub fn get_content_by_tag(tag: String) -> ExternResult<Vec<ContentOutput>> {
     let anchor = StringAnchor::new("tag", &tag);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let links = get_links(
-        GetLinksInputBuilder::try_new(anchor_hash, LinkTypes::TagToContent)?
-            .build(),
-    )?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::TagToContent)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut results = Vec::new();
 
@@ -298,10 +764,9 @@ pub fn get_content_by_tag(tag: String) -> ExternResult<Vec<ContentOutput>> {
 #[hdk_extern]
 pub fn get_my_content(_: ()) -> ExternResult<Vec<ContentOutput>> {
     let agent_info = agent_info()?;
-    let links = get_links(
-        GetLinksInputBuilder::try_new(agent_info.agent_initial_pubkey, LinkTypes::AuthorToContent)?
-            .build(),
-    )?;
+
+    let query = LinkQuery::try_new(agent_info.agent_initial_pubkey, LinkTypes::AuthorToContent)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut results = Vec::new();
 
@@ -378,35 +843,68 @@ pub fn create_path(input: CreatePathInput) -> ExternResult<ActionHash> {
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     create_link(anchor_hash, action_hash.clone(), LinkTypes::IdToPath, ())?;
 
+    // Create global "all_paths" index link for get_all_paths()
+    let all_paths_anchor = StringAnchor::new("all_paths", "index");
+    let all_paths_anchor_hash = hash_entry(&EntryTypes::StringAnchor(all_paths_anchor))?;
+    create_link(all_paths_anchor_hash, action_hash.clone(), LinkTypes::IdToPath, ())?;
+
     Ok(action_hash)
 }
 
 /// Add a step to a learning path
 #[hdk_extern]
 pub fn add_path_step(input: AddPathStepInput) -> ExternResult<ActionHash> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
     // Generate step ID
-    let step_id = format!("{}-step-{}", input.path_id, input.order_index);
+    let step_id = match &input.chapter_id {
+        Some(ch_id) => format!("{}-{}-step-{}", input.path_id, ch_id, input.order_index),
+        None => format!("{}-step-{}", input.path_id, input.order_index),
+    };
 
     let step = PathStep {
-        id: step_id,
+        id: step_id.clone(),
         path_id: input.path_id.clone(),
+        chapter_id: input.chapter_id.clone(),
         order_index: input.order_index,
         step_type: input.step_type,
         resource_id: input.resource_id.clone(),
         step_title: input.step_title,
         step_narrative: input.step_narrative,
         is_optional: input.is_optional,
+        // Learning objectives and engagement
+        learning_objectives_json: serde_json::to_string(&input.learning_objectives.unwrap_or_default())
+            .unwrap_or_else(|_| "[]".to_string()),
+        reflection_prompts_json: serde_json::to_string(&input.reflection_prompts.unwrap_or_default())
+            .unwrap_or_else(|_| "[]".to_string()),
+        practice_exercises_json: serde_json::to_string(&input.practice_exercises.unwrap_or_default())
+            .unwrap_or_else(|_| "[]".to_string()),
+        // Completion and gating
+        estimated_minutes: input.estimated_minutes,
+        completion_criteria: input.completion_criteria,
+        attestation_required: input.attestation_required,
+        attestation_granted: input.attestation_granted,
+        mastery_threshold: input.mastery_threshold,
+        // Metadata
+        metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
     };
 
     let action_hash = create_entry(&EntryTypes::PathStep(step))?;
 
+    // Create ID lookup link for step
+    let step_anchor = StringAnchor::new("step_id", &step_id);
+    let step_anchor_hash = hash_entry(&EntryTypes::StringAnchor(step_anchor))?;
+    create_link(step_anchor_hash, action_hash.clone(), LinkTypes::IdToStep, ())?;
+
     // Link path to step
     let path_anchor = StringAnchor::new("path_id", &input.path_id);
     let path_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_anchor))?;
-    let path_links = get_links(
-        GetLinksInputBuilder::try_new(path_anchor_hash, LinkTypes::IdToPath)?
-            .build(),
-    )?;
+
+    let query = LinkQuery::try_new(path_anchor_hash, LinkTypes::IdToPath)?;
+    let path_links = get_links(query, GetStrategy::default())?;
 
     if let Some(path_link) = path_links.first() {
         let path_action_hash = ActionHash::try_from(path_link.target.clone())
@@ -414,13 +912,30 @@ pub fn add_path_step(input: AddPathStepInput) -> ExternResult<ActionHash> {
         create_link(path_action_hash, action_hash.clone(), LinkTypes::PathToStep, ())?;
     }
 
+    // Link to chapter if specified
+    if let Some(chapter_id) = &input.chapter_id {
+        let chapter_anchor = StringAnchor::new("chapter_id", chapter_id);
+        let chapter_anchor_hash = hash_entry(&EntryTypes::StringAnchor(chapter_anchor))?;
+
+        let chapter_query = LinkQuery::try_new(chapter_anchor_hash, LinkTypes::IdToChapter)?;
+        let chapter_links = get_links(chapter_query, GetStrategy::default())?;
+
+        if let Some(chapter_link) = chapter_links.first() {
+            let chapter_action_hash = ActionHash::try_from(chapter_link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid chapter action hash".to_string())))?;
+            // Link chapter to step
+            create_link(chapter_action_hash.clone(), action_hash.clone(), LinkTypes::ChapterToStep, ())?;
+            // Link step back to chapter (for reverse lookup)
+            create_link(action_hash.clone(), chapter_action_hash, LinkTypes::StepToChapter, ())?;
+        }
+    }
+
     // Link step to content (if resource exists)
     let resource_anchor = StringAnchor::new("content_id", &input.resource_id);
     let resource_anchor_hash = hash_entry(&EntryTypes::StringAnchor(resource_anchor))?;
-    let content_links = get_links(
-        GetLinksInputBuilder::try_new(resource_anchor_hash, LinkTypes::IdToContent)?
-            .build(),
-    )?;
+
+    let content_query = LinkQuery::try_new(resource_anchor_hash, LinkTypes::IdToContent)?;
+    let content_links = get_links(content_query, GetStrategy::default())?;
 
     if let Some(content_link) = content_links.first() {
         create_link(action_hash.clone(), content_link.target.clone(), LinkTypes::StepToContent, ())?;
@@ -429,16 +944,133 @@ pub fn add_path_step(input: AddPathStepInput) -> ExternResult<ActionHash> {
     Ok(action_hash)
 }
 
+/// Path index entry for listing
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PathIndexEntry {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub difficulty: String,
+    pub estimated_duration: Option<String>,
+    pub step_count: u32,
+    pub tags: Vec<String>,
+}
+
+/// Path index output
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PathIndex {
+    pub paths: Vec<PathIndexEntry>,
+    pub total_count: u32,
+    pub last_updated: String,
+}
+
+/// Get all learning paths (for path index)
+/// Uses link-based lookup via global "all_paths" anchor
+#[hdk_extern]
+pub fn get_all_paths(_: ()) -> ExternResult<PathIndex> {
+    // Use a global anchor to find all paths
+    let anchor = StringAnchor::new("all_paths", "index");
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToPath)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut paths = Vec::new();
+
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(path) = record
+                .entry()
+                .to_app_option::<LearningPath>()
+                .ok()
+                .flatten()
+            {
+                // Count steps for this path
+                let step_query = LinkQuery::try_new(action_hash, LinkTypes::PathToStep)?;
+                let step_links = get_links(step_query, GetStrategy::default())?;
+
+                paths.push(PathIndexEntry {
+                    id: path.id,
+                    title: path.title,
+                    description: path.description,
+                    difficulty: path.difficulty,
+                    estimated_duration: path.estimated_duration,
+                    step_count: step_links.len() as u32,
+                    tags: path.tags,
+                });
+            }
+        }
+    }
+
+    let now = sys_time()?;
+
+    Ok(PathIndex {
+        total_count: paths.len() as u32,
+        paths,
+        last_updated: format!("{:?}", now),
+    })
+}
+
+/// Delete a learning path and its steps (removes links, entries remain in DHT)
+/// Used for re-seeding paths with corrected step resource IDs
+#[hdk_extern]
+pub fn delete_path(path_id: String) -> ExternResult<bool> {
+    // Find path by ID
+    let anchor = StringAnchor::new("path_id", &path_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash.clone(), LinkTypes::IdToPath)?;
+    let path_links = get_links(query, GetStrategy::default())?;
+
+    let path_link = match path_links.first() {
+        Some(link) => link,
+        None => return Ok(false), // Path not found
+    };
+
+    let path_action_hash = ActionHash::try_from(path_link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+
+    // Delete path-to-step links and step entries
+    let step_query = LinkQuery::try_new(path_action_hash.clone(), LinkTypes::PathToStep)?;
+    let step_links = get_links(step_query, GetStrategy::default())?;
+
+    for link in step_links {
+        // Delete the link from path to step
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+
+    // Delete the ID-to-path link
+    delete_link(path_link.create_link_hash.clone(), GetOptions::default())?;
+
+    // Delete the all_paths index link
+    let all_paths_anchor = StringAnchor::new("all_paths", "index");
+    let all_paths_anchor_hash = hash_entry(&EntryTypes::StringAnchor(all_paths_anchor))?;
+    let all_paths_query = LinkQuery::try_new(all_paths_anchor_hash, LinkTypes::IdToPath)?;
+    let all_paths_links = get_links(all_paths_query, GetStrategy::default())?;
+
+    for link in all_paths_links {
+        if link.target == path_link.target {
+            delete_link(link.create_link_hash, GetOptions::default())?;
+            break;
+        }
+    }
+
+    Ok(true)
+}
+
 /// Get a learning path with all its steps
 #[hdk_extern]
 pub fn get_path_with_steps(path_id: String) -> ExternResult<Option<PathWithSteps>> {
     // Find path by ID
     let anchor = StringAnchor::new("path_id", &path_id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let path_links = get_links(
-        GetLinksInputBuilder::try_new(anchor_hash, LinkTypes::IdToPath)?
-            .build(),
-    )?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToPath)?;
+    let path_links = get_links(query, GetStrategy::default())?;
 
     let path_link = match path_links.first() {
         Some(link) => link,
@@ -463,10 +1095,8 @@ pub fn get_path_with_steps(path_id: String) -> ExternResult<Option<PathWithSteps
         )))?;
 
     // Get steps
-    let step_links = get_links(
-        GetLinksInputBuilder::try_new(path_action_hash.clone(), LinkTypes::PathToStep)?
-            .build(),
-    )?;
+    let step_query = LinkQuery::try_new(path_action_hash.clone(), LinkTypes::PathToStep)?;
+    let step_links = get_links(step_query, GetStrategy::default())?;
 
     let mut steps = Vec::new();
     for link in step_links {
@@ -497,6 +1127,894 @@ pub fn get_path_with_steps(path_id: String) -> ExternResult<Option<PathWithSteps
         path,
         steps,
     }))
+}
+
+// =============================================================================
+// Chapter Operations
+// =============================================================================
+
+/// Create a chapter for a learning path
+#[hdk_extern]
+pub fn create_chapter(input: CreateChapterInput) -> ExternResult<ChapterOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Generate chapter ID
+    let chapter_id = format!("{}-chapter-{}", input.path_id, input.order_index);
+
+    let chapter = PathChapter {
+        id: chapter_id.clone(),
+        path_id: input.path_id.clone(),
+        order_index: input.order_index,
+        title: input.title,
+        description: input.description,
+        learning_objectives_json: serde_json::to_string(&input.learning_objectives)
+            .unwrap_or_else(|_| "[]".to_string()),
+        estimated_minutes: input.estimated_minutes,
+        is_optional: input.is_optional,
+        attestation_granted: input.attestation_granted,
+        mastery_threshold: input.mastery_threshold,
+        metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::PathChapter(chapter.clone()))?;
+
+    // Create ID lookup link for chapter
+    let chapter_anchor = StringAnchor::new("chapter_id", &chapter_id);
+    let chapter_anchor_hash = hash_entry(&EntryTypes::StringAnchor(chapter_anchor))?;
+    create_link(chapter_anchor_hash, action_hash.clone(), LinkTypes::IdToChapter, ())?;
+
+    // Link path to chapter
+    let path_anchor = StringAnchor::new("path_id", &input.path_id);
+    let path_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_anchor))?;
+
+    let query = LinkQuery::try_new(path_anchor_hash, LinkTypes::IdToPath)?;
+    let path_links = get_links(query, GetStrategy::default())?;
+
+    if let Some(path_link) = path_links.first() {
+        let path_action_hash = ActionHash::try_from(path_link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+        create_link(path_action_hash, action_hash.clone(), LinkTypes::PathToChapter, ())?;
+    }
+
+    Ok(ChapterOutput {
+        action_hash,
+        chapter,
+    })
+}
+
+/// Get a chapter by ID
+#[hdk_extern]
+pub fn get_chapter_by_id(chapter_id: String) -> ExternResult<Option<ChapterOutput>> {
+    let anchor = StringAnchor::new("chapter_id", &chapter_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToChapter)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let link = match links.first() {
+        Some(l) => l,
+        None => return Ok(None),
+    };
+
+    let action_hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid chapter action hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?;
+    let record = match record {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+
+    let chapter: PathChapter = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize chapter".to_string()
+        )))?;
+
+    Ok(Some(ChapterOutput {
+        action_hash,
+        chapter,
+    }))
+}
+
+/// Get all chapters for a path
+#[hdk_extern]
+pub fn get_chapters_for_path(path_id: String) -> ExternResult<Vec<ChapterWithSteps>> {
+    // Find path by ID
+    let path_anchor = StringAnchor::new("path_id", &path_id);
+    let path_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_anchor))?;
+
+    let query = LinkQuery::try_new(path_anchor_hash, LinkTypes::IdToPath)?;
+    let path_links = get_links(query, GetStrategy::default())?;
+
+    let path_link = match path_links.first() {
+        Some(l) => l,
+        None => return Ok(Vec::new()),
+    };
+
+    let path_action_hash = ActionHash::try_from(path_link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+
+    // Get chapters linked to path
+    let chapter_query = LinkQuery::try_new(path_action_hash, LinkTypes::PathToChapter)?;
+    let chapter_links = get_links(chapter_query, GetStrategy::default())?;
+
+    let mut chapters = Vec::new();
+    for link in chapter_links {
+        let chapter_action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid chapter action hash".to_string())))?;
+
+        let chapter_record = get(chapter_action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = chapter_record {
+            if let Some(chapter) = record
+                .entry()
+                .to_app_option::<PathChapter>()
+                .ok()
+                .flatten()
+            {
+                // Get steps for this chapter
+                let step_query = LinkQuery::try_new(chapter_action_hash.clone(), LinkTypes::ChapterToStep)?;
+                let step_links = get_links(step_query, GetStrategy::default())?;
+
+                let mut steps = Vec::new();
+                for step_link in step_links {
+                    let step_action_hash = ActionHash::try_from(step_link.target)
+                        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid step action hash".to_string())))?;
+
+                    let step_record = get(step_action_hash.clone(), GetOptions::default())?;
+                    if let Some(step_rec) = step_record {
+                        if let Some(step) = step_rec
+                            .entry()
+                            .to_app_option::<PathStep>()
+                            .ok()
+                            .flatten()
+                        {
+                            steps.push(PathStepOutput {
+                                action_hash: step_action_hash,
+                                step,
+                            });
+                        }
+                    }
+                }
+
+                // Sort steps by order_index
+                steps.sort_by_key(|s| s.step.order_index);
+
+                chapters.push(ChapterWithSteps {
+                    action_hash: chapter_action_hash,
+                    chapter,
+                    steps,
+                });
+            }
+        }
+    }
+
+    // Sort chapters by order_index
+    chapters.sort_by_key(|c| c.chapter.order_index);
+
+    Ok(chapters)
+}
+
+/// Get a full path with chapters and steps organized
+#[hdk_extern]
+pub fn get_path_full(path_id: String) -> ExternResult<Option<PathWithChaptersAndSteps>> {
+    // Find path by ID
+    let path_anchor = StringAnchor::new("path_id", &path_id);
+    let path_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_anchor))?;
+
+    let query = LinkQuery::try_new(path_anchor_hash, LinkTypes::IdToPath)?;
+    let path_links = get_links(query, GetStrategy::default())?;
+
+    let path_link = match path_links.first() {
+        Some(l) => l,
+        None => return Ok(None),
+    };
+
+    let path_action_hash = ActionHash::try_from(path_link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+
+    let path_record = get(path_action_hash.clone(), GetOptions::default())?;
+    let path_record = match path_record {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+
+    let path: LearningPath = path_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize path".to_string()
+        )))?;
+
+    // Get chapters
+    let chapters = get_chapters_for_path(path_id.clone())?;
+
+    // Get all steps linked directly to path (includes those with chapters)
+    let step_query = LinkQuery::try_new(path_action_hash.clone(), LinkTypes::PathToStep)?;
+    let step_links = get_links(step_query, GetStrategy::default())?;
+
+    let mut ungrouped_steps = Vec::new();
+    for link in step_links {
+        let step_action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid step action hash".to_string())))?;
+
+        let step_record = get(step_action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = step_record {
+            if let Some(step) = record
+                .entry()
+                .to_app_option::<PathStep>()
+                .ok()
+                .flatten()
+            {
+                // Only include steps that are NOT in a chapter
+                if step.chapter_id.is_none() {
+                    ungrouped_steps.push(PathStepOutput {
+                        action_hash: step_action_hash,
+                        step,
+                    });
+                }
+            }
+        }
+    }
+
+    // Sort ungrouped steps by order_index
+    ungrouped_steps.sort_by_key(|s| s.step.order_index);
+
+    Ok(Some(PathWithChaptersAndSteps {
+        action_hash: path_action_hash,
+        path,
+        chapters,
+        ungrouped_steps,
+    }))
+}
+
+/// Update a chapter
+#[hdk_extern]
+pub fn update_chapter(input: UpdateChapterInput) -> ExternResult<ChapterOutput> {
+    // Get existing chapter
+    let existing = get_chapter_by_id(input.chapter_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            format!("Chapter not found: {}", input.chapter_id)
+        )))?;
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Create updated chapter (immutable DHT pattern)
+    let updated_chapter = PathChapter {
+        id: existing.chapter.id,
+        path_id: existing.chapter.path_id.clone(),
+        order_index: input.order_index.unwrap_or(existing.chapter.order_index),
+        title: input.title.unwrap_or(existing.chapter.title),
+        description: input.description.or(existing.chapter.description),
+        learning_objectives_json: input.learning_objectives
+            .map(|lo| serde_json::to_string(&lo).unwrap_or_else(|_| "[]".to_string()))
+            .unwrap_or(existing.chapter.learning_objectives_json),
+        estimated_minutes: input.estimated_minutes.or(existing.chapter.estimated_minutes),
+        is_optional: input.is_optional.unwrap_or(existing.chapter.is_optional),
+        attestation_granted: input.attestation_granted.or(existing.chapter.attestation_granted),
+        mastery_threshold: input.mastery_threshold.or(existing.chapter.mastery_threshold),
+        metadata_json: existing.chapter.metadata_json,
+        created_at: existing.chapter.created_at,
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::PathChapter(updated_chapter.clone()))?;
+
+    // Update the ID lookup link
+    let chapter_anchor = StringAnchor::new("chapter_id", &input.chapter_id);
+    let chapter_anchor_hash = hash_entry(&EntryTypes::StringAnchor(chapter_anchor))?;
+
+    // Delete old link
+    let old_query = LinkQuery::try_new(chapter_anchor_hash.clone(), LinkTypes::IdToChapter)?;
+    let old_links = get_links(old_query, GetStrategy::default())?;
+    for link in old_links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+
+    // Create new link
+    create_link(chapter_anchor_hash, action_hash.clone(), LinkTypes::IdToChapter, ())?;
+
+    // Update path-to-chapter link
+    let path_anchor = StringAnchor::new("path_id", &existing.chapter.path_id);
+    let path_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_anchor))?;
+    let path_query = LinkQuery::try_new(path_anchor_hash, LinkTypes::IdToPath)?;
+    let path_links = get_links(path_query, GetStrategy::default())?;
+
+    if let Some(path_link) = path_links.first() {
+        let path_action_hash = ActionHash::try_from(path_link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+
+        // Delete old path-to-chapter links pointing to old chapter
+        let old_chapter_query = LinkQuery::try_new(path_action_hash.clone(), LinkTypes::PathToChapter)?;
+        let old_chapter_links = get_links(old_chapter_query, GetStrategy::default())?;
+        for link in old_chapter_links {
+            if link.target == existing.action_hash.clone().into() {
+                delete_link(link.create_link_hash, GetOptions::default())?;
+            }
+        }
+
+        // Create new link
+        create_link(path_action_hash, action_hash.clone(), LinkTypes::PathToChapter, ())?;
+    }
+
+    Ok(ChapterOutput {
+        action_hash,
+        chapter: updated_chapter,
+    })
+}
+
+// =============================================================================
+// Path Update Operations
+// =============================================================================
+
+/// Update a learning path
+#[hdk_extern]
+pub fn update_path(input: UpdatePathInput) -> ExternResult<PathWithSteps> {
+    // Get existing path
+    let existing = get_path_with_steps(input.path_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            format!("Path not found: {}", input.path_id)
+        )))?;
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Create updated path (immutable DHT pattern)
+    let updated_path = LearningPath {
+        id: existing.path.id,
+        version: existing.path.version,
+        title: input.title.unwrap_or(existing.path.title),
+        description: input.description.unwrap_or(existing.path.description),
+        purpose: input.purpose.or(existing.path.purpose),
+        created_by: existing.path.created_by,
+        difficulty: input.difficulty.unwrap_or(existing.path.difficulty),
+        estimated_duration: input.estimated_duration.or(existing.path.estimated_duration),
+        visibility: input.visibility.unwrap_or(existing.path.visibility),
+        path_type: existing.path.path_type,
+        tags: input.tags.unwrap_or(existing.path.tags),
+        created_at: existing.path.created_at,
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::LearningPath(updated_path.clone()))?;
+
+    // Update the ID lookup link
+    let path_anchor = StringAnchor::new("path_id", &input.path_id);
+    let path_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_anchor))?;
+
+    // Delete old link
+    let old_query = LinkQuery::try_new(path_anchor_hash.clone(), LinkTypes::IdToPath)?;
+    let old_links = get_links(old_query, GetStrategy::default())?;
+    for link in old_links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+
+    // Create new link
+    create_link(path_anchor_hash, action_hash.clone(), LinkTypes::IdToPath, ())?;
+
+    // Update all_paths index link
+    let all_paths_anchor = StringAnchor::new("all_paths", "index");
+    let all_paths_anchor_hash = hash_entry(&EntryTypes::StringAnchor(all_paths_anchor))?;
+
+    // Delete old all_paths link
+    let old_all_query = LinkQuery::try_new(all_paths_anchor_hash.clone(), LinkTypes::IdToPath)?;
+    let old_all_links = get_links(old_all_query, GetStrategy::default())?;
+    for link in old_all_links {
+        if link.target == existing.action_hash.clone().into() {
+            delete_link(link.create_link_hash, GetOptions::default())?;
+        }
+    }
+
+    // Create new all_paths link
+    create_link(all_paths_anchor_hash, action_hash.clone(), LinkTypes::IdToPath, ())?;
+
+    // Re-link all steps to new path action hash
+    for step_output in &existing.steps {
+        create_link(action_hash.clone(), step_output.action_hash.clone(), LinkTypes::PathToStep, ())?;
+    }
+
+    Ok(PathWithSteps {
+        action_hash,
+        path: updated_path,
+        steps: existing.steps,
+    })
+}
+
+/// Update a step
+#[hdk_extern]
+pub fn update_step(input: UpdateStepInput) -> ExternResult<PathStepOutput> {
+    // Get existing step by ID
+    let step_anchor = StringAnchor::new("step_id", &input.step_id);
+    let step_anchor_hash = hash_entry(&EntryTypes::StringAnchor(step_anchor))?;
+
+    let query = LinkQuery::try_new(step_anchor_hash.clone(), LinkTypes::IdToStep)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let link = links.first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            format!("Step not found: {}", input.step_id)
+        )))?;
+
+    let existing_action_hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid step action hash".to_string())))?;
+
+    let record = get(existing_action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Step record not found".to_string())))?;
+
+    let existing: PathStep = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize step".to_string()
+        )))?;
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Create updated step
+    let updated_step = PathStep {
+        id: existing.id,
+        path_id: existing.path_id.clone(),
+        chapter_id: input.chapter_id.or(existing.chapter_id),
+        order_index: input.order_index.unwrap_or(existing.order_index),
+        step_type: existing.step_type,
+        resource_id: existing.resource_id.clone(),
+        step_title: input.step_title.or(existing.step_title),
+        step_narrative: input.step_narrative.or(existing.step_narrative),
+        is_optional: input.is_optional.unwrap_or(existing.is_optional),
+        learning_objectives_json: input.learning_objectives
+            .map(|lo| serde_json::to_string(&lo).unwrap_or_else(|_| "[]".to_string()))
+            .unwrap_or(existing.learning_objectives_json),
+        reflection_prompts_json: input.reflection_prompts
+            .map(|rp| serde_json::to_string(&rp).unwrap_or_else(|_| "[]".to_string()))
+            .unwrap_or(existing.reflection_prompts_json),
+        practice_exercises_json: input.practice_exercises
+            .map(|pe| serde_json::to_string(&pe).unwrap_or_else(|_| "[]".to_string()))
+            .unwrap_or(existing.practice_exercises_json),
+        estimated_minutes: input.estimated_minutes.or(existing.estimated_minutes),
+        completion_criteria: input.completion_criteria.or(existing.completion_criteria),
+        attestation_required: input.attestation_required.or(existing.attestation_required),
+        attestation_granted: input.attestation_granted.or(existing.attestation_granted),
+        mastery_threshold: input.mastery_threshold.or(existing.mastery_threshold),
+        metadata_json: existing.metadata_json,
+        created_at: existing.created_at,
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::PathStep(updated_step.clone()))?;
+
+    // Update the ID lookup link
+    // Delete old link
+    for lnk in links {
+        delete_link(lnk.create_link_hash, GetOptions::default())?;
+    }
+
+    // Create new link
+    create_link(step_anchor_hash, action_hash.clone(), LinkTypes::IdToStep, ())?;
+
+    // Re-link to path
+    let path_anchor = StringAnchor::new("path_id", &existing.path_id);
+    let path_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_anchor))?;
+    let path_query = LinkQuery::try_new(path_anchor_hash, LinkTypes::IdToPath)?;
+    let path_links = get_links(path_query, GetStrategy::default())?;
+
+    if let Some(path_link) = path_links.first() {
+        let path_action_hash = ActionHash::try_from(path_link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+        create_link(path_action_hash, action_hash.clone(), LinkTypes::PathToStep, ())?;
+    }
+
+    Ok(PathStepOutput {
+        action_hash,
+        step: updated_step,
+    })
+}
+
+/// Get a step by ID
+#[hdk_extern]
+pub fn get_step_by_id(step_id: String) -> ExternResult<Option<PathStepOutput>> {
+    let anchor = StringAnchor::new("step_id", &step_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToStep)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let link = match links.first() {
+        Some(l) => l,
+        None => return Ok(None),
+    };
+
+    let action_hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid step action hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?;
+    let record = match record {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+
+    let step: PathStep = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize step".to_string()
+        )))?;
+
+    Ok(Some(PathStepOutput {
+        action_hash,
+        step,
+    }))
+}
+
+// =============================================================================
+// Relationship Operations
+// =============================================================================
+
+/// Create a relationship between two content nodes
+#[hdk_extern]
+pub fn create_relationship(input: CreateRelationshipInput) -> ExternResult<RelationshipOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Generate relationship ID
+    let rel_id = format!("{}-{}-{}", input.source_id, input.relationship_type, input.target_id);
+
+    let relationship = Relationship {
+        id: rel_id.clone(),
+        source_id: input.source_id.clone(),
+        target_id: input.target_id.clone(),
+        relationship_type: input.relationship_type.clone(),
+        confidence: input.confidence,
+        inference_source: input.inference_source,
+        metadata_json: input.metadata_json,
+        created_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Relationship(relationship.clone()))?;
+
+    // Create index links for querying
+    // By source
+    let source_anchor = StringAnchor::new("rel_source", &input.source_id);
+    let source_anchor_hash = hash_entry(&EntryTypes::StringAnchor(source_anchor))?;
+    create_link(source_anchor_hash, action_hash.clone(), LinkTypes::RelationshipBySource, ())?;
+
+    // By target
+    let target_anchor = StringAnchor::new("rel_target", &input.target_id);
+    let target_anchor_hash = hash_entry(&EntryTypes::StringAnchor(target_anchor))?;
+    create_link(target_anchor_hash, action_hash.clone(), LinkTypes::RelationshipByTarget, ())?;
+
+    // By type
+    let type_anchor = StringAnchor::new("rel_type", &input.relationship_type);
+    let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
+    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::RelationshipByType, ())?;
+
+    Ok(RelationshipOutput {
+        action_hash,
+        relationship,
+    })
+}
+
+/// Get relationships for a content node
+#[hdk_extern]
+pub fn get_relationships(input: GetRelationshipsInput) -> ExternResult<Vec<RelationshipOutput>> {
+    let mut results = Vec::new();
+
+    // Get outgoing relationships (this content is source)
+    if input.direction == "outgoing" || input.direction == "both" {
+        let source_anchor = StringAnchor::new("rel_source", &input.content_id);
+        let source_anchor_hash = hash_entry(&EntryTypes::StringAnchor(source_anchor))?;
+        let query = LinkQuery::try_new(source_anchor_hash, LinkTypes::RelationshipBySource)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links {
+            let action_hash = ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid relationship hash".to_string())))?;
+            if let Some(output) = get_relationship(action_hash)? {
+                results.push(output);
+            }
+        }
+    }
+
+    // Get incoming relationships (this content is target)
+    if input.direction == "incoming" || input.direction == "both" {
+        let target_anchor = StringAnchor::new("rel_target", &input.content_id);
+        let target_anchor_hash = hash_entry(&EntryTypes::StringAnchor(target_anchor))?;
+        let query = LinkQuery::try_new(target_anchor_hash, LinkTypes::RelationshipByTarget)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links {
+            let action_hash = ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid relationship hash".to_string())))?;
+            if let Some(output) = get_relationship(action_hash)? {
+                // Avoid duplicates if direction is "both"
+                if !results.iter().any(|r| r.relationship.id == output.relationship.id) {
+                    results.push(output);
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Get a relationship by action hash
+fn get_relationship(action_hash: ActionHash) -> ExternResult<Option<RelationshipOutput>> {
+    let record = get(action_hash.clone(), GetOptions::default())?;
+
+    match record {
+        Some(record) => {
+            let relationship: Relationship = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(e))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Could not deserialize relationship".to_string()
+                )))?;
+
+            Ok(Some(RelationshipOutput {
+                action_hash,
+                relationship,
+            }))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Get related content for a content node (follows relationships)
+#[hdk_extern]
+pub fn query_related_content(input: QueryRelatedContentInput) -> ExternResult<Vec<ContentOutput>> {
+    let relationships = get_relationships(GetRelationshipsInput {
+        content_id: input.content_id.clone(),
+        direction: "outgoing".to_string(),
+    })?;
+
+    let mut results = Vec::new();
+
+    for rel_output in relationships {
+        // Filter by relationship type if specified
+        if let Some(ref types) = input.relationship_types {
+            if !types.contains(&rel_output.relationship.relationship_type) {
+                continue;
+            }
+        }
+
+        // Get the target content
+        if let Some(content) = get_content_by_id(QueryByIdInput {
+            id: rel_output.relationship.target_id,
+        })? {
+            results.push(content);
+        }
+    }
+
+    Ok(results)
+}
+
+/// Get content graph starting from a root node
+#[hdk_extern]
+pub fn get_content_graph(input: QueryRelatedContentInput) -> ExternResult<ContentGraph> {
+    let root = get_content_by_id(QueryByIdInput {
+        id: input.content_id.clone(),
+    })?;
+
+    let relationships = get_relationships(GetRelationshipsInput {
+        content_id: input.content_id.clone(),
+        direction: "outgoing".to_string(),
+    })?;
+
+    let mut related = Vec::new();
+    let mut total_nodes = if root.is_some() { 1 } else { 0 };
+
+    for rel_output in relationships {
+        if let Some(content) = get_content_by_id(QueryByIdInput {
+            id: rel_output.relationship.target_id,
+        })? {
+            total_nodes += 1;
+            related.push(ContentGraphNode {
+                content,
+                relationship_type: rel_output.relationship.relationship_type,
+                confidence: rel_output.relationship.confidence,
+                children: Vec::new(), // TODO: Recursive traversal for depth > 1
+            });
+        }
+    }
+
+    Ok(ContentGraph {
+        root,
+        related,
+        total_nodes,
+    })
+}
+
+// =============================================================================
+// Human Operations
+// =============================================================================
+
+/// Create a human entry
+#[hdk_extern]
+pub fn create_human(input: CreateHumanInput) -> ExternResult<HumanOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let human = Human {
+        id: input.id.clone(),
+        display_name: input.display_name,
+        bio: input.bio,
+        affinities: input.affinities.clone(),
+        profile_reach: input.profile_reach,
+        location: input.location,
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Human(human.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("human_id", &input.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToHuman, ())?;
+
+    // Create affinity links for querying
+    for affinity in &input.affinities {
+        let affinity_anchor = StringAnchor::new("affinity", affinity);
+        let affinity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(affinity_anchor))?;
+        create_link(affinity_anchor_hash, action_hash.clone(), LinkTypes::HumanByAffinity, ())?;
+    }
+
+    Ok(HumanOutput {
+        action_hash,
+        human,
+    })
+}
+
+/// Get human by ID
+#[hdk_extern]
+pub fn get_human_by_id(id: String) -> ExternResult<Option<HumanOutput>> {
+    let anchor = StringAnchor::new("human_id", &id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToHuman)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid human action hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            let human: Human = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(e))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Could not deserialize human".to_string()
+                )))?;
+
+            return Ok(Some(HumanOutput {
+                action_hash,
+                human,
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Query humans by affinity
+#[hdk_extern]
+pub fn query_humans_by_affinity(input: QueryHumansByAffinityInput) -> ExternResult<Vec<HumanOutput>> {
+    let mut results = Vec::new();
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    for affinity in &input.affinities {
+        if results.len() >= limit {
+            break;
+        }
+
+        let anchor = StringAnchor::new("affinity", affinity);
+        let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+        let query = LinkQuery::try_new(anchor_hash, LinkTypes::HumanByAffinity)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links {
+            if results.len() >= limit {
+                break;
+            }
+
+            let action_hash = ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid human action hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(human) = record
+                    .entry()
+                    .to_app_option::<Human>()
+                    .ok()
+                    .flatten()
+                {
+                    // Avoid duplicates
+                    if !results.iter().any(|r: &HumanOutput| r.human.id == human.id) {
+                        results.push(HumanOutput {
+                            action_hash,
+                            human,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Record content completion for a human (progress tracking)
+#[hdk_extern]
+pub fn record_content_completion(input: RecordCompletionInput) -> ExternResult<bool> {
+    // Get existing progress or create new
+    let progress_anchor = StringAnchor::new("progress", &format!("{}-{}", input.human_id, input.path_id));
+    let progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(progress_anchor))?;
+
+    // Check if progress exists
+    let query = LinkQuery::try_new(progress_anchor_hash.clone(), LinkTypes::HumanToProgress)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    if let Some(link) = links.first() {
+        // Update existing progress
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress hash".to_string())))?;
+
+        let record = get(action_hash, GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(mut progress) = record
+                .entry()
+                .to_app_option::<HumanProgress>()
+                .ok()
+                .flatten()
+            {
+                if !progress.completed_content_ids.contains(&input.content_id) {
+                    progress.completed_content_ids.push(input.content_id);
+                    progress.last_activity_at = timestamp;
+
+                    // Create new entry (immutable DHT pattern)
+                    let new_action_hash = create_entry(&EntryTypes::HumanProgress(progress))?;
+
+                    // Update link (delete old, create new)
+                    delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+                    create_link(progress_anchor_hash, new_action_hash, LinkTypes::HumanToProgress, ())?;
+                }
+            }
+        }
+    } else {
+        // Create new progress entry
+        let progress = HumanProgress {
+            id: format!("{}-{}", input.human_id, input.path_id),
+            human_id: input.human_id,
+            path_id: input.path_id,
+            current_step_index: 0,
+            completed_step_indices: Vec::new(),
+            completed_content_ids: vec![input.content_id],
+            started_at: timestamp.clone(),
+            last_activity_at: timestamp,
+            completed_at: None,
+        };
+
+        let action_hash = create_entry(&EntryTypes::HumanProgress(progress))?;
+        create_link(progress_anchor_hash, action_hash, LinkTypes::HumanToProgress, ())?;
+    }
+
+    Ok(true)
 }
 
 // =============================================================================
@@ -540,4 +2058,5056 @@ fn create_import_batch_link(import_id: &str, target: &ActionHash) -> ExternResul
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     create_link(anchor_hash, target.clone(), LinkTypes::ImportBatchToContent, ())?;
     Ok(())
+}
+
+// =============================================================================
+// Agent Operations (Expanded Identity Model)
+// =============================================================================
+
+/// Create an agent entry
+#[hdk_extern]
+pub fn create_agent(input: CreateAgentInput) -> ExternResult<AgentOutput> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let agent = Agent {
+        id: input.id.clone(),
+        agent_type: input.agent_type.clone(),
+        display_name: input.display_name,
+        bio: input.bio,
+        avatar: input.avatar,
+        affinities: input.affinities.clone(),
+        visibility: input.visibility,
+        location: input.location,
+        holochain_agent_key: Some(agent_info.agent_initial_pubkey.to_string()),
+        did: input.did,
+        activity_pub_type: input.activity_pub_type,
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Agent(agent.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("agent_id", &input.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToAgent, ())?;
+
+    // Create type lookup link
+    let type_anchor = StringAnchor::new("agent_type", &input.agent_type);
+    let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
+    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::AgentByType, ())?;
+
+    // Create affinity links for querying
+    for affinity in &input.affinities {
+        let affinity_anchor = StringAnchor::new("agent_affinity", affinity);
+        let affinity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(affinity_anchor))?;
+        create_link(affinity_anchor_hash, action_hash.clone(), LinkTypes::AgentByAffinity, ())?;
+    }
+
+    Ok(AgentOutput {
+        action_hash,
+        agent,
+    })
+}
+
+/// Get agent by ID
+#[hdk_extern]
+pub fn get_agent_by_id(id: String) -> ExternResult<Option<AgentOutput>> {
+    let anchor = StringAnchor::new("agent_id", &id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToAgent)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid agent action hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            let agent: Agent = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(e))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Could not deserialize agent".to_string()
+                )))?;
+
+            return Ok(Some(AgentOutput {
+                action_hash,
+                agent,
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Query agents by type or affinity
+#[hdk_extern]
+pub fn query_agents(input: QueryAgentsInput) -> ExternResult<Vec<AgentOutput>> {
+    let mut results = Vec::new();
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    // Query by type if specified
+    if let Some(agent_type) = &input.agent_type {
+        let anchor = StringAnchor::new("agent_type", agent_type);
+        let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+        let query = LinkQuery::try_new(anchor_hash, LinkTypes::AgentByType)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid agent hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(agent) = record.entry().to_app_option::<Agent>().ok().flatten() {
+                    results.push(AgentOutput { action_hash, agent });
+                }
+            }
+        }
+    }
+
+    // Query by affinities if specified
+    if let Some(affinities) = &input.affinities {
+        for affinity in affinities {
+            if results.len() >= limit {
+                break;
+            }
+
+            let anchor = StringAnchor::new("agent_affinity", affinity);
+            let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+            let query = LinkQuery::try_new(anchor_hash, LinkTypes::AgentByAffinity)?;
+            let links = get_links(query, GetStrategy::default())?;
+
+            for link in links {
+                if results.len() >= limit {
+                    break;
+                }
+
+                let action_hash = ActionHash::try_from(link.target)
+                    .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid agent hash".to_string())))?;
+
+                let record = get(action_hash.clone(), GetOptions::default())?;
+                if let Some(record) = record {
+                    if let Some(agent) = record.entry().to_app_option::<Agent>().ok().flatten() {
+                        // Avoid duplicates
+                        if !results.iter().any(|r: &AgentOutput| r.agent.id == agent.id) {
+                            results.push(AgentOutput { action_hash, agent });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// AgentProgress Operations
+// =============================================================================
+
+/// Create or get agent progress for a path
+#[hdk_extern]
+pub fn get_or_create_agent_progress(input: CreateAgentProgressInput) -> ExternResult<AgentProgressOutput> {
+    let progress_id = format!("{}-{}", input.agent_id, input.path_id);
+    let progress_anchor = StringAnchor::new("agent_progress", &progress_id);
+    let progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(progress_anchor))?;
+
+    // Check if progress exists
+    let query = LinkQuery::try_new(progress_anchor_hash.clone(), LinkTypes::AgentToProgress)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            let progress: AgentProgress = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(e))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Could not deserialize progress".to_string()
+                )))?;
+
+            return Ok(AgentProgressOutput { action_hash, progress });
+        }
+    }
+
+    // Create new progress
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let progress = AgentProgress {
+        id: progress_id,
+        agent_id: input.agent_id,
+        path_id: input.path_id,
+        current_step_index: 0,
+        completed_step_indices: Vec::new(),
+        completed_content_ids: Vec::new(),
+        step_affinity_json: "{}".to_string(),
+        step_notes_json: "{}".to_string(),
+        reflection_responses_json: "{}".to_string(),
+        attestations_earned: Vec::new(),
+        started_at: timestamp.clone(),
+        last_activity_at: timestamp,
+        completed_at: None,
+    };
+
+    let action_hash = create_entry(&EntryTypes::AgentProgress(progress.clone()))?;
+    create_link(progress_anchor_hash, action_hash.clone(), LinkTypes::AgentToProgress, ())?;
+
+    Ok(AgentProgressOutput { action_hash, progress })
+}
+
+/// Update agent progress
+#[hdk_extern]
+pub fn update_agent_progress(input: UpdateAgentProgressInput) -> ExternResult<AgentProgressOutput> {
+    let progress_id = format!("{}-{}", input.agent_id, input.path_id);
+    let progress_anchor = StringAnchor::new("agent_progress", &progress_id);
+    let progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(progress_anchor))?;
+
+    let query = LinkQuery::try_new(progress_anchor_hash.clone(), LinkTypes::AgentToProgress)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Progress not found. Create it first.".to_string()
+    )))?;
+
+    let action_hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress hash".to_string())))?;
+
+    let record = get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Progress record not found".to_string())))?;
+
+    let mut progress: AgentProgress = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize progress".to_string()
+        )))?;
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Apply updates
+    if let Some(idx) = input.current_step_index {
+        progress.current_step_index = idx;
+    }
+    if let Some(idx) = input.completed_step_index {
+        if !progress.completed_step_indices.contains(&idx) {
+            progress.completed_step_indices.push(idx);
+        }
+    }
+    if let Some(content_id) = input.completed_content_id {
+        if !progress.completed_content_ids.contains(&content_id) {
+            progress.completed_content_ids.push(content_id);
+        }
+    }
+    // Note: step_affinity and step_note updates would require JSON parsing/updating
+    // For simplicity, we'll skip these for now as they need serde_json
+
+    progress.last_activity_at = timestamp;
+
+    // Create new entry (immutable DHT pattern)
+    let new_action_hash = create_entry(&EntryTypes::AgentProgress(progress.clone()))?;
+
+    // Update link
+    delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+    create_link(progress_anchor_hash, new_action_hash.clone(), LinkTypes::AgentToProgress, ())?;
+
+    Ok(AgentProgressOutput {
+        action_hash: new_action_hash,
+        progress,
+    })
+}
+
+// =============================================================================
+// ContentMastery Operations
+// =============================================================================
+
+/// Helper to get mastery level index
+fn get_mastery_level_index(level: &str) -> u32 {
+    match level {
+        "not_started" => 0,
+        "seen" => 1,
+        "remember" => 2,
+        "understand" => 3,
+        "apply" => 4,
+        "analyze" => 5,
+        "evaluate" => 6,
+        "create" => 7,
+        _ => 0,
+    }
+}
+
+/// Upsert content mastery (create or update)
+#[hdk_extern]
+pub fn upsert_mastery(input: UpsertMasteryInput) -> ExternResult<ContentMasteryOutput> {
+    let mastery_id = format!("{}-{}", input.human_id, input.content_id);
+    let mastery_anchor = StringAnchor::new("mastery", &mastery_id);
+    let mastery_anchor_hash = hash_entry(&EntryTypes::StringAnchor(mastery_anchor))?;
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+    let level_index = get_mastery_level_index(&input.mastery_level);
+
+    // Check if mastery exists
+    let query = LinkQuery::try_new(mastery_anchor_hash.clone(), LinkTypes::HumanToMastery)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mastery = if let Some(link) = links.first() {
+        // Update existing
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid mastery hash".to_string())))?;
+
+        let record = get(action_hash, GetOptions::default())?
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Mastery record not found".to_string())))?;
+
+        let mut existing: ContentMastery = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(e))?
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Could not deserialize mastery".to_string()
+            )))?;
+
+        // Update fields
+        existing.mastery_level = input.mastery_level;
+        existing.mastery_level_index = level_index;
+        existing.engagement_count += 1;
+        existing.last_engagement_type = input.engagement_type;
+        existing.last_engagement_at = timestamp.clone();
+        existing.updated_at = timestamp;
+        existing.needs_refresh = false;
+        existing.freshness_score = 1.0;
+
+        // Delete old link
+        delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+
+        existing
+    } else {
+        // Create new
+        ContentMastery {
+            id: mastery_id,
+            human_id: input.human_id.clone(),
+            content_id: input.content_id.clone(),
+            mastery_level: input.mastery_level,
+            mastery_level_index: level_index,
+            freshness_score: 1.0,
+            needs_refresh: false,
+            engagement_count: 1,
+            last_engagement_type: input.engagement_type,
+            last_engagement_at: timestamp.clone(),
+            level_achieved_at: timestamp.clone(),
+            content_version_at_mastery: None,
+            assessment_evidence_json: "[]".to_string(),
+            privileges_json: "[]".to_string(),
+            created_at: timestamp.clone(),
+            updated_at: timestamp,
+        }
+    };
+
+    let action_hash = create_entry(&EntryTypes::ContentMastery(mastery.clone()))?;
+
+    // Create/update links
+    create_link(mastery_anchor_hash, action_hash.clone(), LinkTypes::HumanToMastery, ())?;
+
+    // Link by content
+    let content_anchor = StringAnchor::new("mastery_content", &input.content_id);
+    let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
+    create_link(content_anchor_hash, action_hash.clone(), LinkTypes::ContentToMastery, ())?;
+
+    // Link by human
+    let human_anchor = StringAnchor::new("mastery_human", &input.human_id);
+    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
+    create_link(human_anchor_hash, action_hash.clone(), LinkTypes::HumanToMastery, ())?;
+
+    Ok(ContentMasteryOutput {
+        action_hash,
+        mastery,
+    })
+}
+
+/// Get mastery for a human and content
+#[hdk_extern]
+pub fn get_mastery(input: QueryMasteryInput) -> ExternResult<Vec<ContentMasteryOutput>> {
+    let mut results = Vec::new();
+
+    if let Some(content_ids) = &input.content_ids {
+        // Query specific content IDs
+        for content_id in content_ids {
+            let mastery_id = format!("{}-{}", input.human_id, content_id);
+            let mastery_anchor = StringAnchor::new("mastery", &mastery_id);
+            let mastery_anchor_hash = hash_entry(&EntryTypes::StringAnchor(mastery_anchor))?;
+
+            let query = LinkQuery::try_new(mastery_anchor_hash, LinkTypes::HumanToMastery)?;
+            let links = get_links(query, GetStrategy::default())?;
+
+            if let Some(link) = links.first() {
+                let action_hash = ActionHash::try_from(link.target.clone())
+                    .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid mastery hash".to_string())))?;
+
+                let record = get(action_hash.clone(), GetOptions::default())?;
+                if let Some(record) = record {
+                    if let Some(mastery) = record.entry().to_app_option::<ContentMastery>().ok().flatten() {
+                        // Filter by min level if specified
+                        if let Some(ref min_level) = input.min_level {
+                            let min_index = get_mastery_level_index(min_level);
+                            if mastery.mastery_level_index < min_index {
+                                continue;
+                            }
+                        }
+                        results.push(ContentMasteryOutput { action_hash, mastery });
+                    }
+                }
+            }
+        }
+    } else {
+        // Query all mastery for this human
+        let human_anchor = StringAnchor::new("mastery_human", &input.human_id);
+        let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
+
+        let query = LinkQuery::try_new(human_anchor_hash, LinkTypes::HumanToMastery)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(500) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid mastery hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(mastery) = record.entry().to_app_option::<ContentMastery>().ok().flatten() {
+                    if let Some(ref min_level) = input.min_level {
+                        let min_index = get_mastery_level_index(min_level);
+                        if mastery.mastery_level_index < min_index {
+                            continue;
+                        }
+                    }
+                    results.push(ContentMasteryOutput { action_hash, mastery });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// Attestation Operations
+// =============================================================================
+
+/// Create an attestation
+#[hdk_extern]
+pub fn create_attestation(input: CreateAttestationInput) -> ExternResult<AttestationOutput> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let attestation_id = format!("{}-{}-{}", input.agent_id, input.attestation_type, timestamp);
+
+    let attestation = Attestation {
+        id: attestation_id.clone(),
+        agent_id: input.agent_id.clone(),
+        category: input.category.clone(),
+        attestation_type: input.attestation_type.clone(),
+        display_name: input.display_name,
+        description: input.description,
+        icon_url: input.icon_url,
+        tier: input.tier,
+        earned_via_json: input.earned_via_json,
+        issued_at: timestamp.clone(),
+        issued_by: agent_info.agent_initial_pubkey.to_string(),
+        expires_at: None,
+        proof: None,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Attestation(attestation.clone()))?;
+
+    // Link by agent
+    let agent_anchor = StringAnchor::new("agent_attestations", &input.agent_id);
+    let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
+    create_link(agent_anchor_hash, action_hash.clone(), LinkTypes::AgentToAttestation, ())?;
+
+    // Link by category
+    let category_anchor = StringAnchor::new("attestation_category", &input.category);
+    let category_anchor_hash = hash_entry(&EntryTypes::StringAnchor(category_anchor))?;
+    create_link(category_anchor_hash, action_hash.clone(), LinkTypes::AttestationByCategory, ())?;
+
+    // Link by type
+    let type_anchor = StringAnchor::new("attestation_type", &input.attestation_type);
+    let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
+    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::AttestationByType, ())?;
+
+    Ok(AttestationOutput {
+        action_hash,
+        attestation,
+    })
+}
+
+/// Get attestations for an agent
+#[hdk_extern]
+pub fn get_attestations(input: QueryAttestationsInput) -> ExternResult<Vec<AttestationOutput>> {
+    let mut results = Vec::new();
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    if let Some(agent_id) = &input.agent_id {
+        let agent_anchor = StringAnchor::new("agent_attestations", agent_id);
+        let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
+
+        let query = LinkQuery::try_new(agent_anchor_hash, LinkTypes::AgentToAttestation)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid attestation hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(attestation) = record.entry().to_app_option::<Attestation>().ok().flatten() {
+                    // Filter by category if specified
+                    if let Some(ref category) = input.category {
+                        if &attestation.category != category {
+                            continue;
+                        }
+                    }
+                    results.push(AttestationOutput { action_hash, attestation });
+                }
+            }
+        }
+    } else if let Some(category) = &input.category {
+        let category_anchor = StringAnchor::new("attestation_category", category);
+        let category_anchor_hash = hash_entry(&EntryTypes::StringAnchor(category_anchor))?;
+
+        let query = LinkQuery::try_new(category_anchor_hash, LinkTypes::AttestationByCategory)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid attestation hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(attestation) = record.entry().to_app_option::<Attestation>().ok().flatten() {
+                    results.push(AttestationOutput { action_hash, attestation });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// Human Presence Operations (Secure Login)
+// =============================================================================
+
+/// Input for registering a human (secure login flow)
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RegisterHumanInput {
+    pub display_name: String,
+    pub bio: Option<String>,
+    pub affinities: Vec<String>,
+    pub profile_reach: String,
+    pub location: Option<String>,
+    pub email_hash: Option<String>,           // Hashed for privacy
+    pub passkey_credential_id: Option<String>, // WebAuthn support
+    pub external_identifiers_json: String,    // {provider: credential_hash}[]
+}
+
+/// Output for human session (includes attestations)
+#[derive(Serialize, Deserialize, Debug)]
+pub struct HumanSessionOutput {
+    pub agent_pubkey: String,          // Holochain agent pubkey
+    pub action_hash: ActionHash,
+    pub human: Human,
+    pub session_started_at: String,
+    pub attestations: Vec<AttestationOutput>,
+}
+
+/// Input for updating human profile
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateHumanInput {
+    pub display_name: Option<String>,
+    pub bio: Option<String>,
+    pub affinities: Option<Vec<String>>,
+    pub profile_reach: Option<String>,
+    pub location: Option<String>,
+}
+
+/// Input for linking external identity
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LinkExternalIdentityInput {
+    pub provider: String,           // oauth, did, github, orcid, etc.
+    pub credential_hash: String,    // Hashed credential for privacy
+}
+
+/// Register a new human bound to the current Holochain agent key
+/// Creates one-to-one binding: AgentPubKey -> Human
+#[hdk_extern]
+pub fn register_human(input: RegisterHumanInput) -> ExternResult<HumanSessionOutput> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Check if human already exists for this agent key
+    let existing = get_current_human(())?;
+    if existing.is_some() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Human already registered for this agent key".to_string()
+        )));
+    }
+
+    // Generate human ID from agent pubkey
+    let agent_key_str = agent_info.agent_initial_pubkey.to_string();
+    let human_id = format!("human-{}", &agent_key_str[..16]); // First 16 chars of pubkey
+
+    let human = Human {
+        id: human_id.clone(),
+        display_name: input.display_name,
+        bio: input.bio,
+        affinities: input.affinities.clone(),
+        profile_reach: input.profile_reach,
+        location: input.location,
+        created_at: timestamp.clone(),
+        updated_at: timestamp.clone(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::Human(human.clone()))?;
+
+    // Create primary binding: AgentPubKey -> Human
+    create_link(
+        agent_info.agent_initial_pubkey.clone(),
+        action_hash.clone(),
+        LinkTypes::AgentKeyToHuman,
+        (),
+    )?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("human_id", &human_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToHuman, ())?;
+
+    // Create affinity links
+    for affinity in &input.affinities {
+        let affinity_anchor = StringAnchor::new("affinity", affinity);
+        let affinity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(affinity_anchor))?;
+        create_link(affinity_anchor_hash, action_hash.clone(), LinkTypes::HumanByAffinity, ())?;
+    }
+
+    Ok(HumanSessionOutput {
+        agent_pubkey: agent_key_str,
+        action_hash,
+        human,
+        session_started_at: timestamp,
+        attestations: Vec::new(),
+    })
+}
+
+/// Get the current logged-in human for this agent key
+/// Uses the AgentKeyToHuman link for O(1) lookup
+#[hdk_extern]
+pub fn get_current_human(_: ()) -> ExternResult<Option<HumanSessionOutput>> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Look up human by agent key
+    let query = LinkQuery::try_new(
+        agent_info.agent_initial_pubkey.clone(),
+        LinkTypes::AgentKeyToHuman,
+    )?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid human hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            let human: Human = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(e))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Could not deserialize human".to_string()
+                )))?;
+
+            // Get attestations for this human
+            let attestations = get_attestations(QueryAttestationsInput {
+                agent_id: Some(human.id.clone()),
+                category: None,
+                limit: Some(100),
+            })?;
+
+            return Ok(Some(HumanSessionOutput {
+                agent_pubkey: agent_info.agent_initial_pubkey.to_string(),
+                action_hash,
+                human,
+                session_started_at: timestamp,
+                attestations,
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Update the current human's profile
+/// Creates new entry (immutable DHT pattern) and updates link
+#[hdk_extern]
+pub fn update_human_profile(input: UpdateHumanInput) -> ExternResult<HumanOutput> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get current human
+    let current = get_current_human(())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "No human registered for this agent key".to_string()
+        )))?;
+
+    let mut updated_human = current.human.clone();
+
+    // Apply updates
+    if let Some(display_name) = input.display_name {
+        updated_human.display_name = display_name;
+    }
+    if let Some(bio) = input.bio {
+        updated_human.bio = Some(bio);
+    }
+    if let Some(affinities) = input.affinities {
+        updated_human.affinities = affinities;
+    }
+    if let Some(profile_reach) = input.profile_reach {
+        updated_human.profile_reach = profile_reach;
+    }
+    if let Some(location) = input.location {
+        updated_human.location = Some(location);
+    }
+    updated_human.updated_at = timestamp;
+
+    // Create new entry
+    let new_action_hash = create_entry(&EntryTypes::Human(updated_human.clone()))?;
+
+    // Update AgentKeyToHuman link (delete old, create new)
+    let query = LinkQuery::try_new(
+        agent_info.agent_initial_pubkey.clone(),
+        LinkTypes::AgentKeyToHuman,
+    )?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+    }
+
+    create_link(
+        agent_info.agent_initial_pubkey,
+        new_action_hash.clone(),
+        LinkTypes::AgentKeyToHuman,
+        (),
+    )?;
+
+    Ok(HumanOutput {
+        action_hash: new_action_hash,
+        human: updated_human,
+    })
+}
+
+/// Link an external identity to the current human for recovery/verification
+#[hdk_extern]
+pub fn link_external_identity(input: LinkExternalIdentityInput) -> ExternResult<bool> {
+    // Get current human
+    let current = get_current_human(())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "No human registered for this agent key".to_string()
+        )))?;
+
+    // Create anchor for external identity lookup
+    let external_id = format!("{}:{}", input.provider, input.credential_hash);
+    let anchor = StringAnchor::new("external_id", &external_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    // Check if this external ID is already linked to another human
+    let existing_query = LinkQuery::try_new(anchor_hash.clone(), LinkTypes::HumanByExternalId)?;
+    let existing_links = get_links(existing_query, GetStrategy::default())?;
+
+    if !existing_links.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "External identity already linked to a human".to_string()
+        )));
+    }
+
+    // Create link from external identity to human
+    create_link(anchor_hash, current.action_hash, LinkTypes::HumanByExternalId, ())?;
+
+    Ok(true)
+}
+
+/// Lookup a human by external identity (for recovery scenarios)
+#[hdk_extern]
+pub fn get_human_by_external_identity(input: LinkExternalIdentityInput) -> ExternResult<Option<HumanOutput>> {
+    let external_id = format!("{}:{}", input.provider, input.credential_hash);
+    let anchor = StringAnchor::new("external_id", &external_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::HumanByExternalId)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid human hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            let human: Human = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(e))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Could not deserialize human".to_string()
+                )))?;
+
+            return Ok(Some(HumanOutput { action_hash, human }));
+        }
+    }
+
+    Ok(None)
+}
+
+// =============================================================================
+// Agent Presence Operations (Elohim Service Layer)
+// =============================================================================
+//
+// Agent Presence functions as an intelligent service layer with interceptor
+// capabilities. Elohim agents connect to an agentic API and drive intelligence
+// across the whole application - observing value flows, making decisions,
+// and orchestrating network operations.
+
+/// Input for registering an Elohim agent
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RegisterElohimInput {
+    pub display_name: String,
+    pub scope: String,               // family, community, global
+    pub capabilities_json: String,   // ElohimCapability[] as JSON
+    pub constitutional_commitment: String,  // Hash of constitutional values
+    pub bio: Option<String>,
+}
+
+/// Output for agent session with interceptor capabilities
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AgentSessionOutput {
+    pub agent_pubkey: String,
+    pub action_hash: ActionHash,
+    pub agent: Agent,
+    pub session_started_at: String,
+    pub attestations: Vec<AttestationOutput>,
+    pub scope: Option<String>,        // For Elohim: family/community/global
+    pub can_intercept: bool,          // Whether this agent can observe value flows
+}
+
+/// Input for updating agent state
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateAgentStateInput {
+    pub agent_id: String,
+    pub new_visibility: Option<String>,  // public, connections, private
+    pub new_affinities: Option<Vec<String>>,
+    pub reason: Option<String>,
+}
+
+/// Get the current agent (any type) for this agent key
+/// Returns full session context including interceptor capabilities
+#[hdk_extern]
+pub fn get_current_agent(_: ()) -> ExternResult<Option<AgentSessionOutput>> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Look up agent by agent key
+    let query = LinkQuery::try_new(
+        agent_info.agent_initial_pubkey.clone(),
+        LinkTypes::AgentKeyToAgent,
+    )?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid agent hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            let agent: Agent = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(e))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Could not deserialize agent".to_string()
+                )))?;
+
+            // Get attestations
+            let attestations = get_attestations(QueryAttestationsInput {
+                agent_id: Some(agent.id.clone()),
+                category: None,
+                limit: Some(100),
+            })?;
+
+            // Determine interceptor capabilities based on agent type
+            let (scope, can_intercept) = match agent.agent_type.as_str() {
+                "elohim" => (Some("global".to_string()), true),  // Elohim can observe
+                "ai-agent" => (None, false),
+                _ => (None, false),
+            };
+
+            return Ok(Some(AgentSessionOutput {
+                agent_pubkey: agent_info.agent_initial_pubkey.to_string(),
+                action_hash,
+                agent,
+                session_started_at: timestamp,
+                attestations,
+                scope,
+                can_intercept,
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Register an Elohim agent with constitutional commitment
+/// Elohim are special agents that can intercept and observe value flows
+#[hdk_extern]
+pub fn register_elohim(input: RegisterElohimInput) -> ExternResult<AgentSessionOutput> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Check if agent already exists
+    let existing = get_current_agent(())?;
+    if existing.is_some() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Agent already registered for this key".to_string()
+        )));
+    }
+
+    // Generate agent ID
+    let agent_key_str = agent_info.agent_initial_pubkey.to_string();
+    let agent_id = format!("elohim-{}", &agent_key_str[..16]);
+
+    let agent = Agent {
+        id: agent_id.clone(),
+        agent_type: "elohim".to_string(),
+        display_name: input.display_name,
+        bio: input.bio,
+        avatar: None,
+        affinities: Vec::new(),
+        visibility: "public".to_string(),  // Elohim are public servants
+        location: None,
+        holochain_agent_key: Some(agent_key_str.clone()),
+        did: Some(format!("did:elohim:{}", agent_id)),
+        activity_pub_type: Some("Service".to_string()),
+        created_at: timestamp.clone(),
+        updated_at: timestamp.clone(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::Agent(agent.clone()))?;
+
+    // Create primary binding: AgentPubKey -> Agent
+    create_link(
+        agent_info.agent_initial_pubkey.clone(),
+        action_hash.clone(),
+        LinkTypes::AgentKeyToAgent,
+        (),
+    )?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("agent_id", &agent_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToAgent, ())?;
+
+    // Create type lookup link
+    let type_anchor = StringAnchor::new("agent_type", "elohim");
+    let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
+    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::AgentByType, ())?;
+
+    // Create scope lookup link (for finding Elohim by jurisdiction)
+    let scope_anchor = StringAnchor::new("elohim_scope", &input.scope);
+    let scope_anchor_hash = hash_entry(&EntryTypes::StringAnchor(scope_anchor))?;
+    create_link(scope_anchor_hash, action_hash.clone(), LinkTypes::ElohimByScope, ())?;
+
+    Ok(AgentSessionOutput {
+        agent_pubkey: agent_key_str,
+        action_hash,
+        agent,
+        session_started_at: timestamp,
+        attestations: Vec::new(),
+        scope: Some(input.scope),
+        can_intercept: true,
+    })
+}
+
+/// Update agent state (visibility, affinities)
+#[hdk_extern]
+pub fn update_agent_state(input: UpdateAgentStateInput) -> ExternResult<AgentOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get agent by ID
+    let agent_output = get_agent_by_id(input.agent_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Agent not found".to_string()
+        )))?;
+
+    let mut updated_agent = agent_output.agent.clone();
+
+    // Apply updates
+    if let Some(visibility) = input.new_visibility {
+        updated_agent.visibility = visibility;
+    }
+    if let Some(affinities) = input.new_affinities {
+        updated_agent.affinities = affinities;
+    }
+    updated_agent.updated_at = timestamp;
+
+    // Create new entry
+    let new_action_hash = create_entry(&EntryTypes::Agent(updated_agent.clone()))?;
+
+    // Update ID link
+    let id_anchor = StringAnchor::new("agent_id", &input.agent_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    let query = LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToAgent)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+    }
+    create_link(id_anchor_hash, new_action_hash.clone(), LinkTypes::IdToAgent, ())?;
+
+    Ok(AgentOutput {
+        action_hash: new_action_hash,
+        agent: updated_agent,
+    })
+}
+
+/// Get Elohim agents by scope (family, community, global)
+#[hdk_extern]
+pub fn get_elohim_by_scope(scope: String) -> ExternResult<Vec<AgentOutput>> {
+    let scope_anchor = StringAnchor::new("elohim_scope", &scope);
+    let scope_anchor_hash = hash_entry(&EntryTypes::StringAnchor(scope_anchor))?;
+
+    let query = LinkQuery::try_new(scope_anchor_hash, LinkTypes::ElohimByScope)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links.iter().take(100) {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid agent hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(agent) = record.entry().to_app_option::<Agent>().ok().flatten() {
+                results.push(AgentOutput { action_hash, agent });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// Contributor Presence Operations (Stewardship Lifecycle)
+// =============================================================================
+//
+// The unique Elohim innovation: content creators go through a stewardship
+// lifecycle: UNCLAIMED → STEWARDED → CLAIMED
+//
+// From the Manifesto: "When someone's work is referenced in Lamad, a presence
+// is established for them. This presence is not an account they control (yet),
+// but a place where recognition can accumulate."
+
+/// Input for creating a contributor presence
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateContributorPresenceInput {
+    pub display_name: String,
+    pub external_identifiers_json: String,  // Known identities (email, orcid, github, etc.)
+    pub establishing_content_ids_json: String,  // Content that establishes this presence
+    pub note: Option<String>,
+    pub image: Option<String>,
+}
+
+/// Output for contributor presence
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ContributorPresenceOutput {
+    pub action_hash: ActionHash,
+    pub presence: ContributorPresence,
+}
+
+/// Input for querying contributor presences
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryPresencesInput {
+    pub presence_state: Option<String>,
+    pub steward_id: Option<String>,
+    pub min_recognition_score: Option<f64>,
+    pub limit: Option<u32>,
+}
+
+/// Input for beginning stewardship
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BeginStewardshipInput {
+    pub presence_id: String,
+    pub steward_agent_id: String,
+    pub commitment_note: Option<String>,
+}
+
+/// Input for initiating a claim
+#[derive(Serialize, Deserialize, Debug)]
+pub struct InitiateClaimInput {
+    pub presence_id: String,
+    pub claim_evidence_json: String,
+    pub verification_method: String,
+}
+
+/// Create a new contributor presence (starts in UNCLAIMED state)
+#[hdk_extern]
+pub fn create_contributor_presence(input: CreateContributorPresenceInput) -> ExternResult<ContributorPresenceOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Generate presence ID
+    let presence_id = format!("presence-{}-{}",
+        &input.display_name.replace(' ', "-").to_lowercase(),
+        &timestamp[..16]
+    );
+
+    let presence = ContributorPresence {
+        id: presence_id.clone(),
+        display_name: input.display_name,
+        presence_state: "unclaimed".to_string(),
+        external_identifiers_json: input.external_identifiers_json,
+        establishing_content_ids_json: input.establishing_content_ids_json,
+        established_at: timestamp.clone(),
+        // Recognition starts at zero
+        affinity_total: 0.0,
+        unique_engagers: 0,
+        citation_count: 0,
+        endorsements_json: "[]".to_string(),
+        recognition_score: 0.0,
+        recognition_by_content_json: "{}".to_string(),
+        accumulating_since: timestamp.clone(),
+        last_recognition_at: timestamp.clone(),
+        // No steward yet
+        steward_id: None,
+        stewardship_started_at: None,
+        stewardship_commitment_id: None,
+        stewardship_quality_score: None,
+        // No claim yet
+        claim_initiated_at: None,
+        claim_verified_at: None,
+        claim_verification_method: None,
+        claim_evidence_json: None,
+        claimed_agent_id: None,
+        claim_recognition_transferred_value: None,
+        claim_recognition_transferred_unit: None,
+        claim_facilitated_by: None,
+        invitations_json: "[]".to_string(),
+        note: input.note,
+        image: input.image,
+        metadata_json: "{}".to_string(),
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::ContributorPresence(presence.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("presence_id", &presence_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPresence, ())?;
+
+    // Create state lookup link
+    let state_anchor = StringAnchor::new("presence_state", "unclaimed");
+    let state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(state_anchor))?;
+    create_link(state_anchor_hash, action_hash.clone(), LinkTypes::PresenceByState, ())?;
+
+    Ok(ContributorPresenceOutput { action_hash, presence })
+}
+
+/// Get a contributor presence by ID
+#[hdk_extern]
+pub fn get_contributor_presence_by_id(id: String) -> ExternResult<Option<ContributorPresenceOutput>> {
+    let anchor = StringAnchor::new("presence_id", &id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToPresence)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid presence hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            let presence: ContributorPresence = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(e))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Could not deserialize presence".to_string()
+                )))?;
+
+            return Ok(Some(ContributorPresenceOutput { action_hash, presence }));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Query contributor presences with filters
+#[hdk_extern]
+pub fn query_contributor_presences(input: QueryPresencesInput) -> ExternResult<Vec<ContributorPresenceOutput>> {
+    let mut results = Vec::new();
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    // Query by state if specified
+    if let Some(state) = &input.presence_state {
+        let state_anchor = StringAnchor::new("presence_state", state);
+        let state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(state_anchor))?;
+
+        let query = LinkQuery::try_new(state_anchor_hash, LinkTypes::PresenceByState)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid presence hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(presence) = record.entry().to_app_option::<ContributorPresence>().ok().flatten() {
+                    // Apply filters
+                    if let Some(min_score) = input.min_recognition_score {
+                        if presence.recognition_score < min_score {
+                            continue;
+                        }
+                    }
+                    if let Some(ref steward) = input.steward_id {
+                        if presence.steward_id.as_ref() != Some(steward) {
+                            continue;
+                        }
+                    }
+                    results.push(ContributorPresenceOutput { action_hash, presence });
+                }
+            }
+        }
+    } else if let Some(steward_id) = &input.steward_id {
+        // Query by steward
+        let steward_anchor = StringAnchor::new("steward_presences", steward_id);
+        let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor))?;
+
+        let query = LinkQuery::try_new(steward_anchor_hash, LinkTypes::StewardToPresence)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid presence hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(presence) = record.entry().to_app_option::<ContributorPresence>().ok().flatten() {
+                    if let Some(min_score) = input.min_recognition_score {
+                        if presence.recognition_score < min_score {
+                            continue;
+                        }
+                    }
+                    results.push(ContributorPresenceOutput { action_hash, presence });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Get all presences by state
+#[hdk_extern]
+pub fn get_presences_by_state(state: String) -> ExternResult<Vec<ContributorPresenceOutput>> {
+    query_contributor_presences(QueryPresencesInput {
+        presence_state: Some(state),
+        steward_id: None,
+        min_recognition_score: None,
+        limit: Some(100),
+    })
+}
+
+/// Get all presences stewarded by a specific agent
+#[hdk_extern]
+pub fn get_presences_by_steward(steward_id: String) -> ExternResult<Vec<ContributorPresenceOutput>> {
+    query_contributor_presences(QueryPresencesInput {
+        presence_state: None,
+        steward_id: Some(steward_id),
+        min_recognition_score: None,
+        limit: Some(100),
+    })
+}
+
+/// Begin stewardship of a presence (UNCLAIMED → STEWARDED)
+/// Only Elohim agents can steward presences
+#[hdk_extern]
+pub fn begin_stewardship(input: BeginStewardshipInput) -> ExternResult<ContributorPresenceOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get the presence
+    let presence_output = get_contributor_presence_by_id(input.presence_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Presence not found".to_string())))?;
+
+    let mut presence = presence_output.presence;
+
+    // Verify state is unclaimed
+    if presence.presence_state != "unclaimed" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Cannot begin stewardship: presence is {}", presence.presence_state)
+        )));
+    }
+
+    // Update to stewarded state
+    presence.presence_state = "stewarded".to_string();
+    presence.steward_id = Some(input.steward_agent_id.clone());
+    presence.stewardship_started_at = Some(timestamp.clone());
+    presence.updated_at = timestamp;
+
+    // Create new entry
+    let new_action_hash = create_entry(&EntryTypes::ContributorPresence(presence.clone()))?;
+
+    // Update state links (delete old, create new)
+    let old_state_anchor = StringAnchor::new("presence_state", "unclaimed");
+    let old_state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_state_anchor))?;
+    let old_query = LinkQuery::try_new(old_state_anchor_hash, LinkTypes::PresenceByState)?;
+    let old_links = get_links(old_query, GetStrategy::default())?;
+    for link in old_links {
+        if link.target == presence_output.action_hash.clone().into() {
+            delete_link(link.create_link_hash, GetOptions::default())?;
+            break;
+        }
+    }
+
+    let new_state_anchor = StringAnchor::new("presence_state", "stewarded");
+    let new_state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_state_anchor))?;
+    create_link(new_state_anchor_hash, new_action_hash.clone(), LinkTypes::PresenceByState, ())?;
+
+    // Create steward lookup link
+    let steward_anchor = StringAnchor::new("steward_presences", &input.steward_agent_id);
+    let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor))?;
+    create_link(steward_anchor_hash, new_action_hash.clone(), LinkTypes::StewardToPresence, ())?;
+
+    // Update ID link
+    let id_anchor = StringAnchor::new("presence_id", &input.presence_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    let id_query = LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToPresence)?;
+    let id_links = get_links(id_query, GetStrategy::default())?;
+    if let Some(link) = id_links.first() {
+        delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+    }
+    create_link(id_anchor_hash, new_action_hash.clone(), LinkTypes::IdToPresence, ())?;
+
+    Ok(ContributorPresenceOutput { action_hash: new_action_hash, presence })
+}
+
+/// Initiate a claim on a presence (contributor claims their identity)
+#[hdk_extern]
+pub fn initiate_claim(input: InitiateClaimInput) -> ExternResult<ContributorPresenceOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get the presence
+    let presence_output = get_contributor_presence_by_id(input.presence_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Presence not found".to_string())))?;
+
+    let mut presence = presence_output.presence;
+
+    // Verify state is stewarded (must have steward to claim)
+    if presence.presence_state != "stewarded" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Cannot initiate claim: presence is {}, must be stewarded", presence.presence_state)
+        )));
+    }
+
+    // Update claim fields
+    presence.claim_initiated_at = Some(timestamp.clone());
+    presence.claim_evidence_json = Some(input.claim_evidence_json);
+    presence.claim_verification_method = Some(input.verification_method);
+    presence.updated_at = timestamp;
+
+    // Create new entry (state remains "stewarded" until verified)
+    let new_action_hash = create_entry(&EntryTypes::ContributorPresence(presence.clone()))?;
+
+    // Update ID link
+    let id_anchor = StringAnchor::new("presence_id", &input.presence_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    let id_query = LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToPresence)?;
+    let id_links = get_links(id_query, GetStrategy::default())?;
+    if let Some(link) = id_links.first() {
+        delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+    }
+    create_link(id_anchor_hash, new_action_hash.clone(), LinkTypes::IdToPresence, ())?;
+
+    Ok(ContributorPresenceOutput { action_hash: new_action_hash, presence })
+}
+
+/// Verify a claim and complete the claim process (STEWARDED → CLAIMED)
+/// Links the presence to the claiming agent
+#[hdk_extern]
+pub fn verify_claim(presence_id: String) -> ExternResult<ContributorPresenceOutput> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get the presence
+    let presence_output = get_contributor_presence_by_id(presence_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Presence not found".to_string())))?;
+
+    let mut presence = presence_output.presence;
+
+    // Verify claim was initiated
+    if presence.claim_initiated_at.is_none() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "No claim has been initiated for this presence".to_string()
+        )));
+    }
+
+    // Update to claimed state
+    let claimer_id = agent_info.agent_initial_pubkey.to_string();
+    presence.presence_state = "claimed".to_string();
+    presence.claim_verified_at = Some(timestamp.clone());
+    presence.claimed_agent_id = Some(claimer_id.clone());
+    presence.claim_recognition_transferred_value = Some(presence.recognition_score);
+    presence.claim_recognition_transferred_unit = Some("recognition-points".to_string());
+    presence.updated_at = timestamp;
+
+    // Create new entry
+    let new_action_hash = create_entry(&EntryTypes::ContributorPresence(presence.clone()))?;
+
+    // Update state links
+    let old_state_anchor = StringAnchor::new("presence_state", "stewarded");
+    let old_state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_state_anchor))?;
+    let old_query = LinkQuery::try_new(old_state_anchor_hash, LinkTypes::PresenceByState)?;
+    let old_links = get_links(old_query, GetStrategy::default())?;
+    for link in old_links {
+        if link.target == presence_output.action_hash.clone().into() {
+            delete_link(link.create_link_hash, GetOptions::default())?;
+            break;
+        }
+    }
+
+    let new_state_anchor = StringAnchor::new("presence_state", "claimed");
+    let new_state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_state_anchor))?;
+    create_link(new_state_anchor_hash, new_action_hash.clone(), LinkTypes::PresenceByState, ())?;
+
+    // Create claimed agent lookup link
+    let claimed_anchor = StringAnchor::new("claimed_agent", &claimer_id);
+    let claimed_anchor_hash = hash_entry(&EntryTypes::StringAnchor(claimed_anchor))?;
+    create_link(claimed_anchor_hash, new_action_hash.clone(), LinkTypes::ClaimedAgentToPresence, ())?;
+
+    // Update ID link
+    let id_anchor = StringAnchor::new("presence_id", &presence_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    let id_query = LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToPresence)?;
+    let id_links = get_links(id_query, GetStrategy::default())?;
+    if let Some(link) = id_links.first() {
+        delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+    }
+    create_link(id_anchor_hash, new_action_hash.clone(), LinkTypes::IdToPresence, ())?;
+
+    Ok(ContributorPresenceOutput { action_hash: new_action_hash, presence })
+}
+
+// =============================================================================
+// Progress Tracking Operations
+// =============================================================================
+
+/// Start tracking progress on a learning path
+#[hdk_extern]
+pub fn start_path_progress(input: StartPathProgressInput) -> ExternResult<AgentProgressOutput> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Generate progress ID
+    let progress_id = format!("{}-{}", agent_id, input.path_id);
+
+    // Check if progress already exists
+    let progress_anchor = StringAnchor::new("progress_id", &progress_id);
+    let progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(progress_anchor.clone()))?;
+
+    let existing_query = LinkQuery::try_new(progress_anchor_hash.clone(), LinkTypes::AgentToPathProgress)?;
+    let existing_links = get_links(existing_query, GetStrategy::default())?;
+
+    if let Some(link) = existing_links.first() {
+        // Progress already exists, return it
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+        let record = get(action_hash.clone(), GetOptions::default())?
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Progress record not found".to_string())))?;
+        let progress: AgentProgress = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(e))?
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize progress".to_string())))?;
+        return Ok(AgentProgressOutput { action_hash, progress });
+    }
+
+    // Create new progress
+    let progress = AgentProgress {
+        id: progress_id.clone(),
+        agent_id: agent_id.clone(),
+        path_id: input.path_id.clone(),
+        current_step_index: 0,
+        completed_step_indices: Vec::new(),
+        completed_content_ids: Vec::new(),
+        step_affinity_json: "{}".to_string(),
+        step_notes_json: "{}".to_string(),
+        reflection_responses_json: "{}".to_string(),
+        attestations_earned: Vec::new(),
+        started_at: timestamp.clone(),
+        last_activity_at: timestamp,
+        completed_at: None,
+    };
+
+    let action_hash = create_entry(&EntryTypes::AgentProgress(progress.clone()))?;
+
+    // Create ID lookup link
+    create_link(progress_anchor_hash, action_hash.clone(), LinkTypes::AgentToPathProgress, ())?;
+
+    // Create agent-to-progress link
+    let agent_anchor = StringAnchor::new("agent_progress", &agent_id);
+    let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
+    create_link(agent_anchor_hash, action_hash.clone(), LinkTypes::AgentToPathProgress, ())?;
+
+    // Create path-to-progress link
+    let path_progress_anchor = StringAnchor::new("path_progress", &input.path_id);
+    let path_progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_progress_anchor))?;
+    create_link(path_progress_anchor_hash, action_hash.clone(), LinkTypes::PathToProgress, ())?;
+
+    // Create status link (in_progress)
+    let status_anchor = StringAnchor::new("progress_status", "in_progress");
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::ProgressByStatus, ())?;
+
+    Ok(AgentProgressOutput { action_hash, progress })
+}
+
+/// Complete a step in a learning path
+#[hdk_extern]
+pub fn complete_step(input: CompleteStepInput) -> ExternResult<AgentProgressOutput> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Find existing progress
+    let progress_id = format!("{}-{}", agent_id, input.path_id);
+    let progress_anchor = StringAnchor::new("progress_id", &progress_id);
+    let progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(progress_anchor))?;
+
+    let query = LinkQuery::try_new(progress_anchor_hash.clone(), LinkTypes::AgentToPathProgress)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let link = links.first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            format!("No progress found for path: {}", input.path_id)
+        )))?;
+
+    let existing_action_hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+
+    let record = get(existing_action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Progress record not found".to_string())))?;
+
+    let existing: AgentProgress = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize progress".to_string())))?;
+
+    // Parse existing JSON data
+    let mut step_affinity: HashMap<String, u32> = serde_json::from_str(&existing.step_affinity_json)
+        .unwrap_or_default();
+    let mut step_notes: HashMap<String, String> = serde_json::from_str(&existing.step_notes_json)
+        .unwrap_or_default();
+    let mut reflection_responses: HashMap<String, Vec<String>> = serde_json::from_str(&existing.reflection_responses_json)
+        .unwrap_or_default();
+
+    // Update with new data
+    let step_key = input.step_index.to_string();
+    if let Some(affinity) = input.affinity_score {
+        step_affinity.insert(step_key.clone(), affinity);
+    }
+    if let Some(notes) = input.notes {
+        step_notes.insert(step_key.clone(), notes);
+    }
+    if let Some(responses) = input.reflection_responses {
+        reflection_responses.insert(step_key, responses);
+    }
+
+    // Update completed steps
+    let mut completed_step_indices = existing.completed_step_indices.clone();
+    if !completed_step_indices.contains(&input.step_index) {
+        completed_step_indices.push(input.step_index);
+        completed_step_indices.sort();
+    }
+
+    // Update completed content IDs
+    let mut completed_content_ids = existing.completed_content_ids.clone();
+    if let Some(content_id) = input.content_id {
+        if !completed_content_ids.contains(&content_id) {
+            completed_content_ids.push(content_id);
+        }
+    }
+
+    // Create updated progress
+    let updated_progress = AgentProgress {
+        id: existing.id,
+        agent_id: existing.agent_id,
+        path_id: existing.path_id.clone(),
+        current_step_index: input.step_index + 1,  // Advance to next step
+        completed_step_indices,
+        completed_content_ids,
+        step_affinity_json: serde_json::to_string(&step_affinity).unwrap_or_else(|_| "{}".to_string()),
+        step_notes_json: serde_json::to_string(&step_notes).unwrap_or_else(|_| "{}".to_string()),
+        reflection_responses_json: serde_json::to_string(&reflection_responses).unwrap_or_else(|_| "{}".to_string()),
+        attestations_earned: existing.attestations_earned,
+        started_at: existing.started_at,
+        last_activity_at: timestamp,
+        completed_at: existing.completed_at,
+    };
+
+    let action_hash = create_entry(&EntryTypes::AgentProgress(updated_progress.clone()))?;
+
+    // Update ID lookup link
+    delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+    create_link(progress_anchor_hash, action_hash.clone(), LinkTypes::AgentToPathProgress, ())?;
+
+    Ok(AgentProgressOutput { action_hash, progress: updated_progress })
+}
+
+/// Mark a path as completed
+#[hdk_extern]
+pub fn complete_path(path_id: String) -> ExternResult<AgentProgressOutput> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Find existing progress
+    let progress_id = format!("{}-{}", agent_id, path_id);
+    let progress_anchor = StringAnchor::new("progress_id", &progress_id);
+    let progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(progress_anchor))?;
+
+    let query = LinkQuery::try_new(progress_anchor_hash.clone(), LinkTypes::AgentToPathProgress)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let link = links.first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            format!("No progress found for path: {}", path_id)
+        )))?;
+
+    let existing_action_hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+
+    let record = get(existing_action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Progress record not found".to_string())))?;
+
+    let existing: AgentProgress = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize progress".to_string())))?;
+
+    // Create completed progress
+    let completed_progress = AgentProgress {
+        id: existing.id,
+        agent_id: existing.agent_id,
+        path_id: existing.path_id.clone(),
+        current_step_index: existing.current_step_index,
+        completed_step_indices: existing.completed_step_indices,
+        completed_content_ids: existing.completed_content_ids,
+        step_affinity_json: existing.step_affinity_json,
+        step_notes_json: existing.step_notes_json,
+        reflection_responses_json: existing.reflection_responses_json,
+        attestations_earned: existing.attestations_earned,
+        started_at: existing.started_at,
+        last_activity_at: timestamp.clone(),
+        completed_at: Some(timestamp),
+    };
+
+    let action_hash = create_entry(&EntryTypes::AgentProgress(completed_progress.clone()))?;
+
+    // Update ID lookup link
+    delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+    create_link(progress_anchor_hash, action_hash.clone(), LinkTypes::AgentToPathProgress, ())?;
+
+    // Update status link (in_progress -> completed)
+    let old_status_anchor = StringAnchor::new("progress_status", "in_progress");
+    let old_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_status_anchor))?;
+    let old_status_query = LinkQuery::try_new(old_status_anchor_hash, LinkTypes::ProgressByStatus)?;
+    let old_status_links = get_links(old_status_query, GetStrategy::default())?;
+    for status_link in old_status_links {
+        if status_link.target == existing_action_hash.clone().into() {
+            delete_link(status_link.create_link_hash, GetOptions::default())?;
+            break;
+        }
+    }
+
+    let new_status_anchor = StringAnchor::new("progress_status", "completed");
+    let new_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_status_anchor))?;
+    create_link(new_status_anchor_hash, action_hash.clone(), LinkTypes::ProgressByStatus, ())?;
+
+    Ok(AgentProgressOutput { action_hash, progress: completed_progress })
+}
+
+/// Get current agent's progress on a path
+#[hdk_extern]
+pub fn get_my_path_progress(path_id: String) -> ExternResult<Option<AgentProgressOutput>> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+
+    let progress_id = format!("{}-{}", agent_id, path_id);
+    let progress_anchor = StringAnchor::new("progress_id", &progress_id);
+    let progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(progress_anchor))?;
+
+    let query = LinkQuery::try_new(progress_anchor_hash, LinkTypes::AgentToPathProgress)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let link = match links.first() {
+        Some(l) => l,
+        None => return Ok(None),
+    };
+
+    let action_hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?;
+    let record = match record {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+
+    let progress: AgentProgress = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize progress".to_string())))?;
+
+    Ok(Some(AgentProgressOutput { action_hash, progress }))
+}
+
+/// Get all progress for current agent
+#[hdk_extern]
+pub fn get_my_all_progress(_: ()) -> ExternResult<Vec<AgentProgressOutput>> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+
+    let agent_anchor = StringAnchor::new("agent_progress", &agent_id);
+    let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
+
+    let query = LinkQuery::try_new(agent_anchor_hash, LinkTypes::AgentToPathProgress)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(progress) = rec.entry().to_app_option::<AgentProgress>().ok().flatten() {
+                results.push(AgentProgressOutput { action_hash, progress });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Get progress by status (in_progress, completed, abandoned)
+#[hdk_extern]
+pub fn get_progress_by_status(status: String) -> ExternResult<Vec<AgentProgressOutput>> {
+    let status_anchor = StringAnchor::new("progress_status", &status);
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+
+    let query = LinkQuery::try_new(status_anchor_hash, LinkTypes::ProgressByStatus)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(progress) = rec.entry().to_app_option::<AgentProgress>().ok().flatten() {
+                results.push(AgentProgressOutput { action_hash, progress });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Get progress summaries for current agent
+#[hdk_extern]
+pub fn get_my_progress_summaries(_: ()) -> ExternResult<Vec<ProgressSummary>> {
+    let all_progress = get_my_all_progress(())?;
+    let mut summaries = Vec::new();
+
+    for progress_output in all_progress {
+        let progress = progress_output.progress;
+
+        // Get path to count total steps
+        let path_result = get_path_with_steps(progress.path_id.clone())?;
+        let (path_title, total_steps) = match path_result {
+            Some(path_data) => (path_data.path.title, path_data.steps.len() as u32),
+            None => ("Unknown Path".to_string(), 0),
+        };
+
+        summaries.push(ProgressSummary {
+            path_id: progress.path_id,
+            path_title,
+            total_steps,
+            completed_steps: progress.completed_step_indices.len() as u32,
+            current_step_index: progress.current_step_index,
+            is_completed: progress.completed_at.is_some(),
+            attestations_earned: progress.attestations_earned,
+            started_at: progress.started_at,
+            last_activity_at: progress.last_activity_at,
+            completed_at: progress.completed_at,
+        });
+    }
+
+    Ok(summaries)
+}
+
+// =============================================================================
+// Attestation Operations
+// =============================================================================
+
+/// Grant an attestation for completing a step, chapter, or path
+#[hdk_extern]
+pub fn grant_attestation(input: GrantAttestationInput) -> ExternResult<AgentProgressOutput> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Find existing progress
+    let progress_id = format!("{}-{}", agent_id, input.path_id);
+    let progress_anchor = StringAnchor::new("progress_id", &progress_id);
+    let progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(progress_anchor))?;
+
+    let query = LinkQuery::try_new(progress_anchor_hash.clone(), LinkTypes::AgentToPathProgress)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let link = links.first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            format!("No progress found for path: {}", input.path_id)
+        )))?;
+
+    let existing_action_hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+
+    let record = get(existing_action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Progress record not found".to_string())))?;
+
+    let existing: AgentProgress = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize progress".to_string())))?;
+
+    // Add attestation if not already earned
+    let mut attestations_earned = existing.attestations_earned.clone();
+    if !attestations_earned.contains(&input.attestation_id) {
+        attestations_earned.push(input.attestation_id.clone());
+    }
+
+    // Create updated progress with attestation
+    let updated_progress = AgentProgress {
+        id: existing.id,
+        agent_id: existing.agent_id,
+        path_id: existing.path_id.clone(),
+        current_step_index: existing.current_step_index,
+        completed_step_indices: existing.completed_step_indices,
+        completed_content_ids: existing.completed_content_ids,
+        step_affinity_json: existing.step_affinity_json,
+        step_notes_json: existing.step_notes_json,
+        reflection_responses_json: existing.reflection_responses_json,
+        attestations_earned,
+        started_at: existing.started_at,
+        last_activity_at: timestamp,
+        completed_at: existing.completed_at,
+    };
+
+    let action_hash = create_entry(&EntryTypes::AgentProgress(updated_progress.clone()))?;
+
+    // Update ID lookup link
+    delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+    create_link(progress_anchor_hash, action_hash.clone(), LinkTypes::AgentToPathProgress, ())?;
+
+    // Also create an Attestation entry for audit trail
+    let attestation = Attestation {
+        id: format!("{}-{}-{}", agent_id, input.attestation_id, updated_progress.last_activity_at),
+        agent_id: agent_id.clone(),
+        category: input.source_type.clone(),  // "step", "chapter", "path"
+        attestation_type: input.attestation_id,
+        display_name: format!("Completed: {}", input.reason),
+        description: input.reason,
+        icon_url: None,
+        tier: None,
+        earned_via_json: serde_json::json!({
+            "source_type": input.source_type,
+            "source_id": input.source_id,
+            "path_id": input.path_id
+        }).to_string(),
+        issued_at: updated_progress.last_activity_at.clone(),
+        issued_by: "system".to_string(),
+        expires_at: None,
+        proof: None,
+    };
+
+    let attestation_action_hash = create_entry(&EntryTypes::Attestation(attestation.clone()))?;
+
+    // Link attestation to agent
+    let att_agent_anchor = StringAnchor::new("agent_attestations", &attestation.agent_id);
+    let att_agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(att_agent_anchor))?;
+    create_link(att_agent_anchor_hash, attestation_action_hash, LinkTypes::AgentToAttestation, ())?;
+
+    Ok(AgentProgressOutput { action_hash, progress: updated_progress })
+}
+
+/// Check if learner has required attestation to access a step
+#[hdk_extern]
+pub fn check_attestation_access(input: CheckAttestationAccessInput) -> ExternResult<AttestationAccessResult> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+
+    // Get current progress to check attestations
+    let progress_id = format!("{}-{}", agent_id, input.path_id);
+    let progress_anchor = StringAnchor::new("progress_id", &progress_id);
+    let progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(progress_anchor))?;
+
+    let query = LinkQuery::try_new(progress_anchor_hash, LinkTypes::AgentToPathProgress)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let attestations_earned: Vec<String> = if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+        let record = get(action_hash, GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(progress) = rec.entry().to_app_option::<AgentProgress>().ok().flatten() {
+                progress.attestations_earned
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
+
+    let has_access = attestations_earned.contains(&input.required_attestation);
+
+    Ok(AttestationAccessResult {
+        has_access,
+        required_attestation: input.required_attestation,
+        attestations_earned,
+    })
+}
+
+/// Input for checking attestation access
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CheckAttestationAccessInput {
+    pub path_id: String,
+    pub required_attestation: String,
+}
+
+/// Result of attestation access check
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AttestationAccessResult {
+    pub has_access: bool,
+    pub required_attestation: String,
+    pub attestations_earned: Vec<String>,
+}
+
+// =============================================================================
+// Content Mastery Operations
+// =============================================================================
+
+/// Helper: Get privilege requirements (level index required for each privilege)
+fn get_privilege_requirement(privilege: &str) -> (u32, &'static str) {
+    match privilege {
+        "view" | "practice" => (0, "not_started"),
+        "comment" | "suggest_edit" => (5, "analyze"),
+        "peer_review" | "rate_quality" => (6, "evaluate"),
+        "create_derivative" | "contribute_path" | "govern" => (7, "create"),
+        _ => (4, "apply"), // Default gate at apply level
+    }
+}
+
+/// Initialize mastery tracking for a content node
+/// Creates a new mastery record at "not_started" level
+#[hdk_extern]
+pub fn initialize_mastery(input: InitializeMasteryInput) -> ExternResult<ContentMasteryOutput> {
+    let agent_info = agent_info()?;
+    let human_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Generate mastery ID
+    let mastery_id = format!("{}-{}", human_id, input.content_id);
+
+    // Check if mastery already exists
+    let mastery_anchor = StringAnchor::new("mastery_id", &mastery_id);
+    let mastery_anchor_hash = hash_entry(&EntryTypes::StringAnchor(mastery_anchor.clone()))?;
+
+    let existing_query = LinkQuery::try_new(mastery_anchor_hash.clone(), LinkTypes::HumanToMastery)?;
+    let existing_links = get_links(existing_query, GetStrategy::default())?;
+
+    if let Some(link) = existing_links.first() {
+        // Mastery already exists, return it
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid mastery action hash".to_string())))?;
+        let record = get(action_hash.clone(), GetOptions::default())?
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Mastery record not found".to_string())))?;
+        let mastery: ContentMastery = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(e))?
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize mastery".to_string())))?;
+        return Ok(ContentMasteryOutput { action_hash, mastery });
+    }
+
+    // Create new mastery at not_started level
+    let mastery = ContentMastery {
+        id: mastery_id.clone(),
+        human_id: human_id.clone(),
+        content_id: input.content_id.clone(),
+        mastery_level: "not_started".to_string(),
+        mastery_level_index: 0,
+        freshness_score: 1.0,
+        needs_refresh: false,
+        engagement_count: 0,
+        last_engagement_type: "".to_string(),
+        last_engagement_at: timestamp.clone(),
+        level_achieved_at: timestamp.clone(),
+        content_version_at_mastery: None,
+        assessment_evidence_json: "[]".to_string(),
+        privileges_json: serde_json::json!(["view", "practice"]).to_string(),
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::ContentMastery(mastery.clone()))?;
+
+    // Create ID lookup link
+    create_link(mastery_anchor_hash, action_hash.clone(), LinkTypes::HumanToMastery, ())?;
+
+    // Create human-to-mastery link for "get all my mastery" queries
+    let human_anchor = StringAnchor::new("human_mastery", &human_id);
+    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
+    create_link(human_anchor_hash, action_hash.clone(), LinkTypes::HumanToMastery, ())?;
+
+    // Create content-to-mastery link
+    let content_anchor = StringAnchor::new("content_mastery", &input.content_id);
+    let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
+    create_link(content_anchor_hash, action_hash.clone(), LinkTypes::ContentToMastery, ())?;
+
+    // Create level-based link
+    let level_anchor = StringAnchor::new("mastery_level", "not_started");
+    let level_anchor_hash = hash_entry(&EntryTypes::StringAnchor(level_anchor))?;
+    create_link(level_anchor_hash, action_hash.clone(), LinkTypes::MasteryByLevel, ())?;
+
+    Ok(ContentMasteryOutput { action_hash, mastery })
+}
+
+/// Get mastery for a specific content node
+#[hdk_extern]
+pub fn get_my_mastery(content_id: String) -> ExternResult<Option<ContentMasteryOutput>> {
+    let agent_info = agent_info()?;
+    let human_id = agent_info.agent_initial_pubkey.to_string();
+
+    let mastery_id = format!("{}-{}", human_id, content_id);
+    let mastery_anchor = StringAnchor::new("mastery_id", &mastery_id);
+    let mastery_anchor_hash = hash_entry(&EntryTypes::StringAnchor(mastery_anchor))?;
+
+    let query = LinkQuery::try_new(mastery_anchor_hash, LinkTypes::HumanToMastery)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let link = match links.first() {
+        Some(l) => l,
+        None => return Ok(None),
+    };
+
+    let action_hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid mastery action hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?;
+    let record = match record {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+
+    let mastery: ContentMastery = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize mastery".to_string())))?;
+
+    Ok(Some(ContentMasteryOutput { action_hash, mastery }))
+}
+
+/// Get all mastery records for current agent (for dashboard)
+#[hdk_extern]
+pub fn get_my_all_mastery(_: ()) -> ExternResult<Vec<ContentMasteryOutput>> {
+    let agent_info = agent_info()?;
+    let human_id = agent_info.agent_initial_pubkey.to_string();
+
+    let human_anchor = StringAnchor::new("human_mastery", &human_id);
+    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
+
+    let query = LinkQuery::try_new(human_anchor_hash, LinkTypes::HumanToMastery)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid mastery action hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(mastery) = rec.entry().to_app_option::<ContentMastery>().ok().flatten() {
+                results.push(ContentMasteryOutput { action_hash, mastery });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Mastery snapshot for missions view - compact representation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MasterySnapshot {
+    pub content_id: String,
+    pub level: String,
+    pub level_index: u32,
+    pub freshness: f64,
+    pub needs_refresh: bool,
+}
+
+/// Get mastery for multiple content IDs at once (for missions/path view)
+/// Returns mastery snapshots for all requested content, with defaults for untracked
+#[hdk_extern]
+pub fn get_mastery_batch(content_ids: Vec<String>) -> ExternResult<Vec<MasterySnapshot>> {
+    let agent_info = agent_info()?;
+    let human_id = agent_info.agent_initial_pubkey.to_string();
+
+    let mut results = Vec::new();
+
+    for content_id in content_ids {
+        let mastery_id = format!("{}-{}", human_id, content_id);
+        let mastery_anchor = StringAnchor::new("mastery_id", &mastery_id);
+        let mastery_anchor_hash = hash_entry(&EntryTypes::StringAnchor(mastery_anchor))?;
+
+        let query = LinkQuery::try_new(mastery_anchor_hash, LinkTypes::HumanToMastery)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        if let Some(link) = links.first() {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid mastery action hash".to_string())))?;
+
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(mastery) = record.entry().to_app_option::<ContentMastery>().ok().flatten() {
+                    results.push(MasterySnapshot {
+                        content_id: content_id.clone(),
+                        level: mastery.mastery_level,
+                        level_index: mastery.mastery_level_index,
+                        freshness: mastery.freshness_score,
+                        needs_refresh: mastery.needs_refresh,
+                    });
+                    continue;
+                }
+            }
+        }
+
+        // No mastery found - return default (not started)
+        results.push(MasterySnapshot {
+            content_id,
+            level: "not_started".to_string(),
+            level_index: 0,
+            freshness: 1.0,
+            needs_refresh: false,
+        });
+    }
+
+    Ok(results)
+}
+
+/// Path mastery overview for missions view
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PathMasteryOverview {
+    pub path_id: String,
+    pub path_title: String,
+    pub total_content: u32,
+    pub mastery_snapshots: Vec<MasterySnapshot>,
+    pub level_counts: HashMap<String, u32>,
+    pub completion_percentage: f64,  // % at "seen" or above
+    pub mastery_percentage: f64,     // % at "apply" or above (past gate)
+}
+
+/// Get mastery overview for an entire learning path (missions view)
+#[hdk_extern]
+pub fn get_path_mastery_overview(path_id: String) -> ExternResult<Option<PathMasteryOverview>> {
+    // Get path with steps
+    let path_data = match get_path_with_steps(path_id.clone())? {
+        Some(p) => p,
+        None => return Ok(None),
+    };
+
+    // Extract content IDs from steps
+    let content_ids: Vec<String> = path_data.steps
+        .iter()
+        .filter(|s| s.step.step_type == "content")
+        .map(|s| s.step.resource_id.clone())
+        .collect();
+
+    // Get mastery for all content
+    let mastery_snapshots = get_mastery_batch(content_ids)?;
+
+    // Compute level counts
+    let mut level_counts: HashMap<String, u32> = HashMap::new();
+    for level in MASTERY_LEVELS.iter() {
+        level_counts.insert(level.to_string(), 0);
+    }
+
+    let mut seen_count = 0u32;
+    let mut apply_count = 0u32;
+
+    for snapshot in &mastery_snapshots {
+        *level_counts.entry(snapshot.level.clone()).or_insert(0) += 1;
+        if snapshot.level_index >= 1 {
+            seen_count += 1;
+        }
+        if snapshot.level_index >= 4 {
+            apply_count += 1;
+        }
+    }
+
+    let total = mastery_snapshots.len() as f64;
+    let completion_percentage = if total > 0.0 { (seen_count as f64 / total) * 100.0 } else { 0.0 };
+    let mastery_percentage = if total > 0.0 { (apply_count as f64 / total) * 100.0 } else { 0.0 };
+
+    Ok(Some(PathMasteryOverview {
+        path_id,
+        path_title: path_data.path.title,
+        total_content: mastery_snapshots.len() as u32,
+        mastery_snapshots,
+        level_counts,
+        completion_percentage,
+        mastery_percentage,
+    }))
+}
+
+/// Record an engagement with content (view, practice, etc.)
+#[hdk_extern]
+pub fn record_engagement(input: RecordEngagementInput) -> ExternResult<ContentMasteryOutput> {
+    let agent_info = agent_info()?;
+    let human_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get or create mastery
+    let existing = get_my_mastery(input.content_id.clone())?;
+    let (existing_action_hash, existing_mastery) = match existing {
+        Some(m) => (Some(m.action_hash), m.mastery),
+        None => {
+            let init_result = initialize_mastery(InitializeMasteryInput {
+                content_id: input.content_id.clone(),
+            })?;
+            (Some(init_result.action_hash), init_result.mastery)
+        }
+    };
+
+    // Determine new level based on engagement type
+    let new_level_index = match input.engagement_type.as_str() {
+        "view" if existing_mastery.mastery_level_index < 1 => 1,  // Advance to "seen"
+        _ => existing_mastery.mastery_level_index,  // Keep current level
+    };
+
+    let new_level = MASTERY_LEVELS.get(new_level_index as usize)
+        .unwrap_or(&"not_started")
+        .to_string();
+
+    // Create updated mastery
+    let updated_mastery = ContentMastery {
+        id: existing_mastery.id,
+        human_id: existing_mastery.human_id,
+        content_id: existing_mastery.content_id.clone(),
+        mastery_level: new_level.clone(),
+        mastery_level_index: new_level_index,
+        freshness_score: 1.0,  // Reset freshness on engagement
+        needs_refresh: false,
+        engagement_count: existing_mastery.engagement_count + 1,
+        last_engagement_type: input.engagement_type.clone(),
+        last_engagement_at: timestamp.clone(),
+        level_achieved_at: if new_level_index > existing_mastery.mastery_level_index {
+            timestamp.clone()
+        } else {
+            existing_mastery.level_achieved_at
+        },
+        content_version_at_mastery: existing_mastery.content_version_at_mastery,
+        assessment_evidence_json: existing_mastery.assessment_evidence_json,
+        privileges_json: existing_mastery.privileges_json,
+        created_at: existing_mastery.created_at,
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::ContentMastery(updated_mastery.clone()))?;
+
+    // Update ID lookup link
+    let mastery_id = format!("{}-{}", human_id, input.content_id);
+    let mastery_anchor = StringAnchor::new("mastery_id", &mastery_id);
+    let mastery_anchor_hash = hash_entry(&EntryTypes::StringAnchor(mastery_anchor))?;
+
+    let old_query = LinkQuery::try_new(mastery_anchor_hash.clone(), LinkTypes::HumanToMastery)?;
+    let old_links = get_links(old_query, GetStrategy::default())?;
+    for link in old_links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+    create_link(mastery_anchor_hash, action_hash.clone(), LinkTypes::HumanToMastery, ())?;
+
+    // Update level link if level changed
+    if new_level_index > existing_mastery.mastery_level_index {
+        // Remove old level link
+        let old_level = MASTERY_LEVELS.get(existing_mastery.mastery_level_index as usize)
+            .unwrap_or(&"not_started");
+        let old_level_anchor = StringAnchor::new("mastery_level", old_level);
+        let old_level_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_level_anchor))?;
+        let old_level_query = LinkQuery::try_new(old_level_anchor_hash, LinkTypes::MasteryByLevel)?;
+        let old_level_links = get_links(old_level_query, GetStrategy::default())?;
+        for link in old_level_links {
+            if let Some(existing_ah) = &existing_action_hash {
+                if link.target == existing_ah.clone().into() {
+                    delete_link(link.create_link_hash, GetOptions::default())?;
+                    break;
+                }
+            }
+        }
+
+        // Add new level link
+        let new_level_anchor = StringAnchor::new("mastery_level", &new_level);
+        let new_level_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_level_anchor))?;
+        create_link(new_level_anchor_hash, action_hash.clone(), LinkTypes::MasteryByLevel, ())?;
+    }
+
+    Ok(ContentMasteryOutput { action_hash, mastery: updated_mastery })
+}
+
+/// Record assessment result and potentially level up
+#[hdk_extern]
+pub fn record_assessment(input: RecordAssessmentInput) -> ExternResult<ContentMasteryOutput> {
+    let agent_info = agent_info()?;
+    let human_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get or create mastery
+    let existing = get_my_mastery(input.content_id.clone())?;
+    let (existing_action_hash, existing_mastery) = match existing {
+        Some(m) => (Some(m.action_hash), m.mastery),
+        None => {
+            let init_result = initialize_mastery(InitializeMasteryInput {
+                content_id: input.content_id.clone(),
+            })?;
+            (Some(init_result.action_hash), init_result.mastery)
+        }
+    };
+
+    // Determine target level based on assessment type
+    let target_level_index = match input.assessment_type.as_str() {
+        "recall" => 2,          // remember
+        "comprehension" => 3,   // understand
+        "application" => 4,     // apply (THE GATE)
+        "analysis" => 5,        // analyze
+        "evaluation" => 6,      // evaluate
+        "synthesis" => 7,       // create
+        _ => 2,                 // default to remember
+    };
+
+    // Only level up if passed and would advance
+    let passed = input.score >= input.passing_threshold;
+    let new_level_index = if passed && target_level_index > existing_mastery.mastery_level_index {
+        target_level_index
+    } else {
+        existing_mastery.mastery_level_index
+    };
+
+    let new_level = MASTERY_LEVELS.get(new_level_index as usize)
+        .unwrap_or(&"not_started")
+        .to_string();
+
+    // Build assessment evidence
+    let evidence = serde_json::json!({
+        "type": input.assessment_type,
+        "score": input.score,
+        "passed": passed,
+        "threshold": input.passing_threshold,
+        "questions": input.question_count,
+        "correct": input.correct_count,
+        "time_seconds": input.time_spent_seconds,
+        "timestamp": timestamp,
+        "details": input.evidence_json.unwrap_or_else(|| "{}".to_string()),
+    });
+
+    // Append to existing evidence
+    let mut evidence_array: Vec<serde_json::Value> = serde_json::from_str(&existing_mastery.assessment_evidence_json)
+        .unwrap_or_default();
+    evidence_array.push(evidence);
+
+    // Update privileges if crossed the apply gate
+    let new_privileges = if new_level_index >= 4 {
+        serde_json::json!(["view", "practice", "comment", "suggest_edit"]).to_string()
+    } else {
+        existing_mastery.privileges_json.clone()
+    };
+
+    // Create updated mastery
+    let updated_mastery = ContentMastery {
+        id: existing_mastery.id,
+        human_id: existing_mastery.human_id,
+        content_id: existing_mastery.content_id.clone(),
+        mastery_level: new_level.clone(),
+        mastery_level_index: new_level_index,
+        freshness_score: 1.0,
+        needs_refresh: false,
+        engagement_count: existing_mastery.engagement_count + 1,
+        last_engagement_type: "quiz".to_string(),
+        last_engagement_at: timestamp.clone(),
+        level_achieved_at: if new_level_index > existing_mastery.mastery_level_index {
+            timestamp.clone()
+        } else {
+            existing_mastery.level_achieved_at
+        },
+        content_version_at_mastery: existing_mastery.content_version_at_mastery,
+        assessment_evidence_json: serde_json::to_string(&evidence_array)
+            .unwrap_or_else(|_| "[]".to_string()),
+        privileges_json: new_privileges,
+        created_at: existing_mastery.created_at,
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::ContentMastery(updated_mastery.clone()))?;
+
+    // Update links (same as record_engagement)
+    let mastery_id = format!("{}-{}", human_id, input.content_id);
+    let mastery_anchor = StringAnchor::new("mastery_id", &mastery_id);
+    let mastery_anchor_hash = hash_entry(&EntryTypes::StringAnchor(mastery_anchor))?;
+
+    let old_query = LinkQuery::try_new(mastery_anchor_hash.clone(), LinkTypes::HumanToMastery)?;
+    let old_links = get_links(old_query, GetStrategy::default())?;
+    for link in old_links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+    create_link(mastery_anchor_hash, action_hash.clone(), LinkTypes::HumanToMastery, ())?;
+
+    // Update level link if changed
+    if new_level_index > existing_mastery.mastery_level_index {
+        let old_level = MASTERY_LEVELS.get(existing_mastery.mastery_level_index as usize)
+            .unwrap_or(&"not_started");
+        let old_level_anchor = StringAnchor::new("mastery_level", old_level);
+        let old_level_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_level_anchor))?;
+        let old_level_query = LinkQuery::try_new(old_level_anchor_hash, LinkTypes::MasteryByLevel)?;
+        let old_level_links = get_links(old_level_query, GetStrategy::default())?;
+        for link in old_level_links {
+            if let Some(existing_ah) = &existing_action_hash {
+                if link.target == existing_ah.clone().into() {
+                    delete_link(link.create_link_hash, GetOptions::default())?;
+                    break;
+                }
+            }
+        }
+
+        let new_level_anchor = StringAnchor::new("mastery_level", &new_level);
+        let new_level_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_level_anchor))?;
+        create_link(new_level_anchor_hash, action_hash.clone(), LinkTypes::MasteryByLevel, ())?;
+    }
+
+    Ok(ContentMasteryOutput { action_hash, mastery: updated_mastery })
+}
+
+/// Check if current agent has a specific privilege for content
+#[hdk_extern]
+pub fn check_privilege(input: CheckPrivilegeInput) -> ExternResult<PrivilegeCheckResult> {
+    let (required_index, required_level) = get_privilege_requirement(&input.privilege);
+
+    let mastery = get_my_mastery(input.content_id)?;
+
+    let (current_level, current_index) = match mastery {
+        Some(m) => (m.mastery.mastery_level, m.mastery.mastery_level_index),
+        None => ("not_started".to_string(), 0),
+    };
+
+    Ok(PrivilegeCheckResult {
+        has_privilege: current_index >= required_index,
+        required_level: required_level.to_string(),
+        current_level,
+        current_level_index: current_index,
+    })
+}
+
+/// Get mastery statistics for current agent
+#[hdk_extern]
+pub fn get_my_mastery_stats(_: ()) -> ExternResult<MasteryStats> {
+    let all_mastery = get_my_all_mastery(())?;
+
+    let mut level_distribution: HashMap<String, u32> = HashMap::new();
+    for level in MASTERY_LEVELS.iter() {
+        level_distribution.insert(level.to_string(), 0);
+    }
+
+    let mut above_gate_count = 0u32;
+    let mut fresh_count = 0u32;
+    let mut stale_count = 0u32;
+    let mut needs_refresh_count = 0u32;
+
+    for mastery_output in &all_mastery {
+        let mastery = &mastery_output.mastery;
+
+        *level_distribution.entry(mastery.mastery_level.clone()).or_insert(0) += 1;
+
+        if mastery.mastery_level_index >= 4 {
+            above_gate_count += 1;
+        }
+
+        if mastery.freshness_score >= 0.7 {
+            fresh_count += 1;
+        } else if mastery.freshness_score < 0.4 {
+            stale_count += 1;
+        }
+
+        if mastery.needs_refresh {
+            needs_refresh_count += 1;
+        }
+    }
+
+    Ok(MasteryStats {
+        total_tracked: all_mastery.len() as u32,
+        level_distribution,
+        above_gate_count,
+        fresh_count,
+        stale_count,
+        needs_refresh_count,
+    })
+}
+
+/// Get all mastery records at a specific level
+#[hdk_extern]
+pub fn get_mastery_by_level(level: String) -> ExternResult<Vec<ContentMasteryOutput>> {
+    let level_anchor = StringAnchor::new("mastery_level", &level);
+    let level_anchor_hash = hash_entry(&EntryTypes::StringAnchor(level_anchor))?;
+
+    let query = LinkQuery::try_new(level_anchor_hash, LinkTypes::MasteryByLevel)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let agent_info = agent_info()?;
+    let human_id = agent_info.agent_initial_pubkey.to_string();
+
+    let mut results = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid mastery action hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(mastery) = rec.entry().to_app_option::<ContentMastery>().ok().flatten() {
+                // Only return mastery for current agent
+                if mastery.human_id == human_id {
+                    results.push(ContentMasteryOutput { action_hash, mastery });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// Assessment History & Attestation Gating
+// =============================================================================
+
+/// Assessment history entry (for viewing past attempts)
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AssessmentHistoryEntry {
+    pub assessment_type: String,
+    pub score: f64,
+    pub passed: bool,
+    pub threshold: f64,
+    pub question_count: u32,
+    pub correct_count: u32,
+    pub time_seconds: u32,
+    pub timestamp: String,
+    pub level_achieved: Option<String>,
+}
+
+/// Assessment history output
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AssessmentHistory {
+    pub content_id: String,
+    pub entries: Vec<AssessmentHistoryEntry>,
+    pub total_attempts: u32,
+    pub pass_count: u32,
+    pub best_score: f64,
+    pub current_level: String,
+}
+
+/// Input for checking attestation eligibility
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CheckAttestationEligibilityInput {
+    pub path_id: String,
+    pub attestation_id: String,
+    pub required_content_ids: Vec<String>,
+    pub required_mastery_level: String,
+}
+
+/// Attestation eligibility result
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AttestationEligibilityResult {
+    pub eligible: bool,
+    pub attestation_id: String,
+    pub required_level: String,
+    pub required_level_index: u32,
+    pub content_requirements: Vec<ContentMasteryRequirement>,
+    pub all_requirements_met: bool,
+    pub missing_requirements: Vec<String>,
+}
+
+/// Individual content mastery requirement check
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ContentMasteryRequirement {
+    pub content_id: String,
+    pub required_level: String,
+    pub current_level: String,
+    pub met: bool,
+    pub gap: i32,
+}
+
+/// Input for granting attestation with mastery check
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GrantAttestationWithMasteryInput {
+    pub path_id: String,
+    pub attestation_id: String,
+    pub reason: String,
+    pub source_type: String,
+    pub source_id: String,
+    pub required_content_ids: Vec<String>,
+    pub required_mastery_level: String,
+}
+
+/// Result of step access check
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StepAccessResult {
+    pub step_id: String,
+    pub access_granted: bool,
+    pub blockers: Vec<String>,
+    pub attestation_required: Option<String>,
+    pub mastery_threshold: Option<u32>,
+}
+
+/// Get assessment history for a content node
+#[hdk_extern]
+pub fn get_assessment_history(content_id: String) -> ExternResult<AssessmentHistory> {
+    let mastery = get_my_mastery(content_id.clone())?;
+
+    match mastery {
+        Some(m) => {
+            // Parse assessment evidence JSON
+            let evidence_array: Vec<serde_json::Value> = serde_json::from_str(&m.mastery.assessment_evidence_json)
+                .unwrap_or_default();
+
+            let mut entries = Vec::new();
+            let mut pass_count = 0u32;
+            let mut best_score = 0.0f64;
+
+            for evidence in &evidence_array {
+                let assessment_type = evidence.get("type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let score = evidence.get("score")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                let passed = evidence.get("passed")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let threshold = evidence.get("threshold")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.7);
+                let question_count = evidence.get("questions")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u32;
+                let correct_count = evidence.get("correct")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u32;
+                let time_seconds = evidence.get("time_seconds")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u32;
+                let timestamp = evidence.get("timestamp")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if passed {
+                    pass_count += 1;
+                }
+                if score > best_score {
+                    best_score = score;
+                }
+
+                entries.push(AssessmentHistoryEntry {
+                    assessment_type,
+                    score,
+                    passed,
+                    threshold,
+                    question_count,
+                    correct_count,
+                    time_seconds,
+                    timestamp,
+                    level_achieved: if passed { Some(m.mastery.mastery_level.clone()) } else { None },
+                });
+            }
+
+            Ok(AssessmentHistory {
+                content_id,
+                entries,
+                total_attempts: evidence_array.len() as u32,
+                pass_count,
+                best_score,
+                current_level: m.mastery.mastery_level,
+            })
+        }
+        None => Ok(AssessmentHistory {
+            content_id,
+            entries: Vec::new(),
+            total_attempts: 0,
+            pass_count: 0,
+            best_score: 0.0,
+            current_level: "not_started".to_string(),
+        })
+    }
+}
+
+/// Check if current agent is eligible for an attestation based on mastery requirements
+#[hdk_extern]
+pub fn check_attestation_eligibility(input: CheckAttestationEligibilityInput) -> ExternResult<AttestationEligibilityResult> {
+    let required_level_index = get_mastery_level_index(&input.required_mastery_level);
+
+    let mut content_requirements = Vec::new();
+    let mut missing_requirements = Vec::new();
+    let mut all_met = true;
+
+    for content_id in &input.required_content_ids {
+        let mastery = get_my_mastery(content_id.clone())?;
+
+        let (current_level, current_index) = match mastery {
+            Some(m) => (m.mastery.mastery_level, m.mastery.mastery_level_index),
+            None => ("not_started".to_string(), 0),
+        };
+
+        let met = current_index >= required_level_index;
+        let gap = required_level_index as i32 - current_index as i32;
+
+        if !met {
+            all_met = false;
+            missing_requirements.push(format!(
+                "{}: need {} (have {})",
+                content_id, input.required_mastery_level, current_level
+            ));
+        }
+
+        content_requirements.push(ContentMasteryRequirement {
+            content_id: content_id.clone(),
+            required_level: input.required_mastery_level.clone(),
+            current_level,
+            met,
+            gap,
+        });
+    }
+
+    Ok(AttestationEligibilityResult {
+        eligible: all_met,
+        attestation_id: input.attestation_id,
+        required_level: input.required_mastery_level.clone(),
+        required_level_index,
+        content_requirements,
+        all_requirements_met: all_met,
+        missing_requirements,
+    })
+}
+
+/// Grant attestation only if mastery requirements are met
+#[hdk_extern]
+pub fn grant_attestation_with_mastery_check(input: GrantAttestationWithMasteryInput) -> ExternResult<AgentProgressOutput> {
+    // First check eligibility
+    let eligibility = check_attestation_eligibility(CheckAttestationEligibilityInput {
+        path_id: input.path_id.clone(),
+        attestation_id: input.attestation_id.clone(),
+        required_content_ids: input.required_content_ids.clone(),
+        required_mastery_level: input.required_mastery_level.clone(),
+    })?;
+
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!(
+                "Mastery requirements not met for attestation '{}'. Missing: {:?}",
+                input.attestation_id,
+                eligibility.missing_requirements
+            )
+        )));
+    }
+
+    // If eligible, grant the attestation using existing function
+    grant_attestation(GrantAttestationInput {
+        path_id: input.path_id,
+        attestation_id: input.attestation_id,
+        reason: input.reason,
+        source_type: input.source_type,
+        source_id: input.source_id,
+    })
+}
+
+/// Check step access based on required attestation and mastery
+#[hdk_extern]
+pub fn check_step_access(step_id: String) -> ExternResult<StepAccessResult> {
+    // Get the step
+    let step_output = get_step_by_id(step_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!("Step not found: {}", step_id))))?;
+
+    let step = step_output.step;
+    let mut access_granted = true;
+    let mut blockers = Vec::new();
+
+    // Check attestation requirement
+    if let Some(ref required_attestation) = step.attestation_required {
+        let attestation_check = check_attestation_access(CheckAttestationAccessInput {
+            path_id: step.path_id.clone(),
+            required_attestation: required_attestation.clone(),
+        })?;
+
+        if !attestation_check.has_access {
+            access_granted = false;
+            blockers.push(format!("Missing attestation: {}", required_attestation));
+        }
+    }
+
+    // Check mastery threshold
+    if let Some(mastery_threshold) = step.mastery_threshold {
+        // Get mastery for the content this step references
+        let mastery = get_my_mastery(step.resource_id.clone())?;
+
+        let current_level_index = match mastery {
+            Some(m) => m.mastery.mastery_level_index,
+            None => 0,
+        };
+
+        if current_level_index < mastery_threshold {
+            access_granted = false;
+            let required_level = MASTERY_LEVELS.get(mastery_threshold as usize)
+                .unwrap_or(&"apply")
+                .to_string();
+            let current_level = MASTERY_LEVELS.get(current_level_index as usize)
+                .unwrap_or(&"not_started")
+                .to_string();
+            blockers.push(format!(
+                "Need mastery level '{}' (currently '{}')",
+                required_level, current_level
+            ));
+        }
+    }
+
+    Ok(StepAccessResult {
+        step_id,
+        access_granted,
+        blockers,
+        attestation_required: step.attestation_required,
+        mastery_threshold: step.mastery_threshold,
+    })
+}
+
+/// Batch check multiple steps for access (efficient for path overview)
+#[hdk_extern]
+pub fn check_path_step_access(path_id: String) -> ExternResult<Vec<StepAccessResult>> {
+    let path_with_steps = get_path_with_steps(path_id)?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Path not found".to_string())))?;
+
+    let mut results = Vec::new();
+    for step_output in path_with_steps.steps {
+        let step_id = step_output.step.id.clone();
+        match check_step_access(step_id) {
+            Ok(result) => results.push(result),
+            Err(_) => continue,  // Skip steps that error
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// Practice Pool & Mastery Challenge Types
+// =============================================================================
+
+/// Discovery candidate from knowledge graph
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DiscoveryCandidate {
+    pub content_id: String,
+    pub source_content_id: String,
+    pub relationship_type: String,
+    pub discovery_reason: String,
+}
+
+/// Content mix entry for a challenge
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ContentMixEntry {
+    pub content_id: String,
+    pub source: String,  // "path_active", "refresh_queue", "graph_neighbor", "serendipity"
+    pub question_count: u32,
+}
+
+/// Question in a challenge
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ChallengeQuestion {
+    pub content_id: String,
+    pub question_type: String,
+    pub question_text: String,
+    pub options_json: String,
+    pub correct_answer: String,
+}
+
+/// Response to a challenge question
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ChallengeResponse {
+    pub content_id: String,
+    pub question_index: u32,
+    pub response: String,
+    pub correct: bool,
+    pub time_taken_ms: u32,
+}
+
+/// Level change from a challenge
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LevelChange {
+    pub content_id: String,
+    pub from_level: String,
+    pub to_level: String,
+    pub from_index: u32,
+    pub to_index: u32,
+    pub change: String,  // "up", "down", "same"
+}
+
+/// Discovery made from challenge
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ChallengeDiscovery {
+    pub content_id: String,
+    pub discovered_via: String,
+    pub relationship_type: String,
+}
+
+/// Output for practice pool
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PracticePoolOutput {
+    pub action_hash: ActionHash,
+    pub pool: PracticePool,
+}
+
+/// Output for mastery challenge
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MasteryChallengeOutput {
+    pub action_hash: ActionHash,
+    pub challenge: MasteryChallenge,
+}
+
+/// Input for creating/updating practice pool
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreatePoolInput {
+    pub contributing_path_ids: Vec<String>,
+    pub max_active_size: Option<u32>,
+    pub refresh_threshold: Option<f64>,
+    pub discovery_probability: Option<f64>,
+    pub regression_enabled: Option<bool>,
+    pub challenge_cooldown_hours: Option<u32>,
+}
+
+/// Input for starting a mastery challenge
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StartChallengeInput {
+    pub path_id: Option<String>,
+    pub question_count: u32,
+    pub include_discoveries: bool,
+    pub time_limit_seconds: Option<u32>,
+}
+
+/// Input for submitting challenge responses
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubmitChallengeInput {
+    pub challenge_id: String,
+    pub responses: Vec<ChallengeResponse>,
+    pub actual_time_seconds: u32,
+}
+
+/// Challenge result after submission
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ChallengeResult {
+    pub challenge: MasteryChallengeOutput,
+    pub score: f64,
+    pub level_changes: Vec<LevelChange>,
+    pub discoveries: Vec<ChallengeDiscovery>,
+    pub net_level_change: i32,
+    pub can_retake_at: String,
+}
+
+/// Cooldown check result
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CooldownCheckResult {
+    pub can_take_challenge: bool,
+    pub cooldown_remaining_hours: u32,
+    pub last_challenge_at: Option<String>,
+    pub next_available_at: Option<String>,
+}
+
+/// Pool recommendations for what to practice
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PoolRecommendations {
+    pub priority_refresh: Vec<String>,     // Mastered but need refresh
+    pub active_practice: Vec<String>,      // In active rotation
+    pub discovery_suggestions: Vec<DiscoveryCandidate>,  // Serendipity options
+    pub total_pool_size: u32,
+}
+
+// =============================================================================
+// Practice Pool Operations
+// =============================================================================
+
+/// Get or create practice pool for current agent
+#[hdk_extern]
+pub fn get_or_create_practice_pool(input: CreatePoolInput) -> ExternResult<PracticePoolOutput> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Check if pool already exists
+    let pool_anchor = StringAnchor::new("agent_pool", &agent_id);
+    let pool_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pool_anchor.clone()))?;
+
+    let query = LinkQuery::try_new(pool_anchor_hash.clone(), LinkTypes::AgentToPool)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        // Return existing pool
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid pool hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Pool record not found".to_string())))?;
+
+        let pool: PracticePool = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(e))?
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize pool".to_string())))?;
+
+        return Ok(PracticePoolOutput { action_hash, pool });
+    }
+
+    // Create new pool
+    let pool_id = format!("pool-{}-{}", agent_id, timestamp);
+
+    let pool = PracticePool {
+        id: pool_id.clone(),
+        agent_id: agent_id.clone(),
+        active_content_ids_json: "[]".to_string(),
+        refresh_queue_ids_json: "[]".to_string(),
+        discovery_candidates_json: "[]".to_string(),
+        contributing_path_ids_json: serde_json::to_string(&input.contributing_path_ids)
+            .unwrap_or_else(|_| "[]".to_string()),
+        max_active_size: input.max_active_size.unwrap_or(20),
+        refresh_threshold: input.refresh_threshold.unwrap_or(0.5),
+        discovery_probability: input.discovery_probability.unwrap_or(0.15),
+        regression_enabled: input.regression_enabled.unwrap_or(true),
+        challenge_cooldown_hours: input.challenge_cooldown_hours.unwrap_or(24),
+        last_challenge_at: None,
+        last_challenge_id: None,
+        total_challenges_taken: 0,
+        total_level_ups: 0,
+        total_level_downs: 0,
+        discoveries_unlocked: 0,
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::PracticePool(pool.clone()))?;
+
+    // Create anchor and link
+    create_entry(&EntryTypes::StringAnchor(pool_anchor))?;
+    create_link(pool_anchor_hash, action_hash.clone(), LinkTypes::AgentToPool, ())?;
+
+    Ok(PracticePoolOutput { action_hash, pool })
+}
+
+/// Refresh practice pool with content from paths and knowledge graph
+#[hdk_extern]
+pub fn refresh_practice_pool(_: ()) -> ExternResult<PracticePoolOutput> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get existing pool
+    let pool_output = get_or_create_practice_pool(CreatePoolInput {
+        contributing_path_ids: vec![],
+        max_active_size: None,
+        refresh_threshold: None,
+        discovery_probability: None,
+        regression_enabled: None,
+        challenge_cooldown_hours: None,
+    })?;
+
+    let existing_pool = pool_output.pool;
+
+    // Gather active content from contributing paths
+    let contributing_paths: Vec<String> = serde_json::from_str(&existing_pool.contributing_path_ids_json)
+        .unwrap_or_default();
+
+    let mut active_content: Vec<String> = Vec::new();
+    let mut _refresh_queue: Vec<String> = Vec::new();
+
+    for path_id in &contributing_paths {
+        if let Some(path_with_steps) = get_path_with_steps(path_id.clone())? {
+            for step_output in path_with_steps.steps {
+                let content_id = step_output.step.resource_id.clone();
+
+                // Check mastery for this content
+                if let Some(mastery_output) = get_my_mastery(content_id.clone())? {
+                    let mastery = mastery_output.mastery;
+
+                    // If not yet mastered (below apply level), add to active
+                    if mastery.mastery_level_index < 4 {
+                        if !active_content.contains(&content_id) && active_content.len() < existing_pool.max_active_size as usize {
+                            active_content.push(content_id);
+                        }
+                    }
+                    // If mastered but freshness dropped, add to refresh queue
+                    else if mastery.freshness_score < existing_pool.refresh_threshold {
+                        if !_refresh_queue.contains(&content_id) {
+                            _refresh_queue.push(content_id);
+                        }
+                    }
+                } else {
+                    // No mastery record - add to active
+                    if !active_content.contains(&content_id) && active_content.len() < existing_pool.max_active_size as usize {
+                        active_content.push(content_id);
+                    }
+                }
+            }
+        }
+    }
+
+    // Discover related content from knowledge graph
+    let mut discovery_candidates: Vec<DiscoveryCandidate> = Vec::new();
+
+    for content_id in &active_content {
+        // Get relationships for this content
+        let relationships = get_relationships(GetRelationshipsInput {
+            content_id: content_id.clone(),
+            direction: "both".to_string(),
+        })?;
+
+        for rel_output in relationships {
+            let rel = rel_output.relationship;
+
+            // Find the related content (the one that's not this content_id)
+            let related_id = if rel.source_id == *content_id {
+                rel.target_id.clone()
+            } else {
+                rel.source_id.clone()
+            };
+
+            // Check if this related content is not already in our pool
+            if !active_content.contains(&related_id) && !_refresh_queue.contains(&related_id) {
+                // Check we haven't already added this as a discovery candidate
+                if !discovery_candidates.iter().any(|d| d.content_id == related_id) {
+                    discovery_candidates.push(DiscoveryCandidate {
+                        content_id: related_id,
+                        source_content_id: content_id.clone(),
+                        relationship_type: rel.relationship_type.clone(),
+                        discovery_reason: format!("Related via {} to content you're learning", rel.relationship_type),
+                    });
+                }
+            }
+        }
+    }
+
+    // Limit discovery candidates
+    discovery_candidates.truncate(10);
+
+    // Update the pool
+    let updated_pool = PracticePool {
+        id: existing_pool.id,
+        agent_id: existing_pool.agent_id,
+        active_content_ids_json: serde_json::to_string(&active_content).unwrap_or_else(|_| "[]".to_string()),
+        refresh_queue_ids_json: serde_json::to_string(&_refresh_queue).unwrap_or_else(|_| "[]".to_string()),
+        discovery_candidates_json: serde_json::to_string(&discovery_candidates).unwrap_or_else(|_| "[]".to_string()),
+        contributing_path_ids_json: existing_pool.contributing_path_ids_json,
+        max_active_size: existing_pool.max_active_size,
+        refresh_threshold: existing_pool.refresh_threshold,
+        discovery_probability: existing_pool.discovery_probability,
+        regression_enabled: existing_pool.regression_enabled,
+        challenge_cooldown_hours: existing_pool.challenge_cooldown_hours,
+        last_challenge_at: existing_pool.last_challenge_at,
+        last_challenge_id: existing_pool.last_challenge_id,
+        total_challenges_taken: existing_pool.total_challenges_taken,
+        total_level_ups: existing_pool.total_level_ups,
+        total_level_downs: existing_pool.total_level_downs,
+        discoveries_unlocked: existing_pool.discoveries_unlocked,
+        created_at: existing_pool.created_at,
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::PracticePool(updated_pool.clone()))?;
+
+    // Update link
+    let pool_anchor = StringAnchor::new("agent_pool", &agent_id);
+    let pool_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pool_anchor))?;
+
+    let query = LinkQuery::try_new(pool_anchor_hash.clone(), LinkTypes::AgentToPool)?;
+    let links = get_links(query, GetStrategy::default())?;
+    if let Some(old_link) = links.first() {
+        delete_link(old_link.create_link_hash.clone(), GetOptions::default())?;
+    }
+    create_link(pool_anchor_hash, action_hash.clone(), LinkTypes::AgentToPool, ())?;
+
+    Ok(PracticePoolOutput { action_hash, pool: updated_pool })
+}
+
+/// Add a path to the practice pool
+#[hdk_extern]
+pub fn add_path_to_pool(path_id: String) -> ExternResult<PracticePoolOutput> {
+    let pool_output = get_or_create_practice_pool(CreatePoolInput {
+        contributing_path_ids: vec![path_id.clone()],
+        max_active_size: None,
+        refresh_threshold: None,
+        discovery_probability: None,
+        regression_enabled: None,
+        challenge_cooldown_hours: None,
+    })?;
+
+    let mut contributing: Vec<String> = serde_json::from_str(&pool_output.pool.contributing_path_ids_json)
+        .unwrap_or_default();
+
+    if !contributing.contains(&path_id) {
+        contributing.push(path_id);
+    }
+
+    // Update and refresh
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let updated_pool = PracticePool {
+        contributing_path_ids_json: serde_json::to_string(&contributing).unwrap_or_else(|_| "[]".to_string()),
+        updated_at: timestamp,
+        ..pool_output.pool
+    };
+
+    let action_hash = create_entry(&EntryTypes::PracticePool(updated_pool.clone()))?;
+
+    // Update link
+    let pool_anchor = StringAnchor::new("agent_pool", &agent_id);
+    let pool_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pool_anchor))?;
+
+    let query = LinkQuery::try_new(pool_anchor_hash.clone(), LinkTypes::AgentToPool)?;
+    let links = get_links(query, GetStrategy::default())?;
+    if let Some(old_link) = links.first() {
+        delete_link(old_link.create_link_hash.clone(), GetOptions::default())?;
+    }
+    create_link(pool_anchor_hash, action_hash.clone(), LinkTypes::AgentToPool, ())?;
+
+    // Refresh to populate with content
+    refresh_practice_pool(())
+}
+
+/// Get pool recommendations for what to practice
+#[hdk_extern]
+pub fn get_pool_recommendations(_: ()) -> ExternResult<PoolRecommendations> {
+    let pool_output = refresh_practice_pool(())?;
+    let pool = pool_output.pool;
+
+    let active: Vec<String> = serde_json::from_str(&pool.active_content_ids_json).unwrap_or_default();
+    let refresh: Vec<String> = serde_json::from_str(&pool.refresh_queue_ids_json).unwrap_or_default();
+    let discoveries: Vec<DiscoveryCandidate> = serde_json::from_str(&pool.discovery_candidates_json).unwrap_or_default();
+
+    Ok(PoolRecommendations {
+        priority_refresh: refresh,
+        active_practice: active.clone(),
+        discovery_suggestions: discoveries,
+        total_pool_size: active.len() as u32,
+    })
+}
+
+/// Check if agent can take a mastery challenge (cooldown)
+#[hdk_extern]
+pub fn check_challenge_cooldown(_: ()) -> ExternResult<CooldownCheckResult> {
+    let pool_output = get_or_create_practice_pool(CreatePoolInput {
+        contributing_path_ids: vec![],
+        max_active_size: None,
+        refresh_threshold: None,
+        discovery_probability: None,
+        regression_enabled: None,
+        challenge_cooldown_hours: None,
+    })?;
+
+    let pool = pool_output.pool;
+
+    match &pool.last_challenge_at {
+        None => Ok(CooldownCheckResult {
+            can_take_challenge: true,
+            cooldown_remaining_hours: 0,
+            last_challenge_at: None,
+            next_available_at: None,
+        }),
+        Some(last_challenge) => {
+            // Parse timestamp and check if cooldown has passed
+            // For now, simplified: just check if string is set
+            // In production, would parse timestamp and calculate
+            let cooldown_hours = pool.challenge_cooldown_hours;
+
+            // Simplified check - in production would actually parse and compare timestamps
+            Ok(CooldownCheckResult {
+                can_take_challenge: false, // Would calculate properly
+                cooldown_remaining_hours: cooldown_hours,
+                last_challenge_at: Some(last_challenge.clone()),
+                next_available_at: Some(format!("{} + {} hours", last_challenge, cooldown_hours)),
+            })
+        }
+    }
+}
+
+// =============================================================================
+// Mastery Challenge Operations
+// =============================================================================
+
+/// Start a mastery challenge
+#[hdk_extern]
+pub fn start_mastery_challenge(input: StartChallengeInput) -> ExternResult<MasteryChallengeOutput> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get pool and check cooldown
+    let pool_output = refresh_practice_pool(())?;
+    let pool = pool_output.pool.clone();
+
+    // Build content mix from pool
+    let active: Vec<String> = serde_json::from_str(&pool.active_content_ids_json).unwrap_or_default();
+    let refresh: Vec<String> = serde_json::from_str(&pool.refresh_queue_ids_json).unwrap_or_default();
+    let discoveries: Vec<DiscoveryCandidate> = serde_json::from_str(&pool.discovery_candidates_json).unwrap_or_default();
+
+    let mut content_mix: Vec<ContentMixEntry> = Vec::new();
+    let mut questions_needed = input.question_count;
+    let mut discovery_count = 0u32;
+
+    // Add from refresh queue first (priority)
+    for content_id in refresh.iter().take(questions_needed as usize / 3) {
+        content_mix.push(ContentMixEntry {
+            content_id: content_id.clone(),
+            source: "refresh_queue".to_string(),
+            question_count: 1,
+        });
+        questions_needed -= 1;
+    }
+
+    // Add from active content
+    for content_id in active.iter().take(questions_needed as usize * 2 / 3) {
+        content_mix.push(ContentMixEntry {
+            content_id: content_id.clone(),
+            source: "path_active".to_string(),
+            question_count: 1,
+        });
+        questions_needed -= 1;
+    }
+
+    // Add discovery content if enabled
+    if input.include_discoveries && !discoveries.is_empty() {
+        // Use discovery_probability to decide
+        let discovery_slots = (input.question_count as f64 * pool.discovery_probability) as usize;
+        for discovery in discoveries.iter().take(discovery_slots.min(questions_needed as usize)) {
+            content_mix.push(ContentMixEntry {
+                content_id: discovery.content_id.clone(),
+                source: "serendipity".to_string(),
+                question_count: 1,
+            });
+            discovery_count += 1;
+            questions_needed -= 1;
+        }
+    }
+
+    // Generate placeholder questions (in production, would fetch from content)
+    let mut questions: Vec<ChallengeQuestion> = Vec::new();
+    for mix_entry in &content_mix {
+        questions.push(ChallengeQuestion {
+            content_id: mix_entry.content_id.clone(),
+            question_type: "recall".to_string(),
+            question_text: format!("Question about {}", mix_entry.content_id),
+            options_json: "[]".to_string(),
+            correct_answer: "".to_string(),
+        });
+    }
+
+    let challenge_id = format!("challenge-{}-{}", agent_id, timestamp);
+
+    let challenge = MasteryChallenge {
+        id: challenge_id.clone(),
+        agent_id: agent_id.clone(),
+        pool_id: pool.id.clone(),
+        path_id: input.path_id,
+        content_mix_json: serde_json::to_string(&content_mix).unwrap_or_else(|_| "[]".to_string()),
+        total_questions: content_mix.len() as u32,
+        discovery_questions: discovery_count,
+        state: "in_progress".to_string(),
+        started_at: timestamp.clone(),
+        completed_at: None,
+        time_limit_seconds: input.time_limit_seconds,
+        actual_time_seconds: None,
+        questions_json: serde_json::to_string(&questions).unwrap_or_else(|_| "[]".to_string()),
+        responses_json: "[]".to_string(),
+        score: None,
+        score_by_content_json: "{}".to_string(),
+        level_changes_json: "[]".to_string(),
+        net_level_change: 0,
+        discoveries_json: "[]".to_string(),
+        created_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::MasteryChallenge(challenge.clone()))?;
+
+    // Create links
+    let challenge_anchor = StringAnchor::new("agent_challenges", &agent_id);
+    let challenge_anchor_hash = hash_entry(&EntryTypes::StringAnchor(challenge_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(challenge_anchor))?;
+    create_link(challenge_anchor_hash, action_hash.clone(), LinkTypes::AgentToChallenge, ())?;
+
+    Ok(MasteryChallengeOutput { action_hash, challenge })
+}
+
+/// Submit challenge responses and apply level changes
+#[hdk_extern]
+pub fn submit_mastery_challenge(input: SubmitChallengeInput) -> ExternResult<ChallengeResult> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get the challenge
+    let challenge_anchor = StringAnchor::new("challenge_id", &input.challenge_id);
+    let challenge_anchor_hash = hash_entry(&EntryTypes::StringAnchor(challenge_anchor))?;
+
+    let query = LinkQuery::try_new(challenge_anchor_hash, LinkTypes::AgentToChallenge)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let link = links.first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Challenge not found".to_string())))?;
+
+    let action_hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Challenge record not found".to_string())))?;
+
+    let existing_challenge: MasteryChallenge = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize challenge".to_string())))?;
+
+    // Calculate scores per content
+    let mut correct_by_content: HashMap<String, (u32, u32)> = HashMap::new(); // (correct, total)
+
+    for response in &input.responses {
+        let entry = correct_by_content.entry(response.content_id.clone()).or_insert((0, 0));
+        entry.1 += 1;
+        if response.correct {
+            entry.0 += 1;
+        }
+    }
+
+    // Calculate overall score
+    let total_correct: u32 = input.responses.iter().filter(|r| r.correct).count() as u32;
+    let total_questions = input.responses.len() as u32;
+    let overall_score = if total_questions > 0 {
+        total_correct as f64 / total_questions as f64
+    } else {
+        0.0
+    };
+
+    // Apply level changes
+    let mut level_changes: Vec<LevelChange> = Vec::new();
+    let mut net_level_change: i32 = 0;
+    let mut discoveries: Vec<ChallengeDiscovery> = Vec::new();
+
+    // Get pool settings for regression
+    let pool_output = get_or_create_practice_pool(CreatePoolInput {
+        contributing_path_ids: vec![],
+        max_active_size: None,
+        refresh_threshold: None,
+        discovery_probability: None,
+        regression_enabled: None,
+        challenge_cooldown_hours: None,
+    })?;
+    let pool = pool_output.pool;
+    let regression_enabled = pool.regression_enabled;
+
+    for (content_id, (correct, total)) in &correct_by_content {
+        let content_score = *correct as f64 / *total as f64;
+
+        // Get current mastery
+        let current_mastery = get_my_mastery(content_id.clone())?;
+        let (current_level, current_index) = match &current_mastery {
+            Some(m) => (m.mastery.mastery_level.clone(), m.mastery.mastery_level_index),
+            None => ("not_started".to_string(), 0),
+        };
+
+        // Determine new level
+        let new_index = if content_score >= 0.8 {
+            // Level up if scored 80%+
+            (current_index + 1).min(7)
+        } else if content_score < 0.4 && regression_enabled {
+            // Level down if scored below 40% and regression enabled
+            if current_index > 0 { current_index - 1 } else { 0 }
+        } else {
+            current_index
+        };
+
+        let new_level = MASTERY_LEVELS.get(new_index as usize)
+            .unwrap_or(&"not_started")
+            .to_string();
+
+        let change = if new_index > current_index {
+            "up"
+        } else if new_index < current_index {
+            "down"
+        } else {
+            "same"
+        };
+
+        level_changes.push(LevelChange {
+            content_id: content_id.clone(),
+            from_level: current_level.clone(),
+            to_level: new_level.clone(),
+            from_index: current_index,
+            to_index: new_index,
+            change: change.to_string(),
+        });
+
+        net_level_change += new_index as i32 - current_index as i32;
+
+        // Apply the level change to mastery
+        if new_index != current_index {
+            upsert_mastery(UpsertMasteryInput {
+                human_id: agent_id.clone(),
+                content_id: content_id.clone(),
+                mastery_level: new_level,
+                engagement_type: "mastery_challenge".to_string(),
+            })?;
+        }
+    }
+
+    // Check for discoveries (serendipity content that was answered correctly)
+    let content_mix: Vec<ContentMixEntry> = serde_json::from_str(&existing_challenge.content_mix_json)
+        .unwrap_or_default();
+
+    for mix_entry in &content_mix {
+        if mix_entry.source == "serendipity" {
+            if let Some((correct, _)) = correct_by_content.get(&mix_entry.content_id) {
+                if *correct > 0 {
+                    discoveries.push(ChallengeDiscovery {
+                        content_id: mix_entry.content_id.clone(),
+                        discovered_via: "mastery_challenge".to_string(),
+                        relationship_type: "serendipity".to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    // Update challenge
+    let updated_challenge = MasteryChallenge {
+        id: existing_challenge.id,
+        agent_id: existing_challenge.agent_id,
+        pool_id: existing_challenge.pool_id,
+        path_id: existing_challenge.path_id,
+        content_mix_json: existing_challenge.content_mix_json,
+        total_questions: existing_challenge.total_questions,
+        discovery_questions: existing_challenge.discovery_questions,
+        state: "completed".to_string(),
+        started_at: existing_challenge.started_at,
+        completed_at: Some(timestamp.clone()),
+        time_limit_seconds: existing_challenge.time_limit_seconds,
+        actual_time_seconds: Some(input.actual_time_seconds),
+        questions_json: existing_challenge.questions_json,
+        responses_json: serde_json::to_string(&input.responses).unwrap_or_else(|_| "[]".to_string()),
+        score: Some(overall_score),
+        score_by_content_json: serde_json::to_string(&correct_by_content).unwrap_or_else(|_| "{}".to_string()),
+        level_changes_json: serde_json::to_string(&level_changes).unwrap_or_else(|_| "[]".to_string()),
+        net_level_change,
+        discoveries_json: serde_json::to_string(&discoveries).unwrap_or_else(|_| "[]".to_string()),
+        created_at: existing_challenge.created_at,
+    };
+
+    let new_action_hash = create_entry(&EntryTypes::MasteryChallenge(updated_challenge.clone()))?;
+
+    // Update pool statistics
+    let total_ups = level_changes.iter().filter(|c| c.change == "up").count() as u32;
+    let total_downs = level_changes.iter().filter(|c| c.change == "down").count() as u32;
+
+    let updated_pool = PracticePool {
+        last_challenge_at: Some(timestamp.clone()),
+        last_challenge_id: Some(updated_challenge.id.clone()),
+        total_challenges_taken: pool.total_challenges_taken + 1,
+        total_level_ups: pool.total_level_ups + total_ups,
+        total_level_downs: pool.total_level_downs + total_downs,
+        discoveries_unlocked: pool.discoveries_unlocked + discoveries.len() as u32,
+        updated_at: timestamp.clone(),
+        ..pool
+    };
+
+    let pool_action_hash = create_entry(&EntryTypes::PracticePool(updated_pool))?;
+
+    // Update pool link
+    let pool_anchor = StringAnchor::new("agent_pool", &agent_id);
+    let pool_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pool_anchor))?;
+
+    let pool_query = LinkQuery::try_new(pool_anchor_hash.clone(), LinkTypes::AgentToPool)?;
+    let pool_links = get_links(pool_query, GetStrategy::default())?;
+    if let Some(old_link) = pool_links.first() {
+        delete_link(old_link.create_link_hash.clone(), GetOptions::default())?;
+    }
+    create_link(pool_anchor_hash, pool_action_hash, LinkTypes::AgentToPool, ())?;
+
+    // Calculate next available time
+    let cooldown_hours = pool.challenge_cooldown_hours;
+    let next_available = format!("{} + {} hours", timestamp, cooldown_hours);
+
+    Ok(ChallengeResult {
+        challenge: MasteryChallengeOutput {
+            action_hash: new_action_hash,
+            challenge: updated_challenge,
+        },
+        score: overall_score,
+        level_changes,
+        discoveries,
+        net_level_change,
+        can_retake_at: next_available,
+    })
+}
+
+/// Get challenge history for current agent
+#[hdk_extern]
+pub fn get_challenge_history(_: ()) -> ExternResult<Vec<MasteryChallengeOutput>> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+
+    let challenge_anchor = StringAnchor::new("agent_challenges", &agent_id);
+    let challenge_anchor_hash = hash_entry(&EntryTypes::StringAnchor(challenge_anchor))?;
+
+    let query = LinkQuery::try_new(challenge_anchor_hash, LinkTypes::AgentToChallenge)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(challenge) = rec.entry().to_app_option::<MasteryChallenge>().ok().flatten() {
+                results.push(MasteryChallengeOutput { action_hash, challenge });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// hREA Point System - Value Flow Demonstration
+// =============================================================================
+
+/// Point amounts for each trigger
+fn get_point_amount(trigger: &str) -> i32 {
+    match trigger {
+        "engagement_view" => 1,
+        "engagement_practice" => 2,
+        "challenge_correct" => 5,
+        "challenge_complete" => 10,
+        "level_up" => 20,
+        "level_down" => -10,
+        "discovery" => 15,
+        "path_step_complete" => 5,
+        "path_complete" => 100,
+        "contribution" => 50,
+        _ => 1,
+    }
+}
+
+/// Output for learner point balance
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LearnerPointBalanceOutput {
+    pub action_hash: ActionHash,
+    pub balance: LearnerPointBalance,
+}
+
+/// Output for point event
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PointEventOutput {
+    pub action_hash: ActionHash,
+    pub event: PointEvent,
+}
+
+/// Output for contributor recognition
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ContributorRecognitionOutput {
+    pub action_hash: ActionHash,
+    pub recognition: ContributorRecognition,
+}
+
+/// Output for contributor impact
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ContributorImpactOutput {
+    pub action_hash: ActionHash,
+    pub impact: ContributorImpact,
+}
+
+/// Input for earning points
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EarnPointsInput {
+    pub trigger: String,
+    pub content_id: Option<String>,
+    pub challenge_id: Option<String>,
+    pub path_id: Option<String>,
+    pub was_correct: Option<bool>,
+    pub note: Option<String>,
+}
+
+/// Result of earning points (includes recognition flow)
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EarnPointsResult {
+    pub point_event: PointEventOutput,
+    pub new_balance: LearnerPointBalanceOutput,
+    pub recognition_sent: Vec<ContributorRecognitionOutput>,
+    pub points_earned: i32,
+}
+
+/// Contributor dashboard - the exciting view!
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ContributorDashboard {
+    pub contributor_id: String,
+    pub total_recognition_points: i64,
+    pub total_learners_reached: u32,
+    pub total_content_mastered: u32,
+    pub total_discoveries_sparked: u32,
+    pub impact_by_content: Vec<ContentImpactSummary>,
+    pub recent_events: Vec<RecognitionEventSummary>,
+    pub impact: Option<ContributorImpactOutput>,
+}
+
+/// Impact summary per content piece
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ContentImpactSummary {
+    pub content_id: String,
+    pub recognition_points: i64,
+    pub learners_reached: u32,
+    pub mastery_count: u32,
+}
+
+/// Recent recognition event for the timeline
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RecognitionEventSummary {
+    pub learner_id: String,
+    pub content_id: String,
+    pub flow_type: String,
+    pub recognition_points: i32,
+    pub occurred_at: String,
+}
+
+/// Get or create a ContributorPresence for content.
+/// This is the key to allowing recognition to flow even when contributors aren't "present" yet.
+/// The presence exists in states: unclaimed → stewarded → claimed
+/// Recognition accumulates regardless of state, and transfers when claimed.
+fn get_or_create_content_presence(
+    content_id: &str,
+    content_title: &str,
+    author_id: Option<&str>,
+    timestamp: &str,
+) -> ExternResult<String> {
+    // First, check if there's already a presence linked to this content
+    let content_anchor = StringAnchor::new("content_presence", content_id);
+    let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor.clone()))?;
+
+    let query = LinkQuery::try_new(content_anchor_hash.clone(), LinkTypes::ContentToPresence)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        // Presence exists for this content, get its ID
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid presence hash".to_string())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(presence) = record.entry().to_app_option::<ContributorPresence>().ok().flatten() {
+                return Ok(presence.id);
+            }
+        }
+    }
+
+    // No presence exists - create an unclaimed one for this content
+    // Display name comes from author if known, otherwise from content title
+    let display_name = author_id
+        .map(|a| a.to_string())
+        .unwrap_or_else(|| format!("Creator of: {}", content_title));
+
+    // Build external identifiers from author if known
+    let external_ids: HashMap<String, String> = author_id
+        .map(|a| {
+            let mut ids = HashMap::new();
+            ids.insert("source_author_id".to_string(), a.to_string());
+            ids
+        })
+        .unwrap_or_default();
+
+    // Build establishing content list
+    let establishing_content: Vec<String> = vec![content_id.to_string()];
+
+    let presence_id = format!("presence-content-{}", content_id);
+
+    let presence = ContributorPresence {
+        id: presence_id.clone(),
+        display_name,
+        presence_state: "unclaimed".to_string(),
+        external_identifiers_json: serde_json::to_string(&external_ids).unwrap_or_else(|_| "{}".to_string()),
+        establishing_content_ids_json: serde_json::to_string(&establishing_content).unwrap_or_else(|_| "[]".to_string()),
+        established_at: timestamp.to_string(),
+        // Recognition starts at zero
+        affinity_total: 0.0,
+        unique_engagers: 0,
+        citation_count: 0,
+        endorsements_json: "[]".to_string(),
+        recognition_score: 0.0,
+        recognition_by_content_json: "{}".to_string(),
+        accumulating_since: timestamp.to_string(),
+        last_recognition_at: timestamp.to_string(),
+        // No steward yet
+        steward_id: None,
+        stewardship_started_at: None,
+        stewardship_commitment_id: None,
+        stewardship_quality_score: None,
+        // No claim yet
+        claim_initiated_at: None,
+        claim_verified_at: None,
+        claim_verification_method: None,
+        claim_evidence_json: None,
+        claimed_agent_id: None,
+        claim_recognition_transferred_value: None,
+        claim_recognition_transferred_unit: None,
+        claim_facilitated_by: None,
+        invitations_json: "[]".to_string(),
+        note: Some(format!("Auto-created presence for content: {}", content_id)),
+        image: None,
+        metadata_json: "{}".to_string(),
+        created_at: timestamp.to_string(),
+        updated_at: timestamp.to_string(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::ContributorPresence(presence))?;
+
+    // Create content-to-presence link so we find this presence next time
+    create_entry(&EntryTypes::StringAnchor(content_anchor))?;
+    create_link(content_anchor_hash, action_hash.clone(), LinkTypes::ContentToPresence, ())?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("presence_id", &presence_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPresence, ())?;
+
+    // Create state lookup link (unclaimed)
+    let state_anchor = StringAnchor::new("presence_state", "unclaimed");
+    let state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(state_anchor))?;
+    create_link(state_anchor_hash, action_hash, LinkTypes::PresenceByState, ())?;
+
+    Ok(presence_id)
+}
+
+/// Earn points (and trigger recognition flow to contributors)
+#[hdk_extern]
+pub fn earn_points(input: EarnPointsInput) -> ExternResult<EarnPointsResult> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Calculate points
+    let points = get_point_amount(&input.trigger);
+
+    // Create point event (hREA EconomicEvent)
+    let event_id = format!("pe-{}-{}", agent_id, timestamp);
+    let point_event = PointEvent {
+        id: event_id.clone(),
+        agent_id: agent_id.clone(),
+        action: if points >= 0 { "produce".to_string() } else { "consume".to_string() },
+        trigger: input.trigger.clone(),
+        points,
+        content_id: input.content_id.clone(),
+        challenge_id: input.challenge_id.clone(),
+        path_id: input.path_id.clone(),
+        was_correct: input.was_correct,
+        note: input.note,
+        metadata_json: "{}".to_string(),
+        occurred_at: timestamp.clone(),
+    };
+
+    let event_action_hash = create_entry(&EntryTypes::PointEvent(point_event.clone()))?;
+
+    // Create links for the event
+    let agent_events_anchor = StringAnchor::new("agent_points", &agent_id);
+    let agent_events_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_events_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(agent_events_anchor))?;
+    create_link(agent_events_anchor_hash, event_action_hash.clone(), LinkTypes::AgentToPointEvents, ())?;
+
+    if let Some(ref content_id) = input.content_id {
+        let content_events_anchor = StringAnchor::new("content_points", content_id);
+        let content_events_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_events_anchor.clone()))?;
+        create_entry(&EntryTypes::StringAnchor(content_events_anchor))?;
+        create_link(content_events_anchor_hash, event_action_hash.clone(), LinkTypes::ContentToPointEvents, ())?;
+    }
+
+    // Update or create point balance (hREA EconomicResource)
+    let balance_output = update_point_balance(&agent_id, points, &input.trigger, &event_id, &timestamp)?;
+
+    // Flow recognition to contributors (hREA Appreciation)
+    // Recognition ALWAYS flows - ContributorPresence exists for all content,
+    // even when the creator hasn't claimed their presence yet.
+    // This is the key to the stewardship model: recognition accumulates
+    // and transfers when claimed, attesting for humanity.
+    let mut recognition_sent = Vec::new();
+    if let Some(ref content_id) = input.content_id {
+        // Get content to find title and author info
+        if let Some(content_output) = get_content_by_id(QueryByIdInput { id: content_id.clone() })? {
+            let content = content_output.content;
+
+            // Get or create the ContributorPresence for this content
+            // Recognition flows regardless of whether author is "present"
+            let presence_id = get_or_create_content_presence(
+                content_id,
+                &content.title,
+                content.author_id.as_deref(),
+                &timestamp,
+            )?;
+
+            // Flow recognition to the presence (claimed, stewarded, or unclaimed)
+            let recognition = flow_recognition_to_contributor(
+                &presence_id,
+                content_id,
+                &agent_id,
+                &event_id,
+                &input.trigger,
+                points,
+                input.path_id.clone(),
+                input.challenge_id.clone(),
+                &timestamp,
+            )?;
+            recognition_sent.push(recognition);
+        }
+    }
+
+    Ok(EarnPointsResult {
+        point_event: PointEventOutput {
+            action_hash: event_action_hash,
+            event: point_event,
+        },
+        new_balance: balance_output,
+        recognition_sent,
+        points_earned: points,
+    })
+}
+
+/// Update or create point balance
+fn update_point_balance(
+    agent_id: &str,
+    points: i32,
+    trigger: &str,
+    event_id: &str,
+    timestamp: &str,
+) -> ExternResult<LearnerPointBalanceOutput> {
+    let balance_anchor = StringAnchor::new("agent_balance", agent_id);
+    let balance_anchor_hash = hash_entry(&EntryTypes::StringAnchor(balance_anchor.clone()))?;
+
+    let query = LinkQuery::try_new(balance_anchor_hash.clone(), LinkTypes::AgentToPointBalance)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let (existing_balance, existing_action_hash) = if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid balance hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(balance) = rec.entry().to_app_option::<LearnerPointBalance>().ok().flatten() {
+                (Some(balance), Some((action_hash, link.create_link_hash.clone())))
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        }
+    } else {
+        (None, None)
+    };
+
+    // Update points by trigger
+    let mut points_by_trigger: HashMap<String, i64> = match &existing_balance {
+        Some(b) => serde_json::from_str(&b.points_by_trigger_json).unwrap_or_default(),
+        None => HashMap::new(),
+    };
+    *points_by_trigger.entry(trigger.to_string()).or_insert(0) += points as i64;
+
+    let updated_balance = LearnerPointBalance {
+        id: format!("balance-{}", agent_id),
+        agent_id: agent_id.to_string(),
+        total_points: existing_balance.as_ref().map(|b| b.total_points).unwrap_or(0) + points as i64,
+        points_by_trigger_json: serde_json::to_string(&points_by_trigger).unwrap_or_else(|_| "{}".to_string()),
+        total_earned: existing_balance.as_ref().map(|b| b.total_earned).unwrap_or(0) + if points > 0 { points as i64 } else { 0 },
+        total_spent: existing_balance.as_ref().map(|b| b.total_spent).unwrap_or(0) + if points < 0 { points.abs() as i64 } else { 0 },
+        last_point_event_id: Some(event_id.to_string()),
+        last_point_event_at: Some(timestamp.to_string()),
+        created_at: existing_balance.as_ref().map(|b| b.created_at.clone()).unwrap_or_else(|| timestamp.to_string()),
+        updated_at: timestamp.to_string(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::LearnerPointBalance(updated_balance.clone()))?;
+
+    // Update link
+    if let Some((_, old_link_hash)) = existing_action_hash {
+        delete_link(old_link_hash, GetOptions::default())?;
+    } else {
+        create_entry(&EntryTypes::StringAnchor(balance_anchor))?;
+    }
+    create_link(balance_anchor_hash, action_hash.clone(), LinkTypes::AgentToPointBalance, ())?;
+
+    Ok(LearnerPointBalanceOutput {
+        action_hash,
+        balance: updated_balance,
+    })
+}
+
+/// Flow recognition to a contributor (hREA Appreciation)
+fn flow_recognition_to_contributor(
+    contributor_id: &str,
+    content_id: &str,
+    learner_id: &str,
+    appreciation_of_event_id: &str,
+    trigger: &str,
+    learner_points: i32,
+    path_id: Option<String>,
+    challenge_id: Option<String>,
+    timestamp: &str,
+) -> ExternResult<ContributorRecognitionOutput> {
+    // Calculate recognition points (fraction of learner points)
+    let recognition_points = (learner_points.abs() as f64 * 0.2) as i32; // 20% flows to contributor
+
+    // Determine flow type
+    let flow_type = match trigger {
+        "engagement_view" | "engagement_practice" => "content_engagement",
+        "level_up" | "challenge_correct" => "content_mastery",
+        "path_complete" | "path_step_complete" => "path_completion",
+        "discovery" => "discovery_spark",
+        _ => "content_engagement",
+    };
+
+    let recognition_id = format!("recog-{}-{}-{}", contributor_id, learner_id, timestamp);
+
+    let recognition = ContributorRecognition {
+        id: recognition_id,
+        contributor_id: contributor_id.to_string(),
+        content_id: content_id.to_string(),
+        learner_id: learner_id.to_string(),
+        appreciation_of_event_id: appreciation_of_event_id.to_string(),
+        flow_type: flow_type.to_string(),
+        recognition_points,
+        path_id,
+        challenge_id,
+        note: Some(format!("Recognition for {} learning your content", trigger)),
+        occurred_at: timestamp.to_string(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::ContributorRecognition(recognition.clone()))?;
+
+    // Create links
+    let contributor_anchor = StringAnchor::new("contributor_recognition", contributor_id);
+    let contributor_anchor_hash = hash_entry(&EntryTypes::StringAnchor(contributor_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(contributor_anchor))?;
+    create_link(contributor_anchor_hash, action_hash.clone(), LinkTypes::ContributorToRecognition, ())?;
+
+    let content_anchor = StringAnchor::new("content_recognition", content_id);
+    let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(content_anchor))?;
+    create_link(content_anchor_hash, action_hash.clone(), LinkTypes::ContentToRecognition, ())?;
+
+    // Update contributor impact summary
+    update_contributor_impact(contributor_id, recognition_points, content_id, flow_type, timestamp)?;
+
+    Ok(ContributorRecognitionOutput {
+        action_hash,
+        recognition,
+    })
+}
+
+/// Update contributor impact summary
+fn update_contributor_impact(
+    contributor_id: &str,
+    recognition_points: i32,
+    content_id: &str,
+    flow_type: &str,
+    timestamp: &str,
+) -> ExternResult<ContributorImpactOutput> {
+    let impact_anchor = StringAnchor::new("contributor_impact", contributor_id);
+    let impact_anchor_hash = hash_entry(&EntryTypes::StringAnchor(impact_anchor.clone()))?;
+
+    let query = LinkQuery::try_new(impact_anchor_hash.clone(), LinkTypes::ContributorToImpact)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let existing = if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid impact hash".to_string())))?;
+
+        let record = get(action_hash, GetOptions::default())?;
+        if let Some(rec) = record {
+            rec.entry().to_app_option::<ContributorImpact>().ok().flatten()
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Update impact by content
+    let mut impact_by_content: HashMap<String, serde_json::Value> = match &existing {
+        Some(i) => serde_json::from_str(&i.impact_by_content_json).unwrap_or_default(),
+        None => HashMap::new(),
+    };
+    let content_impact = impact_by_content.entry(content_id.to_string()).or_insert(serde_json::json!({
+        "points": 0,
+        "learners": 0,
+        "mastered": 0
+    }));
+    if let Some(obj) = content_impact.as_object_mut() {
+        let current_points = obj.get("points").and_then(|v| v.as_i64()).unwrap_or(0);
+        obj.insert("points".to_string(), serde_json::json!(current_points + recognition_points as i64));
+    }
+
+    // Update impact by flow type
+    let mut impact_by_flow: HashMap<String, i64> = match &existing {
+        Some(i) => serde_json::from_str(&i.impact_by_flow_type_json).unwrap_or_default(),
+        None => HashMap::new(),
+    };
+    *impact_by_flow.entry(flow_type.to_string()).or_insert(0) += recognition_points as i64;
+
+    let is_mastery = flow_type == "content_mastery";
+    let is_discovery = flow_type == "discovery_spark";
+
+    let updated_impact = ContributorImpact {
+        id: format!("impact-{}", contributor_id),
+        contributor_id: contributor_id.to_string(),
+        total_recognition_points: existing.as_ref().map(|i| i.total_recognition_points).unwrap_or(0) + recognition_points as i64,
+        total_learners_reached: existing.as_ref().map(|i| i.total_learners_reached).unwrap_or(0) + 1,
+        total_content_mastered: existing.as_ref().map(|i| i.total_content_mastered).unwrap_or(0) + if is_mastery { 1 } else { 0 },
+        total_discoveries_sparked: existing.as_ref().map(|i| i.total_discoveries_sparked).unwrap_or(0) + if is_discovery { 1 } else { 0 },
+        impact_by_content_json: serde_json::to_string(&impact_by_content).unwrap_or_else(|_| "{}".to_string()),
+        impact_by_flow_type_json: serde_json::to_string(&impact_by_flow).unwrap_or_else(|_| "{}".to_string()),
+        recent_events_json: "[]".to_string(), // Would append recent events
+        created_at: existing.as_ref().map(|i| i.created_at.clone()).unwrap_or_else(|| timestamp.to_string()),
+        updated_at: timestamp.to_string(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::ContributorImpact(updated_impact.clone()))?;
+
+    // Update link
+    let query2 = LinkQuery::try_new(impact_anchor_hash.clone(), LinkTypes::ContributorToImpact)?;
+    let links2 = get_links(query2, GetStrategy::default())?;
+    if let Some(old_link) = links2.first() {
+        delete_link(old_link.create_link_hash.clone(), GetOptions::default())?;
+    } else {
+        create_entry(&EntryTypes::StringAnchor(impact_anchor))?;
+    }
+    create_link(impact_anchor_hash, action_hash.clone(), LinkTypes::ContributorToImpact, ())?;
+
+    Ok(ContributorImpactOutput {
+        action_hash,
+        impact: updated_impact,
+    })
+}
+
+/// Get my point balance
+#[hdk_extern]
+pub fn get_my_point_balance(_: ()) -> ExternResult<Option<LearnerPointBalanceOutput>> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+
+    let balance_anchor = StringAnchor::new("agent_balance", &agent_id);
+    let balance_anchor_hash = hash_entry(&EntryTypes::StringAnchor(balance_anchor))?;
+
+    let query = LinkQuery::try_new(balance_anchor_hash, LinkTypes::AgentToPointBalance)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid balance hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(balance) = rec.entry().to_app_option::<LearnerPointBalance>().ok().flatten() {
+                return Ok(Some(LearnerPointBalanceOutput { action_hash, balance }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Get my point history
+#[hdk_extern]
+pub fn get_my_point_history(_: ()) -> ExternResult<Vec<PointEventOutput>> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+
+    let events_anchor = StringAnchor::new("agent_points", &agent_id);
+    let events_anchor_hash = hash_entry(&EntryTypes::StringAnchor(events_anchor))?;
+
+    let query = LinkQuery::try_new(events_anchor_hash, LinkTypes::AgentToPointEvents)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid event hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(event) = rec.entry().to_app_option::<PointEvent>().ok().flatten() {
+                results.push(PointEventOutput { action_hash, event });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Get contributor dashboard - THE EXCITING VIEW!
+#[hdk_extern]
+pub fn get_contributor_dashboard(contributor_id: String) -> ExternResult<ContributorDashboard> {
+    // Get impact summary
+    let impact_anchor = StringAnchor::new("contributor_impact", &contributor_id);
+    let impact_anchor_hash = hash_entry(&EntryTypes::StringAnchor(impact_anchor))?;
+
+    let query = LinkQuery::try_new(impact_anchor_hash, LinkTypes::ContributorToImpact)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let impact = if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid impact hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            rec.entry().to_app_option::<ContributorImpact>().ok().flatten()
+                .map(|impact| ContributorImpactOutput { action_hash, impact })
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Parse impact by content for the summary
+    let impact_by_content: Vec<ContentImpactSummary> = match &impact {
+        Some(i) => {
+            let map: HashMap<String, serde_json::Value> = serde_json::from_str(&i.impact.impact_by_content_json)
+                .unwrap_or_default();
+            map.into_iter().map(|(content_id, v)| {
+                ContentImpactSummary {
+                    content_id,
+                    recognition_points: v.get("points").and_then(|p| p.as_i64()).unwrap_or(0),
+                    learners_reached: v.get("learners").and_then(|l| l.as_u64()).unwrap_or(0) as u32,
+                    mastery_count: v.get("mastered").and_then(|m| m.as_u64()).unwrap_or(0) as u32,
+                }
+            }).collect()
+        }
+        None => Vec::new(),
+    };
+
+    // Get recent recognition events
+    let recognition_anchor = StringAnchor::new("contributor_recognition", &contributor_id);
+    let recognition_anchor_hash = hash_entry(&EntryTypes::StringAnchor(recognition_anchor))?;
+
+    let recog_query = LinkQuery::try_new(recognition_anchor_hash, LinkTypes::ContributorToRecognition)?;
+    let recog_links = get_links(recog_query, GetStrategy::default())?;
+
+    let mut recent_events = Vec::new();
+    for link in recog_links.iter().take(10) {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid recognition hash".to_string())))?;
+
+        let record = get(action_hash, GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(recognition) = rec.entry().to_app_option::<ContributorRecognition>().ok().flatten() {
+                recent_events.push(RecognitionEventSummary {
+                    learner_id: recognition.learner_id,
+                    content_id: recognition.content_id,
+                    flow_type: recognition.flow_type,
+                    recognition_points: recognition.recognition_points,
+                    occurred_at: recognition.occurred_at,
+                });
+            }
+        }
+    }
+
+    Ok(ContributorDashboard {
+        contributor_id: contributor_id.clone(),
+        total_recognition_points: impact.as_ref().map(|i| i.impact.total_recognition_points).unwrap_or(0),
+        total_learners_reached: impact.as_ref().map(|i| i.impact.total_learners_reached).unwrap_or(0),
+        total_content_mastered: impact.as_ref().map(|i| i.impact.total_content_mastered).unwrap_or(0),
+        total_discoveries_sparked: impact.as_ref().map(|i| i.impact.total_discoveries_sparked).unwrap_or(0),
+        impact_by_content,
+        recent_events,
+        impact,
+    })
+}
+
+/// Get my contributor dashboard (for current agent)
+#[hdk_extern]
+pub fn get_my_contributor_dashboard(_: ()) -> ExternResult<ContributorDashboard> {
+    let agent_info = agent_info()?;
+    let agent_id = agent_info.agent_initial_pubkey.to_string();
+    get_contributor_dashboard(agent_id)
+}
+
+// =============================================================================
+// Lamad: Steward Economy Operations
+// =============================================================================
+//
+// The Steward Economy enables sustainable income for those who care-take the
+// knowledge graph. Stewards may or may not be the original creators - they
+// earn from maintaining, curating, and making knowledge accessible.
+//
+// Key concepts:
+// - StewardCredential: Proof of qualification (mastery, peer attestations, track record)
+// - PremiumGate: Access control with pricing and revenue sharing
+// - AccessGrant: Record of learner gaining access
+// - StewardRevenue: Three-way split (steward, contributor, commons)
+// =============================================================================
+
+/// Output for steward credential
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StewardCredentialOutput {
+    pub action_hash: ActionHash,
+    pub credential: StewardCredential,
+}
+
+/// Output for premium gate
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PremiumGateOutput {
+    pub action_hash: ActionHash,
+    pub gate: PremiumGate,
+}
+
+/// Output for access grant
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AccessGrantOutput {
+    pub action_hash: ActionHash,
+    pub grant: AccessGrant,
+}
+
+/// Output for steward revenue
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StewardRevenueOutput {
+    pub action_hash: ActionHash,
+    pub revenue: StewardRevenue,
+}
+
+/// Input for creating a steward credential
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateStewardCredentialInput {
+    pub steward_presence_id: String,
+    pub tier: String,
+    pub domain_tags: Vec<String>,
+    pub mastery_content_ids: Vec<String>,
+    pub mastery_level_achieved: String,
+    pub peer_attestation_ids: Vec<String>,
+    pub stewarded_presence_ids: Vec<String>,
+    pub stewarded_content_ids: Vec<String>,
+    pub stewarded_path_ids: Vec<String>,
+    pub note: Option<String>,
+}
+
+/// Input for creating a premium gate
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreatePremiumGateInput {
+    pub steward_credential_id: String,
+    pub steward_presence_id: String,
+    pub contributor_presence_id: Option<String>,
+    pub gated_resource_type: String,
+    pub gated_resource_ids: Vec<String>,
+    pub gate_title: String,
+    pub gate_description: String,
+    pub gate_image: Option<String>,
+    pub required_attestations: Vec<RequiredAttestationInput>,
+    pub required_mastery: Vec<RequiredMasteryInput>,
+    pub required_vouches: Option<RequiredVouchesInput>,
+    pub pricing_model: String,
+    pub price_amount: Option<f64>,
+    pub price_unit: Option<String>,
+    pub subscription_period_days: Option<u32>,
+    pub min_amount: Option<f64>,
+    pub steward_share_percent: f64,
+    pub commons_share_percent: f64,
+    pub contributor_share_percent: Option<f64>,
+    pub scholarship_eligible: bool,
+    pub max_scholarships_per_period: Option<u32>,
+    pub scholarship_criteria_json: Option<String>,
+    pub note: Option<String>,
+}
+
+/// Required attestation for gate access
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RequiredAttestationInput {
+    pub attestation_type: String,
+    pub attestation_id: Option<String>,
+}
+
+/// Required mastery for gate access
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RequiredMasteryInput {
+    pub content_id: String,
+    pub min_level: String,
+}
+
+/// Required vouches for gate access
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RequiredVouchesInput {
+    pub min_count: u32,
+    pub from_tier: Option<String>,
+}
+
+/// Input for granting access
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GrantAccessInput {
+    pub gate_id: String,
+    pub grant_type: String,
+    pub granted_via: String,
+    pub payment_amount: Option<f64>,
+    pub payment_unit: Option<String>,
+    pub scholarship_sponsor_id: Option<String>,
+    pub scholarship_reason: Option<String>,
+}
+
+/// Create a steward credential
+#[hdk_extern]
+pub fn create_steward_credential(input: CreateStewardCredentialInput) -> ExternResult<StewardCredentialOutput> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Validate steward tier
+    if !STEWARD_TIERS.contains(&input.tier.as_str()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Invalid steward tier: {}. Must be one of: {:?}", input.tier, STEWARD_TIERS)
+        )));
+    }
+
+    let credential_id = format!("steward-cred-{}-{}", input.steward_presence_id, timestamp);
+
+    let credential = StewardCredential {
+        id: credential_id.clone(),
+        steward_presence_id: input.steward_presence_id.clone(),
+        agent_id: agent_info.agent_initial_pubkey.to_string(),
+        tier: input.tier.clone(),
+        stewarded_presence_ids_json: serde_json::to_string(&input.stewarded_presence_ids).unwrap_or_else(|_| "[]".to_string()),
+        stewarded_content_ids_json: serde_json::to_string(&input.stewarded_content_ids).unwrap_or_else(|_| "[]".to_string()),
+        stewarded_path_ids_json: serde_json::to_string(&input.stewarded_path_ids).unwrap_or_else(|_| "[]".to_string()),
+        mastery_content_ids_json: serde_json::to_string(&input.mastery_content_ids).unwrap_or_else(|_| "[]".to_string()),
+        mastery_level_achieved: input.mastery_level_achieved.clone(),
+        qualification_verified_at: timestamp.clone(),
+        peer_attestation_ids_json: serde_json::to_string(&input.peer_attestation_ids).unwrap_or_else(|_| "[]".to_string()),
+        unique_attester_count: input.peer_attestation_ids.len() as u32,
+        attester_reputation_sum: 0.0,
+        stewardship_quality_score: 0.0,
+        total_learners_served: 0,
+        total_content_improvements: 0,
+        domain_tags_json: serde_json::to_string(&input.domain_tags).unwrap_or_else(|_| "[]".to_string()),
+        is_active: true,
+        deactivation_reason: None,
+        note: input.note,
+        metadata_json: "{}".to_string(),
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::StewardCredential(credential.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("steward_credential_id", &credential_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToStewardCredential, ())?;
+
+    // Create steward presence link
+    let human_anchor = StringAnchor::new("human_credential", &input.steward_presence_id);
+    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(human_anchor))?;
+    create_link(human_anchor_hash, action_hash.clone(), LinkTypes::HumanToCredential, ())?;
+
+    // Create tier lookup link
+    let tier_anchor = StringAnchor::new("credential_tier", &input.tier);
+    let tier_anchor_hash = hash_entry(&EntryTypes::StringAnchor(tier_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(tier_anchor))?;
+    create_link(tier_anchor_hash, action_hash.clone(), LinkTypes::CredentialByTier, ())?;
+
+    // Create domain scope links
+    for domain in &input.domain_tags {
+        let domain_anchor = StringAnchor::new("credential_domain", domain);
+        let domain_anchor_hash = hash_entry(&EntryTypes::StringAnchor(domain_anchor.clone()))?;
+        create_entry(&EntryTypes::StringAnchor(domain_anchor))?;
+        create_link(domain_anchor_hash, action_hash.clone(), LinkTypes::CredentialByDomain, ())?;
+    }
+
+    Ok(StewardCredentialOutput {
+        action_hash,
+        credential,
+    })
+}
+
+/// Get steward credential by ID
+#[hdk_extern]
+pub fn get_steward_credential(credential_id: String) -> ExternResult<Option<StewardCredentialOutput>> {
+    let id_anchor = StringAnchor::new("steward_credential_id", &credential_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToStewardCredential)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid credential hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(credential) = rec.entry().to_app_option::<StewardCredential>().ok().flatten() {
+                return Ok(Some(StewardCredentialOutput { action_hash, credential }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Get steward credentials for a human presence
+#[hdk_extern]
+pub fn get_credentials_for_human(human_presence_id: String) -> ExternResult<Vec<StewardCredentialOutput>> {
+    let human_anchor = StringAnchor::new("human_credential", &human_presence_id);
+    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
+
+    let query = LinkQuery::try_new(human_anchor_hash, LinkTypes::HumanToCredential)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid credential hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(credential) = rec.entry().to_app_option::<StewardCredential>().ok().flatten() {
+                if credential.is_active {
+                    results.push(StewardCredentialOutput { action_hash, credential });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Create a premium gate for content
+#[hdk_extern]
+pub fn create_premium_gate(input: CreatePremiumGateInput) -> ExternResult<PremiumGateOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Validate pricing model
+    if !PRICING_MODELS.contains(&input.pricing_model.as_str()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Invalid pricing model: {}. Must be one of: {:?}", input.pricing_model, PRICING_MODELS)
+        )));
+    }
+
+    // Validate revenue shares sum to 100%
+    let contributor_share = input.contributor_share_percent.unwrap_or(0.0);
+    let total_share = input.steward_share_percent + contributor_share + input.commons_share_percent;
+    if (total_share - 100.0).abs() > 0.01 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Revenue shares must sum to 100%, got {}", total_share)
+        )));
+    }
+
+    // Get first resource ID for the gate ID
+    let first_resource = input.gated_resource_ids.first()
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("At least one gated resource ID required".to_string())))?;
+
+    let gate_id = format!("gate-{}-{}", first_resource, timestamp);
+
+    let gate = PremiumGate {
+        id: gate_id.clone(),
+        steward_credential_id: input.steward_credential_id.clone(),
+        steward_presence_id: input.steward_presence_id.clone(),
+        contributor_presence_id: input.contributor_presence_id.clone(),
+        gated_resource_type: input.gated_resource_type,
+        gated_resource_ids_json: serde_json::to_string(&input.gated_resource_ids).unwrap_or_else(|_| "[]".to_string()),
+        gate_title: input.gate_title,
+        gate_description: input.gate_description,
+        gate_image: input.gate_image,
+        required_attestations_json: serde_json::to_string(&input.required_attestations).unwrap_or_else(|_| "[]".to_string()),
+        required_mastery_json: serde_json::to_string(&input.required_mastery).unwrap_or_else(|_| "[]".to_string()),
+        required_vouches_json: serde_json::to_string(&input.required_vouches).unwrap_or_else(|_| "{}".to_string()),
+        pricing_model: input.pricing_model.clone(),
+        price_amount: input.price_amount,
+        price_unit: input.price_unit,
+        subscription_period_days: input.subscription_period_days,
+        min_amount: input.min_amount,
+        steward_share_percent: input.steward_share_percent,
+        commons_share_percent: input.commons_share_percent,
+        contributor_share_percent: input.contributor_share_percent,
+        scholarship_eligible: input.scholarship_eligible,
+        max_scholarships_per_period: input.max_scholarships_per_period,
+        scholarship_criteria_json: input.scholarship_criteria_json,
+        is_active: true,
+        deactivation_reason: None,
+        total_access_grants: 0,
+        total_revenue_generated: 0.0,
+        total_to_steward: 0.0,
+        total_to_contributor: 0.0,
+        total_to_commons: 0.0,
+        total_scholarships_granted: 0,
+        note: input.note,
+        metadata_json: "{}".to_string(),
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::PremiumGate(gate.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("gate_id", &gate_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToGate, ())?;
+
+    // Create resource lookup links for all gated resources
+    for resource_id in &input.gated_resource_ids {
+        let resource_anchor = StringAnchor::new("resource_gate", resource_id);
+        let resource_anchor_hash = hash_entry(&EntryTypes::StringAnchor(resource_anchor.clone()))?;
+        create_entry(&EntryTypes::StringAnchor(resource_anchor))?;
+        create_link(resource_anchor_hash, action_hash.clone(), LinkTypes::ResourceToGate, ())?;
+    }
+
+    // Create pricing model link
+    let pricing_anchor = StringAnchor::new("gate_pricing", &input.pricing_model);
+    let pricing_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pricing_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(pricing_anchor))?;
+    create_link(pricing_anchor_hash, action_hash.clone(), LinkTypes::GateByPricingModel, ())?;
+
+    // Create steward lookup link
+    let steward_anchor = StringAnchor::new("steward_gates", &input.steward_credential_id);
+    let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(steward_anchor))?;
+    create_link(steward_anchor_hash, action_hash.clone(), LinkTypes::GateBySteward, ())?;
+
+    // Create contributor lookup link if different from steward
+    if let Some(ref contributor_id) = input.contributor_presence_id {
+        let contributor_anchor = StringAnchor::new("contributor_gates", contributor_id);
+        let contributor_anchor_hash = hash_entry(&EntryTypes::StringAnchor(contributor_anchor.clone()))?;
+        create_entry(&EntryTypes::StringAnchor(contributor_anchor))?;
+        create_link(contributor_anchor_hash, action_hash.clone(), LinkTypes::GateByContributor, ())?;
+    }
+
+    Ok(PremiumGateOutput {
+        action_hash,
+        gate,
+    })
+}
+
+/// Get premium gate by ID
+#[hdk_extern]
+pub fn get_premium_gate(gate_id: String) -> ExternResult<Option<PremiumGateOutput>> {
+    let id_anchor = StringAnchor::new("gate_id", &gate_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToGate)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid gate hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(gate) = rec.entry().to_app_option::<PremiumGate>().ok().flatten() {
+                return Ok(Some(PremiumGateOutput { action_hash, gate }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Get gates for a resource
+#[hdk_extern]
+pub fn get_gates_for_resource(resource_id: String) -> ExternResult<Vec<PremiumGateOutput>> {
+    let resource_anchor = StringAnchor::new("resource_gate", &resource_id);
+    let resource_anchor_hash = hash_entry(&EntryTypes::StringAnchor(resource_anchor))?;
+
+    let query = LinkQuery::try_new(resource_anchor_hash, LinkTypes::ResourceToGate)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid gate hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(gate) = rec.entry().to_app_option::<PremiumGate>().ok().flatten() {
+                if gate.is_active {
+                    results.push(PremiumGateOutput { action_hash, gate });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Grant access through a gate
+#[hdk_extern]
+pub fn grant_access(input: GrantAccessInput) -> ExternResult<AccessGrantOutput> {
+    let agent_info = agent_info()?;
+    let learner_id = agent_info.agent_initial_pubkey.to_string();
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get the gate
+    let gate = get_premium_gate(input.gate_id.clone())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Gate not found".to_string())))?;
+
+    // Validate access type
+    if !ACCESS_GRANT_TYPES.contains(&input.grant_type.as_str()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Invalid grant type: {}. Must be one of: {:?}", input.grant_type, ACCESS_GRANT_TYPES)
+        )));
+    }
+
+    let grant_id = format!("grant-{}-{}-{}", input.gate_id, learner_id, timestamp);
+
+    // Calculate expiration based on subscription period if applicable
+    let valid_until = match input.grant_type.as_str() {
+        "subscription" => {
+            let days = gate.gate.subscription_period_days.unwrap_or(30);
+            Some(format!("{}+{}d", timestamp, days))
+        }
+        _ => None,
+    };
+
+    let grant = AccessGrant {
+        id: grant_id.clone(),
+        gate_id: input.gate_id.clone(),
+        learner_agent_id: learner_id.clone(),
+        grant_type: input.grant_type.clone(),
+        granted_via: input.granted_via.clone(),
+        payment_event_id: None,
+        payment_amount: input.payment_amount,
+        payment_unit: input.payment_unit.clone(),
+        scholarship_sponsor_id: input.scholarship_sponsor_id.clone(),
+        scholarship_reason: input.scholarship_reason.clone(),
+        granted_at: timestamp.clone(),
+        valid_until,
+        renewal_due_at: None,
+        is_active: true,
+        revoked_at: None,
+        revoke_reason: None,
+        metadata_json: "{}".to_string(),
+        created_at: timestamp.clone(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::AccessGrant(grant.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("grant_id", &grant_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToAccessGrant, ())?;
+
+    // Create learner lookup link
+    let learner_anchor = StringAnchor::new("learner_grants", &learner_id);
+    let learner_anchor_hash = hash_entry(&EntryTypes::StringAnchor(learner_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(learner_anchor))?;
+    create_link(learner_anchor_hash, action_hash.clone(), LinkTypes::LearnerToGrant, ())?;
+
+    // Create gate lookup link
+    let gate_anchor = StringAnchor::new("gate_grants", &input.gate_id);
+    let gate_anchor_hash = hash_entry(&EntryTypes::StringAnchor(gate_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(gate_anchor))?;
+    create_link(gate_anchor_hash, action_hash.clone(), LinkTypes::GateToGrant, ())?;
+
+    // Create grant type link
+    let type_anchor = StringAnchor::new("grant_type", &input.grant_type);
+    let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(type_anchor))?;
+    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::GrantByType, ())?;
+
+    // If there was payment, create revenue record
+    if let Some(amount) = input.payment_amount {
+        if amount > 0.0 {
+            create_steward_revenue(&gate.gate, &grant_id, &learner_id, amount, input.payment_unit.as_deref(), &timestamp)?;
+        }
+    }
+
+    Ok(AccessGrantOutput {
+        action_hash,
+        grant,
+    })
+}
+
+/// Create steward revenue record (internal function)
+fn create_steward_revenue(
+    gate: &PremiumGate,
+    grant_id: &str,
+    learner_id: &str,
+    gross_amount: f64,
+    payment_unit: Option<&str>,
+    timestamp: &str,
+) -> ExternResult<StewardRevenueOutput> {
+    // Calculate three-way split
+    let steward_amount = gross_amount * (gate.steward_share_percent / 100.0);
+    let contributor_share = gate.contributor_share_percent.unwrap_or(0.0);
+    let contributor_amount = gross_amount * (contributor_share / 100.0);
+    let commons_amount = gross_amount * (gate.commons_share_percent / 100.0);
+
+    let revenue_id = format!("revenue-{}-{}", grant_id, timestamp);
+    let payment_unit_str = payment_unit.unwrap_or("elohim-credit");
+
+    // Create placeholder economic event IDs (would be linked to actual Shefa events)
+    let steward_economic_event_id = format!("econ-steward-{}", revenue_id);
+    let contributor_economic_event_id = if gate.contributor_presence_id.is_some() && contributor_amount > 0.0 {
+        Some(format!("econ-contributor-{}", revenue_id))
+    } else {
+        None
+    };
+    let commons_economic_event_id = format!("econ-commons-{}", revenue_id);
+
+    let revenue = StewardRevenue {
+        id: revenue_id.clone(),
+        access_grant_id: grant_id.to_string(),
+        gate_id: gate.id.clone(),
+        from_learner_id: learner_id.to_string(),
+        to_steward_presence_id: gate.steward_presence_id.clone(),
+        to_contributor_presence_id: gate.contributor_presence_id.clone(),
+        gross_amount,
+        payment_unit: payment_unit_str.to_string(),
+        steward_amount,
+        contributor_amount,
+        commons_amount,
+        steward_economic_event_id,
+        contributor_economic_event_id,
+        commons_economic_event_id,
+        status: "completed".to_string(),
+        completed_at: Some(timestamp.to_string()),
+        failure_reason: None,
+        note: None,
+        metadata_json: "{}".to_string(),
+        created_at: timestamp.to_string(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::StewardRevenue(revenue.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("revenue_id", &revenue_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToStewardRevenue, ())?;
+
+    // Create steward revenue link (using steward_presence_id for lookup)
+    let steward_anchor = StringAnchor::new("steward_revenue", &gate.steward_presence_id);
+    let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(steward_anchor))?;
+    create_link(steward_anchor_hash, action_hash.clone(), LinkTypes::StewardToRevenue, ())?;
+
+    // Create contributor revenue link if applicable
+    if let Some(ref contributor_id) = gate.contributor_presence_id {
+        let contributor_anchor = StringAnchor::new("contributor_revenue", contributor_id);
+        let contributor_anchor_hash = hash_entry(&EntryTypes::StringAnchor(contributor_anchor.clone()))?;
+        create_entry(&EntryTypes::StringAnchor(contributor_anchor))?;
+        create_link(contributor_anchor_hash, action_hash.clone(), LinkTypes::ContributorToRevenue, ())?;
+    }
+
+    Ok(StewardRevenueOutput {
+        action_hash,
+        revenue,
+    })
+}
+
+/// Check if a learner has access to a gated resource
+#[hdk_extern]
+pub fn check_access(gate_id: String) -> ExternResult<Option<AccessGrantOutput>> {
+    let agent_info = agent_info()?;
+    let learner_id = agent_info.agent_initial_pubkey.to_string();
+
+    let learner_anchor = StringAnchor::new("learner_grants", &learner_id);
+    let learner_anchor_hash = hash_entry(&EntryTypes::StringAnchor(learner_anchor))?;
+
+    let query = LinkQuery::try_new(learner_anchor_hash, LinkTypes::LearnerToGrant)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid grant hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(grant) = rec.entry().to_app_option::<AccessGrant>().ok().flatten() {
+                if grant.gate_id == gate_id && grant.is_active {
+                    // TODO: Check expiration
+                    return Ok(Some(AccessGrantOutput { action_hash, grant }));
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Get my access grants
+#[hdk_extern]
+pub fn get_my_access_grants(_: ()) -> ExternResult<Vec<AccessGrantOutput>> {
+    let agent_info = agent_info()?;
+    let learner_id = agent_info.agent_initial_pubkey.to_string();
+
+    let learner_anchor = StringAnchor::new("learner_grants", &learner_id);
+    let learner_anchor_hash = hash_entry(&EntryTypes::StringAnchor(learner_anchor))?;
+
+    let query = LinkQuery::try_new(learner_anchor_hash, LinkTypes::LearnerToGrant)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid grant hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(grant) = rec.entry().to_app_option::<AccessGrant>().ok().flatten() {
+                if grant.is_active {
+                    results.push(AccessGrantOutput { action_hash, grant });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Steward revenue summary
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StewardRevenueSummary {
+    pub steward_presence_id: String,
+    pub total_revenue: f64,
+    pub total_grants: u32,
+    pub revenue_by_gate: Vec<GateRevenueSummary>,
+}
+
+/// Revenue summary per gate
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GateRevenueSummary {
+    pub gate_id: String,
+    pub gate_title: String,
+    pub total_revenue: f64,
+    pub grant_count: u32,
+}
+
+/// Get steward revenue summary
+#[hdk_extern]
+pub fn get_steward_revenue_summary(steward_presence_id: String) -> ExternResult<StewardRevenueSummary> {
+    let steward_anchor = StringAnchor::new("steward_revenue", &steward_presence_id);
+    let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor))?;
+
+    let query = LinkQuery::try_new(steward_anchor_hash, LinkTypes::StewardToRevenue)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut total_revenue = 0.0;
+    let mut revenue_by_gate: HashMap<String, (String, f64, u32)> = HashMap::new();
+
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid revenue hash".to_string())))?;
+
+        let record = get(action_hash, GetOptions::default())?;
+        if let Some(rec) = record {
+            if let Some(revenue) = rec.entry().to_app_option::<StewardRevenue>().ok().flatten() {
+                total_revenue += revenue.steward_amount;
+
+                let entry = revenue_by_gate.entry(revenue.gate_id.clone())
+                    .or_insert((revenue.gate_id.clone(), 0.0, 0));
+                entry.1 += revenue.steward_amount;
+                entry.2 += 1;
+            }
+        }
+    }
+
+    let revenue_summaries: Vec<GateRevenueSummary> = revenue_by_gate.into_iter()
+        .map(|(gate_id, (_, total, count))| GateRevenueSummary {
+            gate_id: gate_id.clone(),
+            gate_title: gate_id, // Would look up actual name
+            total_revenue: total,
+            grant_count: count,
+        })
+        .collect();
+
+    Ok(StewardRevenueSummary {
+        steward_presence_id,
+        total_revenue,
+        total_grants: revenue_summaries.iter().map(|g| g.grant_count).sum(),
+        revenue_by_gate: revenue_summaries,
+    })
 }

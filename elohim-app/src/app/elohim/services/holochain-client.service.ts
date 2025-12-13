@@ -298,20 +298,40 @@ export class HolochainClientService {
       // Store credentials for persistence (optional)
       this.storeSigningCredentials({ capSecret, keyPair, signingKey });
 
-      // Step 8: Attach app interface and get issued token
-      const { port: appPort } = await adminWs.attachAppInterface({
-        allowed_origins: this.config.origin,
-      });
+      // Step 8: Find or create app interface
+      // First check for existing app interfaces to avoid creating duplicates
+      const existingInterfaces = await adminWs.listAppInterfaces();
+      let appPort: number;
 
+      if (existingInterfaces.length > 0) {
+        // Use the first existing app interface
+        appPort = existingInterfaces[0].port;
+        console.log(`[Holochain] Using existing app interface on port ${appPort}`);
+      } else {
+        // No existing interface, create one
+        const { port } = await adminWs.attachAppInterface({
+          allowed_origins: this.config.origin,
+        });
+        appPort = port;
+        console.log(`[Holochain] Created new app interface on port ${appPort}`);
+      }
+
+      // Step 9: Authorize signing credentials for the cell
+      await adminWs.authorizeSigningCredentials(cellId);
+      console.log('[Holochain] Signing credentials authorized');
+
+      // Step 10: Get app authentication token
       const issuedToken = await adminWs.issueAppAuthenticationToken({
         installed_app_id: this.config.appId,
+        single_use: false,
+        expiry_seconds: 3600, // 1 hour
       });
 
-      // Step 9: Connect to App WebSocket
+      // Step 11: Connect to App WebSocket
       // In Che: routes through dev-proxy path-based URL
       // Local: connects directly to localhost:port
       const appUrl = this.resolveAppUrl(appPort);
-      console.log('Connecting to app interface:', appUrl);
+      console.log('[Holochain] Connecting to app interface:', appUrl);
 
       const appWs = await AppWebsocket.connect({
         url: new URL(appUrl),
@@ -364,10 +384,51 @@ export class HolochainClientService {
   }
 
   /**
-   * Make a zome call
+   * Wait for connection to be established (with timeout).
+   * Returns true if connected, false if timed out.
+   */
+  async waitForConnection(timeoutMs: number = 10000): Promise<boolean> {
+    const startTime = Date.now();
+    const pollInterval = 100;
+
+    while (Date.now() - startTime < timeoutMs) {
+      const { state, appWs, cellId } = this.connectionSignal();
+
+      if (state === 'connected' && appWs && cellId) {
+        return true;
+      }
+
+      if (state === 'error') {
+        return false;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+
+    return false;
+  }
+
+  /**
+   * Make a zome call (waits for connection if not yet established)
    */
   async callZome<T>(input: ZomeCallInput): Promise<ZomeCallResult<T>> {
-    const { appWs, cellId } = this.connectionSignal();
+    let { appWs, cellId, state } = this.connectionSignal();
+
+    // If not connected yet, wait for connection
+    if (!appWs || !cellId) {
+      if (state === 'connecting' || state === 'authenticating' || state === 'disconnected') {
+        console.log('[HolochainClient] Waiting for connection before zome call...');
+        const connected = await this.waitForConnection();
+        if (!connected) {
+          return {
+            success: false,
+            error: 'Connection timed out',
+          };
+        }
+        // Re-read connection state after waiting
+        ({ appWs, cellId } = this.connectionSignal());
+      }
+    }
 
     if (!appWs || !cellId) {
       return {
@@ -413,15 +474,17 @@ export class HolochainClientService {
 
   /**
    * Extract cell ID from app info
+   *
+   * Holochain cell_info structure (0.6.x):
+   * { "role_name": [{ type: "provisioned", value: { cell_id: {...} } }] }
    */
   private extractCellId(appInfo: AppInfo): CellId | null {
-    // Look for the first provisioned cell
     const cellInfoEntries = Object.entries(appInfo.cell_info);
     for (const [, cells] of cellInfoEntries) {
-      const cellArray = cells as Array<{ provisioned?: { cell_id: CellId } }>;
+      const cellArray = cells as Array<{ type: string; value: { cell_id: CellId } }>;
       for (const cell of cellArray) {
-        if (cell.provisioned) {
-          return cell.provisioned.cell_id;
+        if (cell.type === 'provisioned' && cell.value?.cell_id) {
+          return cell.value.cell_id;
         }
       }
     }

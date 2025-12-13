@@ -5,7 +5,6 @@ export const environment = {
   logLevel: 'debug' as LogLevel,
   environment: 'alpha',
   gitHash: 'GIT_HASH_PLACEHOLDER',
-  useKuzuDb: true,
   // Holochain Edge Node configuration
   // Single proxy URL handles admin operations with authentication
   holochain: {

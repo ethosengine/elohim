@@ -712,8 +712,479 @@ The Admin Proxy handles Stage 2 security by:
 - Audit logging all actions
 - Rate limiting abuse
 
+## Lessons Learned
+
+### Passphrase Handling for `--in-process-lair`
+
+The lair keystore requires an interactive TTY for passphrase input. When running `hc sandbox generate --in-process-lair` in the background, stdin gets disconnected causing:
+
+```
+Error: No such device or address (os error 6)
+```
+
+**Solution**: Use `socat` with PTY options to create a pseudo-terminal:
+
+```bash
+# Create wrapper script
+cat > /tmp/hc_wrapper.sh << 'EOF'
+#!/bin/bash
+exec hc sandbox generate --app-id myapp --in-process-lair -r=4445 /path/to/app.happ
+EOF
+chmod +x /tmp/hc_wrapper.sh
+
+# Run with socat providing PTY and passphrase
+nohup sh -c '(echo "test"; sleep infinity) | socat - EXEC:/tmp/hc_wrapper.sh,pty,setsid,ctty' > sandbox.log 2>&1 &
+```
+
+Key points:
+- `pty,setsid,ctty` options make socat create a proper PTY
+- `(echo "test"; sleep infinity)` provides passphrase then keeps stdin open
+- Use `grep -a` to parse logs with null bytes from PTY
+
+### Link-Based Lookups vs query()
+
+The HDK `query()` function filters the local source chain, not the DHT. To find all entries of a type across the network, use **link-based lookups via anchors**:
+
+```rust
+// Create a global anchor when creating paths
+let anchor = StringAnchor::new("all_paths", "index");
+let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+create_link(anchor_hash, path_hash, LinkTypes::IdToPath, ())?;
+
+// Query via anchor, not query()
+let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToPath)?;
+let links = get_links(query, GetStrategy::default())?;
+```
+
+### Seeder Idempotency
+
+Always check if content/paths exist before creating to avoid duplicates:
+
+```typescript
+// Check before create
+const existing = await appWs.callZome({
+  cell_id: cellId,
+  zome_name: 'content_store',
+  fn_name: 'get_content_by_id',
+  payload: { id: content.id },
+});
+
+if (existing) {
+  console.log('Already exists, skipping');
+  continue;
+}
+```
+
+### Fixing Bad Data in Immutable DHT
+
+Holochain entries are immutable. To "fix" data with wrong references:
+
+1. **Delete links** (not entries) to make old data unreachable
+2. **Create new entry** with correct data
+3. **Create new links** pointing to the new entry
+
+```rust
+// delete_link requires GetOptions in HDK 0.6.0
+delete_link(link.create_link_hash, GetOptions::default())?;
+```
+
+### Pattern Matching for Path Steps
+
+When seeding learning paths, use ID substring matching rather than exact content_type:
+
+```typescript
+// Find content by ID pattern (substring match)
+const findContentByPattern = (pattern: string): string | null => {
+  const match = allContent.find(c =>
+    c.content.id.toLowerCase().includes(pattern.toLowerCase())
+  );
+  return match ? match.content.id : null;
+};
+
+// Step definition uses pattern
+{ id_pattern: 'manifesto', step_type: 'read', title: 'Read the Manifesto' }
+// Matches: elohim-protocol-manifesto-d1768814832f
+```
+
+### Process Management
+
+**Killing dev-proxy**: `pkill -f 'node.*dev-proxy'` may not match. Use port-based:
+
+```bash
+fuser -k 8888/tcp 2>/dev/null
+```
+
+**Graceful port conflict handling** in dev-proxy:
+
+```typescript
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${port} already in use`);
+    process.exit(1);
+  }
+});
+```
+
+### NPM Scripts for Holochain Dev Stack
+
+```json
+{
+  "hc:start": "./scripts/hc-start.sh",
+  "hc:stop": "pkill -f 'holochain.*conductor' ; fuser -k 8888/tcp 2>/dev/null ; echo 'Stopped'",
+  "hc:reset": "npm run hc:stop && rm -rf ../holochain/local-dev/.hc* && echo 'Cleared sandbox data'"
+}
+```
+
+### Automated Startup Script Pattern
+
+The `hc-start.sh` script handles:
+1. Check if hApp exists, build if not
+2. Check if conductor already running (idempotent)
+3. Start sandbox with socat passphrase handling
+4. Wait for conductor ready (poll for `admin_port` in log)
+5. Start dev-proxy with dynamic admin port
+6. Run seeder (idempotent, auto-fixes placeholder IDs)
+
+## Domain Model Architecture: Shefa / Lamad Separation
+
+The Elohim Protocol maintains a clean separation between the **generalizable economic substrate** (Shefa) and **domain-specific implementations** (like Lamad for learning).
+
+### Shefa: hREA Economic Substrate
+
+Shefa is the **domain-agnostic economic layer** based on [hREA (Holochain Resource-Event-Agent)](https://github.com/h-REA/hREA). It provides primitives that ANY domain can compose:
+
+```
+Shefa Primitives (Domain-Agnostic)
+───────────────────────────────────
+EconomicEvent      - Something happened (produce, consume, transfer)
+EconomicResource   - Accumulated value (balances, inventories)
+Appreciation       - Recognition flowing between agents
+ContributorPresence - Identity that can accumulate recognition (claimed/unclaimed/stewarded)
+Process            - Multi-step economic activity
+Intent             - Desire to do something economically
+Commitment         - Promise to fulfill an intent
+Claim              - Assertion of a future event
+Settlement         - Resolution of a claim
+```
+
+**Key principle**: Shefa types have NO domain-specific fields. They are pure hREA.
+
+### Lamad: Learning Domain Implementation
+
+Lamad is a **learning platform that composes Shefa primitives**. It demonstrates how domain-specific applications use the economic substrate:
+
+```
+Lamad Type                    →  Composes Shefa Primitive
+─────────────────────────────────────────────────────────
+LamadPointTriggers            →  Triggers for EconomicEvents
+LamadPointEvent               →  Learning-specific EconomicEvent
+LearnerPointBalance           →  Learning-specific EconomicResource
+LamadContributorRecognition   →  Learning-specific Appreciation
+LamadContributorDashboard     →  Aggregation view over hREA flows
+ContentMastery                →  (Lamad-native, not Shefa-derived)
+PracticePool, MasteryChallenge →  (Lamad-native learning mechanics)
+```
+
+### Why This Separation Matters
+
+1. **Extensibility**: Other domains can use Shefa without learning concepts:
+   - Marketplace: `SellerDashboard`, `BuyerJourney`
+   - Care Network: `CaregiverImpact`, `CareRecipientJourney`
+   - Commons: `StewardDashboard`, `ResourceHealthView`
+
+2. **No Pollution**: Shefa stays pure hREA. Adding a new domain never requires changing Shefa.
+
+3. **Composability**: A single user could participate in multiple domains (learning + marketplace + care network), all sharing the same ContributorPresence and economic history.
+
+4. **Standards Compliance**: Shefa can evolve toward full hREA/ValueFlows compatibility.
+
+### SDK Organization
+
+**Types** (`holochain/sdk/src/types.ts`):
+```
+// Shefa sections (domain-agnostic)
+Shefa: Economic Event Types
+Shefa: Economic Resource Types
+Shefa: Contributor Presence Types
+Shefa: Process Types
+Shefa: Intent Types
+Shefa: Commitment Types
+Shefa: Appreciation Types
+Shefa: Claim & Settlement Types
+
+// Lamad section (learning-specific)
+Lamad: Learning Economy (uses Shefa hREA primitives)
+  - LamadPointTriggers, LamadPointEvent, etc.
+  - LamadContributorDashboard, LamadContributorImpact, etc.
+```
+
+**Zome Client** (`holochain/sdk/src/client/zome-client.ts`):
+```
+// Shefa methods
+createEconomicEvent(), createEconomicResource(), createAppreciation()
+
+// Lamad methods (clearly namespaced)
+earnLamadPoints(), getMyLamadPointBalance(), getLamadContributorDashboard()
+```
+
+### Adding a New Domain
+
+To add a new domain (e.g., "Mercado" for marketplace):
+
+1. **Create domain types** in `types.ts`:
+   ```typescript
+   // Mercado: Marketplace Economy (uses Shefa hREA primitives)
+   export interface MercadoTransaction { ... }  // → EconomicEvent
+   export interface MercadoInventory { ... }    // → EconomicResource
+   export interface MercadoSellerDashboard { ... } // Aggregation
+   ```
+
+2. **Add zome functions** with domain prefix:
+   ```rust
+   pub fn create_mercado_listing(...) -> ExternResult<...>
+   pub fn get_mercado_seller_dashboard(...) -> ExternResult<...>
+   ```
+
+3. **Add client methods** with domain prefix:
+   ```typescript
+   async createMercadoListing(): Promise<...>
+   async getMercadoSellerDashboard(): Promise<...>
+   ```
+
+Shefa primitives remain unchanged. The new domain simply composes them.
+
+### ContributorPresence: The Recognition Bridge
+
+`ContributorPresence` is special - it's Shefa (domain-agnostic) but enables recognition to flow across ALL domains:
+
+```
+Learner earns points (Lamad)
+    │
+    ▼
+ContributorPresence accumulates recognition (Shefa)
+    │
+    ├── LamadContributorDashboard shows learning impact
+    ├── MercadoSellerDashboard shows marketplace impact (future)
+    └── CaregiverDashboard shows care network impact (future)
+```
+
+Same contributor, unified identity, multi-domain recognition.
+
+## Angular App: Lamad Learner Implementation
+
+The Lamad learning system is fully wired from Holochain zomes through to Angular services. This includes content mastery tracking, practice pools, mastery challenges, and learning points.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Domain Services (lamad/services/)                          │
+│  ContentMasteryService, PracticeService, PointsService      │
+├─────────────────────────────────────────────────────────────┤
+│  Backend Layer (elohim/services/)                           │
+│  LearnerBackendService → HolochainClientService             │
+├─────────────────────────────────────────────────────────────┤
+│  Zome (content_store)                                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Files
+
+**Backend Service** (`elohim/services/learner-backend.service.ts`):
+- Low-level zome call wrappers for mastery, practice pools, challenges, points
+- Returns `null` on errors (graceful degradation)
+- No caching at this layer
+
+**Domain Services** (`lamad/services/`):
+- `ContentMasteryService` - Bloom's taxonomy mastery tracking with dual backend (localStorage + Holochain)
+- `PracticeService` - Khan Academy-style practice pool and challenge management
+- `PointsService` - Learning economy with Shefa integration
+
+**Models** (`lamad/models/`):
+- `content-mastery.model.ts` - Mastery types, wire format types (`*Wire` suffix), transformers
+- `practice.model.ts` - Practice pool, mastery challenge, challenge response types
+- `learning-points.model.ts` - Point balance, events, contributor recognition (wire format)
+- `mastery-visualization.ts` - UI constants (colors, icons, labels) for Bloom's levels
+
+### Naming Conventions
+
+- **Wire format types**: Use snake_case fields, suffixed with `Wire` (e.g., `ContentMasteryWire`, `LamadContributorRecognitionWire`)
+- **App format types**: Use camelCase fields, no suffix (e.g., `ContentMastery`, `LamadContributorRecognition`)
+- **Mastery-specific types**: Prefixed with `Mastery` to avoid collision with governance types (e.g., `MasteryChallengeState`, `MasteryChallengeResponse`)
+- **Lamad-specific types**: Prefixed with `Lamad` to avoid collision with generic Shefa types (e.g., `LamadRecognitionFlowType`)
+
+### Dual Backend Migration Path
+
+The system supports progressive onboarding:
+
+1. **Visitor mode**: localStorage via `LocalSourceChainService` (no account needed)
+2. **Hosted account**: Migration to Holochain DHT via `migrateToBackend()`
+3. **Native mode**: Full Holochain experience
+
+```typescript
+// ContentMasteryService backend selection
+private get storageBackend(): 'local' | 'holochain' {
+  return this.backend.isAvailable() ? 'holochain' : 'local';
+}
+```
+
+### UI Components (Future)
+
+The services are ready to support these components:
+- `MasteryBadgeComponent` - Shows mastery level icon/color
+- `MasteryGridComponent` - Khan Academy-style grid for path mastery
+- `PracticePoolComponent` - Practice rotation and recommendations
+- `ChallengeFlowComponent` - Start → Questions → Results
+- `PointsBalanceComponent` - Header widget showing points
+
+## Angular App: Economic Attribution & Steward Economy
+
+The Shefa economic substrate and Lamad steward economy are wired from Holochain zomes through to Angular services. **These services are ready for component development.**
+
+### What You Can Build With These Services
+
+**Track Value Flows:**
+```typescript
+// Get all economic events for an agent
+economicService.getEventsForAgent('agent-id', 'both').subscribe(events => {
+  // Display timeline of value flows (produce, consume, transfer, etc.)
+});
+
+// Get recognition received by a contributor
+appreciationService.getAppreciationsFor('contributor-id').subscribe(appreciations => {
+  // Show appreciation messages and quantities
+});
+```
+
+**Build Contributor Dashboards:**
+```typescript
+// Get contributor's aggregated impact
+contributorService.getDashboard('contributor-id').subscribe(dashboard => {
+  // dashboard.totalRecognitionPoints - total points earned
+  // dashboard.totalLearnersReached - unique learners who engaged
+  // dashboard.impactByContent - breakdown by content piece
+  // dashboard.recentEvents - recognition timeline
+});
+```
+
+**Implement Monetization:**
+```typescript
+// Create a steward credential (curator, expert, etc.)
+stewardService.createCredential({
+  tier: 'curator',
+  stewardedContentIds: ['content-1', 'content-2'],
+}).subscribe(credential => { ... });
+
+// Gate content with revenue sharing
+stewardService.createGate({
+  credentialId: credential.id,
+  gatedResourceIds: ['premium-content-id'],
+  pricingModel: 'subscription',
+  priceAmount: 10,
+  stewardSharePercent: 40,
+  contributorSharePercent: 40,
+  commonsSharePercent: 20,
+}).subscribe(gate => { ... });
+
+// Check if learner has access
+stewardService.checkAccess('gate-id').subscribe(grant => {
+  if (grant) { /* show content */ }
+  else { /* show purchase option */ }
+});
+```
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Shefa Services (shefa/services/) - Domain-Agnostic             │
+│  EconomicService, AppreciationService                           │
+├─────────────────────────────────────────────────────────────────┤
+│  Lamad Services (lamad/services/) - Learning-Specific           │
+│  ContributorService, StewardService                             │
+├─────────────────────────────────────────────────────────────────┤
+│  HolochainClientService → Holochain Conductor → DHT             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Available Services
+
+**Shefa (Domain-Agnostic)** - `elohim-app/src/app/shefa/services/`
+
+| Service | What You Can Do |
+|---------|-----------------|
+| `EconomicService` | Query economic events by agent or action type, create new events |
+| `AppreciationService` | Query recognition given/received, create appreciation records |
+
+**Lamad (Learning-Specific)** - `elohim-app/src/app/lamad/services/`
+
+| Service | What You Can Do |
+|---------|-----------------|
+| `ContributorService` | Get contributor dashboards, impact metrics, recognition history |
+| `StewardService` | Create/query credentials and gates, check/grant access, get revenue reports |
+
+### Steward Economy Types
+Location: `elohim-app/src/app/lamad/models/steward-economy.model.ts`
+
+- `StewardTier`: 'caretaker' | 'curator' | 'expert' | 'pioneer'
+- `PricingModel`: 'one_time' | 'subscription' | 'pay_what_you_can' | 'free_with_attribution' | 'commons_sponsored'
+- `GrantType`: 'lifetime' | 'subscription' | 'scholarship' | 'creator_gift'
+- `StewardCredential`, `PremiumGate`, `AccessGrant`, `StewardRevenue`
+- `LamadContributorDashboard`, `LamadContributorImpact`, `LamadContributorRecognition`
+
+### Existing Dashboard
+
+The `/shefa` route has a working economic dashboard (`shefa-home.component.ts`) showing:
+- Connection status, stats grid, recent events, recent appreciations
+- Demo data fallback when Holochain not connected
+- Good reference for how to consume these services
+
+### Components to Build
+
+These services are ready for:
+- `ContributorDashboardComponent` - Full contributor impact view
+- `StewardCredentialFormComponent` - Create/edit credentials
+- `PremiumGateFormComponent` - Configure gates with pricing
+- `GatedContentWrapperComponent` - Access control for content
+- `AccessPurchaseComponent` - Purchase flow for gated content
+- `RevenueReportComponent` - Revenue breakdown visualization
+
+## Vertical Integration Status
+
+All three verticals are now complete and integrated:
+
+| Vertical | Status | Documentation |
+|----------|--------|---------------|
+| 1. Human Identity | **COMPLETE** | `elohim-app/src/app/imagodei/claude.md` |
+| 2. Lamad Learner | **COMPLETE** | `elohim-app/src/app/lamad/BLOOM-MASTERY-DESIGN.md` |
+| 3. Economic Attribution | **COMPLETE** | `elohim-app/src/app/elohim/models/` |
+
+### Integration Points Wired
+
+1. **Identity → Learner**: Points earned by identified user (via agent public key)
+2. **Identity → Attribution**: Recognition flows to ContributorPresence
+3. **Learner → Attribution**: `earn_points()` automatically sends recognition to contributors
+4. **All → Auth**: All services check `HolochainClientService.isConnected()`
+
+### Build Status
+
+- **elohim-app TypeScript**: Passes (CSS budget warnings, CommonJS dependency notes)
+- **Holochain DNA WASM**: Passes (1 unused assignment warning in `lib.rs:5468`)
+
+### Known Limitations (Phase 2 Work)
+
+- **App interface proxy**: Phase 1 (admin) works in Che; Phase 2 (app interface for zome calls) pending
+- **Type codegen**: SDK types maintained manually; ts-rs suggested for auto-generation
+- **Node operator detection**: Uses localStorage flag; future: DHT query
+
 ## Related Files
 
 - `elohim-app/src/app/elohim/services/holochain-client.service.ts` - Client service
+- `elohim-app/src/app/elohim/services/learner-backend.service.ts` - Lamad zome call wrappers
 - `elohim-app/src/app/elohim/models/holochain-connection.model.ts` - Types
 - `elohim-app/src/environments/environment*.ts` - Endpoint configuration
+- `elohim-app/scripts/hc-start.sh` - Automated dev stack startup
+- `holochain/seeder/src/seed.ts` - Content and path seeder
+- `holochain/dev-proxy/src/index.ts` - WebSocket proxy for Che
+- `holochain/sdk/src/types.ts` - SDK type definitions (Shefa + Lamad)
+- `holochain/sdk/src/client/zome-client.ts` - Zome client with domain-namespaced methods

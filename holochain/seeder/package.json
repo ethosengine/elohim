@@ -1,0 +1,19 @@
+{
+  "name": "holochain-seeder",
+  "version": "1.0.0",
+  "description": "Seed content data from /data/content into Holochain",
+  "type": "module",
+  "scripts": {
+    "seed": "npx tsx src/seed.ts",
+    "seed:sample": "npx tsx src/seed.ts --limit 10"
+  },
+  "dependencies": {
+    "@holochain/client": "^0.19.2",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -5,9 +5,6 @@ export const environment = {
   logLevel: 'debug' as LogLevel,
   environment: 'development',
   gitHash: 'local-dev',
-  // Use Kuzu WASM embedded graph database
-  // Loaded via script tag injection from /assets/wasm/kuzu-wasm.js
-  useKuzuDb: true,
   // Holochain Edge Node configuration
   // In Eclipse Che: auto-detects and uses local dev-proxy with path-based routing
   // In deployed mode: uses remote admin-proxy with API key authentication

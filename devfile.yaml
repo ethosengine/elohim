@@ -68,10 +68,21 @@ components:
           value: /usr/local/bin/chrome
         - name: CHROME_PATH
           value: /opt/chrome-linux64/chrome
-        # PATH: Ensure holochain binaries and helper scripts are available everywhere
+        # Rust toolchain (installed to /opt/rust in Dockerfile)
+        - name: RUSTUP_HOME
+          value: /opt/rust/rustup
+        - name: CARGO_HOME
+          value: /opt/rust/cargo
+        # RUSTFLAGS for Holochain WASM builds (getrandom backend for wasm32)
+        - name: RUSTFLAGS
+          value: '--cfg getrandom_backend="custom"'
+        # CC for native compilation (some crates need explicit gcc)
+        - name: CC
+          value: gcc
+        # PATH: Ensure holochain binaries, rust toolchain, and helper scripts are available
         # (not just interactive shells that source .bashrc)
         - name: PATH
-          value: '/opt/holochain/bin:/home/user/bin:/home/user/.nix-profile/bin:/home/user/.local/bin:${PATH}'
+          value: '/opt/rust/cargo/bin:/opt/holochain/bin:/home/user/bin:/home/user/.nix-profile/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
       endpoints:
         - name: angular-dev
           targetPort: 4200
@@ -86,16 +97,17 @@ components:
         - name: hc-dev
           targetPort: 8888
           exposure: public
-          protocol: https
+          protocol: http
+          #secure:true needed for che http -> ws upgrade, which uses traefik proxy
+          secure: true
       volumeMounts:
         - name: nix-store
           path: /nix
         - name: nix-xdg
           path: /nix-xdg
-        - name: cargo-cache
-          path: /home/user/.cargo
-        - name: rustup-cache
-          path: /home/user/.rustup
+        # Note: Rust toolchain is in /opt/rust (baked into image), not ~/.cargo or ~/.rustup
+        # The /home/user/.cargo and /home/user/.rustup paths are NOT mounted as volumes
+        # because the toolchain lives in /opt/rust and CARGO_HOME/RUSTUP_HOME point there
 
   # Nix store volume - required for Nix/Holochain tooling
   - name: nix-store
@@ -103,14 +115,6 @@ components:
       size: 25Gi
   # XDG directories for Nix cache/config
   - name: nix-xdg
-    volume:
-      size: 2Gi
-  # Cargo cache - dependency artifacts and incremental builds
-  - name: cargo-cache
-    volume:
-      size: 3Gi
-  # Rustup toolchain cache
-  - name: rustup-cache
     volume:
       size: 2Gi
 commands:
@@ -163,10 +167,30 @@ commands:
       component: tools
       workingDir: /projects/elohim/holochain/dev-proxy
       commandLine: |
-        npm install && npm run build && npm start     
-           
+        npm install && npm run build && npm start
+
+  - id: build-happ
+    exec:
+      component: tools
+      workingDir: /projects/elohim/holochain/dna/lamad-spike
+      commandLine: |
+        echo "Building Holochain WASM zomes..."
+        cargo build --release --target wasm32-unknown-unknown
+        echo "Packing DNA..."
+        hc dna pack . -o workdir/lamad_spike.dna
+        echo "Packing hApp..."
+        hc app pack workdir -o workdir/lamad-spike.happ
+        echo "Done! hApp at: workdir/lamad-spike.happ"
+
+  - id: seed-holochain
+    exec:
+      component: tools
+      workingDir: /projects/elohim/holochain/seeder
+      commandLine: |
+        npm install && npm run seed
+
 #events:
 #  postStart:
 #    - setup-vscode-cli
 #    - setup-npm-env
-#   - setup-claude-mcp
+#    - setup-claude-mcp

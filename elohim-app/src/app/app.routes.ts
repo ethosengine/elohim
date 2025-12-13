@@ -21,6 +21,11 @@ export const routes: Routes = [
     loadChildren: () =>
       import('./shefa/shefa.routes').then(m => m.SHEFA_ROUTES)
   },
+  {
+    path: 'identity',
+    loadChildren: () =>
+      import('./imagodei/imagodei.routes').then(m => m.IMAGODEI_ROUTES)
+  },
   // 404 catch-all - must be last
   {
     path: '**',

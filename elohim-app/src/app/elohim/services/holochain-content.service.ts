@@ -12,7 +12,7 @@
  * The admin interface works for testing, but zome calls require app interface.
  *
  * Once the proxy is ready, this service will transparently provide content
- * from the Holochain DHT instead of JSON files or Kuzu.
+ * from the Holochain DHT.
  *
  * @see HolochainClientService for connection management
  * @see DataLoaderService for the primary content abstraction (delegates here when ready)
@@ -83,6 +83,77 @@ export interface QueryByIdInput {
 }
 
 // =============================================================================
+// Holochain Learning Path Types (match Rust DNA structures)
+// =============================================================================
+
+/**
+ * Path index entry from get_all_paths
+ */
+export interface HolochainPathIndexEntry {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: string;
+  estimated_duration: string | null;
+  step_count: number;
+  tags: string[];
+}
+
+/**
+ * Path index output from get_all_paths
+ */
+export interface HolochainPathIndex {
+  paths: HolochainPathIndexEntry[];
+  total_count: number;
+  last_updated: string;
+}
+
+/**
+ * Path step from Holochain
+ */
+export interface HolochainPathStep {
+  id: string;
+  path_id: string;
+  order_index: number;
+  step_type: string;
+  resource_id: string;
+  step_title: string | null;
+  step_narrative: string | null;
+  is_optional: boolean;
+}
+
+/**
+ * Learning path entry from Holochain
+ */
+export interface HolochainLearningPath {
+  id: string;
+  version: string;
+  title: string;
+  description: string;
+  purpose: string | null;
+  created_by: string;
+  difficulty: string;
+  estimated_duration: string | null;
+  visibility: string;
+  path_type: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Path with steps output
+ */
+export interface HolochainPathWithSteps {
+  action_hash: Uint8Array;
+  path: HolochainLearningPath;
+  steps: Array<{
+    action_hash: Uint8Array;
+    step: HolochainPathStep;
+  }>;
+}
+
+// =============================================================================
 // Service Implementation
 // =============================================================================
 
@@ -93,13 +164,9 @@ export class HolochainContentService {
   /**
    * Whether Holochain content service is available.
    *
-   * Currently returns false because the app interface proxy (Phase 2) is not
-   * yet implemented. The HolochainClientService can connect to admin interface,
-   * but zome calls require app interface which returns localhost ports.
-   *
-   * Set to true once:
-   * 1. App interface proxy is deployed
-   * 2. Connection flow supports browser-based zome calls
+   * Starts as false, set to true after successful testAvailability() call.
+   * The HolochainClientService now properly discovers existing app interfaces
+   * and authorizes signing credentials, enabling zome calls from the browser.
    */
   private readonly availableSignal = signal(false);
   readonly available = this.availableSignal.asReadonly();
@@ -231,6 +298,49 @@ export class HolochainContentService {
   }
 
   // ===========================================================================
+  // Learning Path Methods
+  // ===========================================================================
+
+  /**
+   * Get all learning paths (path index).
+   */
+  async getPathIndex(): Promise<HolochainPathIndex> {
+    console.log('[HolochainContent] Calling get_all_paths...');
+    const result = await this.holochainClient.callZome<HolochainPathIndex>({
+      zomeName: 'content_store',
+      fnName: 'get_all_paths',
+      payload: null,
+    });
+
+    console.log('[HolochainContent] get_all_paths result:', result);
+
+    if (!result.success || !result.data) {
+      console.warn('[HolochainContent] get_all_paths failed or empty:', result.error);
+      return { paths: [], total_count: 0, last_updated: new Date().toISOString() };
+    }
+
+    console.log('[HolochainContent] Found paths:', result.data.total_count);
+    return result.data;
+  }
+
+  /**
+   * Get a learning path with all its steps.
+   */
+  async getPathWithSteps(pathId: string): Promise<HolochainPathWithSteps | null> {
+    const result = await this.holochainClient.callZome<HolochainPathWithSteps | null>({
+      zomeName: 'content_store',
+      fnName: 'get_path_with_steps',
+      payload: pathId,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  // ===========================================================================
   // Private Methods - Zome Calls
   // ===========================================================================
 
@@ -326,25 +436,24 @@ export class HolochainContentService {
   }
 
   /**
-   * Map Holochain reach string to ContentReach type
+   * Map Holochain reach string to ReachLevel type.
+   * Uses the ReachLevel values from protocol-core.model.ts:
+   * private, invited, local, neighborhood, municipal, bioregional, regional, commons
    */
   private mapReachLevel(reach: string): ContentNode['reach'] {
-    const validReaches: ContentNode['reach'][] = [
-      'private', 'invited', 'local', 'community', 'federated', 'commons'
-    ];
-
-    // Handle Holochain's neighborhood/municipal/etc. mappings
+    // Handle various reach string formats
     const reachMap: Record<string, ContentNode['reach']> = {
       'private': 'private',
       'invited': 'invited',
       'local': 'local',
-      'neighborhood': 'local',        // Map to local
-      'municipal': 'community',       // Map to community
-      'community': 'community',
-      'bioregional': 'community',     // Map to community
-      'regional': 'federated',        // Map to federated
-      'federated': 'federated',
+      'neighborhood': 'neighborhood',
+      'municipal': 'municipal',
+      'community': 'municipal',       // Alias: community → municipal
+      'bioregional': 'bioregional',
+      'regional': 'regional',
+      'federated': 'regional',        // Alias: federated → regional
       'commons': 'commons',
+      'public': 'commons',            // Alias: public → commons
     };
 
     return reachMap[reach.toLowerCase()] ?? 'commons';

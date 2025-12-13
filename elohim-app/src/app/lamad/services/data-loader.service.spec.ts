@@ -1,45 +1,15 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { KuzuDataService } from '@app/elohim/services/kuzu-data.service';
+import { HolochainContentService } from '@app/elohim/services/holochain-content.service';
 import { LearningPath, PathIndex, ContentNode, AgentProgress } from '../models';
 import { of, throwError } from 'rxjs';
-
-// Override environment for tests to disable Kuzu
-import { environment } from '../../../environments/environment';
 
 describe('DataLoaderService', () => {
   let service: DataLoaderService;
   let httpMock: HttpTestingController;
-  let originalUseKuzuDb: boolean;
+  let mockHolochainContent: jasmine.SpyObj<HolochainContentService>;
   const basePath = '/assets/lamad-data';
-
-  // Mock KuzuDataService to prevent actual WASM initialization in tests
-  const mockKuzuDataService = {
-    initialize: jasmine.createSpy('initialize').and.returnValue(Promise.resolve()),
-    getPath: jasmine.createSpy('getPath'),
-    getContent: jasmine.createSpy('getContent'),
-    getPathIndex: jasmine.createSpy('getPathIndex'),
-    getContentIndex: jasmine.createSpy('getContentIndex'),
-    clearCache: jasmine.createSpy('clearCache')
-  };
-
-  const mockPath: LearningPath = {
-    id: 'test-path',
-    version: '1.0.0',
-    title: 'Test Path',
-    description: 'A test path',
-    purpose: 'Testing',
-    createdBy: 'test-user',
-    contributors: [],
-    createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z',
-    difficulty: 'beginner',
-    estimatedDuration: '1 hour',
-    tags: ['test'],
-    visibility: 'public',
-    steps: []
-  };
 
   const mockContent: ContentNode = {
     id: 'test-content',
@@ -51,22 +21,6 @@ describe('DataLoaderService', () => {
     tags: [],
     relatedNodeIds: [],
     metadata: {}
-  };
-
-  const mockPathIndex: PathIndex = {
-    lastUpdated: '2025-01-01T00:00:00.000Z',
-    totalCount: 1,
-    paths: [
-      {
-        id: 'test-path',
-        title: 'Test Path',
-        description: 'A test path',
-        difficulty: 'beginner',
-        estimatedDuration: '1 hour',
-        stepCount: 0,
-        tags: ['test']
-      }
-    ]
   };
 
   const mockProgress: AgentProgress = {
@@ -83,32 +37,32 @@ describe('DataLoaderService', () => {
   };
 
   beforeEach(() => {
-    // Disable Kuzu for tests - force JSON fallback
-    originalUseKuzuDb = (environment as any).useKuzuDb;
-    (environment as any).useKuzuDb = false;
+    mockHolochainContent = jasmine.createSpyObj('HolochainContentService', [
+      'getContent',
+      'getContentByType',
+      'getStats',
+      'clearCache',
+      'isAvailable',
+      'getPathIndex',
+      'getPathWithSteps'
+    ]);
 
-    // Reset spies between tests
-    Object.values(mockKuzuDataService).forEach(spy => {
-      if (spy && typeof spy.calls !== 'undefined') {
-        spy.calls.reset();
-      }
-    });
+    // Default mock returns
+    mockHolochainContent.getStats.and.returnValue(of({ total_count: 0, by_type: {} }));
+    mockHolochainContent.isAvailable.and.returnValue(true);
+    (mockHolochainContent.getPathIndex as jasmine.Spy).and.returnValue(Promise.resolve({ paths: [], total_count: 0, last_updated: '' }));
+    (mockHolochainContent.getPathWithSteps as jasmine.Spy).and.returnValue(Promise.resolve(null));
 
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
       providers: [
         DataLoaderService,
-        { provide: KuzuDataService, useValue: mockKuzuDataService }
+        { provide: HolochainContentService, useValue: mockHolochainContent }
       ]
     });
 
     service = TestBed.inject(DataLoaderService);
     httpMock = TestBed.inject(HttpTestingController);
-  });
-
-  afterEach(() => {
-    // Restore original environment value
-    (environment as any).useKuzuDb = originalUseKuzuDb;
   });
 
   afterEach(() => {
@@ -120,120 +74,102 @@ describe('DataLoaderService', () => {
   });
 
   describe('getPath', () => {
-    it('should load a path', (done) => {
+    it('should load path from Holochain', (done) => {
+      const mockHcPath = {
+        action_hash: new Uint8Array(),
+        path: {
+          id: 'test-path',
+          version: '1.0.0',
+          title: 'Test Path',
+          description: 'A test path',
+          purpose: 'Testing',
+          created_by: 'test-agent',
+          difficulty: 'beginner',
+          estimated_duration: '1 hour',
+          visibility: 'public',
+          path_type: 'journey',
+          tags: ['test'],
+          created_at: '2025-01-01T00:00:00.000Z',
+          updated_at: '2025-01-01T00:00:00.000Z',
+        },
+        steps: [],
+      };
+
+      (mockHolochainContent.getPathWithSteps as jasmine.Spy).and.returnValue(Promise.resolve(mockHcPath));
+
       service.getPath('test-path').subscribe(path => {
-        expect(path).toEqual(mockPath);
+        expect(path.id).toBe('test-path');
+        expect(path.title).toBe('Test Path');
         done();
       });
-
-      const req = httpMock.expectOne(`${basePath}/paths/test-path.json`);
-      expect(req.request.method).toBe('GET');
-      req.flush(mockPath);
-    });
-
-    it('should cache path requests', (done) => {
-      service.getPath('test-path').subscribe();
-      service.getPath('test-path').subscribe(path => {
-        expect(path).toEqual(mockPath);
-        done();
-      });
-
-      const req = httpMock.expectOne(`${basePath}/paths/test-path.json`);
-      req.flush(mockPath);
-    });
-
-    it('should handle path not found error', (done) => {
-      service.getPath('missing-path').subscribe({
-        error: err => {
-          expect(err.message).toContain('Path not found');
-          done();
-        }
-      });
-
-      const req = httpMock.expectOne(`${basePath}/paths/missing-path.json`);
-      req.error(new ProgressEvent('error'), { status: 404 });
     });
   });
 
   describe('getContent', () => {
-    it('should load content', (done) => {
+    it('should load content from Holochain', (done) => {
+      mockHolochainContent.getContent.and.returnValue(of(mockContent));
+
       service.getContent('test-content').subscribe(content => {
         expect(content).toEqual(mockContent);
+        expect(mockHolochainContent.getContent).toHaveBeenCalledWith('test-content');
         done();
       });
-
-      const req = httpMock.expectOne(`${basePath}/content/test-content.json`);
-      expect(req.request.method).toBe('GET');
-      req.flush(mockContent);
     });
 
     it('should cache content requests', (done) => {
+      mockHolochainContent.getContent.and.returnValue(of(mockContent));
+
       service.getContent('test-content').subscribe();
       service.getContent('test-content').subscribe(content => {
         expect(content).toEqual(mockContent);
+        // Should only call Holochain once due to caching
+        expect(mockHolochainContent.getContent).toHaveBeenCalledTimes(1);
         done();
       });
-
-      const req = httpMock.expectOne(`${basePath}/content/test-content.json`);
-      req.flush(mockContent);
     });
 
     it('should handle content not found error', (done) => {
+      mockHolochainContent.getContent.and.returnValue(of(null));
+
       service.getContent('missing-content').subscribe({
         error: err => {
           expect(err.message).toContain('Content not found');
           done();
         }
       });
-
-      const req = httpMock.expectOne(`${basePath}/content/missing-content.json`);
-      req.error(new ProgressEvent('error'), { status: 404 });
     });
   });
 
   describe('getPathIndex', () => {
-    it('should load path index', (done) => {
+    it('should load path index from Holochain', (done) => {
+      const mockHcPathIndex = {
+        paths: [
+          { id: 'test-path', title: 'Test', description: 'Desc', difficulty: 'beginner', estimated_duration: '1h', step_count: 3, tags: [] }
+        ],
+        total_count: 1,
+        last_updated: '2025-01-01T00:00:00.000Z',
+      };
+
+      (mockHolochainContent.getPathIndex as jasmine.Spy).and.returnValue(Promise.resolve(mockHcPathIndex));
+
       service.getPathIndex().subscribe(index => {
-        expect(index).toEqual(mockPathIndex);
+        expect(index.totalCount).toBe(1);
+        expect(index.paths.length).toBe(1);
+        expect(index.paths[0].id).toBe('test-path');
         done();
       });
-
-      const req = httpMock.expectOne(`${basePath}/paths/index.json`);
-      req.flush(mockPathIndex);
-    });
-
-    it('should handle path index load error', (done) => {
-      service.getPathIndex().subscribe(index => {
-        expect(index.paths).toEqual([]);
-        expect(index.totalCount).toBe(0);
-        done();
-      });
-
-      const req = httpMock.expectOne(`${basePath}/paths/index.json`);
-      req.error(new ProgressEvent('error'), { status: 500 });
     });
   });
 
   describe('getContentIndex', () => {
-    it('should load content index', (done) => {
-      const mockIndex = { nodes: [] };
+    it('should return stats from Holochain', (done) => {
+      mockHolochainContent.getStats.and.returnValue(of({ total_count: 5, by_type: { concept: 3, exercise: 2 } }));
+
       service.getContentIndex().subscribe(index => {
-        expect(index).toEqual(mockIndex);
+        expect(index.totalCount).toBe(5);
+        expect(index.byType).toEqual({ concept: 3, exercise: 2 });
         done();
       });
-
-      const req = httpMock.expectOne(`${basePath}/content/index.json`);
-      req.flush(mockIndex);
-    });
-
-    it('should handle content index load error', (done) => {
-      service.getContentIndex().subscribe(index => {
-        expect(index.nodes).toEqual([]);
-        done();
-      });
-
-      const req = httpMock.expectOne(`${basePath}/content/index.json`);
-      req.error(new ProgressEvent('error'), { status: 500 });
     });
   });
 
@@ -304,6 +240,13 @@ describe('DataLoaderService', () => {
 
       const result = service.getLocalProgress('test-agent', 'test-path');
       expect(result).toBeNull();
+    });
+  });
+
+  describe('clearCache', () => {
+    it('should clear Holochain content cache', () => {
+      service.clearCache();
+      expect(mockHolochainContent.clearCache).toHaveBeenCalled();
     });
   });
 });

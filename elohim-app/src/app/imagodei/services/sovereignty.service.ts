@@ -26,6 +26,7 @@ import {
   getHostedDataResidency,
   getAppUserDataResidency,
 } from '../models/sovereignty.model';
+import { type KeyLocation, type IdentityMode } from '../models/identity.model';
 
 @Injectable({
   providedIn: 'root',
@@ -95,18 +96,33 @@ export class SovereigntyService {
   readonly canUpgrade = computed(() => this.sovereigntyState().migrationAvailable);
 
   /**
-   * Determine sovereignty stage based on connection state.
+   * Determine sovereignty stage based on connection state and conductor location.
+   *
+   * Stage Detection Logic:
+   * - visitor: No Holochain connection, session-only or anonymous
+   * - hosted: Connected to remote edge node (custodial keys)
+   * - app-user: Connected to local conductor on user's device (self-sovereign keys)
+   * - node-operator: Local conductor that also hosts other humans
    */
   private determineStage(
     holochainState: string,
     hasStoredCredentials: boolean
   ): SovereigntyStage {
-    // For now, we detect based on Holochain connection status
-    // In the future, this will also check for local conductor vs hosted
+    const displayInfo = this.holochainService.getDisplayInfo();
 
     if (holochainState === 'connected') {
-      // Connected to Edge Node = Hosted User
-      // TODO: Detect app-user vs hosted based on conductor location
+      // Detect if conductor is local or remote
+      const isLocalConductor = this.isLocalConductor(displayInfo.appUrl);
+
+      if (isLocalConductor) {
+        // Local conductor - either app-user or node-operator
+        // For now, detect node-operator based on configuration
+        // In the future, check if hosting other humans via DHT query
+        const isNodeOperator = this.detectNodeOperatorStatus();
+        return isNodeOperator ? 'node-operator' : 'app-user';
+      }
+
+      // Remote conductor = Hosted User
       return 'hosted';
     }
 
@@ -117,6 +133,47 @@ export class SovereigntyService {
 
     // Not connected = Visitor
     return 'visitor';
+  }
+
+  /**
+   * Check if conductor is running locally on user's device.
+   */
+  private isLocalConductor(url: string | null): boolean {
+    if (!url) return false;
+
+    // Local conductor indicators
+    const localPatterns = [
+      'localhost',
+      '127.0.0.1',
+      '[::1]',
+      '0.0.0.0',
+    ];
+
+    const urlLower = url.toLowerCase();
+    return localPatterns.some(pattern => urlLower.includes(pattern));
+  }
+
+  /**
+   * Detect if user is operating a node (hosting other humans).
+   *
+   * Node operator detection (future enhancements):
+   * - Query DHT for hosted agent count
+   * - Check conductor configuration for hosting mode
+   * - Verify always-on uptime requirements
+   */
+  private detectNodeOperatorStatus(): boolean {
+    // For MVP, check for node operator flag in localStorage
+    // In production, this will query the conductor for hosted agents
+    try {
+      const nodeConfig = localStorage.getItem('elohim_node_operator_config');
+      if (nodeConfig) {
+        const config = JSON.parse(nodeConfig);
+        return config.isNodeOperator === true && config.hostedHumanCount > 0;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return false;
   }
 
   /**
@@ -194,6 +251,7 @@ export class SovereigntyService {
     }
 
     const keys: KeyInfo[] = [];
+    const keyLocation = this.getKeyLocation(stage);
 
     if (displayInfo.agentPubKey) {
       keys.push({
@@ -201,23 +259,82 @@ export class SovereigntyService {
         label: 'Agent Public Key',
         value: displayInfo.agentPubKey,
         truncated: this.truncateKey(displayInfo.agentPubKey),
-        canExport: true, // Always exportable for non-visitor stages
+        canExport: stage !== 'hosted', // Can't export from custodial hosting
         canRevoke: false,
       });
     }
 
-    if (displayInfo.hasStoredCredentials) {
-      keys.push({
-        type: 'signing-key',
-        label: 'Signing Key',
-        value: '(stored in browser)',
-        truncated: 'Active',
-        canExport: true,
-        canRevoke: true,
-      });
+    // Add key location info based on stage
+    const keyLocationInfo = this.getKeyLocationInfo(stage, keyLocation);
+    if (keyLocationInfo) {
+      keys.push(keyLocationInfo);
     }
 
     return keys;
+  }
+
+  /**
+   * Determine key location based on sovereignty stage.
+   */
+  private getKeyLocation(stage: SovereigntyStage): KeyLocation {
+    switch (stage) {
+      case 'visitor':
+        return 'none';
+      case 'hosted':
+        return 'custodial'; // Keys held by edge node
+      case 'app-user':
+        return 'device'; // Keys on local conductor
+      case 'node-operator':
+        return 'device'; // Could be 'hardware' if using HSM
+      default:
+        return 'none';
+    }
+  }
+
+  /**
+   * Get key location display info.
+   */
+  private getKeyLocationInfo(stage: SovereigntyStage, location: KeyLocation): KeyInfo | null {
+    switch (location) {
+      case 'custodial':
+        return {
+          type: 'signing-key',
+          label: 'Signing Key',
+          value: 'Held by Edge Node',
+          truncated: 'Custodial',
+          canExport: false,
+          canRevoke: false,
+        };
+      case 'device':
+        return {
+          type: 'signing-key',
+          label: 'Signing Key',
+          value: 'On your device',
+          truncated: stage === 'node-operator' ? 'Self-Sovereign (Node)' : 'Self-Sovereign',
+          canExport: true,
+          canRevoke: true,
+        };
+      case 'hardware':
+        return {
+          type: 'signing-key',
+          label: 'Signing Key',
+          value: 'Hardware Security Module',
+          truncated: 'Hardware Protected',
+          canExport: false, // Hardware keys can't be exported
+          canRevoke: true,
+        };
+      case 'browser':
+        return {
+          type: 'signing-key',
+          label: 'Signing Key',
+          value: 'Browser Storage',
+          truncated: 'Browser (Less Secure)',
+          canExport: true,
+          canRevoke: true,
+        };
+      default:
+        return null;
+    }
   }
 
   /**

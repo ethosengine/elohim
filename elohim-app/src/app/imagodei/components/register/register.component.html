@@ -1,0 +1,162 @@
+<div class="register-container">
+  <div class="register-card">
+    <!-- Header -->
+    <div class="register-header">
+      <h1>Join the Network</h1>
+      <p class="subtitle">Create your identity to participate in the community</p>
+    </div>
+
+    <!-- Connection Status -->
+    @if (!isConnected()) {
+      <div class="status-banner warning">
+        <span class="status-icon">⚠</span>
+        <span>Connecting to network...</span>
+      </div>
+    }
+
+    <!-- Migration Banner -->
+    @if (hasSession() && canMigrate()) {
+      <div class="migration-banner">
+        <div class="migration-header">
+          <span class="migration-icon">↑</span>
+          <strong>Upgrade Available</strong>
+        </div>
+        <p>You have session progress that can be migrated to your network identity.</p>
+        @if (sessionStats()) {
+          <p class="session-stats">{{ getSessionStatsDisplay() }}</p>
+        }
+        <button
+          type="button"
+          class="btn btn-secondary"
+          [disabled]="isMigrating() || !isConnected()"
+          (click)="onMigrate()"
+        >
+          @if (isMigrating()) {
+            <span class="spinner"></span>
+            {{ migrationState().currentStep || 'Migrating...' }}
+          } @else {
+            Migrate Session Data
+          }
+        </button>
+      </div>
+    }
+
+    <!-- Error Display -->
+    @if (error()) {
+      <div class="error-banner" (click)="clearError()">
+        <span class="error-icon">✕</span>
+        <span>{{ error() }}</span>
+        <button type="button" class="error-dismiss">Dismiss</button>
+      </div>
+    }
+
+    <!-- Registration Form -->
+    <form class="register-form" (ngSubmit)="onRegister()">
+      <!-- Display Name -->
+      <div class="form-group">
+        <label for="displayName">Display Name *</label>
+        <input
+          id="displayName"
+          type="text"
+          [(ngModel)]="form.displayName"
+          name="displayName"
+          placeholder="How should we call you?"
+          required
+          maxlength="50"
+          [disabled]="isRegistering()"
+        />
+        <span class="hint">This is how you'll appear to others</span>
+      </div>
+
+      <!-- Bio -->
+      <div class="form-group">
+        <label for="bio">Bio</label>
+        <textarea
+          id="bio"
+          [(ngModel)]="form.bio"
+          name="bio"
+          placeholder="Tell us a bit about yourself..."
+          rows="3"
+          maxlength="500"
+          [disabled]="isRegistering()"
+        ></textarea>
+        <span class="hint">Optional - share what brings you here</span>
+      </div>
+
+      <!-- Affinities -->
+      <div class="form-group">
+        <label for="affinities">Interests</label>
+        <input
+          id="affinities"
+          type="text"
+          [(ngModel)]="form.affinities"
+          name="affinities"
+          placeholder="philosophy, technology, community..."
+          [disabled]="isRegistering()"
+        />
+        <span class="hint">Comma-separated topics you're drawn to</span>
+      </div>
+
+      <!-- Location -->
+      <div class="form-group">
+        <label for="location">Location</label>
+        <input
+          id="location"
+          type="text"
+          [(ngModel)]="form.location"
+          name="location"
+          placeholder="City, Country"
+          maxlength="100"
+          [disabled]="isRegistering()"
+        />
+        <span class="hint">Optional - helps connect you with nearby community</span>
+      </div>
+
+      <!-- Profile Reach -->
+      <div class="form-group">
+        <label>Profile Visibility</label>
+        <div class="reach-options">
+          @for (option of reachOptions; track option.value) {
+            <label class="reach-option" [class.selected]="form.profileReach === option.value">
+              <input
+                type="radio"
+                [(ngModel)]="form.profileReach"
+                name="profileReach"
+                [value]="option.value"
+                [disabled]="isRegistering()"
+              />
+              <div class="reach-content">
+                <strong>{{ option.label }}</strong>
+                <span>{{ option.description }}</span>
+              </div>
+            </label>
+          }
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div class="form-actions">
+        <button
+          type="submit"
+          class="btn btn-primary"
+          [disabled]="isRegistering() || !isConnected() || !form.displayName.trim()"
+        >
+          @if (isRegistering()) {
+            <span class="spinner"></span>
+            Creating Identity...
+          } @else {
+            Create Identity
+          }
+        </button>
+      </div>
+    </form>
+
+    <!-- Footer Links -->
+    <div class="register-footer">
+      <p>
+        By joining, you agree to participate in good faith with the community.
+      </p>
+      <a routerLink="/" class="back-link">← Back to Home</a>
+    </div>
+  </div>
+</div>

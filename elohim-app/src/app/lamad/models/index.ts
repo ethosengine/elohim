@@ -134,6 +134,15 @@ export * from './content-access.model';
 // Content Mastery models (Bloom's Taxonomy progression)
 export * from './content-mastery.model';
 
+// Practice Pool models (Khan Academy-style organic learning)
+export * from './practice.model';
+
+// Learning Points models (Shefa economic integration)
+export * from './learning-points.model';
+
+// Mastery Visualization (colors, icons, labels for UI)
+export * from './mastery-visualization';
+
 // Content Lifecycle models (refresh policies, deprecation, archival)
 export * from './content-lifecycle.model';
 
@@ -242,6 +251,9 @@ export * from '@app/elohim/models/economic-event.model';
 
 // Contributor Presence models (stewardship lifecycle for absent contributors)
 export * from '@app/elohim/models/contributor-presence.model';
+
+// Steward Economy models (credentials, gates, access, revenue)
+export * from './steward-economy.model';
 
 // ============================================================================
 // RE-EXPORTS FROM QAHAL (Community)

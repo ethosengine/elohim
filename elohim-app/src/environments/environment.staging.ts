@@ -5,7 +5,6 @@ export const environment = {
   logLevel: 'debug' as LogLevel,
   environment: 'staging',
   gitHash: 'GIT_HASH_PLACEHOLDER',
-  useKuzuDb: true,  // Use embedded Kuzu WASM database
   // Holochain Edge Node configuration (staging uses alpha for now)
   // Single proxy URL handles admin operations with authentication
   holochain: {

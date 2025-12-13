@@ -1,7 +1,10 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, map } from 'rxjs';
+import { BehaviorSubject, Observable, map, from, of } from 'rxjs';
+import { catchError, tap } from 'rxjs/operators';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import {
   ContentMastery,
   EngagementType,
@@ -17,14 +20,29 @@ import {
   isAboveGate,
   compareMasteryLevels,
   MasteryRecordContent,
-  SourceChainEntry
+  SourceChainEntry,
+  PathMasteryOverview,
+  transformMasteryFromWire,
 } from '../models';
+
+/** Result of migration from local to backend */
+export interface MigrationResult {
+  migrated: number;
+  failed: number;
+  success: boolean;
+  errors: string[];
+}
 
 /**
  * ContentMasteryService - Manages Bloom's Taxonomy mastery tracking.
  *
+ * Dual Backend Architecture:
+ * - Visitor mode: localStorage via LocalSourceChainService (no account needed)
+ * - Hosted account: Migrate localStorage → backend (adoption funnel)
+ * - Native mode: Full backend experience
+ *
  * Philosophy:
- * - All mastery data is stored on the agent's local source chain
+ * - All mastery data is stored on the agent's source chain
  * - Mastery entries are immutable (new entries for level changes)
  * - Freshness decays over time based on level-specific rates
  * - Privileges unlock at specific Bloom's levels
@@ -32,10 +50,6 @@ import {
  * Source Chain Entries:
  * - 'mastery-record': Each mastery level achievement
  * - Links from content → mastery records via 'mastery-for-content'
- *
- * Holochain migration:
- * - Mastery records migrate directly to agent's private source chain
- * - No structural changes needed
  */
 @Injectable({ providedIn: 'root' })
 export class ContentMasteryService {
@@ -46,7 +60,9 @@ export class ContentMasteryService {
 
   constructor(
     private readonly sourceChain: LocalSourceChainService,
-    private readonly sessionHuman: SessionHumanService
+    private readonly sessionHuman: SessionHumanService,
+    private readonly backend: LearnerBackendService,
+    private readonly holochainClient: HolochainClientService
   ) {
     // Initialize when session is available
     this.sessionHuman.session$.subscribe(session => {
@@ -54,6 +70,24 @@ export class ContentMasteryService {
         this.initializeForSession(session.sessionId);
       }
     });
+  }
+
+  // =========================================================================
+  // BACKEND SELECTION
+  // =========================================================================
+
+  /**
+   * Check if backend is available for mastery operations.
+   */
+  isBackendAvailable(): boolean {
+    return this.holochainClient.isConnected();
+  }
+
+  /**
+   * Get the active storage backend.
+   */
+  private get storageBackend(): 'local' | 'backend' {
+    return this.isBackendAvailable() ? 'backend' : 'local';
   }
 
   // =========================================================================
@@ -499,5 +533,148 @@ export class ContentMasteryService {
   isAboveGate(contentId: string): boolean {
     const mastery = this.masteryCache.get(contentId);
     return mastery ? isAboveGate(mastery.level) : false;
+  }
+
+  // =========================================================================
+  // BACKEND INTEGRATION
+  // =========================================================================
+
+  /**
+   * Get path mastery overview (Khan Academy-style grid).
+   * Only available when backend is connected.
+   */
+  getPathMasteryOverview(pathId: string): Observable<PathMasteryOverview | null> {
+    if (!this.isBackendAvailable()) {
+      console.warn('[ContentMastery] Backend not available for path overview');
+      return of(null);
+    }
+
+    return from(this.backend.getPathMasteryOverview(pathId)).pipe(
+      catchError(err => {
+        console.warn('[ContentMastery] Failed to get path overview:', err);
+        return of(null);
+      })
+    );
+  }
+
+  /**
+   * Sync a mastery record to backend.
+   * Called automatically when backend becomes available.
+   */
+  private async syncMasteryToBackend(mastery: ContentMastery): Promise<boolean> {
+    if (!this.isBackendAvailable()) return false;
+
+    try {
+      // Initialize mastery on backend
+      await this.backend.initializeMastery(mastery.contentId);
+
+      // Record engagement to set the level
+      if (mastery.level !== 'not_started') {
+        await this.backend.recordEngagement({
+          content_id: mastery.contentId,
+          engagement_type: mastery.lastEngagementType,
+        });
+      }
+
+      return true;
+    } catch (err) {
+      console.warn('[ContentMastery] Failed to sync to backend:', err);
+      return false;
+    }
+  }
+
+  // =========================================================================
+  // MIGRATION: Visitor → Hosted Account
+  // =========================================================================
+
+  /**
+   * Migrate visitor's localStorage progress to their new backend account.
+   * Called when visitor creates a Hosted-level account.
+   *
+   * @returns Migration result with counts and errors
+   */
+  async migrateToBackend(): Promise<MigrationResult> {
+    const result: MigrationResult = {
+      migrated: 0,
+      failed: 0,
+      success: false,
+      errors: [],
+    };
+
+    if (!this.isBackendAvailable()) {
+      result.errors.push('Backend not available');
+      return result;
+    }
+
+    // Get all local mastery records
+    const localRecords = this.sourceChain.getEntriesByType<MasteryRecordContent>('mastery-record');
+    if (localRecords.length === 0) {
+      result.success = true;
+      return result;
+    }
+
+    console.log(`[ContentMastery] Migrating ${localRecords.length} mastery records to backend`);
+
+    // Group by contentId (keep latest per content)
+    const latestByContent = new Map<string, SourceChainEntry<MasteryRecordContent>>();
+    for (const entry of localRecords) {
+      const contentId = entry.content.contentId;
+      const existing = latestByContent.get(contentId);
+      if (!existing || new Date(entry.timestamp) > new Date(existing.timestamp)) {
+        latestByContent.set(contentId, entry);
+      }
+    }
+
+    // Migrate each unique content mastery
+    for (const [contentId, entry] of latestByContent) {
+      try {
+        // Initialize mastery on backend
+        const initialized = await this.backend.initializeMastery(contentId);
+        if (!initialized) {
+          result.failed++;
+          result.errors.push(`Failed to initialize mastery for ${contentId}`);
+          continue;
+        }
+
+        // If level is beyond 'seen', we need to record assessments to reach it
+        // For now, we just record the engagement type
+        if (entry.content.level !== 'not_started' && entry.content.level !== 'seen') {
+          await this.backend.recordEngagement({
+            content_id: contentId,
+            engagement_type: entry.content.lastEngagementType,
+          });
+        }
+
+        result.migrated++;
+      } catch (err) {
+        result.failed++;
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        result.errors.push(`${contentId}: ${errorMsg}`);
+      }
+    }
+
+    result.success = result.failed === 0;
+    console.log(`[ContentMastery] Migration complete: ${result.migrated} migrated, ${result.failed} failed`);
+
+    return result;
+  }
+
+  /**
+   * Check if there are local records that need migration.
+   */
+  hasPendingMigration(): boolean {
+    if (!this.isBackendAvailable()) return false;
+    const localRecords = this.sourceChain.getEntriesByType<MasteryRecordContent>('mastery-record');
+    return localRecords.length > 0;
+  }
+
+  /**
+   * Get count of records pending migration.
+   */
+  getPendingMigrationCount(): number {
+    const localRecords = this.sourceChain.getEntriesByType<MasteryRecordContent>('mastery-record');
+    // Group by contentId to get unique count
+    const uniqueContentIds = new Set(localRecords.map(r => r.content.contentId));
+    return uniqueContentIds.size;
   }
 }

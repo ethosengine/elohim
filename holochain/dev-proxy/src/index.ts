@@ -181,9 +181,23 @@ function main(): void {
     handleUpgrade(wss, request, socket as Duplex, head);
   });
 
+  // Handle server errors (e.g., port already in use)
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n❌ Port ${config.port} is already in use.`);
+      console.error(`   Another dev-proxy instance may be running.`);
+      console.error(`\n   To fix this, either:`);
+      console.error(`   1. Kill the existing process: pkill -f 'node.*dev-proxy'`);
+      console.error(`   2. Or use a different port: PORT=8889 npm start\n`);
+      process.exit(1);
+    }
+    console.error('❌ Server error:', err.message);
+    process.exit(1);
+  });
+
   // Start listening
   server.listen(config.port, () => {
-    console.log(`Holochain Dev Proxy listening on port ${config.port}`);
+    console.log(`\n✅ Holochain Dev Proxy listening on port ${config.port}`);
     console.log('Routes:');
     console.log(`  /admin     → ws://localhost:${config.adminPort}`);
     console.log(

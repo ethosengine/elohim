@@ -8,6 +8,10 @@ import {
   SessionMigration,
   HolochainUpgradePrompt,
   UpgradeTrigger,
+  SessionState,
+  SessionAccessLevel,
+  UpgradeIntent,
+  HostingCostStatus,
 } from '../models/session-human.model';
 // Content access models from lamad pillar
 import {
@@ -97,8 +101,6 @@ export class SessionHumanService {
     return {
       sessionId,
       displayName: 'Traveler',
-      isAnonymous: true,
-      accessLevel: 'visitor',
       createdAt: now,
       lastActiveAt: now,
       stats: {
@@ -111,6 +113,19 @@ export class SessionHumanService {
         averageSessionLength: 0,
         sessionCount: 1,
       },
+
+      // Session state - active visitor by default
+      isAnonymous: true,
+      accessLevel: 'visitor',
+      sessionState: 'active',
+
+      // No Holochain link initially
+      linkedAgentPubKey: undefined,
+      linkedHumanId: undefined,
+      linkedAt: undefined,
+
+      // No upgrade in progress
+      upgradeIntent: undefined,
     };
   }
 
@@ -652,6 +667,154 @@ export class SessionHumanService {
   }
 
   // =========================================================================
+  // Hybrid State Management (Session + Holochain)
+  // =========================================================================
+
+  /**
+   * Link this session to a Holochain identity.
+   * Used when user creates Holochain identity but wants to keep session for offline use.
+   */
+  linkToHolochainIdentity(agentPubKey: string, humanId: string): void {
+    const session = this.sessionSubject.value;
+    if (!session) return;
+
+    session.linkedAgentPubKey = agentPubKey;
+    session.linkedHumanId = humanId;
+    session.linkedAt = new Date().toISOString();
+    session.sessionState = 'linked';
+    session.isAnonymous = false;
+    session.accessLevel = 'linked';
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Check if session is linked to a Holochain identity.
+   */
+  isLinkedToHolochain(): boolean {
+    const session = this.sessionSubject.value;
+    return session?.sessionState === 'linked' && !!session.linkedAgentPubKey;
+  }
+
+  /**
+   * Get linked Holochain agent pubkey.
+   */
+  getLinkedAgentPubKey(): string | null {
+    return this.sessionSubject.value?.linkedAgentPubKey ?? null;
+  }
+
+  /**
+   * Get linked Human ID.
+   */
+  getLinkedHumanId(): string | null {
+    return this.sessionSubject.value?.linkedHumanId ?? null;
+  }
+
+  // =========================================================================
+  // Upgrade Intent Tracking
+  // =========================================================================
+
+  /**
+   * Start an upgrade intent (user begins but hasn't completed upgrade).
+   */
+  startUpgradeIntent(targetStage: 'hosted' | 'app-user' | 'node-operator'): void {
+    const session = this.sessionSubject.value;
+    if (!session) return;
+
+    session.upgradeIntent = {
+      targetStage,
+      startedAt: new Date().toISOString(),
+      currentStep: 'initiated',
+      completedSteps: [],
+      paused: false,
+    };
+    session.sessionState = 'upgrading';
+    session.accessLevel = 'pending';
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Update upgrade progress.
+   */
+  updateUpgradeProgress(currentStep: string, completedStep?: string): void {
+    const session = this.sessionSubject.value;
+    if (!session?.upgradeIntent) return;
+
+    session.upgradeIntent.currentStep = currentStep;
+    if (completedStep) {
+      session.upgradeIntent.completedSteps.push(completedStep);
+    }
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Pause upgrade (user abandons temporarily).
+   */
+  pauseUpgrade(reason?: string): void {
+    const session = this.sessionSubject.value;
+    if (!session?.upgradeIntent) return;
+
+    session.upgradeIntent.paused = true;
+    session.upgradeIntent.pauseReason = reason;
+    session.sessionState = 'active';
+    session.accessLevel = 'visitor';
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Resume a paused upgrade.
+   */
+  resumeUpgrade(): void {
+    const session = this.sessionSubject.value;
+    if (!session?.upgradeIntent) return;
+
+    session.upgradeIntent.paused = false;
+    session.upgradeIntent.pauseReason = undefined;
+    session.sessionState = 'upgrading';
+    session.accessLevel = 'pending';
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Cancel upgrade intent entirely.
+   */
+  cancelUpgrade(): void {
+    const session = this.sessionSubject.value;
+    if (!session) return;
+
+    session.upgradeIntent = undefined;
+    session.sessionState = 'active';
+    session.accessLevel = 'visitor';
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Get current upgrade intent.
+   */
+  getUpgradeIntent(): UpgradeIntent | null {
+    return this.sessionSubject.value?.upgradeIntent ?? null;
+  }
+
+  /**
+   * Check if upgrade is in progress.
+   */
+  isUpgrading(): boolean {
+    const session = this.sessionSubject.value;
+    return session?.sessionState === 'upgrading' && !session.upgradeIntent?.paused;
+  }
+
+  // =========================================================================
   // Migration to Holochain
   // =========================================================================
 
@@ -687,7 +850,28 @@ export class SessionHumanService {
   }
 
   /**
-   * Clear session after successful migration.
+   * Mark session as migrated (keeps reference but data moves to Holochain).
+   * Use this when you want to preserve the session for fallback/offline.
+   */
+  markAsMigrated(agentPubKey: string, humanId: string): void {
+    const session = this.sessionSubject.value;
+    if (!session) return;
+
+    session.sessionState = 'migrated';
+    session.linkedAgentPubKey = agentPubKey;
+    session.linkedHumanId = humanId;
+    session.linkedAt = new Date().toISOString();
+    session.isAnonymous = false;
+    session.accessLevel = 'linked';
+    session.upgradeIntent = undefined;
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Clear session completely after migration.
+   * Use this when user wants to fully delete session data.
    */
   clearAfterMigration(): void {
     const session = this.sessionSubject.value;
@@ -707,6 +891,13 @@ export class SessionHumanService {
     keysToRemove.forEach(key => localStorage.removeItem(key));
 
     this.sessionSubject.next(null);
+  }
+
+  /**
+   * Get session state.
+   */
+  getSessionState(): SessionState | null {
+    return this.sessionSubject.value?.sessionState ?? null;
   }
 
   // =========================================================================

@@ -9,5 +9,8 @@ name = "content_store"
 
 [dependencies]
 hdk.workspace = true
+holochain_serialized_bytes.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 content_store_integrity = { path = "../content_store_integrity" }
+getrandom = { version = "0.3", features = ["wasm_js"] }

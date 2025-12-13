@@ -1,6 +1,6 @@
 # Lamad Spike hApp Manifest
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: lamad-spike
 description: "Minimal hApp for testing browser-to-Holochain connectivity"
 roles:
@@ -9,4 +9,4 @@ roles:
       strategy: create
       deferred: false
     dna:
-      bundled: "../lamad_spike.dna"
+      path: "lamad_spike.dna"

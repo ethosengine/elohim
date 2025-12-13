@@ -2,8 +2,11 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, forkJoin, from, defer } from 'rxjs';
 import { catchError, map, shareReplay, switchMap } from 'rxjs/operators';
-import { environment } from '../../../environments/environment';
-import { KuzuDataService } from './kuzu-data.service';
+import {
+  HolochainContentService,
+  HolochainPathWithSteps,
+  HolochainPathIndex,
+} from './holochain-content.service';
 
 // Models from elohim (local)
 import { Agent, AgentProgress } from '../models/agent.model';
@@ -160,8 +163,6 @@ export interface GovernanceStateRecord {
 @Injectable({ providedIn: 'root' })
 export class DataLoaderService {
   private readonly basePath = '/assets/lamad-data';
-  private useKuzu: boolean;
-  private kuzuInitPromise: Promise<void> | null = null;
 
   // Caches to prevent redundant HTTP calls (shareReplay pattern)
   private readonly pathCache = new Map<string, Observable<LearningPath>>();
@@ -172,100 +173,81 @@ export class DataLoaderService {
 
   constructor(
     private readonly http: HttpClient,
-    private readonly kuzuService: KuzuDataService
-  ) {
-    // Use Kuzu WASM database if enabled in environment
-    this.useKuzu = (environment as any).useKuzuDb ?? false;
-  }
-
-  /**
-   * Ensures Kuzu is initialized before use (lazy initialization).
-   * Returns a promise that resolves when initialization is complete.
-   */
-  private async ensureKuzuInitialized(): Promise<void> {
-    if (!this.useKuzu) {
-      return;
-    }
-
-    this.kuzuInitPromise ??= this.kuzuService.initialize().catch(err => {
-      console.error('[DataLoader] Kuzu initialization failed:', err);
-      this.useKuzu = false;
-    });
-
-    return this.kuzuInitPromise;
-  }
+    private readonly holochainContent: HolochainContentService
+  ) {}
 
   /**
    * Load a LearningPath by ID.
    * Does NOT load the content for each step (lazy loading).
-   * Falls back to JSON if path not in Kuzu.
+   * Uses Holochain as the only source.
    */
   getPath(pathId: string): Observable<LearningPath> {
     if (!this.pathCache.has(pathId)) {
-      let request: Observable<LearningPath>;
-
-      if (this.useKuzu) {
-        // Kuzu is the primary source for paths - ensure initialization first
-        request = defer(() => from(this.ensureKuzuInitialized())).pipe(
-          switchMap(() => this.kuzuService.getPath(pathId)),
-          shareReplay(1),
-          catchError(() => {
-            console.warn(`[DataLoader] ⚠️ KUZU MISSING: LearningPath "${pathId}"`);
+      const request = defer(() =>
+        from(this.holochainContent.getPathWithSteps(pathId))
+      ).pipe(
+        map(result => {
+          if (!result) {
             throw new Error(`Path not found: ${pathId}`);
-          })
-        );
-      } else {
-        request = this.http.get<LearningPath>(
-          `${this.basePath}/paths/${pathId}.json`
-        ).pipe(
-          shareReplay(1),
-          catchError(() => {
-            throw new Error(`Path not found: ${pathId}`);
-          })
-        );
-      }
+          }
+          return this.transformHolochainPath(result);
+        }),
+        shareReplay(1)
+      );
 
       this.pathCache.set(pathId, request);
     }
     return this.pathCache.get(pathId)!;
   }
 
-  // Track content fallbacks to avoid log spam
-  private readonly contentFallbackLog = new Set<string>();
+  /**
+   * Transform Holochain path response to LearningPath model.
+   * Maps snake_case Rust fields to camelCase TypeScript fields.
+   */
+  private transformHolochainPath(hcPath: HolochainPathWithSteps): LearningPath {
+    return {
+      id: hcPath.path.id,
+      version: hcPath.path.version,
+      title: hcPath.path.title,
+      description: hcPath.path.description,
+      purpose: hcPath.path.purpose ?? '',
+      createdBy: hcPath.path.created_by,
+      contributors: [],
+      createdAt: hcPath.path.created_at,
+      updatedAt: hcPath.path.updated_at,
+      difficulty: hcPath.path.difficulty as LearningPath['difficulty'],
+      estimatedDuration: hcPath.path.estimated_duration ?? '',
+      tags: hcPath.path.tags,
+      visibility: hcPath.path.visibility as LearningPath['visibility'],
+      steps: hcPath.steps.map((s, index) => ({
+        order: s.step.order_index,
+        stepType: (s.step.step_type || 'content') as 'content' | 'path' | 'external' | 'checkpoint',
+        resourceId: s.step.resource_id,
+        stepTitle: s.step.step_title ?? `Step ${index + 1}`,
+        stepNarrative: s.step.step_narrative ?? '',
+        learningObjectives: [],
+        optional: s.step.is_optional,
+        completionCriteria: [],
+      })),
+    };
+  }
 
   /**
    * Load a ContentNode by ID.
    * This is the only way to get content - enforces lazy loading.
-   * Uses Kuzu as primary source (loaded from CSV for full content support).
+   * Uses Holochain as the only source.
    */
   getContent(resourceId: string): Observable<ContentNode> {
     if (!this.contentCache.has(resourceId)) {
-      let request: Observable<ContentNode>;
-
-      if (this.useKuzu) {
-        // Kuzu is primary source for content - ensure initialization first
-        request = defer(() => from(this.ensureKuzuInitialized())).pipe(
-          switchMap(() => this.kuzuService.getContent(resourceId)),
-          shareReplay(1),
-          catchError(() => {
-            // Log missing content (once per resourceId)
-            if (!this.contentFallbackLog.has(resourceId)) {
-              this.contentFallbackLog.add(resourceId);
-              console.warn(`[DataLoader] ⚠️ KUZU MISSING: ContentNode "${resourceId}"`);
-            }
+      const request = this.holochainContent.getContent(resourceId).pipe(
+        map(content => {
+          if (!content) {
             throw new Error(`Content not found: ${resourceId}`);
-          })
-        );
-      } else {
-        request = this.http.get<ContentNode>(
-          `${this.basePath}/content/${resourceId}.json`
-        ).pipe(
-          shareReplay(1),
-          catchError(() => {
-            throw new Error(`Content not found: ${resourceId}`);
-          })
-        );
-      }
+          }
+          return content;
+        }),
+        shareReplay(1)
+      );
 
       this.contentCache.set(resourceId, request);
     }
@@ -275,46 +257,54 @@ export class DataLoaderService {
   /**
    * Load the content index for search/discovery.
    * Returns metadata only, not full content.
+   *
+   * TODO: Implement getContentIndex in HolochainContentService
    */
   getContentIndex(): Observable<any> {
-    // Delegate to Kuzu if enabled - ensure initialization first
-    if (this.useKuzu) {
-      return defer(() => from(this.ensureKuzuInitialized())).pipe(
-        switchMap(() => this.kuzuService.getContentIndex())
-      );
-    }
-
-    return this.http.get(`${this.basePath}/content/index.json`).pipe(
-      catchError(() => of({ nodes: [], lastUpdated: new Date().toISOString() }))
+    // TODO: Implement content index via Holochain (get all content metadata)
+    return this.holochainContent.getStats().pipe(
+      map(stats => ({
+        nodes: [],  // TODO: Fetch actual content list
+        totalCount: stats.total_count,
+        byType: stats.by_type,
+        lastUpdated: new Date().toISOString()
+      }))
     );
   }
 
   /**
    * Load the path index for discovery.
-   * Falls back to JSON if Kuzu has no path data.
+   * Uses Holochain as the only source.
    */
   getPathIndex(): Observable<PathIndex> {
-    // Kuzu is primary source for path index - ensure initialization first
-    if (this.useKuzu) {
-      return defer(() => from(this.ensureKuzuInitialized())).pipe(
-        switchMap(() => this.kuzuService.getPathIndex()),
-        switchMap(index => {
-          if (!index.paths || index.paths.length === 0) {
-            console.warn('[DataLoader] ⚠️ KUZU MISSING: PathIndex (0 paths in Kuzu)');
-            return of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() });
-          }
-          return of(index);
-        }),
-        catchError(err => {
-          console.warn('[DataLoader] ⚠️ KUZU ERROR for PathIndex:', err.message);
-          return of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() });
-        })
-      );
-    }
-
-    return this.http.get<PathIndex>(`${this.basePath}/paths/index.json`).pipe(
-      catchError(() => of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() }))
+    return defer(() =>
+      from(this.holochainContent.getPathIndex())
+    ).pipe(
+      map(hcIndex => this.transformHolochainPathIndex(hcIndex)),
+      catchError(err => {
+        console.error('[DataLoader] Failed to load path index:', err);
+        return of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() });
+      })
     );
+  }
+
+  /**
+   * Transform Holochain path index to PathIndex model.
+   */
+  private transformHolochainPathIndex(hcIndex: HolochainPathIndex): PathIndex {
+    return {
+      lastUpdated: hcIndex.last_updated,
+      totalCount: hcIndex.total_count,
+      paths: hcIndex.paths.map(p => ({
+        id: p.id,
+        title: p.title,
+        description: p.description,
+        difficulty: p.difficulty as any,
+        estimatedDuration: p.estimated_duration ?? '',
+        stepCount: p.step_count,
+        tags: p.tags,
+      })),
+    };
   }
 
   /**
@@ -378,21 +368,8 @@ export class DataLoaderService {
     this.attestationCache$ = null;
     this.attestationsByContentCache.clear();
     this.graphCache$ = null;
-    this.contentFallbackLog.clear();
-    // Also clear Kuzu caches if enabled
-    if (this.useKuzu) {
-      this.kuzuService.clearCache();
-    }
-  }
-
-  /**
-   * Get a summary of what's missing from Kuzu (for debugging).
-   * Call this from browser console: `ng.getComponent(document.querySelector('app-root')).dataLoader.getKuzuMissingSummary()`
-   */
-  getKuzuMissingSummary(): { contentFallbacks: string[] } {
-    return {
-      contentFallbacks: Array.from(this.contentFallbackLog)
-    };
+    // Also clear Holochain content cache
+    this.holochainContent.clearCache();
   }
 
   // =========================================================================

@@ -22,9 +22,6 @@ export { PathService } from './path.service';
 // Content access
 export { ContentService } from './content.service';
 
-// Kuzu embedded database (WASM) - re-exported from elohim
-export { KuzuDataService } from '@app/elohim/services/kuzu-data.service';
-
 // Graph exploration
 export { ExplorationService } from './exploration.service';
 
@@ -49,12 +46,29 @@ export { PathNegotiationService } from './path-negotiation.service';
 
 // Content mastery
 export { ContentMasteryService } from './content-mastery.service';
+export type { MigrationResult } from './content-mastery.service';
 
-// Local source chain (Holochain-style agent-centric storage) - re-exported from elohim
+// Practice pool and challenges (Khan Academy-style)
+export { PracticeService } from './practice.service';
+
+// Learning points (Shefa integration)
+export { PointsService } from './points.service';
+
+// Local source chain (agent-centric storage) - re-exported from elohim
 export { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 
 // Progress migration
 export { ProgressMigrationService } from './progress-migration.service';
+
+// ============================================================================
+// LAMAD STEWARD ECONOMY SERVICES
+// ============================================================================
+
+// Contributor dashboard & impact tracking
+export { ContributorService } from './contributor.service';
+
+// Steward economy (credentials, gates, access, revenue)
+export { StewardService } from './steward.service';
 
 // ============================================================================
 // RE-EXPORTS FROM ELOHIM (Protocol-Core)
@@ -92,7 +106,8 @@ export { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
 export { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
 // Profile (human-centered identity view, Imago Dei aligned)
-export { ProfileService } from '@app/imagodei/services/profile.service';
+// Note: ProfileService is in elohim/services (cross-pillar service)
+export { ProfileService } from '@app/elohim/services/profile.service';
 
 // ============================================================================
 // RE-EXPORTS FROM QAHAL (Community)
@@ -102,8 +117,10 @@ export { ProfileService } from '@app/imagodei/services/profile.service';
 export { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 
 // Human consent (graduated intimacy)
-export { HumanConsentService } from '@app/qahal/services/human-consent.service';
+// Note: HumanConsentService is in elohim/services (cross-pillar service)
+export { HumanConsentService } from '@app/elohim/services/human-consent.service';
 
 // Governance (challenges, proposals, precedents, deliberation)
-export { GovernanceService } from '@app/qahal/services/governance.service';
-export type { ChallengeSubmission, ProposalSubmission, Vote, DiscussionMessage } from '@app/qahal/services/governance.service';
+// Note: GovernanceService is in elohim/services (cross-pillar service)
+export { GovernanceService } from '@app/elohim/services/governance.service';
+export type { ChallengeSubmission, ProposalSubmission, Vote, DiscussionMessage } from '@app/elohim/services/governance.service';

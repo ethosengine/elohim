@@ -1,0 +1,227 @@
+<div class="profile-container">
+  <div class="profile-card">
+    <!-- Header -->
+    <div class="profile-header">
+      <button type="button" class="back-button" (click)="goBack()">← Back</button>
+      <h1>Your Profile</h1>
+    </div>
+
+    <!-- Loading State -->
+    @if (isLoading()) {
+      <div class="loading-state">
+        <span class="spinner"></span>
+        <span>Loading profile...</span>
+      </div>
+    }
+
+    <!-- Success Message -->
+    @if (successMessage()) {
+      <div class="success-banner" (click)="clearMessages()">
+        <span class="success-icon">✓</span>
+        <span>{{ successMessage() }}</span>
+      </div>
+    }
+
+    <!-- Error Display -->
+    @if (error()) {
+      <div class="error-banner" (click)="clearMessages()">
+        <span class="error-icon">✕</span>
+        <span>{{ error() }}</span>
+      </div>
+    }
+
+    <!-- Profile Content -->
+    @if (!isLoading()) {
+      <!-- View Mode -->
+      @if (!isEditing()) {
+        <div class="profile-view">
+          <!-- Avatar & Name -->
+          <div class="profile-identity">
+            <div class="avatar">{{ initials() }}</div>
+            <div class="identity-info">
+              <h2 class="display-name">{{ displayName() }}</h2>
+              <span class="mode-badge" [class]="mode()">{{ mode() }}</span>
+            </div>
+          </div>
+
+          <!-- Sovereignty Stage -->
+          <div class="sovereignty-section">
+            <span class="sovereignty-label">Sovereignty Stage</span>
+            <span class="sovereignty-value">{{ sovereigntyInfo().label }}</span>
+          </div>
+
+          <!-- Profile Details -->
+          @if (profile(); as p) {
+            <div class="profile-details">
+              <!-- Bio -->
+              @if (p.bio) {
+                <div class="detail-group">
+                  <span class="detail-label">Bio</span>
+                  <p class="detail-value bio">{{ p.bio }}</p>
+                </div>
+              }
+
+              <!-- Affinities -->
+              @if (p.affinities && p.affinities.length > 0) {
+                <div class="detail-group">
+                  <span class="detail-label">Interests</span>
+                  <div class="affinities">
+                    @for (affinity of p.affinities; track affinity) {
+                      <span class="affinity-tag">{{ affinity }}</span>
+                    }
+                  </div>
+                </div>
+              }
+
+              <!-- Location -->
+              @if (p.location) {
+                <div class="detail-group">
+                  <span class="detail-label">Location</span>
+                  <span class="detail-value">{{ p.location }}</span>
+                </div>
+              }
+
+              <!-- Profile Reach -->
+              <div class="detail-group">
+                <span class="detail-label">Visibility</span>
+                <span class="detail-value">{{ getReachLabel(p.profileReach) }}</span>
+              </div>
+
+              <!-- Member Since -->
+              <div class="detail-group">
+                <span class="detail-label">Member Since</span>
+                <span class="detail-value">{{ formatDate(p.createdAt) }}</span>
+              </div>
+            </div>
+          }
+
+          <!-- Attestations -->
+          @if (attestations().length > 0) {
+            <div class="attestations-section">
+              <span class="section-title">Attestations</span>
+              <div class="attestations">
+                @for (attestation of attestations(); track attestation) {
+                  <span class="attestation-badge">{{ attestation }}</span>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Edit Button -->
+          @if (canEdit()) {
+            <div class="profile-actions">
+              <button type="button" class="btn btn-primary" (click)="startEditing()">
+                Edit Profile
+              </button>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Edit Mode -->
+      @if (isEditing()) {
+        <form class="profile-edit" (ngSubmit)="saveProfile()">
+          <!-- Display Name -->
+          <div class="form-group">
+            <label for="displayName">Display Name *</label>
+            <input
+              id="displayName"
+              type="text"
+              [(ngModel)]="form.displayName"
+              name="displayName"
+              required
+              maxlength="50"
+              [disabled]="isSaving()"
+            />
+          </div>
+
+          <!-- Bio -->
+          <div class="form-group">
+            <label for="bio">Bio</label>
+            <textarea
+              id="bio"
+              [(ngModel)]="form.bio"
+              name="bio"
+              rows="3"
+              maxlength="500"
+              [disabled]="isSaving()"
+            ></textarea>
+          </div>
+
+          <!-- Affinities -->
+          <div class="form-group">
+            <label for="affinities">Interests</label>
+            <input
+              id="affinities"
+              type="text"
+              [(ngModel)]="form.affinities"
+              name="affinities"
+              placeholder="philosophy, technology, community..."
+              [disabled]="isSaving()"
+            />
+            <span class="hint">Comma-separated</span>
+          </div>
+
+          <!-- Location -->
+          <div class="form-group">
+            <label for="location">Location</label>
+            <input
+              id="location"
+              type="text"
+              [(ngModel)]="form.location"
+              name="location"
+              maxlength="100"
+              [disabled]="isSaving()"
+            />
+          </div>
+
+          <!-- Profile Reach -->
+          <div class="form-group">
+            <label>Visibility</label>
+            <div class="reach-options">
+              @for (option of reachOptions; track option.value) {
+                <label class="reach-option" [class.selected]="form.profileReach === option.value">
+                  <input
+                    type="radio"
+                    [(ngModel)]="form.profileReach"
+                    name="profileReach"
+                    [value]="option.value"
+                    [disabled]="isSaving()"
+                  />
+                  <div class="reach-content">
+                    <strong>{{ option.label }}</strong>
+                    <span>{{ option.description }}</span>
+                  </div>
+                </label>
+              }
+            </div>
+          </div>
+
+          <!-- Form Actions -->
+          <div class="form-actions">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              (click)="cancelEditing()"
+              [disabled]="isSaving()"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              [disabled]="isSaving() || !form.displayName.trim()"
+            >
+              @if (isSaving()) {
+                <span class="spinner"></span>
+                Saving...
+              } @else {
+                Save Changes
+              }
+            </button>
+          </div>
+        </form>
+      }
+    }
+  </div>
+</div>

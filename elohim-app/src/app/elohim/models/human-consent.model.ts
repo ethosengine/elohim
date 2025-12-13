@@ -25,35 +25,19 @@
  * enables X and Y to have their Elohim agents craft a love map path.
  */
 
-// Re-export shared types from protocol-core
-import { IntimacyLevel, ConsentState } from '@app/elohim/models/protocol-core.model';
+// Import shared types from protocol-core (canonical source)
+import {
+  IntimacyLevel,
+  ConsentState,
+  INTIMACY_LEVEL_VALUES,
+  hasMinimumIntimacy,
+  getNextIntimacyLevel,
+  isConsentActive,
+  type ConsentStateChange as BaseConsentStateChange,
+} from '@app/elohim/models/protocol-core.model';
 
-// Re-export for convenience
+// Re-export for convenience (types only to avoid duplicate values)
 export type { IntimacyLevel, ConsentState };
-
-// =========================================================================
-// Intimacy Levels (helpers)
-// =========================================================================
-
-/**
- * Numeric values for intimacy levels for comparison operations.
- */
-export const INTIMACY_LEVEL_VALUES: Record<IntimacyLevel, number> = {
-  recognition: 0,
-  connection: 1,
-  trusted: 2,
-  intimate: 3,
-};
-
-/**
- * Check if source level is at least as intimate as target level.
- */
-export function hasMinimumIntimacy(
-  current: IntimacyLevel,
-  required: IntimacyLevel
-): boolean {
-  return INTIMACY_LEVEL_VALUES[current] >= INTIMACY_LEVEL_VALUES[required];
-}
 
 // =========================================================================
 // Human Consent Record
@@ -150,7 +134,7 @@ export interface HumanConsent {
   /**
    * History of consent state changes for audit purposes.
    */
-  stateHistory: ConsentStateChange[];
+  stateHistory: HumanConsentStateChange[];
 
   /**
    * How many times has elevation been requested/declined?
@@ -160,16 +144,15 @@ export interface HumanConsent {
 }
 
 /**
- * ConsentStateChange - Record of a consent state transition.
+ * HumanConsentStateChange - Record of a consent state transition for human relationships.
+ *
+ * Extends the base ConsentStateChange with intimacy level tracking.
  */
-export interface ConsentStateChange {
-  fromState: ConsentState;
-  toState: ConsentState;
+export interface HumanConsentStateChange extends BaseConsentStateChange {
+  /** Previous intimacy level (if changed) */
   fromLevel?: IntimacyLevel;
+  /** New intimacy level (if changed) */
   toLevel?: IntimacyLevel;
-  timestamp: string;
-  initiatedBy: 'initiator' | 'participant' | 'system';
-  reason?: string;
 }
 
 // =========================================================================
@@ -274,13 +257,6 @@ export function requiresMutualAttestation(level: IntimacyLevel): boolean {
 }
 
 /**
- * Check if a consent state allows relationship usage.
- */
-export function isConsentActive(state: ConsentState): boolean {
-  return state === 'accepted' || state === 'not_required';
-}
-
-/**
  * Check if consent can be elevated (not at max level, is accepted).
  */
 export function canElevate(consent: HumanConsent): boolean {
@@ -289,20 +265,5 @@ export function canElevate(consent: HumanConsent): boolean {
   );
 }
 
-/**
- * Get the next intimacy level, if any.
- */
-export function getNextIntimacyLevel(
-  current: IntimacyLevel
-): IntimacyLevel | null {
-  switch (current) {
-    case 'recognition':
-      return 'connection';
-    case 'connection':
-      return 'trusted';
-    case 'trusted':
-      return 'intimate';
-    case 'intimate':
-      return null; // Already at max
-  }
-}
+// Re-export utility functions from protocol-core for convenience
+export { INTIMACY_LEVEL_VALUES, hasMinimumIntimacy, getNextIntimacyLevel, isConsentActive };

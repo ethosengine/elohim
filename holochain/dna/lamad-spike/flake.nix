@@ -2,7 +2,7 @@
   description = "Lamad Spike - Minimal Holochain DNA for browser connectivity testing";
 
   inputs = {
-    holonix.url = "github:holochain/holonix?ref=main-0.5";
+    holonix.url = "github:holochain/holonix?ref=main-0.6";
     nixpkgs.follows = "holonix/nixpkgs";
   };
 

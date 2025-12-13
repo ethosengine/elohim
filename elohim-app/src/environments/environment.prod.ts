@@ -5,7 +5,6 @@ export const environment = {
   logLevel: 'error' as LogLevel,
   environment: 'production',
   gitHash: 'GIT_HASH_PLACEHOLDER',
-  useKuzuDb: true,  // Use embedded Kuzu WASM database
   // Holochain Edge Node configuration (prod - not yet deployed)
   // Single proxy URL handles admin operations with authentication
   // TODO: Update proxyApiKey when prod Edge Node is deployed
