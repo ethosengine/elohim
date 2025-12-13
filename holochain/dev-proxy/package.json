@@ -1,14 +1,15 @@
 {
   "name": "elohim-dev-proxy",
   "version": "1.0.0",
-  "description": "Path-based WebSocket proxy for Holochain development in Eclipse Che",
+  "deprecated": "Use admin-proxy with DEV_MODE=true instead. Run: cd ../admin-proxy && DEV_MODE=true npm start",
+  "description": "[DEPRECATED] Path-based WebSocket proxy for Holochain development - use admin-proxy with DEV_MODE=true instead",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "start:local": "node dist/index.js",
-    "start:remote": "CONDUCTOR_URL=wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024 node dist/index.js",
+    "start": "echo '⚠️  DEPRECATED: Use admin-proxy with DEV_MODE=true instead' && echo '   Run: cd ../admin-proxy && DEV_MODE=true npm start' && echo '' && node dist/index.js",
+    "start:local": "npm run start",
+    "start:remote": "CONDUCTOR_URL=wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024 npm run start",
     "dev": "tsc --watch"
   },
   "dependencies": {

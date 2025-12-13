@@ -22,7 +22,7 @@
     "hc:stop": "pkill -f 'holochain.*conductor' ; fuser -k 8888/tcp 2>/dev/null ; echo 'Stopped Holochain services'",
     "hc:reset": "npm run hc:stop && rm -rf ../holochain/local-dev/.hc* ../holochain/local-dev/.sandbox* && echo '🗑️  Cleared Holochain sandbox data'",
     "hc:sandbox": "cd ../holochain/local-dev && hc sandbox generate --run 4444 --app-port 4445",
-    "hc:proxy": "cd ../holochain/dev-proxy && npm start",
+    "hc:proxy": "cd ../holochain/admin-proxy && DEV_MODE=true npm start",
     "hc:install": "hc sandbox call --running 4444 install-app ../holochain/dna/lamad-spike/workdir/lamad-spike.happ --app-id lamad-spike && hc sandbox call --running 4444 enable-app lamad-spike",
     "hc:seed": "cd ../holochain/seeder && npm run seed",
     "hc:seed:sample": "cd ../holochain/seeder && npm run seed:sample",

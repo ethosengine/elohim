@@ -112,29 +112,29 @@ for i in {1..15}; do
     sleep 1
 done
 
-# Check if dev-proxy is already running with correct admin port
+# Check if proxy is already running with correct admin port
 PROXY_STATUS=$(curl -s http://localhost:8888/status 2>/dev/null || echo "")
-PROXY_ADMIN_PORT=$(echo "$PROXY_STATUS" | grep -o '"adminPort":[0-9]*' | grep -o '[0-9]*' || echo "0")
+PROXY_CONDUCTOR_URL=$(echo "$PROXY_STATUS" | grep -o '"conductorUrl":"[^"]*"' | grep -o 'localhost:[0-9]*' | grep -o '[0-9]*' || echo "0")
 
-if [ -n "$PROXY_STATUS" ] && [ "$PROXY_ADMIN_PORT" = "$ADMIN_PORT" ]; then
-    echo "✅ Dev-proxy already running with correct admin port $ADMIN_PORT"
+if [ -n "$PROXY_STATUS" ] && [ "$PROXY_CONDUCTOR_URL" = "$ADMIN_PORT" ]; then
+    echo "✅ Proxy already running with correct admin port $ADMIN_PORT"
 else
     if [ -n "$PROXY_STATUS" ]; then
-        echo "⚠️  Dev-proxy running with wrong admin port ($PROXY_ADMIN_PORT vs $ADMIN_PORT), restarting..."
+        echo "⚠️  Proxy running with wrong admin port ($PROXY_CONDUCTOR_URL vs $ADMIN_PORT), restarting..."
         fuser -k 8888/tcp 2>/dev/null || true
         sleep 1
     fi
 
-    echo "🚀 Starting dev-proxy with admin port $ADMIN_PORT..."
-    cd "$HC_DIR/dev-proxy"
-    # Pass the dynamic admin port to dev-proxy via CONDUCTOR_ADMIN_PORT env var
-    CONDUCTOR_ADMIN_PORT="$ADMIN_PORT" npm start &
+    echo "🚀 Starting admin-proxy with admin port $ADMIN_PORT (dev mode)..."
+    cd "$HC_DIR/admin-proxy"
+    # Pass the dynamic admin port via CONDUCTOR_URL, enable DEV_MODE for no auth
+    DEV_MODE=true CONDUCTOR_URL="ws://localhost:$ADMIN_PORT" npm start &
 
     # Wait for proxy to be ready
-    echo "⏳ Waiting for dev-proxy to start..."
+    echo "⏳ Waiting for proxy to start..."
     for i in {1..10}; do
         if curl -s http://localhost:8888/health >/dev/null 2>&1; then
-            echo "✅ Dev-proxy ready on port 8888 → admin:$ADMIN_PORT"
+            echo "✅ Proxy ready on port 8888 → admin:$ADMIN_PORT"
             break
         fi
         sleep 1
@@ -177,7 +177,7 @@ echo ""
 echo "🔷 Holochain Stack Status:"
 echo "   Admin port: $ADMIN_PORT"
 echo "   App port: 4445"
-curl -s http://localhost:8888/status 2>/dev/null | head -1 || echo "   Dev-proxy: not responding"
+curl -s http://localhost:8888/status 2>/dev/null | head -1 || echo "   Proxy: not responding"
 echo ""
 hc sandbox call --running "$ADMIN_PORT" list-apps 2>/dev/null | head -5
 

@@ -165,9 +165,9 @@ commands:
   - id: start-hc-dev-proxy
     exec:
       component: tools
-      workingDir: /projects/elohim/holochain/dev-proxy
+      workingDir: /projects/elohim/holochain/admin-proxy
       commandLine: |
-        npm install && npm run build && npm start
+        DEV_MODE=true npm install && npm run build && npm start
 
   - id: build-happ
     exec:
