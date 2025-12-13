@@ -360,6 +360,46 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        stage('Build hApp Installer') {
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Building hApp Installer image: ${IMAGE_TAG}"
+
+                            // Unstash hApp if it was built
+                            try {
+                                dir('holochain/edgenode/scripts') {
+                                    unstash 'happ-bundle'
+                                }
+                                echo "hApp bundle available for installer image"
+                            } catch (Exception e) {
+                                error "hApp bundle not found - cannot build installer image"
+                            }
+
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                cd holochain/edgenode/scripts
+
+                                # Build hApp installer sidecar
+                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                    nerdctl -n k8s.io build \\
+                                    -t elohim-happ-installer:${IMAGE_TAG} \\
+                                    -f Dockerfile .
+
+                                nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} elohim-happ-installer:${GIT_COMMIT_HASH}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Push to Harbor') {
             steps {
                 container('builder') {
@@ -393,6 +433,20 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     fi
                                 """
 
+                                // Push hApp Installer image
+                                sh """
+                                    if nerdctl -n k8s.io images | grep -q "elohim-happ-installer.*${IMAGE_TAG}"; then
+                                        echo "Pushing hApp Installer image..."
+                                        nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:${IMAGE_TAG}
+                                        nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:${GIT_COMMIT_HASH}
+
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:${GIT_COMMIT_HASH}
+                                    else
+                                        echo "hApp Installer image not found, skipping push"
+                                    fi
+                                """
+
                                 if (env.BRANCH_NAME == 'dev') {
                                     sh """
                                         nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
@@ -401,6 +455,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                         if nerdctl -n k8s.io images | grep -q "elohim-admin-proxy.*${IMAGE_TAG}"; then
                                             nerdctl -n k8s.io tag elohim-admin-proxy:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-admin-proxy:dev-latest
                                             nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-admin-proxy:dev-latest
+                                        fi
+
+                                        if nerdctl -n k8s.io images | grep -q "elohim-happ-installer.*${IMAGE_TAG}"; then
+                                            nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:dev-latest
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:dev-latest
                                         fi
                                     """
                                 }
@@ -478,6 +537,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi elohim-admin-proxy:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-admin-proxy:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi elohim-happ-installer:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-happ-installer:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io system prune -af --volumes || true
                             """
                         }

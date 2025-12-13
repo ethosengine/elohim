@@ -1,0 +1,13 @@
+{
+  "name": "happ-installer",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Installs hApp on Holochain conductor startup",
+  "main": "install-happ.mjs",
+  "scripts": {
+    "install-happ": "node install-happ.mjs"
+  },
+  "dependencies": {
+    "@holochain/client": "^0.20.0"
+  }
+}
