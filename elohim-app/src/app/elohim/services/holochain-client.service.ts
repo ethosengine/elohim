@@ -132,6 +132,19 @@ export class HolochainClientService {
       return url;
     }
 
+    // Check if we have a configured admin URL (deployed environment)
+    // Route app interface through admin-proxy using /app/:port path
+    if (this.config.adminUrl && !this.config.adminUrl.includes('localhost')) {
+      // Use admin URL base with /app/:port path
+      const baseUrl = this.config.adminUrl.replace(/\/$/, ''); // Remove trailing slash
+      const apiKeyParam = this.config.proxyApiKey
+        ? `?apiKey=${encodeURIComponent(this.config.proxyApiKey)}`
+        : '';
+      const url = `${baseUrl}/app/${port}${apiKeyParam}`;
+      console.log('[Holochain] App URL resolved (admin-proxy):', url);
+      return url;
+    }
+
     // Default: direct localhost connection (works for local dev)
     const url = `ws://localhost:${port}`;
     console.log('[Holochain] App URL resolved (direct):', url);

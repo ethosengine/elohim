@@ -131,3 +131,70 @@ function toBuffer(data: RawData): Buffer {
   }
   return Buffer.from(data);
 }
+
+export interface AppProxyOptions {
+  clientWs: WebSocket;
+  appPort: number;
+  clientId: string;
+  clientOrigin?: string;
+  onClose?: () => void;
+}
+
+/**
+ * Creates a simple passthrough proxy for app interface connections.
+ * No message filtering - app interfaces don't need permission checks.
+ */
+export function createAppProxy(options: AppProxyOptions): void {
+  const { clientWs, appPort, clientId, clientOrigin, onClose } = options;
+
+  const appUrl = `ws://localhost:${appPort}`;
+  console.log(`[${clientId}] Creating app proxy to ${appUrl} (origin: ${clientOrigin ?? 'none'})`);
+
+  // Connect to conductor app interface
+  const conductorWs = new WebSocket(appUrl, {
+    origin: clientOrigin ?? 'http://localhost:8080',
+  });
+
+  conductorWs.on('open', () => {
+    console.log(`[${clientId}] Connected to app interface on port ${appPort}`);
+  });
+
+  conductorWs.on('error', (err) => {
+    console.error(`[${clientId}] App interface connection error:`, err.message);
+    clientWs.close(1011, 'App interface connection error');
+  });
+
+  // Client -> Conductor (passthrough)
+  clientWs.on('message', (data: RawData) => {
+    if (conductorWs.readyState === WebSocket.OPEN) {
+      conductorWs.send(data);
+    }
+  });
+
+  // Conductor -> Client (passthrough)
+  conductorWs.on('message', (data: RawData) => {
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.send(data);
+    }
+  });
+
+  // Handle disconnections
+  clientWs.on('close', (code, reason) => {
+    console.log(`[${clientId}] App client disconnected: ${code} ${reason.toString()}`);
+    conductorWs.close();
+    onClose?.();
+  });
+
+  clientWs.on('error', (err) => {
+    console.error(`[${clientId}] App client error:`, err.message);
+    conductorWs.close();
+  });
+
+  conductorWs.on('close', (code, reason) => {
+    console.log(`[${clientId}] App interface disconnected: ${code} ${reason.toString()}`);
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.close(1011, 'App interface disconnected');
+    }
+    onClose?.();
+  });
+}

@@ -2,9 +2,35 @@ import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { loadConfig, Config } from './config.js';
 import { validateApiKey, extractApiKey } from './auth.js';
-import { createProxy } from './proxy.js';
+import { createProxy, createAppProxy } from './proxy.js';
 import { getPermissionLevelName, PermissionLevel } from './permissions.js';
 import type { Duplex } from 'stream';
+
+// App interface port range (matches dev-proxy)
+const APP_PORT_MIN = 4445;
+const APP_PORT_MAX = 65535;
+
+/**
+ * Parse URL path to determine route type
+ */
+function parseRoute(url: string): { type: 'admin' } | { type: 'app'; port: number } | null {
+  // Match /app/:port pattern
+  const appMatch = url.match(/^\/app\/(\d+)/);
+  if (appMatch) {
+    const port = parseInt(appMatch[1], 10);
+    if (port >= APP_PORT_MIN && port <= APP_PORT_MAX) {
+      return { type: 'app', port };
+    }
+    return null; // Invalid port
+  }
+
+  // Default to admin interface (root path or /admin)
+  if (url === '/' || url.startsWith('/?') || url.startsWith('/admin')) {
+    return { type: 'admin' };
+  }
+
+  return null;
+}
 
 let config: Config;
 let connectionCounter = 0;
@@ -51,7 +77,16 @@ function handleUpgrade(
   const host = request.headers.host ?? 'localhost';
   const url = request.url ?? '/';
 
-  console.log(`[${clientId}] Upgrade request from ${request.socket.remoteAddress}`);
+  console.log(`[${clientId}] Upgrade request from ${request.socket.remoteAddress} for ${url}`);
+
+  // Parse route to determine admin vs app interface
+  const route = parseRoute(url);
+  if (!route) {
+    console.warn(`[${clientId}] Invalid route: ${url}`);
+    socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+    socket.destroy();
+    return;
+  }
 
   // Extract and validate API key
   const apiKey = extractApiKey(url, host);
@@ -65,23 +100,37 @@ function handleUpgrade(
   }
 
   const levelName = getPermissionLevelName(permissionLevel);
-  console.log(`[${clientId}] Authenticated with ${levelName} access`);
+  console.log(`[${clientId}] Authenticated with ${levelName} access, route: ${route.type}`);
 
-  // Accept the WebSocket connection
   // Pass through client's Origin header to conductor
   const clientOrigin = request.headers.origin;
 
+  // Accept the WebSocket connection and create appropriate proxy
   wss.handleUpgrade(request, socket, head, (ws: WebSocket) => {
-    createProxy({
-      clientWs: ws,
-      permissionLevel,
-      conductorUrl: config.conductorUrl,
-      clientId,
-      clientOrigin,
-      onClose: () => {
-        console.log(`[${clientId}] Proxy closed`);
-      },
-    });
+    if (route.type === 'app') {
+      // App interface - simple passthrough proxy
+      createAppProxy({
+        clientWs: ws,
+        appPort: route.port,
+        clientId,
+        clientOrigin,
+        onClose: () => {
+          console.log(`[${clientId}] App proxy closed`);
+        },
+      });
+    } else {
+      // Admin interface - filtered proxy with permission checks
+      createProxy({
+        clientWs: ws,
+        permissionLevel,
+        conductorUrl: config.conductorUrl,
+        clientId,
+        clientOrigin,
+        onClose: () => {
+          console.log(`[${clientId}] Admin proxy closed`);
+        },
+      });
+    }
   });
 }
 
