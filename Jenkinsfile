@@ -239,15 +239,24 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 echo 'Building Angular application'
                                 echo "Using git hash: ${GIT_COMMIT_HASH}"
                                 echo "Using image tag: ${IMAGE_TAG}"
-                                
+
                                 // Replace placeholders
                                 sh """
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.prod.ts
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.staging.ts
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.alpha.ts
                                 """
-                                
-                                sh 'npm run build'
+
+                                // Determine build configuration based on branch
+                                def buildConfig = 'production'
+                                if (env.BRANCH_NAME == 'staging' || env.BRANCH_NAME ==~ /staging-.+/) {
+                                    buildConfig = 'staging'
+                                } else if (env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ || env.BRANCH_NAME.contains('alpha')) {
+                                    buildConfig = 'alpha'
+                                }
+
+                                echo "Building with configuration: ${buildConfig}"
+                                sh "npm run build -- --configuration=${buildConfig}"
                                 sh 'ls -la dist/'
                             }
                         }
