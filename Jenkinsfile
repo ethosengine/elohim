@@ -248,14 +248,21 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 """
 
                                 // Determine build configuration based on branch
+                                // For PR builds, CHANGE_TARGET contains the target branch (e.g., 'dev')
+                                // For direct branch builds, use BRANCH_NAME
+                                def targetBranch = env.CHANGE_TARGET ?: env.BRANCH_NAME
+                                def sourceBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME
+
                                 def buildConfig = 'production'
-                                if (env.BRANCH_NAME == 'staging' || env.BRANCH_NAME ==~ /staging-.+/) {
+                                if (targetBranch == 'staging' || targetBranch ==~ /staging-.+/ ||
+                                    sourceBranch == 'staging' || sourceBranch ==~ /staging-.+/) {
                                     buildConfig = 'staging'
-                                } else if (env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ || env.BRANCH_NAME.contains('alpha')) {
+                                } else if (targetBranch == 'dev' || targetBranch ==~ /feat-.+/ || targetBranch ==~ /claude\/.+/ || targetBranch.contains('alpha') ||
+                                           sourceBranch == 'dev' || sourceBranch ==~ /feat-.+/ || sourceBranch ==~ /claude\/.+/ || sourceBranch.contains('alpha')) {
                                     buildConfig = 'alpha'
                                 }
 
-                                echo "Building with configuration: ${buildConfig}"
+                                echo "Building with configuration: ${buildConfig} (target: ${targetBranch}, source: ${sourceBranch})"
                                 sh "npm run build -- --configuration=${buildConfig}"
                                 sh 'ls -la dist/'
                             }
