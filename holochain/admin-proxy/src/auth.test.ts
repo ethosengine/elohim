@@ -4,11 +4,20 @@ import { PermissionLevel } from './permissions.js';
 import type { Config } from './config.js';
 
 const mockConfig: Config = {
+  devMode: false,
   conductorUrl: 'ws://localhost:4444',
   port: 8080,
+  adminPort: 4444,
+  appPortMin: 4445,
+  appPortMax: 65535,
   apiKeyAuthenticated: 'test-auth-key',
   apiKeyAdmin: 'test-admin-key',
   logLevel: 'info',
+};
+
+const devModeConfig: Config = {
+  ...mockConfig,
+  devMode: true,
 };
 
 describe('auth', () => {
@@ -32,6 +41,12 @@ describe('auth', () => {
     it('returns null for invalid key', () => {
       expect(validateApiKey('invalid-key', mockConfig)).toBe(null);
       expect(validateApiKey('', mockConfig)).toBe(null);
+    });
+
+    it('returns ADMIN for any key in dev mode', () => {
+      expect(validateApiKey(null, devModeConfig)).toBe(PermissionLevel.ADMIN);
+      expect(validateApiKey('invalid-key', devModeConfig)).toBe(PermissionLevel.ADMIN);
+      expect(validateApiKey('', devModeConfig)).toBe(PermissionLevel.ADMIN);
     });
   });
 
