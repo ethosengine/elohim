@@ -21,6 +21,7 @@ describe('ContentMasteryService', () => {
     displayName: 'Test User',
     isAnonymous: true,
     accessLevel: 'visitor',
+    sessionState: 'active',
     createdAt: '2025-01-01T00:00:00.000Z',
     lastActiveAt: '2025-01-01T00:00:00.000Z',
     stats: {
