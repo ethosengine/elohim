@@ -248,7 +248,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                     echo ""
                                     echo "=== Packaging DNA ==="
-                                    hc dna pack . -o lamad_spike.dna
+                                    hc dna pack . -o workdir/lamad_spike.dna
 
                                     echo ""
                                     echo "=== Packaging hApp ==="
@@ -256,13 +256,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                     echo ""
                                     echo "=== Build artifacts ==="
-                                    ls -lh *.dna *.happ
+                                    ls -lh lamad-spike.happ workdir/lamad_spike.dna
                                 '
                             '''
 
                             // Archive the hApp
-                            archiveArtifacts artifacts: '*.happ,*.dna', allowEmptyArchive: false
-                            stash name: 'happ-bundle', includes: '*.happ'
+                            archiveArtifacts artifacts: 'lamad-spike.happ,workdir/lamad_spike.dna', allowEmptyArchive: false
+                            stash name: 'happ-bundle', includes: 'lamad-spike.happ'
 
                             echo 'DNA build complete!'
                         }
