@@ -26,6 +26,7 @@ export const OPERATION_WHITELIST: Record<string, PermissionLevel> = {
   generate_agent_pub_key: PermissionLevel.AUTHENTICATED,
   grant_zome_call_capability: PermissionLevel.AUTHENTICATED,
   revoke_zome_call_capability: PermissionLevel.AUTHENTICATED,
+  authorize_signing_credentials: PermissionLevel.AUTHENTICATED,
   attach_app_interface: PermissionLevel.AUTHENTICATED,
   issue_app_authentication_token: PermissionLevel.AUTHENTICATED,
   list_capability_grants: PermissionLevel.AUTHENTICATED,
