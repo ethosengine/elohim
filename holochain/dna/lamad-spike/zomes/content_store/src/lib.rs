@@ -7111,3 +7111,170 @@ pub fn get_steward_revenue_summary(steward_presence_id: String) -> ExternResult<
         revenue_by_gate: revenue_summaries,
     })
 }
+
+// =============================================================================
+// Migration Export Functions
+// =============================================================================
+// These functions exist so that FUTURE versions of this DNA can call them
+// via bridge calls to migrate data forward. Every DNA version should have
+// these export functions.
+
+/// Schema version identifier for migration compatibility
+pub const SCHEMA_VERSION: &str = "v1";
+
+/// Export the schema version (for migration compatibility checking)
+#[hdk_extern]
+pub fn export_schema_version(_: ()) -> ExternResult<String> {
+    Ok(SCHEMA_VERSION.to_string())
+}
+
+/// Export all content entries (for migration)
+/// Uses chain query to get all Content entries created by any agent on this node
+#[hdk_extern]
+pub fn export_all_content(_: ()) -> ExternResult<Vec<ContentOutput>> {
+    let filter = ChainQueryFilter::new()
+        .entry_type(UnitEntryTypes::Content.try_into()?);
+
+    let records = query(filter)?;
+    let mut results = Vec::new();
+
+    for record in records {
+        let action_hash = record.action_hashed().hash.clone();
+
+        if let Some(entry_hash) = record.action().entry_hash() {
+            if let Some(content) = record
+                .entry()
+                .to_app_option::<Content>()
+                .ok()
+                .flatten()
+            {
+                results.push(ContentOutput {
+                    action_hash,
+                    entry_hash: entry_hash.clone(),
+                    content,
+                });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Path with all its steps for migration
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PathWithStepsExport {
+    pub path: LearningPath,
+    pub path_action_hash: ActionHash,
+    pub steps: Vec<PathStepExport>,
+}
+
+/// Path step for migration export
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PathStepExport {
+    pub step: PathStep,
+    pub action_hash: ActionHash,
+}
+
+/// Export all learning paths with their steps (for migration)
+#[hdk_extern]
+pub fn export_all_paths_with_steps(_: ()) -> ExternResult<Vec<PathWithStepsExport>> {
+    // Use the global "all_paths" anchor
+    let anchor = StringAnchor::new("all_paths", "index");
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToPath)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+
+    for link in links {
+        let path_action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+
+        let record = get(path_action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(path) = record
+                .entry()
+                .to_app_option::<LearningPath>()
+                .ok()
+                .flatten()
+            {
+                // Get all steps for this path
+                let step_query = LinkQuery::try_new(path_action_hash.clone(), LinkTypes::PathToStep)?;
+                let step_links = get_links(step_query, GetStrategy::default())?;
+
+                let mut steps = Vec::new();
+                for step_link in step_links {
+                    let step_action_hash = ActionHash::try_from(step_link.target)
+                        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid step action hash".to_string())))?;
+
+                    let step_record = get(step_action_hash.clone(), GetOptions::default())?;
+                    if let Some(step_rec) = step_record {
+                        if let Some(step) = step_rec
+                            .entry()
+                            .to_app_option::<PathStep>()
+                            .ok()
+                            .flatten()
+                        {
+                            steps.push(PathStepExport {
+                                step,
+                                action_hash: step_action_hash,
+                            });
+                        }
+                    }
+                }
+
+                // Sort steps by order_index
+                steps.sort_by_key(|s| s.step.order_index);
+
+                results.push(PathWithStepsExport {
+                    path,
+                    path_action_hash,
+                    steps,
+                });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Export all mastery records for current agent (for migration)
+/// Wraps get_my_all_mastery for explicit migration use
+#[hdk_extern]
+pub fn export_all_mastery(_: ()) -> ExternResult<Vec<ContentMasteryOutput>> {
+    get_my_all_mastery(())
+}
+
+/// Export all progress records for current agent (for migration)
+/// Wraps get_my_all_progress for explicit migration use
+#[hdk_extern]
+pub fn export_all_progress(_: ()) -> ExternResult<Vec<AgentProgressOutput>> {
+    get_my_all_progress(())
+}
+
+/// Complete migration export - all data needed to migrate to a new DNA version
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MigrationExport {
+    pub schema_version: String,
+    pub content: Vec<ContentOutput>,
+    pub paths: Vec<PathWithStepsExport>,
+    pub mastery: Vec<ContentMasteryOutput>,
+    pub progress: Vec<AgentProgressOutput>,
+    pub exported_at: String,
+}
+
+/// Export all data for migration in a single call
+#[hdk_extern]
+pub fn export_for_migration(_: ()) -> ExternResult<MigrationExport> {
+    let now = sys_time()?;
+
+    Ok(MigrationExport {
+        schema_version: SCHEMA_VERSION.to_string(),
+        content: export_all_content(())?,
+        paths: export_all_paths_with_steps(())?,
+        mastery: export_all_mastery(())?,
+        progress: export_all_progress(())?,
+        exported_at: format!("{:?}", now),
+    })
+}

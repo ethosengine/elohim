@@ -1,0 +1,1 @@
+# DNA Archive\n\nThis directory contains archived DNA builds for migration support.\n\nWhen releasing a new DNA version, archive the previous .dna file here:\n\n```\ncp workdir/lamad-spike.dna archive/lamad-v1.dna\n```\n\nThis allows future versions to bundle the old DNA for migration.
