@@ -1,0 +1,37 @@
+{
+  "name": "@holochain/rna",
+  "version": "0.1.0",
+  "description": "RNA - Holochain migration toolkit for transcribing data between DNA versions",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit"
+  },
+  "keywords": [
+    "holochain",
+    "migration",
+    "dna",
+    "upgrade",
+    "rna"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ethosengine/elohim"
+  },
+  "license": "MIT OR Apache-2.0",
+  "dependencies": {
+    "@holochain/client": "^0.19.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  }
+}

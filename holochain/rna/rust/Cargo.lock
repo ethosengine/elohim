@@ -111,27 +111,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 
 [[package]]
-name = "content_store"
-version = "0.1.0"
-dependencies = [
- "content_store_integrity",
- "hc-rna",
- "hdk",
- "holochain_serialized_bytes",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "content_store_integrity"
-version = "0.1.0"
-dependencies = [
- "hdi",
- "holochain_serialized_bytes",
- "serde",
-]
-
-[[package]]
 name = "convert_case"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
