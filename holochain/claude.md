@@ -9,7 +9,7 @@ The Elohim app supports three distinct modes for connecting to Holochain, each s
 
 | Mode | Use Case | Conductor Location | DNS Required |
 |------|----------|-------------------|--------------|
-| **Local Dev (Eclipse Che)** | Development & testing | Local sandbox in Che | No (dev-proxy) |
+| **Local Dev (Eclipse Che)** | Development & testing | Local sandbox in Che | No (admin-proxy in DEV_MODE) |
 | **Remote Edge Node** | Deployed infrastructure | Kubernetes cluster | Yes |
 | **Device-Local (Packaged App)** | End-user installation | User's device | No |
 
@@ -41,17 +41,17 @@ echo "" | holochain -c /tmp/conductor1/conductor-config.yaml --piped &
 # 3. Attach app interface (after conductor is running)
 hc sandbox call -r 4444 add-app-ws 4445
 
-# 4. Start dev-proxy
-cd /projects/elohim/holochain/dev-proxy
-npm install && npm run build && npm start &
+# 4. Start admin-proxy (dev mode)
+cd /projects/elohim/holochain/admin-proxy
+DEV_MODE=true npm install && npm run build && npm start &
 
 # 5. (Optional) Start Holochain Playground
 npx @holochain-playground/cli ws://localhost:8888/admin &
 ```
 
-### Dev Proxy Routes
+### Admin Proxy Routes (Dev Mode)
 
-The dev-proxy provides path-based WebSocket routing:
+The admin-proxy (with DEV_MODE=true) provides path-based WebSocket routing:
 
 | Path | Target | Purpose |
 |------|--------|---------|
@@ -62,7 +62,7 @@ The dev-proxy provides path-based WebSocket routing:
 
 ### Accessing from Browser
 
-The Angular app auto-detects Che environment and routes through dev-proxy:
+The Angular app auto-detects Che environment and routes through admin-proxy:
 
 ```typescript
 // HolochainClientService automatically resolves URLs:
@@ -141,7 +141,7 @@ holochain: {
   adminUrl: 'wss://holochain-dev.elohim.host',
   appUrl: 'wss://holochain-dev.elohim.host',
   proxyApiKey: 'dev-elohim-auth-2024',
-  useLocalProxy: false,  // Disable dev-proxy, connect directly
+  useLocalProxy: false,  // Disable local proxy, connect directly
 }
 ```
 
@@ -156,12 +156,12 @@ kubectl port-forward -n ethosengine deploy/elohim-edgenode-dev 4444:8444
 # Then connect to ws://localhost:4444
 ```
 
-### Dev Proxy Remote Mode
+### Admin Proxy Remote Mode
 
-The dev-proxy can also proxy to a remote conductor (useful for debugging remote issues):
+The admin-proxy can also proxy to a remote conductor (useful for debugging remote issues):
 
 ```bash
-# Start dev-proxy in remote mode
+# Start admin-proxy in remote mode (from holochain/admin-proxy/)
 CONDUCTOR_URL=wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024 npm start
 
 # Or use the npm script
@@ -808,13 +808,13 @@ const findContentByPattern = (pattern: string): string | null => {
 
 ### Process Management
 
-**Killing dev-proxy**: `pkill -f 'node.*dev-proxy'` may not match. Use port-based:
+**Killing admin-proxy**: `pkill -f 'node.*admin-proxy'` may not match. Use port-based:
 
 ```bash
 fuser -k 8888/tcp 2>/dev/null
 ```
 
-**Graceful port conflict handling** in dev-proxy:
+**Graceful port conflict handling** in admin-proxy:
 
 ```typescript
 server.on('error', (err: NodeJS.ErrnoException) => {
@@ -842,7 +842,7 @@ The `hc-start.sh` script handles:
 2. Check if conductor already running (idempotent)
 3. Start sandbox with socat passphrase handling
 4. Wait for conductor ready (poll for `admin_port` in log)
-5. Start dev-proxy with dynamic admin port
+5. Start admin-proxy with dynamic admin port
 6. Run seeder (idempotent, auto-fixes placeholder IDs)
 
 ## Domain Model Architecture: Shefa / Lamad Separation
@@ -1185,6 +1185,6 @@ All three verticals are now complete and integrated:
 - `elohim-app/src/environments/environment*.ts` - Endpoint configuration
 - `elohim-app/scripts/hc-start.sh` - Automated dev stack startup
 - `holochain/seeder/src/seed.ts` - Content and path seeder
-- `holochain/dev-proxy/src/index.ts` - WebSocket proxy for Che
+- `holochain/admin-proxy/src/index.ts` - WebSocket proxy for Che (DEV_MODE) and production
 - `holochain/sdk/src/types.ts` - SDK type definitions (Shefa + Lamad)
 - `holochain/sdk/src/client/zome-client.ts` - Zome client with domain-namespaced methods

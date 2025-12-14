@@ -223,13 +223,6 @@ Secure gateway protecting the Holochain Admin API:
 - **Permissions:** PUBLIC (read-only), AUTHENTICATED (normal workflow), ADMIN (destructive)
 - **Whitelist:** Only known operations allowed (unknown operations blocked)
 
-### Dev Proxy (`holochain/dev-proxy/`)
-Path-based WebSocket router for Eclipse Che:
-- **Port:** 8888
-- **Routes:** `/admin` → conductor admin, `/app/:port` → app interfaces
-- **Auth:** None (internal network only)
-- **Mode:** Local (to localhost) or Remote (to deployed conductor)
-
 ### Edge Node (`holochain/edgenode/`)
 Kubernetes-deployed Holochain conductor:
 - **Base image:** `ghcr.io/holo-host/edgenode:v0.0.8-alpha31-hc0.6.0-go-pion-custom` (Holochain 0.6.0)
