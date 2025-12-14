@@ -243,10 +243,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     rustc --version
                                     cargo --version
 
-                                    # Required for getrandom 0.3.x on wasm32-unknown-unknown
-                                    export RUSTFLAGS="--cfg getrandom_backend=\"custom\""
-                                    echo "RUSTFLAGS: $RUSTFLAGS"
-
                                     echo ""
                                     echo "=== Building zomes (Rust -> WASM) ==="
                                     cargo build --release --target wasm32-unknown-unknown
