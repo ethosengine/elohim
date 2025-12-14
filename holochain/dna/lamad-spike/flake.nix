@@ -15,6 +15,9 @@
           packages = with pkgs; [
             # Add any additional dev tools here
           ];
+          # Required for getrandom 0.3.x on wasm32-unknown-unknown
+          # Holochain provides a custom random implementation via host functions
+          RUSTFLAGS = "--cfg getrandom_backend=\"custom\"";
         };
       };
     };
