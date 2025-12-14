@@ -45,7 +45,27 @@ function readHcPorts(): { adminPort: number; appPort: number } {
 // Read ports from file or env
 const ports = readHcPorts();
 const ADMIN_WS_URL = process.env.HOLOCHAIN_ADMIN_URL || `ws://localhost:${ports.adminPort}`;
-const APP_WS_URL = process.env.HOLOCHAIN_APP_URL || `ws://localhost:${ports.appPort}`;
+// APP_WS_URL is computed dynamically for remote connections (see resolveAppUrl function)
+const DEFAULT_APP_WS_URL = process.env.HOLOCHAIN_APP_URL || `ws://localhost:${ports.appPort}`;
+
+/**
+ * Resolve app WebSocket URL based on admin URL and dynamic port.
+ * For remote connections (via proxy), use /app/:port path routing.
+ * For local connections, use direct localhost.
+ */
+function resolveAppUrl(adminUrl: string, port: number): string {
+  // If admin URL is remote (not localhost), route through proxy
+  if (!adminUrl.includes('localhost') && !adminUrl.includes('127.0.0.1')) {
+    // Extract base URL (remove query params) and add /app/:port path
+    const url = new URL(adminUrl);
+    const baseUrl = `${url.protocol}//${url.host}`;
+    const apiKey = url.searchParams.get('apiKey');
+    const apiKeyParam = apiKey ? `?apiKey=${encodeURIComponent(apiKey)}` : '';
+    return `${baseUrl}/app/${port}${apiKeyParam}`;
+  }
+  // Local: use direct connection
+  return `ws://localhost:${port}`;
+}
 
 // Types matching the Holochain zome
 interface CreateContentInput {
@@ -325,7 +345,6 @@ async function seed() {
   console.log('🌱 Holochain Content Seeder');
   console.log(`📁 Content directory: ${CONTENT_DIR}`);
   console.log(`🔌 Admin WebSocket: ${ADMIN_WS_URL}`);
-  console.log(`🔌 App WebSocket: ${APP_WS_URL}`);
   if (limit) console.log(`📊 Limit: ${limit} files`);
 
   // Connect to admin websocket
@@ -394,12 +413,29 @@ async function seed() {
   await adminWs.authorizeSigningCredentials(cellId);
   console.log('✅ Signing credentials authorized');
 
+  // Attach or get existing app interface
+  console.log('\n🔌 Setting up app interface...');
+  let appPort: number;
+  const existingInterfaces = await adminWs.listAppInterfaces();
+  if (existingInterfaces.length > 0) {
+    appPort = existingInterfaces[0].port;
+    console.log(`✅ Using existing app interface on port ${appPort}`);
+  } else {
+    const { port } = await adminWs.attachAppInterface({ allowed_origins: '*' });
+    appPort = port;
+    console.log(`✅ Created app interface on port ${appPort}`);
+  }
+
+  // Resolve app URL (uses proxy routing for remote, direct for local)
+  const appWsUrl = process.env.HOLOCHAIN_APP_URL || resolveAppUrl(ADMIN_WS_URL, appPort);
+  console.log(`🔌 App WebSocket: ${appWsUrl}`);
+
   // Connect to app websocket
   console.log('\n📡 Connecting to Holochain app...');
   let appWs: AppWebsocket;
   try {
     appWs = await AppWebsocket.connect({
-      url: new URL(APP_WS_URL),
+      url: new URL(appWsUrl),
       wsClientOptions: { origin: 'http://localhost' },
       token: token.token,
     });
