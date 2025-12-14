@@ -7,6 +7,9 @@ use hdk::prelude::*;
 use content_store_integrity::*;
 use std::collections::HashMap;
 
+// Migration module for DNA version upgrades
+pub mod migration;
+
 // =============================================================================
 // Input/Output Types for Content
 // =============================================================================

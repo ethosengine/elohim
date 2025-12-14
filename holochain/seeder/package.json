@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "seed": "npx tsx src/seed.ts",
-    "seed:sample": "npx tsx src/seed.ts --limit 10"
+    "seed:sample": "npx tsx src/seed.ts --limit 10",
+    "migrate": "npx tsx src/migrate.ts",
+    "migrate:dry-run": "npx tsx src/migrate.ts --dry-run",
+    "migrate:verify": "npx tsx src/migrate.ts --verify-only"
   },
   "dependencies": {
     "@holochain/client": "^0.19.2",
