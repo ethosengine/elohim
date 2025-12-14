@@ -1,4 +1,5 @@
 # Lamad Spike hApp Manifest
+# Rebuilt: 2025-12-14 - fixed getrandom wasm_js issue
 ---
 manifest_version: "0"
 name: lamad-spike
