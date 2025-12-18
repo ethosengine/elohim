@@ -28,8 +28,10 @@ export interface HolochainEnvironmentConfig {
  */
 export interface Environment {
   production: boolean;
-  apiUrl: string;
-  lamadApiUrl: string;
   logLevel: LogLevel;
+  /** Environment name (development, alpha, staging, production) */
+  environment: string;
+  /** Git commit hash for version tracking */
+  gitHash: string;
   holochain?: HolochainEnvironmentConfig;
 }

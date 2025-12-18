@@ -106,11 +106,11 @@ describe('PathOverviewComponent', () => {
     metadata: {}
   };
 
-  const mockAllSteps: any[] = [
-    { step: mockPath.steps[0], content: { ...mockContent, id: 'node-1' }, isCompleted: true, completedInOtherPath: false, isCompletedGlobally: true, hasPrevious: false, hasNext: true },
-    { step: mockPath.steps[1], content: { ...mockContent, id: 'node-2' }, isCompleted: true, completedInOtherPath: false, isCompletedGlobally: true, hasPrevious: true, hasNext: true },
-    { step: mockPath.steps[2], content: { ...mockContent, id: 'node-3' }, isCompleted: false, completedInOtherPath: false, isCompletedGlobally: false, hasPrevious: true, hasNext: true },
-    { step: mockPath.steps[3], content: { ...mockContent, id: 'node-4' }, isCompleted: false, completedInOtherPath: false, isCompletedGlobally: false, hasPrevious: true, hasNext: false }
+  const mockStepsMetadata: any[] = [
+    { step: mockPath.steps[0], stepIndex: 0, isCompleted: true, completedInOtherPath: false, masteryLevel: 2, masteryTier: 'practiced' },
+    { step: mockPath.steps[1], stepIndex: 1, isCompleted: true, completedInOtherPath: false, masteryLevel: 2, masteryTier: 'practiced' },
+    { step: mockPath.steps[2], stepIndex: 2, isCompleted: false, completedInOtherPath: false, masteryLevel: 0, masteryTier: 'unseen' },
+    { step: mockPath.steps[3], stepIndex: 3, isCompleted: false, completedInOtherPath: false, masteryLevel: 0, masteryTier: 'unseen' }
   ];
 
   beforeEach(async () => {
@@ -119,7 +119,7 @@ describe('PathOverviewComponent', () => {
       'getAccessibleSteps',
       'getPathCompletionByContent',
       'getChapterSummariesWithContent',
-      'getAllStepsWithCompletionStatus',
+      'getAllStepsMetadata',
       'getConceptProgressForPath',
       'getChapterFirstStep'
     ]);
@@ -152,7 +152,7 @@ describe('PathOverviewComponent', () => {
     pathService.getAccessibleSteps.and.returnValue(of(mockAccessibleSteps));
     pathService.getPathCompletionByContent.and.returnValue(of(mockCompletion));
     pathService.getChapterSummariesWithContent.and.returnValue(of([]));
-    pathService.getAllStepsWithCompletionStatus.and.returnValue(of(mockAllSteps));
+    pathService.getAllStepsMetadata.and.returnValue(of(mockStepsMetadata));
     pathService.getConceptProgressForPath.and.returnValue(of([]));
 
     fixture = TestBed.createComponent(PathOverviewComponent);

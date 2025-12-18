@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { LamadHomeComponent } from './lamad-home.component';
 import { PathService } from '../../services/path.service';
+import { PathFilterService } from '../../services/path-filter.service';
 import { ProfileService } from '@app/elohim/services/profile.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
@@ -11,6 +12,7 @@ describe('LamadHomeComponent', () => {
   let component: LamadHomeComponent;
   let fixture: ComponentFixture<LamadHomeComponent>;
   let pathService: jasmine.SpyObj<PathService>;
+  let pathFilterService: jasmine.SpyObj<PathFilterService>;
   let router: jasmine.SpyObj<Router>;
   let profileService: jasmine.SpyObj<ProfileService>;
   let agentService: jasmine.SpyObj<AgentService>;
@@ -45,6 +47,7 @@ describe('LamadHomeComponent', () => {
 
   beforeEach(async () => {
     const pathServiceSpy = jasmine.createSpyObj('PathService', ['listPaths']);
+    const pathFilterServiceSpy = jasmine.createSpyObj('PathFilterService', ['getFeaturedPaths']);
     const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
     const profileServiceSpy = jasmine.createSpyObj('ProfileService', ['getCurrentFocus']);
     const agentServiceSpy = jasmine.createSpyObj('AgentService', ['getCurrentAgentId', 'getAgentProgress']);
@@ -62,6 +65,7 @@ describe('LamadHomeComponent', () => {
       imports: [LamadHomeComponent],
       providers: [
         { provide: PathService, useValue: pathServiceSpy },
+        { provide: PathFilterService, useValue: pathFilterServiceSpy },
         { provide: Router, useValue: routerSpy },
         { provide: ProfileService, useValue: profileServiceSpy },
         { provide: AgentService, useValue: agentServiceSpy }
@@ -69,11 +73,13 @@ describe('LamadHomeComponent', () => {
     }).compileComponents();
 
     pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
+    pathFilterService = TestBed.inject(PathFilterService) as jasmine.SpyObj<PathFilterService>;
     router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
     profileService = TestBed.inject(ProfileService) as jasmine.SpyObj<ProfileService>;
     agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
 
     pathService.listPaths.and.returnValue(of(mockPathIndex));
+    pathFilterService.getFeaturedPaths.and.callFake((paths: PathIndexEntry[]) => paths);
     profileService.getCurrentFocus.and.returnValue(of([]));
     agentService.getCurrentAgentId.and.returnValue('test-agent');
     agentService.getAgentProgress.and.returnValue(of([]));
@@ -203,12 +209,12 @@ describe('LamadHomeComponent', () => {
   it('should load saved view mode from localStorage', () => {
     localStorageMock['lamad-view-mode'] = 'explore';
 
-    const newComponent = new LamadHomeComponent(pathService, router, profileService, agentService);
+    const newComponent = new LamadHomeComponent(pathService, pathFilterService, router, profileService, agentService);
     expect(newComponent.viewMode).toBe('explore');
   });
 
   it('should default to paths mode if no saved preference', () => {
-    const newComponent = new LamadHomeComponent(pathService, router, profileService, agentService);
+    const newComponent = new LamadHomeComponent(pathService, pathFilterService, router, profileService, agentService);
     expect(newComponent.viewMode).toBe('paths');
   });
 

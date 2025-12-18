@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { HolochainContentService } from '@app/elohim/services/holochain-content.service';
+import { IndexedDBCacheService } from '@app/elohim/services/indexeddb-cache.service';
 import { LearningPath, PathIndex, ContentNode, AgentProgress } from '../models';
 import { of, throwError } from 'rxjs';
 
@@ -9,6 +10,7 @@ describe('DataLoaderService', () => {
   let service: DataLoaderService;
   let httpMock: HttpTestingController;
   let mockHolochainContent: jasmine.SpyObj<HolochainContentService>;
+  let mockIndexedDBCache: jasmine.SpyObj<IndexedDBCacheService>;
   const basePath = '/assets/lamad-data';
 
   const mockContent: ContentNode = {
@@ -47,17 +49,41 @@ describe('DataLoaderService', () => {
       'getPathWithSteps'
     ]);
 
+    mockIndexedDBCache = jasmine.createSpyObj('IndexedDBCacheService', [
+      'init',
+      'getPath',
+      'setPath',
+      'getContent',
+      'setContent',
+      'getContentBatch',
+      'setContentBatch',
+      'getStats',
+      'clearAll'
+    ]);
+
     // Default mock returns
     mockHolochainContent.getStats.and.returnValue(of({ total_count: 0, by_type: {} }));
     mockHolochainContent.isAvailable.and.returnValue(true);
     (mockHolochainContent.getPathIndex as jasmine.Spy).and.returnValue(Promise.resolve({ paths: [], total_count: 0, last_updated: '' }));
     (mockHolochainContent.getPathWithSteps as jasmine.Spy).and.returnValue(Promise.resolve(null));
 
+    // IndexedDB mock returns (disabled by default to use Holochain)
+    mockIndexedDBCache.init.and.returnValue(Promise.resolve(false));
+    mockIndexedDBCache.getPath.and.returnValue(Promise.resolve(null));
+    mockIndexedDBCache.setPath.and.returnValue(Promise.resolve());
+    mockIndexedDBCache.getContent.and.returnValue(Promise.resolve(null));
+    mockIndexedDBCache.setContent.and.returnValue(Promise.resolve());
+    mockIndexedDBCache.getContentBatch.and.returnValue(Promise.resolve(new Map()));
+    mockIndexedDBCache.setContentBatch.and.returnValue(Promise.resolve());
+    mockIndexedDBCache.getStats.and.returnValue(Promise.resolve({ contentCount: 0, pathCount: 0, isAvailable: false }));
+    mockIndexedDBCache.clearAll.and.returnValue(Promise.resolve());
+
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
       providers: [
         DataLoaderService,
-        { provide: HolochainContentService, useValue: mockHolochainContent }
+        { provide: HolochainContentService, useValue: mockHolochainContent },
+        { provide: IndexedDBCacheService, useValue: mockIndexedDBCache }
       ]
     });
 
@@ -128,13 +154,18 @@ describe('DataLoaderService', () => {
       });
     });
 
-    it('should handle content not found error', (done) => {
+    it('should return placeholder when content not found', (done) => {
       mockHolochainContent.getContent.and.returnValue(of(null));
 
       service.getContent('missing-content').subscribe({
-        error: err => {
-          expect(err.message).toContain('Content not found');
+        next: content => {
+          expect(content.contentType).toBe('placeholder');
+          expect(content.title).toContain('Content Not Found');
+          expect(content.id).toBe('missing-content');
           done();
+        },
+        error: () => {
+          fail('Should not throw error, should return placeholder');
         }
       });
     });

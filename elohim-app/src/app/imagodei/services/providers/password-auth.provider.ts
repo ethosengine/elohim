@@ -76,12 +76,15 @@ export class PasswordAuthProvider implements AuthProvider {
     }
 
     // Use explicit authUrl if provided (for local dev or production)
-    if (environment.holochain.authUrl) {
+    if (environment.holochain?.authUrl) {
       return environment.holochain.authUrl;
     }
 
     // Fall back to deriving from adminUrl
-    const adminUrl = environment.holochain.adminUrl;
+    const adminUrl = environment.holochain?.adminUrl;
+    if (!adminUrl) {
+      throw new Error('Holochain configuration not available');
+    }
 
     // Convert WebSocket URL to HTTP URL
     // wss://holochain-dev.elohim.host -> https://holochain-dev.elohim.host

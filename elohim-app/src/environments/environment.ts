@@ -1,6 +1,6 @@
-import { LogLevel } from './environment.types';
+import { Environment, LogLevel } from './environment.types';
 
-export const environment = {
+export const environment: Environment = {
   production: false,
   logLevel: 'debug' as LogLevel,
   environment: 'development',

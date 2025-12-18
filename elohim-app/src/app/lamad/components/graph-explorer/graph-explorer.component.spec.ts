@@ -79,7 +79,7 @@ describe('GraphExplorerComponent', () => {
       'getVisibleEdges',
       'reset'
     ]);
-    const dataLoaderSpy = jasmine.createSpyObj('DataLoaderService', ['getGraph', 'getPath']);
+    const dataLoaderSpy = jasmine.createSpyObj('DataLoaderService', ['getGraph', 'getPath', 'getPathHierarchy']);
 
     await TestBed.configureTestingModule({
       imports: [
@@ -117,6 +117,13 @@ describe('GraphExplorerComponent', () => {
         lastUpdated: new Date().toISOString(),
         version: '1.0.0'
       }
+    } as any));
+    dataLoaderService.getPathHierarchy.and.returnValue(of({
+      id: 'elohim-protocol',
+      title: 'Elohim Protocol',
+      description: 'A learning path',
+      steps: [],
+      chapters: []
     } as any));
 
     fixture = TestBed.createComponent(GraphExplorerComponent);
@@ -157,7 +164,7 @@ describe('GraphExplorerComponent', () => {
     component.setViewMode('overview');
 
     expect(component.viewMode).toBe('overview');
-    expect(dataLoaderService.getGraph).toHaveBeenCalled();
+    expect(dataLoaderService.getPathHierarchy).toHaveBeenCalled();
   });
 
   it('should expand cluster on double-click', () => {
