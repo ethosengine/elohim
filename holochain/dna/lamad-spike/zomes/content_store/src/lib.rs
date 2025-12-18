@@ -21,12 +21,15 @@ pub struct CreateContentInput {
     pub content_type: String,
     pub title: String,
     pub description: String,
+    pub summary: Option<String>,          // Short preview text for cards/lists
     pub content: String,
     pub content_format: String,
     pub tags: Vec<String>,
     pub source_path: Option<String>,
     pub related_node_ids: Vec<String>,
     pub reach: String,
+    pub estimated_minutes: Option<u32>,   // Reading/viewing time
+    pub thumbnail_url: Option<String>,    // Preview image for visual cards
     pub metadata_json: String,
 }
 
@@ -76,7 +79,7 @@ pub struct QueryByIdInput {
 pub struct CreateRelationshipInput {
     pub source_id: String,
     pub target_id: String,
-    pub relationship_type: String,  // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
+    pub relationship_type: String,  // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES, DERIVED_FROM
     pub confidence: f64,            // 0.0 - 1.0
     pub inference_source: String,   // explicit, path, tag, semantic
     pub metadata_json: Option<String>,
@@ -306,10 +309,12 @@ pub struct CreatePathInput {
     pub visibility: String,
     pub path_type: String,
     pub tags: Vec<String>,
+    /// Extensible metadata JSON (stores chapters for hierarchical paths)
+    pub metadata_json: Option<String>,
 }
 
 /// Input for adding a step to a path
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AddPathStepInput {
     pub path_id: String,
     pub chapter_id: Option<String>,      // If part of a chapter
@@ -605,6 +610,7 @@ pub fn create_content(input: CreateContentInput) -> ExternResult<ContentOutput> 
         content_type: input.content_type.clone(),
         title: input.title,
         description: input.description,
+        summary: input.summary,
         content: input.content,
         content_format: input.content_format,
         tags: input.tags.clone(),
@@ -613,6 +619,8 @@ pub fn create_content(input: CreateContentInput) -> ExternResult<ContentOutput> 
         author_id: Some(agent_info.agent_initial_pubkey.to_string()),
         reach: input.reach,
         trust_score: 0.0,
+        estimated_minutes: input.estimated_minutes,
+        thumbnail_url: input.thumbnail_url,
         metadata_json: input.metadata_json,
         created_at: timestamp.clone(),
         updated_at: timestamp,
@@ -716,6 +724,69 @@ pub fn get_content_by_id(input: QueryByIdInput) -> ExternResult<Option<ContentOu
     }
 }
 
+/// Input for batch ID existence check
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CheckIdsExistInput {
+    pub ids: Vec<String>,
+}
+
+/// Output for batch ID existence check - returns only the IDs that exist
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CheckIdsExistOutput {
+    pub existing_ids: Vec<String>,
+}
+
+/// Batch check which content IDs already exist (for efficient seeding)
+/// Returns only the IDs that already exist
+#[hdk_extern]
+pub fn check_content_ids_exist(input: CheckIdsExistInput) -> ExternResult<CheckIdsExistOutput> {
+    let mut existing_ids = Vec::new();
+
+    for id in input.ids {
+        let anchor = StringAnchor::new("content_id", &id);
+        let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+        let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        if !links.is_empty() {
+            existing_ids.push(id);
+        }
+    }
+
+    Ok(CheckIdsExistOutput { existing_ids })
+}
+
+/// Input for batch content retrieval by IDs
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BatchGetContentInput {
+    pub ids: Vec<String>,
+}
+
+/// Output for batch content retrieval
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BatchGetContentOutput {
+    pub found: Vec<ContentOutput>,
+    pub not_found: Vec<String>,
+}
+
+/// Batch get content by multiple IDs in a single call (optimized for UI loading)
+/// Returns found content and list of IDs that were not found
+#[hdk_extern]
+pub fn batch_get_content_by_ids(input: BatchGetContentInput) -> ExternResult<BatchGetContentOutput> {
+    let mut found = Vec::new();
+    let mut not_found = Vec::new();
+
+    for id in input.ids {
+        match get_content_by_id(QueryByIdInput { id: id.clone() })? {
+            Some(output) => found.push(output),
+            None => not_found.push(id),
+        }
+    }
+
+    Ok(BatchGetContentOutput { found, not_found })
+}
+
 /// Get content by content_type (using TypeToContent links)
 #[hdk_extern]
 pub fn get_content_by_type(input: QueryByTypeInput) -> ExternResult<Vec<ContentOutput>> {
@@ -761,6 +832,98 @@ pub fn get_content_by_tag(tag: String) -> ExternResult<Vec<ContentOutput>> {
     }
 
     Ok(results)
+}
+
+/// Input for paginated content query by type
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PaginatedByTypeInput {
+    pub content_type: String,          // Filter by type
+    pub page_size: u32,                // Number of items per page (max 100)
+    pub offset: u32,                   // Number of items to skip
+}
+
+/// Output for paginated content query
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PaginatedContentOutput {
+    pub items: Vec<ContentOutput>,
+    pub total_count: u32,              // Total matching items
+    pub offset: u32,                   // Current offset
+    pub has_more: bool,
+}
+
+/// Get content by type with pagination support
+/// More efficient than loading all content at once for large datasets
+#[hdk_extern]
+pub fn get_content_by_type_paginated(input: PaginatedByTypeInput) -> ExternResult<PaginatedContentOutput> {
+    let anchor = StringAnchor::new("content_type", &input.content_type);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::TypeToContent)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let total_count = links.len() as u32;
+    let page_size = (input.page_size.min(100)) as usize; // Cap at 100
+    let offset = input.offset as usize;
+
+    let mut items = Vec::new();
+    for link in links.iter().skip(offset).take(page_size) {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+
+        if let Some(output) = get_content(action_hash)? {
+            items.push(output);
+        }
+    }
+
+    let has_more = offset + items.len() < links.len();
+
+    Ok(PaginatedContentOutput {
+        items,
+        total_count,
+        offset: input.offset,
+        has_more,
+    })
+}
+
+/// Input for paginated content query by tag
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PaginatedByTagInput {
+    pub tag: String,                   // Filter by tag
+    pub page_size: u32,                // Number of items per page (max 100)
+    pub offset: u32,                   // Number of items to skip
+}
+
+/// Get content by tag with pagination support
+#[hdk_extern]
+pub fn get_content_by_tag_paginated(input: PaginatedByTagInput) -> ExternResult<PaginatedContentOutput> {
+    let anchor = StringAnchor::new("tag", &input.tag);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::TagToContent)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let total_count = links.len() as u32;
+    let page_size = (input.page_size.min(100)) as usize;
+    let offset = input.offset as usize;
+
+    let mut items = Vec::new();
+    for link in links.iter().skip(offset).take(page_size) {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+
+        if let Some(output) = get_content(action_hash)? {
+            items.push(output);
+        }
+    }
+
+    let has_more = offset + items.len() < links.len();
+
+    Ok(PaginatedContentOutput {
+        items,
+        total_count,
+        offset: input.offset,
+        has_more,
+    })
 }
 
 /// List all content created by the current agent
@@ -835,6 +998,7 @@ pub fn create_path(input: CreatePathInput) -> ExternResult<ActionHash> {
         visibility: input.visibility,
         path_type: input.path_type,
         tags: input.tags,
+        metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
         created_at: timestamp.clone(),
         updated_at: timestamp,
     };
@@ -945,6 +1109,62 @@ pub fn add_path_step(input: AddPathStepInput) -> ExternResult<ActionHash> {
     }
 
     Ok(action_hash)
+}
+
+/// Batch add multiple steps to a path (for efficient seeding)
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BatchAddPathStepsInput {
+    pub steps: Vec<AddPathStepInput>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BatchAddPathStepsOutput {
+    pub created_count: u32,
+    pub action_hashes: Vec<ActionHash>,
+    pub errors: Vec<String>,
+}
+
+#[hdk_extern]
+pub fn batch_add_path_steps(input: BatchAddPathStepsInput) -> ExternResult<BatchAddPathStepsOutput> {
+    let mut action_hashes = Vec::new();
+    let mut errors = Vec::new();
+
+    for step_input in input.steps {
+        match add_path_step(step_input.clone()) {
+            Ok(hash) => {
+                action_hashes.push(hash);
+            }
+            Err(e) => {
+                errors.push(format!("Failed to add step {}: {:?}", step_input.order_index, e));
+            }
+        }
+    }
+
+    Ok(BatchAddPathStepsOutput {
+        created_count: action_hashes.len() as u32,
+        action_hashes,
+        errors,
+    })
+}
+
+/// Batch check which path IDs already exist
+#[hdk_extern]
+pub fn check_path_ids_exist(input: CheckIdsExistInput) -> ExternResult<CheckIdsExistOutput> {
+    let mut existing_ids = Vec::new();
+
+    for id in input.ids {
+        let anchor = StringAnchor::new("path_id", &id);
+        let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+        let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToPath)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        if !links.is_empty() {
+            existing_ids.push(id);
+        }
+    }
+
+    Ok(CheckIdsExistOutput { existing_ids })
 }
 
 /// Path index entry for listing
@@ -1482,6 +1702,7 @@ pub fn update_path(input: UpdatePathInput) -> ExternResult<PathWithSteps> {
         visibility: input.visibility.unwrap_or(existing.path.visibility),
         path_type: existing.path.path_type,
         tags: input.tags.unwrap_or(existing.path.tags),
+        metadata_json: existing.path.metadata_json,
         created_at: existing.path.created_at,
         updated_at: timestamp,
     };
@@ -7280,4 +7501,1164 @@ pub fn export_for_migration(_: ()) -> ExternResult<MigrationExport> {
         progress: export_all_progress(())?,
         exported_at: format!("{:?}", now),
     })
+}
+
+// =============================================================================
+// KnowledgeMap Operations
+// =============================================================================
+
+/// Input for creating a knowledge map
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateKnowledgeMapInput {
+    pub id: Option<String>,
+    pub map_type: String,           // domain, self, person, collective
+    pub owner_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub subject_type: String,
+    pub subject_id: String,
+    pub subject_name: String,
+    pub visibility: String,
+    pub shared_with_json: String,
+    pub nodes_json: String,
+    pub path_ids_json: String,
+    pub overall_affinity: f64,
+    pub content_graph_id: Option<String>,
+    pub mastery_levels_json: String,
+    pub goals_json: String,
+    pub metadata_json: String,
+}
+
+/// Output for knowledge map
+#[derive(Serialize, Deserialize, Debug)]
+pub struct KnowledgeMapOutput {
+    pub action_hash: ActionHash,
+    pub knowledge_map: KnowledgeMap,
+}
+
+/// Create a knowledge map
+#[hdk_extern]
+pub fn create_knowledge_map(input: CreateKnowledgeMapInput) -> ExternResult<KnowledgeMapOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let knowledge_map_id = input.id.unwrap_or_else(|| {
+        format!("km-{}-{}", input.owner_id, timestamp)
+    });
+
+    let knowledge_map = KnowledgeMap {
+        id: knowledge_map_id.clone(),
+        map_type: input.map_type.clone(),
+        owner_id: input.owner_id.clone(),
+        title: input.title,
+        description: input.description,
+        subject_type: input.subject_type,
+        subject_id: input.subject_id,
+        subject_name: input.subject_name,
+        visibility: input.visibility,
+        shared_with_json: input.shared_with_json,
+        nodes_json: input.nodes_json,
+        path_ids_json: input.path_ids_json,
+        overall_affinity: input.overall_affinity,
+        content_graph_id: input.content_graph_id,
+        mastery_levels_json: input.mastery_levels_json,
+        goals_json: input.goals_json,
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+        metadata_json: input.metadata_json,
+    };
+
+    let action_hash = create_entry(&EntryTypes::KnowledgeMap(knowledge_map.clone()))?;
+
+    // Link by ID
+    let id_anchor = StringAnchor::new("knowledge_map_id", &knowledge_map_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToKnowledgeMap, ())?;
+
+    // Link by owner
+    let owner_anchor = StringAnchor::new("knowledge_map_owner", &input.owner_id);
+    let owner_anchor_hash = hash_entry(&EntryTypes::StringAnchor(owner_anchor))?;
+    create_link(owner_anchor_hash, action_hash.clone(), LinkTypes::OwnerToKnowledgeMap, ())?;
+
+    // Link by type
+    let type_anchor = StringAnchor::new("knowledge_map_type", &input.map_type);
+    let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
+    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::KnowledgeMapByType, ())?;
+
+    Ok(KnowledgeMapOutput {
+        action_hash,
+        knowledge_map,
+    })
+}
+
+/// Get knowledge map by ID
+#[hdk_extern]
+pub fn get_knowledge_map_by_id(id: String) -> ExternResult<Option<KnowledgeMapOutput>> {
+    let id_anchor = StringAnchor::new("knowledge_map_id", &id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToKnowledgeMap)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid knowledge map hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(knowledge_map) = record.entry().to_app_option::<KnowledgeMap>().ok().flatten() {
+                return Ok(Some(KnowledgeMapOutput { action_hash, knowledge_map }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Input for querying knowledge maps
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryKnowledgeMapsInput {
+    pub owner_id: Option<String>,
+    pub map_type: Option<String>,
+    pub limit: Option<u32>,
+}
+
+/// Query knowledge maps
+#[hdk_extern]
+pub fn query_knowledge_maps(input: QueryKnowledgeMapsInput) -> ExternResult<Vec<KnowledgeMapOutput>> {
+    let mut results = Vec::new();
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    if let Some(owner_id) = &input.owner_id {
+        let owner_anchor = StringAnchor::new("knowledge_map_owner", owner_id);
+        let owner_anchor_hash = hash_entry(&EntryTypes::StringAnchor(owner_anchor))?;
+
+        let query = LinkQuery::try_new(owner_anchor_hash, LinkTypes::OwnerToKnowledgeMap)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid knowledge map hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(knowledge_map) = record.entry().to_app_option::<KnowledgeMap>().ok().flatten() {
+                    // Filter by map_type if specified
+                    if let Some(ref map_type) = input.map_type {
+                        if &knowledge_map.map_type != map_type {
+                            continue;
+                        }
+                    }
+                    results.push(KnowledgeMapOutput { action_hash, knowledge_map });
+                }
+            }
+        }
+    } else if let Some(map_type) = &input.map_type {
+        let type_anchor = StringAnchor::new("knowledge_map_type", map_type);
+        let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
+
+        let query = LinkQuery::try_new(type_anchor_hash, LinkTypes::KnowledgeMapByType)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid knowledge map hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(knowledge_map) = record.entry().to_app_option::<KnowledgeMap>().ok().flatten() {
+                    results.push(KnowledgeMapOutput { action_hash, knowledge_map });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// PathExtension Operations
+// =============================================================================
+
+/// Input for creating a path extension
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreatePathExtensionInput {
+    pub id: Option<String>,
+    pub base_path_id: String,
+    pub base_path_version: String,
+    pub extended_by: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub insertions_json: String,
+    pub annotations_json: String,
+    pub reorderings_json: String,
+    pub exclusions_json: String,
+    pub visibility: String,
+    pub shared_with_json: String,
+    pub forked_from: Option<String>,
+    pub forks_json: String,
+    pub upstream_proposal_json: Option<String>,
+    pub stats_json: String,
+}
+
+/// Output for path extension
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PathExtensionOutput {
+    pub action_hash: ActionHash,
+    pub path_extension: PathExtension,
+}
+
+/// Create a path extension
+#[hdk_extern]
+pub fn create_path_extension(input: CreatePathExtensionInput) -> ExternResult<PathExtensionOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let extension_id = input.id.unwrap_or_else(|| {
+        format!("ext-{}-{}", input.base_path_id, timestamp)
+    });
+
+    let path_extension = PathExtension {
+        id: extension_id.clone(),
+        base_path_id: input.base_path_id.clone(),
+        base_path_version: input.base_path_version,
+        extended_by: input.extended_by.clone(),
+        title: input.title,
+        description: input.description,
+        insertions_json: input.insertions_json,
+        annotations_json: input.annotations_json,
+        reorderings_json: input.reorderings_json,
+        exclusions_json: input.exclusions_json,
+        visibility: input.visibility,
+        shared_with_json: input.shared_with_json,
+        forked_from: input.forked_from,
+        forks_json: input.forks_json,
+        upstream_proposal_json: input.upstream_proposal_json,
+        stats_json: input.stats_json,
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::PathExtension(path_extension.clone()))?;
+
+    // Link by ID
+    let id_anchor = StringAnchor::new("path_extension_id", &extension_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPathExtension, ())?;
+
+    // Link by extender
+    let extender_anchor = StringAnchor::new("path_extension_extender", &input.extended_by);
+    let extender_anchor_hash = hash_entry(&EntryTypes::StringAnchor(extender_anchor))?;
+    create_link(extender_anchor_hash, action_hash.clone(), LinkTypes::ExtenderToExtension, ())?;
+
+    // Link by base path
+    let base_anchor = StringAnchor::new("path_extension_base", &input.base_path_id);
+    let base_anchor_hash = hash_entry(&EntryTypes::StringAnchor(base_anchor))?;
+    create_link(base_anchor_hash, action_hash.clone(), LinkTypes::BasePathToExtension, ())?;
+
+    Ok(PathExtensionOutput {
+        action_hash,
+        path_extension,
+    })
+}
+
+/// Get path extension by ID
+#[hdk_extern]
+pub fn get_path_extension_by_id(id: String) -> ExternResult<Option<PathExtensionOutput>> {
+    let id_anchor = StringAnchor::new("path_extension_id", &id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToPathExtension)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path extension hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(path_extension) = record.entry().to_app_option::<PathExtension>().ok().flatten() {
+                return Ok(Some(PathExtensionOutput { action_hash, path_extension }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Input for querying path extensions
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryPathExtensionsInput {
+    pub base_path_id: Option<String>,
+    pub extended_by: Option<String>,
+    pub limit: Option<u32>,
+}
+
+/// Query path extensions
+#[hdk_extern]
+pub fn query_path_extensions(input: QueryPathExtensionsInput) -> ExternResult<Vec<PathExtensionOutput>> {
+    let mut results = Vec::new();
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    if let Some(base_path_id) = &input.base_path_id {
+        let base_anchor = StringAnchor::new("path_extension_base", base_path_id);
+        let base_anchor_hash = hash_entry(&EntryTypes::StringAnchor(base_anchor))?;
+
+        let query = LinkQuery::try_new(base_anchor_hash, LinkTypes::BasePathToExtension)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path extension hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(path_extension) = record.entry().to_app_option::<PathExtension>().ok().flatten() {
+                    // Filter by extender if specified
+                    if let Some(ref extended_by) = input.extended_by {
+                        if &path_extension.extended_by != extended_by {
+                            continue;
+                        }
+                    }
+                    results.push(PathExtensionOutput { action_hash, path_extension });
+                }
+            }
+        }
+    } else if let Some(extended_by) = &input.extended_by {
+        let extender_anchor = StringAnchor::new("path_extension_extender", extended_by);
+        let extender_anchor_hash = hash_entry(&EntryTypes::StringAnchor(extender_anchor))?;
+
+        let query = LinkQuery::try_new(extender_anchor_hash, LinkTypes::ExtenderToExtension)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path extension hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(path_extension) = record.entry().to_app_option::<PathExtension>().ok().flatten() {
+                    results.push(PathExtensionOutput { action_hash, path_extension });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// Challenge Operations (Governance)
+// =============================================================================
+
+/// Input for creating a challenge
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateChallengeInput {
+    pub id: Option<String>,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub challenger_id: String,
+    pub challenger_name: String,
+    pub challenger_standing: String,
+    pub grounds: String,
+    pub description: String,
+    pub evidence_json: String,
+    pub status: String,
+    pub priority: String,
+    pub sla_deadline: Option<String>,
+    pub assigned_elohim: Option<String>,
+    pub resolution_json: Option<String>,
+    pub metadata_json: String,
+}
+
+/// Output for challenge
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ChallengeOutput {
+    pub action_hash: ActionHash,
+    pub challenge: Challenge,
+}
+
+/// Create a challenge
+#[hdk_extern]
+pub fn create_challenge(input: CreateChallengeInput) -> ExternResult<ChallengeOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let challenge_id = input.id.unwrap_or_else(|| {
+        format!("chal-{}-{}", input.entity_id, timestamp)
+    });
+
+    let challenge = Challenge {
+        id: challenge_id.clone(),
+        entity_type: input.entity_type.clone(),
+        entity_id: input.entity_id.clone(),
+        challenger_id: input.challenger_id.clone(),
+        challenger_name: input.challenger_name,
+        challenger_standing: input.challenger_standing,
+        grounds: input.grounds,
+        description: input.description,
+        evidence_json: input.evidence_json,
+        status: input.status.clone(),
+        filed_at: timestamp.clone(),
+        acknowledged_at: None,
+        sla_deadline: input.sla_deadline,
+        assigned_elohim: input.assigned_elohim,
+        priority: input.priority,
+        resolution_json: input.resolution_json,
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+        metadata_json: input.metadata_json,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Challenge(challenge.clone()))?;
+
+    // Link by ID
+    let id_anchor = StringAnchor::new("challenge_id", &challenge_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToChallenge, ())?;
+
+    // Link by entity
+    let entity_key = format!("{}:{}", input.entity_type, input.entity_id);
+    let entity_anchor = StringAnchor::new("challenge_entity", &entity_key);
+    let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
+    create_link(entity_anchor_hash, action_hash.clone(), LinkTypes::EntityToChallenge, ())?;
+
+    // Link by challenger
+    let challenger_anchor = StringAnchor::new("challenge_challenger", &input.challenger_id);
+    let challenger_anchor_hash = hash_entry(&EntryTypes::StringAnchor(challenger_anchor))?;
+    create_link(challenger_anchor_hash, action_hash.clone(), LinkTypes::ChallengerToChallenge, ())?;
+
+    // Link by status
+    let status_anchor = StringAnchor::new("challenge_status", &input.status);
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::ChallengeByStatus, ())?;
+
+    Ok(ChallengeOutput {
+        action_hash,
+        challenge,
+    })
+}
+
+/// Get challenge by ID
+#[hdk_extern]
+pub fn get_challenge_by_id(id: String) -> ExternResult<Option<ChallengeOutput>> {
+    let id_anchor = StringAnchor::new("challenge_id", &id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToChallenge)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(challenge) = record.entry().to_app_option::<Challenge>().ok().flatten() {
+                return Ok(Some(ChallengeOutput { action_hash, challenge }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Input for querying challenges
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryChallengesInput {
+    pub entity_type: Option<String>,
+    pub entity_id: Option<String>,
+    pub challenger_id: Option<String>,
+    pub status: Option<String>,
+    pub limit: Option<u32>,
+}
+
+/// Query challenges
+#[hdk_extern]
+pub fn query_challenges(input: QueryChallengesInput) -> ExternResult<Vec<ChallengeOutput>> {
+    let mut results = Vec::new();
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    if input.entity_type.is_some() && input.entity_id.is_some() {
+        let entity_key = format!("{}:{}", input.entity_type.as_ref().unwrap(), input.entity_id.as_ref().unwrap());
+        let entity_anchor = StringAnchor::new("challenge_entity", &entity_key);
+        let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
+
+        let query = LinkQuery::try_new(entity_anchor_hash, LinkTypes::EntityToChallenge)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(challenge) = record.entry().to_app_option::<Challenge>().ok().flatten() {
+                    // Filter by status if specified
+                    if let Some(ref status) = input.status {
+                        if &challenge.status != status {
+                            continue;
+                        }
+                    }
+                    results.push(ChallengeOutput { action_hash, challenge });
+                }
+            }
+        }
+    } else if let Some(status) = &input.status {
+        let status_anchor = StringAnchor::new("challenge_status", status);
+        let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+
+        let query = LinkQuery::try_new(status_anchor_hash, LinkTypes::ChallengeByStatus)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(challenge) = record.entry().to_app_option::<Challenge>().ok().flatten() {
+                    results.push(ChallengeOutput { action_hash, challenge });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// Proposal Operations (Governance)
+// =============================================================================
+
+/// Input for creating a proposal
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateProposalInput {
+    pub id: Option<String>,
+    pub title: String,
+    pub proposal_type: String,
+    pub description: String,
+    pub proposer_id: String,
+    pub proposer_name: String,
+    pub rationale: String,
+    pub status: String,
+    pub phase: String,
+    pub amendments_json: String,
+    pub voting_config_json: String,
+    pub current_votes_json: String,
+    pub outcome_json: Option<String>,
+    pub related_entity_type: Option<String>,
+    pub related_entity_id: Option<String>,
+    pub metadata_json: String,
+}
+
+/// Output for proposal
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ProposalOutput {
+    pub action_hash: ActionHash,
+    pub proposal: Proposal,
+}
+
+/// Create a proposal
+#[hdk_extern]
+pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ProposalOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let proposal_id = input.id.unwrap_or_else(|| {
+        format!("prop-{}", timestamp)
+    });
+
+    let proposal = Proposal {
+        id: proposal_id.clone(),
+        title: input.title,
+        proposal_type: input.proposal_type.clone(),
+        description: input.description,
+        proposer_id: input.proposer_id.clone(),
+        proposer_name: input.proposer_name,
+        rationale: input.rationale,
+        status: input.status.clone(),
+        phase: input.phase,
+        amendments_json: input.amendments_json,
+        voting_config_json: input.voting_config_json,
+        current_votes_json: input.current_votes_json,
+        outcome_json: input.outcome_json,
+        related_entity_type: input.related_entity_type,
+        related_entity_id: input.related_entity_id,
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+        metadata_json: input.metadata_json,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Proposal(proposal.clone()))?;
+
+    // Link by ID
+    let id_anchor = StringAnchor::new("proposal_id", &proposal_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToProposal, ())?;
+
+    // Link by type
+    let type_anchor = StringAnchor::new("proposal_type", &input.proposal_type);
+    let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
+    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::ProposalByType, ())?;
+
+    // Link by proposer
+    let proposer_anchor = StringAnchor::new("proposal_proposer", &input.proposer_id);
+    let proposer_anchor_hash = hash_entry(&EntryTypes::StringAnchor(proposer_anchor))?;
+    create_link(proposer_anchor_hash, action_hash.clone(), LinkTypes::ProposerToProposal, ())?;
+
+    // Link by status
+    let status_anchor = StringAnchor::new("proposal_status", &input.status);
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::ProposalByStatus, ())?;
+
+    Ok(ProposalOutput {
+        action_hash,
+        proposal,
+    })
+}
+
+/// Get proposal by ID
+#[hdk_extern]
+pub fn get_proposal_by_id(id: String) -> ExternResult<Option<ProposalOutput>> {
+    let id_anchor = StringAnchor::new("proposal_id", &id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToProposal)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid proposal hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(proposal) = record.entry().to_app_option::<Proposal>().ok().flatten() {
+                return Ok(Some(ProposalOutput { action_hash, proposal }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Input for querying proposals
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryProposalsInput {
+    pub proposal_type: Option<String>,
+    pub proposer_id: Option<String>,
+    pub status: Option<String>,
+    pub limit: Option<u32>,
+}
+
+/// Query proposals
+#[hdk_extern]
+pub fn query_proposals(input: QueryProposalsInput) -> ExternResult<Vec<ProposalOutput>> {
+    let mut results = Vec::new();
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    if let Some(status) = &input.status {
+        let status_anchor = StringAnchor::new("proposal_status", status);
+        let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+
+        let query = LinkQuery::try_new(status_anchor_hash, LinkTypes::ProposalByStatus)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid proposal hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(proposal) = record.entry().to_app_option::<Proposal>().ok().flatten() {
+                    // Filter by type and proposer if specified
+                    if let Some(ref proposal_type) = input.proposal_type {
+                        if &proposal.proposal_type != proposal_type {
+                            continue;
+                        }
+                    }
+                    if let Some(ref proposer_id) = input.proposer_id {
+                        if &proposal.proposer_id != proposer_id {
+                            continue;
+                        }
+                    }
+                    results.push(ProposalOutput { action_hash, proposal });
+                }
+            }
+        }
+    } else if let Some(proposal_type) = &input.proposal_type {
+        let type_anchor = StringAnchor::new("proposal_type", proposal_type);
+        let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
+
+        let query = LinkQuery::try_new(type_anchor_hash, LinkTypes::ProposalByType)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid proposal hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(proposal) = record.entry().to_app_option::<Proposal>().ok().flatten() {
+                    results.push(ProposalOutput { action_hash, proposal });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// Precedent Operations (Governance)
+// =============================================================================
+
+/// Input for creating a precedent
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreatePrecedentInput {
+    pub id: Option<String>,
+    pub title: String,
+    pub summary: String,
+    pub full_reasoning: String,
+    pub binding: String,              // constitutional, binding-network, binding-local, persuasive
+    pub scope_json: String,
+    pub established_by: String,
+    pub status: String,
+    pub superseded_by: Option<String>,
+    pub metadata_json: String,
+}
+
+/// Output for precedent
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PrecedentOutput {
+    pub action_hash: ActionHash,
+    pub precedent: Precedent,
+}
+
+/// Create a precedent
+#[hdk_extern]
+pub fn create_precedent(input: CreatePrecedentInput) -> ExternResult<PrecedentOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let precedent_id = input.id.unwrap_or_else(|| {
+        format!("prec-{}", timestamp)
+    });
+
+    let precedent = Precedent {
+        id: precedent_id.clone(),
+        title: input.title,
+        summary: input.summary,
+        full_reasoning: input.full_reasoning,
+        binding: input.binding.clone(),
+        scope_json: input.scope_json.clone(),
+        citations: 0,  // Starts at 0, incremented when cited
+        status: input.status.clone(),
+        established_by: input.established_by,
+        established_at: timestamp.clone(),
+        superseded_by: input.superseded_by,
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+        metadata_json: input.metadata_json,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Precedent(precedent.clone()))?;
+
+    // Link by ID
+    let id_anchor = StringAnchor::new("precedent_id", &precedent_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPrecedent, ())?;
+
+    // Link by scope (extract from JSON - simplified, use first scope)
+    let scope_anchor = StringAnchor::new("precedent_scope", &input.scope_json);
+    let scope_anchor_hash = hash_entry(&EntryTypes::StringAnchor(scope_anchor))?;
+    create_link(scope_anchor_hash, action_hash.clone(), LinkTypes::PrecedentByScope, ())?;
+
+    // Link by status
+    let status_anchor = StringAnchor::new("precedent_status", &input.status);
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::PrecedentByStatus, ())?;
+
+    Ok(PrecedentOutput {
+        action_hash,
+        precedent,
+    })
+}
+
+/// Get precedent by ID
+#[hdk_extern]
+pub fn get_precedent_by_id(id: String) -> ExternResult<Option<PrecedentOutput>> {
+    let id_anchor = StringAnchor::new("precedent_id", &id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToPrecedent)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid precedent hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(precedent) = record.entry().to_app_option::<Precedent>().ok().flatten() {
+                return Ok(Some(PrecedentOutput { action_hash, precedent }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Input for querying precedents
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryPrecedentsInput {
+    pub status: Option<String>,
+    pub binding: Option<String>,  // constitutional, binding-network, binding-local, persuasive
+    pub limit: Option<u32>,
+}
+
+/// Query precedents
+#[hdk_extern]
+pub fn query_precedents(input: QueryPrecedentsInput) -> ExternResult<Vec<PrecedentOutput>> {
+    let mut results = Vec::new();
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    if let Some(status) = &input.status {
+        let status_anchor = StringAnchor::new("precedent_status", status);
+        let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+
+        let query = LinkQuery::try_new(status_anchor_hash, LinkTypes::PrecedentByStatus)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid precedent hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(precedent) = record.entry().to_app_option::<Precedent>().ok().flatten() {
+                    // Filter by binding if specified
+                    if let Some(ref binding) = input.binding {
+                        if &precedent.binding != binding {
+                            continue;
+                        }
+                    }
+                    results.push(PrecedentOutput { action_hash, precedent });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// Discussion Operations (Governance)
+// =============================================================================
+
+/// Input for creating a discussion
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateDiscussionInput {
+    pub id: Option<String>,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub category: String,
+    pub title: String,
+    pub messages_json: String,
+    pub status: String,
+    pub metadata_json: String,
+}
+
+/// Output for discussion
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DiscussionOutput {
+    pub action_hash: ActionHash,
+    pub discussion: Discussion,
+}
+
+/// Create a discussion
+#[hdk_extern]
+pub fn create_discussion(input: CreateDiscussionInput) -> ExternResult<DiscussionOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let discussion_id = input.id.unwrap_or_else(|| {
+        format!("disc-{}-{}", input.entity_id, timestamp)
+    });
+
+    let discussion = Discussion {
+        id: discussion_id.clone(),
+        entity_type: input.entity_type.clone(),
+        entity_id: input.entity_id.clone(),
+        category: input.category.clone(),
+        title: input.title,
+        messages_json: input.messages_json,
+        status: input.status.clone(),
+        message_count: 0,
+        last_activity_at: timestamp.clone(),
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+        metadata_json: input.metadata_json,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Discussion(discussion.clone()))?;
+
+    // Link by ID
+    let id_anchor = StringAnchor::new("discussion_id", &discussion_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToDiscussion, ())?;
+
+    // Link by entity
+    let entity_key = format!("{}:{}", input.entity_type, input.entity_id);
+    let entity_anchor = StringAnchor::new("discussion_entity", &entity_key);
+    let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
+    create_link(entity_anchor_hash, action_hash.clone(), LinkTypes::EntityToDiscussion, ())?;
+
+    // Link by category
+    let category_anchor = StringAnchor::new("discussion_category", &input.category);
+    let category_anchor_hash = hash_entry(&EntryTypes::StringAnchor(category_anchor))?;
+    create_link(category_anchor_hash, action_hash.clone(), LinkTypes::DiscussionByCategory, ())?;
+
+    // Link by status
+    let status_anchor = StringAnchor::new("discussion_status", &input.status);
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::DiscussionByStatus, ())?;
+
+    Ok(DiscussionOutput {
+        action_hash,
+        discussion,
+    })
+}
+
+/// Get discussion by ID
+#[hdk_extern]
+pub fn get_discussion_by_id(id: String) -> ExternResult<Option<DiscussionOutput>> {
+    let id_anchor = StringAnchor::new("discussion_id", &id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToDiscussion)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid discussion hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(discussion) = record.entry().to_app_option::<Discussion>().ok().flatten() {
+                return Ok(Some(DiscussionOutput { action_hash, discussion }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Input for querying discussions
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryDiscussionsInput {
+    pub entity_type: Option<String>,
+    pub entity_id: Option<String>,
+    pub category: Option<String>,
+    pub status: Option<String>,
+    pub limit: Option<u32>,
+}
+
+/// Query discussions
+#[hdk_extern]
+pub fn query_discussions(input: QueryDiscussionsInput) -> ExternResult<Vec<DiscussionOutput>> {
+    let mut results = Vec::new();
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    if input.entity_type.is_some() && input.entity_id.is_some() {
+        let entity_key = format!("{}:{}", input.entity_type.as_ref().unwrap(), input.entity_id.as_ref().unwrap());
+        let entity_anchor = StringAnchor::new("discussion_entity", &entity_key);
+        let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
+
+        let query = LinkQuery::try_new(entity_anchor_hash, LinkTypes::EntityToDiscussion)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid discussion hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(discussion) = record.entry().to_app_option::<Discussion>().ok().flatten() {
+                    // Filter by category/status if specified
+                    if let Some(ref category) = input.category {
+                        if &discussion.category != category {
+                            continue;
+                        }
+                    }
+                    if let Some(ref status) = input.status {
+                        if &discussion.status != status {
+                            continue;
+                        }
+                    }
+                    results.push(DiscussionOutput { action_hash, discussion });
+                }
+            }
+        }
+    } else if let Some(category) = &input.category {
+        let category_anchor = StringAnchor::new("discussion_category", category);
+        let category_anchor_hash = hash_entry(&EntryTypes::StringAnchor(category_anchor))?;
+
+        let query = LinkQuery::try_new(category_anchor_hash, LinkTypes::DiscussionByCategory)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid discussion hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(discussion) = record.entry().to_app_option::<Discussion>().ok().flatten() {
+                    results.push(DiscussionOutput { action_hash, discussion });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// GovernanceState Operations
+// =============================================================================
+
+/// Input for creating/updating governance state
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateGovernanceStateInput {
+    pub id: Option<String>,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub status: String,
+    pub status_basis_json: String,
+    pub labels_json: String,
+    pub active_challenges_json: String,
+    pub active_proposals_json: String,
+    pub precedent_ids_json: String,
+    pub metadata_json: String,
+}
+
+/// Output for governance state
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GovernanceStateOutput {
+    pub action_hash: ActionHash,
+    pub governance_state: GovernanceState,
+}
+
+/// Create or update governance state for an entity
+#[hdk_extern]
+pub fn set_governance_state(input: CreateGovernanceStateInput) -> ExternResult<GovernanceStateOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let governance_state_id = input.id.unwrap_or_else(|| {
+        format!("gs-{}:{}", input.entity_type, input.entity_id)
+    });
+
+    let governance_state = GovernanceState {
+        id: governance_state_id,
+        entity_type: input.entity_type.clone(),
+        entity_id: input.entity_id.clone(),
+        status: input.status.clone(),
+        status_basis_json: input.status_basis_json,
+        labels_json: input.labels_json,
+        active_challenges_json: input.active_challenges_json,
+        active_proposals_json: input.active_proposals_json,
+        precedent_ids_json: input.precedent_ids_json,
+        last_updated: timestamp.clone(),
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+        metadata_json: input.metadata_json,
+    };
+
+    let action_hash = create_entry(&EntryTypes::GovernanceState(governance_state.clone()))?;
+
+    // Link by entity (primary lookup)
+    let entity_key = format!("{}:{}", input.entity_type, input.entity_id);
+    let entity_anchor = StringAnchor::new("governance_state_entity", &entity_key);
+    let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
+    create_link(entity_anchor_hash, action_hash.clone(), LinkTypes::IdToGovernanceState, ())?;
+
+    // Link by status
+    let status_anchor = StringAnchor::new("governance_state_status", &input.status);
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::GovernanceStateByStatus, ())?;
+
+    Ok(GovernanceStateOutput {
+        action_hash,
+        governance_state,
+    })
+}
+
+/// Get governance state for an entity
+#[hdk_extern]
+pub fn get_governance_state(input: GetGovernanceStateInput) -> ExternResult<Option<GovernanceStateOutput>> {
+    let entity_key = format!("{}:{}", input.entity_type, input.entity_id);
+    let entity_anchor = StringAnchor::new("governance_state_entity", &entity_key);
+    let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
+
+    let query = LinkQuery::try_new(entity_anchor_hash, LinkTypes::IdToGovernanceState)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    // Return the most recent governance state
+    if let Some(link) = links.last() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid governance state hash".to_string())))?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(governance_state) = record.entry().to_app_option::<GovernanceState>().ok().flatten() {
+                return Ok(Some(GovernanceStateOutput { action_hash, governance_state }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Input for getting governance state
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetGovernanceStateInput {
+    pub entity_type: String,
+    pub entity_id: String,
+}
+
+/// Input for querying governance states
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryGovernanceStatesInput {
+    pub status: Option<String>,
+    pub limit: Option<u32>,
+}
+
+/// Query governance states by status
+#[hdk_extern]
+pub fn query_governance_states(input: QueryGovernanceStatesInput) -> ExternResult<Vec<GovernanceStateOutput>> {
+    let mut results = Vec::new();
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    if let Some(status) = &input.status {
+        let status_anchor = StringAnchor::new("governance_state_status", status);
+        let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+
+        let query = LinkQuery::try_new(status_anchor_hash, LinkTypes::GovernanceStateByStatus)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid governance state hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(governance_state) = record.entry().to_app_option::<GovernanceState>().ok().flatten() {
+                    results.push(GovernanceStateOutput { action_hash, governance_state });
+                }
+            }
+        }
+    }
+
+    Ok(results)
 }

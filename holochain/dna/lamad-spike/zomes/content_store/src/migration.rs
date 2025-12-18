@@ -222,12 +222,15 @@ pub fn import_migrated_content(content_list: Vec<Content>) -> ExternResult<Migra
             content_type: transformed.content_type,
             title: transformed.title,
             description: transformed.description,
+            summary: transformed.summary,
             content: transformed.content,
             content_format: transformed.content_format,
             tags: transformed.tags,
             source_path: transformed.source_path,
             related_node_ids: transformed.related_node_ids,
             reach: transformed.reach,
+            estimated_minutes: transformed.estimated_minutes,
+            thumbnail_url: transformed.thumbnail_url,
             metadata_json: transformed.metadata_json,
         };
 

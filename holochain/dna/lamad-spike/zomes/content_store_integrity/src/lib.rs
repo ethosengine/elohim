@@ -54,17 +54,19 @@ pub const AGENT_TYPES: [&str; 4] = [
 ];
 
 /// Content types supported in Lamad
-pub const CONTENT_TYPES: [&str; 10] = [
-    "epic",
-    "concept",
-    "scenario",
-    "assessment",
-    "resource",
-    "reflection",
-    "discussion",
-    "exercise",
-    "example",
-    "reference",
+pub const CONTENT_TYPES: [&str; 12] = [
+    "epic",        // High-level narrative/vision document
+    "concept",     // Atomic knowledge unit
+    "lesson",      // Digestible learning session (AI-derived from concepts)
+    "scenario",    // Gherkin feature/scenario
+    "assessment",  // Quiz or test
+    "resource",    // Supporting material
+    "reflection",  // Journaling/reflection prompt
+    "discussion",  // Discussion topic
+    "exercise",    // Practice activity
+    "example",     // Illustrative example
+    "reference",   // Reference material
+    "article",     // Long-form article content
 ];
 
 /// Content format types
@@ -332,21 +334,27 @@ pub const VALUE_FLOW_LAYERS: [&str; 4] = [
 // =============================================================================
 
 /// Content entry representing a content node (matches ContentNode from elohim-service)
+/// This is the atomic unit of knowledge in the Lamad system.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct Content {
     pub id: String,
-    pub content_type: String,
+    pub content_type: String,            // epic, concept, lesson, scenario, assessment, etc.
     pub title: String,
     pub description: String,
+    pub summary: Option<String>,         // Short preview text for cards/lists (AI-generated)
     pub content: String,
-    pub content_format: String,
+    pub content_format: String,          // markdown, html, video, audio, interactive, external
     pub tags: Vec<String>,
-    pub source_path: Option<String>,
-    pub related_node_ids: Vec<String>,
+    pub source_path: Option<String>,     // Original source file path if imported
+    pub related_node_ids: Vec<String>,   // Quick graph references (denormalized)
     pub author_id: Option<String>,
-    pub reach: String,
+    pub reach: String,                   // Visibility: private, community, public, commons
     pub trust_score: f64,
+    // Attention metadata for digestible learning sessions
+    pub estimated_minutes: Option<u32>,  // Reading/viewing time
+    pub thumbnail_url: Option<String>,   // Preview image for visual cards
+    // Extensible metadata
     pub metadata_json: String,
     pub created_at: String,
     pub updated_at: String,
@@ -371,6 +379,8 @@ pub struct LearningPath {
     pub visibility: String,
     pub path_type: String,
     pub tags: Vec<String>,
+    /// Extensible metadata (stores chapters JSON for hierarchical paths)
+    pub metadata_json: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -448,6 +458,24 @@ pub struct PathChapter {
 // Content Relationship Entry
 // =============================================================================
 
+/// Relationship types for content graph edges
+pub const RELATIONSHIP_TYPES: [&str; 6] = [
+    "RELATES_TO",   // General association between concepts
+    "CONTAINS",     // Parent-child hierarchical relationship
+    "DEPENDS_ON",   // Prerequisite dependency (must understand first)
+    "IMPLEMENTS",   // Implementation of a concept
+    "REFERENCES",   // Citation or reference to another concept
+    "DERIVED_FROM", // This content was derived from source content
+];
+
+/// Inference sources for relationships
+pub const INFERENCE_SOURCES: [&str; 4] = [
+    "explicit",   // Manually created by author/curator
+    "path",       // Inferred from learning path structure
+    "tag",        // Inferred from shared tags
+    "semantic",   // Inferred by AI from content similarity
+];
+
 /// Relationship between two content nodes (stored in DHT, replaces Kuzu)
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -455,9 +483,9 @@ pub struct Relationship {
     pub id: String,
     pub source_id: String,
     pub target_id: String,
-    pub relationship_type: String,  // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
+    pub relationship_type: String,  // See RELATIONSHIP_TYPES
     pub confidence: f64,            // 0.0 - 1.0
-    pub inference_source: String,   // explicit, path, tag, semantic
+    pub inference_source: String,   // See INFERENCE_SOURCES
     pub metadata_json: Option<String>,
     pub created_at: String,
 }
@@ -1073,6 +1101,286 @@ pub const CHALLENGE_STATES: [&str; 3] = [
 ];
 
 // =============================================================================
+// Lamad: Knowledge Map Entry
+// =============================================================================
+
+/// KnowledgeMap - A personalized view of learnable territory.
+///
+/// Four relational dimensions:
+/// 1. domain - Relationship with knowledge (Khan Academy style)
+/// 2. self - Relationship with self ("know thyself")
+/// 3. person - Relationship with others (Gottman Love Maps)
+/// 4. collective - Relationship with communities
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct KnowledgeMap {
+    pub id: String,
+    pub map_type: String,           // domain, self, person, collective
+    pub owner_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    // Subject being mapped
+    pub subject_type: String,       // content-graph, agent, organization
+    pub subject_id: String,
+    pub subject_name: String,
+    // Visibility
+    pub visibility: String,         // private, mutual, shared, public
+    pub shared_with_json: String,   // String[] as JSON
+    // Map content
+    pub nodes_json: String,         // KnowledgeNode[] as JSON
+    pub path_ids_json: String,      // String[] as JSON
+    pub overall_affinity: f64,
+    // For domain maps
+    pub content_graph_id: Option<String>,
+    pub mastery_levels_json: String, // Record<string, string> as JSON
+    pub goals_json: String,          // DomainGoal[] as JSON
+    // Timestamps
+    pub created_at: String,
+    pub updated_at: String,
+    pub metadata_json: String,
+}
+
+/// Knowledge map types
+pub const KNOWLEDGE_MAP_TYPES: [&str; 4] = [
+    "domain",
+    "self",
+    "person",
+    "collective",
+];
+
+/// Knowledge map visibility levels
+pub const KNOWLEDGE_MAP_VISIBILITY: [&str; 4] = [
+    "private",
+    "mutual",
+    "shared",
+    "public",
+];
+
+// =============================================================================
+// Lamad: Path Extension Entry
+// =============================================================================
+
+/// PathExtension - Learner-owned mutations to curated paths.
+///
+/// Enables personal learning customization without fragmenting curation.
+/// Extensions can insert steps, add annotations, reorder, or exclude steps.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct PathExtension {
+    pub id: String,
+    pub base_path_id: String,
+    pub base_path_version: String,
+    pub extended_by: String,
+    pub title: String,
+    pub description: Option<String>,
+    // Modifications (all as JSON for flexibility)
+    pub insertions_json: String,      // PathStepInsertion[] as JSON
+    pub annotations_json: String,     // PathStepAnnotation[] as JSON
+    pub reorderings_json: String,     // PathStepReorder[] as JSON
+    pub exclusions_json: String,      // PathStepExclusion[] as JSON
+    // Visibility
+    pub visibility: String,           // private, shared, public
+    pub shared_with_json: String,     // String[] as JSON
+    // Fork tracking
+    pub forked_from: Option<String>,
+    pub forks_json: String,           // String[] as JSON
+    // Upstream proposal (propose changes back to maintainer)
+    pub upstream_proposal_json: Option<String>,
+    // Stats
+    pub stats_json: String,           // ExtensionStats as JSON
+    // Timestamps
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Extension visibility levels
+pub const EXTENSION_VISIBILITY: [&str; 3] = [
+    "private",
+    "shared",
+    "public",
+];
+
+// =============================================================================
+// Governance Entry Types
+// =============================================================================
+
+/// Challenge - A formal challenge to content or decisions.
+///
+/// Enables community members with standing to challenge content quality,
+/// accuracy, safety, or constitutional alignment.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Challenge {
+    pub id: String,
+    pub entity_type: String,          // content, path, extension, attestation, decision
+    pub entity_id: String,
+    pub challenger_id: String,
+    pub challenger_name: String,
+    pub challenger_standing: String,  // Attestation level granting standing
+    pub grounds: String,              // factual-error, safety, policy, constitutional
+    pub description: String,
+    pub evidence_json: String,        // Evidence[] as JSON
+    pub status: String,               // filed, acknowledged, under-review, resolved, dismissed
+    pub filed_at: String,
+    pub acknowledged_at: Option<String>,
+    pub sla_deadline: Option<String>,
+    pub assigned_elohim: Option<String>,
+    pub priority: String,             // normal, high, critical
+    pub resolution_json: Option<String>, // ChallengeResolution as JSON
+    pub created_at: String,
+    pub updated_at: String,
+    pub metadata_json: String,
+}
+
+/// Challenge grounds
+pub const CHALLENGE_GROUNDS: [&str; 5] = [
+    "factual-error",
+    "new-evidence",
+    "safety",
+    "policy",
+    "constitutional",
+];
+
+/// Challenge status states
+pub const CHALLENGE_STATUS: [&str; 5] = [
+    "filed",
+    "acknowledged",
+    "under-review",
+    "resolved",
+    "dismissed",
+];
+
+/// Proposal - A formal proposal for changes.
+///
+/// Supports various governance decision-making mechanisms.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Proposal {
+    pub id: String,
+    pub title: String,
+    pub proposal_type: String,        // sense-check, consent, consensus, supermajority
+    pub description: String,
+    pub proposer_id: String,
+    pub proposer_name: String,
+    pub rationale: String,
+    pub status: String,               // draft, discussion, voting, decided, dismissed
+    pub phase: String,                // Current phase
+    pub amendments_json: String,      // Amendment[] as JSON
+    pub voting_config_json: String,   // VotingConfig as JSON
+    pub current_votes_json: String,   // VoteCount as JSON
+    pub outcome_json: Option<String>, // ProposalOutcome as JSON
+    pub related_entity_type: Option<String>,
+    pub related_entity_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub metadata_json: String,
+}
+
+/// Proposal types
+pub const PROPOSAL_TYPES: [&str; 4] = [
+    "sense-check",
+    "consent",
+    "consensus",
+    "supermajority",
+];
+
+/// Proposal status states
+pub const PROPOSAL_STATUS: [&str; 5] = [
+    "draft",
+    "discussion",
+    "voting",
+    "decided",
+    "dismissed",
+];
+
+/// Precedent - A binding decision that guides future decisions.
+///
+/// Precedents form the case law of the governance system.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Precedent {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub full_reasoning: String,
+    pub binding: String,              // constitutional, binding-network, binding-local, persuasive
+    pub scope_json: String,           // { entityTypes, categories, roles } as JSON
+    pub citations: u32,               // How often this precedent is cited
+    pub status: String,               // active, superseded, under-review
+    pub established_by: String,       // Proposal ID or governance body
+    pub established_at: String,
+    pub superseded_by: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub metadata_json: String,
+}
+
+/// Precedent binding levels
+pub const PRECEDENT_BINDING: [&str; 4] = [
+    "constitutional",
+    "binding-network",
+    "binding-local",
+    "persuasive",
+];
+
+/// Discussion - A threaded discussion on an entity.
+///
+/// Enables structured deliberation on content, proposals, or challenges.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Discussion {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub category: String,             // general, proposal, challenge, feedback
+    pub title: String,
+    pub messages_json: String,        // DiscussionMessage[] as JSON
+    pub status: String,               // open, closed, archived
+    pub message_count: u32,
+    pub last_activity_at: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub metadata_json: String,
+}
+
+/// Discussion categories
+pub const DISCUSSION_CATEGORIES: [&str; 4] = [
+    "general",
+    "proposal",
+    "challenge",
+    "feedback",
+];
+
+/// GovernanceState - Current governance status of an entity.
+///
+/// Tracks the governance posture of content, paths, etc.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct GovernanceState {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub status: String,               // approved, pending, challenged, suspended
+    pub status_basis_json: String,    // StatusBasis as JSON
+    pub labels_json: String,          // Label[] as JSON
+    pub active_challenges_json: String, // String[] as JSON
+    pub active_proposals_json: String,  // String[] as JSON
+    pub precedent_ids_json: String,     // String[] as JSON
+    pub last_updated: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub metadata_json: String,
+}
+
+/// Governance status states
+pub const GOVERNANCE_STATUS: [&str; 4] = [
+    "approved",
+    "pending",
+    "challenged",
+    "suspended",
+];
+
+// =============================================================================
 // hREA Point System Entries - Value Flow Demonstration
 // =============================================================================
 
@@ -1506,9 +1814,18 @@ pub enum EntryTypes {
     ContentMastery(ContentMastery),
     PracticePool(PracticePool),
     MasteryChallenge(MasteryChallenge),
+    KnowledgeMap(KnowledgeMap),
+    PathExtension(PathExtension),
 
     // Qahal: Community & Relationships
     Relationship(Relationship),
+
+    // Governance
+    Challenge(Challenge),
+    Proposal(Proposal),
+    Precedent(Precedent),
+    Discussion(Discussion),
+    GovernanceState(GovernanceState),
 
     // Imago Dei: Identity
     Human(Human),           // Legacy, kept for backward compatibility
@@ -1763,6 +2080,50 @@ pub enum LinkTypes {
     StewardToRevenue,           // Anchor(steward_credential_id) -> StewardRevenue
     ContributorToRevenue,       // Anchor(contributor_presence_id) -> StewardRevenue
     RevenueByStatus,            // Anchor(status) -> StewardRevenue
+
+    // =========================================================================
+    // Lamad: KnowledgeMap links
+    // =========================================================================
+    IdToKnowledgeMap,           // Anchor(knowledge_map_id) -> KnowledgeMap
+    OwnerToKnowledgeMap,        // Anchor(owner_id) -> KnowledgeMap
+    KnowledgeMapByType,         // Anchor(map_type) -> KnowledgeMap
+
+    // =========================================================================
+    // Lamad: PathExtension links
+    // =========================================================================
+    IdToPathExtension,          // Anchor(extension_id) -> PathExtension
+    ExtenderToExtension,        // Anchor(extended_by) -> PathExtension
+    BasePathToExtension,        // Anchor(base_path_id) -> PathExtension
+
+    // =========================================================================
+    // Lamad: Governance links
+    // =========================================================================
+    // Challenge
+    IdToChallenge,              // Anchor(challenge_id) -> Challenge
+    EntityToChallenge,          // Anchor(entity_type:entity_id) -> Challenge
+    ChallengerToChallenge,      // Anchor(challenger_id) -> Challenge
+    ChallengeByStatus,          // Anchor(status) -> Challenge
+
+    // Proposal
+    IdToProposal,               // Anchor(proposal_id) -> Proposal
+    ProposalByType,             // Anchor(proposal_type) -> Proposal
+    ProposerToProposal,         // Anchor(proposer_id) -> Proposal
+    ProposalByStatus,           // Anchor(status) -> Proposal
+
+    // Precedent
+    IdToPrecedent,              // Anchor(precedent_id) -> Precedent
+    PrecedentByScope,           // Anchor(scope) -> Precedent
+    PrecedentByStatus,          // Anchor(status) -> Precedent
+
+    // Discussion
+    IdToDiscussion,             // Anchor(discussion_id) -> Discussion
+    EntityToDiscussion,         // Anchor(entity_type:entity_id) -> Discussion
+    DiscussionByCategory,       // Anchor(category) -> Discussion
+    DiscussionByStatus,         // Anchor(status) -> Discussion
+
+    // GovernanceState
+    IdToGovernanceState,        // Anchor(entity_type:entity_id) -> GovernanceState
+    GovernanceStateByStatus,    // Anchor(status) -> GovernanceState
 }
 
 // =============================================================================

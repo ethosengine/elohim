@@ -25,12 +25,20 @@ Requires Rust and Holochain HDK:
 # Install Holochain dev tools
 nix develop
 
-# Build the DNA
+# Build the WASM zomes (IMPORTANT: must specify wasm32 target and RUSTFLAGS)
+RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
+
+# Pack the DNA (IMPORTANT: must repack after rebuilding WASM!)
 hc dna pack .
 
 # Package as hApp
 hc app pack ./workdir
 ```
+
+**Important build notes:**
+1. `cargo build --release` without `--target wasm32-unknown-unknown` builds for native target and does NOT update the WASM files
+2. After rebuilding WASM, you MUST run `hc dna pack .` to update the `.dna` bundle
+3. After repacking, restart Holochain to load the new DNA
 
 ## Entry Type
 
