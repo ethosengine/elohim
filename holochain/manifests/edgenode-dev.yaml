@@ -21,6 +21,7 @@ stringData:
   # IMPORTANT: Change these in production!
   api-key-authenticated: "dev-elohim-auth-2024"
   api-key-admin: "dev-elohim-admin-2024"
+  jwt-secret: "dev-jwt-secret-change-in-production-2024"
 ---
 # ConfigMap for conductor configuration
 apiVersion: v1
@@ -163,6 +164,11 @@ spec:
                 secretKeyRef:
                   name: elohim-admin-proxy-secrets
                   key: api-key-admin
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-admin-proxy-secrets
+                  key: jwt-secret
           resources:
             requests:
               memory: "64Mi"

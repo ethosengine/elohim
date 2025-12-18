@@ -23,6 +23,7 @@ stringData:
   # Use strong, unique keys generated with: openssl rand -hex 32
   api-key-authenticated: "CHANGE-ME-prod-elohim-auth-2024"
   api-key-admin: "CHANGE-ME-prod-elohim-admin-2024"
+  jwt-secret: "CHANGE-ME-prod-jwt-secret-use-openssl-rand-hex-32"
 ---
 # ConfigMap for conductor configuration
 apiVersion: v1
@@ -165,6 +166,11 @@ spec:
                 secretKeyRef:
                   name: elohim-admin-proxy-prod-secrets
                   key: api-key-admin
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-admin-proxy-prod-secrets
+                  key: jwt-secret
           resources:
             requests:
               memory: "128Mi"
