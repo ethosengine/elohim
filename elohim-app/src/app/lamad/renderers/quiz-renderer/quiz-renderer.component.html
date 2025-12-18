@@ -1,4 +1,4 @@
-<div *ngIf="quiz" class="quiz-container p-4 max-w-2xl mx-auto">
+<div *ngIf="quiz && quiz.questions?.length" class="quiz-container p-4 max-w-2xl mx-auto">
   <div *ngFor="let q of quiz.questions; let i = index" class="question mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
     <h3 class="font-bold text-lg mb-3">{{ i + 1 }}. {{ q.question }}</h3>
 
@@ -51,6 +51,9 @@
     </div>
   </div>
 </div>
-<div *ngIf="!quiz" class="text-center text-gray-500">
-  Loading quiz...
+<div *ngIf="!quiz || !quiz.questions?.length" class="text-center p-8">
+  <div class="text-gray-500 dark:text-gray-400">
+    <p class="text-lg mb-2">Quiz not available</p>
+    <p class="text-sm">This assessment content is not yet configured with quiz questions.</p>
+  </div>
 </div>

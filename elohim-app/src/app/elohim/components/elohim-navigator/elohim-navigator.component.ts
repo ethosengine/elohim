@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Input } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router, NavigationEnd } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -10,6 +10,7 @@ import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-tog
 import { HolochainClientService } from '../../services/holochain-client.service';
 import { EdgeNodeDisplayInfo } from '../../models/holochain-connection.model';
 import { SovereigntyBadgeComponent } from '../../../lamad/components/sovereignty-badge/sovereignty-badge.component';
+import { IdentityService } from '../../../imagodei/services/identity.service';
 
 /**
  * Context app identifiers for the Elohim Protocol
@@ -102,8 +103,33 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   constructor(
     private readonly sessionHumanService: SessionHumanService,
     private readonly router: Router,
-    readonly holochainService: HolochainClientService
+    readonly holochainService: HolochainClientService,
+    private readonly identityService: IdentityService
   ) {}
+
+  // =========================================================================
+  // Authentication State
+  // =========================================================================
+
+  /**
+   * Whether the user is authenticated (hosted or self-sovereign mode)
+   */
+  readonly isAuthenticated = computed(() => {
+    const mode = this.identityService.mode();
+    return mode === 'hosted' || mode === 'self-sovereign';
+  });
+
+  /**
+   * Get display name - from identity service if authenticated, session otherwise
+   */
+  readonly authenticatedDisplayName = computed(() => {
+    return this.identityService.displayName() ?? 'User';
+  });
+
+  /**
+   * Get identity mode for display
+   */
+  readonly identityMode = computed(() => this.identityService.mode());
 
   ngOnInit(): void {
     // Subscribe to session human state
@@ -270,6 +296,42 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   onJoinNetwork(): void {
     this.openUpgradeModal();
+  }
+
+  // =========================================================================
+  // Authentication Actions
+  // =========================================================================
+
+  /**
+   * Navigate to login page
+   */
+  goToLogin(): void {
+    this.closeAllTrays();
+    const returnUrl = this.router.url;
+    this.router.navigate(['/identity/login'], {
+      queryParams: { returnUrl },
+    });
+  }
+
+  /**
+   * Navigate to registration page
+   */
+  goToRegister(): void {
+    this.closeAllTrays();
+    const returnUrl = this.router.url;
+    this.router.navigate(['/identity/register'], {
+      queryParams: { returnUrl },
+    });
+  }
+
+  /**
+   * Logout the current user
+   */
+  async onLogout(): Promise<void> {
+    this.closeAllTrays();
+    await this.identityService.logout();
+    // Navigate to home after logout
+    this.router.navigate(['/']);
   }
 
   // =========================================================================

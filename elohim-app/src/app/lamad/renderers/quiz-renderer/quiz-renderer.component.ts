@@ -44,10 +44,36 @@ export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
   passed = false;
 
   ngOnChanges(): void {
-    if (this.node && this.node.contentFormat === 'quiz-json') {
-      this.quiz = this.node.content as QuizContent;
-      this.answers.clear();
-      this.submitted = false;
+    // Reset state when node changes
+    this.quiz = null;
+    this.answers.clear();
+    this.submitted = false;
+    this.score = 0;
+    this.passed = false;
+
+    if (!this.node) return;
+
+    // Handle quiz content - could be quiz-json format or assessment type
+    if (this.node.contentFormat === 'quiz-json' || this.node.contentType === 'assessment') {
+      let content = this.node.content;
+
+      // Parse if it's a string
+      if (typeof content === 'string') {
+        try {
+          content = JSON.parse(content);
+        } catch (e) {
+          console.error('[QuizRenderer] Failed to parse quiz content:', e);
+          return;
+        }
+      }
+
+      // Validate quiz structure
+      const quizData = content as QuizContent;
+      if (quizData && Array.isArray(quizData.questions)) {
+        this.quiz = quizData;
+      } else {
+        console.warn('[QuizRenderer] Invalid quiz structure - missing questions array:', content);
+      }
     }
   }
 

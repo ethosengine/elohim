@@ -16,6 +16,8 @@ import { IdentityService } from '../../services/identity.service';
 import { SessionHumanService } from '../../services/session-human.service';
 import { SessionMigrationService } from '../../services/session-migration.service';
 import { HolochainClientService } from '../../../elohim/services/holochain-client.service';
+import { AuthService } from '../../services/auth.service';
+import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
 import {
   type RegisterHumanRequest,
   type ProfileReach,
@@ -23,6 +25,7 @@ import {
   getReachLabel,
   getReachDescription,
 } from '../../models/identity.model';
+import { type RegisterCredentials } from '../../models/auth.model';
 
 @Component({
   selector: 'app-register',
@@ -36,6 +39,8 @@ export class RegisterComponent implements OnInit {
   private readonly sessionHumanService = inject(SessionHumanService);
   private readonly migrationService = inject(SessionMigrationService);
   private readonly holochainClient = inject(HolochainClientService);
+  private readonly authService = inject(AuthService);
+  private readonly passwordProvider = inject(PasswordAuthProvider);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -49,6 +54,10 @@ export class RegisterComponent implements OnInit {
     affinities: '',
     profileReach: 'community' as ProfileReach,
     location: '',
+    // Authentication credentials
+    email: '',
+    password: '',
+    confirmPassword: '',
   };
 
   // ==========================================================================
@@ -58,6 +67,7 @@ export class RegisterComponent implements OnInit {
   readonly isRegistering = signal(false);
   readonly isMigrating = signal(false);
   readonly error = signal<string | null>(null);
+  readonly showPassword = signal(false);
 
   /** Return URL after successful registration */
   private returnUrl = '/';
@@ -103,6 +113,11 @@ export class RegisterComponent implements OnInit {
   // ==========================================================================
 
   ngOnInit(): void {
+    // Register password provider with auth service
+    if (!this.authService.hasProvider('password')) {
+      this.authService.registerProvider(this.passwordProvider);
+    }
+
     // Get return URL from query params
     this.route.queryParams.subscribe(params => {
       this.returnUrl = params['returnUrl'] ?? '/';
@@ -132,6 +147,7 @@ export class RegisterComponent implements OnInit {
 
   /**
    * Register new identity.
+   * If session data exists, automatically migrate it to preserve user's progress.
    */
   async onRegister(): Promise<void> {
     if (!this.isConnected()) {
@@ -144,19 +160,98 @@ export class RegisterComponent implements OnInit {
       return;
     }
 
+    // Validate email
+    if (!this.form.email.trim()) {
+      this.error.set('Please enter your email address.');
+      return;
+    }
+
+    if (!this.isValidEmail(this.form.email)) {
+      this.error.set('Please enter a valid email address.');
+      return;
+    }
+
+    // Validate password
+    if (!this.form.password) {
+      this.error.set('Please enter a password.');
+      return;
+    }
+
+    if (this.form.password.length < 8) {
+      this.error.set('Password must be at least 8 characters.');
+      return;
+    }
+
+    if (this.form.password !== this.form.confirmPassword) {
+      this.error.set('Passwords do not match.');
+      return;
+    }
+
     this.isRegistering.set(true);
     this.error.set(null);
 
     try {
-      const request: RegisterHumanRequest = {
-        displayName: this.form.displayName.trim(),
-        bio: this.form.bio.trim() || undefined,
-        affinities: this.parseAffinities(this.form.affinities),
-        profileReach: this.form.profileReach,
-        location: this.form.location.trim() || undefined,
-      };
+      // Check if we have session data to migrate
+      const hasSessionToMigrate = this.hasSession() && this.canMigrate();
 
-      await this.identityService.registerHuman(request);
+      if (hasSessionToMigrate) {
+        // Use migration flow to preserve session progress
+        console.log('[Register] Session data found, using migration flow to preserve progress');
+
+        const overrides: Partial<RegisterHumanRequest> = {
+          displayName: this.form.displayName.trim(),
+          bio: this.form.bio.trim() || undefined,
+          affinities: this.parseAffinities(this.form.affinities),
+          profileReach: this.form.profileReach,
+          location: this.form.location.trim() || undefined,
+        };
+
+        const migrationResult = await this.migrationService.migrate(overrides);
+
+        if (!migrationResult.success) {
+          throw new Error(migrationResult.error ?? 'Migration failed');
+        }
+
+        console.log('[Register] Session migrated successfully:', migrationResult.migratedData);
+      } else {
+        // No session data - standard registration
+        const request: RegisterHumanRequest = {
+          displayName: this.form.displayName.trim(),
+          bio: this.form.bio.trim() || undefined,
+          affinities: this.parseAffinities(this.form.affinities),
+          profileReach: this.form.profileReach,
+          location: this.form.location.trim() || undefined,
+        };
+
+        await this.identityService.registerHuman(request);
+      }
+
+      // Step 2: Create auth credentials for login/logout (both flows need this)
+      const humanId = this.identityService.humanId();
+      const agentPubKey = this.identityService.agentPubKey();
+
+      if (humanId && agentPubKey) {
+        const authCredentials: RegisterCredentials = {
+          identifier: this.form.email.trim().toLowerCase(),
+          identifierType: 'email',
+          password: this.form.password,
+          humanId,
+          agentPubKey,
+        };
+
+        const authResult = await this.authService.register('password', authCredentials);
+
+        if (!authResult.success) {
+          // Holochain registration succeeded but auth failed
+          // User can still use the app, just can't login from another device
+          console.warn('[Register] Auth credentials creation failed:', authResult.error);
+          // Don't block the flow - they're registered in Holochain
+        }
+      }
+
+      // Clear password from form for security
+      this.form.password = '';
+      this.form.confirmPassword = '';
 
       // Success - navigate to return URL
       this.router.navigate([this.returnUrl]);
@@ -170,11 +265,19 @@ export class RegisterComponent implements OnInit {
 
   /**
    * Migrate from session to network identity.
+   * Note: This is now primarily for quick migration without email/password.
+   * The main "Create Identity" button will also migrate if session exists.
    */
   async onMigrate(): Promise<void> {
     if (!this.canMigrate()) {
       this.error.set('Migration not available. Check network connection.');
       return;
+    }
+
+    // If email/password are filled in, use the full registration flow instead
+    // This ensures auth credentials are created
+    if (this.form.email.trim() && this.form.password) {
+      return this.onRegister();
     }
 
     this.isMigrating.set(true);
@@ -197,6 +300,24 @@ export class RegisterComponent implements OnInit {
       const result = await this.migrationService.migrate(overrides);
 
       if (result.success) {
+        // Also create auth credentials if email/password were provided
+        const humanId = this.identityService.humanId();
+        const agentPubKey = this.identityService.agentPubKey();
+
+        if (humanId && agentPubKey && this.form.email.trim() && this.form.password) {
+          const authCredentials: RegisterCredentials = {
+            identifier: this.form.email.trim().toLowerCase(),
+            identifierType: 'email',
+            password: this.form.password,
+            humanId,
+            agentPubKey,
+          };
+
+          await this.authService.register('password', authCredentials);
+          this.form.password = '';
+          this.form.confirmPassword = '';
+        }
+
         // Success - navigate to return URL
         this.router.navigate([this.returnUrl]);
       } else {
@@ -217,9 +338,33 @@ export class RegisterComponent implements OnInit {
     this.error.set(null);
   }
 
+  /**
+   * Toggle password visibility.
+   */
+  togglePasswordVisibility(): void {
+    this.showPassword.update(v => !v);
+  }
+
+  /**
+   * Navigate to login page.
+   */
+  goToLogin(): void {
+    this.router.navigate(['/identity/login'], {
+      queryParams: { returnUrl: this.returnUrl },
+    });
+  }
+
   // ==========================================================================
   // Helpers
   // ==========================================================================
+
+  /**
+   * Validate email format.
+   */
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
 
   /**
    * Parse comma-separated affinities string to array.

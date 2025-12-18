@@ -4,6 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 import { Subject, forkJoin, of } from 'rxjs';
 import { takeUntil, catchError } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
+import { PathFilterService } from '../../services/path-filter.service';
 import { ProfileService } from '@app/elohim/services/profile.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
@@ -31,7 +32,18 @@ import { CurrentFocus } from '../../models/profile.model';
   styleUrls: ['./lamad-home.component.css']
 })
 export class LamadHomeComponent implements OnInit, OnDestroy {
+  /** Featured paths shown initially (limited for performance) */
   paths: PathIndexEntry[] = [];
+
+  /** Full path list (loaded on demand) */
+  private allPaths: PathIndexEntry[] = [];
+
+  /** Whether to show all paths or just featured */
+  showAllPaths = false;
+
+  /** Number of featured paths to display initially */
+  private readonly FEATURED_PATH_LIMIT = 6;
+
   featuredPath: PathIndexEntry | null = null;
   activeFocus: CurrentFocus | null = null;
 
@@ -48,6 +60,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly pathService: PathService,
+    private readonly pathFilterService: PathFilterService,
     private readonly router: Router,
     private readonly profileService: ProfileService,
     private readonly agentService: AgentService
@@ -87,7 +100,14 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: (results) => {
         const index = results[0] as PathIndex;
-        this.paths = index.paths || [];
+        // Store full path list for "View All" expansion
+        this.allPaths = index.paths || [];
+
+        // Show only featured paths initially (performance optimization)
+        this.paths = this.pathFilterService.getFeaturedPaths(
+          this.allPaths,
+          this.FEATURED_PATH_LIMIT
+        );
 
         if (isAuth && results.length > 1 && results[1] && Array.isArray(results[1]) && results[1].length > 0) {
             // Sort by most recent activity
@@ -102,12 +122,12 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
           const progressRecords = results[2] as Array<{ pathId: string; completedStepIndices: number[]; completedAt?: string }>;
           this.pathProgressMap.clear();
 
-          // Calculate progress for each path
+          // Calculate progress for each path (use allPaths for lookup)
           progressRecords
             .filter(p => p.pathId !== '__global__') // Skip global progress record
             .forEach(progress => {
               // Find the path to get total step count
-              const path = this.paths.find(p => p.id === progress.pathId);
+              const path = this.allPaths.find(p => p.id === progress.pathId);
               if (path && path.stepCount > 0) {
                 const percent = progress.completedAt
                   ? 100
@@ -118,7 +138,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
         }
 
         // Feature the Elohim Protocol path
-        this.featuredPath = this.paths.find(p => p.id === 'elohim-protocol') || this.paths[0] || null;
+        this.featuredPath = this.allPaths.find(p => p.id === 'elohim-protocol') || this.allPaths[0] || null;
 
         this.isLoading = false;
       },
@@ -127,6 +147,30 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
         this.isLoading = false;
       }
     });
+  }
+
+  /**
+   * Toggle between featured paths and all paths
+   */
+  toggleShowAllPaths(): void {
+    this.showAllPaths = !this.showAllPaths;
+    this.paths = this.showAllPaths
+      ? this.allPaths
+      : this.pathFilterService.getFeaturedPaths(this.allPaths, this.FEATURED_PATH_LIMIT);
+  }
+
+  /**
+   * Get the total number of paths available
+   */
+  get totalPathCount(): number {
+    return this.allPaths.length;
+  }
+
+  /**
+   * Check if there are more paths to show
+   */
+  get hasMorePaths(): boolean {
+    return this.allPaths.length > this.FEATURED_PATH_LIMIT;
   }
 
   /**

@@ -125,6 +125,67 @@ export interface AgentProgress {
    * Special pathId '__global__' is used to store this field for cross-path tracking.
    */
   completedContentIds?: string[];
+
+  /**
+   * Content mastery tracking (Bloom's Taxonomy progression).
+   *
+   * Tracks mastery level per content node (by resourceId) across all paths.
+   * This enables:
+   * - Cross-path mastery views (if you're "apply" level in path A, shows in path B)
+   * - UI indicators: seen → practiced → applied → mastered
+   * - Attestation gating (require "apply" level for certain privileges)
+   *
+   * Storage: Stored as Record<resourceId, MasteryLevel>
+   * Special pathId '__global__' is used to store this field for cross-path tracking.
+   */
+  contentMastery?: Record<string, MasteryLevel>;
+}
+
+/**
+ * Simplified mastery tier for UI display.
+ * Maps Bloom's levels to user-friendly tiers.
+ */
+export type MasteryTier = 'unseen' | 'seen' | 'practiced' | 'applied' | 'mastered';
+
+/**
+ * Map MasteryLevel to simplified MasteryTier for UI.
+ */
+export function getMasteryTier(level: MasteryLevel): MasteryTier {
+  switch (level) {
+    case 'not_started':
+      return 'unseen';
+    case 'seen':
+      return 'seen';
+    case 'remember':
+    case 'understand':
+      return 'practiced';
+    case 'apply':
+      return 'applied';
+    case 'analyze':
+    case 'evaluate':
+    case 'create':
+      return 'mastered';
+    default:
+      return 'unseen';
+  }
+}
+
+/**
+ * Get numeric progress percentage for a mastery level.
+ * Useful for progress bars.
+ */
+export function getMasteryProgress(level: MasteryLevel): number {
+  const values: Record<MasteryLevel, number> = {
+    not_started: 0,
+    seen: 15,
+    remember: 30,
+    understand: 50,
+    apply: 70,
+    analyze: 85,
+    evaluate: 95,
+    create: 100,
+  };
+  return values[level] ?? 0;
 }
 
 /**
@@ -257,6 +318,12 @@ export interface NewAttestation {
   iconUrl?: string;
   tier?: 'bronze' | 'silver' | 'gold' | 'platinum';  // Visual distinction
 }
+
+/**
+ * AgentAttestation - Clearer alias for attestations about agents.
+ * Distinct from ContentAttestation (trust claims about content).
+ */
+export type AgentAttestation = NewAttestation;
 
 /**
  * FrontierItem - An item on the learning frontier (what's next?)

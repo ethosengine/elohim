@@ -6,8 +6,14 @@ import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
  * LearningPath - A curated journey through Territory resources.
  *
  * Paths can be structured in two ways:
- * 1. Flat: Just `steps[]` - simple sequential journey
- * 2. Chapters: `chapters[]` containing steps - thematic groupings
+ * 1. Flat: Just `steps[]` - simple sequential journey (legacy)
+ * 2. Hierarchical: `chapters[]` → `modules[]` → `sections[]` → `conceptIds[]`
+ *
+ * The hierarchical structure enables:
+ * - Chapters: Top-level thematic groupings
+ * - Modules: Mid-level organization within chapters (the "lesson" unit)
+ * - Sections: Focused learning sessions within modules
+ * - Concepts: Individual content items referenced by ID
  *
  * Paths can also compose other paths:
  * - A step can reference another path (stepType: 'path')
@@ -191,15 +197,16 @@ export interface LearningPath {
 }
 
 /**
- * PathChapter - A thematic grouping of steps within a path.
+ * PathChapter - A thematic grouping within a path.
  *
  * Chapters provide:
  * - Visual/conceptual organization for longer journeys
  * - Optional attestations at chapter completion (milestones)
  * - Clearer progress indication ("Chapter 2 of 5")
  *
- * Named "chapter" rather than "unit" or "module" to evoke
- * narrative journey rather than institutional curriculum.
+ * Structure: chapters[] → modules[] → sections[] → conceptIds[]
+ *
+ * Aligned with MCP schema for rich hierarchical organization.
  */
 export interface PathChapter {
   id: string;
@@ -213,8 +220,18 @@ export interface PathChapter {
   /** Order within path */
   order: number;
 
-  /** Steps in this chapter */
-  steps: PathStep[];
+  /**
+   * Modules in this chapter (4-level hierarchy: chapter → modules → sections → conceptIds)
+   * Use this for complex paths with multiple layers of organization.
+   */
+  modules?: PathModule[];
+
+  /**
+   * Direct steps in this chapter (2-level hierarchy: chapter → steps)
+   * Use this for simpler paths where chapters contain steps directly.
+   * If both `modules` and `steps` exist, `modules` takes precedence.
+   */
+  steps?: PathStep[];
 
   /** Estimated duration for this chapter */
   estimatedDuration?: string;
@@ -224,6 +241,117 @@ export interface PathChapter {
 
   /** Whether this chapter is optional */
   optional?: boolean;
+}
+
+/**
+ * PathModule - A thematic grouping of sections within a chapter.
+ *
+ * Modules provide mid-level organization:
+ * - Group related sections together
+ * - Enable "Module 2 of 4" progress indication
+ * - Support module-level learning objectives
+ *
+ * Aligned with MCP schema: Chapter → Module → Section → Concepts
+ */
+export interface PathModule {
+  id: string;
+
+  /** Module title */
+  title: string;
+
+  /** What this module covers */
+  description?: string;
+
+  /** Order within chapter */
+  order: number;
+
+  /** Sections in this module */
+  sections: PathSection[];
+
+  /** Estimated duration for this module */
+  estimatedDuration?: string;
+
+  /** Learning objectives for this module */
+  learningObjectives?: string[];
+
+  /** Whether this module is optional */
+  optional?: boolean;
+}
+
+/**
+ * PathSection - A focused grouping of concepts within a module.
+ *
+ * Sections are the leaf-level groupings that contain actual content:
+ * - Reference concepts by ID (conceptIds)
+ * - Typically represent a single focused learning session (a "lesson")
+ * - Limited to ~1 hour of learning (human capacity constraint)
+ * - Contains skill-based assessments derived from content
+ *
+ * Aligned with MCP schema: Chapter → Module → Section → conceptIds[]
+ */
+export interface PathSection {
+  id: string;
+
+  /** Section title */
+  title: string;
+
+  /** What this section covers */
+  description?: string;
+
+  /** Order within module */
+  order: number;
+
+  /**
+   * Concept IDs referenced by this section.
+   * These link to ContentNode entries in the content graph.
+   */
+  conceptIds: string[];
+
+  /**
+   * Skill-based assessments for this section.
+   * Following Khan Academy model: assessments are derived from content.
+   * Multiple assessments can approach the same concept from different angles.
+   */
+  assessments?: SectionAssessment[];
+
+  /** Estimated duration in minutes (max ~60 for a single lesson) */
+  estimatedMinutes?: number;
+
+  /** Estimated duration for this section (legacy string format) */
+  estimatedDuration?: string;
+
+  /** Whether this section is optional */
+  optional?: boolean;
+}
+
+/**
+ * SectionAssessment - A skill-based assessment within a section.
+ *
+ * Following the Khan Academy model:
+ * - Assessments are derived FROM the content within the section
+ * - Multiple assessments can cover the same concept from different angles
+ * - Types: core (direct), applied (scenarios), synthesis (integration)
+ */
+export interface SectionAssessment {
+  /** Unique assessment ID */
+  id: string;
+
+  /** Assessment title (e.g., "Adding Two Numbers" or "Adding Two Numbers - Word Problems") */
+  title: string;
+
+  /**
+   * Assessment type:
+   * - 'core': Direct application of concepts (knowledge recall, understanding)
+   * - 'applied': Scenarios, word problems, real-world application
+   * - 'synthesis': Combining multiple concepts, higher-order thinking
+   */
+  type: 'core' | 'applied' | 'synthesis';
+
+  /** What this assessment measures */
+  description?: string;
+
+  /** Reference to assessment content (if stored separately) */
+  assessmentId?: string;
 }
 
 /**

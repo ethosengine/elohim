@@ -19,8 +19,8 @@
  */
 
 import { Injectable, computed, signal } from '@angular/core';
-import { Observable, of, from, defer } from 'rxjs';
-import { map, catchError, shareReplay, switchMap, tap } from 'rxjs/operators';
+import { Observable, of, from, defer, Subject, BehaviorSubject } from 'rxjs';
+import { map, catchError, shareReplay, switchMap, tap, debounceTime, buffer } from 'rxjs/operators';
 import { HolochainClientService } from './holochain-client.service';
 import { ContentNode, ContentType, ContentFormat, ContentMetadata } from '../../lamad/models/content-node.model';
 
@@ -82,6 +82,49 @@ export interface QueryByIdInput {
   id: string;
 }
 
+/**
+ * Input for batch content retrieval
+ */
+export interface BatchGetContentInput {
+  ids: string[];
+}
+
+/**
+ * Output from batch content retrieval
+ */
+export interface BatchGetContentOutput {
+  found: HolochainContentOutput[];
+  not_found: string[];
+}
+
+/**
+ * Input for paginated content query by type
+ */
+export interface PaginatedByTypeInput {
+  content_type: string;
+  page_size: number;
+  offset: number;
+}
+
+/**
+ * Input for paginated content query by tag
+ */
+export interface PaginatedByTagInput {
+  tag: string;
+  page_size: number;
+  offset: number;
+}
+
+/**
+ * Output for paginated content queries
+ */
+export interface PaginatedContentOutput {
+  items: HolochainContentOutput[];
+  total_count: number;
+  offset: number;
+  has_more: boolean;
+}
+
 // =============================================================================
 // Holochain Learning Path Types (match Rust DNA structures)
 // =============================================================================
@@ -137,6 +180,8 @@ export interface HolochainLearningPath {
   visibility: string;
   path_type: string;
   tags: string[];
+  /** Extensible metadata JSON (stores chapters for hierarchical paths) */
+  metadata_json: string;
   created_at: string;
   updated_at: string;
 }
@@ -151,6 +196,449 @@ export interface HolochainPathWithSteps {
     action_hash: Uint8Array;
     step: HolochainPathStep;
   }>;
+}
+
+// =============================================================================
+// Holochain Agent Types (match Rust DNA structures)
+// =============================================================================
+
+/**
+ * Agent entry as stored in Holochain
+ * Matches Agent struct in integrity zome
+ */
+export interface HolochainAgentEntry {
+  id: string;
+  agent_type: string;           // human, organization, ai-agent, elohim
+  display_name: string;
+  bio: string | null;
+  avatar: string | null;
+  affinities: string[];
+  visibility: string;           // public, connections, private
+  location: string | null;
+  holochain_agent_key: string | null;
+  did: string | null;
+  activity_pub_type: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Output from agent retrieval zome calls
+ */
+export interface HolochainAgentOutput {
+  action_hash: Uint8Array;
+  agent: HolochainAgentEntry;
+}
+
+/**
+ * Input for querying agents
+ */
+export interface QueryAgentsInput {
+  agent_type?: string;
+  affinities?: string[];
+  limit?: number;
+}
+
+// =============================================================================
+// Holochain Attestation Types (match Rust DNA structures)
+// =============================================================================
+
+/**
+ * Attestation entry as stored in Holochain
+ * Matches Attestation struct in integrity zome
+ */
+export interface HolochainAttestationEntry {
+  id: string;
+  agent_id: string;
+  category: string;             // domain-mastery, path-completion, role-credential, achievement
+  attestation_type: string;
+  display_name: string;
+  description: string;
+  icon_url: string | null;
+  tier: string | null;          // bronze, silver, gold, platinum
+  earned_via_json: string;
+  issued_at: string;
+  issued_by: string;
+  expires_at: string | null;
+  proof: string | null;
+}
+
+/**
+ * Output from attestation retrieval zome calls
+ */
+export interface HolochainAttestationOutput {
+  action_hash: Uint8Array;
+  attestation: HolochainAttestationEntry;
+}
+
+/**
+ * Input for querying attestations
+ */
+export interface QueryAttestationsInput {
+  agent_id?: string;
+  category?: string;
+  limit?: number;
+}
+
+// =============================================================================
+// Holochain Relationship/Graph Types (match Rust DNA structures)
+// =============================================================================
+
+/**
+ * Relationship entry as stored in Holochain
+ * Matches Relationship struct in integrity zome
+ */
+export interface HolochainRelationshipEntry {
+  id: string;
+  source_id: string;
+  target_id: string;
+  relationship_type: string;    // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
+  confidence: number;           // 0.0 - 1.0
+  inference_source: string;     // explicit, path, tag, semantic
+  metadata_json: string | null;
+  created_at: string;
+}
+
+/**
+ * Output from relationship retrieval zome calls
+ */
+export interface HolochainRelationshipOutput {
+  action_hash: Uint8Array;
+  relationship: HolochainRelationshipEntry;
+}
+
+/**
+ * Input for querying relationships
+ */
+export interface GetRelationshipsInput {
+  content_id: string;
+  direction: string;            // outgoing, incoming, both
+}
+
+/**
+ * Input for querying related content / content graph
+ */
+export interface QueryRelatedContentInput {
+  content_id: string;
+  relationship_types?: string[];
+  depth?: number;
+}
+
+/**
+ * Content graph node for tree traversal
+ */
+export interface HolochainContentGraphNode {
+  content: HolochainContentOutput;
+  relationship_type: string;
+  confidence: number;
+  children: HolochainContentGraphNode[];
+}
+
+/**
+ * Content graph output from get_content_graph
+ */
+export interface HolochainContentGraph {
+  root: HolochainContentOutput | null;
+  related: HolochainContentGraphNode[];
+  total_nodes: number;
+}
+
+// =============================================================================
+// Holochain KnowledgeMap Types (match Rust DNA structures)
+// =============================================================================
+
+/**
+ * KnowledgeMap entry as stored in Holochain
+ */
+export interface HolochainKnowledgeMapEntry {
+  id: string;
+  map_type: string;             // domain, self, person, collective
+  owner_id: string;
+  title: string;
+  description: string | null;
+  subject_type: string;
+  subject_id: string;
+  subject_name: string;
+  visibility: string;
+  shared_with_json: string;
+  nodes_json: string;
+  path_ids_json: string;
+  overall_affinity: number;
+  content_graph_id: string | null;
+  mastery_levels_json: string;
+  goals_json: string;
+  created_at: string;
+  updated_at: string;
+  metadata_json: string;
+}
+
+/**
+ * Output from knowledge map retrieval
+ */
+export interface HolochainKnowledgeMapOutput {
+  action_hash: Uint8Array;
+  knowledge_map: HolochainKnowledgeMapEntry;
+}
+
+/**
+ * Input for querying knowledge maps
+ */
+export interface QueryKnowledgeMapsInput {
+  owner_id?: string;
+  map_type?: string;
+  limit?: number;
+}
+
+// =============================================================================
+// Holochain PathExtension Types (match Rust DNA structures)
+// =============================================================================
+
+/**
+ * PathExtension entry as stored in Holochain
+ */
+export interface HolochainPathExtensionEntry {
+  id: string;
+  base_path_id: string;
+  base_path_version: string;
+  extended_by: string;
+  title: string;
+  description: string | null;
+  insertions_json: string;
+  annotations_json: string;
+  reorderings_json: string;
+  exclusions_json: string;
+  visibility: string;
+  shared_with_json: string;
+  forked_from: string | null;
+  forks_json: string;
+  upstream_proposal_json: string | null;
+  stats_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Output from path extension retrieval
+ */
+export interface HolochainPathExtensionOutput {
+  action_hash: Uint8Array;
+  path_extension: HolochainPathExtensionEntry;
+}
+
+/**
+ * Input for querying path extensions
+ */
+export interface QueryPathExtensionsInput {
+  base_path_id?: string;
+  extended_by?: string;
+  limit?: number;
+}
+
+// =============================================================================
+// Holochain Governance Types (match Rust DNA structures)
+// =============================================================================
+
+/**
+ * Challenge entry as stored in Holochain
+ */
+export interface HolochainChallengeEntry {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  challenger_id: string;
+  challenger_name: string;
+  challenger_standing: string;
+  grounds: string;
+  description: string;
+  evidence_json: string;
+  status: string;
+  filed_at: string;
+  acknowledged_at: string | null;
+  sla_deadline: string | null;
+  assigned_elohim: string | null;
+  priority: string;
+  resolution_json: string | null;
+  created_at: string;
+  updated_at: string;
+  metadata_json: string;
+}
+
+/**
+ * Output from challenge retrieval
+ */
+export interface HolochainChallengeOutput {
+  action_hash: Uint8Array;
+  challenge: HolochainChallengeEntry;
+}
+
+/**
+ * Input for querying challenges
+ */
+export interface QueryChallengesInput {
+  entity_type?: string;
+  entity_id?: string;
+  challenger_id?: string;
+  status?: string;
+  limit?: number;
+}
+
+/**
+ * Proposal entry as stored in Holochain
+ */
+export interface HolochainProposalEntry {
+  id: string;
+  title: string;
+  proposal_type: string;
+  description: string;
+  proposer_id: string;
+  proposer_name: string;
+  rationale: string;
+  status: string;
+  phase: string;
+  amendments_json: string;
+  voting_config_json: string;
+  current_votes_json: string;
+  outcome_json: string | null;
+  related_entity_type: string | null;
+  related_entity_id: string | null;
+  created_at: string;
+  updated_at: string;
+  metadata_json: string;
+}
+
+/**
+ * Output from proposal retrieval
+ */
+export interface HolochainProposalOutput {
+  action_hash: Uint8Array;
+  proposal: HolochainProposalEntry;
+}
+
+/**
+ * Input for querying proposals
+ */
+export interface QueryProposalsInput {
+  proposal_type?: string;
+  proposer_id?: string;
+  status?: string;
+  limit?: number;
+}
+
+/**
+ * Precedent entry as stored in Holochain
+ */
+export interface HolochainPrecedentEntry {
+  id: string;
+  title: string;
+  summary: string;
+  full_reasoning: string;
+  binding: string;
+  scope_json: string;
+  citations: number;
+  status: string;
+  established_by: string;
+  established_at: string;
+  superseded_by: string | null;
+  created_at: string;
+  updated_at: string;
+  metadata_json: string;
+}
+
+/**
+ * Output from precedent retrieval
+ */
+export interface HolochainPrecedentOutput {
+  action_hash: Uint8Array;
+  precedent: HolochainPrecedentEntry;
+}
+
+/**
+ * Input for querying precedents
+ */
+export interface QueryPrecedentsInput {
+  status?: string;
+  binding?: string;
+  limit?: number;
+}
+
+/**
+ * Discussion entry as stored in Holochain
+ */
+export interface HolochainDiscussionEntry {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  category: string;
+  title: string;
+  messages_json: string;
+  status: string;
+  message_count: number;
+  last_activity_at: string;
+  created_at: string;
+  updated_at: string;
+  metadata_json: string;
+}
+
+/**
+ * Output from discussion retrieval
+ */
+export interface HolochainDiscussionOutput {
+  action_hash: Uint8Array;
+  discussion: HolochainDiscussionEntry;
+}
+
+/**
+ * Input for querying discussions
+ */
+export interface QueryDiscussionsInput {
+  entity_type?: string;
+  entity_id?: string;
+  category?: string;
+  status?: string;
+  limit?: number;
+}
+
+/**
+ * GovernanceState entry as stored in Holochain
+ */
+export interface HolochainGovernanceStateEntry {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  status: string;
+  status_basis_json: string;
+  labels_json: string;
+  active_challenges_json: string;
+  active_proposals_json: string;
+  precedent_ids_json: string;
+  last_updated: string;
+  created_at: string;
+  updated_at: string;
+  metadata_json: string;
+}
+
+/**
+ * Output from governance state retrieval
+ */
+export interface HolochainGovernanceStateOutput {
+  action_hash: Uint8Array;
+  governance_state: HolochainGovernanceStateEntry;
+}
+
+/**
+ * Input for getting governance state
+ */
+export interface GetGovernanceStateInput {
+  entity_type: string;
+  entity_id: string;
+}
+
+/**
+ * Input for querying governance states
+ */
+export interface QueryGovernanceStatesInput {
+  status?: string;
+  limit?: number;
 }
 
 // =============================================================================
@@ -180,7 +668,101 @@ export class HolochainContentService {
   /** Cache for stats (refreshed periodically) */
   private statsCache$: Observable<HolochainContentStats> | null = null;
 
+  // Request coalescing for batch loading
+  private readonly pendingBatchRequests = new Map<string, { resolve: (content: ContentNode | null) => void; reject: (err: any) => void }[]>();
+  private batchRequestTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly BATCH_DEBOUNCE_MS = 50; // Collect requests for 50ms before batching
+
   constructor(private readonly holochainClient: HolochainClientService) {}
+
+  /**
+   * Get content by ID with request coalescing.
+   *
+   * Multiple rapid requests for different IDs will be batched into a single
+   * zome call, reducing network round-trips.
+   *
+   * @param resourceId Content ID to fetch
+   * @returns Promise resolving to ContentNode or null
+   */
+  async getContentCoalesced(resourceId: string): Promise<ContentNode | null> {
+    if (!this.isAvailable()) {
+      return null;
+    }
+
+    // Check cache first
+    if (this.contentCache.has(resourceId)) {
+      try {
+        return await this.contentCache.get(resourceId)!.toPromise() ?? null;
+      } catch {
+        // Cache error, continue to fetch
+      }
+    }
+
+    // Add to pending batch
+    return new Promise((resolve, reject) => {
+      if (!this.pendingBatchRequests.has(resourceId)) {
+        this.pendingBatchRequests.set(resourceId, []);
+      }
+      this.pendingBatchRequests.get(resourceId)!.push({ resolve, reject });
+
+      // Schedule batch execution
+      this.scheduleBatchExecution();
+    });
+  }
+
+  /**
+   * Schedule batch execution after debounce period.
+   */
+  private scheduleBatchExecution(): void {
+    if (this.batchRequestTimer) {
+      return; // Already scheduled
+    }
+
+    this.batchRequestTimer = setTimeout(() => {
+      this.executeBatchRequest();
+    }, this.BATCH_DEBOUNCE_MS);
+  }
+
+  /**
+   * Execute the batched request.
+   */
+  private async executeBatchRequest(): Promise<void> {
+    this.batchRequestTimer = null;
+
+    const ids = Array.from(this.pendingBatchRequests.keys());
+    if (ids.length === 0) {
+      return;
+    }
+
+    // Copy and clear pending requests
+    const requests = new Map(this.pendingBatchRequests);
+    this.pendingBatchRequests.clear();
+
+    try {
+      const { found, notFound } = await this.batchGetContent(ids);
+
+      // Resolve found content
+      for (const [id, content] of found) {
+        const handlers = requests.get(id);
+        if (handlers) {
+          handlers.forEach(h => h.resolve(content));
+        }
+      }
+
+      // Resolve not found as null
+      for (const id of notFound) {
+        const handlers = requests.get(id);
+        if (handlers) {
+          handlers.forEach(h => h.resolve(null));
+        }
+      }
+    } catch (err) {
+      // Reject all pending requests
+      for (const handlers of requests.values()) {
+        handlers.forEach(h => h.reject(err));
+      }
+    }
+  }
 
   /**
    * Check if Holochain content is available for use.
@@ -221,6 +803,109 @@ export class HolochainContentService {
   }
 
   /**
+   * Batch get multiple content items by IDs in a single zome call.
+   *
+   * This is more efficient than calling getContent() multiple times
+   * as it reduces network round-trips.
+   *
+   * @param ids Array of content IDs to fetch
+   * @returns Map of id → ContentNode for found items, plus list of not found IDs
+   */
+  async batchGetContent(ids: string[]): Promise<{ found: Map<string, ContentNode>; notFound: string[] }> {
+    if (!this.isAvailable() || ids.length === 0) {
+      return { found: new Map(), notFound: ids };
+    }
+
+    // Filter out IDs already in cache
+    const uncachedIds: string[] = [];
+    const found = new Map<string, ContentNode>();
+
+    for (const id of ids) {
+      if (this.contentCache.has(id)) {
+        // Get from cache synchronously if possible
+        const cached = this.contentCache.get(id);
+        if (cached) {
+          // Note: This is async but we'll handle it
+          uncachedIds.push(id); // Still include for batch, cache will be used
+        }
+      } else {
+        uncachedIds.push(id);
+      }
+    }
+
+    if (uncachedIds.length === 0) {
+      // All items were in cache, resolve them
+      for (const id of ids) {
+        const cached = this.contentCache.get(id);
+        if (cached) {
+          try {
+            const content = await cached.toPromise();
+            if (content) {
+              found.set(id, content);
+            }
+          } catch {
+            // Ignore cache errors
+          }
+        }
+      }
+      return { found, notFound: [] };
+    }
+
+    try {
+      const result = await this.holochainClient.callZome<BatchGetContentOutput>({
+        zomeName: 'content_store',
+        fnName: 'batch_get_content_by_ids',
+        payload: { ids: uncachedIds } as BatchGetContentInput,
+      });
+
+      if (!result.success || !result.data) {
+        console.warn('[HolochainContent] Batch get failed:', result.error);
+        return { found: new Map(), notFound: ids };
+      }
+
+      // Transform and cache results
+      for (const output of result.data.found) {
+        const content = this.transformToContentNode(output);
+        found.set(content.id, content);
+
+        // Update cache with shareReplay observable
+        this.contentCache.set(content.id, of(content).pipe(shareReplay(1)));
+      }
+
+      return { found, notFound: result.data.not_found };
+    } catch (err) {
+      console.warn('[HolochainContent] Batch get error:', err);
+      return { found: new Map(), notFound: ids };
+    }
+  }
+
+  /**
+   * Prefetch content for related nodes (call in background after loading main content).
+   *
+   * This proactively loads related content into the cache so it's ready
+   * when the user navigates to it.
+   *
+   * @param relatedNodeIds Array of related content IDs to prefetch
+   */
+  prefetchRelatedContent(relatedNodeIds: string[]): void {
+    if (!this.isAvailable() || relatedNodeIds.length === 0) {
+      return;
+    }
+
+    // Filter to only uncached IDs
+    const uncachedIds = relatedNodeIds.filter(id => !this.contentCache.has(id));
+
+    if (uncachedIds.length === 0) {
+      return;
+    }
+
+    // Fire and forget - don't await, don't block UI
+    this.batchGetContent(uncachedIds).catch(err => {
+      console.debug('[HolochainContent] Prefetch error (non-critical):', err);
+    });
+  }
+
+  /**
    * Get content by type from Holochain.
    *
    * Returns empty array if service unavailable.
@@ -238,6 +923,112 @@ export class HolochainContentService {
         return of([]);
       })
     );
+  }
+
+  /**
+   * Get content by type with pagination support.
+   *
+   * Use this for large datasets where you want to load content in pages.
+   *
+   * @param contentType The content type to filter by
+   * @param pageSize Number of items per page (max 100)
+   * @param offset Number of items to skip (for pagination)
+   * @returns Paginated result with items, total count, and has_more flag
+   */
+  async getContentByTypePaginated(
+    contentType: string,
+    pageSize = 20,
+    offset = 0
+  ): Promise<{ items: ContentNode[]; totalCount: number; offset: number; hasMore: boolean }> {
+    if (!this.isAvailable()) {
+      return { items: [], totalCount: 0, offset, hasMore: false };
+    }
+
+    try {
+      const result = await this.holochainClient.callZome<PaginatedContentOutput>({
+        zomeName: 'content_store',
+        fnName: 'get_content_by_type_paginated',
+        payload: {
+          content_type: contentType,
+          page_size: Math.min(pageSize, 100),
+          offset,
+        } as PaginatedByTypeInput,
+      });
+
+      if (!result.success || !result.data) {
+        console.warn('[HolochainContent] Paginated query failed:', result.error);
+        return { items: [], totalCount: 0, offset, hasMore: false };
+      }
+
+      const items = result.data.items.map(output => this.transformToContentNode(output));
+
+      // Cache the items
+      for (const item of items) {
+        this.contentCache.set(item.id, of(item).pipe(shareReplay(1)));
+      }
+
+      return {
+        items,
+        totalCount: result.data.total_count,
+        offset: result.data.offset,
+        hasMore: result.data.has_more,
+      };
+    } catch (err) {
+      console.warn('[HolochainContent] Paginated query error:', err);
+      return { items: [], totalCount: 0, offset, hasMore: false };
+    }
+  }
+
+  /**
+   * Get content by tag with pagination support.
+   *
+   * @param tag The tag to filter by
+   * @param pageSize Number of items per page (max 100)
+   * @param offset Number of items to skip
+   * @returns Paginated result with items, total count, and has_more flag
+   */
+  async getContentByTagPaginated(
+    tag: string,
+    pageSize = 20,
+    offset = 0
+  ): Promise<{ items: ContentNode[]; totalCount: number; offset: number; hasMore: boolean }> {
+    if (!this.isAvailable()) {
+      return { items: [], totalCount: 0, offset, hasMore: false };
+    }
+
+    try {
+      const result = await this.holochainClient.callZome<PaginatedContentOutput>({
+        zomeName: 'content_store',
+        fnName: 'get_content_by_tag_paginated',
+        payload: {
+          tag,
+          page_size: Math.min(pageSize, 100),
+          offset,
+        } as PaginatedByTagInput,
+      });
+
+      if (!result.success || !result.data) {
+        console.warn('[HolochainContent] Paginated tag query failed:', result.error);
+        return { items: [], totalCount: 0, offset, hasMore: false };
+      }
+
+      const items = result.data.items.map(output => this.transformToContentNode(output));
+
+      // Cache the items
+      for (const item of items) {
+        this.contentCache.set(item.id, of(item).pipe(shareReplay(1)));
+      }
+
+      return {
+        items,
+        totalCount: result.data.total_count,
+        offset: result.data.offset,
+        hasMore: result.data.has_more,
+      };
+    } catch (err) {
+      console.warn('[HolochainContent] Paginated tag query error:', err);
+      return { items: [], totalCount: 0, offset, hasMore: false };
+    }
   }
 
   /**
@@ -335,6 +1126,358 @@ export class HolochainContentService {
 
     if (!result.success || !result.data) {
       return null;
+    }
+
+    return result.data;
+  }
+
+  // ===========================================================================
+  // Agent Methods
+  // ===========================================================================
+
+  /**
+   * Get an agent by ID.
+   */
+  async getAgentById(agentId: string): Promise<HolochainAgentOutput | null> {
+    const result = await this.holochainClient.callZome<HolochainAgentOutput | null>({
+      zomeName: 'content_store',
+      fnName: 'get_agent_by_id',
+      payload: agentId,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Query agents by type or affinities.
+   */
+  async queryAgents(input: QueryAgentsInput): Promise<HolochainAgentOutput[]> {
+    const result = await this.holochainClient.callZome<HolochainAgentOutput[]>({
+      zomeName: 'content_store',
+      fnName: 'query_agents',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return [];
+    }
+
+    return result.data;
+  }
+
+  // ===========================================================================
+  // Attestation Methods
+  // ===========================================================================
+
+  /**
+   * Query attestations by agent ID or category.
+   */
+  async getAttestations(input: QueryAttestationsInput): Promise<HolochainAttestationOutput[]> {
+    const result = await this.holochainClient.callZome<HolochainAttestationOutput[]>({
+      zomeName: 'content_store',
+      fnName: 'get_attestations',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return [];
+    }
+
+    return result.data;
+  }
+
+  // ===========================================================================
+  // Relationship/Graph Methods
+  // ===========================================================================
+
+  /**
+   * Get relationships for a content node.
+   */
+  async getRelationships(input: GetRelationshipsInput): Promise<HolochainRelationshipOutput[]> {
+    const result = await this.holochainClient.callZome<HolochainRelationshipOutput[]>({
+      zomeName: 'content_store',
+      fnName: 'get_relationships',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return [];
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Get content graph starting from a root node.
+   */
+  async getContentGraph(contentId: string, relationshipTypes?: string[]): Promise<HolochainContentGraph | null> {
+    const input: QueryRelatedContentInput = {
+      content_id: contentId,
+      relationship_types: relationshipTypes,
+    };
+
+    const result = await this.holochainClient.callZome<HolochainContentGraph>({
+      zomeName: 'content_store',
+      fnName: 'get_content_graph',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  // ===========================================================================
+  // KnowledgeMap Methods
+  // ===========================================================================
+
+  /**
+   * Get a knowledge map by ID.
+   */
+  async getKnowledgeMapById(id: string): Promise<HolochainKnowledgeMapOutput | null> {
+    const result = await this.holochainClient.callZome<HolochainKnowledgeMapOutput | null>({
+      zomeName: 'content_store',
+      fnName: 'get_knowledge_map_by_id',
+      payload: id,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Query knowledge maps.
+   */
+  async queryKnowledgeMaps(input: QueryKnowledgeMapsInput): Promise<HolochainKnowledgeMapOutput[]> {
+    const result = await this.holochainClient.callZome<HolochainKnowledgeMapOutput[]>({
+      zomeName: 'content_store',
+      fnName: 'query_knowledge_maps',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return [];
+    }
+
+    return result.data;
+  }
+
+  // ===========================================================================
+  // PathExtension Methods
+  // ===========================================================================
+
+  /**
+   * Get a path extension by ID.
+   */
+  async getPathExtensionById(id: string): Promise<HolochainPathExtensionOutput | null> {
+    const result = await this.holochainClient.callZome<HolochainPathExtensionOutput | null>({
+      zomeName: 'content_store',
+      fnName: 'get_path_extension_by_id',
+      payload: id,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Query path extensions.
+   */
+  async queryPathExtensions(input: QueryPathExtensionsInput): Promise<HolochainPathExtensionOutput[]> {
+    const result = await this.holochainClient.callZome<HolochainPathExtensionOutput[]>({
+      zomeName: 'content_store',
+      fnName: 'query_path_extensions',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return [];
+    }
+
+    return result.data;
+  }
+
+  // ===========================================================================
+  // Governance Methods (Challenge, Proposal, Precedent, Discussion, State)
+  // ===========================================================================
+
+  /**
+   * Get a challenge by ID.
+   */
+  async getChallengeById(id: string): Promise<HolochainChallengeOutput | null> {
+    const result = await this.holochainClient.callZome<HolochainChallengeOutput | null>({
+      zomeName: 'content_store',
+      fnName: 'get_challenge_by_id',
+      payload: id,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Query challenges.
+   */
+  async queryChallenges(input: QueryChallengesInput): Promise<HolochainChallengeOutput[]> {
+    const result = await this.holochainClient.callZome<HolochainChallengeOutput[]>({
+      zomeName: 'content_store',
+      fnName: 'query_challenges',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return [];
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Get a proposal by ID.
+   */
+  async getProposalById(id: string): Promise<HolochainProposalOutput | null> {
+    const result = await this.holochainClient.callZome<HolochainProposalOutput | null>({
+      zomeName: 'content_store',
+      fnName: 'get_proposal_by_id',
+      payload: id,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Query proposals.
+   */
+  async queryProposals(input: QueryProposalsInput): Promise<HolochainProposalOutput[]> {
+    const result = await this.holochainClient.callZome<HolochainProposalOutput[]>({
+      zomeName: 'content_store',
+      fnName: 'query_proposals',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return [];
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Get a precedent by ID.
+   */
+  async getPrecedentById(id: string): Promise<HolochainPrecedentOutput | null> {
+    const result = await this.holochainClient.callZome<HolochainPrecedentOutput | null>({
+      zomeName: 'content_store',
+      fnName: 'get_precedent_by_id',
+      payload: id,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Query precedents.
+   */
+  async queryPrecedents(input: QueryPrecedentsInput): Promise<HolochainPrecedentOutput[]> {
+    const result = await this.holochainClient.callZome<HolochainPrecedentOutput[]>({
+      zomeName: 'content_store',
+      fnName: 'query_precedents',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return [];
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Get a discussion by ID.
+   */
+  async getDiscussionById(id: string): Promise<HolochainDiscussionOutput | null> {
+    const result = await this.holochainClient.callZome<HolochainDiscussionOutput | null>({
+      zomeName: 'content_store',
+      fnName: 'get_discussion_by_id',
+      payload: id,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Query discussions.
+   */
+  async queryDiscussions(input: QueryDiscussionsInput): Promise<HolochainDiscussionOutput[]> {
+    const result = await this.holochainClient.callZome<HolochainDiscussionOutput[]>({
+      zomeName: 'content_store',
+      fnName: 'query_discussions',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return [];
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Get governance state for an entity.
+   */
+  async getGovernanceState(input: GetGovernanceStateInput): Promise<HolochainGovernanceStateOutput | null> {
+    const result = await this.holochainClient.callZome<HolochainGovernanceStateOutput | null>({
+      zomeName: 'content_store',
+      fnName: 'get_governance_state',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Query governance states.
+   */
+  async queryGovernanceStates(input: QueryGovernanceStatesInput): Promise<HolochainGovernanceStateOutput[]> {
+    const result = await this.holochainClient.callZome<HolochainGovernanceStateOutput[]>({
+      zomeName: 'content_store',
+      fnName: 'query_governance_states',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return [];
     }
 
     return result.data;

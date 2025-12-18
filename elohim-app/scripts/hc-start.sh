@@ -151,28 +151,6 @@ else
     echo "   Ensure $HAPP_PATH exists and restart with: npm run hc:stop && npm run start:hc"
 fi
 
-# Check if we need to seed data
-echo "🔍 Checking content status..."
-cd "$HC_DIR/seeder"
-if [ ! -d "node_modules" ]; then
-    echo "📦 Installing seeder dependencies..."
-    npm install --silent
-fi
-
-# Run seeder with dynamic ports
-export HOLOCHAIN_ADMIN_URL="ws://localhost:$ADMIN_PORT"
-export HOLOCHAIN_APP_URL="ws://localhost:4445"
-
-# Try to get content stats to check if seeding is needed
-CONTENT_COUNT=$(HOLOCHAIN_ADMIN_URL="$HOLOCHAIN_ADMIN_URL" HOLOCHAIN_APP_URL="$HOLOCHAIN_APP_URL" npm run --silent seed:sample 2>&1 | grep -o "total_count: [0-9]*" | grep -o "[0-9]*" || echo "0")
-if [ "$CONTENT_COUNT" -lt "10" ]; then
-    echo "🌱 Seeding content data (first run)..."
-    HOLOCHAIN_ADMIN_URL="$HOLOCHAIN_ADMIN_URL" HOLOCHAIN_APP_URL="$HOLOCHAIN_APP_URL" npm run seed
-    echo "✅ Content seeded"
-else
-    echo "✅ Content already seeded ($CONTENT_COUNT items)"
-fi
-
 # Show status
 echo ""
 echo "🔷 Holochain Stack Status:"

@@ -4,6 +4,7 @@ import { map, switchMap } from 'rxjs/operators';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { LearningPath, PathStep, PathStepView, PathIndex, PathChapter, ContentNode, AgentProgress } from '../models';
+import { MasteryLevel, MasteryTier, getMasteryTier } from '@app/elohim/models/agent.model';
 
 /**
  * Access check result for fog-of-war system.
@@ -69,6 +70,14 @@ export class PathService {
    */
   listPaths(): Observable<PathIndex> {
     return this.dataLoader.getPathIndex();
+  }
+
+  /**
+   * Get content by ID (for hierarchical paths that use conceptIds).
+   * This loads a single content node by its ID.
+   */
+  getContentById(contentId: string): Observable<ContentNode | null> {
+    return this.dataLoader.getContent(contentId);
   }
 
   /**
@@ -381,6 +390,11 @@ export class PathService {
       completedContentIds: this.agentService.getCompletedContentIds(agentId)
     }).pipe(
       switchMap(({ path, progress, completedContentIds }) => {
+        // Handle empty steps - forkJoin([]) never emits, so return early
+        if (path.steps.length === 0) {
+          return of([]);
+        }
+
         // Load all content nodes for this path
         const contentLoads = path.steps.map(step =>
           this.dataLoader.getContent(step.resourceId)
@@ -404,6 +418,58 @@ export class PathService {
             });
           })
         );
+      })
+    );
+  }
+
+  /**
+   * Get step metadata for overview display WITHOUT loading content.
+   *
+   * This is a lightweight alternative to getAllStepsWithCompletionStatus
+   * for the path overview page. It uses step metadata from the path definition
+   * instead of loading each content node.
+   *
+   * Use this for:
+   * - Path overview pages
+   * - Step lists/navigation
+   * - Any UI that shows step titles/types without content
+   */
+  getAllStepsMetadata(
+    pathId: string,
+    agentId?: string
+  ): Observable<Array<{
+    step: PathStep;
+    stepIndex: number;
+    isCompleted: boolean;
+    isCompletedGlobally: boolean;
+    completedInOtherPath: boolean;
+    masteryLevel: MasteryLevel;
+    masteryTier: MasteryTier;
+  }>> {
+    return forkJoin({
+      path: this.getPath(pathId),
+      progress: this.agentService.getProgressForPath(pathId),
+      completedContentIds: this.agentService.getCompletedContentIds(agentId),
+      masteryMap: this.agentService.getAllContentMastery(agentId)
+    }).pipe(
+      map(({ path, progress, completedContentIds, masteryMap }) => {
+        return path.steps.map((step, index) => {
+          const isCompletedInThisPath = progress?.completedStepIndices.includes(index) ?? false;
+          const isCompletedGlobally = completedContentIds.has(step.resourceId);
+          const completedInOtherPath = isCompletedGlobally && !isCompletedInThisPath;
+          const masteryLevel = masteryMap.get(step.resourceId) ?? 'not_started';
+          const masteryTier = getMasteryTier(masteryLevel);
+
+          return {
+            step,
+            stepIndex: index,
+            isCompleted: isCompletedInThisPath,
+            isCompletedGlobally,
+            completedInOtherPath,
+            masteryLevel,
+            masteryTier
+          };
+        });
       })
     );
   }
@@ -455,13 +521,30 @@ export class PathService {
     return conceptMap;
   }
 
+  /**
+   * Get display titles for concepts.
+   * Uses the concept ID formatted as a title to avoid loading full content.
+   * This is a performance optimization - loading content just for titles was causing timeouts.
+   */
   private loadConceptTitles(conceptIds: string[]): Observable<Array<{ id: string; title: string }>> {
-    const contentObservables = conceptIds.map(id =>
-      this.dataLoader.getContent(id).pipe(
-        map(node => ({ id, title: node?.title ?? id }))
-      )
-    );
-    return forkJoin(contentObservables);
+    // Format concept IDs as titles (e.g., "governance-epic" → "Governance Epic")
+    // This avoids N parallel content loads just to get titles
+    const titles = conceptIds.map(id => ({
+      id,
+      title: this.formatConceptIdAsTitle(id)
+    }));
+    return of(titles);
+  }
+
+  /**
+   * Convert a concept ID to a human-readable title.
+   * Example: "governance-epic" → "Governance Epic"
+   */
+  private formatConceptIdAsTitle(conceptId: string): string {
+    return conceptId
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   }
 
   private calculateConceptProgress(
@@ -592,11 +675,12 @@ export class PathService {
           if (ch.id === chapterId) {
             break;
           }
-          absoluteStartIndex += ch.steps.length;
+          absoluteStartIndex += this.getChapterConceptCount(ch);
         }
 
-        // Load all steps in this chapter
-        return this.getBulkSteps(pathId, absoluteStartIndex, chapter.steps.length);
+        // Load all concepts in this chapter
+        const conceptCount = this.getChapterConceptCount(chapter);
+        return this.getBulkSteps(pathId, absoluteStartIndex, conceptCount);
       })
     );
   }
@@ -688,7 +772,7 @@ export class PathService {
 
         let absoluteStepIndex = 0;
         return path.chapters.map(chapter => {
-          const totalSteps = chapter.steps.length;
+          const totalSteps = this.getChapterConceptCount(chapter);
 
           // Calculate completed steps in this chapter
           let completedSteps = 0;
@@ -760,6 +844,48 @@ export class PathService {
     );
   }
 
+  // =========================================================================
+  // Helper methods for hierarchical paths (Chapter → Module → Section → conceptIds)
+  // =========================================================================
+
+  /**
+   * Get total concept count for a chapter (flattening the hierarchy).
+   * Handles both 4-level (modules→sections→conceptIds) and 2-level (steps) formats.
+   */
+  private getChapterConceptCount(chapter: PathChapter): number {
+    // 2-level format: chapters with direct steps
+    if (chapter.steps && chapter.steps.length > 0) {
+      return chapter.steps.length;
+    }
+    // 4-level format: modules→sections→conceptIds
+    let count = 0;
+    for (const module of chapter.modules || []) {
+      for (const section of module.sections || []) {
+        count += section.conceptIds?.length || 0;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Get all concept IDs from a chapter (flattening the hierarchy).
+   * Handles both 4-level (modules→sections→conceptIds) and 2-level (steps) formats.
+   */
+  private getChapterConceptIds(chapter: PathChapter): string[] {
+    // 2-level format: chapters with direct steps
+    if (chapter.steps && chapter.steps.length > 0) {
+      return chapter.steps.map(step => step.resourceId);
+    }
+    // 4-level format: modules→sections→conceptIds
+    const conceptIds: string[] = [];
+    for (const module of chapter.modules || []) {
+      for (const section of module.sections || []) {
+        conceptIds.push(...(section.conceptIds || []));
+      }
+    }
+    return conceptIds;
+  }
+
   private calculateChapterMetrics(
     chapters: PathChapter[],
     progress: AgentProgress | null,
@@ -770,7 +896,7 @@ export class PathService {
       const metrics = this.calculateSingleChapterMetrics(
         chapter, absoluteStepIndex, progress, completedContentIds
       );
-      absoluteStepIndex += chapter.steps.length;
+      absoluteStepIndex += this.getChapterConceptCount(chapter);
       return { chapter, ...metrics };
     });
   }
@@ -790,13 +916,14 @@ export class PathService {
     sharedContentCompleted: number;
     isComplete: boolean;
   } {
-    const totalSteps = chapter.steps.length;
-    const chapterContentIds = new Set(chapter.steps.map(step => step.resourceId));
+    const conceptIds = this.getChapterConceptIds(chapter);
+    const totalSteps = conceptIds.length;
+    const chapterContentIds = new Set(conceptIds);
     const totalUniqueContent = chapterContentIds.size;
 
     const completedSteps = this.countCompletedSteps(totalSteps, startIndex, progress);
-    const { completedUniqueContent, sharedContentCompleted } = this.countCompletedContent(
-      chapterContentIds, chapter.steps, startIndex, progress, completedContentIds
+    const { completedUniqueContent, sharedContentCompleted } = this.countCompletedContentForConcepts(
+      chapterContentIds, completedContentIds
     );
 
     const stepCompletionPercentage = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
@@ -821,6 +948,28 @@ export class PathService {
     return count;
   }
 
+  /**
+   * Count completed content for hierarchical paths using concept IDs.
+   */
+  private countCompletedContentForConcepts(
+    chapterContentIds: Set<string>,
+    completedContentIds: Set<string>
+  ): { completedUniqueContent: number; sharedContentCompleted: number } {
+    let completedUniqueContent = 0;
+    let sharedContentCompleted = 0;
+
+    for (const contentId of chapterContentIds) {
+      if (completedContentIds.has(contentId)) {
+        completedUniqueContent++;
+        // For hierarchical paths, all completions count as shared (cross-path mastery)
+        sharedContentCompleted++;
+      }
+    }
+
+    return { completedUniqueContent, sharedContentCompleted };
+  }
+
+  // Legacy method for flat step-based paths (kept for backwards compatibility)
   private countCompletedContent(
     chapterContentIds: Set<string>,
     steps: PathStep[],

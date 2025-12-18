@@ -159,7 +159,9 @@ export class HolochainImportService {
           } else {
             missing.push(id);
           }
-        } catch {
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn(`Failed to verify content '${id}': ${message}`);
           missing.push(id);
         }
       }

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, computed, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute } from '@angular/router';
@@ -6,6 +6,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { SovereigntyService } from '@app/imagodei/services/sovereignty.service';
+import { IdentityService } from '@app/imagodei/services/identity.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { SessionHuman, SessionActivity, SessionPathProgress, MasteryStats, MasteryLevel } from '../../models';
@@ -38,6 +39,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   // Injected services for sovereignty/network tab
   private readonly sovereigntyService = inject(SovereigntyService);
   private readonly holochainService = inject(HolochainClientService);
+  readonly identityService = inject(IdentityService); // Public for template access
   private readonly route = inject(ActivatedRoute);
 
   // Tab management
@@ -49,6 +51,85 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   readonly connectionStatus = this.sovereigntyService.connectionStatus;
   readonly canUpgrade = this.sovereigntyService.canUpgrade;
   readonly edgeNodeInfo = computed(() => this.holochainService.getDisplayInfo());
+
+  // ==========================================================================
+  // Identity State (from IdentityService - unified source of truth)
+  // ==========================================================================
+
+  /** Whether user is authenticated via Holochain (hosted or self-sovereign) */
+  readonly isNetworkAuthenticated = computed(() => {
+    const mode = this.identityService.mode();
+    return mode === 'hosted' || mode === 'self-sovereign';
+  });
+
+  /** Current identity mode */
+  readonly identityMode = this.identityService.mode;
+
+  /** Holochain profile (when authenticated) */
+  readonly holochainProfile = this.identityService.profile;
+
+  /** Display name from identity (prefers Holochain, falls back to session) */
+  readonly displayName = computed(() => {
+    if (this.isNetworkAuthenticated()) {
+      return this.identityService.displayName();
+    }
+    return this.session?.displayName ?? 'Traveler';
+  });
+
+  /** Bio from identity (prefers Holochain, falls back to session) */
+  readonly bio = computed(() => {
+    if (this.isNetworkAuthenticated()) {
+      return this.holochainProfile()?.bio ?? null;
+    }
+    return this.session?.bio ?? null;
+  });
+
+  /** Interests/affinities (prefers Holochain, falls back to session) */
+  readonly interests = computed(() => {
+    if (this.isNetworkAuthenticated()) {
+      return this.holochainProfile()?.affinities ?? [];
+    }
+    return this.session?.interests ?? [];
+  });
+
+  /** Location from Holochain profile */
+  readonly location = computed(() => this.holochainProfile()?.location ?? null);
+
+  /** Profile reach from Holochain profile */
+  readonly profileReach = computed(() => this.holochainProfile()?.profileReach ?? null);
+
+  /** Member since date */
+  readonly memberSince = computed(() => {
+    if (this.isNetworkAuthenticated()) {
+      return this.holochainProfile()?.createdAt ?? null;
+    }
+    return this.session?.createdAt ?? null;
+  });
+
+  /** Badge text based on identity mode */
+  readonly modeBadgeText = computed(() => {
+    const mode = this.identityMode();
+    switch (mode) {
+      case 'hosted': return 'Hosted Human';
+      case 'self-sovereign': return 'Self-Sovereign';
+      case 'session': return 'Session Visitor';
+      case 'anonymous': return 'Anonymous';
+      case 'migrating': return 'Migrating...';
+      default: return 'Visitor';
+    }
+  });
+
+  /** Badge icon based on identity mode */
+  readonly modeBadgeIcon = computed(() => {
+    const mode = this.identityMode();
+    switch (mode) {
+      case 'hosted': return 'cloud_done';
+      case 'self-sovereign': return 'verified_user';
+      case 'session': return 'local_activity';
+      case 'migrating': return 'sync';
+      default: return 'person';
+    }
+  });
 
   // Session data
   session: SessionHuman | null = null;
@@ -146,7 +227,17 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   }
 
   private initEditForm(): void {
-    if (this.session) {
+    // Use Holochain profile data if authenticated, otherwise use session
+    if (this.isNetworkAuthenticated()) {
+      const profile = this.holochainProfile();
+      this.editForm = {
+        displayName: profile?.displayName ?? '',
+        avatarUrl: '', // Holochain profile doesn't have avatarUrl in current schema
+        bio: profile?.bio ?? '',
+        locale: '', // Not in Holochain schema yet
+        interests: profile?.affinities?.join(', ') ?? ''
+      };
+    } else if (this.session) {
       this.editForm = {
         displayName: this.session.displayName,
         avatarUrl: this.session.avatarUrl ?? '',
@@ -259,27 +350,36 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     this.initEditForm();
   }
 
-  saveProfile(): void {
-    // Update display name
-    this.sessionHumanService.setDisplayName(this.editForm.displayName);
-
-    // Update avatar
-    this.sessionHumanService.setAvatarUrl(this.editForm.avatarUrl);
-
-    // Update bio
-    this.sessionHumanService.setBio(this.editForm.bio);
-
-    // Update locale
-    this.sessionHumanService.setLocale(this.editForm.locale);
-
-    // Update interests (comma-separated to array)
+  async saveProfile(): Promise<void> {
+    // Parse interests (comma-separated to array)
     const interests = this.editForm.interests
       .split(',')
       .map(i => i.trim())
       .filter(i => i.length > 0);
-    this.sessionHumanService.setInterests(interests);
 
-    this.isEditing = false;
+    // If authenticated via Holochain, update the Holochain profile
+    if (this.isNetworkAuthenticated()) {
+      try {
+        await this.identityService.updateProfile({
+          displayName: this.editForm.displayName,
+          bio: this.editForm.bio || undefined,
+          affinities: interests,
+          // Note: avatarUrl and locale not in Holochain schema yet
+        });
+        this.isEditing = false;
+      } catch (err) {
+        console.error('[ProfilePage] Failed to update Holochain profile:', err);
+        // Show error to user (could add error state signal)
+      }
+    } else {
+      // Update session data for visitors
+      this.sessionHumanService.setDisplayName(this.editForm.displayName);
+      this.sessionHumanService.setAvatarUrl(this.editForm.avatarUrl);
+      this.sessionHumanService.setBio(this.editForm.bio);
+      this.sessionHumanService.setLocale(this.editForm.locale);
+      this.sessionHumanService.setInterests(interests);
+      this.isEditing = false;
+    }
   }
 
   // =========================================================================

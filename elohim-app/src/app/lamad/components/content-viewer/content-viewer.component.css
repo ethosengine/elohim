@@ -1128,3 +1128,114 @@
   cursor: not-allowed;
 
 }
+
+/* Header Navigation */
+.header-nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+/* Return to Path Button */
+.return-to-path-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--lamad-accent-primary, #6366f1);
+  border: none;
+  color: white;
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.return-to-path-btn:hover {
+  background: var(--lamad-accent-dark, #4f46e5);
+  transform: translateX(-4px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+/* Network Tab */
+.network-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.network-header {
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.network-header h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  color: var(--lamad-text-primary);
+}
+
+.network-header p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--lamad-text-secondary);
+}
+
+.mini-graph-container {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border-radius: 12px;
+  border: 1px solid var(--lamad-border);
+  overflow: hidden;
+  min-height: 350px;
+}
+
+.network-actions {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0;
+}
+
+.btn-explore-graph {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border: none;
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.btn-explore-graph:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
+}
+
+.btn-explore-graph .icon {
+  font-size: 1.25rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .header-nav {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .return-to-path-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .mini-graph-container {
+    min-height: 280px;
+  }
+}

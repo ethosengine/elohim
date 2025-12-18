@@ -1,23 +1,43 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable, of, forkJoin, from, defer } from 'rxjs';
-import { catchError, map, shareReplay, switchMap } from 'rxjs/operators';
+import { Observable, of, from, defer, throwError, timer, forkJoin } from 'rxjs';
+import { catchError, map, shareReplay, timeout, retry, tap, switchMap } from 'rxjs/operators';
 import {
   HolochainContentService,
   HolochainPathWithSteps,
   HolochainPathIndex,
+  HolochainAgentEntry,
+  HolochainAttestationEntry,
+  HolochainContentGraph,
+  HolochainContentGraphNode,
 } from './holochain-content.service';
+import { IndexedDBCacheService } from './indexeddb-cache.service';
 
 // Models from elohim (local)
-import { Agent, AgentProgress } from '../models/agent.model';
+import { Agent, AgentProgress, AgentAttestation } from '../models/agent.model';
 
 // Models from lamad pillar (will stay there - content-specific)
 // Using relative imports for now; will update to @app/lamad after full migration
 import { LearningPath, PathIndex } from '../../lamad/models/learning-path.model';
-import { ContentNode, ContentGraph, ContentGraphMetadata } from '../../lamad/models/content-node.model';
+import { ContentNode, ContentGraph, ContentGraphMetadata, ContentRelationship, ContentRelationshipType } from '../../lamad/models/content-node.model';
 import { ContentAttestation } from '../../lamad/models/content-attestation.model';
-import { KnowledgeMapIndex, KnowledgeMap } from '../../lamad/models/knowledge-map.model';
-import { PathExtensionIndex, PathExtension } from '../../lamad/models/path-extension.model';
+import {
+  KnowledgeMapIndex,
+  KnowledgeMap,
+  KnowledgeMapIndexEntry,
+  KnowledgeMapType,
+  KnowledgeNode
+} from '../../lamad/models/knowledge-map.model';
+import {
+  PathExtensionIndex,
+  PathExtension,
+  PathExtensionIndexEntry,
+  PathStepInsertion,
+  PathStepAnnotation,
+  PathStepReorder,
+  PathStepExclusion,
+  UpstreamProposal,
+  ExtensionStats
+} from '../../lamad/models/path-extension.model';
 
 // Assessment types (inline until models are expanded)
 export interface AssessmentIndex {
@@ -127,84 +147,196 @@ export interface GovernanceStateRecord {
   lastUpdated: string;
 }
 
+// Cluster graph types (for hierarchical graph visualization)
+export interface ClusterConnectionData {
+  sourceClusterId: string;
+  targetClusterId: string;
+  connectionCount: number;
+  relationshipTypes: string[];
+}
+
+export interface ClusterConnectionSummary {
+  clusterId: string;
+  outgoingByCluster: Map<string, ClusterConnectionData>;
+  incomingByCluster: Map<string, ClusterConnectionData>;
+  totalConnections: number;
+}
+
 /**
- * DataLoaderService - Loads data from JSON files (prototype) or Holochain (production).
+ * DataLoaderService - Loads data from Holochain via HolochainContentService.
  *
  * This service is the ONLY place that knows about the data source.
  * All other services depend on this abstraction.
  *
- * Holochain migration:
- * - Prototype: HttpClient fetches from /assets/lamad-data/
- * - Holochain: Replace with HolochainService calls to conductor
+ * Migration Status:
+ * - Content, Paths, Steps: Fully migrated to Holochain
+ * - Agents, Attestations: Zomes exist, need wiring (TODO)
+ * - Knowledge Maps, Extensions, Governance: Entry types not yet created (TODO)
  *
- * File structure expected:
- * /assets/lamad-data/
- *   paths/
- *     index.json         <- PathIndex
- *     {pathId}.json      <- LearningPath
- *   content/
- *     index.json         <- ContentIndex (metadata only)
- *     {resourceId}.json  <- ContentNode
- *   agents/
- *     index.json         <- Agent profiles
- *     {agentId}.json     <- Agent profile
- *   progress/
- *     {agentId}/
- *       {pathId}.json    <- AgentProgress
- *   attestations/
- *     index.json         <- ContentAttestation records
- *   knowledge-maps/
- *     index.json         <- KnowledgeMapIndex
- *     {mapId}.json       <- KnowledgeMap
- *   extensions/
- *     index.json         <- PathExtensionIndex
- *     {extensionId}.json <- PathExtension
+ * Reference data for implementing missing zomes:
+ * /data/lamad/ contains JSON prototypes showing data structures
  */
 @Injectable({ providedIn: 'root' })
 export class DataLoaderService {
-  private readonly basePath = '/assets/lamad-data';
-
-  // Caches to prevent redundant HTTP calls (shareReplay pattern)
+  // Caches to prevent redundant calls (shareReplay pattern)
   private readonly pathCache = new Map<string, Observable<LearningPath>>();
   private readonly contentCache = new Map<string, Observable<ContentNode>>();
   private attestationCache$: Observable<ContentAttestation[]> | null = null;
   private readonly attestationsByContentCache = new Map<string, ContentAttestation[]>();
   private graphCache$: Observable<ContentGraph> | null = null;
+  private pathIndexCache$: Observable<PathIndex> | null = null;
+
+  /** Maximum number of content items to keep in cache */
+  private readonly CONTENT_CACHE_MAX_SIZE = 500;
+
+  /** Maximum number of paths to keep in cache */
+  private readonly PATH_CACHE_MAX_SIZE = 50;
+
+  /** IndexedDB cache initialized flag */
+  private idbInitialized = false;
 
   constructor(
-    private readonly http: HttpClient,
-    private readonly holochainContent: HolochainContentService
-  ) {}
+    private readonly holochainContent: HolochainContentService,
+    private readonly idbCache: IndexedDBCacheService
+  ) {
+    // Initialize IndexedDB cache in background
+    this.initIndexedDB();
+  }
+
+  /**
+   * Initialize IndexedDB cache.
+   * Non-blocking - app continues to work without persistent cache if it fails.
+   */
+  private async initIndexedDB(): Promise<void> {
+    try {
+      this.idbInitialized = await this.idbCache.init();
+      if (this.idbInitialized) {
+        const stats = await this.idbCache.getStats();
+        console.log('[DataLoader] IndexedDB cache initialized:', stats);
+      }
+    } catch {
+      console.warn('[DataLoader] IndexedDB initialization failed, using memory-only cache');
+    }
+  }
+
+  /** Path loading timeout in milliseconds */
+  private readonly PATH_TIMEOUT_MS = 10000;
 
   /**
    * Load a LearningPath by ID.
    * Does NOT load the content for each step (lazy loading).
    * Uses Holochain as the only source.
+   *
+   * Cache hierarchy:
+   * 1. In-memory cache (fastest, LRU eviction)
+   * 2. IndexedDB cache (persistent across refreshes)
+   * 3. Holochain zome call (network)
+   *
+   * Uses LRU-style cache eviction to prevent unbounded memory growth.
    */
   getPath(pathId: string): Observable<LearningPath> {
-    if (!this.pathCache.has(pathId)) {
-      const request = defer(() =>
-        from(this.holochainContent.getPathWithSteps(pathId))
-      ).pipe(
+    // Check if already cached (and move to end for LRU)
+    if (this.pathCache.has(pathId)) {
+      const existing = this.pathCache.get(pathId)!;
+      // Move to end (most recently used) - delete and re-add
+      this.pathCache.delete(pathId);
+      this.pathCache.set(pathId, existing);
+      return existing;
+    }
+
+    // Evict oldest entries if cache is at capacity
+    while (this.pathCache.size >= this.PATH_CACHE_MAX_SIZE) {
+      const firstKey = this.pathCache.keys().next().value;
+      if (firstKey) {
+        this.pathCache.delete(firstKey);
+      } else {
+        break;
+      }
+    }
+
+    const request = defer(() => this.loadPathWithIDBFallback(pathId)).pipe(
+        timeout(this.PATH_TIMEOUT_MS),
         map(result => {
           if (!result) {
             throw new Error(`Path not found: ${pathId}`);
           }
-          return this.transformHolochainPath(result);
+          return result;
+        }),
+        tap(path => {
+          // Store in IndexedDB cache (background, non-blocking)
+          if (this.idbInitialized) {
+            this.idbCache.setPath(path).catch(() => {
+              // Ignore IndexedDB errors
+            });
+          }
+        }),
+        catchError(err => {
+          const errMsg = err.message || String(err);
+          // "Path not found" is expected for stale references - log as warning, not error
+          if (errMsg.includes('Path not found') || errMsg.includes('not found')) {
+            console.warn(`[DataLoader] Path "${pathId}" not found (may be stale reference)`);
+          } else {
+            console.error(`[DataLoader] Error loading path "${pathId}":`, errMsg);
+          }
+          // Remove from cache so next request retries
+          this.pathCache.delete(pathId);
+          throw err; // Re-throw - paths are critical, can't use placeholder
         }),
         shareReplay(1)
       );
 
-      this.pathCache.set(pathId, request);
+    this.pathCache.set(pathId, request);
+    return request;
+  }
+
+  /**
+   * Load path with IndexedDB fallback.
+   * Checks IndexedDB first, then Holochain.
+   */
+  private async loadPathWithIDBFallback(pathId: string): Promise<LearningPath | null> {
+    // Try IndexedDB first
+    if (this.idbInitialized) {
+      const cached = await this.idbCache.getPath(pathId);
+      if (cached) {
+        console.log(`[DataLoader] Path "${pathId}" loaded from IndexedDB cache, chapters:`, cached.chapters?.length ?? 'none');
+        return cached;
+      }
     }
-    return this.pathCache.get(pathId)!;
+
+    // Fall back to Holochain
+    console.log(`[DataLoader] Loading path "${pathId}" from Holochain...`);
+    const hcPath = await this.holochainContent.getPathWithSteps(pathId);
+    if (!hcPath) {
+      return null;
+    }
+    const transformed = this.transformHolochainPath(hcPath);
+    console.log(`[DataLoader] Path "${pathId}" loaded from Holochain, chapters:`, transformed.chapters?.length ?? 'none');
+    return transformed;
   }
 
   /**
    * Transform Holochain path response to LearningPath model.
    * Maps snake_case Rust fields to camelCase TypeScript fields.
+   *
+   * Extracts chapters from metadata_json if present, preserving
+   * the hierarchical structure for UI display.
    */
   private transformHolochainPath(hcPath: HolochainPathWithSteps): LearningPath {
+    // Parse metadata to extract chapters if available
+    let chapters: LearningPath['chapters'] | undefined;
+    try {
+      const metadataJson = hcPath.path.metadata_json;
+      console.log(`[DataLoader] metadata_json for "${hcPath.path.id}":`, metadataJson?.substring(0, 100) ?? 'MISSING');
+      const metadata = JSON.parse(metadataJson || '{}');
+      if (metadata.chapters && Array.isArray(metadata.chapters)) {
+        chapters = metadata.chapters;
+        console.log(`[DataLoader] Extracted ${metadata.chapters.length} chapters from metadata`);
+      }
+    } catch (e) {
+      console.error('[DataLoader] Error parsing metadata_json:', e);
+      // Ignore JSON parse errors - chapters will remain undefined
+    }
+
     return {
       id: hcPath.path.id,
       version: hcPath.path.version,
@@ -219,6 +351,9 @@ export class DataLoaderService {
       estimatedDuration: hcPath.path.estimated_duration ?? '',
       tags: hcPath.path.tags,
       visibility: hcPath.path.visibility as LearningPath['visibility'],
+      // Include chapters from metadata (hierarchical structure)
+      chapters,
+      // Steps remain flattened for backward compatibility and progress tracking
       steps: hcPath.steps.map((s, index) => ({
         order: s.step.order_index,
         stepType: (s.step.step_type || 'content') as 'content' | 'path' | 'external' | 'checkpoint',
@@ -232,26 +367,261 @@ export class DataLoaderService {
     };
   }
 
+  /** Content loading timeout in milliseconds */
+  private readonly CONTENT_TIMEOUT_MS = 5000;
+
   /**
    * Load a ContentNode by ID.
    * This is the only way to get content - enforces lazy loading.
    * Uses Holochain as the only source.
+   *
+   * IMPORTANT: Returns a placeholder node instead of throwing for missing content.
+   * This prevents one missing item from breaking entire path loading.
+   *
+   * Cache hierarchy:
+   * 1. In-memory cache (fastest, LRU eviction)
+   * 2. IndexedDB cache (persistent across refreshes)
+   * 3. Holochain zome call (network)
+   *
+   * Uses LRU-style cache eviction to prevent unbounded memory growth.
    */
   getContent(resourceId: string): Observable<ContentNode> {
-    if (!this.contentCache.has(resourceId)) {
-      const request = this.holochainContent.getContent(resourceId).pipe(
-        map(content => {
-          if (!content) {
-            throw new Error(`Content not found: ${resourceId}`);
-          }
-          return content;
-        }),
-        shareReplay(1)
-      );
-
-      this.contentCache.set(resourceId, request);
+    // Check if already in memory cache (and move to end for LRU)
+    if (this.contentCache.has(resourceId)) {
+      const existing = this.contentCache.get(resourceId)!;
+      // Move to end (most recently used) - delete and re-add
+      this.contentCache.delete(resourceId);
+      this.contentCache.set(resourceId, existing);
+      return existing;
     }
-    return this.contentCache.get(resourceId)!;
+
+    // Evict oldest entries if cache is at capacity
+    while (this.contentCache.size >= this.CONTENT_CACHE_MAX_SIZE) {
+      const firstKey = this.contentCache.keys().next().value;
+      if (firstKey) {
+        this.contentCache.delete(firstKey);
+      } else {
+        break;
+      }
+    }
+
+    // Check IndexedDB cache first, then fall back to Holochain
+    const request = defer(() => this.loadContentWithIDBFallback(resourceId)).pipe(
+      timeout(this.CONTENT_TIMEOUT_MS),
+      map(content => {
+        if (!content) {
+          console.warn(`[DataLoader] Content not found: ${resourceId}, returning placeholder`);
+          return this.createPlaceholderContent(resourceId);
+        }
+        return content;
+      }),
+      tap(content => {
+        // Store in IndexedDB cache (background, non-blocking)
+        if (this.idbInitialized && content.contentType !== 'placeholder') {
+          this.idbCache.setContent(content).catch(() => {
+            // Ignore IndexedDB errors
+          });
+        }
+      }),
+      catchError(err => {
+        // Don't cache errors - return placeholder and don't cache this result
+        console.warn(`[DataLoader] Error loading "${resourceId}":`, err.message || err);
+        // Remove from cache so next request retries
+        this.contentCache.delete(resourceId);
+        return of(this.createPlaceholderContent(resourceId, err.message));
+      }),
+      shareReplay(1)
+    );
+
+    this.contentCache.set(resourceId, request);
+    return request;
+  }
+
+  /**
+   * Load content with IndexedDB fallback.
+   * Checks IndexedDB first, then Holochain.
+   */
+  private async loadContentWithIDBFallback(resourceId: string): Promise<ContentNode | null> {
+    // Try IndexedDB first
+    if (this.idbInitialized) {
+      const cached = await this.idbCache.getContent(resourceId);
+      if (cached) {
+        return cached;
+      }
+    }
+
+    // Fall back to Holochain
+    const result = await this.holochainContent.getContent(resourceId).toPromise();
+    return result ?? null;
+  }
+
+  /**
+   * Batch load multiple content items efficiently.
+   *
+   * Uses a single zome call to fetch all content, then populates the cache.
+   * Much more efficient than calling getContent() multiple times.
+   *
+   * Cache hierarchy:
+   * 1. In-memory cache (checked individually)
+   * 2. IndexedDB batch lookup
+   * 3. Holochain batch zome call
+   *
+   * @param resourceIds Array of content IDs to load
+   * @returns Observable of Map<id, ContentNode>
+   */
+  batchGetContent(resourceIds: string[]): Observable<Map<string, ContentNode>> {
+    if (resourceIds.length === 0) {
+      return of(new Map());
+    }
+
+    return defer(() => this.batchGetContentWithIDB(resourceIds)).pipe(
+      timeout(this.CONTENT_TIMEOUT_MS * 2), // Allow more time for batch
+      catchError(err => {
+        console.warn('[DataLoader] Batch load error:', err);
+        // Return placeholders for all
+        const contentMap = new Map<string, ContentNode>();
+        for (const id of resourceIds) {
+          contentMap.set(id, this.createPlaceholderContent(id, err.message));
+        }
+        return of(contentMap);
+      })
+    );
+  }
+
+  /**
+   * Internal batch get with IndexedDB support.
+   */
+  private async batchGetContentWithIDB(resourceIds: string[]): Promise<Map<string, ContentNode>> {
+    const contentMap = new Map<string, ContentNode>();
+    const uncachedIds: string[] = [];
+
+    // First pass: check in-memory cache
+    for (const id of resourceIds) {
+      if (this.contentCache.has(id)) {
+        try {
+          const content = await this.contentCache.get(id)!.toPromise();
+          if (content) {
+            contentMap.set(id, content);
+            continue;
+          }
+        } catch {
+          // Continue to next cache layer
+        }
+      }
+      uncachedIds.push(id);
+    }
+
+    if (uncachedIds.length === 0) {
+      return contentMap;
+    }
+
+    // Second pass: check IndexedDB
+    const remainingIds: string[] = [];
+    if (this.idbInitialized) {
+      const idbResults = await this.idbCache.getContentBatch(uncachedIds);
+      for (const id of uncachedIds) {
+        const cached = idbResults.get(id);
+        if (cached) {
+          contentMap.set(id, cached);
+          // Populate memory cache
+          this.contentCache.set(id, of(cached).pipe(shareReplay(1)));
+        } else {
+          remainingIds.push(id);
+        }
+      }
+    } else {
+      remainingIds.push(...uncachedIds);
+    }
+
+    if (remainingIds.length === 0) {
+      return contentMap;
+    }
+
+    // Third pass: fetch from Holochain
+    const result = await this.holochainContent.batchGetContent(remainingIds);
+
+    // Process found content
+    const toCache: ContentNode[] = [];
+    for (const [id, content] of result.found) {
+      contentMap.set(id, content);
+      this.contentCache.set(id, of(content).pipe(shareReplay(1)));
+      toCache.push(content);
+    }
+
+    // Store in IndexedDB (background)
+    if (this.idbInitialized && toCache.length > 0) {
+      this.idbCache.setContentBatch(toCache).catch(() => {
+        // Ignore errors
+      });
+    }
+
+    // Add placeholders for not found
+    for (const id of result.notFound) {
+      const placeholder = this.createPlaceholderContent(id);
+      contentMap.set(id, placeholder);
+    }
+
+    return contentMap;
+  }
+
+  /**
+   * Prefetch content for upcoming path steps.
+   *
+   * Call this when user starts a path to preload the first few steps,
+   * or when navigating to prefetch upcoming content.
+   *
+   * @param resourceIds Content IDs to prefetch
+   * @param prefetchCount Number of items to prefetch (default 3)
+   */
+  prefetchContent(resourceIds: string[], prefetchCount = 3): void {
+    // Filter to uncached IDs
+    const uncachedIds = resourceIds
+      .filter(id => !this.contentCache.has(id))
+      .slice(0, prefetchCount);
+
+    if (uncachedIds.length === 0) {
+      return;
+    }
+
+    // Fire and forget - don't block the UI
+    this.holochainContent.prefetchRelatedContent(uncachedIds);
+  }
+
+  /**
+   * Load path with prefetching of initial step content.
+   *
+   * Enhanced version of getPath that also prefetches the first few steps.
+   */
+  getPathWithPrefetch(pathId: string, prefetchSteps = 3): Observable<LearningPath> {
+    return this.getPath(pathId).pipe(
+      tap(path => {
+        // Prefetch first N step content in background
+        const stepResourceIds = path.steps
+          .slice(0, prefetchSteps)
+          .map(s => s.resourceId);
+        this.prefetchContent(stepResourceIds, prefetchSteps);
+      })
+    );
+  }
+
+  /**
+   * Create a placeholder content node for missing/errored content.
+   * This allows the UI to continue functioning and show useful feedback.
+   */
+  private createPlaceholderContent(resourceId: string, errorMessage?: string): ContentNode {
+    return {
+      id: resourceId,
+      contentType: 'placeholder',
+      title: `Content Not Found: ${resourceId}`,
+      description: errorMessage || `The content "${resourceId}" could not be loaded.`,
+      content: `This content is not yet available. It may not have been seeded or there was an error loading it.\n\nResource ID: ${resourceId}${errorMessage ? `\nError: ${errorMessage}` : ''}`,
+      contentFormat: 'markdown',
+      tags: ['missing', 'placeholder'],
+      relatedNodeIds: [],
+      metadata: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
   }
 
   /**
@@ -275,17 +645,32 @@ export class DataLoaderService {
   /**
    * Load the path index for discovery.
    * Uses Holochain as the only source.
+   * Cached with shareReplay(1) to prevent redundant Holochain calls.
    */
   getPathIndex(): Observable<PathIndex> {
-    return defer(() =>
-      from(this.holochainContent.getPathIndex())
-    ).pipe(
-      map(hcIndex => this.transformHolochainPathIndex(hcIndex)),
-      catchError(err => {
-        console.error('[DataLoader] Failed to load path index:', err);
-        return of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() });
-      })
-    );
+    if (!this.pathIndexCache$) {
+      this.pathIndexCache$ = defer(() =>
+        from(this.holochainContent.getPathIndex())
+      ).pipe(
+        map(hcIndex => this.transformHolochainPathIndex(hcIndex)),
+        shareReplay(1),
+        catchError(err => {
+          console.error('[DataLoader] Failed to load path index:', err);
+          // Clear cache on error so next call retries
+          this.pathIndexCache$ = null;
+          return of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() });
+        })
+      );
+    }
+    return this.pathIndexCache$;
+  }
+
+  /**
+   * Invalidate the path index cache.
+   * Call this after creating/updating/deleting paths.
+   */
+  invalidatePathIndexCache(): void {
+    this.pathIndexCache$ = null;
   }
 
   /**
@@ -308,11 +693,19 @@ export class DataLoaderService {
   }
 
   /**
-   * Load agent profile.
+   * Load agent profile from Holochain.
    */
   getAgent(agentId: string): Observable<Agent | null> {
-    return this.http.get<Agent>(`${this.basePath}/agents/${agentId}.json`).pipe(
-      catchError(() => of(null))  // Not authenticated or profile missing
+    if (!this.holochainContent.isAvailable()) {
+      return of(null);
+    }
+
+    return defer(() => from(this.holochainContent.getAgentById(agentId))).pipe(
+      map(result => result ? this.transformHolochainAgent(result.agent) : null),
+      catchError((err) => {
+        console.warn(`[DataLoader] Failed to load agent "${agentId}":`, err);
+        return of(null);
+      })
     );
   }
 
@@ -361,15 +754,90 @@ export class DataLoaderService {
 
   /**
    * Clear all caches - useful for testing or after auth changes.
+   *
+   * @param includeIndexedDB If true, also clears IndexedDB persistent cache
    */
-  clearCache(): void {
+  clearCache(includeIndexedDB = false): void {
     this.pathCache.clear();
     this.contentCache.clear();
     this.attestationCache$ = null;
     this.attestationsByContentCache.clear();
     this.graphCache$ = null;
+    this.relationshipByNodeCache.clear();
+    this.pathIndexCache$ = null;
     // Also clear Holochain content cache
     this.holochainContent.clearCache();
+
+    // Optionally clear IndexedDB persistent cache
+    if (includeIndexedDB && this.idbInitialized) {
+      this.idbCache.clearAll().catch(() => {
+        // Ignore errors
+      });
+    }
+  }
+
+  /**
+   * Clear only the IndexedDB persistent cache.
+   * Useful when data schema changes or to force fresh data.
+   */
+  async clearPersistentCache(): Promise<void> {
+    if (this.idbInitialized) {
+      await this.idbCache.clearAll();
+    }
+  }
+
+  /**
+   * Get cache statistics for debugging/monitoring.
+   */
+  getCacheStats(): {
+    pathCacheSize: number;
+    contentCacheSize: number;
+    relationshipCacheSize: number;
+    hasGraph: boolean;
+    hasPathIndex: boolean;
+    indexedDBAvailable: boolean;
+  } {
+    return {
+      pathCacheSize: this.pathCache.size,
+      contentCacheSize: this.contentCache.size,
+      relationshipCacheSize: this.relationshipByNodeCache.size,
+      hasGraph: this.graphCache$ !== null,
+      hasPathIndex: this.pathIndexCache$ !== null,
+      indexedDBAvailable: this.idbInitialized
+    };
+  }
+
+  /**
+   * Get detailed cache statistics including IndexedDB.
+   */
+  async getDetailedCacheStats(): Promise<{
+    memory: {
+      pathCacheSize: number;
+      contentCacheSize: number;
+      relationshipCacheSize: number;
+    };
+    indexedDB: {
+      available: boolean;
+      contentCount: number;
+      pathCount: number;
+    };
+  }> {
+    const idbStats = this.idbInitialized
+      ? await this.idbCache.getStats()
+      : { contentCount: 0, pathCount: 0, isAvailable: false };
+
+    return {
+      memory: {
+        pathCacheSize: this.pathCache.size,
+        contentCacheSize: this.contentCache.size,
+        relationshipCacheSize: this.relationshipByNodeCache.size,
+      },
+      indexedDB: {
+        available: idbStats.isAvailable,
+        contentCount: idbStats.contentCount,
+        pathCount: idbStats.pathCount,
+      },
+    };
   }
 
   // =========================================================================
@@ -378,17 +846,69 @@ export class DataLoaderService {
 
   /**
    * Load all content attestations.
-   * Returns the full attestation index.
+   *
+   * NOTE: ContentAttestations (trust claims about content) are different from
+   * Agent Attestations (credentials/achievements). Content attestations need
+   * their own entry type in Holochain. For now, returns empty array.
+   *
+   * Use getAgentAttestations() for agent credentials.
    */
   getAttestations(): Observable<ContentAttestation[]> {
-    this.attestationCache$ ??= this.http.get<{ attestations: ContentAttestation[] }>(
-      `${this.basePath}/attestations/index.json`
-    ).pipe(
-      map(response => response.attestations ?? []),
-      shareReplay(1),
-      catchError(() => of([]))
-    );
+    // Content attestations need their own entry type - not yet implemented
+    // The zome has Agent attestations, not Content attestations
+    this.attestationCache$ ??= of([]);
     return this.attestationCache$;
+  }
+
+  /**
+   * Load agent attestations (credentials/achievements) from Holochain.
+   *
+   * These are different from content attestations - they represent
+   * achievements earned by agents (domain-mastery, path-completion, etc.)
+   */
+  getAgentAttestations(agentId?: string, category?: string): Observable<AgentAttestation[]> {
+    if (!this.holochainContent.isAvailable()) {
+      return of([]);
+    }
+
+    return defer(() => from(this.holochainContent.getAttestations({
+      agent_id: agentId,
+      category: category,
+    }))).pipe(
+      map(results => results.map(r => this.transformHolochainAttestation(r.attestation))),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load agent attestations:', err);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Transform Holochain attestation entry to frontend AgentAttestation model.
+   */
+  private transformHolochainAttestation(hcAtt: HolochainAttestationEntry): AgentAttestation {
+    let earnedVia: AgentAttestation['earnedVia'] = {};
+    try {
+      earnedVia = JSON.parse(hcAtt.earned_via_json || '{}');
+    } catch {
+      // Ignore parse errors
+    }
+
+    return {
+      id: hcAtt.id,
+      agentId: hcAtt.agent_id,
+      category: hcAtt.category as AgentAttestation['category'],
+      attestationType: hcAtt.attestation_type,
+      displayName: hcAtt.display_name,
+      description: hcAtt.description,
+      iconUrl: hcAtt.icon_url ?? undefined,
+      tier: hcAtt.tier as AgentAttestation['tier'],
+      earnedVia,
+      issuedAt: hcAtt.issued_at,
+      issuedBy: hcAtt.issued_by,
+      expiresAt: hcAtt.expires_at ?? undefined,
+      proof: hcAtt.proof ?? undefined,
+    };
   }
 
   /**
@@ -420,14 +940,40 @@ export class DataLoaderService {
   }
 
   /**
-   * Load the agent index (all known agents).
+   * Load the agent index (all known agents) from Holochain.
    */
   getAgentIndex(): Observable<{ agents: Agent[] }> {
-    return this.http.get<{ agents: Agent[] }>(
-      `${this.basePath}/agents/index.json`
-    ).pipe(
-      catchError(() => of({ agents: [] }))
+    if (!this.holochainContent.isAvailable()) {
+      return of({ agents: [] });
+    }
+
+    return defer(() => from(this.holochainContent.queryAgents({}))).pipe(
+      map(results => ({
+        agents: results.map(r => this.transformHolochainAgent(r.agent))
+      })),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load agent index:', err);
+        return of({ agents: [] });
+      })
     );
+  }
+
+  /**
+   * Transform Holochain agent entry to frontend Agent model.
+   */
+  private transformHolochainAgent(hcAgent: HolochainAgentEntry): Agent {
+    return {
+      id: hcAgent.id,
+      displayName: hcAgent.display_name,
+      type: hcAgent.agent_type as Agent['type'],
+      bio: hcAgent.bio ?? undefined,
+      avatar: hcAgent.avatar ?? undefined,
+      visibility: hcAgent.visibility as Agent['visibility'],
+      createdAt: hcAgent.created_at,
+      updatedAt: hcAgent.updated_at,
+      did: hcAgent.did ?? undefined,
+      activityPubType: hcAgent.activity_pub_type as Agent['activityPubType'],
+    };
   }
 
   // =========================================================================
@@ -435,25 +981,138 @@ export class DataLoaderService {
   // =========================================================================
 
   /**
-   * Load the knowledge map index.
+   * Load the knowledge map index from Holochain.
    */
   getKnowledgeMapIndex(): Observable<KnowledgeMapIndex> {
-    return this.http.get<KnowledgeMapIndex>(
-      `${this.basePath}/knowledge-maps/index.json`
-    ).pipe(
-      catchError(() => of({ maps: [], totalCount: 0, lastUpdated: new Date().toISOString() }))
+    if (!this.holochainContent.isAvailable()) {
+      return of({ maps: [], totalCount: 0, lastUpdated: new Date().toISOString() });
+    }
+
+    return defer(() => from(this.holochainContent.queryKnowledgeMaps({}))).pipe(
+      map(results => ({
+        lastUpdated: new Date().toISOString(),
+        totalCount: results.length,
+        maps: results.map(r => this.transformHolochainKnowledgeMapToIndex(r.knowledge_map))
+      })),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load knowledge map index:', err);
+        return of({ maps: [], totalCount: 0, lastUpdated: new Date().toISOString() });
+      })
     );
   }
 
   /**
-   * Load a specific knowledge map.
+   * Load a specific knowledge map from Holochain.
    */
   getKnowledgeMap(mapId: string): Observable<KnowledgeMap | null> {
-    return this.http.get<KnowledgeMap>(
-      `${this.basePath}/knowledge-maps/${mapId}.json`
-    ).pipe(
-      catchError(() => of(null))
+    if (!this.holochainContent.isAvailable()) {
+      return of(null);
+    }
+
+    return defer(() => from(this.holochainContent.getKnowledgeMapById(mapId))).pipe(
+      map(result => result ? this.transformHolochainKnowledgeMap(result.knowledge_map) : null),
+      catchError((err) => {
+        console.warn(`[DataLoader] Failed to load knowledge map "${mapId}":`, err);
+        return of(null);
+      })
     );
+  }
+
+  /**
+   * Transform Holochain knowledge map entry to KnowledgeMapIndexEntry.
+   */
+  private transformHolochainKnowledgeMapToIndex(hcMap: {
+    id: string;
+    map_type: string;
+    owner_id: string;
+    title: string;
+    subject_type: string;
+    subject_id: string;
+    subject_name: string;
+    visibility: string;
+    nodes_json: string;
+    overall_affinity: number;
+    updated_at: string;
+  }): KnowledgeMapIndexEntry {
+    let nodes: unknown[] = [];
+    try {
+      nodes = hcMap.nodes_json ? JSON.parse(hcMap.nodes_json) : [];
+    } catch {
+      // Ignore parse errors
+    }
+
+    return {
+      id: hcMap.id,
+      mapType: hcMap.map_type as KnowledgeMapType,
+      title: hcMap.title,
+      subjectName: hcMap.subject_name,
+      ownerId: hcMap.owner_id,
+      ownerName: '', // Would need to look up agent name
+      visibility: hcMap.visibility,
+      overallAffinity: hcMap.overall_affinity,
+      nodeCount: Array.isArray(nodes) ? nodes.length : 0,
+      updatedAt: hcMap.updated_at
+    };
+  }
+
+  /**
+   * Transform Holochain knowledge map entry to full KnowledgeMap model.
+   */
+  private transformHolochainKnowledgeMap(hcMap: {
+    id: string;
+    map_type: string;
+    owner_id: string;
+    title: string;
+    description: string | null;
+    subject_type: string;
+    subject_id: string;
+    subject_name: string;
+    visibility: string;
+    shared_with_json: string;
+    nodes_json: string;
+    path_ids_json: string;
+    overall_affinity: number;
+    content_graph_id: string | null;
+    mastery_levels_json: string;
+    goals_json: string;
+    created_at: string;
+    updated_at: string;
+    metadata_json: string;
+  }): KnowledgeMap {
+    let nodes: KnowledgeNode[] = [];
+    let pathIds: string[] = [];
+    let sharedWith: string[] = [];
+    let metadata: Record<string, unknown> = {};
+
+    try {
+      nodes = hcMap.nodes_json ? JSON.parse(hcMap.nodes_json) : [];
+      pathIds = hcMap.path_ids_json ? JSON.parse(hcMap.path_ids_json) : [];
+      sharedWith = hcMap.shared_with_json ? JSON.parse(hcMap.shared_with_json) : [];
+      metadata = hcMap.metadata_json ? JSON.parse(hcMap.metadata_json) : {};
+    } catch {
+      // Ignore parse errors
+    }
+
+    return {
+      id: hcMap.id,
+      mapType: hcMap.map_type as KnowledgeMapType,
+      subject: {
+        type: hcMap.subject_type as 'content-graph' | 'agent' | 'organization',
+        subjectId: hcMap.subject_id,
+        subjectName: hcMap.subject_name
+      },
+      ownerId: hcMap.owner_id,
+      title: hcMap.title,
+      description: hcMap.description ?? undefined,
+      visibility: hcMap.visibility as 'private' | 'mutual' | 'shared' | 'public',
+      sharedWith,
+      nodes,
+      pathIds,
+      overallAffinity: hcMap.overall_affinity,
+      createdAt: hcMap.created_at,
+      updatedAt: hcMap.updated_at,
+      metadata
+    };
   }
 
   // =========================================================================
@@ -461,24 +1120,40 @@ export class DataLoaderService {
   // =========================================================================
 
   /**
-   * Load the path extension index.
+   * Load the path extension index from Holochain.
    */
   getPathExtensionIndex(): Observable<PathExtensionIndex> {
-    return this.http.get<PathExtensionIndex>(
-      `${this.basePath}/extensions/index.json`
-    ).pipe(
-      catchError(() => of({ extensions: [], totalCount: 0, lastUpdated: new Date().toISOString() }))
+    if (!this.holochainContent.isAvailable()) {
+      return of({ extensions: [], totalCount: 0, lastUpdated: new Date().toISOString() });
+    }
+
+    return defer(() => from(this.holochainContent.queryPathExtensions({}))).pipe(
+      map(results => ({
+        lastUpdated: new Date().toISOString(),
+        totalCount: results.length,
+        extensions: results.map(r => this.transformHolochainPathExtensionToIndex(r.path_extension))
+      })),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load path extension index:', err);
+        return of({ extensions: [], totalCount: 0, lastUpdated: new Date().toISOString() });
+      })
     );
   }
 
   /**
-   * Load a specific path extension.
+   * Load a specific path extension from Holochain.
    */
   getPathExtension(extensionId: string): Observable<PathExtension | null> {
-    return this.http.get<PathExtension>(
-      `${this.basePath}/extensions/${extensionId}.json`
-    ).pipe(
-      catchError(() => of(null))
+    if (!this.holochainContent.isAvailable()) {
+      return of(null);
+    }
+
+    return defer(() => from(this.holochainContent.getPathExtensionById(extensionId))).pipe(
+      map(result => result ? this.transformHolochainPathExtension(result.path_extension) : null),
+      catchError((err) => {
+        console.warn(`[DataLoader] Failed to load path extension "${extensionId}":`, err);
+        return of(null);
+      })
     );
   }
 
@@ -486,41 +1161,412 @@ export class DataLoaderService {
    * Get extensions for a specific base path.
    */
   getExtensionsForPath(pathId: string): Observable<PathExtension[]> {
-    return this.getPathExtensionIndex().pipe(
-      map(index => {
-        // Filter by basePathId and return just the IDs
-        return index.extensions.filter(e => e.basePathId === pathId);
-      }),
-      // For full extension data, we'd need to load each one
-      // For now, just return the index entries cast appropriately
-      map(entries => entries as unknown as PathExtension[])
+    if (!this.holochainContent.isAvailable()) {
+      return of([]);
+    }
+
+    return defer(() => from(this.holochainContent.queryPathExtensions({ base_path_id: pathId }))).pipe(
+      map(results => results.map(r => this.transformHolochainPathExtension(r.path_extension))),
+      catchError((err) => {
+        console.warn(`[DataLoader] Failed to load extensions for path "${pathId}":`, err);
+        return of([]);
+      })
     );
+  }
+
+  /**
+   * Transform Holochain path extension entry to PathExtensionIndexEntry.
+   */
+  private transformHolochainPathExtensionToIndex(hcExt: {
+    id: string;
+    base_path_id: string;
+    base_path_version: string;
+    extended_by: string;
+    title: string;
+    description: string | null;
+    visibility: string;
+    insertions_json: string;
+    annotations_json: string;
+    updated_at: string;
+  }): PathExtensionIndexEntry {
+    let insertionCount = 0;
+    let annotationCount = 0;
+    try {
+      const insertions = hcExt.insertions_json ? JSON.parse(hcExt.insertions_json) : [];
+      const annotations = hcExt.annotations_json ? JSON.parse(hcExt.annotations_json) : [];
+      insertionCount = Array.isArray(insertions) ? insertions.length : 0;
+      annotationCount = Array.isArray(annotations) ? annotations.length : 0;
+    } catch {
+      // Ignore parse errors
+    }
+
+    return {
+      id: hcExt.id,
+      basePathId: hcExt.base_path_id,
+      basePathTitle: '', // Would need to look up path title
+      title: hcExt.title,
+      description: hcExt.description ?? undefined,
+      extendedBy: hcExt.extended_by,
+      extenderName: '', // Would need to look up agent name
+      visibility: hcExt.visibility,
+      insertionCount,
+      annotationCount,
+      forkCount: 0, // Would need separate query
+      updatedAt: hcExt.updated_at
+    };
+  }
+
+  /**
+   * Transform Holochain path extension entry to full PathExtension model.
+   */
+  private transformHolochainPathExtension(hcExt: {
+    id: string;
+    base_path_id: string;
+    base_path_version: string;
+    extended_by: string;
+    title: string;
+    description: string | null;
+    visibility: string;
+    shared_with_json: string;
+    insertions_json: string;
+    annotations_json: string;
+    reorderings_json: string;
+    exclusions_json: string;
+    forked_from: string | null;
+    forks_json: string;
+    upstream_proposal_json: string | null;
+    stats_json: string;
+    created_at: string;
+    updated_at: string;
+  }): PathExtension {
+    let sharedWith: string[] = [];
+    let insertions: PathStepInsertion[] = [];
+    let annotations: PathStepAnnotation[] = [];
+    let reorderings: PathStepReorder[] = [];
+    let exclusions: PathStepExclusion[] = [];
+    let forks: string[] = [];
+    let upstreamProposal: UpstreamProposal | undefined;
+    let stats: ExtensionStats | undefined;
+
+    try {
+      sharedWith = hcExt.shared_with_json ? JSON.parse(hcExt.shared_with_json) : [];
+      insertions = hcExt.insertions_json ? JSON.parse(hcExt.insertions_json) : [];
+      annotations = hcExt.annotations_json ? JSON.parse(hcExt.annotations_json) : [];
+      reorderings = hcExt.reorderings_json ? JSON.parse(hcExt.reorderings_json) : [];
+      exclusions = hcExt.exclusions_json ? JSON.parse(hcExt.exclusions_json) : [];
+      forks = hcExt.forks_json ? JSON.parse(hcExt.forks_json) : [];
+      upstreamProposal = hcExt.upstream_proposal_json ? JSON.parse(hcExt.upstream_proposal_json) : undefined;
+      stats = hcExt.stats_json ? JSON.parse(hcExt.stats_json) : undefined;
+    } catch {
+      // Ignore parse errors
+    }
+
+    return {
+      id: hcExt.id,
+      basePathId: hcExt.base_path_id,
+      basePathVersion: hcExt.base_path_version,
+      extendedBy: hcExt.extended_by,
+      title: hcExt.title,
+      description: hcExt.description ?? undefined,
+      insertions,
+      annotations,
+      reorderings,
+      exclusions,
+      visibility: hcExt.visibility as 'private' | 'shared' | 'public',
+      sharedWith,
+      forkedFrom: hcExt.forked_from ?? undefined,
+      forks,
+      upstreamProposal,
+      stats,
+      createdAt: hcExt.created_at,
+      updatedAt: hcExt.updated_at
+    };
   }
 
   // =========================================================================
   // Graph Loading (for Exploration Service)
   // =========================================================================
 
+  /** LRU cache for per-node relationship queries */
+  private readonly relationshipByNodeCache = new Map<string, Observable<ContentRelationship[]>>();
+  private readonly RELATIONSHIP_CACHE_MAX_SIZE = 100;
+
   /**
    * Load the full content graph for exploration.
-   * This builds the graph from the content index and relationships.
    *
-   * Note: This is a heavier operation than lazy loading individual nodes.
-   * Use only for graph exploration features.
+   * When Holochain is available, fetches relationships and builds the graph.
+   * Falls back to empty graph if unavailable.
+   *
+   * Note: Prefer getRelationshipsForNode() for single-node queries to avoid
+   * loading the entire graph.
    */
   getGraph(): Observable<ContentGraph> {
-    this.graphCache$ ??= forkJoin({
-      overview: this.http.get<ContentGraphMetadata>(`${this.basePath}/graph/overview.json`),
-      index: this.getContentIndex(),
-      relationships: this.http.get<{ relationships: Array<{ id: string; source: string; target: string; type: string }> }>(
-        `${this.basePath}/graph/relationships.json`
-      )
-    }).pipe(
-      map(({ overview, index, relationships }) => this.buildContentGraph(overview, index, relationships)),
-      shareReplay(1),
-      catchError(() => of(this.createEmptyGraph()))
-    );
+    if (!this.graphCache$) {
+      if (this.holochainContent.isAvailable()) {
+        // Build graph from Holochain relationships
+        this.graphCache$ = this.buildGraphFromHolochain().pipe(
+          shareReplay(1),
+          catchError((err) => {
+            console.warn('[DataLoader] Failed to load graph from Holochain:', err);
+            return of(this.createEmptyGraph());
+          })
+        );
+      } else {
+        this.graphCache$ = of(this.createEmptyGraph());
+      }
+    }
     return this.graphCache$;
+  }
+
+  /**
+   * Get relationships for a single node (lazy loading).
+   *
+   * This is more efficient than loading the full graph when you only need
+   * relationships for one content node. Uses caching to prevent redundant calls.
+   *
+   * @param contentId - The content node ID to get relationships for
+   * @param direction - 'outgoing', 'incoming', or 'both'
+   * @returns Observable of ContentRelationship[]
+   */
+  getRelationshipsForNode(
+    contentId: string,
+    direction: 'outgoing' | 'incoming' | 'both' = 'both'
+  ): Observable<ContentRelationship[]> {
+    const cacheKey = `${contentId}:${direction}`;
+
+    if (!this.relationshipByNodeCache.has(cacheKey)) {
+      // Evict oldest entries if cache is too large
+      if (this.relationshipByNodeCache.size >= this.RELATIONSHIP_CACHE_MAX_SIZE) {
+        const firstKey = this.relationshipByNodeCache.keys().next().value;
+        if (firstKey) {
+          this.relationshipByNodeCache.delete(firstKey);
+        }
+      }
+
+      const request = this.fetchRelationshipsForNode(contentId, direction).pipe(
+        shareReplay(1),
+        catchError((err) => {
+          console.warn(`[DataLoader] Failed to load relationships for "${contentId}":`, err);
+          // Remove from cache on error
+          this.relationshipByNodeCache.delete(cacheKey);
+          return of([]);
+        })
+      );
+
+      this.relationshipByNodeCache.set(cacheKey, request);
+    }
+
+    return this.relationshipByNodeCache.get(cacheKey)!;
+  }
+
+  /**
+   * Fetch relationships for a node from Holochain.
+   */
+  private fetchRelationshipsForNode(
+    contentId: string,
+    direction: 'outgoing' | 'incoming' | 'both'
+  ): Observable<ContentRelationship[]> {
+    if (!this.holochainContent.isAvailable()) {
+      return of([]);
+    }
+
+    return defer(() =>
+      from(this.holochainContent.getRelationships({ content_id: contentId, direction }))
+    ).pipe(
+      map(results => results.map(r => this.transformHolochainRelationship(r.relationship)))
+    );
+  }
+
+  /**
+   * Transform Holochain relationship entry to frontend ContentRelationship model.
+   */
+  private transformHolochainRelationship(
+    hcRel: { id: string; source_id: string; target_id: string; relationship_type: string; confidence: number; metadata_json: string | null }
+  ): ContentRelationship {
+    let metadata: Record<string, unknown> = {};
+    try {
+      metadata = JSON.parse(hcRel.metadata_json || '{}');
+    } catch {
+      // Ignore parse errors
+    }
+
+    // Store confidence in metadata since ContentRelationship doesn't have a confidence field
+    if (hcRel.confidence !== undefined && hcRel.confidence !== null) {
+      metadata['confidence'] = hcRel.confidence;
+    }
+
+    return {
+      id: hcRel.id,
+      sourceNodeId: hcRel.source_id,
+      targetNodeId: hcRel.target_id,
+      relationshipType: hcRel.relationship_type as ContentRelationshipType,
+      metadata
+    };
+  }
+
+  /**
+   * Invalidate the relationship cache for a specific node.
+   * Call this after creating/updating relationships.
+   */
+  invalidateRelationshipCache(contentId?: string): void {
+    if (contentId) {
+      // Remove all cache entries for this node
+      for (const key of this.relationshipByNodeCache.keys()) {
+        if (key.startsWith(`${contentId}:`)) {
+          this.relationshipByNodeCache.delete(key);
+        }
+      }
+    } else {
+      // Clear entire cache
+      this.relationshipByNodeCache.clear();
+    }
+  }
+
+  /**
+   * Build ContentGraph from Holochain content and relationships.
+   */
+  private buildGraphFromHolochain(): Observable<ContentGraph> {
+    // Get content graph starting from manifesto root
+    return defer(() => from(this.holochainContent.getContentGraph('manifesto'))).pipe(
+      map(hcGraph => {
+        if (!hcGraph) {
+          return this.createEmptyGraph();
+        }
+        return this.transformHolochainGraph(hcGraph);
+      })
+    );
+  }
+
+  /**
+   * Transform Holochain ContentGraph to frontend ContentGraph structure.
+   */
+  private transformHolochainGraph(hcGraph: HolochainContentGraph): ContentGraph {
+    const nodes = new Map<string, ContentNode>();
+    const relationships = new Map<string, ContentRelationship>();
+    const nodesByType = new Map<string, Set<string>>();
+    const nodesByTag = new Map<string, Set<string>>();
+    const nodesByCategory = new Map<string, Set<string>>();
+    const adjacency = new Map<string, Set<string>>();
+    const reverseAdjacency = new Map<string, Set<string>>();
+
+    // Add root node if present
+    if (hcGraph.root) {
+      const rootNode = this.transformHolochainContentToNode(hcGraph.root);
+      this.addNodeToGraphIndexes(rootNode, nodes, nodesByType, nodesByTag, nodesByCategory, adjacency, reverseAdjacency);
+    }
+
+    // Process related nodes recursively
+    this.processHolochainGraphNodes(hcGraph.related, nodes, relationships, nodesByType, nodesByTag, nodesByCategory, adjacency, reverseAdjacency, hcGraph.root?.content.id);
+
+    return {
+      nodes,
+      relationships,
+      nodesByType,
+      nodesByTag,
+      nodesByCategory,
+      adjacency,
+      reverseAdjacency,
+      metadata: {
+        nodeCount: hcGraph.total_nodes,
+        relationshipCount: relationships.size,
+        lastUpdated: new Date().toISOString(),
+        version: '1.0.0'
+      }
+    };
+  }
+
+  /**
+   * Transform HolochainContentOutput to ContentNode.
+   */
+  private transformHolochainContentToNode(output: { content: { id: string; content_type: string; title: string; description: string; content: string; content_format: string; tags: string[]; source_path: string | null; related_node_ids: string[]; metadata_json: string; created_at: string; updated_at: string } }): ContentNode {
+    const entry = output.content;
+    let metadata = {};
+    try {
+      metadata = JSON.parse(entry.metadata_json || '{}');
+    } catch {
+      // Ignore parse errors
+    }
+
+    return {
+      id: entry.id,
+      contentType: entry.content_type as ContentNode['contentType'],
+      title: entry.title,
+      description: entry.description,
+      content: entry.content,
+      contentFormat: entry.content_format as ContentNode['contentFormat'],
+      tags: entry.tags,
+      sourcePath: entry.source_path ?? undefined,
+      relatedNodeIds: entry.related_node_ids,
+      metadata,
+      createdAt: entry.created_at,
+      updatedAt: entry.updated_at,
+    };
+  }
+
+  /**
+   * Process graph nodes recursively from Holochain tree structure.
+   */
+  private processHolochainGraphNodes(
+    graphNodes: HolochainContentGraphNode[],
+    nodes: Map<string, ContentNode>,
+    relationships: Map<string, ContentRelationship>,
+    nodesByType: Map<string, Set<string>>,
+    nodesByTag: Map<string, Set<string>>,
+    nodesByCategory: Map<string, Set<string>>,
+    adjacency: Map<string, Set<string>>,
+    reverseAdjacency: Map<string, Set<string>>,
+    parentId?: string
+  ): void {
+    for (const graphNode of graphNodes) {
+      const node = this.transformHolochainContentToNode(graphNode.content);
+      this.addNodeToGraphIndexes(node, nodes, nodesByType, nodesByTag, nodesByCategory, adjacency, reverseAdjacency);
+
+      // Add relationship from parent to this node
+      if (parentId) {
+        const relId = `${parentId}-${node.id}`;
+        relationships.set(relId, {
+          id: relId,
+          sourceNodeId: parentId,
+          targetNodeId: node.id,
+          relationshipType: graphNode.relationship_type as ContentRelationshipType
+        });
+
+        // Update adjacency
+        if (!adjacency.has(parentId)) adjacency.set(parentId, new Set());
+        adjacency.get(parentId)!.add(node.id);
+
+        if (!reverseAdjacency.has(node.id)) reverseAdjacency.set(node.id, new Set());
+        reverseAdjacency.get(node.id)!.add(parentId);
+      }
+
+      // Process children recursively
+      if (graphNode.children.length > 0) {
+        this.processHolochainGraphNodes(graphNode.children, nodes, relationships, nodesByType, nodesByTag, nodesByCategory, adjacency, reverseAdjacency, node.id);
+      }
+    }
+  }
+
+  /**
+   * Add a node to all graph indexes.
+   */
+  private addNodeToGraphIndexes(
+    node: ContentNode,
+    nodes: Map<string, ContentNode>,
+    nodesByType: Map<string, Set<string>>,
+    nodesByTag: Map<string, Set<string>>,
+    nodesByCategory: Map<string, Set<string>>,
+    adjacency: Map<string, Set<string>>,
+    reverseAdjacency: Map<string, Set<string>>
+  ): void {
+    nodes.set(node.id, node);
+    this.addToSetMap(nodesByType, node.contentType, node.id);
+    for (const tag of node.tags || []) {
+      this.addToSetMap(nodesByTag, tag, node.id);
+    }
+    const category = (node.metadata as Record<string, unknown>)?.['category'] as string ?? 'uncategorized';
+    this.addToSetMap(nodesByCategory, category, node.id);
+    if (!adjacency.has(node.id)) adjacency.set(node.id, new Set());
+    if (!reverseAdjacency.has(node.id)) reverseAdjacency.set(node.id, new Set());
   }
 
   /**
@@ -628,11 +1674,29 @@ export class DataLoaderService {
 
   /**
    * Load the assessment index.
+   * Builds from Content entries with assessment contentType.
    */
   getAssessmentIndex(): Observable<AssessmentIndex> {
-    return this.http.get<AssessmentIndex>(
-      `${this.basePath}/assessments/index.json`
-    ).pipe(
+    if (!this.holochainContent.isAvailable()) {
+      return of({ assessments: [], totalCount: 0, lastUpdated: new Date().toISOString() });
+    }
+
+    return this.holochainContent.getContentByType('assessment', 500).pipe(
+      map(contentNodes => {
+        const assessments: AssessmentIndexEntry[] = contentNodes.map(node => ({
+          id: node.id,
+          title: node.title,
+          domain: node.metadata?.['domain'] ?? 'general',
+          instrumentType: node.metadata?.['instrumentType'] ?? 'questionnaire',
+          estimatedTime: node.metadata?.['estimatedTime'] ?? '15 minutes',
+        }));
+
+        return {
+          assessments,
+          totalCount: assessments.length,
+          lastUpdated: new Date().toISOString(),
+        };
+      }),
       catchError(() => of({ assessments: [], totalCount: 0, lastUpdated: new Date().toISOString() }))
     );
   }
@@ -662,30 +1726,60 @@ export class DataLoaderService {
 
   /**
    * Load the governance index (counts and metadata).
+   * Aggregates counts from all governance entity types.
    */
   getGovernanceIndex(): Observable<GovernanceIndex> {
-    return this.http.get<GovernanceIndex>(
-      `${this.basePath}/governance/index.json`
-    ).pipe(
-      catchError(() => of({
+    if (!this.holochainContent.isAvailable()) {
+      return of({
         lastUpdated: new Date().toISOString(),
         challengeCount: 0,
         proposalCount: 0,
         precedentCount: 0,
         discussionCount: 0
-      }))
+      });
+    }
+
+    // Query all governance types in parallel
+    return defer(() => Promise.all([
+      this.holochainContent.queryChallenges({}),
+      this.holochainContent.queryProposals({}),
+      this.holochainContent.queryPrecedents({}),
+      this.holochainContent.queryDiscussions({})
+    ])).pipe(
+      map(([challenges, proposals, precedents, discussions]) => ({
+        lastUpdated: new Date().toISOString(),
+        challengeCount: challenges.length,
+        proposalCount: proposals.length,
+        precedentCount: precedents.length,
+        discussionCount: discussions.length
+      })),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load governance index:', err);
+        return of({
+          lastUpdated: new Date().toISOString(),
+          challengeCount: 0,
+          proposalCount: 0,
+          precedentCount: 0,
+          discussionCount: 0
+        });
+      })
     );
   }
 
   /**
-   * Load all challenges.
+   * Load all challenges from Holochain.
    */
   getChallenges(): Observable<ChallengeRecord[]> {
-    return this.http.get<{ challenges: ChallengeRecord[] }>(
-      `${this.basePath}/governance/challenges.json`
-    ).pipe(
-      map(response => response.challenges || []),
-      catchError(() => of([]))
+    if (!this.holochainContent.isAvailable()) {
+      return of([]);
+    }
+
+    return defer(() => from(this.holochainContent.queryChallenges({}))).pipe(
+      map(results => results.map(r => this.transformHolochainChallenge(r.challenge))),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load challenges:', err);
+        return of([]);
+      })
     );
   }
 
@@ -693,22 +1787,81 @@ export class DataLoaderService {
    * Get challenges for a specific entity.
    */
   getChallengesForEntity(entityType: string, entityId: string): Observable<ChallengeRecord[]> {
-    return this.getChallenges().pipe(
-      map(challenges => challenges.filter(
-        c => c.entityType === entityType && c.entityId === entityId
-      ))
+    if (!this.holochainContent.isAvailable()) {
+      return of([]);
+    }
+
+    return defer(() => from(this.holochainContent.queryChallenges({
+      entity_type: entityType,
+      entity_id: entityId
+    }))).pipe(
+      map(results => results.map(r => this.transformHolochainChallenge(r.challenge))),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load challenges for entity:', err);
+        return of([]);
+      })
     );
   }
 
   /**
-   * Load all proposals.
+   * Transform Holochain challenge entry to frontend ChallengeRecord model.
+   */
+  private transformHolochainChallenge(hcChallenge: {
+    id: string;
+    entity_type: string;
+    entity_id: string;
+    challenger_id: string;
+    challenger_name: string;
+    challenger_standing: string;
+    grounds: string;
+    description: string;
+    evidence_json: string;
+    status: string;
+    filed_at: string;
+    sla_deadline: string | null;
+    assigned_elohim: string | null;
+    resolution_json: string | null;
+  }): ChallengeRecord {
+    let resolution: ChallengeRecord['resolution'];
+    try {
+      resolution = hcChallenge.resolution_json ? JSON.parse(hcChallenge.resolution_json) : undefined;
+    } catch {
+      // Ignore parse errors
+    }
+
+    return {
+      id: hcChallenge.id,
+      entityType: hcChallenge.entity_type,
+      entityId: hcChallenge.entity_id,
+      challenger: {
+        agentId: hcChallenge.challenger_id,
+        displayName: hcChallenge.challenger_name,
+        standing: hcChallenge.challenger_standing
+      },
+      grounds: hcChallenge.grounds,
+      description: hcChallenge.description,
+      status: hcChallenge.status,
+      filedAt: hcChallenge.filed_at,
+      slaDeadline: hcChallenge.sla_deadline ?? undefined,
+      assignedElohim: hcChallenge.assigned_elohim ?? undefined,
+      resolution
+    };
+  }
+
+  /**
+   * Load all proposals from Holochain.
    */
   getProposals(): Observable<ProposalRecord[]> {
-    return this.http.get<{ proposals: ProposalRecord[] }>(
-      `${this.basePath}/governance/proposals.json`
-    ).pipe(
-      map(response => response.proposals || []),
-      catchError(() => of([]))
+    if (!this.holochainContent.isAvailable()) {
+      return of([]);
+    }
+
+    return defer(() => from(this.holochainContent.queryProposals({}))).pipe(
+      map(results => results.map(r => this.transformHolochainProposal(r.proposal))),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load proposals:', err);
+        return of([]);
+      })
     );
   }
 
@@ -716,20 +1869,80 @@ export class DataLoaderService {
    * Get proposals by status (voting, discussion, decided).
    */
   getProposalsByStatus(status: string): Observable<ProposalRecord[]> {
-    return this.getProposals().pipe(
-      map(proposals => proposals.filter(p => p.status === status))
+    if (!this.holochainContent.isAvailable()) {
+      return of([]);
+    }
+
+    return defer(() => from(this.holochainContent.queryProposals({ status }))).pipe(
+      map(results => results.map(r => this.transformHolochainProposal(r.proposal))),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load proposals by status:', err);
+        return of([]);
+      })
     );
   }
 
   /**
-   * Load all precedents.
+   * Transform Holochain proposal entry to frontend ProposalRecord model.
+   */
+  private transformHolochainProposal(hcProposal: {
+    id: string;
+    title: string;
+    proposal_type: string;
+    description: string;
+    proposer_id: string;
+    proposer_name: string;
+    status: string;
+    phase: string;
+    voting_config_json: string;
+    current_votes_json: string;
+    outcome_json: string | null;
+    created_at: string;
+  }): ProposalRecord {
+    let votingConfig: ProposalRecord['votingConfig'];
+    let currentVotes: ProposalRecord['currentVotes'];
+    let outcome: ProposalRecord['outcome'];
+
+    try {
+      votingConfig = hcProposal.voting_config_json ? JSON.parse(hcProposal.voting_config_json) : undefined;
+      currentVotes = hcProposal.current_votes_json ? JSON.parse(hcProposal.current_votes_json) : undefined;
+      outcome = hcProposal.outcome_json ? JSON.parse(hcProposal.outcome_json) : undefined;
+    } catch {
+      // Ignore parse errors
+    }
+
+    return {
+      id: hcProposal.id,
+      title: hcProposal.title,
+      proposalType: hcProposal.proposal_type,
+      description: hcProposal.description,
+      proposer: {
+        agentId: hcProposal.proposer_id,
+        displayName: hcProposal.proposer_name
+      },
+      status: hcProposal.status,
+      phase: hcProposal.phase,
+      createdAt: hcProposal.created_at,
+      votingConfig,
+      currentVotes,
+      outcome
+    };
+  }
+
+  /**
+   * Load all precedents from Holochain.
    */
   getPrecedents(): Observable<PrecedentRecord[]> {
-    return this.http.get<{ precedents: PrecedentRecord[] }>(
-      `${this.basePath}/governance/precedents.json`
-    ).pipe(
-      map(response => response.precedents || []),
-      catchError(() => of([]))
+    if (!this.holochainContent.isAvailable()) {
+      return of([]);
+    }
+
+    return defer(() => from(this.holochainContent.queryPrecedents({}))).pipe(
+      map(results => results.map(r => this.transformHolochainPrecedent(r.precedent))),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load precedents:', err);
+        return of([]);
+      })
     );
   }
 
@@ -737,20 +1950,65 @@ export class DataLoaderService {
    * Get precedents by binding level (constitutional, binding-network, binding-local, persuasive).
    */
   getPrecedentsByBinding(binding: string): Observable<PrecedentRecord[]> {
-    return this.getPrecedents().pipe(
-      map(precedents => precedents.filter(p => p.binding === binding))
+    if (!this.holochainContent.isAvailable()) {
+      return of([]);
+    }
+
+    return defer(() => from(this.holochainContent.queryPrecedents({ binding }))).pipe(
+      map(results => results.map(r => this.transformHolochainPrecedent(r.precedent))),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load precedents by binding:', err);
+        return of([]);
+      })
     );
   }
 
   /**
-   * Load all discussion threads.
+   * Transform Holochain precedent entry to frontend PrecedentRecord model.
+   */
+  private transformHolochainPrecedent(hcPrecedent: {
+    id: string;
+    title: string;
+    summary: string;
+    full_reasoning: string;
+    binding: string;
+    scope_json: string;
+    citations: number;
+    status: string;
+  }): PrecedentRecord {
+    let scope: PrecedentRecord['scope'] = { entityTypes: [] };
+    try {
+      scope = hcPrecedent.scope_json ? JSON.parse(hcPrecedent.scope_json) : { entityTypes: [] };
+    } catch {
+      // Ignore parse errors
+    }
+
+    return {
+      id: hcPrecedent.id,
+      title: hcPrecedent.title,
+      summary: hcPrecedent.summary,
+      fullReasoning: hcPrecedent.full_reasoning,
+      binding: hcPrecedent.binding,
+      scope,
+      citations: hcPrecedent.citations,
+      status: hcPrecedent.status
+    };
+  }
+
+  /**
+   * Load all discussion threads from Holochain.
    */
   getDiscussions(): Observable<DiscussionRecord[]> {
-    return this.http.get<{ discussions: DiscussionRecord[] }>(
-      `${this.basePath}/governance/discussions.json`
-    ).pipe(
-      map(response => response.discussions || []),
-      catchError(() => of([]))
+    if (!this.holochainContent.isAvailable()) {
+      return of([]);
+    }
+
+    return defer(() => from(this.holochainContent.queryDiscussions({}))).pipe(
+      map(results => results.map(r => this.transformHolochainDiscussion(r.discussion))),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load discussions:', err);
+        return of([]);
+      })
     );
   }
 
@@ -758,23 +2016,223 @@ export class DataLoaderService {
    * Get discussions for a specific entity.
    */
   getDiscussionsForEntity(entityType: string, entityId: string): Observable<DiscussionRecord[]> {
-    return this.getDiscussions().pipe(
-      map(discussions => discussions.filter(
-        d => d.entityType === entityType && d.entityId === entityId
-      ))
+    if (!this.holochainContent.isAvailable()) {
+      return of([]);
+    }
+
+    return defer(() => from(this.holochainContent.queryDiscussions({
+      entity_type: entityType,
+      entity_id: entityId
+    }))).pipe(
+      map(results => results.map(r => this.transformHolochainDiscussion(r.discussion))),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load discussions for entity:', err);
+        return of([]);
+      })
     );
   }
 
   /**
-   * Load governance state for a specific entity.
+   * Transform Holochain discussion entry to frontend DiscussionRecord model.
+   */
+  private transformHolochainDiscussion(hcDiscussion: {
+    id: string;
+    entity_type: string;
+    entity_id: string;
+    category: string;
+    title: string;
+    messages_json: string;
+    status: string;
+    message_count: number;
+  }): DiscussionRecord {
+    let messages: DiscussionRecord['messages'] = [];
+    try {
+      messages = hcDiscussion.messages_json ? JSON.parse(hcDiscussion.messages_json) : [];
+    } catch {
+      // Ignore parse errors
+    }
+
+    return {
+      id: hcDiscussion.id,
+      entityType: hcDiscussion.entity_type,
+      entityId: hcDiscussion.entity_id,
+      category: hcDiscussion.category,
+      title: hcDiscussion.title,
+      messages,
+      status: hcDiscussion.status,
+      messageCount: hcDiscussion.message_count
+    };
+  }
+
+  /**
+   * Load governance state for a specific entity from Holochain.
    */
   getGovernanceState(entityType: string, entityId: string): Observable<GovernanceStateRecord | null> {
-    return this.http.get<GovernanceStateRecord>(
-      `${this.basePath}/governance/state-${entityType}-${entityId}.json`
-    ).pipe(
-      catchError(err => {
-        // Not all entities have governance state files - that's expected
+    if (!this.holochainContent.isAvailable()) {
+      return of(null);
+    }
+
+    return defer(() => from(this.holochainContent.getGovernanceState({
+      entity_type: entityType,
+      entity_id: entityId
+    }))).pipe(
+      map(result => result ? this.transformHolochainGovernanceState(result.governance_state) : null),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load governance state:', err);
         return of(null);
+      })
+    );
+  }
+
+  /**
+   * Transform Holochain governance state entry to frontend GovernanceStateRecord model.
+   */
+  private transformHolochainGovernanceState(hcState: {
+    entity_type: string;
+    entity_id: string;
+    status: string;
+    status_basis_json: string;
+    labels_json: string;
+    active_challenges_json: string;
+    last_updated: string;
+  }): GovernanceStateRecord {
+    let statusBasis: GovernanceStateRecord['statusBasis'] = {
+      method: '',
+      reasoning: '',
+      deciderId: '',
+      deciderType: '',
+      decidedAt: ''
+    };
+    let labels: GovernanceStateRecord['labels'] = [];
+    let activeChallenges: string[] = [];
+
+    try {
+      statusBasis = hcState.status_basis_json ? JSON.parse(hcState.status_basis_json) : statusBasis;
+      labels = hcState.labels_json ? JSON.parse(hcState.labels_json) : [];
+      activeChallenges = hcState.active_challenges_json ? JSON.parse(hcState.active_challenges_json) : [];
+    } catch {
+      // Ignore parse errors
+    }
+
+    return {
+      entityType: hcState.entity_type,
+      entityId: hcState.entity_id,
+      status: hcState.status,
+      statusBasis,
+      labels,
+      activeChallenges,
+      lastUpdated: hcState.last_updated
+    };
+  }
+
+  // =========================================================================
+  // Cluster Graph Methods (for hierarchical graph visualization)
+  // =========================================================================
+
+  /**
+   * Get path hierarchy for cluster graph visualization.
+   *
+   * This is a convenience method that uses existing getPath() which loads
+   * chapters from Holochain's metadata_json field. The LearningPath returned
+   * contains the full hierarchy: chapters → modules → sections → conceptIds.
+   *
+   * @param pathId - Learning path ID (e.g., 'elohim-protocol')
+   * @returns Observable of LearningPath with chapters hierarchy
+   */
+  getPathHierarchy(pathId: string): Observable<LearningPath> {
+    return this.getPath(pathId);
+  }
+
+  /**
+   * Batch load content nodes for a cluster's conceptIds.
+   *
+   * Uses existing batchGetContent() for efficient retrieval from Holochain.
+   * This is optimized for cluster expansion where we need to load all
+   * concepts in a section at once.
+   *
+   * @param conceptIds - Array of concept IDs to load
+   * @returns Observable of Map<id, ContentNode>
+   */
+  getClusterConcepts(conceptIds: string[]): Observable<Map<string, ContentNode>> {
+    return this.batchGetContent(conceptIds);
+  }
+
+  /**
+   * Get aggregated connections for concepts within a cluster.
+   *
+   * Queries relationships for each concept and aggregates them by
+   * target cluster. This enables showing "12 connections to Governance"
+   * on collapsed clusters instead of individual relationship lines.
+   *
+   * @param conceptIds - Concept IDs in the source cluster
+   * @param clusterMapping - Map of conceptId → clusterId for aggregation
+   * @returns Observable of ClusterConnectionSummary
+   */
+  getClusterConnections(
+    conceptIds: string[],
+    clusterMapping: Map<string, string>
+  ): Observable<ClusterConnectionSummary> {
+    if (conceptIds.length === 0) {
+      return of({
+        clusterId: '',
+        outgoingByCluster: new Map(),
+        incomingByCluster: new Map(),
+        totalConnections: 0
+      });
+    }
+
+    // Query relationships for all concepts in the cluster
+    const relationshipQueries = conceptIds.map(id =>
+      this.getRelationshipsForNode(id, 'both').pipe(
+        catchError(() => of([]))
+      )
+    );
+
+    return forkJoin(relationshipQueries).pipe(
+      map(relationshipArrays => {
+        const outgoingByCluster = new Map<string, ClusterConnectionData>();
+        const incomingByCluster = new Map<string, ClusterConnectionData>();
+        let totalConnections = 0;
+
+        for (let i = 0; i < conceptIds.length; i++) {
+          const sourceConceptId = conceptIds[i];
+          const relationships = relationshipArrays[i];
+
+          for (const rel of relationships) {
+            const isOutgoing = rel.sourceNodeId === sourceConceptId;
+            const otherNodeId = isOutgoing ? rel.targetNodeId : rel.sourceNodeId;
+
+            // Look up which cluster the other node belongs to
+            const otherClusterId = clusterMapping.get(otherNodeId);
+            if (!otherClusterId) continue;  // Skip nodes not in our cluster mapping
+
+            const targetMap = isOutgoing ? outgoingByCluster : incomingByCluster;
+
+            if (!targetMap.has(otherClusterId)) {
+              targetMap.set(otherClusterId, {
+                sourceClusterId: '',  // Will be set by caller
+                targetClusterId: otherClusterId,
+                connectionCount: 0,
+                relationshipTypes: []
+              });
+            }
+
+            const connection = targetMap.get(otherClusterId)!;
+            connection.connectionCount++;
+            totalConnections++;
+
+            if (!connection.relationshipTypes.includes(rel.relationshipType)) {
+              connection.relationshipTypes.push(rel.relationshipType);
+            }
+          }
+        }
+
+        return {
+          clusterId: '',  // Caller sets this
+          outgoingByCluster,
+          incomingByCluster,
+          totalConnections
+        };
       })
     );
   }

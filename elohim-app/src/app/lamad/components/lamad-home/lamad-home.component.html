@@ -102,10 +102,22 @@
       </section>
     }
 
-    <!-- All Paths -->
+    <!-- Paths Section -->
     @if (paths.length > 0) {
       <section class="paths-section">
-        <h2 class="section-title">Browse All Paths</h2>
+        <div class="section-header">
+          <h2 class="section-title">
+            {{ showAllPaths ? 'All Paths' : 'Featured Paths' }}
+            @if (!showAllPaths && hasMorePaths) {
+              <span class="path-count">({{ totalPathCount }} total)</span>
+            }
+          </h2>
+          @if (hasMorePaths) {
+            <button class="btn btn-text" (click)="toggleShowAllPaths()">
+              {{ showAllPaths ? 'Show Featured' : 'View All Paths' }}
+            </button>
+          }
+        </div>
 
         <div class="paths-grid">
           @for (path of paths; track path.id) {

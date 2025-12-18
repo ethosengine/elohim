@@ -51,6 +51,9 @@ export class HolochainClientService {
   /** Current connection state */
   private readonly connectionSignal = signal<HolochainConnection>(INITIAL_CONNECTION_STATE);
 
+  /** Track if connection error has been logged to avoid console spam */
+  private connectionErrorLogged = false;
+
   /** Expose connection state as readonly */
   readonly connection = this.connectionSignal.asReadonly();
 
@@ -190,6 +193,9 @@ export class HolochainClientService {
         connectedAt: new Date(),
         error: undefined,
       });
+
+      // Reset error logging flag on successful connection
+      this.connectionErrorLogged = false;
 
       console.log(`[Holochain] Connection successful (${mode})`, {
         url: adminUrl,
@@ -361,6 +367,9 @@ export class HolochainClientService {
         error: undefined,
       });
 
+      // Reset error logging flag on successful connection
+      this.connectionErrorLogged = false;
+
       console.log('Connected to Holochain conductor', {
         appId: this.config.appId,
         agentPubKey: this.encodeAgentPubKey(agentPubKey),
@@ -474,7 +483,22 @@ export class HolochainClientService {
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Zome call failed';
-      console.error(`Zome call failed: ${input.zomeName}.${input.fnName}`, err);
+
+      // Detect connection-related errors and only log once
+      const isConnectionError = errorMessage.includes('Websocket') ||
+                                errorMessage.includes('InvalidToken') ||
+                                errorMessage.includes('not open') ||
+                                errorMessage.includes('not connected');
+
+      if (isConnectionError) {
+        if (!this.connectionErrorLogged) {
+          console.error(`[Holochain] Connection error: ${errorMessage} - subsequent errors will be suppressed`);
+          this.connectionErrorLogged = true;
+        }
+      } else {
+        // Log non-connection errors normally
+        console.error(`Zome call failed: ${input.zomeName}.${input.fnName}`, err);
+      }
 
       return {
         success: false,

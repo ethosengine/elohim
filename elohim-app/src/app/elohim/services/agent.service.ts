@@ -4,7 +4,7 @@ import { map, tap, switchMap, take } from 'rxjs/operators';
 import { DataLoaderService } from './data-loader.service';
 
 // Models from elohim (local)
-import { Agent, AgentProgress, FrontierItem } from '../models/agent.model';
+import { Agent, AgentProgress, FrontierItem, MasteryLevel, MASTERY_LEVEL_VALUES } from '../models/agent.model';
 
 // Models from lamad pillar (content-specific access control)
 import { AccessLevel, ContentAccessMetadata, AccessCheckResult } from '../../lamad/models/content-access.model';
@@ -441,6 +441,108 @@ export class AgentService {
         return new Set(progress.completedContentIds);
       })
     );
+  }
+
+  /**
+   * Get mastery level for a specific content node.
+   *
+   * @param contentId The content resource ID
+   * @param agentId Optional agent ID (defaults to current agent)
+   */
+  getContentMastery(contentId: string, _agentId?: string): Observable<MasteryLevel> {
+    return this.getProgressForPath('__global__').pipe(
+      map(progress => {
+        if (!progress?.contentMastery) {
+          return 'not_started' as MasteryLevel;
+        }
+        return progress.contentMastery[contentId] || 'not_started';
+      })
+    );
+  }
+
+  /**
+   * Get all content mastery levels as a Map.
+   *
+   * @param agentId Optional agent ID (defaults to current agent)
+   */
+  getAllContentMastery(_agentId?: string): Observable<Map<string, MasteryLevel>> {
+    return this.getProgressForPath('__global__').pipe(
+      map(progress => {
+        if (!progress?.contentMastery) {
+          return new Map<string, MasteryLevel>();
+        }
+        return new Map(Object.entries(progress.contentMastery));
+      })
+    );
+  }
+
+  /**
+   * Update mastery level for a content node.
+   *
+   * Mastery only increases, never decreases (ratchet behavior).
+   * This tracks progression through: seen → practiced → applied → mastered
+   *
+   * @param contentId The content resource ID
+   * @param level The new mastery level
+   * @param agentId Optional agent ID (defaults to current agent)
+   */
+  updateContentMastery(contentId: string, level: MasteryLevel, agentId?: string): Observable<void> {
+    const targetAgentId = agentId ?? this.getCurrentAgentId();
+
+    return this.getProgressForPath('__global__').pipe(
+      switchMap(existingProgress => {
+        const now = new Date().toISOString();
+
+        const progress: AgentProgress = existingProgress || {
+          agentId: targetAgentId,
+          pathId: '__global__',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: now,
+          lastActivityAt: now,
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+          completedContentIds: [],
+          contentMastery: {},
+        };
+
+        // Initialize if missing
+        if (!progress.contentMastery) {
+          progress.contentMastery = {};
+        }
+
+        // Ratchet behavior: only increase mastery level
+        const currentLevel = progress.contentMastery[contentId] || 'not_started';
+        if (MASTERY_LEVEL_VALUES[level] > MASTERY_LEVEL_VALUES[currentLevel]) {
+          progress.contentMastery[contentId] = level;
+        }
+
+        // Also mark as completed if at 'apply' or above
+        if (MASTERY_LEVEL_VALUES[level] >= MASTERY_LEVEL_VALUES['apply']) {
+          if (!progress.completedContentIds) {
+            progress.completedContentIds = [];
+          }
+          if (!progress.completedContentIds.includes(contentId)) {
+            progress.completedContentIds.push(contentId);
+          }
+        }
+
+        progress.lastActivityAt = now;
+
+        this.progressCache.set('__global__', progress);
+        return this.dataLoader.saveAgentProgress(progress);
+      })
+    );
+  }
+
+  /**
+   * Mark content as "seen" (viewed but not yet practiced).
+   * Convenience method for the most common mastery update.
+   */
+  markContentSeen(contentId: string, agentId?: string): Observable<void> {
+    return this.updateContentMastery(contentId, 'seen', agentId);
   }
 
   /**

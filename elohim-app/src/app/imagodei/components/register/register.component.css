@@ -136,6 +136,8 @@
 }
 
 .form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
 .form-group textarea {
   padding: 0.75rem 1rem;
   border: 1px solid var(--surface-border, #dee2e6);
@@ -158,6 +160,54 @@
 .form-group textarea:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Form Sections */
+.form-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--surface-border, #dee2e6);
+}
+
+.section-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-color, #1a1a2e);
+}
+
+.section-description {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--text-color-secondary, #6c757d);
+}
+
+/* Password Input */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+}
+
+.password-input-wrapper input {
+  flex: 1;
+  padding-right: 4rem;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-color-secondary, #6c757d);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.password-toggle:hover {
+  color: var(--primary-500, #3b82f6);
 }
 
 .form-group textarea {
@@ -299,6 +349,25 @@
   margin: 0 0 1rem;
   font-size: 0.85rem;
   color: var(--text-color-secondary, #6c757d);
+}
+
+.login-prompt {
+  font-size: 0.9rem !important;
+}
+
+.login-link {
+  color: var(--primary-500, #3b82f6);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.login-link:hover {
+  text-decoration: underline;
+}
+
+.terms-text {
+  font-size: 0.8rem !important;
+  margin-top: 0.5rem !important;
 }
 
 .back-link {

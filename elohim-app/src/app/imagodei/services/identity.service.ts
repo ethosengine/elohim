@@ -14,10 +14,12 @@
  * It does NOT replace these services - they remain available for direct use.
  */
 
-import { Injectable, inject, signal, computed, effect } from '@angular/core';
+import { Injectable, inject, signal, computed, effect, untracked } from '@angular/core';
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { SessionHumanService } from './session-human.service';
 import { SovereigntyService } from './sovereignty.service';
+import { AuthService } from './auth.service';
+import { PasswordAuthProvider } from './providers/password-auth.provider';
 import {
   type IdentityState,
   type IdentityMode,
@@ -32,6 +34,7 @@ import {
   INITIAL_IDENTITY_STATE,
   getInitials,
 } from '../models/identity.model';
+import { type PasswordCredentials, type AuthResult } from '../models/auth.model';
 
 // =============================================================================
 // Wire Format Types (internal - snake_case matches conductor response)
@@ -155,6 +158,8 @@ export class IdentityService {
   private readonly holochainClient = inject(HolochainClientService);
   private readonly sessionHumanService = inject(SessionHumanService);
   private readonly sovereigntyService = inject(SovereigntyService);
+  private readonly authService = inject(AuthService);
+  private readonly passwordProvider = inject(PasswordAuthProvider);
 
   // ==========================================================================
   // State
@@ -162,6 +167,12 @@ export class IdentityService {
 
   /** Core identity state signal */
   private readonly identitySignal = signal<IdentityState>(INITIAL_IDENTITY_STATE);
+
+  /** Guard to prevent re-entry during async operations */
+  private isCheckingIdentity = false;
+
+  /** Track if we've already tried checking Holochain identity (avoid retrying on error) */
+  private hasCheckedHolochainIdentity = false;
 
   // ==========================================================================
   // Public Signals (read-only)
@@ -228,10 +239,19 @@ export class IdentityService {
   // ==========================================================================
 
   constructor() {
+    // Register password auth provider
+    if (!this.authService.hasProvider('password')) {
+      this.authService.registerProvider(this.passwordProvider);
+    }
+
     // Watch for Holochain connection changes
+    // Use untracked() to read identity mode without creating a dependency
+    // This prevents the effect from re-running when identity state changes
     effect(() => {
       const isConnected = this.holochainClient.isConnected();
-      const currentMode = this.identitySignal().mode;
+
+      // Read mode without tracking - only react to isConnected changes
+      const currentMode = untracked(() => this.identitySignal().mode);
 
       if (isConnected && currentMode === 'session') {
         // Holochain just connected - check if we have an identity there
@@ -239,6 +259,21 @@ export class IdentityService {
       } else if (!isConnected && (currentMode === 'hosted' || currentMode === 'self-sovereign')) {
         // Holochain disconnected - fall back to session
         this.fallbackToSession();
+      }
+    });
+
+    // Watch for auth state changes (login/logout)
+    // Use untracked() to read identity mode without creating a dependency
+    effect(() => {
+      const auth = this.authService.auth();
+
+      if (auth.isAuthenticated && auth.humanId && auth.agentPubKey) {
+        // Read mode without tracking - only react to auth changes
+        const currentMode = untracked(() => this.identitySignal().mode);
+        if (currentMode === 'session' || currentMode === 'anonymous') {
+          // Connect to Holochain as this authenticated user
+          this.connectAsAuthenticatedUser(auth.humanId, auth.agentPubKey);
+        }
       }
     });
 
@@ -290,8 +325,21 @@ export class IdentityService {
 
   /**
    * Check if we have an identity in Holochain.
+   * This is optional - visitors can browse without a Holochain identity.
    */
   private async checkHolochainIdentity(): Promise<void> {
+    // Prevent re-entry while already checking
+    if (this.isCheckingIdentity) {
+      return;
+    }
+
+    // Don't retry if we've already checked (successful or not)
+    if (this.hasCheckedHolochainIdentity) {
+      return;
+    }
+
+    this.isCheckingIdentity = true;
+    this.hasCheckedHolochainIdentity = true;
     this.updateState({ isLoading: true, error: null });
 
     try {
@@ -356,11 +404,26 @@ export class IdentityService {
         this.updateState({ isLoading: false });
       }
     } catch (err) {
-      console.error('[IdentityService] Failed to check Holochain identity:', err);
+      // This is expected for visitors - the zome function may not exist or user may not be registered
+      // Don't treat this as an error - just stay in session mode
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const isExpectedError = errorMessage.includes("doesn't exist") ||
+                              errorMessage.includes('not found') ||
+                              errorMessage.includes('No human found');
+
+      if (isExpectedError) {
+        console.log('[IdentityService] No Holochain identity found, staying in session mode');
+      } else {
+        console.warn('[IdentityService] Unexpected error checking Holochain identity:', err);
+      }
+
+      // Clear loading state, don't set error for expected cases
       this.updateState({
         isLoading: false,
-        error: err instanceof Error ? err.message : 'Failed to check identity',
+        error: isExpectedError ? null : errorMessage,
       });
+    } finally {
+      this.isCheckingIdentity = false;
     }
   }
 
@@ -594,6 +657,101 @@ export class IdentityService {
       const errorMessage = err instanceof Error ? err.message : 'Update failed';
       this.updateState({ isLoading: false, error: errorMessage });
       throw err;
+    }
+  }
+
+  // ==========================================================================
+  // Authentication (Login/Logout)
+  // ==========================================================================
+
+  /**
+   * Login with email/username and password.
+   *
+   * @param identifier - Email or username
+   * @param password - Password
+   * @returns Authentication result
+   */
+  async loginWithPassword(identifier: string, password: string): Promise<AuthResult> {
+    const credentials: PasswordCredentials = {
+      type: 'password',
+      identifier,
+      password,
+    };
+
+    return this.authService.login('password', credentials);
+  }
+
+  /**
+   * Logout and return to visitor session.
+   */
+  async logout(): Promise<void> {
+    // Logout from auth service
+    await this.authService.logout();
+
+    // Fall back to session identity
+    this.fallbackToSession();
+
+    console.log('[IdentityService] Logged out, reverted to session');
+  }
+
+  /**
+   * Connect to Holochain as an authenticated user (after login).
+   * This is called by the auth state effect when login succeeds.
+   */
+  private async connectAsAuthenticatedUser(humanId: string, agentPubKey: string): Promise<void> {
+    // For hosted mode, the edge node holds the keys
+    // We need to verify the identity and load the profile
+
+    if (!this.holochainClient.isConnected()) {
+      console.log('[IdentityService] Waiting for Holochain connection to verify auth');
+      return;
+    }
+
+    try {
+      // Verify the identity by fetching the current human
+      const result = await this.holochainClient.callZome<HumanSessionResult | null>({
+        zomeName: 'content_store',
+        fnName: 'get_current_human',
+        payload: null,
+      });
+
+      if (result.success && result.data) {
+        const sessionResult = result.data;
+
+        // Verify the humanId matches
+        if (sessionResult.human.id !== humanId) {
+          console.warn('[IdentityService] HumanId mismatch after login');
+          // Continue anyway - the auth token is still valid
+        }
+
+        // Update identity state
+        const conductorInfo = this.detectConductorType();
+        const identityMode = conductorInfo.isLocal ? 'self-sovereign' : 'hosted';
+        const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
+        const sovereigntyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
+
+        this.updateState({
+          mode: identityMode,
+          isAuthenticated: true,
+          humanId: sessionResult.human.id,
+          displayName: sessionResult.human.display_name,
+          agentPubKey: sessionResult.agent_pubkey,
+          profile: mapToProfile(sessionResult.human),
+          attestations: sessionResult.attestations.map(a => a.attestation.attestation_type),
+          sovereigntyStage,
+          keyLocation,
+          canExportKeys: keyLocation === 'custodial',
+          isLocalConductor: conductorInfo.isLocal,
+          conductorUrl: conductorInfo.url,
+          hostingCost: sovereigntyStage === 'hosted' ? this.getDefaultHostingCost() : null,
+          isLoading: false,
+          error: null,
+        });
+
+        console.log('[IdentityService] Connected as authenticated user:', sessionResult.human.display_name);
+      }
+    } catch (err) {
+      console.error('[IdentityService] Failed to verify authenticated user:', err);
     }
   }
 

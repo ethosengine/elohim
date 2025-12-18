@@ -5,7 +5,7 @@
  * Command-line interface for running content imports.
  *
  * Usage:
- *   npx ts-node src/cli/import.ts import --source ./data/content --output ./output
+ *   npx ts-node src/cli/import.ts import --source ./docs/content --output ./output
  *   npx ts-node src/cli/import.ts import --full  # Full reimport
  *   npx ts-node src/cli/import.ts stats          # Show import statistics
  *
@@ -58,7 +58,7 @@ program
 program
   .command('import')
   .description('Import content from source files into Kuzu database')
-  .option('-s, --source <dir>', 'Source content directory', './data/content')
+  .option('-s, --source <dir>', 'Source content directory', './docs/content')
   .option('-d, --db <file>', 'Kuzu database path', './output/lamad.kuzu')
   .option('-f, --full', 'Force full reimport (ignore incremental cache)', false)
   .option('-v, --verbose', 'Verbose output', false)
@@ -512,7 +512,7 @@ program
 program
   .command('scaffold')
   .description('Generate README and TODO templates for user types')
-  .option('-b, --base <dir>', 'Base content directory', '/projects/elohim/data/content/elohim-protocol')
+  .option('-b, --base <dir>', 'Base content directory', '/projects/elohim/docs/content/elohim-protocol')
   .option('-e, --epic <name>', 'Epic to scaffold (governance, value_scanner, etc.)')
   .option('-u, --user <name>', 'User type to scaffold')
   .option('--all', 'Scaffold all epics and user types', false)

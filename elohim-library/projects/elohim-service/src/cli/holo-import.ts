@@ -6,7 +6,7 @@
  * Runs the same transformers as the Kuzu import, different storage layer.
  *
  * Usage:
- *   npx ts-node src/cli/holo-import.ts holo:import --source ./data/content
+ *   npx ts-node src/cli/holo-import.ts holo:import --source ./docs/content
  *   npx ts-node src/cli/holo-import.ts holo:stats
  *   npx ts-node src/cli/holo-import.ts holo:verify --ids "manifesto,governance-epic"
  *   npx ts-node src/cli/holo-import.ts holo:list --type scenario
@@ -41,7 +41,7 @@ program
 program
   .command('holo:import')
   .description('Import content from source files to Holochain')
-  .option('-s, --source <dir>', 'Source content directory', './data/content')
+  .option('-s, --source <dir>', 'Source content directory', './docs/content')
   .option('--admin-url <url>', 'Holochain admin WebSocket URL', DEFAULT_CONFIG.adminUrl)
   .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.appId)
   .option('--happ-path <path>', 'Path to .happ file for installation')

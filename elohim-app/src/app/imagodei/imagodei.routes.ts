@@ -2,6 +2,7 @@
  * Imagodei Routes - Identity and presence management routes.
  *
  * Routes:
+ * - /identity/login - Hosted human login
  * - /identity/register - New user registration
  * - /identity/profile - View/edit user profile (requires auth)
  * - /identity/presences - Contributor presence list (requires auth)
@@ -11,6 +12,11 @@ import { Routes } from '@angular/router';
 import { identityGuard } from './guards/identity.guard';
 
 export const IMAGODEI_ROUTES: Routes = [
+  {
+    path: 'login',
+    loadComponent: () =>
+      import('./components/login/login.component').then(m => m.LoginComponent),
+  },
   {
     path: 'register',
     loadComponent: () =>

@@ -5,13 +5,15 @@ import {
   ViewChild,
   ViewContainerRef,
   ComponentRef,
-  inject
+  inject,
+  AfterViewChecked
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Subject, Subscription, forkJoin, of } from 'rxjs';
 import { takeUntil, catchError } from 'rxjs/operators';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
+import { AgentService } from '@app/elohim/services/agent.service';
 import { ContentService } from '../../services/content.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { SeoService } from '../../../services/seo.service';
@@ -29,14 +31,19 @@ import { TrustBadge } from '@app/elohim/models/trust-badge.model';
 import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';
 import { ContentEditorService } from '../../content-io/services/content-editor.service';
 
+// Exploration components
+import { PathContextService } from '../../services/path-context.service';
+import { PathContext } from '../../models/exploration-context.model';
+import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
+
 @Component({
   selector: 'app-content-viewer',
   standalone: true,
-  imports: [CommonModule, RouterModule, ContentDownloadComponent],
+  imports: [CommonModule, RouterModule, ContentDownloadComponent, MiniGraphComponent],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],
 })
-export class ContentViewerComponent implements OnInit, OnDestroy {
+export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewChecked {
   node: ContentNode | null = null;
   affinity = 0;
   relatedNodes: ContentNode[] = [];
@@ -57,6 +64,10 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   // Edit capability
   canEditContent = false;
 
+  // Path context for return navigation (when viewing from a detour)
+  pathContext: PathContext | null = null;
+  hasReturnPath = false;
+
   // Dynamic renderer hosting
   @ViewChild('rendererHost', { read: ViewContainerRef, static: false })
   rendererHost!: ViewContainerRef;
@@ -66,6 +77,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   /** Whether we have a registered renderer for the current content format */
   hasRegisteredRenderer = false;
 
+  /** Flag to trigger renderer loading in AfterViewChecked */
+  private pendingRendererLoad = false;
+
   private readonly destroy$ = new Subject<void>();
   private nodeId: string | null = null;
   private readonly seoService = inject(SeoService);
@@ -74,11 +88,13 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly affinityService: AffinityTrackingService,
+    private readonly agentService: AgentService,
     private readonly rendererRegistry: RendererRegistryService,
     private readonly contentService: ContentService,
     private readonly dataLoader: DataLoaderService,
     private readonly trustBadgeService: TrustBadgeService,
-    private readonly editorService: ContentEditorService
+    private readonly editorService: ContentEditorService,
+    private readonly pathContextService: PathContextService
   ) {}
 
   ngOnInit(): void {
@@ -99,12 +115,28 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
           this.affinity = change.newValue;
         }
       });
+
+    // Subscribe to path context for return navigation
+    this.pathContextService.context$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((context) => {
+        this.pathContext = context;
+        this.hasReturnPath = context !== null && context.detourStack !== undefined && context.detourStack.length > 0;
+      });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
     this.destroyRenderer();
+  }
+
+  ngAfterViewChecked(): void {
+    // Load renderer when view is ready and we have a pending load request
+    if (this.pendingRendererLoad && this.node && this.rendererHost) {
+      this.pendingRendererLoad = false;
+      this.loadRenderer();
+    }
   }
 
   /**
@@ -214,6 +246,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
         // Auto-track view (increment if first time)
         this.affinityService.trackView(nodeId);
 
+        // Mark content as "seen" for mastery tracking
+        this.agentService.markContentSeen(nodeId).pipe(takeUntil(this.destroy$)).subscribe();
+
         // Load related nodes
         this.loadRelatedNodes(contentNode.relatedNodeIds);
 
@@ -225,9 +260,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
 
         this.isLoading = false;
 
-        // Load the appropriate renderer for this content format
-        // Use setTimeout to ensure ViewChild is available after view updates
-        setTimeout(() => this.loadRenderer(), 0);
+        // Schedule renderer loading for next change detection cycle
+        // The AfterViewChecked hook will load it once the ViewChild is available
+        this.pendingRendererLoad = true;
       },
       error: () => {
         this.error = 'Failed to load content';
@@ -440,5 +475,65 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   getMetadataVersion(): string | null {
     if (!this.node?.metadata?.['version']) return null;
     return this.node.metadata['version'];
+  }
+
+  // =========================================================================
+  // Path Context & Return Navigation Methods
+  // =========================================================================
+
+  /**
+   * Return to the path from a detour.
+   */
+  returnToPath(): void {
+    const returnRoute = this.pathContextService.returnToPath();
+    if (returnRoute) {
+      this.router.navigate(returnRoute);
+    }
+  }
+
+  /**
+   * Handle node selection from the mini-graph.
+   */
+  onGraphNodeSelected(nodeId: string): void {
+    // Track the detour if we're in a path context
+    if (this.pathContext && this.nodeId) {
+      this.pathContextService.startDetour({
+        fromContentId: this.nodeId,
+        toContentId: nodeId,
+        detourType: 'related',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Navigate to the selected content
+    this.router.navigate(['/lamad/resource', nodeId]);
+  }
+
+  /**
+   * Navigate to full graph explorer with focus on current content.
+   */
+  exploreInGraph(): void {
+    if (!this.nodeId) return;
+
+    // Track the detour if we're in a path context
+    if (this.pathContext) {
+      this.pathContextService.startDetour({
+        fromContentId: this.nodeId,
+        toContentId: this.nodeId,
+        detourType: 'graph-explore',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Navigate to graph explorer
+    this.router.navigate(['/lamad/explore'], {
+      queryParams: {
+        focus: this.nodeId,
+        ...(this.pathContext ? {
+          fromPath: this.pathContext.pathId,
+          returnStep: this.pathContext.stepIndex
+        } : {})
+      }
+    });
   }
 }

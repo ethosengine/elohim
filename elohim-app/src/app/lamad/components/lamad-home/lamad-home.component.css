@@ -294,11 +294,41 @@
   margin-bottom: 2.5rem;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
 .section-title {
   font-size: 1.5rem;
   font-weight: 600;
-  margin-bottom: 1.5rem;
+  margin: 0;
   color: var(--lamad-text-primary);
+}
+
+.path-count {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--lamad-text-secondary, #6b7280);
+  margin-left: 0.5rem;
+}
+
+.btn-text {
+  background: transparent;
+  border: none;
+  color: var(--lamad-accent-primary, #6366f1);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-text:hover {
+  background: var(--lamad-surface-hover, #f3f4f6);
 }
 
 .paths-grid {

@@ -2,27 +2,33 @@
   <!-- Header -->
   <header class="profile-header">
     <div class="profile-avatar">
-      @if (session?.avatarUrl) {
-        <img [src]="session!.avatarUrl" [alt]="session!.displayName" class="avatar-image" />
+      @if (session?.avatarUrl && !isNetworkAuthenticated()) {
+        <img [src]="session!.avatarUrl" [alt]="displayName()" class="avatar-image" />
       } @else {
-        <div class="avatar-placeholder">
-          {{ session?.displayName?.charAt(0) ?? 'T' }}
+        <div class="avatar-placeholder" [class.authenticated]="isNetworkAuthenticated()">
+          {{ displayName().charAt(0) }}
         </div>
       }
     </div>
 
     <div class="profile-info">
-      <h1 class="profile-name">{{ session?.displayName ?? 'Traveler' }}</h1>
-      <div class="profile-badge">
-        <span class="badge-icon">local_activity</span>
-        <span class="badge-text">Session Visitor</span>
+      <h1 class="profile-name">{{ displayName() }}</h1>
+      <div class="profile-badge" [class]="'badge-' + identityMode()">
+        <span class="badge-icon">{{ modeBadgeIcon() }}</span>
+        <span class="badge-text">{{ modeBadgeText() }}</span>
       </div>
-      @if (session?.bio) {
-        <p class="profile-bio">{{ session!.bio }}</p>
+      @if (bio()) {
+        <p class="profile-bio">{{ bio() }}</p>
       }
-      @if (session?.interests && session!.interests!.length > 0) {
+      @if (location()) {
+        <p class="profile-location">
+          <span class="location-icon">location_on</span>
+          {{ location() }}
+        </p>
+      }
+      @if (interests().length > 0) {
         <div class="profile-interests">
-          @for (interest of session!.interests!; track interest) {
+          @for (interest of interests(); track interest) {
             <span class="interest-tag">{{ interest }}</span>
           }
         </div>
@@ -37,17 +43,19 @@
     </div>
   </header>
 
-  <!-- Upgrade Banner -->
-  <div class="upgrade-banner">
-    <div class="upgrade-content">
-      <span class="upgrade-icon">cloud_sync</span>
-      <div class="upgrade-text">
-        <strong>Your progress is stored locally</strong>
-        <p>Install the Elohim app to save your progress permanently and sync across devices.</p>
+  <!-- Upgrade Banner - Only show for session visitors -->
+  @if (!isNetworkAuthenticated()) {
+    <div class="upgrade-banner">
+      <div class="upgrade-content">
+        <span class="upgrade-icon">cloud_sync</span>
+        <div class="upgrade-text">
+          <strong>Your progress is stored locally</strong>
+          <p>Install the Elohim app to save your progress permanently and sync across devices.</p>
+        </div>
+        <button class="btn-primary">Join Network</button>
       </div>
-      <button class="btn-primary">Join Network</button>
     </div>
-  </div>
+  }
 
   <!-- Tab Navigation -->
   <nav class="tab-nav">
@@ -528,23 +536,36 @@
             <div class="profile-display">
               <div class="field-row">
                 <span class="field-label">Display Name</span>
-                <span class="field-value">{{ session?.displayName ?? 'Traveler' }}</span>
+                <span class="field-value">{{ displayName() }}</span>
               </div>
-              <div class="field-row">
-                <span class="field-label">Avatar URL</span>
-                <span class="field-value">{{ session?.avatarUrl || '(not set)' }}</span>
-              </div>
+              @if (!isNetworkAuthenticated()) {
+                <div class="field-row">
+                  <span class="field-label">Avatar URL</span>
+                  <span class="field-value">{{ session?.avatarUrl || '(not set)' }}</span>
+                </div>
+              }
               <div class="field-row">
                 <span class="field-label">Bio</span>
-                <span class="field-value">{{ session?.bio || '(not set)' }}</span>
+                <span class="field-value">{{ bio() || '(not set)' }}</span>
               </div>
+              @if (isNetworkAuthenticated()) {
+                <div class="field-row">
+                  <span class="field-label">Location</span>
+                  <span class="field-value">{{ location() || '(not set)' }}</span>
+                </div>
+                <div class="field-row">
+                  <span class="field-label">Profile Visibility</span>
+                  <span class="field-value">{{ profileReach() || 'community' }}</span>
+                </div>
+              } @else {
+                <div class="field-row">
+                  <span class="field-label">Locale</span>
+                  <span class="field-value">{{ session?.locale || '(not set)' }}</span>
+                </div>
+              }
               <div class="field-row">
-                <span class="field-label">Locale</span>
-                <span class="field-value">{{ session?.locale || '(not set)' }}</span>
-              </div>
-              <div class="field-row">
-                <span class="field-label">Interests</span>
-                <span class="field-value">{{ session?.interests?.join(', ') || '(not set)' }}</span>
+                <span class="field-label">{{ isNetworkAuthenticated() ? 'Affinities' : 'Interests' }}</span>
+                <span class="field-value">{{ interests().join(', ') || '(not set)' }}</span>
               </div>
               <button class="btn-primary" (click)="startEditing()">Edit Profile</button>
             </div>
@@ -560,16 +581,18 @@
                   placeholder="Your name"
                 />
               </div>
-              <div class="form-group">
-                <label for="avatarUrl">Avatar URL</label>
-                <input
-                  id="avatarUrl"
-                  type="url"
-                  [(ngModel)]="editForm.avatarUrl"
-                  name="avatarUrl"
-                  placeholder="https://example.com/avatar.jpg"
-                />
-              </div>
+              @if (!isNetworkAuthenticated()) {
+                <div class="form-group">
+                  <label for="avatarUrl">Avatar URL</label>
+                  <input
+                    id="avatarUrl"
+                    type="url"
+                    [(ngModel)]="editForm.avatarUrl"
+                    name="avatarUrl"
+                    placeholder="https://example.com/avatar.jpg"
+                  />
+                </div>
+              }
               <div class="form-group">
                 <label for="bio">Bio</label>
                 <textarea
@@ -580,18 +603,20 @@
                   placeholder="Tell us about yourself..."
                 ></textarea>
               </div>
+              @if (!isNetworkAuthenticated()) {
+                <div class="form-group">
+                  <label for="locale">Locale</label>
+                  <input
+                    id="locale"
+                    type="text"
+                    [(ngModel)]="editForm.locale"
+                    name="locale"
+                    placeholder="en_US"
+                  />
+                </div>
+              }
               <div class="form-group">
-                <label for="locale">Locale</label>
-                <input
-                  id="locale"
-                  type="text"
-                  [(ngModel)]="editForm.locale"
-                  name="locale"
-                  placeholder="en_US"
-                />
-              </div>
-              <div class="form-group">
-                <label for="interests">Interests (comma-separated)</label>
+                <label for="interests">{{ isNetworkAuthenticated() ? 'Affinities' : 'Interests' }} (comma-separated)</label>
                 <input
                   id="interests"
                   type="text"
@@ -611,41 +636,64 @@
         <!-- Data Management -->
         <section class="settings-section">
           <h2 class="section-title">Data Management</h2>
-          <p class="section-description">
-            Your session data is stored locally in your browser. Export it to save a backup or transfer to another device.
-          </p>
+          @if (isNetworkAuthenticated()) {
+            <p class="section-description">
+              Your data is stored on the Elohim network. You have full control over your identity and can export your data at any time.
+            </p>
+          } @else {
+            <p class="section-description">
+              Your session data is stored locally in your browser. Export it to save a backup or transfer to another device.
+            </p>
+          }
           <div class="settings-actions">
             <button class="btn-secondary" (click)="exportData()">
               <span class="btn-icon">download</span>
               Export Data
             </button>
-            <button class="btn-danger" (click)="resetSession()">
-              <span class="btn-icon">delete</span>
-              Reset Session
-            </button>
+            @if (!isNetworkAuthenticated()) {
+              <button class="btn-danger" (click)="resetSession()">
+                <span class="btn-icon">delete</span>
+                Reset Session
+              </button>
+            }
           </div>
         </section>
 
-        <!-- Session Info -->
+        <!-- Identity Info -->
         <section class="settings-section">
-          <h2 class="section-title">Session Information</h2>
+          <h2 class="section-title">{{ isNetworkAuthenticated() ? 'Identity Information' : 'Session Information' }}</h2>
           <div class="info-grid">
-            <div class="info-row">
-              <span class="info-label">Session ID</span>
-              <code class="info-value">{{ session?.sessionId ?? 'N/A' }}</code>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Created</span>
-              <span class="info-value">{{ session?.createdAt ? formatTimestamp(session!.createdAt) : 'N/A' }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Last Active</span>
-              <span class="info-value">{{ session?.lastActiveAt ? formatTimestamp(session!.lastActiveAt) : 'N/A' }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Access Level</span>
-              <span class="info-value">{{ session?.accessLevel ?? 'visitor' }}</span>
-            </div>
+            @if (isNetworkAuthenticated()) {
+              <div class="info-row">
+                <span class="info-label">Human ID</span>
+                <code class="info-value">{{ identityService.humanId() ?? 'N/A' }}</code>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Identity Mode</span>
+                <span class="info-value identity-mode" [class]="'mode-' + identityMode()">{{ modeBadgeText() }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Member Since</span>
+                <span class="info-value">{{ memberSince() ? formatTimestamp(memberSince()!) : 'N/A' }}</span>
+              </div>
+            } @else {
+              <div class="info-row">
+                <span class="info-label">Session ID</span>
+                <code class="info-value">{{ session?.sessionId ?? 'N/A' }}</code>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Created</span>
+                <span class="info-value">{{ session?.createdAt ? formatTimestamp(session!.createdAt) : 'N/A' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Last Active</span>
+                <span class="info-value">{{ session?.lastActiveAt ? formatTimestamp(session!.lastActiveAt) : 'N/A' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Access Level</span>
+                <span class="info-value">{{ session?.accessLevel ?? 'visitor' }}</span>
+              </div>
+            }
           </div>
         </section>
       </div>

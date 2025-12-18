@@ -15,11 +15,21 @@
   <div *ngIf="node && !isLoading" class="content">
     <!-- Header -->
     <div class="content-header">
-      <button
-        class="back-button"
-        (click)="backToHome()">
-        ← Back to Lamad
-      </button>
+      <div class="header-nav">
+        <button
+          class="back-button"
+          (click)="backToHome()">
+          ← Back to Lamad
+        </button>
+
+        <!-- Return to Path button (shown when viewing from a detour) -->
+        <button
+          *ngIf="hasReturnPath"
+          class="return-to-path-btn"
+          (click)="returnToPath()">
+          ← Return to {{ pathContext?.pathTitle }}
+        </button>
+      </div>
 
       <div class="header-main">
         <div class="content-type-badge">
@@ -285,10 +295,31 @@
       </section>
 
       <!-- Network Tab -->
-      <section *ngSwitchCase="'network'">
-        <div class="placeholder-tab">
-          <h3>Network Context</h3>
-          <p>Graph relationships visualization coming soon.</p>
+      <section *ngSwitchCase="'network'" class="network-tab">
+        <div class="network-header">
+          <h3>Content Neighborhood</h3>
+          <p>Explore related concepts in the knowledge graph</p>
+        </div>
+
+        <!-- Mini Graph Visualization -->
+        <div class="mini-graph-container">
+          <app-mini-graph
+            *ngIf="node"
+            [focusNodeId]="node.id"
+            [depth]="1"
+            [maxNodes]="20"
+            [height]="350"
+            (nodeSelected)="onGraphNodeSelected($event)"
+            (exploreRequested)="exploreInGraph()">
+          </app-mini-graph>
+        </div>
+
+        <!-- Explore in Full Graph Button -->
+        <div class="network-actions">
+          <button class="btn-explore-graph" (click)="exploreInGraph()">
+            <span class="icon">🔭</span>
+            Explore in Full Graph
+          </button>
         </div>
       </section>
 

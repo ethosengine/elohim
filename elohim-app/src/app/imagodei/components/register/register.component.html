@@ -18,26 +18,13 @@
     @if (hasSession() && canMigrate()) {
       <div class="migration-banner">
         <div class="migration-header">
-          <span class="migration-icon">↑</span>
-          <strong>Upgrade Available</strong>
+          <span class="migration-icon">✓</span>
+          <strong>Your Progress Will Be Saved</strong>
         </div>
-        <p>You have session progress that can be migrated to your network identity.</p>
+        <p>Your session progress will be automatically migrated when you create your identity.</p>
         @if (sessionStats()) {
           <p class="session-stats">{{ getSessionStatsDisplay() }}</p>
         }
-        <button
-          type="button"
-          class="btn btn-secondary"
-          [disabled]="isMigrating() || !isConnected()"
-          (click)="onMigrate()"
-        >
-          @if (isMigrating()) {
-            <span class="spinner"></span>
-            {{ migrationState().currentStep || 'Migrating...' }}
-          } @else {
-            Migrate Session Data
-          }
-        </button>
       </div>
     }
 
@@ -134,12 +121,76 @@
         </div>
       </div>
 
+      <!-- Account Credentials Section -->
+      <div class="form-section">
+        <h2 class="section-title">Account Credentials</h2>
+        <p class="section-description">Create login credentials to access your identity from any device.</p>
+
+        <!-- Email -->
+        <div class="form-group">
+          <label for="email">Email *</label>
+          <input
+            id="email"
+            type="email"
+            [(ngModel)]="form.email"
+            name="email"
+            placeholder="you@example.com"
+            required
+            autocomplete="email"
+            [disabled]="isRegistering()"
+          />
+          <span class="hint">Used for login - we won't share this</span>
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+          <label for="password">Password *</label>
+          <div class="password-input-wrapper">
+            <input
+              id="password"
+              [type]="showPassword() ? 'text' : 'password'"
+              [(ngModel)]="form.password"
+              name="password"
+              placeholder="Minimum 8 characters"
+              required
+              minlength="8"
+              autocomplete="new-password"
+              [disabled]="isRegistering()"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              (click)="togglePasswordVisibility()"
+              [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+            >
+              {{ showPassword() ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+          <span class="hint">Minimum 8 characters</span>
+        </div>
+
+        <!-- Confirm Password -->
+        <div class="form-group">
+          <label for="confirmPassword">Confirm Password *</label>
+          <input
+            id="confirmPassword"
+            [type]="showPassword() ? 'text' : 'password'"
+            [(ngModel)]="form.confirmPassword"
+            name="confirmPassword"
+            placeholder="Re-enter your password"
+            required
+            autocomplete="new-password"
+            [disabled]="isRegistering()"
+          />
+        </div>
+      </div>
+
       <!-- Submit -->
       <div class="form-actions">
         <button
           type="submit"
           class="btn btn-primary"
-          [disabled]="isRegistering() || !isConnected() || !form.displayName.trim()"
+          [disabled]="isRegistering() || !isConnected() || !form.displayName.trim() || !form.email.trim() || !form.password || form.password !== form.confirmPassword"
         >
           @if (isRegistering()) {
             <span class="spinner"></span>
@@ -153,7 +204,11 @@
 
     <!-- Footer Links -->
     <div class="register-footer">
-      <p>
+      <p class="login-prompt">
+        Already have an account?
+        <a (click)="goToLogin()" class="login-link">Sign in</a>
+      </p>
+      <p class="terms-text">
         By joining, you agree to participate in good faith with the community.
       </p>
       <a routerLink="/" class="back-link">← Back to Home</a>
