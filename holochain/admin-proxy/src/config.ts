@@ -24,6 +24,17 @@ export interface Config {
   apiKeyAdmin?: string;
   /** Log level */
   logLevel: 'debug' | 'info' | 'warn' | 'error';
+
+  // ==========================================================================
+  // JWT Authentication (for hosted humans)
+  // ==========================================================================
+
+  /** Secret for signing JWT tokens (required in production) */
+  jwtSecret: string;
+  /** JWT token expiry in seconds (default: 3600 = 1 hour) */
+  jwtExpirySeconds: number;
+  /** Enable password-based authentication */
+  enablePasswordAuth: boolean;
 }
 
 function getEnvOrDefault(name: string, defaultValue: string): string {
@@ -41,6 +52,7 @@ function parsePortRange(rangeStr: string): { min: number; max: number } {
 export function loadConfig(): Config {
   const devMode = getEnvOrDefault('DEV_MODE', 'false').toLowerCase() === 'true';
   const portRange = parsePortRange(getEnvOrDefault('APP_PORT_RANGE', '4445-65535'));
+  const enablePasswordAuth = getEnvOrDefault('ENABLE_PASSWORD_AUTH', 'true').toLowerCase() === 'true';
 
   // In production mode, API keys are required
   if (!devMode) {
@@ -50,6 +62,12 @@ export function loadConfig(): Config {
     if (!process.env.API_KEY_ADMIN) {
       throw new Error('Missing required environment variable: API_KEY_ADMIN (required when DEV_MODE is not true)');
     }
+  }
+
+  // JWT secret: required in production, use default for dev
+  const jwtSecret = process.env.JWT_SECRET ?? (devMode ? 'dev-jwt-secret-do-not-use-in-production' : '');
+  if (!devMode && !jwtSecret) {
+    throw new Error('Missing required environment variable: JWT_SECRET (required when DEV_MODE is not true)');
   }
 
   return {
@@ -62,6 +80,11 @@ export function loadConfig(): Config {
     apiKeyAuthenticated: process.env.API_KEY_AUTHENTICATED,
     apiKeyAdmin: process.env.API_KEY_ADMIN,
     logLevel: getEnvOrDefault('LOG_LEVEL', 'info') as Config['logLevel'],
+
+    // JWT settings
+    jwtSecret,
+    jwtExpirySeconds: parseInt(getEnvOrDefault('JWT_EXPIRY_SECONDS', '3600'), 10),
+    enablePasswordAuth,
   };
 }
 

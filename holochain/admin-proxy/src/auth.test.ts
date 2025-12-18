@@ -13,6 +13,9 @@ const mockConfig: Config = {
   apiKeyAuthenticated: 'test-auth-key',
   apiKeyAdmin: 'test-admin-key',
   logLevel: 'info',
+  jwtSecret: 'test-jwt-secret',
+  jwtExpirySeconds: 3600,
+  enablePasswordAuth: true,
 };
 
 const devModeConfig: Config = {

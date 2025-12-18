@@ -190,8 +190,20 @@ export function createAppProxy(options: AppProxyOptions): void {
     origin: clientOrigin ?? 'http://localhost:8080',
   });
 
+  // Buffer messages until conductor connection is ready
+  // This is critical because the client sends authenticate message immediately
+  let conductorReady = false;
+  const pendingMessages: RawData[] = [];
+
   conductorWs.on('open', () => {
     console.log(`[${clientId}] Connected to app interface on port ${appPort}`);
+    conductorReady = true;
+
+    // Send any messages that arrived before conductor was ready
+    for (const msg of pendingMessages) {
+      conductorWs.send(msg);
+    }
+    pendingMessages.length = 0;
   });
 
   conductorWs.on('error', (err) => {
@@ -199,10 +211,13 @@ export function createAppProxy(options: AppProxyOptions): void {
     clientWs.close(1011, 'App interface connection error');
   });
 
-  // Client -> Conductor (passthrough)
+  // Client -> Conductor (passthrough with buffering)
   clientWs.on('message', (data: RawData) => {
-    if (conductorWs.readyState === WebSocket.OPEN) {
+    if (conductorReady) {
       conductorWs.send(data);
+    } else {
+      // Queue message until conductor is ready
+      pendingMessages.push(data);
     }
   });
 

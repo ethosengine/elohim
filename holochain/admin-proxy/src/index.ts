@@ -21,6 +21,7 @@ import { loadConfig, Config, isCheEnvironment, getCheInfo } from './config.js';
 import { validateApiKey, extractApiKey } from './auth.js';
 import { createProxy, createAppProxy } from './proxy.js';
 import { getPermissionLevelName } from './permissions.js';
+import { handleAuthRequest } from './auth-routes.js';
 import type { Duplex } from 'stream';
 
 let config: Config;
@@ -96,17 +97,33 @@ function handleStatus(res: ServerResponse): void {
 }
 
 /**
- * Handle HTTP requests (health checks, status)
+ * Handle HTTP requests (health checks, status, auth)
  */
-function handleRequest(req: IncomingMessage, res: ServerResponse): void {
-  if (req.url === '/health' || req.url === '/healthz') {
+async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  // Log all HTTP requests for debugging
+  const method = req.method ?? 'UNKNOWN';
+  const url = req.url ?? '/';
+  const origin = req.headers.origin ?? '-';
+  console.log(`[HTTP] ${method} ${url} (origin: ${origin})`);
+
+  if (url === '/health' || url === '/healthz') {
     handleHealthCheck(res);
     return;
   }
 
-  if (req.url === '/status') {
+  if (url === '/status') {
     handleStatus(res);
     return;
+  }
+
+  // Handle auth routes
+  if (url.startsWith('/auth')) {
+    console.log(`[HTTP] Routing to auth handler: ${method} ${url}`);
+    const handled = await handleAuthRequest(req, res, config);
+    if (handled) {
+      console.log(`[HTTP] Auth request handled: ${method} ${url}`);
+      return;
+    }
   }
 
   // Return 404 for all other HTTP requests
@@ -131,6 +148,10 @@ function handleUpgrade(
   const url = request.url ?? '/';
 
   console.log(`[${clientId}] Upgrade request from ${request.socket.remoteAddress} for ${url}`);
+  // Debug: log full URL to see if token is present
+  if (url.includes('/app/')) {
+    console.log(`[${clientId}] Full URL: ${url}`);
+  }
 
   // Parse route to determine admin vs app interface
   const route = parseRoute(url);
@@ -256,6 +277,9 @@ function main(): void {
     console.log(`  /app/:port → ws://localhost:port (range ${config.appPortMin}-${config.appPortMax})`);
     console.log('  /health    → Health check');
     console.log('  /status    → Active connections');
+    if (config.enablePasswordAuth) {
+      console.log('  /auth/*    → Authentication endpoints (register, login, logout, refresh, me)');
+    }
   });
 
   // Graceful shutdown
