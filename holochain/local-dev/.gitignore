@@ -1,8 +1,15 @@
-# Holochain sandbox files
+# Holochain sandbox state files
 .hc
 .hc_ports
 .hc_wrapper.sh
 .sandbox_log
+.hc_live_*
 
-# Sandbox data directories
-**/
+# Conductor data (restored from snapshots)
+conductor-data/
+
+# Snapshot archives (can be large, store separately)
+snapshots/
+
+# Runtime reports
+last-seed-report.json

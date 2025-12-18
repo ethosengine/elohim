@@ -12,6 +12,9 @@ dist/
 .env.local
 .env.*.local
 
+# Runtime data (user store, etc.)
+data/
+
 # IDE
 .idea/
 .vscode/
