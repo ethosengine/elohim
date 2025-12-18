@@ -1,18 +1,27 @@
 {
   "name": "holochain-seeder",
   "version": "1.0.0",
-  "description": "Seed content data from /data/content into Holochain",
+  "description": "Seed structured JSON from /data/lamad into Holochain",
   "type": "module",
   "scripts": {
+    "bootstrap": "npx tsx src/bootstrap.ts",
     "seed": "npx tsx src/seed.ts",
     "seed:sample": "npx tsx src/seed.ts --limit 10",
+    "stats": "npx tsx src/stats.ts",
     "migrate": "npx tsx src/migrate.ts",
     "migrate:dry-run": "npx tsx src/migrate.ts --dry-run",
-    "migrate:verify": "npx tsx src/migrate.ts --verify-only"
+    "migrate:verify": "npx tsx src/migrate.ts --verify-only",
+    "snapshot": "npx tsx src/snapshot.ts",
+    "snapshot:save": "npx tsx src/snapshot.ts save",
+    "snapshot:create": "npx tsx src/snapshot.ts create",
+    "snapshot:restore": "npx tsx src/snapshot.ts restore",
+    "snapshot:clean": "npx tsx src/snapshot.ts clean",
+    "snapshot:status": "npx tsx src/snapshot.ts status",
+    "snapshot:list": "npx tsx src/snapshot.ts list",
+    "hc:start:snapshot": "hc sandbox run --root /projects/elohim/holochain/local-dev/conductor-data -p=4445"
   },
   "dependencies": {
-    "@holochain/client": "^0.19.2",
-    "gray-matter": "^4.0.3"
+    "@holochain/client": "^0.19.2"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

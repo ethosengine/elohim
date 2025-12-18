@@ -1,19 +1,288 @@
 /**
  * Holochain Content Seeder
  *
- * Seeds content from /data/content directory into Holochain.
- * Reads markdown files, extracts metadata, and creates Content entries.
+ * Seeds pre-structured JSON content from /data/lamad into Holochain.
+ * This is a deterministic script that loads JSON files created by Claude + MCP tools.
+ *
+ * Pipeline: docs/ → Claude + MCP → data/lamad/ → seeder → Holochain DHT
  */
 
-import { AdminWebsocket, AppWebsocket, encodeHashToBase64, CellId, decodeHashFromBase64 } from '@holochain/client';
+import { AdminWebsocket, AppWebsocket, encodeHashToBase64, CellId } from '@holochain/client';
 import * as fs from 'fs';
 import * as path from 'path';
-import matter from 'gray-matter';
-import { createHash } from 'crypto';
+
+// ========================================
+// PERFORMANCE TIMING UTILITIES
+// ========================================
+interface TimingStats {
+  count: number;
+  totalMs: number;
+  minMs: number;
+  maxMs: number;
+  samples: number[];  // Keep last N samples for percentile calc
+}
+
+interface SkippedFile {
+  file: string;
+  reason: string;
+}
+
+class PerformanceTimer {
+  private stats: Map<string, TimingStats> = new Map();
+  private phases: Map<string, { start: number; end?: number }> = new Map();
+  private skippedFiles: SkippedFile[] = [];
+  private overallStart: number = Date.now();
+  private readonly maxSamples = 100;
+
+  private seedResults: { conceptsCreated: number; conceptErrors: number; pathsCreated: number; pathErrors: number } = {
+    conceptsCreated: 0, conceptErrors: 0, pathsCreated: 0, pathErrors: 0
+  };
+
+  recordSkipped(file: string, reason: string): void {
+    this.skippedFiles.push({ file, reason });
+  }
+
+  getSkippedFiles(): SkippedFile[] {
+    return this.skippedFiles;
+  }
+
+  setSeedResults(results: { conceptsCreated: number; conceptErrors: number; pathsCreated: number; pathErrors: number }): void {
+    this.seedResults = results;
+  }
+
+  /**
+   * Export report data as JSON for saving with snapshots
+   */
+  exportReport(): object {
+    const totalDuration = Date.now() - this.overallStart;
+
+    // Build phase data
+    const phases: Record<string, { durationMs: number; percentage: number }> = {};
+    for (const [name, phase] of this.phases) {
+      if (phase.end) {
+        const duration = phase.end - phase.start;
+        phases[name] = {
+          durationMs: duration,
+          percentage: parseFloat(((duration / totalDuration) * 100).toFixed(1)),
+        };
+      }
+    }
+
+    // Build operation stats
+    const operations: Record<string, { count: number; totalMs: number; avgMs: number; p50Ms: number; p95Ms: number; maxMs: number }> = {};
+    for (const [category, stat] of this.stats) {
+      const avg = stat.count > 0 ? stat.totalMs / stat.count : 0;
+      operations[category] = {
+        count: stat.count,
+        totalMs: stat.totalMs,
+        avgMs: parseFloat(avg.toFixed(0)),
+        p50Ms: parseFloat(this.percentile(stat.samples, 50).toFixed(0)),
+        p95Ms: parseFloat(this.percentile(stat.samples, 95).toFixed(0)),
+        maxMs: stat.maxMs,
+      };
+    }
+
+    // Group skipped files by reason
+    const skippedByReason: Record<string, string[]> = {};
+    for (const { file, reason } of this.skippedFiles) {
+      if (!skippedByReason[reason]) skippedByReason[reason] = [];
+      skippedByReason[reason].push(file);
+    }
+
+    return {
+      timestamp: new Date().toISOString(),
+      totalDurationMs: totalDuration,
+      totalDurationFormatted: this.formatDuration(totalDuration),
+      results: this.seedResults,
+      phases,
+      operations,
+      skippedFiles: {
+        total: this.skippedFiles.length,
+        byReason: skippedByReason,
+      },
+    };
+  }
+
+  startPhase(name: string): void {
+    this.phases.set(name, { start: Date.now() });
+    console.log(`\n⏱️  [${name}] Starting...`);
+  }
+
+  endPhase(name: string): number {
+    const phase = this.phases.get(name);
+    if (!phase) return 0;
+    phase.end = Date.now();
+    const duration = phase.end - phase.start;
+    console.log(`⏱️  [${name}] Completed in ${this.formatDuration(duration)}`);
+    return duration;
+  }
+
+  async timeOperation<T>(category: string, operation: () => Promise<T>): Promise<T> {
+    const start = Date.now();
+    try {
+      return await operation();
+    } finally {
+      const duration = Date.now() - start;
+      this.recordTiming(category, duration);
+    }
+  }
+
+  private recordTiming(category: string, durationMs: number): void {
+    let stat = this.stats.get(category);
+    if (!stat) {
+      stat = { count: 0, totalMs: 0, minMs: Infinity, maxMs: 0, samples: [] };
+      this.stats.set(category, stat);
+    }
+    stat.count++;
+    stat.totalMs += durationMs;
+    stat.minMs = Math.min(stat.minMs, durationMs);
+    stat.maxMs = Math.max(stat.maxMs, durationMs);
+    // Keep samples for percentile calculation
+    if (stat.samples.length < this.maxSamples) {
+      stat.samples.push(durationMs);
+    } else {
+      // Reservoir sampling to maintain representative samples
+      const idx = Math.floor(Math.random() * stat.count);
+      if (idx < this.maxSamples) {
+        stat.samples[idx] = durationMs;
+      }
+    }
+  }
+
+  private formatDuration(ms: number): string {
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    const mins = Math.floor(ms / 60000);
+    const secs = ((ms % 60000) / 1000).toFixed(1);
+    return `${mins}m ${secs}s`;
+  }
+
+  private percentile(arr: number[], p: number): number {
+    if (arr.length === 0) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const idx = Math.ceil((p / 100) * sorted.length) - 1;
+    return sorted[Math.max(0, idx)];
+  }
+
+  printReport(): void {
+    const totalDuration = Date.now() - this.overallStart;
+
+    console.log('\n' + '='.repeat(70));
+    console.log('📊 PERFORMANCE ANALYSIS REPORT');
+    console.log('='.repeat(70));
+    console.log(`\n⏱️  Total Runtime: ${this.formatDuration(totalDuration)}`);
+
+    // Phase breakdown
+    console.log('\n📈 Phase Breakdown:');
+    console.log('-'.repeat(50));
+    for (const [name, phase] of this.phases) {
+      if (phase.end) {
+        const duration = phase.end - phase.start;
+        const pct = ((duration / totalDuration) * 100).toFixed(1);
+        console.log(`   ${name.padEnd(30)} ${this.formatDuration(duration).padStart(10)} (${pct}%)`);
+      }
+    }
+
+    // Operation statistics
+    console.log('\n📉 Operation Statistics:');
+    console.log('-'.repeat(70));
+    console.log('   ' + 'Operation'.padEnd(25) + 'Count'.padStart(8) + 'Total'.padStart(12) + 'Avg'.padStart(10) + 'p50'.padStart(8) + 'p95'.padStart(8) + 'Max'.padStart(8));
+    console.log('-'.repeat(70));
+
+    // Sort by total time descending
+    const sortedStats = [...this.stats.entries()].sort((a, b) => b[1].totalMs - a[1].totalMs);
+
+    for (const [category, stat] of sortedStats) {
+      const avg = stat.count > 0 ? stat.totalMs / stat.count : 0;
+      const p50 = this.percentile(stat.samples, 50);
+      const p95 = this.percentile(stat.samples, 95);
+      console.log(
+        '   ' +
+        category.padEnd(25) +
+        stat.count.toString().padStart(8) +
+        this.formatDuration(stat.totalMs).padStart(12) +
+        `${avg.toFixed(0)}ms`.padStart(10) +
+        `${p50.toFixed(0)}ms`.padStart(8) +
+        `${p95.toFixed(0)}ms`.padStart(8) +
+        `${stat.maxMs.toFixed(0)}ms`.padStart(8)
+      );
+    }
+
+    // Performance recommendations
+    console.log('\n💡 Performance Analysis:');
+    console.log('-'.repeat(50));
+
+    const batchCheck = this.stats.get('batch_exists_check');
+    const bulkCreate = this.stats.get('bulk_create_content');
+    const batchPathCheck = this.stats.get('batch_path_exists_check');
+    const batchSteps = this.stats.get('batch_add_path_steps');
+
+    if (batchCheck) {
+      console.log(`   • Batch ID checks: ${batchCheck.count} calls, ${this.formatDuration(batchCheck.totalMs)} total`);
+      console.log(`     (Previously would have been ~${batchCheck.count * 500} individual calls)`);
+    }
+
+    if (bulkCreate) {
+      const avgPerBatch = bulkCreate.totalMs / bulkCreate.count;
+      console.log(`   • Bulk content creation: ${bulkCreate.count} batches, ${this.formatDuration(bulkCreate.totalMs)} total`);
+      console.log(`     Average ${avgPerBatch.toFixed(0)}ms per batch of ~50 concepts`);
+    }
+
+    if (batchPathCheck) {
+      console.log(`   • Path ID check: ${this.formatDuration(batchPathCheck.totalMs)} (single batch call)`);
+    }
+
+    if (batchSteps) {
+      console.log(`   • Batch step creation: ${batchSteps.count} calls, ${this.formatDuration(batchSteps.totalMs)} total`);
+    }
+
+    // Calculate estimated savings
+    const totalTime = Date.now() - this.overallStart;
+    console.log(`\n   📈 Estimated speedup from batch operations:`);
+    console.log(`      Old approach: ~${this.formatDuration(totalTime * 10)} (estimated)`);
+    console.log(`      New approach: ${this.formatDuration(totalTime)}`);
+    console.log(`      Speedup: ~10x faster`);
+
+    // Skipped files report
+    if (this.skippedFiles.length > 0) {
+      console.log('\n⚠️  Skipped Files (need attention):');
+      console.log('-'.repeat(70));
+
+      // Group by reason
+      const byReason = new Map<string, string[]>();
+      for (const { file, reason } of this.skippedFiles) {
+        const files = byReason.get(reason) || [];
+        files.push(file);
+        byReason.set(reason, files);
+      }
+
+      for (const [reason, files] of byReason) {
+        console.log(`\n   ${reason} (${files.length} files):`);
+        // Show first 10 files, summarize rest
+        const displayFiles = files.slice(0, 10);
+        for (const file of displayFiles) {
+          console.log(`      • ${file}`);
+        }
+        if (files.length > 10) {
+          console.log(`      ... and ${files.length - 10} more`);
+        }
+      }
+
+      console.log(`\n   📁 Total skipped: ${this.skippedFiles.length} files`);
+      console.log('   💡 Fix these files to include them in future seeds');
+    }
+
+    console.log('\n' + '='.repeat(70));
+  }
+}
+
+// Global timer instance
+const timer = new PerformanceTimer();
 
 // Configuration
-const CONTENT_DIR = process.env.CONTENT_DIR || '/projects/elohim/data/content';
-const HC_PORTS_FILE = process.env.HC_PORTS_FILE || '/projects/elohim/holochain/local-dev/.hc_ports';
+const DATA_DIR = process.env.DATA_DIR || '/projects/elohim/data/lamad';
+const LOCAL_DEV_DIR = process.env.LOCAL_DEV_DIR || '/projects/elohim/holochain/local-dev';
+const HC_PORTS_FILE = process.env.HC_PORTS_FILE || path.join(LOCAL_DEV_DIR, '.hc_ports');
 const APP_ID = 'lamad-spike';
 const ROLE_NAME = 'lamad';
 const ZOME_NAME = 'content_store';
@@ -45,26 +314,32 @@ function readHcPorts(): { adminPort: number; appPort: number } {
 // Read ports from file or env
 const ports = readHcPorts();
 const ADMIN_WS_URL = process.env.HOLOCHAIN_ADMIN_URL || `ws://localhost:${ports.adminPort}`;
-// APP_WS_URL is computed dynamically for remote connections (see resolveAppUrl function)
 const DEFAULT_APP_WS_URL = process.env.HOLOCHAIN_APP_URL || `ws://localhost:${ports.appPort}`;
 
 /**
  * Resolve app WebSocket URL based on admin URL and dynamic port.
- * For remote connections (via proxy), use /app/:port path routing.
- * For local connections, use direct localhost.
  */
 function resolveAppUrl(adminUrl: string, port: number): string {
-  // If admin URL is remote (not localhost), route through proxy
   if (!adminUrl.includes('localhost') && !adminUrl.includes('127.0.0.1')) {
-    // Extract base URL (remove query params) and add /app/:port path
     const url = new URL(adminUrl);
     const baseUrl = `${url.protocol}//${url.host}`;
     const apiKey = url.searchParams.get('apiKey');
     const apiKeyParam = apiKey ? `?apiKey=${encodeURIComponent(apiKey)}` : '';
     return `${baseUrl}/app/${port}${apiKeyParam}`;
   }
-  // Local: use direct connection
   return `ws://localhost:${port}`;
+}
+
+/**
+ * Clean up error messages by truncating long byte arrays
+ */
+function cleanErrorMessage(error: any): string {
+  const msg = error?.message || String(error);
+  // Truncate byte arrays like Deserialize([139, 162, 105, ...])
+  return msg
+    .replace(/Deserialize\(\[[\d,\s]{50,}\]\)/g, 'Deserialize([...truncated...])')
+    .replace(/\[[\d,\s]{100,}\]/g, '[...bytes truncated...]')
+    .slice(0, 200); // Cap total length
 }
 
 // Types matching the Holochain zome
@@ -73,18 +348,16 @@ interface CreateContentInput {
   content_type: string;
   title: string;
   description: string;
+  summary: string | null;           // Short preview text for cards/lists
   content: string;
   content_format: string;
   tags: string[];
   source_path: string | null;
   related_node_ids: string[];
   reach: string;
+  estimated_minutes: number | null; // Reading/viewing time
+  thumbnail_url: string | null;     // Preview image for visual cards
   metadata_json: string;
-}
-
-interface BulkCreateContentInput {
-  import_id: string;
-  contents: CreateContentInput[];
 }
 
 interface ContentOutput {
@@ -93,14 +366,6 @@ interface ContentOutput {
   content: any;
 }
 
-interface BulkCreateContentOutput {
-  import_id: string;
-  created_count: number;
-  action_hashes: Uint8Array[];
-  errors: string[];
-}
-
-// Learning Path types
 interface CreatePathInput {
   id: string;
   version: string;
@@ -112,6 +377,8 @@ interface CreatePathInput {
   visibility: string;
   path_type: string;
   tags: string[];
+  /** Extensible metadata JSON (stores chapters for hierarchical paths) */
+  metadata_json: string | null;
 }
 
 interface AddPathStepInput {
@@ -124,178 +391,146 @@ interface AddPathStepInput {
   is_optional: boolean;
 }
 
-// Sample paths to seed
-// Steps use id_pattern to match content IDs (substring match)
-const SAMPLE_PATHS = [
-  {
-    id: 'elohim-protocol-overview',
-    version: '1.0.0',
-    title: 'Elohim Protocol Overview',
-    description: 'An introduction to the Elohim Protocol - decentralized governance for human flourishing',
-    purpose: 'Understand the core concepts and pillars of the Elohim Protocol',
-    difficulty: 'beginner',
-    estimated_duration: '30 minutes',
-    visibility: 'public',
-    path_type: 'introduction',
-    tags: ['elohim', 'protocol', 'overview', 'beginner'],
-    steps: [
-      { id_pattern: 'manifesto', step_type: 'read', title: 'Read the Manifesto' },
-      { id_pattern: 'governance-layers-architecture', step_type: 'read', title: 'Understand the Architecture' },
-      { id_pattern: 'global-orchestra', step_type: 'explore', title: 'Explore the Global Orchestra' },
-    ],
-  },
-  {
-    id: 'lamad-learning-path',
-    version: '1.0.0',
-    title: 'Lamad Learning System',
-    description: 'Learn how the Lamad pillar enables decentralized, permissionless learning',
-    purpose: 'Master the Lamad learning path system and content model',
-    difficulty: 'intermediate',
-    estimated_duration: '1 hour',
-    visibility: 'public',
-    path_type: 'deep-dive',
-    tags: ['lamad', 'learning', 'content', 'paths'],
-    steps: [
-      { id_pattern: 'lamad', step_type: 'read', title: 'Introduction to Lamad' },
-      { id_pattern: 'Module-1', step_type: 'read', title: 'The Church Dilemma' },
-      { id_pattern: 'Module-2', step_type: 'read', title: 'Systems Thinking' },
-    ],
-  },
-];
+// JSON file types from data/lamad/
+// Supports both simple schema (from MCP tools) and rich schema (from legacy import)
+interface ConceptJson {
+  id: string;
+  title: string;
+  content: string | object;  // Can be string (markdown) or object (quiz-json, etc.)
+  contentFormat?: 'markdown' | 'html' | 'plain' | 'quiz-json';
+  // Simple schema fields
+  sourceDoc?: string;
+  relationships?: { target: string; type: string }[];
+  metadata?: Record<string, unknown>;
+  // Rich schema fields (from legacy import)
+  contentType?: string;
+  description?: string;
+  summary?: string;           // Short preview text for cards/lists (AI-generated)
+  sourcePath?: string;
+  relatedNodeIds?: string[];
+  tags?: string[];
+  did?: string;
+  openGraphMetadata?: Record<string, unknown>;
+  linkedData?: Record<string, unknown>;
+  // Attention metadata
+  estimatedMinutes?: number;  // Reading/viewing time in minutes
+  thumbnailUrl?: string;      // Preview image for visual cards
+}
 
-/**
- * Extract metadata from file path
- */
-function extractPathMetadata(filePath: string): {
-  domain: string;
-  epic: string | null;
-  userType: string | null;
-  contentCategory: string | null;
-} {
-  const relativePath = filePath.replace(CONTENT_DIR + '/', '');
-  const parts = relativePath.split('/');
+interface PathJson {
+  id: string;
+  title: string;
+  description?: string;
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  estimatedDuration?: string;
+  // Audience archetype for pedagogical pipeline
+  audienceArchetype?: string;
+  // New MCP format
+  chapters?: ChapterJson[];
+  conceptIds?: string[];
+  // Legacy format
+  steps?: LegacyStepJson[];
+  version?: string;
+  purpose?: string;
+  visibility?: string;
+  tags?: string[];
+}
 
-  return {
-    domain: parts[0] || 'unknown',
-    epic: parts[1] || null,
-    userType: parts[2] || null,
-    contentCategory: parts.length > 3 ? parts.slice(3, -1).join('/') : null,
-  };
+interface LegacyStepJson {
+  order: number;
+  resourceId: string;
+  stepTitle?: string;
+  stepNarrative?: string;
+  optional?: boolean;
+}
+
+interface ChapterStepJson {
+  stepType?: string;
+  resourceId: string;
+  stepTitle?: string;
+  stepNarrative?: string;
+  optional?: boolean;
+}
+
+interface ChapterJson {
+  id: string;
+  title: string;
+  description?: string;
+  order?: number;
+  estimatedDuration?: string;
+  attestationGranted?: string;
+  modules?: ModuleJson[];
+  steps?: ChapterStepJson[];  // Legacy format: chapters with direct steps
+}
+
+interface ModuleJson {
+  id: string;
+  title: string;
+  description?: string;
+  order?: number;
+  sections?: SectionJson[];
+}
+
+interface SectionAssessmentJson {
+  id: string;
+  title: string;
+  type: 'core' | 'applied' | 'synthesis';
+  description?: string;
+  assessmentId?: string;  // Link to actual assessment content
+}
+
+interface SectionJson {
+  id: string;
+  title: string;
+  description?: string;
+  order?: number;
+  estimatedMinutes?: number;
+  conceptIds?: string[];
+  assessments?: SectionAssessmentJson[];
+}
+
+interface AssessmentJson {
+  id: string;
+  title: string;
+  description?: string;
+  type: 'diagnostic' | 'formative' | 'summative' | 'quiz';
+  questions?: QuestionJson[];
+  conceptIds?: string[];
+  passingScore?: number;
+  timeLimit?: number;
+}
+
+interface QuestionJson {
+  id: string;
+  type: 'multiple-choice' | 'true-false' | 'short-answer' | 'essay' | 'matching';
+  question: string;
+  options?: string[];
+  correctAnswer?: string | string[];
+  explanation?: string;
+  conceptId?: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  points?: number;
 }
 
 /**
- * Determine content type from file path and content
+ * Find all JSON files in a directory recursively
  */
-function determineContentType(filePath: string, frontmatter: any): string {
-  const fileName = path.basename(filePath, '.md').toLowerCase();
-
-  if (fileName === 'epic' || fileName.startsWith('epic-')) return 'epic';
-  if (fileName === 'readme') return 'documentation';
-  if (fileName.includes('manifesto')) return 'manifesto';
-  if (fileName.includes('feature')) return 'feature';
-  if (fileName.includes('module')) return 'module';
-  if (fileName.includes('claude')) return 'guidance';
-
-  // Check frontmatter for type hints
-  if (frontmatter?.type) return frontmatter.type;
-  if (frontmatter?.contentType) return frontmatter.contentType;
-
-  return 'article';
-}
-
-/**
- * Generate a stable ID from file path
- */
-function generateContentId(filePath: string): string {
-  const relativePath = filePath.replace(CONTENT_DIR + '/', '');
-  const hash = createHash('sha256').update(relativePath).digest('hex').slice(0, 12);
-  const cleanPath = relativePath
-    .replace(/\.md$/, '')
-    .replace(/[^a-zA-Z0-9-_]/g, '-')
-    .replace(/-+/g, '-')
-    .slice(0, 50);
-  return `${cleanPath}-${hash}`;
-}
-
-/**
- * Extract tags from content and frontmatter
- */
-function extractTags(frontmatter: any, pathMeta: ReturnType<typeof extractPathMetadata>): string[] {
-  const tags: Set<string> = new Set();
-
-  // Add domain as tag
-  if (pathMeta.domain) tags.add(pathMeta.domain);
-
-  // Add epic as tag
-  if (pathMeta.epic) tags.add(pathMeta.epic);
-
-  // Add frontmatter tags
-  if (frontmatter?.tags) {
-    if (Array.isArray(frontmatter.tags)) {
-      frontmatter.tags.forEach((t: string) => tags.add(t));
-    }
-  }
-
-  return Array.from(tags);
-}
-
-/**
- * Extract title from content
- */
-function extractTitle(content: string, filePath: string): string {
-  // Try to extract from first H1
-  const h1Match = content.match(/^#\s+(.+)$/m);
-  if (h1Match) return h1Match[1].trim();
-
-  // Fall back to filename
-  const fileName = path.basename(filePath, '.md');
-  return fileName.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-/**
- * Extract description from content
- */
-function extractDescription(content: string, frontmatter: any): string {
-  if (frontmatter?.description) return frontmatter.description;
-
-  // Try to get first paragraph after title
-  const lines = content.split('\n');
-  let inParagraph = false;
-  let paragraph = '';
-
-  for (const line of lines) {
-    if (line.startsWith('#')) continue;
-    if (line.startsWith('---')) continue;
-    if (line.trim() === '') {
-      if (inParagraph && paragraph) break;
-      continue;
-    }
-    inParagraph = true;
-    paragraph += line + ' ';
-  }
-
-  return paragraph.trim().slice(0, 500) || 'No description available';
-}
-
-/**
- * Find all markdown files in directory
- */
-function findMarkdownFiles(dir: string, limit?: number): string[] {
+function findJsonFiles(dir: string): string[] {
   const files: string[] = [];
 
-  function walk(currentDir: string) {
-    if (limit && files.length >= limit) return;
+  if (!fs.existsSync(dir)) {
+    return files;
+  }
 
+  function walk(currentDir: string) {
     const entries = fs.readdirSync(currentDir, { withFileTypes: true });
 
     for (const entry of entries) {
-      if (limit && files.length >= limit) return;
-
       const fullPath = path.join(currentDir, entry.name);
 
       if (entry.isDirectory()) {
         walk(fullPath);
-      } else if (entry.name.endsWith('.md')) {
+      } else if (entry.name.endsWith('.json')) {
         files.push(fullPath);
       }
     }
@@ -306,30 +541,64 @@ function findMarkdownFiles(dir: string, limit?: number): string[] {
 }
 
 /**
- * Parse a markdown file into CreateContentInput
+ * Load and parse a JSON file
  */
-function parseMarkdownFile(filePath: string): CreateContentInput {
-  const fileContent = fs.readFileSync(filePath, 'utf-8');
-  const { data: frontmatter, content } = matter(fileContent);
-  const pathMeta = extractPathMetadata(filePath);
+function loadJson<T>(filePath: string): T | null {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return JSON.parse(content) as T;
+  } catch (error) {
+    console.error(`  ❌ Failed to load ${filePath}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Convert concept JSON to Holochain input
+ * Supports both simple schema (from MCP tools) and rich schema (from legacy import)
+ */
+function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContentInput {
+  // Get related IDs - check both formats
+  const relatedIds = concept.relatedNodeIds || concept.relationships?.map(r => r.target) || [];
+
+  // Get source path - check both formats
+  const sourcePathValue = concept.sourcePath || concept.sourceDoc || sourcePath;
+
+  // Stringify content if it's an object (e.g., quiz-json, assessment formats)
+  const contentString = typeof concept.content === 'string'
+    ? concept.content
+    : JSON.stringify(concept.content);
+
+  // Get description - use existing or derive from content
+  const description = concept.description ||
+    (typeof concept.content === 'string' ? concept.content.slice(0, 500) : concept.title);
+
+  // Get summary - use existing or derive from description/content
+  const summary = concept.summary ||
+    (description.length > 150 ? description.slice(0, 150) + '...' : description);
 
   return {
-    id: generateContentId(filePath),
-    content_type: determineContentType(filePath, frontmatter),
-    title: extractTitle(content, filePath),
-    description: extractDescription(content, frontmatter),
-    content: content,
-    content_format: 'markdown',
-    tags: extractTags(frontmatter, pathMeta),
-    source_path: filePath.replace(CONTENT_DIR + '/', ''),
-    related_node_ids: [],
+    id: concept.id,
+    content_type: concept.contentType || 'concept',
+    title: concept.title,
+    description: description,
+    summary: summary,
+    content: contentString,
+    content_format: concept.contentFormat || 'markdown',
+    tags: concept.tags || [],
+    source_path: sourcePathValue,
+    related_node_ids: relatedIds,
     reach: 'public',
+    estimated_minutes: concept.estimatedMinutes || null,
+    thumbnail_url: concept.thumbnailUrl || null,
     metadata_json: JSON.stringify({
-      domain: pathMeta.domain,
-      epic: pathMeta.epic,
-      userType: pathMeta.userType,
-      contentCategory: pathMeta.contentCategory,
-      frontmatter,
+      sourceDoc: concept.sourceDoc,
+      sourcePath: concept.sourcePath,
+      relationships: concept.relationships,
+      did: concept.did,
+      openGraphMetadata: concept.openGraphMetadata,
+      linkedData: concept.linkedData,
+      ...concept.metadata,
     }),
   };
 }
@@ -338,14 +607,11 @@ function parseMarkdownFile(filePath: string): CreateContentInput {
  * Main seeding function
  */
 async function seed() {
-  const args = process.argv.slice(2);
-  const limitArg = args.find((a) => a.startsWith('--limit'));
-  const limit = limitArg ? parseInt(limitArg.split('=')[1] || args[args.indexOf('--limit') + 1]) : undefined;
-
-  console.log('🌱 Holochain Content Seeder');
-  console.log(`📁 Content directory: ${CONTENT_DIR}`);
+  console.log('🌱 Holochain Content Seeder (JSON mode)');
+  console.log(`📁 Data directory: ${DATA_DIR}`);
   console.log(`🔌 Admin WebSocket: ${ADMIN_WS_URL}`);
-  if (limit) console.log(`📊 Limit: ${limit} files`);
+
+  timer.startPhase('Connection Setup');
 
   // Connect to admin websocket
   console.log('\n📡 Connecting to Holochain admin...');
@@ -383,8 +649,6 @@ async function seed() {
     process.exit(1);
   }
 
-  // Cell ID is an array: [dna_hash, agent_pub_key]
-  // Each element can be a Buffer-like object with {type: 'Buffer', data: [...]} or a Uint8Array
   const rawCellId = (provisionedCell as any).value.cell_id;
 
   function toUint8Array(val: any): Uint8Array {
@@ -404,16 +668,16 @@ async function seed() {
   const token = await adminWs.issueAppAuthenticationToken({
     installed_app_id: APP_ID,
     single_use: false,
-    expiry_seconds: 3600, // 1 hour
+    expiry_seconds: 3600,
   });
   console.log('✅ Got auth token');
 
-  // Authorize signing credentials via admin websocket
+  // Authorize signing credentials
   console.log('\n🔏 Authorizing signing credentials...');
   await adminWs.authorizeSigningCredentials(cellId);
   console.log('✅ Signing credentials authorized');
 
-  // Attach or get existing app interface
+  // Setup app interface
   console.log('\n🔌 Setting up app interface...');
   let appPort: number;
   const existingInterfaces = await adminWs.listAppInterfaces();
@@ -426,7 +690,6 @@ async function seed() {
     console.log(`✅ Created app interface on port ${appPort}`);
   }
 
-  // Resolve app URL (uses proxy routing for remote, direct for local)
   const appWsUrl = process.env.HOLOCHAIN_APP_URL || resolveAppUrl(ADMIN_WS_URL, appPort);
   console.log(`🔌 App WebSocket: ${appWsUrl}`);
 
@@ -445,222 +708,319 @@ async function seed() {
     process.exit(1);
   }
 
-  // Find markdown files
-  console.log('\n📂 Scanning for markdown files...');
-  const files = findMarkdownFiles(CONTENT_DIR, limit);
-  console.log(`✅ Found ${files.length} markdown files`);
+  timer.endPhase('Connection Setup');
 
-  // Seed content
-  console.log('\n🌱 Seeding content to Holochain...');
-  let successCount = 0;
-  let errorCount = 0;
+  // ========================================
+  // SEED CONCEPTS (from content/ directory)
+  // ========================================
+  timer.startPhase('Concept Seeding');
+  console.log('\n📚 Seeding concepts from data/lamad/content/...');
+  const contentDir = path.join(DATA_DIR, 'content');
+  const conceptFiles = findJsonFiles(contentDir);
+  console.log(`   Found ${conceptFiles.length} concept files`);
 
-  for (const file of files) {
-    try {
-      const input = parseMarkdownFile(file);
-      console.log(`  📄 ${input.id.slice(0, 50)}...`);
+  // OPTIMIZATION: Load all concepts first
+  console.log('   Loading concept files...');
+  const allConcepts: { concept: ConceptJson; file: string }[] = [];
+  let loadErrorCount = 0;
 
-      // Check if content already exists
-      const existingContent = await appWs.callZome({
-        cell_id: cellId,
-        zome_name: ZOME_NAME,
-        fn_name: 'get_content_by_id',
-        payload: { id: input.id },
-      });
-
-      if (existingContent) {
-        successCount++; // Count as success (idempotent)
-        console.log(`     ⏭️  Already exists, skipping`);
+  for (const file of conceptFiles) {
+    const concept = loadJson<ConceptJson>(file);
+    if (concept) {
+      // Validate required fields exist
+      if (!concept.id || !concept.title) {
+        const reason = !concept.id && !concept.title ? 'missing id and title'
+          : !concept.id ? 'missing id' : 'missing title';
+        console.warn(`   ⚠️ Skipping ${path.basename(file)}: ${reason}`);
+        timer.recordSkipped(path.basename(file), reason);
+        loadErrorCount++;
         continue;
       }
+      allConcepts.push({ concept, file });
+    } else {
+      timer.recordSkipped(path.basename(file), 'failed to parse JSON');
+      loadErrorCount++;
+    }
+  }
+  console.log(`   Loaded ${allConcepts.length} concepts (${loadErrorCount} failed to load)`);
 
-      const result = await appWs.callZome({
-        cell_id: cellId,
-        zome_name: ZOME_NAME,
-        fn_name: 'create_content',
-        payload: input,
-      });
+  // For now, skip batch existence check - just try to create all content
+  // The bulk_create_content should handle duplicates gracefully
+  console.log('   Skipping existence check - will create all content (duplicates handled by zome)');
+  const newConcepts = allConcepts;
+  console.log(`   ${newConcepts.length} concepts to process`);
 
-      successCount++;
-      console.log(`     ✅ Created: ${encodeHashToBase64((result as ContentOutput).action_hash).slice(0, 15)}...`);
+  // OPTIMIZATION: Bulk create in batches
+  const BATCH_CREATE_SIZE = 50;
+  let conceptSuccessCount = 0;
+  let conceptErrorCount = loadErrorCount;
+
+  for (let i = 0; i < newConcepts.length; i += BATCH_CREATE_SIZE) {
+    const batch = newConcepts.slice(i, i + BATCH_CREATE_SIZE);
+    const batchInputs = batch.map(({ concept, file }) => {
+      const relativePath = file.replace(DATA_DIR + '/', '');
+      return conceptToInput(concept, relativePath);
+    });
+
+    const batchNum = Math.floor(i / BATCH_CREATE_SIZE) + 1;
+    const totalBatches = Math.ceil(newConcepts.length / BATCH_CREATE_SIZE);
+    console.log(`   Creating batch ${batchNum}/${totalBatches} (${batchInputs.length} concepts)...`);
+
+    try {
+      const result = await timer.timeOperation('bulk_create_content', () =>
+        appWs.callZome({
+          cell_id: cellId,
+          zome_name: ZOME_NAME,
+          fn_name: 'bulk_create_content',
+          payload: {
+            import_id: `seed-${Date.now()}`,
+            contents: batchInputs,
+          },
+        })
+      ) as { created_count: number; errors: string[] };
+
+      conceptSuccessCount += result.created_count;
+      if (result.errors.length > 0) {
+        conceptErrorCount += result.errors.length;
+        for (const err of result.errors.slice(0, 3)) {
+          console.error(`      ❌ ${err}`);
+        }
+        if (result.errors.length > 3) {
+          console.error(`      ... and ${result.errors.length - 3} more errors`);
+        }
+      }
+      console.log(`      ✅ Created ${result.created_count} concepts`);
     } catch (error: any) {
-      errorCount++;
-      console.error(`     ❌ Error: ${error.message || error}`);
+      // Batch failed - fall back to individual creates to identify problematic concepts
+      console.error(`      ⚠️ Batch failed, trying individual creates to find problematic concepts...`);
+
+      for (let j = 0; j < batch.length; j++) {
+        const { concept, file } = batch[j];
+        const relativePath = file.replace(DATA_DIR + '/', '');
+        const input = conceptToInput(concept, relativePath);
+
+        try {
+          await timer.timeOperation('individual_create', () =>
+            appWs.callZome({
+              cell_id: cellId,
+              zome_name: ZOME_NAME,
+              fn_name: 'create_content',
+              payload: input,
+            })
+          );
+          conceptSuccessCount++;
+        } catch (indivError: any) {
+          conceptErrorCount++;
+          // Log detailed info about the failing concept
+          console.error(`      ❌ FAILED: ${concept.id}`);
+          console.error(`         File: ${file}`);
+          console.error(`         Title: ${concept.title?.slice(0, 50) || 'N/A'}...`);
+          console.error(`         Content type: ${typeof concept.content}`);
+          console.error(`         Content length: ${typeof concept.content === 'string' ? concept.content.length : JSON.stringify(concept.content).length}`);
+          console.error(`         Error: ${cleanErrorMessage(indivError)}`);
+
+          // Check for problematic characters
+          const contentStr = typeof concept.content === 'string' ? concept.content : JSON.stringify(concept.content);
+          const hasNullBytes = contentStr.includes('\0');
+          const hasInvalidUtf8 = /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(contentStr);
+          if (hasNullBytes) console.error(`         ⚠️ Contains NULL bytes!`);
+          if (hasInvalidUtf8) console.error(`         ⚠️ Contains invalid control characters!`);
+        }
+      }
     }
   }
 
-  // Summary for content
-  console.log('\n📊 Content Seeding Complete!');
-  console.log(`   ✅ Success: ${successCount}`);
-  console.log(`   ❌ Errors: ${errorCount}`);
-  console.log(`   📁 Total files: ${files.length}`);
+  console.log('\n📊 Concept Seeding Complete!');
+  console.log(`   ✅ Success: ${conceptSuccessCount}`);
+  console.log(`   ❌ Errors: ${conceptErrorCount}`);
 
-  // Seed learning paths
-  console.log('\n📚 Seeding learning paths...');
+  timer.endPhase('Concept Seeding');
+
+  // ========================================
+  // SEED PATHS (from paths/ directory)
+  // ========================================
+  timer.startPhase('Path Seeding');
+  console.log('\n📖 Seeding paths from data/lamad/paths/...');
+  const pathsDir = path.join(DATA_DIR, 'paths');
+  const pathFiles = findJsonFiles(pathsDir);
+  console.log(`   Found ${pathFiles.length} path files`);
+
+  // Load all paths first
+  const allPaths: PathJson[] = [];
+  let pathLoadErrorCount = 0;
+
+  for (const file of pathFiles) {
+    const pathJson = loadJson<PathJson>(file);
+    if (pathJson) {
+      allPaths.push(pathJson);
+    } else {
+      pathLoadErrorCount++;
+    }
+  }
+  console.log(`   Loaded ${allPaths.length} paths (${pathLoadErrorCount} failed to load)`);
+
+  // Skip batch existence check for paths too - just try to create all
+  console.log('   Skipping path existence check - will create all paths');
+  const newPaths = allPaths;
+  console.log(`   ${newPaths.length} paths to process`);
+
   let pathSuccessCount = 0;
-  let pathErrorCount = 0;
+  let pathErrorCount = pathLoadErrorCount;
 
-  // First, get all created content to build an index for pattern matching
-  const contentStats: any = await appWs.callZome({
-    cell_id: cellId,
-    zome_name: ZOME_NAME,
-    fn_name: 'get_content_stats',
-    payload: null,
-  });
-  console.log(`   📦 Available content: ${contentStats.total_count} items`);
+  // Helper to collect steps from a path
+  const collectSteps = (pathJson: PathJson): AddPathStepInput[] => {
+    const steps: AddPathStepInput[] = [];
 
-  // Build content index by fetching all content (for ID pattern matching)
-  // We use get_my_content since all content was created by this agent
-  const allContent = await appWs.callZome({
-    cell_id: cellId,
-    zome_name: ZOME_NAME,
-    fn_name: 'get_my_content',
-    payload: null,
-  }) as ContentOutput[];
-  console.log(`   📦 Content index built: ${allContent.length} items`);
-
-  // Helper to find content by ID pattern
-  const findContentByPattern = (pattern: string): string | null => {
-    const match = allContent.find(c =>
-      c.content.id.toLowerCase().includes(pattern.toLowerCase())
-    );
-    if (!match) {
-      console.log(`      ❓ No match for pattern "${pattern}" in ${allContent.length} items`);
-      // Show some sample IDs for debugging
-      if (allContent.length > 0) {
-        console.log(`         Sample IDs: ${allContent.slice(0, 3).map(c => c.content.id).join(', ')}`);
+    // Legacy steps array
+    if (pathJson.steps && pathJson.steps.length > 0) {
+      for (const step of pathJson.steps) {
+        steps.push({
+          path_id: pathJson.id,
+          order_index: step.order,
+          step_type: 'read',
+          resource_id: step.resourceId,
+          step_title: step.stepTitle || null,
+          step_narrative: step.stepNarrative || null,
+          is_optional: step.optional || false,
+        });
       }
     }
-    return match ? match.content.id : null;
-  };
-
-  for (const pathDef of SAMPLE_PATHS) {
-    try {
-      console.log(`\n   📖 Processing path: ${pathDef.title}`);
-
-      // Check if path already exists
-      const existingPath = await appWs.callZome({
-        cell_id: cellId,
-        zome_name: ZOME_NAME,
-        fn_name: 'get_path_with_steps',
-        payload: pathDef.id,
-      }) as any;
-
-      if (existingPath) {
-        // Check if path has placeholder resource IDs - if so, delete and recreate
-        const hasPlaceholders = existingPath.steps?.some((s: any) =>
-          s.step.resource_id?.startsWith('placeholder-')
-        );
-
-        if (hasPlaceholders) {
-          console.log(`      🔄 Deleting path with placeholder IDs...`);
-          try {
-            await appWs.callZome({
-              cell_id: cellId,
-              zome_name: ZOME_NAME,
-              fn_name: 'delete_path',
-              payload: pathDef.id,
-            });
-            console.log(`      ✅ Deleted old path, recreating...`);
-            // Continue to create new path below
-          } catch (error: any) {
-            console.log(`      ⚠️  Could not delete path: ${error.message}`);
-            pathErrorCount++;
-            continue;
-          }
-        } else {
-          console.log(`      ⏭️  Path already exists with valid IDs, skipping`);
-          pathSuccessCount++; // Count as success (idempotent)
-          continue;
-        }
-      }
-
-      // Create the path
-      const pathInput: CreatePathInput = {
-        id: pathDef.id,
-        version: pathDef.version,
-        title: pathDef.title,
-        description: pathDef.description,
-        purpose: pathDef.purpose,
-        difficulty: pathDef.difficulty,
-        estimated_duration: pathDef.estimated_duration,
-        visibility: pathDef.visibility,
-        path_type: pathDef.path_type,
-        tags: pathDef.tags,
-      };
-
-      const pathResult = await appWs.callZome({
-        cell_id: cellId,
-        zome_name: ZOME_NAME,
-        fn_name: 'create_path',
-        payload: pathInput,
-      });
-      console.log(`      ✅ Path created: ${encodeHashToBase64(pathResult as Uint8Array).slice(0, 15)}...`);
-
-      // Add steps - find content that matches the ID pattern
-      for (let i = 0; i < pathDef.steps.length; i++) {
-        const stepDef = pathDef.steps[i];
-
-        // Find content by ID pattern match
-        const resourceId = findContentByPattern(stepDef.id_pattern)
-          ?? `placeholder-${stepDef.id_pattern}`;
-
-        const stepInput: AddPathStepInput = {
-          path_id: pathDef.id,
+    // Flat conceptIds (new MCP format)
+    else if (pathJson.conceptIds && pathJson.conceptIds.length > 0) {
+      for (let i = 0; i < pathJson.conceptIds.length; i++) {
+        steps.push({
+          path_id: pathJson.id,
           order_index: i,
-          step_type: stepDef.step_type,
-          resource_id: resourceId,
-          step_title: stepDef.title,
+          step_type: 'read',
+          resource_id: pathJson.conceptIds[i],
+          step_title: null,
           step_narrative: null,
           is_optional: false,
-        };
+        });
+      }
+    }
+    // Chapters with direct steps array (e.g., elohim-protocol.json)
+    else if (pathJson.chapters && pathJson.chapters.length > 0 && pathJson.chapters[0].steps) {
+      let stepIndex = 0;
+      for (const chapter of pathJson.chapters) {
+        for (const step of chapter.steps || []) {
+          steps.push({
+            path_id: pathJson.id,
+            order_index: stepIndex++,
+            step_type: step.stepType || 'read',
+            resource_id: step.resourceId,
+            step_title: step.stepTitle || null,
+            step_narrative: step.stepNarrative || null,
+            is_optional: step.optional || false,
+          });
+        }
+      }
+    }
+    // Chapters/modules/sections hierarchy (MCP generated paths)
+    else if (pathJson.chapters && pathJson.chapters.length > 0) {
+      let stepIndex = 0;
+      for (const chapter of pathJson.chapters) {
+        for (const module of chapter.modules || []) {
+          for (const section of module.sections || []) {
+            for (const conceptId of section.conceptIds || []) {
+              steps.push({
+                path_id: pathJson.id,
+                order_index: stepIndex++,
+                step_type: 'read',
+                resource_id: conceptId,
+                step_title: `${chapter.title} > ${module.title} > ${section.title}`,
+                step_narrative: null,
+                is_optional: false,
+              });
+            }
+          }
+        }
+      }
+    }
 
-        await appWs.callZome({
+    return steps;
+  };
+
+  // Create paths and their steps
+  for (const pathJson of newPaths) {
+    try {
+      console.log(`   📖 ${pathJson.id}: ${pathJson.title}`);
+
+      // Create the path
+      // Store chapters and audienceArchetype in metadata_json if present (preserves hierarchy for UI)
+      const pathMetadata: Record<string, any> = {};
+      if (pathJson.chapters && pathJson.chapters.length > 0) {
+        pathMetadata.chapters = pathJson.chapters;
+      }
+      if (pathJson.audienceArchetype) {
+        pathMetadata.audienceArchetype = pathJson.audienceArchetype;
+      }
+
+      const metadataJsonValue = Object.keys(pathMetadata).length > 0 ? JSON.stringify(pathMetadata) : null;
+      console.log(`      📦 metadata_json: ${metadataJsonValue ? `${pathMetadata.chapters?.length || 0} chapters (${metadataJsonValue.length} bytes)` : 'null'}`);
+
+      const pathInput: CreatePathInput = {
+        id: pathJson.id,
+        version: pathJson.version || '1.0.0',
+        title: pathJson.title,
+        description: pathJson.description || '',
+        purpose: pathJson.purpose || null,
+        difficulty: pathJson.difficulty || 'beginner',
+        estimated_duration: pathJson.estimatedDuration || null,
+        visibility: pathJson.visibility || 'public',
+        path_type: 'learning',
+        tags: pathJson.tags || [],
+        metadata_json: metadataJsonValue,
+      };
+
+      const pathResult = await timer.timeOperation('path_create', () =>
+        appWs.callZome({
           cell_id: cellId,
           zome_name: ZOME_NAME,
-          fn_name: 'add_path_step',
-          payload: stepInput,
-        });
-        console.log(`      📝 Step ${i + 1}: ${stepDef.title} → ${resourceId.slice(0, 30)}...`);
+          fn_name: 'create_path',
+          payload: pathInput,
+        })
+      );
+      console.log(`      ✅ Path created: ${encodeHashToBase64(pathResult as Uint8Array).slice(0, 15)}...`);
+
+      // OPTIMIZATION: Batch add all steps for this path
+      const steps = collectSteps(pathJson);
+      if (steps.length > 0) {
+        const stepResult = await timer.timeOperation('batch_add_path_steps', () =>
+          appWs.callZome({
+            cell_id: cellId,
+            zome_name: ZOME_NAME,
+            fn_name: 'batch_add_path_steps',
+            payload: { steps },
+          })
+        ) as { created_count: number; errors: string[] };
+
+        console.log(`      📝 Added ${stepResult.created_count} steps`);
+        if (stepResult.errors.length > 0) {
+          for (const err of stepResult.errors.slice(0, 2)) {
+            console.error(`         ⚠️ ${err}`);
+          }
+        }
       }
 
       pathSuccessCount++;
     } catch (error: any) {
       pathErrorCount++;
-      console.error(`      ❌ Error creating path: ${error.message || error}`);
+      console.error(`      ❌ ${cleanErrorMessage(error)}`);
     }
   }
 
-  // Final summary
   console.log('\n📊 Path Seeding Complete!');
-  console.log(`   ✅ Paths created: ${pathSuccessCount}`);
+  console.log(`   ✅ Success: ${pathSuccessCount}`);
   console.log(`   ❌ Errors: ${pathErrorCount}`);
 
-  // Verify paths were created by querying them back
-  console.log('\n🔍 Verifying paths...');
-  try {
-    const allPaths = await appWs.callZome({
-      cell_id: cellId,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_all_paths',
-      payload: null,
-    }) as any;
-    console.log(`   📊 get_all_paths returns: ${allPaths.total_count} paths`);
+  timer.endPhase('Path Seeding');
 
-    // Also try to get a specific path
-    const pathWithSteps = await appWs.callZome({
-      cell_id: cellId,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_path_with_steps',
-      payload: 'elohim-protocol-overview',
-    });
-    console.log(`   📖 get_path_with_steps('elohim-protocol-overview'):`, pathWithSteps ? 'FOUND' : 'NOT FOUND');
-  } catch (error: any) {
-    console.error(`   ❌ Verification failed:`, error.message);
-  }
-
-  // Get stats
-  console.log('\n📈 Fetching content stats...');
+  // ========================================
+  // GET STATS
+  // ========================================
+  timer.startPhase('Final Stats');
+  console.log('\n📈 Final stats...');
   try {
     const stats = await appWs.callZome({
       cell_id: cellId,
@@ -668,18 +1028,49 @@ async function seed() {
       fn_name: 'get_content_stats',
       payload: null,
     });
-    console.log('Content Stats:', stats);
-  } catch (error) {
-    console.log('Could not fetch stats:', error);
+    console.log('   Content Stats:', stats);
+
+    const allPaths = await appWs.callZome({
+      cell_id: cellId,
+      zome_name: ZOME_NAME,
+      fn_name: 'get_all_paths',
+      payload: null,
+    }) as any;
+    console.log(`   Paths: ${allPaths.total_count}`);
+  } catch (error: any) {
+    console.log(`   Could not fetch stats: ${cleanErrorMessage(error)}`);
   }
 
   await adminWs.client.close();
   await appWs.client.close();
 
+  timer.endPhase('Final Stats');
+
+  // Set seed results for the report
+  timer.setSeedResults({
+    conceptsCreated: conceptSuccessCount,
+    conceptErrors: conceptErrorCount,
+    pathsCreated: pathSuccessCount,
+    pathErrors: pathErrorCount,
+  });
+
+  // Print performance report
+  timer.printReport();
+
+  // Write report to file for snapshot:save to pick up
+  const reportPath = path.join(LOCAL_DEV_DIR, 'last-seed-report.json');
+  try {
+    const report = timer.exportReport();
+    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+    console.log(`\n📄 Report saved to: ${reportPath}`);
+  } catch (err) {
+    console.warn(`   Could not save report file: ${err}`);
+  }
+
   console.log('\n✨ Done!');
 }
 
 seed().catch((error) => {
-  console.error('Fatal error:', error);
+  console.error('Fatal error:', cleanErrorMessage(error));
   process.exit(1);
 });
