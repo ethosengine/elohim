@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <rect width="400" height="300" fill="#e8e8e8"/>
+  <rect x="50" y="50" width="300" height="200" rx="8" fill="#d0d0d0"/>
+  <path d="M150 120 L200 180 L250 140 L300 200 L100 200 Z" fill="#a0a0a0"/>
+  <circle cx="140" cy="100" r="25" fill="#a0a0a0"/>
+  <text x="200" y="260" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" fill="#666">Learning Path</text>
+</svg>
