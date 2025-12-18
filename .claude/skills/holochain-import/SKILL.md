@@ -24,7 +24,7 @@ All commands run from `elohim-library/projects/elohim-service/`:
 ```bash
 # Full import
 npx ts-node src/cli/holo-import.ts holo:import \
-  --source ./data/content \
+  --source ./docs/content \
   --admin-url wss://holochain-dev.elohim.host \
   --app-id lamad-spike \
   --batch-size 50
@@ -40,7 +40,7 @@ npx ts-node src/cli/holo-import.ts holo:import --skip-relationships
 ```
 
 **Options:**
-- `-s, --source <dir>` - Source content directory (default: `./data/content`)
+- `-s, --source <dir>` - Source content directory (default: `./docs/content`)
 - `--admin-url <url>` - Holochain admin WebSocket URL (default: `wss://holochain-dev.elohim.host`)
 - `--app-id <id>` - Holochain app ID (default: `lamad-spike`)
 - `--happ-path <path>` - Path to .happ file for installation

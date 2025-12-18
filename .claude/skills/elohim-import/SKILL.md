@@ -5,465 +5,688 @@ description: Knowledge and workflows for importing Elohim Protocol content into 
 
 # Elohim Import Skill
 
-This skill provides domain expertise for working with the Elohim Protocol content import pipeline. It transforms raw markdown and Gherkin files into structured ContentNode JSON for the lamad learning system.
+This skill provides domain expertise for transforming raw Elohim Protocol content into structured learning content for the lamad system. It supports both direct import of raw source files and creative transformation into structured concepts and paths.
+
+## Design Principles
+
+1. **Rust DNA is source of truth** - TypeScript/JSON schemas align with Holochain Rust structs
+2. **Maximal model complexity** - The graph supports rich relationships; AI derives meaning for learners
+3. **No static complexity** - Complexity is relative to the learner, not the content
+4. **This skill IS the AI** - During prototyping, Claude (via this skill) fulfills the AI derivation role at import time. In production, distributed AI agents will compute paths dynamically per-learner.
+
+## Content Pipeline Architecture
+
+```
+Holochain DNA (Rust)    [Source of truth - entry types, relationships]
+      ↓
+MCP Schemas (TypeScript) [Aligned with DNA structs]
+      ↓
+docs/content/           [Raw markdown, Gherkin - human authored]
+      ↓
+   Claude + MCP tools   [Non-deterministic, creative transformation]
+      ↓
+data/lamad/             [Structured JSON - schema-aligned seed data]
+      ↓
+   holochain/seeder     [Deterministic script - loads JSON to DHT]
+      ↓
+Holochain DHT           [Production data]
+```
+
+---
+
+## Pedagogical Seed Generation Pipeline
+
+This section documents the repeatable process for generating meaningful learning path hierarchies. The pipeline transforms raw content into pedagogically-sound curricula with proper scope and sequence.
+
+### Core Terminology
+
+| Term | Definition |
+|------|------------|
+| **Chapter** | Domain/theme grouping (answers "what world?") |
+| **Module** | Capability grouping (answers "what can I do?") |
+| **Section** | = **Lesson** (≤1hr, answers "what concept?") |
+| **Content** | Individual learning artifact |
+| **Skill** | Assessment derived from content |
+| **Assessment** | Aggregation of skill questions, scoped to lesson |
+
+### The Scoping Questions Framework
+
+Each hierarchy level must answer a **different question** to provide distinct semantic value:
+
+| Level | Question | Title Pattern | Example |
+|-------|----------|---------------|---------|
+| **Chapter** | "What domain?" | Domain noun phrase | "AI Governance" |
+| **Module** | "What capability?" | Verb + Object | "Navigating Constitutional Architecture" |
+| **Section** | "What concept?" | Concept noun phrase | "The Appeals Hierarchy" |
+| **Content** | "What artifact?" | Specific title | "The Appellant Journey" |
+
+**Anti-patterns to AVOID:**
+- ❌ Repeating parent title at child level ("Governance" → "Governance Overview" → "Governance Intro")
+- ❌ Generic titles ("Introduction", "Overview", "Basics")
+- ❌ Purely structural titles ("Part 1", "Section A", "Module 1")
+
+**Good patterns:**
+- ✅ Each level adds specificity
+- ✅ Titles answer different questions
+- ✅ Can reconstruct location from title alone
+
+### Section = Lesson (Critical Constraint)
+
+Each Section represents ONE LESSON with a **maximum duration of ~1 hour**. This constraint is based on human learning capacity limits.
+
+**Content Budget per Section:**
+- 2-4 concept items (articles, videos, etc.)
+- ~15-45 minutes of content consumption
+- ~15-20 minutes for reflection/assessment
+- Natural break points for session boundaries
+
+**Section Structure:**
+```
+Section: [Concept Title]
+├── Content 1: Foundation (the "what")
+├── Content 2: Depth (the "how" or "why")
+├── Content 3: Example/Application (optional)
+└── Assessment(s): Verify understanding before proceeding
+```
+
+### Assessments as Skills (Khan Academy Model)
+
+Assessments are NOT separate artifacts. They are **smart aggregations of questions generated FROM each piece of content**, scoped to the Lesson (Section) level.
+
+**Content → Skills → Assessments:**
+```
+Content Item: "The Appeals Process" (article)
+   └── Generates skill questions about appeals
+
+Content Item: "Appellant Scenario" (example)
+   └── Generates application questions about the same concept
+
+Section Assessment = Aggregation of questions from both content items
+```
+
+**Multiple Assessments per Lesson:**
+A section can have multiple assessments approaching the same concept from different angles:
+
+```
+Section: "Adding Two Numbers" (Lesson)
+├── Content: Explanation of addition
+├── Content: Visual representations
+├── Assessment 1: "Adding Two Numbers" (core - direct practice)
+└── Assessment 2: "Adding Two Numbers - Word Problems" (applied)
+```
+
+**Assessment Types:**
+- **`core`**: Direct application of concepts (knowledge recall, understanding)
+- **`applied`**: Scenarios, word problems, real-world application
+- **`synthesis`**: Combining multiple concepts, higher-order thinking
+
+### The 6-Phase Pedagogical Pipeline
+
+#### Phase 1: Audience Analysis
+
+**Purpose:** Understand the learner before designing curriculum.
+
+Create an audience archetype document (stored in `data/lamad/audiences/`):
+
+```yaml
+archetype:
+  name: "Policy-Developer-Blogger"
+  description: "Tech-literate advocate interested in systems change"
+
+entry_knowledge:
+  - Basic understanding of distributed systems
+  - Familiarity with governance concepts
+  - Some exposure to blockchain/crypto discourse
+
+motivations:
+  - Understand enough to advocate effectively
+  - Implement or contribute to the protocol
+  - Write/communicate about these ideas
+
+decisions_enabled:
+  - "Should I/my organization adopt this approach?"
+  - "How do I explain this to stakeholders?"
+  - "Where can I contribute technically?"
+
+time_budget: "6-8 hours total, 30-60 min sessions"
+
+resistance_points:
+  - Skepticism about "love" in technology
+  - Concerns about feasibility at scale
+  - Questions about economic sustainability
+```
+
+#### Phase 2: Content Inventory & Concept Extraction
+
+**Purpose:** Map all atomic concepts and their relationships.
+
+1. Read all source docs for the target domain
+2. Extract atomic concepts (single ideas that can stand alone)
+3. Identify relationships (prereq, related, extends, exemplifies)
+4. Tag concepts by type (theory, practice, example, assessment)
+
+#### Phase 3: Learning Objective Mapping
+
+**Purpose:** Define what learners should be able to DO at each level.
+
+Using Bloom's Taxonomy progression (Remember → Understand → Apply → Analyze → Evaluate → Create):
+
+- **Chapter (Terminal Objectives):** "Evaluate governance decisions against constitutional principles"
+- **Module (Enabling Objectives):** "Apply the appeals process to novel scenarios"
+- **Section (Concept Objectives):** "Explain how appeals escalate through constitutional layers"
+
+#### Phase 4: Hierarchical Scope Generation
+
+**Purpose:** Generate titles that provide DISTINCT semantic value at each level.
+
+Apply the Scoping Questions Framework to transform flat content into properly scoped hierarchy.
+
+**Example Transformation:**
+
+BEFORE (flat):
+```
+Chapter: AI Governance
+  Step: Governance Overview
+  Step: Quiz
+  Step: Policy Maker Perspective
+```
+
+AFTER (properly scoped):
+```
+Chapter: AI Governance (domain)
+  Module: Understanding Constitutional Architecture (capability)
+    Section: The Layered Governance Model (concept)
+      Content: Governance Epic Overview
+      Content: Constitutional Layers Diagram
+  Module: Navigating the System as a Stakeholder (capability)
+    Section: The Policy Maker's Interface (concept)
+      Content: Policy Maker README
+    Section: The Appellant's Journey (concept)
+      Content: Appellant README
+```
+
+#### Phase 5: Sequence Optimization
+
+**Purpose:** Order content for optimal learning.
+
+Sequencing Principles:
+1. **Prerequisites first:** Concepts that enable understanding come before those that require it
+2. **Scaffold complexity:** Simple → Complex within each module
+3. **Theory before practice:** Concepts before applications
+4. **Assess after clusters:** Check understanding after related concepts
+5. **End with synthesis:** Final module should integrate previous learning
+
+#### Phase 6: Narrative Threading
+
+**Purpose:** Each level tells a coherent story.
+
+**Narrative Templates:**
+
+- **Chapter description:** "In [Chapter], you'll explore [domain]. By the end, you'll be able to [terminal objective]."
+- **Module description:** "This module builds your ability to [capability]. You'll learn [key concepts] through [content types]."
+- **Section description:** "[Concept] is [brief definition]. Understanding this enables you to [application]."
+
+### Path JSON Schema (4-Level with Assessments)
+
+```json
+{
+  "id": "elohim-protocol",
+  "title": "Elohim Protocol: Living Documentation",
+  "chapters": [
+    {
+      "id": "chapter-2-governance",
+      "title": "AI Governance",
+      "description": "Constitutional oversight, appeals, and democratic AI governance",
+      "modules": [
+        {
+          "id": "mod-constitutional-architecture",
+          "title": "Understanding Constitutional Architecture",
+          "description": "Learn how the layered governance model enables both local autonomy and global coherence",
+          "sections": [
+            {
+              "id": "sec-layered-model",
+              "title": "The Layered Governance Model",
+              "estimatedMinutes": 45,
+              "conceptIds": [
+                "governance-epic",
+                "constitutional-layers"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-governance-layers-core",
+                  "title": "Governance Layers",
+                  "type": "core",
+                  "description": "Identify and explain the constitutional layers"
+                },
+                {
+                  "id": "skill-governance-layers-applied",
+                  "title": "Governance Layers - Scenarios",
+                  "type": "applied",
+                  "description": "Apply layer concepts to real-world scenarios"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Directory Structure (Updated)
+
+| Directory | Purpose |
+|-----------|---------|
+| `/docs/content/` | Raw source content (markdown, gherkin) |
+| `/data/lamad/` | Structured JSON seed data |
+| `/data/lamad/content/` | Concept JSON files |
+| `/data/lamad/paths/` | Learning path JSON files |
+| `/data/lamad/assessments/` | Assessment JSON files |
+| `/data/lamad/audiences/` | Audience archetype YAML files |
+
+---
 
 ## When to Use This Skill
 
 Reference this skill when the user:
-- Asks about importing content from `/data/content/`
-- Wants to understand the ContentNode schema
-- Needs to explore epics, user types, or scenarios
-- Is debugging import pipeline issues
-- Wants to validate standards compliance
-- Needs to manage human network data
+- Wants to import raw source files directly as content
+- Wants to create learning paths or modules from docs
+- Needs to transform markdown into structured concepts
+- Is building the content graph (concepts + relationships)
+- Wants to create quizzes or assessments
+- Needs to seed content to Holochain
 
-## Content Structure
+## Directory Structure
 
-### Source Content Locations
+| Directory | Purpose |
+|-----------|---------|
+| `/docs/content/` | Raw source content (markdown, gherkin) |
+| `/data/lamad/` | Structured JSON seed data |
+| `/data/lamad/content/` | Concept JSON files |
+| `/data/lamad/paths/` | Learning path JSON files |
+| `/data/lamad/assessments/` | Assessment JSON files |
 
-| Directory | Description |
-|-----------|-------------|
-| `/data/content/elohim-protocol/` | Main protocol content (governance, value_scanner, etc.) |
-| `/data/content/fct/` | Foundations for Christian Technology course |
-| `/data/content/ethosengine/` | Ethos Engine project content |
+## MCP Server: elohim-content
 
-### Epic Structure
+The `elohim-content` MCP server provides tools for reading, transforming, and writing content.
 
-Each epic follows this directory pattern:
+### Source Reading Tools
+
+| Tool | Purpose | Example |
+|------|---------|---------|
+| `read_doc` | Read markdown/gherkin from docs/content/ | `{"path": "elohim-protocol/governance/epic.md"}` |
+| `list_docs` | List documents by epic or pattern | `{"epic": "governance"}` |
+| `search_docs` | Search for concepts/keywords | `{"query": "constitutional oversight"}` |
+
+### Seed Data CRUD
+
+| Tool | Purpose |
+|------|---------|
+| `list_seeds` | List existing seed files (concepts, paths, assessments) |
+| `read_seed` | Read a specific seed JSON file |
+| `write_seed` | Write/update structured JSON to data/lamad/ |
+| `delete_seed` | Remove a seed file |
+| `validate_seed` | Validate against Holochain schemas |
+
+### Content Graph Tools
+
+| Tool | Purpose |
+|------|---------|
+| `create_concept` | Create atomic concept from docs or raw source |
+| `create_relationship` | Link concepts (DEPENDS_ON, RELATES_TO, CONTAINS, etc.) |
+| `query_graph` | Find concepts by tags, relationships |
+| `get_related` | Get related concepts for a node |
+| `update_concept` | Modify concept content/metadata |
+| `delete_concept` | Remove concept and relationships |
+
+### Path Authoring Tools
+
+Paths are **views/projections** over the content graph:
+
+| Tool | Purpose |
+|------|---------|
+| `create_path` | Create ordered traversal through graph |
+| `create_chapter` | Group concepts into chapter |
+| `create_module` | Group into module |
+| `create_section` | Group into section |
+| `add_to_path` | Add concept at position |
+| `remove_from_path` | Remove concept (keeps in graph) |
+| `generate_path` | Auto-generate from graph region |
+
+### Assessment Tools
+
+| Tool | Purpose |
+|------|---------|
+| `create_quiz` | Generate quiz from concepts |
+| `create_assessment` | Build assessment instrument |
+| `update_assessment` | Modify questions/scoring |
+
+## Import Modes
+
+### 1. Direct Source Import
+
+Import a raw source file directly as content, preserving the original markdown:
 
 ```
-[epic_name]/
-├── epic.md              # Domain narrative with YAML frontmatter
-├── [user_type]/
-│   ├── README.md        # Archetype definition
-│   └── scenarios/       # Gherkin feature files (.feature)
-└── resources/
-    ├── books/           # Reference books
-    ├── videos/          # Video content
-    └── organizations/   # Related organizations
+1. Read the source file
+   → read_doc(path: "elohim-protocol/manifesto.md")
+
+2. Create concept with full content
+   → create_concept(
+       id: "manifesto",
+       title: "Elohim Protocol Manifesto",
+       content: <full markdown from file>,
+       sourceDoc: "elohim-protocol/manifesto.md",
+       tags: ["elohim", "manifesto", "vision"]
+     )
 ```
 
-### Epics Available
+Use this mode when:
+- The source file should be preserved as-is
+- Content is already atomic (single document = single concept)
+- You want 1:1 mapping from docs to content
 
-- `governance` - AI constitutional oversight and appeals
-- `value_scanner` - Care economy and value recognition
-- `public_observer` - Civic participation and oversight
-- `autonomous_entity` - Workplace transformation
-- `social_medium` - Relationship-centered digital communication
-- `economic_coordination` - REA-based value flows
+### 2. Creative Transformation
 
-## Architecture
-
-The import pipeline uses **Kuzu embedded graph database** as the source of truth:
+Transform source material into multiple atomic concepts with relationships:
 
 ```
-/data/content/*.md, *.feature
-        ↓
-   import command → Kuzu database (schema enforced)
-        ↓
-   db:dump → lamad-seed.cypher (git-committed)
-        ↓
-   Angular WASM loads Kuzu directly
+1. Read the source file(s)
+   → read_doc(path: "elohim-protocol/governance/epic.md")
+
+2. Extract multiple atomic concepts
+   → create_concept(id: "separation-of-powers", ...)
+   → create_concept(id: "appeals-process", ...)
+   → create_concept(id: "constitutional-oversight", ...)
+
+3. Create relationships
+   → create_relationship(source: "appeals-process", target: "separation-of-powers", type: "DEPENDS_ON")
 ```
 
-This architecture:
-- Enforces schema with primary key uniqueness
-- Uses Holochain-style hash IDs for future compatibility
-- Enables Cypher graph queries
-- Produces git-friendly seed files
+Use this mode when:
+- Source content covers multiple distinct concepts
+- You want to build a knowledge graph
+- Content needs to be chunked for learning purposes
 
-## CLI Commands
+## Content Model
 
-Run from `elohim-library/projects/elohim-service/`:
+### Content Graph vs Paths
 
-### Import Commands
-
-```bash
-# Full import to Kuzu database (recommended)
-npx ts-node src/cli/import.ts import \
-  --source /projects/elohim/data/content \
-  --db ./output/lamad.kuzu \
-  --full
-
-# Incremental import (only changed files)
-npx ts-node src/cli/import.ts import --db ./output/lamad.kuzu
-
-# Skip relationships (faster, uses less memory)
-npx ts-node src/cli/import.ts import --db ./output/lamad.kuzu --skip-relationships
-
-# Dry run (don't write to database)
-npx ts-node src/cli/import.ts import --db ./output/lamad.kuzu --dry-run
+```
+                ┌─────────────────────────────────────┐
+                │         CONTENT GRAPH               │
+                │  (multi-dimensional knowledge graph) │
+                │                                     │
+                │   Concept ←→ Concept ←→ Concept     │
+                │      ↑          ↑          ↑        │
+                │ DEPENDS_ON  RELATES_TO  CONTAINS    │
+                │      ↓          ↓          ↓        │
+                │   Concept ←→ Concept ←→ Concept     │
+                └─────────────────────────────────────┘
+                                ↓
+                ┌─────────────────────────────────────┐
+                │      PATH (one view/projection)      │
+                │                                     │
+                │   Chapter → Module → Section        │
+                │      (ordered traversal of graph)   │
+                └─────────────────────────────────────┘
 ```
 
-### Exploration Commands
+- **Content Graph**: Underlying knowledge graph with all relationships
+- **Path**: One ordered traversal/projection over the graph
+- **Exploration**: Users can leave path to explore related graph nodes
 
-```bash
-# List all epics with node counts
-npx ts-node src/cli/import.ts list-epics
+### Concept Schema
 
-# List user types/archetypes
-npx ts-node src/cli/import.ts list-user-types
-npx ts-node src/cli/import.ts list-user-types --epic governance
+Aligned with Holochain DNA `Content` struct:
 
-# Explore content with filters
-npx ts-node src/cli/import.ts explore --epic governance
-npx ts-node src/cli/import.ts explore --user-type policy_maker
-npx ts-node src/cli/import.ts explore --type scenario --limit 20
-npx ts-node src/cli/import.ts explore --node specific-node-id
+```json
+{
+  "id": "separation-of-powers",
+  "title": "Separation of Powers",
+  "content": "Markdown content here...",
+  "contentFormat": "markdown",
+  "contentType": "article",
+  "sourceDoc": "elohim-protocol/governance/epic.md",
+  "tags": ["governance", "constitutional"],
+  "relationships": [
+    {"target": "appeals-process", "type": "RELATES_TO"},
+    {"target": "ai-oversight", "type": "DEPENDS_ON"},
+    {"target": "governance-epic", "type": "DERIVED_FROM"}
+  ],
+  "estimatedMinutes": 8
+}
 ```
 
-### Validation Commands
-
-```bash
-# Check manifest and import stats
-npx ts-node src/cli/import.ts stats
-npx ts-node src/cli/import.ts validate
-
-# Validate standards compliance (DID, JSON-LD, Open Graph)
-npx ts-node src/cli/import.ts validate-standards
-```
-
-### Trust & Human Commands
-
-```bash
-# Enrich content with trust scores from attestations
-npx ts-node src/cli/import.ts enrich-trust
-
-# Scaffold templates for user types
-npx ts-node src/cli/import.ts scaffold --list
-npx ts-node src/cli/import.ts scaffold --epic governance
-npx ts-node src/cli/import.ts scaffold --epic governance --user policy_maker
-
-# Manage human network
-npx ts-node src/cli/import.ts add-human --name "Alice" --id alice --bio "Activist" --category community
-npx ts-node src/cli/import.ts add-relationship --from alice --to bob --type neighbor
-npx ts-node src/cli/import.ts import-humans
-```
-
-### Database Commands (Kuzu Graph DB)
-
-Kuzu is the **source of truth** for all content data.
-
-```bash
-# Show database statistics
-npx ts-node src/cli/import.ts db:stats --db ./output/lamad.kuzu
-
-# Export to Cypher seed file (git-friendly, for version control)
-npx ts-node src/cli/import.ts db:dump \
-  --db ./output/lamad.kuzu \
-  --output ./output/lamad-seed.cypher
-
-# Export to JSON (for Angular or other consumers)
-npx ts-node src/cli/import.ts db:export \
-  --db ./output/lamad.kuzu \
-  --output ./output/lamad-export
-
-# Execute raw Cypher queries
-npx ts-node src/cli/import.ts query --db ./output/lamad.kuzu \
-  -q "MATCH (p:LearningPath) RETURN p.id, p.title"
-
-npx ts-node src/cli/import.ts query --db ./output/lamad.kuzu \
-  -q "MATCH (c:ContentNode) WHERE c.contentType = 'scenario' RETURN c.id, c.title LIMIT 10"
-```
-
-### Path & Content CRUD
-
-```bash
-# List all learning paths
-npx ts-node src/cli/import.ts path:list --db ./output/lamad.kuzu
-
-# Show path details
-npx ts-node src/cli/import.ts path:show --db ./output/lamad.kuzu --id elohim-protocol
-
-# Create new path
-npx ts-node src/cli/import.ts path:create --db ./output/lamad.kuzu \
-  --id my-journey \
-  --title "My Learning Journey" \
-  --difficulty beginner
-
-# Add step to path
-npx ts-node src/cli/import.ts path:add-step --db ./output/lamad.kuzu \
-  --path my-journey \
-  --content manifesto \
-  --position 0 \
-  --title "The Vision"
-
-# Show content node
-npx ts-node src/cli/import.ts content:show --db ./output/lamad.kuzu --id manifesto
-
-# Create new content node
-npx ts-node src/cli/import.ts content:create --db ./output/lamad.kuzu \
-  --id my-concept \
-  --type concept \
-  --title "My Concept" \
-  --content "Description here"
-```
-
-#### Cypher Query Examples
-
-```cypher
--- Find all paths with their step counts
-MATCH (p:LearningPath)-[:PATH_HAS_STEP]->(s:PathStep)
-RETURN p.id, p.title, count(s) as stepCount
-
--- Find content by type
-MATCH (c:ContentNode)
-WHERE c.contentType = 'scenario'
-RETURN c.id, c.title
-
--- Find related content (graph traversal)
-MATCH (a:ContentNode)-[:RELATES_TO]->(b:ContentNode)
-WHERE a.id = 'manifesto'
-RETURN b.id, b.title
-
--- Find path steps with content
-MATCH (p:LearningPath)-[:PATH_HAS_STEP]->(s:PathStep)-[:STEP_USES_CONTENT]->(c:ContentNode)
-WHERE p.id = 'elohim-protocol'
-RETURN s.orderIndex, s.stepTitle, c.title
-ORDER BY s.orderIndex
-```
-
-### Learning Path Generation
-
-```bash
-# Generate a learning path from imported content
-npx ts-node src/cli/import.ts generate-path \
-  --id governance-intro \
-  --title "Introduction to AI Governance" \
-  --epic governance \
-  --user-type policy_maker \
-  --max-steps 10
-
-# Generate with chapters (grouped by content type)
-npx ts-node src/cli/import.ts generate-path \
-  --id value-scanner-journey \
-  --title "Value Scanner Deep Dive" \
-  --epic value_scanner \
-  --chapters \
-  --max-steps 15
-
-# Preview without writing (dry run)
-npx ts-node src/cli/import.ts generate-path \
-  --id test-path \
-  --title "Test Path" \
-  --epic governance \
-  --dry-run
-
-# Full options
-npx ts-node src/cli/import.ts generate-path \
-  --id <id>                    # Required: kebab-case path ID
-  --title <title>              # Required: display title
-  --description <desc>         # Optional: path description
-  --purpose <purpose>          # Optional: why follow this path
-  --epic <name>                # Filter to specific epic
-  --user-type <type>           # Filter to specific user type
-  --type <types>               # Content types (default: scenario,role,epic)
-  --difficulty <level>         # beginner, intermediate, advanced
-  --max-steps <n>              # Maximum steps (default: 10)
-  --chapters                   # Organize into chapters by type
-  --dry-run                    # Preview without writing
-  --output <dir>               # Output directory (default: ./output/lamad)
-```
-
-## ContentNode Schema
-
-### Core Fields
+#### Content Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Unique identifier (kebab-case) |
-| `contentType` | ContentType | source, epic, scenario, role, reference, example |
-| `title` | string | Display title |
-| `description` | string | Brief summary |
-| `content` | string | Full content body |
-| `contentFormat` | ContentFormat | markdown, gherkin, plaintext, html |
-| `tags` | string[] | Classification tags |
-| `relatedNodeIds` | string[] | Links to related content |
-| `metadata` | object | Additional structured data |
+| `estimatedMinutes` | number | Reading/viewing time in minutes |
+| `contentType` | `"article"` \| `"video"` \| `"interactive"` \| `"assessment"` | Media format |
+| `metadata` | object | Extensible JSON for additional data |
 
-### Metadata Fields
+**Note:** Complexity is NOT stored on content. It's relative to the learner - a beginner finds content "deep" that an expert finds "light".
 
-| Field | Description |
-|-------|-------------|
-| `epic` | Parent epic name |
-| `userType` | Associated user archetype |
-| `derivedFrom` | Source node ID (provenance) |
-| `sourceType` | Type of source file |
-| `importedAt` | Import timestamp |
+**This skill IS the AI:** During prototyping, Claude (via this skill) makes complexity and sequencing judgments when creating relationships and paths. When building a learning path, Claude assesses prerequisite depth, concept ordering, and appropriate chunking based on the target learner profile. In production, distributed AI agents will make these assessments dynamically per-learner.
 
-## Relationship Types
+### Path Schema
+
+Paths use a **4-level hierarchy** aligned between MCP schemas and Angular models:
+
+```
+Path
+  └── Chapter (PathChapter)
+        └── Module (PathModule)
+              └── Section (PathSection)
+                    └── conceptIds: string[]
+```
+
+**Example:**
+```json
+{
+  "id": "governance-intro",
+  "title": "Introduction to Constitutional Governance",
+  "description": "Learn the foundations of AI constitutional oversight",
+  "difficulty": "beginner",
+  "chapters": [
+    {
+      "id": "ch-foundations",
+      "title": "Constitutional Foundations",
+      "order": 0,
+      "modules": [
+        {
+          "id": "mod-principles",
+          "title": "Core Principles",
+          "order": 0,
+          "sections": [
+            {
+              "id": "sec-separation",
+              "title": "Separation of Powers",
+              "order": 0,
+              "conceptIds": ["separation-of-powers", "checks-balances"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Angular Model Types:**
+- `PathChapter` - contains `modules: PathModule[]` (required)
+- `PathModule` - contains `sections: PathSection[]` (required)
+- `PathSection` - contains `conceptIds: string[]` (required, links to ContentNode IDs)
+
+### Relationship Types (DNA-aligned)
+
+Aligned with Holochain DNA `Relationship.relationship_type`:
 
 | Type | Description |
 |------|-------------|
-| `CONTAINS` / `BELONGS_TO` | Hierarchical parent-child |
-| `DERIVED_FROM` / `SOURCE_OF` | Provenance chain |
-| `RELATES_TO` | General conceptual connection |
-| `REFERENCES` | Content mentions another node |
+| `RELATES_TO` | General association between concepts |
+| `CONTAINS` | Parent-child hierarchical relationship |
+| `DEPENDS_ON` | Prerequisite dependency (must understand first) |
+| `IMPLEMENTS` | Implementation of a concept |
+| `REFERENCES` | Citation or reference to another concept |
+| `DERIVED_FROM` | This content was derived from source content |
 
-## Output Structure
+#### The `DERIVED_FROM` Relationship
+
+Use `DERIVED_FROM` to link derived/transformed content back to its source:
 
 ```
-output/lamad/
-├── nodes.json           # All ContentNodes
-├── relationships.json   # All relationships
-├── import-summary.json  # Import statistics
-├── manifest.json        # Incremental tracking
-└── paths/               # Generated learning paths
-    ├── index.json       # Path catalog/index
-    └── [path-id].json   # Individual path definitions
+Source Document (raw)          Derived Content (atomic lesson)
+┌─────────────────────┐       ┌─────────────────────────────┐
+│ governance-epic.md  │ ←──── │ separation-of-powers.json   │
+│ (full epic document)│       │ relationships: [            │
+└─────────────────────┘       │   {target: "governance-epic",│
+                              │    type: "DERIVED_FROM"}    │
+                              │ ]                           │
+                              └─────────────────────────────┘
 ```
 
-## Models & Schemas
+This enables:
+- **Provenance tracking**: Know where content came from
+- **Discovery**: "View source document" links in UI
+- **Hierarchy derivation**: AI can traverse `DERIVED_FROM` to build scope/sequence
 
-### Service Models (elohim-service/src/models/)
+## Example Workflows
 
-| Model | File | Purpose |
-|-------|------|---------|
-| `ContentNode` | content-node.model.ts | Core content unit with id, title, content, metadata |
-| `ContentRelationship` | content-node.model.ts | Graph edges between nodes |
-| `PathMetadata` | path-metadata.model.ts | Metadata extracted from file paths |
-| `ContentManifest` | manifest.model.ts | Tracks imports for incremental updates |
-| `ImportOptions` | import-context.model.ts | Pipeline configuration options |
-| `ImportResult` | import-context.model.ts | Pipeline execution results |
+### Enrich Content with Attention Metadata
 
-### App Models (elohim-app/src/app/lamad/models/)
+When importing or updating content, add attention metadata for digestible learning sessions:
 
-| Model | File | Purpose |
-|-------|------|---------|
-| `ContentNode` | content-node.model.ts | App-side content (mirrors service) |
-| `LearningPath` | learning-path.model.ts | Structured learning sequences |
-| `Exploration` | exploration.model.ts | User exploration state |
-| `HumanNode` | human-node.model.ts | Human personas in network |
-| `ContentAttestation` | content-attestation.model.ts | Trust attestations |
-| `TrustBadge` | trust-badge.model.ts | Visual trust indicators |
-| `ContentMastery` | content-mastery.model.ts | Learning progress tracking |
-| `KnowledgeMap` | knowledge-map.model.ts | Knowledge graph visualization |
+```
+1. Read existing concept
+   → read_seed(path: "content/separation-of-powers.json")
 
-### Type Definitions
+2. Estimate reading time (word count / 200 wpm)
+   → ~1500 words = 8 minutes
 
-**ContentType** (content-node.model.ts):
-- `source` - Raw source file (provenance layer)
-- `epic` - Domain narrative
-- `feature` - Feature specification
-- `scenario` - Behavioral specification (gherkin)
-- `concept` - Abstract concept
-- `role` - Archetype/persona definition
-- `video` - Video content
-- `organization` - Organization profile
-- `book-chapter` - Reference material
-- `path` - Learning path
-- `assessment` - Assessment instrument
-- `reference` - External reference
-- `example` - Code or usage example
+3. Update with metadata
+   → write_seed(path: "content/separation-of-powers.json", {
+       ...existingContent,
+       estimatedMinutes: 8,
+       contentType: "article"
+     })
+```
 
-**ContentFormat**:
-- `markdown` - Markdown text
-- `gherkin` - Gherkin feature files
-- `html` - HTML content
-- `plaintext` - Plain text
-- `video-embed` - Embedded video
-- `external-link` - External URL
-- `quiz-json` - Quiz data
-- `assessment-json` - Assessment data
+**Note:** Do NOT add a static complexity field. Complexity is relative to the learner. Instead, **this skill (Claude) embeds complexity judgments into the graph structure** - through relationship types (`DEPENDS_ON` for prerequisites), ordering in paths, and chunking decisions made during import.
 
-**ImportMode** (import-context.model.ts):
-- `full` - Import everything from scratch
-- `incremental` - Only import changed files
-- `schema-migrate` - Update existing to new schema
+### Import Raw Source Files
 
-**EpicCategory** (path-metadata.model.ts):
-- `governance`, `autonomous_entity`, `public_observer`
-- `social_medium`, `value_scanner`, `economic_coordination`
-- `lamad`, `other`
+Import a collection of markdown files directly:
 
-**HumanCategory** (human.service.ts):
-- `core-family`, `workplace`, `community`, `affinity`
-- `local-economy`, `newcomer`, `visitor`, `red-team`, `edge-case`
+```
+1. List available documents
+   → list_docs(epic: "governance")
 
-## Services
+2. For each document, read and create concept
+   → doc = read_doc(path: "elohim-protocol/governance/epic.md")
+   → create_concept(
+       id: "governance-epic",
+       title: doc.frontmatter.title || "Governance Epic",
+       content: doc.content,
+       sourceDoc: doc.path,
+       tags: doc.frontmatter.tags || ["governance"]
+     )
+```
 
-| Service | File | Purpose |
-|---------|------|---------|
-| `import-pipeline` | import-pipeline.service.ts | Main import orchestration |
-| `manifest` | manifest.service.ts | Manifest loading/saving |
-| `relationship-extractor` | relationship-extractor.service.ts | Graph relationship inference |
-| `standards` | standards.service.ts | DID, JSON-LD, Open Graph generation |
-| `trust` | trust.service.ts | Attestation-based trust scoring |
-| `human` | human.service.ts | Human network management |
-| `scaffold` | scaffold.service.ts | Template generation |
+### Transform into Learning Module
 
-## Database (Kuzu)
+```
+1. Read the governance epic
+   → read_doc(path: "elohim-protocol/governance/epic.md")
 
-### Schema Overview
+2. Extract atomic concepts
+   → create_concept(id: "separation-of-powers", title: "...", content: "...")
+   → create_concept(id: "appeals-process", ...)
+   → create_concept(id: "constitutional-oversight", ...)
 
-The Kuzu graph database schema is designed for Holochain compatibility:
+3. Create relationships
+   → create_relationship(source: "appeals-process", target: "separation-of-powers", type: "DEPENDS_ON")
 
-| Node Table | Purpose | Maps To |
-|------------|---------|---------|
-| `ContentNode` | Core content unit | Holochain content entry |
-| `LearningPath` | Curated learning journey | Holochain path entry |
-| `PathStep` | Step in a learning path | Embedded in path |
-| `PathChapter` | Chapter grouping steps | Embedded in path |
-| `Agent` | Human, AI, or org | Holochain AgentPubKey |
-| `AgentProgress` | User progress on path | Private Holochain entry |
-| `ContentAttestation` | Trust endorsement | Holochain link + entry |
+4. Build learning path
+   → create_path(id: "governance-intro", title: "...")
+   → create_chapter(id: "ch-foundations", pathId: "governance-intro", ...)
+   → create_module(id: "mod-principles", pathId: "governance-intro", chapterId: "ch-foundations", ...)
+   → create_section(id: "sec-overview", conceptIds: ["separation-of-powers", "appeals-process"], ...)
 
-| Relationship Table | From → To | Purpose |
-|--------------------|-----------|---------|
-| `CONTAINS` | ContentNode → ContentNode | Hierarchical |
-| `RELATES_TO` | ContentNode → ContentNode | Semantic link |
-| `DEPENDS_ON` | ContentNode → ContentNode | Prerequisite |
-| `PATH_HAS_STEP` | LearningPath → PathStep | Path structure |
-| `PATH_HAS_CHAPTER` | LearningPath → PathChapter | Chapter structure |
-| `CHAPTER_HAS_STEP` | PathChapter → PathStep | Chapter steps |
-| `STEP_USES_CONTENT` | PathStep → ContentNode | Step content |
-| `AUTHORED` | Agent → ContentNode | Authorship |
+5. Create quiz
+   → create_quiz(id: "gov-quiz-1", title: "Governance Basics", conceptIds: [...])
+```
 
-### Database Files
+### Seed to Holochain
 
-| File | Purpose |
-|------|---------|
-| `db/kuzu-schema.ts` | Schema DDL definitions |
-| `db/kuzu-client.ts` | KuzuClient class with CRUD operations |
-| `db/index.ts` | Module exports |
+After creating content in data/lamad/, run the seeder:
+
+```bash
+cd /projects/elohim/holochain/seeder
+npm run seed
+```
+
+The seeder reads JSON from data/lamad/ and loads it to Holochain DHT.
+
+## Epics Available
+
+Source content organized by epic:
+
+| Epic | Description |
+|------|-------------|
+| `governance` | AI constitutional oversight and appeals |
+| `value_scanner` | Care economy and value recognition |
+| `public_observer` | Civic participation and oversight |
+| `autonomous_entity` | Workplace transformation |
+| `social_medium` | Relationship-centered digital communication |
+| `economic_coordination` | REA-based value flows |
+
+## Schema Definitions
+
+Schemas are defined in `/projects/elohim/mcp-servers/elohim-content/src/schemas/index.ts`:
+
+- `conceptSchema` - Atomic knowledge unit
+- `pathSchema` - Learning path with chapters/modules/sections
+- `assessmentSchema` - Quiz and assessment instruments
+- `questionSchema` - Individual assessment questions
+
+## Legacy CLI Commands
+
+The CLI in `elohim-library/projects/elohim-service/` provides exploration commands:
+
+```bash
+# List epics
+npx ts-node src/cli/import.ts list-epics
+
+# Explore content
+npx ts-node src/cli/import.ts explore --epic governance
+
+# List user types
+npx ts-node src/cli/import.ts list-user-types
+```
 
 ## Troubleshooting
 
-### Out of Memory
+### No content in data/lamad/
 
-For large imports, increase Node.js memory:
+Use the MCP tools to:
+1. **Direct import**: Read source files and create concepts with full content
+2. **Transform**: Extract atomic concepts from source material
+
+### Seeder can't find content
+
+Ensure JSON files exist in:
+- `data/lamad/content/*.json` - Concepts
+- `data/lamad/paths/*.json` - Learning paths
+- `data/lamad/assessments/*.json` - Assessments
+
+### MCP server not responding
+
+Build and restart the MCP server:
 ```bash
-NODE_OPTIONS="--max-old-space-size=4096" npx ts-node src/cli/import.ts import
+cd /projects/elohim/mcp-servers/elohim-content
+npm install
+npm run build
 ```
-
-Or skip relationship extraction:
-```bash
-npx ts-node src/cli/import.ts import --skip-relationships
-```
-
-### Missing Relationships
-
-Relationships are skipped by default for performance. Run with relationships:
-```bash
-npx ts-node src/cli/import.ts import --full  # includes relationships
-```
-
-### Schema Validation Errors
-
-Check that source files have valid YAML frontmatter:
-```yaml
----
-epic: governance
-user_type: policy_maker
----
-```
-
-## File Sync
-
-The following files should stay in sync:
-- **This skill** documents CLI commands and schemas
-- **CLI** (import.ts) implements commands using services
-- **Models** define data structures used throughout
-- **Services** implement business logic
-
-When modifying any of these, hooks will remind you to update related files.

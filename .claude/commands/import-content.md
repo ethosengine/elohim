@@ -20,7 +20,7 @@ Import content from source files into lamad ContentNodes.
 
 This command triggers the elohim-service content import pipeline:
 
-1. **Scans** `/data/content/` for markdown (.md) and Gherkin (.feature) files
+1. **Scans** `/docs/content/` for markdown (.md) and Gherkin (.feature) files
 2. **Parses** each file extracting:
    - Path metadata (domain, epic, user type)
    - YAML frontmatter
@@ -58,5 +58,5 @@ Located at: `elohim-library/projects/elohim-service/`
 To run manually:
 ```bash
 cd elohim-library/projects/elohim-service
-npx ts-node src/cli/import.ts import --source ../../data/content --output ../../output/lamad
+npx ts-node src/cli/import.ts import --source ../../docs/content --output ../../output/lamad
 ```
