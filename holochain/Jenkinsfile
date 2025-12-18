@@ -506,14 +506,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('Deploy Edge Node - Alpha') {
+        // NOTE: Alpha edge node deployment removed.
+        // Consolidated architecture: holochain-dev.elohim.host serves both alpha and staging apps.
+        // holochain.elohim.host (production) deployed from main branch.
+
+        stage('Deploy Edge Node - Prod') {
             when {
                 allOf {
                     changeset "holochain/**"
-                    anyOf {
-                        branch 'dev'
-                        expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
-                    }
+                    branch 'main'
                 }
             }
             steps {
@@ -522,14 +523,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         def props = loadBuildVars()
 
                         withBuildVars(props) {
-                            echo "Deploying Edge Node to Alpha: ${IMAGE_TAG}"
+                            echo "Deploying Edge Node to Production: ${IMAGE_TAG}"
 
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-alpha.yaml > holochain/manifests/edgenode-alpha-${IMAGE_TAG}.yaml"
-                            sh "kubectl apply -f holochain/manifests/edgenode-alpha-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-edgenode-alpha -n ethosengine"
-                            sh "kubectl rollout status deployment/elohim-edgenode-alpha -n ethosengine --timeout=300s"
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-prod.yaml > holochain/manifests/edgenode-prod-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f holochain/manifests/edgenode-prod-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-edgenode-prod -n ethosengine"
+                            sh "kubectl rollout status deployment/elohim-edgenode-prod -n ethosengine --timeout=300s"
 
-                            echo "Edge Node Alpha deployed: https://holochain-alpha.elohim.host"
+                            echo "Edge Node Prod deployed: https://holochain.elohim.host"
                         }
                     }
                 }

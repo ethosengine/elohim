@@ -6,7 +6,8 @@ export const environment = {
   environment: 'alpha',
   gitHash: 'GIT_HASH_PLACEHOLDER',
   // Holochain Edge Node configuration
-  // Alpha uses dev instance until alpha holochain is deployed
+  // Alpha and Staging share holochain-dev for pre-production testing
+  // This consolidated architecture enables RNA version testing before production
   holochain: {
     adminUrl: 'wss://holochain-dev.elohim.host',
     appUrl: 'wss://holochain-dev.elohim.host',

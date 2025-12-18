@@ -7,8 +7,15 @@ This guide explains the different runtime environments for developing and deploy
 | Build Config | App Deployment | Holochain URL | Holochain Deployment |
 |--------------|----------------|---------------|----------------------|
 | `alpha` | `alpha.elohim.host` | `wss://holochain-dev.elohim.host` | `elohim-edgenode-dev` |
-| `staging` | `staging.elohim.host` | `wss://holochain-alpha.elohim.host` | `elohim-edgenode-alpha` |
-| `production` | `elohim.host` | `wss://holochain.elohim.host` | (not deployed yet) |
+| `staging` | `staging.elohim.host` | `wss://holochain-dev.elohim.host` | `elohim-edgenode-dev` |
+| `production` | `elohim.host` | `wss://holochain.elohim.host` | `elohim-edgenode-prod` |
+
+**Consolidated Holochain Architecture:**
+- **Pre-production** (`holochain-dev.elohim.host`): Serves both alpha and staging apps
+  - Enables RNA (DNA version) testing before production
+  - Single conductor can host multiple hApp versions
+  - Reduces infrastructure complexity
+- **Production** (`holochain.elohim.host`): Reserved for production deployments
 
 **Branch to Build Config Mapping:**
 - `dev` branch, `feat-*`, `claude/*` branches → `alpha` config
@@ -109,18 +116,18 @@ holochain: {
 
 ---
 
-## Runtime 3: Deployed Alpha App → Deployed Dev Holochain
+## Runtime 3: Deployed Alpha/Staging Apps → Deployed Dev Holochain
 
-**Use case:** Alpha testing by stakeholders at `alpha.elohim.host`
+**Use case:** Pre-production testing by stakeholders at `alpha.elohim.host` or `staging.elohim.host`
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │  User's Browser                                                      │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  https://alpha.elohim.host                                          │
+│  https://alpha.elohim.host  OR  https://staging.elohim.host         │
 │      │                                                               │
-│      │ Loads Angular app (built with --configuration=alpha)         │
+│      │ Loads Angular app (built with --configuration=alpha/staging) │
 │      │                                                               │
 │      │ wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024  │
 │      ▼                                                               │
@@ -131,12 +138,17 @@ holochain: {
 ┌─────────────────────────────────────────────────────────────────────┐
 │  elohim-edgenode-dev (Kubernetes)                                   │
 │  Same as Runtime 2                                                  │
+│                                                                      │
+│  Consolidated architecture - supports multiple hApp versions:       │
+│  ├── lamad-spike (current version)                                  │
+│  └── lamad-v2 (future RNA upgrades)                                 │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Note:** The alpha app currently connects to `holochain-dev.elohim.host` which is IP-whitelisted. This means:
+**Note:** Both alpha and staging apps connect to `holochain-dev.elohim.host` which is IP-whitelisted. This means:
 - Works from internal network (Che, cluster pods, VPN)
 - Does NOT work from public internet without VPN/port-forward
+- Enables testing RNA version upgrades before production deployment
 
 ---
 

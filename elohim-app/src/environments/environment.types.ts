@@ -15,6 +15,8 @@ export interface HolochainEnvironmentConfig {
   adminUrl: string;
   /** App WebSocket URL (direct conductor access after auth) */
   appUrl: string;
+  /** HTTP base URL for auth endpoints (admin-proxy /auth/*) */
+  authUrl?: string;
   /** API key for admin proxy authentication */
   proxyApiKey?: string;
   /** Use local dev-proxy in Eclipse Che (auto-detected if true) */

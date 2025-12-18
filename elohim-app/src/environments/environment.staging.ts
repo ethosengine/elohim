@@ -2,14 +2,15 @@ import { LogLevel } from './environment.types';
 
 export const environment = {
   production: false,
-  logLevel: 'debug' as LogLevel,
+  logLevel: 'info' as LogLevel,
   environment: 'staging',
   gitHash: 'GIT_HASH_PLACEHOLDER',
-  // Holochain Edge Node configuration (staging uses alpha for now)
-  // Single proxy URL handles admin operations with authentication
+  // Holochain Edge Node configuration
+  // Alpha and Staging share holochain-dev for pre-production testing
+  // This allows RNA version testing before production deployment
   holochain: {
-    adminUrl: 'wss://holochain-alpha.elohim.host',
-    appUrl: 'wss://holochain-alpha.elohim.host',
-    proxyApiKey: 'alpha-elohim-auth-2024',
+    adminUrl: 'wss://holochain-dev.elohim.host',
+    appUrl: 'wss://holochain-dev.elohim.host',
+    proxyApiKey: 'dev-elohim-auth-2024',
   }
 };
