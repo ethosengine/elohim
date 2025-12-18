@@ -1,0 +1,67 @@
+---
+epic: social_medium
+user_type: community_moderator
+archetype_name: "Community Moderator"
+epic_domain: "Digital Communication - Relationship-centered social media"
+governance_scope: [neighborhood, community, district, affinity_network, cultural_linguistic, educational]
+related_users: [activist, child, elder, content_creator]
+---
+
+# Community Moderator - Social Medium
+
+## Archetype
+
+A community moderator is someone who maintains healthy, productive spaces at various governance layers. Unlike platform moderators enforcing top-down rules, Elohim moderators serve their communities by upholding locally-determined standards, responding to conflicts with restorative approaches, and working alongside AI agents to maintain spaces where human flourishing is possible. They may be volunteer community members, elected representatives, or recognized leaders.
+
+Key characteristics:
+- Age range: Typically adults (25+) with demonstrated community wisdom
+- Serves specific communities rather than enforcing platform-wide rules
+- Uses restorative justice approaches over punitive moderation
+- Works with AI agents as partners in maintaining healthy spaces
+- Accountable to the communities they serve
+- Balances free expression with harm prevention
+- Focuses on community flourishing, not rule enforcement
+
+## Core Needs
+
+- **Agent Partnership**: AI agents handle pattern detection and routine tasks; humans handle nuanced judgment
+- **Restorative Tools**: Approaches that heal harm and restore relationships rather than just punish
+- **Community Accountability**: Clear mandate from and accountability to the communities they serve
+- **Burnout Prevention**: Sustainable moderation that doesn't extract moderators' wellbeing
+- **Context Understanding**: Tools that provide full context for making wise decisions
+
+## Key Relationships
+
+- **activist**: Supports organizing spaces while preventing infiltration and bad actors
+- **child**: Ensures safe spaces for youth participation and learning
+- **elder**: Protects vulnerable elders while preserving their dignity and agency
+- **content_creator**: Works with creators to maintain quality and truth standards
+- **Elohim Moderation Agent**: Partners with AI to detect patterns, surface concerns, and maintain health
+
+## Relevant Governance Layers
+
+### Geographic/Political
+
+- **neighborhood**: Local community space moderation, neighbor dispute resolution
+- **community**: Community-wide space management, standard setting
+- **district**: Cross-community moderation coordination
+
+### Functional
+
+- **affinity_network**: Interest community moderation (hobby groups, support networks)
+- **cultural_linguistic**: Cultural community space moderation, cultural standard preservation
+- **educational**: Educational space moderation, learning environment maintenance
+
+## Implementation Notes
+
+- **AI Partnership**: Agents detect patterns, moderators exercise judgment; hybrid human-AI approach
+- **Context Visibility**: Moderators see full context, user history, community patterns before decisions
+- **Restorative Priority**: System encourages restoration over punishment wherever possible
+- **Local Standards**: Each community sets own standards within constitutional constraints
+- **Appeal Process**: Decisions can be appealed to broader community governance
+- **Moderator Support**: Mental health resources, peer support, rotation to prevent burnout
+- **Transparency**: Moderation decisions and reasoning visible to community (privacy-respecting)
+- **Pattern Learning**: System learns from successful moderator decisions across communities
+- **Emergency Protocols**: Rapid response for serious threats (violence, abuse, exploitation)
+- **Cultural Competence**: Moderation respects diverse cultural norms and contexts
+- **No Arbitrary Power**: Moderators work within community charters, not personal preference

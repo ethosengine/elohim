@@ -1,0 +1,128 @@
+@epic:public_observer
+@user_type:board_member
+@governance_layer:workplace_organizational
+@related_users:citizen,politician,activist,community_organizer,worker
+@related_layers:district,municipality,community
+@elohim_agents:public_observer,domain_elohim,accountability_elohim,community_elohim
+
+Feature: Employment and Economic Development Governance for Board Member
+  As a board member serving on employment, pension, or economic development board in the public_observer system
+  Operating at the workplace organizational functional layer
+  I want independent analysis of labor, employment, and economic development decisions
+  So that I can balance fiduciary duties with community and worker interests despite limited expertise
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the board_member user is registered in the system
+    And the workplace_organizational governance context is active
+    And I am a volunteer serving on pension board, public employment board, or economic development commission
+
+  Scenario: Pension board member evaluates investment strategy balancing returns and values
+    Given pension fund considers divesting from fossil fuel investments
+    And staff analysis emphasizes fiduciary duty and projected investment returns
+    And some beneficiaries advocate for climate-conscious investing
+    When the board member requests Observer independent analysis
+    Then they receive comparison of fossil fuel versus clean energy investment performance
+    And see examples from peer pension funds that divested with outcome data
+    And access analysis of climate risk to long-term portfolio value
+    And understand fiduciary duty in context of environmental and social factors
+    And independent analysis helps board balance competing considerations
+
+  Scenario: Economic development board member learns accessible expertise on incentive packages
+    Given business proposes expansion with request for $5M in tax incentives
+    And staff recommendation supports incentives emphasizing job creation promises
+    And board member has no economic development expertise but must vote responsibly
+    When the board member uses Observer accessible expertise
+    Then they receive plain-language explanation of incentive types and impacts
+    And see cost-benefit analysis comparing incentive cost to projected tax revenue
+    And access track record of business's job creation in other locations
+    And get key questions to ask about job quality, accountability, and alternatives
+    And accessible expertise enables informed judgment on incentive proposal
+
+  Scenario: Employment board member tracks implementation of living wage policy
+    Given board approved living wage requirement for city contractors two years ago
+    And staff reports successful implementation and compliance
+    And community advocates report ongoing wage violations by contractors
+    When the board member uses Observer implementation tracking
+    Then they see contractor wage data showing compliance rates over time
+    And discover enforcement gaps allowing violations to persist
+    And find workers at some contractors still earning below living wage
+    And access comparison to peer cities with stronger enforcement mechanisms
+    And impact tracking reveals gap between policy adoption and actual outcomes
+
+  Scenario: Economic development board member evaluates community benefits agreement
+    Given board considers approving development incentives with community benefits terms
+    And developer proposes hiring commitments, affordable housing, and public space
+    And board wants to understand if benefits are meaningful and enforceable
+    When the board member requests Observer community benefits analysis
+    Then they receive assessment of whether proposed benefits serve community needs
+    And see track record of similar agreements in other jurisdictions
+    And discover many community benefits agreements not enforced or delivered
+    And access specific enforcement mechanisms that make agreements effective
+    And independent analysis helps board negotiate stronger accountability
+
+  Scenario: Pension board member understands worker and community concerns on investment
+    Given pension fund invests in companies with controversial labor practices
+    And beneficiaries and community members raise concerns at board meeting
+    And board wants to understand stakeholder perspectives beyond who testified
+    When the board member seeks community accountability data from Observer
+    Then they receive survey data from pension beneficiaries on investment priorities
+    And see worker concerns about fund investments in companies with poor labor records
+    And access analysis of investment alignment with beneficiary values
+    And understand community impacts of fund investment decisions
+    And community accountability helps board consider stakeholder interests
+
+  Scenario: Economic development board member detects conflicts in incentive recommendation
+    Given staff recommends tax incentives for company relocating to municipality
+    And presentation emphasizes economic benefits and competitive pressure
+    And board will vote on multi-year incentive package at next meeting
+    When the board member uses Observer capture protection analysis
+    Then they discover company executives donated to city officials who appoint board
+    And see consultant hired to evaluate deal previously worked for the company
+    And find incentive terms more generous than peer municipalities offered similar companies
+    And access independent economic analysis showing marginal public benefit
+    And capture protection makes conflicts of interest and manipulation visible
+
+  Scenario: Employment board member evaluates public sector labor contract proposal
+    Given board negotiates collective bargaining agreement with public employees union
+    And city staff emphasizes budget constraints and fiscal sustainability
+    And board wants to balance responsible budgeting with fair compensation
+    When the board member requests Observer labor relations analysis
+    Then they receive comparison of proposed wages to regional public sector market
+    And see employee turnover and vacancy data showing retention challenges
+    And access analysis of contract cost impact on city budget over time
+    And get examples of creative solutions from peer jurisdictions' negotiations
+    And accessible expertise helps board negotiate effectively and fairly
+
+  Scenario: Economic development board member tracks promised jobs from past incentives
+    Given board previously approved incentive packages for business attraction
+    And businesses promised specific job creation targets as incentive condition
+    And board wants to know if incentives produced promised economic benefits
+    When the board member uses Observer accountability tracking
+    Then they see actual job creation versus promises for past incentive deals
+    And discover many businesses created fewer jobs than committed
+    And find weak enforcement mechanisms allowing businesses to keep incentives despite failures
+    And access fiscal impact analysis showing poor return on incentive investment
+    And accountability tracking reveals incentive outcomes diverged from projections
+
+  Scenario: Pension board member prepares for decision on emerging market investments
+    Given investment staff recommends increasing allocation to emerging markets
+    And recommendation includes complex analysis of risk-adjusted returns
+    And board member wants to make informed fiduciary decision but lacks investment expertise
+    When the board member uses Observer decision support
+    Then they receive executive summary of emerging market investment considerations
+    And see performance and volatility data from peer pension funds' allocations
+    And access key questions to ask investment staff about risk management
+    And understand how proposed allocation fits pension fund's overall strategy
+    And accessible expertise enables informed fiduciary judgment
+
+  Scenario: Economic development board member evaluates workforce development program
+    Given board considers funding proposal for job training program
+    And program providers present enrollment projections and success stories
+    And board wants evidence that program will effectively serve unemployed workers
+    When the board member requests Observer workforce program analysis
+    Then they receive outcome data from similar programs including job placement and wages
+    And see analysis of whether program serves populations with greatest need
+    And discover some training programs have poor employment outcomes despite good marketing
+    And access best practices from effective workforce development initiatives
+    And evidence-based analysis helps board invest in programs that actually work

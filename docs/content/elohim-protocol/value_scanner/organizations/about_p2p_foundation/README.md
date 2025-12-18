@@ -1,0 +1,95 @@
+---
+node_type: organization
+org_id: about_p2p_foundation
+name: "About - P2P Foundation"
+url: "https://p2pfoundation.net/the-p2p-foundation/about-the-p2p-foundation"
+gem_id: "LYwUXMNJCbRt6EvMc1uk"
+
+# Epic relationships (NO DUPLICATION NEEDED)
+primary_epic: value_scanner
+related_epics: [governance]
+
+epic_relationships:
+  value_scanner:
+    inspiration: "[How About - P2P Foundation inspires the value_scanner epic]"
+    parallel_work: []
+  governance:
+    inspiration: "[How About - P2P Foundation inspires the governance epic]"
+    parallel_work: []
+
+# What they demonstrate
+demonstrates_principles: []
+
+# Who they inspire (across ALL epics)
+inspires_users: []
+
+# Where they operate
+operates_at_layers: []
+
+# Graph relationships (automatically generated from above)
+edge_types:
+  - inspires_epic
+  - demonstrates_principle
+  - aligns_with_user
+  - operates_at_layer
+---
+
+# About - P2P Foundation
+
+## Description
+
+Read about our Story, Mission, and Strategic Priorities
+
+**Publisher:** P2P Foundation
+
+## Vision Alignment
+
+How this organization's work aligns with the Elohim Protocol vision:
+
+- [Alignment point 1 - to be filled in]
+- [Alignment point 2 - to be filled in]
+
+## Multi-Epic Inspiration
+
+### Primary Epic: value_scanner
+
+[Detailed explanation of how About - P2P Foundation relates to and inspires the value_scanner epic]
+
+**Parallel Work:**
+- [What they're doing that parallels this epic]
+
+### Related Epic: governance
+
+[How About - P2P Foundation also inspires the governance epic]
+
+**Parallel Work:**
+- [What relates to this epic]
+
+## Demonstrations of Principles
+
+### [Principle 1]
+How this organization demonstrates this principle in practice
+
+### [Principle 2]  
+How this organization demonstrates this principle in practice
+
+## Key Resources
+
+- **Website:** https://p2pfoundation.net/the-p2p-foundation/about-the-p2p-foundation
+- **Key reading:** [Links to important content]
+- **People:** [Key figures]
+
+## Graph Connections
+
+### Inspires Epics
+- `value_scanner` - Primary focus and location
+- `governance` - [Connection description]
+
+### Inspires Users
+- `[epic:user_type]` - [how/why]
+
+### Demonstrates Principles
+- `[principle_name]` - [how they demonstrate it]
+
+### Operates At Layers
+- `[layer_name]` - [what they do at this layer]
