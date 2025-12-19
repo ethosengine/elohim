@@ -43,20 +43,16 @@ data:
       # Bootstrap and signal served by Doorway gateway
       bootstrap_url: "https://holochain-dev.elohim.host/bootstrap"
       signal_url: "wss://holochain-dev.elohim.host/signal"
-      # Disable mDNS (not needed for web deployment)
-      mdns: false
-      # Enable WebRTC relaying for NAT traversal
+      enable_mdns: false
       enable_relaying: true
-      # STUN servers for WebRTC connection establishment
       webrtc_config:
-        stun_urls:
-          - "stun:stun.cloudflare.com:3478"
-          - "stun:stun.l.google.com:19302"
-    # Use standard holo-host paths (image has symlinks to /data)
+        ice_servers:
+          - urls: ["stun:stun.cloudflare.com:3478"]
+          - urls: ["stun:stun.l.google.com:19302"]
     data_root_path: "/var/local/lib/holochain"
     keystore:
       type: lair_server_in_proc
-      root: "/var/local/lib/holochain/ks"
+      lair_root: "/var/local/lib/holochain/ks"
 ---
 apiVersion: apps/v1
 kind: Deployment
