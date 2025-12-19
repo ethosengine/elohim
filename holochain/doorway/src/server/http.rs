@@ -261,9 +261,21 @@ async fn handle_request(
         // Status endpoint with runtime info
         (Method::GET, "/status") => to_boxed(routes::status_check(Arc::clone(&state)).await),
 
-        // Bootstrap service routes
-        (Method::POST, p) if p.starts_with("/bootstrap/") => {
+        // Bootstrap service routes (X-Op header protocol)
+        // POST /bootstrap with X-Op header, or legacy path-based routing
+        (Method::POST, p) if p == "/bootstrap" || p.starts_with("/bootstrap/") => {
             handle_bootstrap_request(state, req, &path).await
+        }
+
+        // Bootstrap ping (GET for health check)
+        (Method::GET, "/bootstrap") => {
+            to_boxed(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "text/plain")
+                    .body(Full::new(Bytes::from("OK")))
+                    .unwrap(),
+            )
         }
 
         // Signal service WebSocket (SBD protocol)
@@ -289,6 +301,7 @@ async fn handle_request(
 }
 
 /// Handle bootstrap service requests
+/// Supports both X-Op header protocol (POST /bootstrap) and legacy path-based routing
 async fn handle_bootstrap_request(
     state: Arc<AppState>,
     req: Request<Incoming>,
@@ -322,6 +335,22 @@ async fn handle_bootstrap_request(
         })
         .unwrap_or("tx5");
 
+    // Determine operation: check X-Op header first, then fall back to path
+    let x_op = req
+        .headers()
+        .get("X-Op")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_lowercase());
+
+    let op = if let Some(ref header_op) = x_op {
+        header_op.as_str()
+    } else {
+        // Legacy path-based routing: /bootstrap/put, /bootstrap/random, /bootstrap/now
+        path.strip_prefix("/bootstrap/").unwrap_or("")
+    };
+
+    debug!("Bootstrap request: op={}, network={}, x_op={:?}", op, network, x_op);
+
     // Read request body
     let body = match req.collect().await {
         Ok(collected) => collected.to_bytes(),
@@ -340,13 +369,20 @@ async fn handle_bootstrap_request(
     };
 
     // Route to appropriate handler
-    let op = path.strip_prefix("/bootstrap/").unwrap_or("");
-    debug!("Bootstrap request: op={}, network={}", op, network);
-
     let response = match op {
         "put" => bootstrap::handle_put(store, body, network).await,
         "random" => bootstrap::handle_random(store, body, network).await,
         "now" => bootstrap::handle_now().await,
+        "" => {
+            // POST /bootstrap without X-Op header - invalid
+            Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header("Content-Type", "application/json")
+                .body(Full::new(Bytes::from(
+                    r#"{"error": "Missing X-Op header or path operation"}"#,
+                )))
+                .unwrap()
+        }
         _ => Response::builder()
             .status(StatusCode::NOT_FOUND)
             .header("Content-Type", "application/json")
