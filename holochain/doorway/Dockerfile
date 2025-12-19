@@ -1,4 +1,6 @@
 # Build stage
+# NOTE: Build context should be holochain/ directory, not doorway/
+# Run: docker build -f doorway/Dockerfile -t doorway .
 FROM rust:1.83-slim-bookworm AS builder
 
 WORKDIR /app
@@ -9,19 +11,23 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy manifests first for dependency caching
-COPY Cargo.toml Cargo.lock ./
+# Copy manifests and local crates first for dependency caching
+COPY doorway/Cargo.toml doorway/Cargo.lock ./
+COPY crates ./crates
 
 # Create dummy src to build dependencies
 RUN mkdir -p src && \
     echo 'fn main() { println!("placeholder"); }' > src/main.rs && \
     echo 'pub fn placeholder() {}' > src/lib.rs
 
+# Fix the path to doorway-client (now relative to /app)
+RUN sed -i 's|path = "../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml
+
 # Build dependencies (this layer gets cached)
 RUN cargo build --release && rm -rf src target/release/doorway*
 
 # Copy actual source
-COPY src ./src
+COPY doorway/src ./src
 
 # Build the release binary
 RUN cargo build --release
@@ -45,7 +51,7 @@ RUN useradd -m -u 1000 doorway
 COPY --from=builder /app/target/release/doorway /usr/local/bin/doorway
 
 # Copy default config
-COPY .env.example /app/.env.example
+COPY doorway/.env.example /app/.env.example
 
 # Set ownership
 RUN chown -R doorway:doorway /app

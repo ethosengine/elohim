@@ -293,13 +293,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                cd holochain/doorway
+                                cd holochain
 
                                 # Build Doorway using multi-stage Dockerfile (Rust build)
+                                # Context is holochain/ to include crates/doorway-client
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                     nerdctl -n k8s.io build \\
                                     -t elohim-doorway:${IMAGE_TAG} \\
-                                    -f Dockerfile .
+                                    -f doorway/Dockerfile .
 
                                 nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} elohim-doorway:${GIT_COMMIT_HASH}
                             """
