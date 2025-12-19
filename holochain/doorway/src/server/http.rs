@@ -212,7 +212,28 @@ async fn handle_request(
     let method = req.method().clone();
     let path = req.uri().path().to_string();
 
-    info!("[{}] {} {}", addr, method, path);
+    // Check if this is a signal subdomain request (signal.*.elohim.host)
+    let host = req
+        .headers()
+        .get("host")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("");
+    let is_signal_host = host.starts_with("signal.") || host.contains(".signal.");
+
+    info!("[{}] {} {} (host: {})", addr, method, path, host);
+
+    // Signal subdomain: route /{pubkey} to signal handler (tx5 protocol)
+    // Path should be /{pubkey} where pubkey has no additional slashes
+    if is_signal_host && method == Method::GET && path.len() > 1 {
+        let after_slash = &path[1..]; // Skip leading /
+        if !after_slash.is_empty() && !after_slash.contains('/') {
+            if hyper_tungstenite::is_upgrade_request(&req) {
+                return Ok(handle_signal_request(state, req, &path, addr).await);
+            } else {
+                return Ok(to_boxed(bad_request_response("Signal endpoint requires WebSocket upgrade")));
+            }
+        }
+    }
 
     // Handle auth routes (/auth/*) - these consume the request
     if path.starts_with("/auth") {
@@ -419,8 +440,11 @@ async fn handle_signal_request(
         }
     };
 
-    // Extract pubkey from path: /signal/{pubkey}
-    let pub_key_str = path.strip_prefix("/signal/").unwrap_or("");
+    // Extract pubkey from path: /signal/{pubkey} or /{pubkey} (signal subdomain)
+    let pub_key_str = path
+        .strip_prefix("/signal/")
+        .or_else(|| path.strip_prefix("/"))
+        .unwrap_or("");
     if pub_key_str.is_empty() {
         return to_boxed(bad_request_response("Missing public key in path"));
     }

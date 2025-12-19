@@ -25,8 +25,8 @@ admin_interfaces:
 network:
   # Bootstrap served by Doorway gateway
   bootstrap_url: "https://elohim.host/bootstrap"
-  # Signal uses official Holochain server (tx5 protocol expects bare host)
-  signal_url: "wss://sbd.holo.host"
+  # Signal served by Doorway on dedicated subdomain (tx5 protocol)
+  signal_url: "wss://signal.elohim.host"
   enable_mdns: false
   enable_relaying: true
   webrtc_config:
