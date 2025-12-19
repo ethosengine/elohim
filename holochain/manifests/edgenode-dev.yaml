@@ -40,9 +40,10 @@ data:
           # Doorway gateway handles external authentication
           allowed_origins: "*"
     network:
-      # Bootstrap and signal served by Doorway gateway
+      # Bootstrap served by Doorway gateway
       bootstrap_url: "https://holochain-dev.elohim.host/bootstrap"
-      signal_url: "wss://holochain-dev.elohim.host/signal"
+      # Signal uses official Holochain server (tx5 protocol expects bare host)
+      signal_url: "wss://sbd.holo.host"
       enable_mdns: false
       enable_relaying: true
       webrtc_config:
