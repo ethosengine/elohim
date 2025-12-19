@@ -25,13 +25,16 @@ RUN mkdir -p src/bin && \
 RUN sed -i 's|path = "../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml
 
 # Build dependencies (this layer gets cached)
-RUN cargo build --release && rm -rf src target/release/doorway*
+RUN cargo build --release
+
+# Remove placeholder source and binaries to force rebuild
+RUN rm -rf src target/release/doorway target/release/libdoorway* target/release/deps/doorway* target/release/deps/libdoorway*
 
 # Copy actual source
 COPY doorway/src ./src
 
-# Build the release binary
-RUN cargo build --release
+# Touch source files to ensure rebuild and build the release binary
+RUN touch src/main.rs src/lib.rs && cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
