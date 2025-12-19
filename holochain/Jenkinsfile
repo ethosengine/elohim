@@ -272,11 +272,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('Build Admin Proxy') {
+        stage('Build Doorway') {
             when {
-                // Build when admin-proxy code or manifests change
+                // Build when doorway code or manifests change
                 anyOf {
-                    changeset "holochain/admin-proxy/**"
+                    changeset "holochain/doorway/**"
                     changeset "holochain/manifests/edgenode-*.yaml"
                 }
             }
@@ -286,29 +286,22 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         def props = loadBuildVars()
 
                         withBuildVars(props) {
-                            echo "Building Admin Proxy: ${IMAGE_TAG}"
-
-                            dir('holochain/admin-proxy') {
-                                sh '''
-                                    npm ci
-                                    npm run build
-                                    npm test
-                                '''
-                            }
+                            echo "Building Doorway Gateway: ${IMAGE_TAG}"
 
                             sh """#!/bin/bash
                                 set -euo pipefail
 
                                 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                cd holochain/admin-proxy
+                                cd holochain/doorway
 
+                                # Build Doorway using multi-stage Dockerfile (Rust build)
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                     nerdctl -n k8s.io build \\
-                                    -t elohim-admin-proxy:${IMAGE_TAG} \\
+                                    -t elohim-doorway:${IMAGE_TAG} \\
                                     -f Dockerfile .
 
-                                nerdctl -n k8s.io tag elohim-admin-proxy:${IMAGE_TAG} elohim-admin-proxy:${GIT_COMMIT_HASH}
+                                nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} elohim-doorway:${GIT_COMMIT_HASH}
                             """
                         }
                     }
@@ -424,17 +417,17 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
                                 """
 
-                                // Push Admin Proxy image (if it was built)
+                                // Push Doorway image (if it was built)
                                 sh """
-                                    if nerdctl -n k8s.io images | grep -q "elohim-admin-proxy.*${IMAGE_TAG}"; then
-                                        echo "Pushing Admin Proxy image..."
-                                        nerdctl -n k8s.io tag elohim-admin-proxy:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-admin-proxy:${IMAGE_TAG}
-                                        nerdctl -n k8s.io tag elohim-admin-proxy:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-admin-proxy:${GIT_COMMIT_HASH}
+                                    if nerdctl -n k8s.io images | grep -q "elohim-doorway.*${IMAGE_TAG}"; then
+                                        echo "Pushing Doorway image..."
+                                        nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${IMAGE_TAG}
+                                        nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${GIT_COMMIT_HASH}
 
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-admin-proxy:${IMAGE_TAG}
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-admin-proxy:${GIT_COMMIT_HASH}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${GIT_COMMIT_HASH}
                                     else
-                                        echo "Admin Proxy image not found, skipping push"
+                                        echo "Doorway image not found, skipping push"
                                     fi
                                 """
 
@@ -457,9 +450,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                         nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
                                         nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
 
-                                        if nerdctl -n k8s.io images | grep -q "elohim-admin-proxy.*${IMAGE_TAG}"; then
-                                            nerdctl -n k8s.io tag elohim-admin-proxy:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-admin-proxy:dev-latest
-                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-admin-proxy:dev-latest
+                                        if nerdctl -n k8s.io images | grep -q "elohim-doorway.*${IMAGE_TAG}"; then
+                                            nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:dev-latest
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:dev-latest
                                         fi
 
                                         if nerdctl -n k8s.io images | grep -q "elohim-happ-installer.*${IMAGE_TAG}"; then
@@ -550,8 +543,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             sh """
                                 nerdctl -n k8s.io rmi elohim-edgenode:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG} || true
-                                nerdctl -n k8s.io rmi elohim-admin-proxy:${IMAGE_TAG} || true
-                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-admin-proxy:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi elohim-doorway:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-doorway:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi elohim-happ-installer:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-happ-installer:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io system prune -af --volumes || true

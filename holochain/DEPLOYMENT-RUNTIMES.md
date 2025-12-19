@@ -55,7 +55,7 @@ This guide explains the different runtime environments for developing and deploy
 **How it works:**
 1. Angular app auto-detects Che environment (`*.code.ethosengine.com`)
 2. Resolves hc-dev endpoint URL (replaces `-angular-dev` with `-hc-dev`)
-3. Dev-proxy routes WebSocket paths to local conductor
+3. Doorway routes WebSocket paths to local conductor
 4. No authentication needed (internal network)
 
 **Start the stack:**
@@ -89,10 +89,10 @@ npm run hc:start  # In elohim-app/
 │  Ingress (holochain-dev.elohim.host)                                │
 │      │                                                               │
 │      ▼                                                               │
-│  Admin Proxy (:8080)                                                │
-│      ├── API Key validation                                         │
+│  Doorway Gateway (:8080)                                            │
+│      ├── API Key / JWT validation                                   │
 │      ├── Permission filtering (PUBLIC/AUTHENTICATED/ADMIN)          │
-│      └── Operation whitelist                                        │
+│      └── Operation whitelist + Worker Pool                          │
 │      │                                                               │
 │      ▼                                                               │
 │  Socat Proxy (:8444) → Conductor (:4444, localhost-only)            │
@@ -169,7 +169,7 @@ holochain: {
 │      │ Stage 2 (Hosted): wss://holochain.elohim.host                │
 │      │                   Custodial keys, authenticated              │
 │      ▼                                                               │
-│  Admin Proxy (public, no IP whitelist)                              │
+│  Doorway Gateway (public, no IP whitelist)                          │
 │      ├── Rate limiting                                              │
 │      ├── Abuse detection                                            │
 │      └── Audit logging                                              │
@@ -177,7 +177,7 @@ holochain: {
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Status:** Not yet deployed. Requires removing IP whitelist and hardening admin-proxy.
+**Status:** Not yet deployed. Requires removing IP whitelist and hardening Doorway gateway.
 
 ---
 
@@ -228,17 +228,18 @@ The Elohim Protocol supports a progressive journey from anonymous visitor to sel
 
 ## Holochain Infrastructure Components
 
-### Admin Proxy (`holochain/admin-proxy/`)
-Secure gateway protecting the Holochain Admin API:
-- **Port:** 8080 (public via ingress)
-- **Auth:** API key via query parameter (`?apiKey=...`)
+### Doorway Gateway (`holochain/doorway/`)
+Rust-based secure gateway protecting the Holochain Admin API:
+- **Port:** 8080 (public via ingress), 8888 (local dev)
+- **Auth:** API key via query parameter (`?apiKey=...`) or JWT tokens
 - **Permissions:** PUBLIC (read-only), AUTHENTICATED (normal workflow), ADMIN (destructive)
 - **Whitelist:** Only known operations allowed (unknown operations blocked)
+- **Worker Pool:** 4 persistent connections to conductor prevent thread starvation
 
 ### Edge Node (`holochain/edgenode/`)
 Kubernetes-deployed Holochain conductor:
 - **Base image:** `ghcr.io/holo-host/edgenode:v0.0.8-alpha31-hc0.6.0-go-pion-custom` (Holochain 0.6.0)
-- **Ports:** 4444 (admin, localhost-only), 8444 (socat proxy), 8080 (admin-proxy)
+- **Ports:** 4444 (admin, localhost-only), 8444 (socat proxy), 8080 (doorway)
 - **Storage:** emptyDir (ephemeral)
 - **Network:** holostrap.elohim.host for bootstrap/signal
 
@@ -270,10 +271,10 @@ args: ["TCP-LISTEN:8444,fork,reuseaddr", "TCP:127.0.0.1:4444"]
    kubectl logs -n ethosengine <pod> -c edgenode
    ```
 
-### "Operation not permitted" from admin-proxy
-- Check if operation is in the whitelist (`holochain/admin-proxy/src/permissions.ts`)
+### "Operation not permitted" from Doorway
+- Check if operation is in the whitelist (`holochain/doorway/src/auth/permissions.rs`)
 - Verify API key is correct for required permission level
-- Check admin-proxy logs: `kubectl logs -n ethosengine <pod> -c admin-proxy`
+- Check Doorway logs: `kubectl logs -n ethosengine <pod> -c doorway`
 
 ### Connection timeout
 - Verify conductor readiness: check probe status
@@ -282,8 +283,72 @@ args: ["TCP-LISTEN:8444,fork,reuseaddr", "TCP:127.0.0.1:4444"]
 
 ---
 
+## Content Seeding
+
+The seeder populates Holochain with structured content from `/data/lamad`.
+
+### Local Seeding
+
+```bash
+# From elohim-app/
+npm run hc:seed              # Full seed
+npm run hc:seed:sample       # Sample (10 items)
+```
+
+### Remote Seeding
+
+```bash
+# Dev environment (holochain-dev.elohim.host)
+npm run hc:seed:dev
+npm run hc:seed:dev:sample   # Test with 10 items first
+
+# Production (holochain.elohim.host)
+export ELOHIM_PROD_API_KEY="your-production-api-key"
+npm run hc:seed:prod
+```
+
+### How Remote Seeding Works
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Seeder Script                                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  1. Connect to Admin WebSocket                                       │
+│     wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024     │
+│                                                                      │
+│  2. Get app auth token                                               │
+│     issueAppAuthenticationToken() → token                            │
+│                                                                      │
+│  3. List/create app interface                                        │
+│     listAppInterfaces() → port (e.g., 43733)                        │
+│                                                                      │
+│  4. Connect to App WebSocket (auto-resolved URL)                     │
+│     wss://holochain-dev.elohim.host/app/43733?apiKey=...            │
+│                                                                      │
+│  5. Seed content via zome calls                                      │
+│     bulk_create_content, create_path, etc.                          │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Important:** Only set `HOLOCHAIN_ADMIN_URL` for remote seeding. The seeder
+automatically resolves the app URL using the `/app/:port` routing pattern.
+
+### Checking Content Stats
+
+```bash
+npm run hc:stats:dev         # Dev environment
+npm run hc:stats:prod        # Production
+```
+
+For detailed seeder documentation, see `holochain/seeder/README.md`.
+
+---
+
 ## Related Documentation
 
 - `holochain/claude.md` - Main architecture documentation
 - `holochain/edgenode/README.md` - Edge node quick reference
+- `holochain/seeder/README.md` - Seeder documentation
 - `elohim-app/src/app/elohim/services/holochain-client.service.ts` - Client implementation

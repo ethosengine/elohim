@@ -162,12 +162,12 @@ commands:
           --env JENKINS_USERNAME="$JENKINS_USERNAME" \
           --env JENKINS_TOKEN="$JENKINS_TOKEN"
 
-  - id: start-hc-dev-proxy
+  - id: start-doorway
     exec:
       component: tools
-      workingDir: /projects/elohim/holochain/admin-proxy
+      workingDir: /projects/elohim/holochain/doorway
       commandLine: |
-        DEV_MODE=true PORT=8888 npm install && npm run build && npm start
+        RUSTFLAGS="" cargo build --release && ./target/release/doorway --dev-mode --listen 0.0.0.0:8888 --conductor-url ws://localhost:4444
 
   - id: build-happ
     exec:

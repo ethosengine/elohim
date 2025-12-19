@@ -4,18 +4,18 @@
 # Accessible at: holochain.elohim.host
 #
 # Architecture:
-#   Browser -> Admin Proxy (auth + whitelist) -> Conductor (localhost)
+#   Browser -> Doorway Gateway (auth + whitelist + worker pool) -> Conductor (localhost)
 #
 # Ports:
 #   - 4444: Conductor Admin WebSocket (localhost only)
 #   - 8444: socat proxy (pod-internal, for legacy/direct access)
-#   - 8080: Admin Proxy (public, authenticated)
+#   - 8080: Doorway Gateway (public, authenticated)
 ---
-# Secret for Admin Proxy API keys
+# Secret for Doorway Gateway API keys
 apiVersion: v1
 kind: Secret
 metadata:
-  name: elohim-admin-proxy-prod-secrets
+  name: elohim-doorway-prod-secrets
   namespace: ethosengine
 type: Opaque
 stringData:
@@ -39,7 +39,7 @@ data:
           type: websocket
           port: 4444
           # Allow any origin - conductor only binds to localhost anyway
-          # The admin proxy handles external authentication
+          # Doorway gateway handles external authentication
           allowed_origins: "*"
     network:
       bootstrap_url: "https://holostrap.elohim.host"
@@ -140,36 +140,37 @@ spec:
               port: 8444
             initialDelaySeconds: 5
             periodSeconds: 5
-        # Admin Proxy - authenticates and filters admin operations
+        # Doorway Gateway - Rust WebSocket gateway with auth, worker pool
         # Production uses versioned tags for stability
-        - name: admin-proxy
-          image: harbor.ethosengine.com/ethosengine/elohim-admin-proxy:BUILD_NUMBER_PLACEHOLDER
+        - name: doorway
+          image: harbor.ethosengine.com/ethosengine/elohim-doorway:BUILD_NUMBER_PLACEHOLDER
           imagePullPolicy: IfNotPresent
+          args:
+            - "--listen"
+            - "0.0.0.0:8080"
+            - "--conductor-url"
+            - "ws://localhost:4444"
           ports:
-            - name: proxy-ws
+            - name: gateway-ws
               containerPort: 8080
               protocol: TCP
           env:
-            - name: CONDUCTOR_URL
-              value: "ws://localhost:4444"
-            - name: PORT
-              value: "8080"
-            - name: LOG_LEVEL
-              value: "warn"
+            - name: RUST_LOG
+              value: "warn,doorway=info"
             - name: API_KEY_AUTHENTICATED
               valueFrom:
                 secretKeyRef:
-                  name: elohim-admin-proxy-prod-secrets
+                  name: elohim-doorway-prod-secrets
                   key: api-key-authenticated
             - name: API_KEY_ADMIN
               valueFrom:
                 secretKeyRef:
-                  name: elohim-admin-proxy-prod-secrets
+                  name: elohim-doorway-prod-secrets
                   key: api-key-admin
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: elohim-admin-proxy-prod-secrets
+                  name: elohim-doorway-prod-secrets
                   key: jwt-secret
           resources:
             requests:
@@ -235,8 +236,8 @@ spec:
       port: 4444
       targetPort: 8444
       protocol: TCP
-    # Admin Proxy (for public authenticated access)
-    - name: proxy-ws
+    # Doorway Gateway (for public authenticated access)
+    - name: gateway-ws
       port: 8080
       targetPort: 8080
       protocol: TCP
@@ -244,7 +245,7 @@ spec:
     app: elohim-edgenode
     environment: prod
 ---
-# Public Ingress - routes all traffic through authenticated Admin Proxy
+# Public Ingress - routes all traffic through authenticated Doorway Gateway
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

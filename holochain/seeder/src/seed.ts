@@ -750,8 +750,14 @@ async function seed() {
   const newConcepts = allConcepts;
   console.log(`   ${newConcepts.length} concepts to process`);
 
-  // OPTIMIZATION: Bulk create in batches
-  const BATCH_CREATE_SIZE = 50;
+  // Detect if we're running against a remote conductor (needs gentler approach)
+  const isRemote = !ADMIN_WS_URL.includes('localhost') && !ADMIN_WS_URL.includes('127.0.0.1');
+  const BATCH_CREATE_SIZE = isRemote ? 10 : 50;  // Smaller batches for remote
+  const BATCH_DELAY_MS = isRemote ? 2000 : 0;    // 2s delay between batches for remote
+
+  if (isRemote) {
+    console.log(`   🌐 Remote mode: batch size=${BATCH_CREATE_SIZE}, delay=${BATCH_DELAY_MS}ms`);
+  }
   let conceptSuccessCount = 0;
   let conceptErrorCount = loadErrorCount;
 
@@ -790,6 +796,11 @@ async function seed() {
         }
       }
       console.log(`      ✅ Created ${result.created_count} concepts`);
+
+      // Delay between batches for remote to let conductor catch up
+      if (BATCH_DELAY_MS > 0 && i + BATCH_CREATE_SIZE < newConcepts.length) {
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+      }
     } catch (error: any) {
       // Batch failed - fall back to individual creates to identify problematic concepts
       console.error(`      ⚠️ Batch failed, trying individual creates to find problematic concepts...`);
@@ -845,13 +856,28 @@ async function seed() {
   const pathFiles = findJsonFiles(pathsDir);
   console.log(`   Found ${pathFiles.length} path files`);
 
-  // Load all paths first
+  // Load all paths first (skip index files)
   const allPaths: PathJson[] = [];
   let pathLoadErrorCount = 0;
 
   for (const file of pathFiles) {
+    // Skip index/metadata files
+    if (path.basename(file) === 'index.json' || path.basename(file).startsWith('_')) {
+      console.log(`   ⏭️  Skipping metadata file: ${path.basename(file)}`);
+      continue;
+    }
+
     const pathJson = loadJson<PathJson>(file);
     if (pathJson) {
+      // Validate required fields
+      if (!pathJson.id || !pathJson.title) {
+        const reason = !pathJson.id && !pathJson.title ? 'missing id and title'
+          : !pathJson.id ? 'missing id' : 'missing title';
+        console.warn(`   ⚠️ Skipping ${path.basename(file)}: ${reason}`);
+        timer.recordSkipped(path.basename(file), reason);
+        pathLoadErrorCount++;
+        continue;
+      }
       allPaths.push(pathJson);
     } else {
       pathLoadErrorCount++;
@@ -983,27 +1009,51 @@ async function seed() {
       );
       console.log(`      ✅ Path created: ${encodeHashToBase64(pathResult as Uint8Array).slice(0, 15)}...`);
 
-      // OPTIMIZATION: Batch add all steps for this path
+      // OPTIMIZATION: Batch add steps for this path (in chunks to avoid timeouts)
       const steps = collectSteps(pathJson);
       if (steps.length > 0) {
-        const stepResult = await timer.timeOperation('batch_add_path_steps', () =>
-          appWs.callZome({
-            cell_id: cellId,
-            zome_name: ZOME_NAME,
-            fn_name: 'batch_add_path_steps',
-            payload: { steps },
-          })
-        ) as { created_count: number; errors: string[] };
+        const STEP_BATCH_SIZE = isRemote ? 5 : 20; // Even smaller for remote
+        let totalCreated = 0;
+        let totalErrors: string[] = [];
 
-        console.log(`      📝 Added ${stepResult.created_count} steps`);
-        if (stepResult.errors.length > 0) {
-          for (const err of stepResult.errors.slice(0, 2)) {
+        for (let i = 0; i < steps.length; i += STEP_BATCH_SIZE) {
+          const batch = steps.slice(i, i + STEP_BATCH_SIZE);
+          try {
+            const stepResult = await timer.timeOperation('batch_add_path_steps', () =>
+              appWs.callZome({
+                cell_id: cellId,
+                zome_name: ZOME_NAME,
+                fn_name: 'batch_add_path_steps',
+                payload: { steps: batch },
+              })
+            ) as { created_count: number; errors: string[] };
+
+            totalCreated += stepResult.created_count;
+            totalErrors.push(...stepResult.errors);
+
+            // Delay between step batches for remote
+            if (BATCH_DELAY_MS > 0 && i + STEP_BATCH_SIZE < steps.length) {
+              await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS / 2));
+            }
+          } catch (batchError: any) {
+            console.error(`         ⚠️ Step batch ${Math.floor(i / STEP_BATCH_SIZE) + 1} failed: ${cleanErrorMessage(batchError)}`);
+          }
+        }
+
+        console.log(`      📝 Added ${totalCreated}/${steps.length} steps`);
+        if (totalErrors.length > 0) {
+          for (const err of totalErrors.slice(0, 2)) {
             console.error(`         ⚠️ ${err}`);
           }
         }
       }
 
       pathSuccessCount++;
+
+      // Delay between paths for remote
+      if (BATCH_DELAY_MS > 0) {
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+      }
     } catch (error: any) {
       pathErrorCount++;
       console.error(`      ❌ ${cleanErrorMessage(error)}`);

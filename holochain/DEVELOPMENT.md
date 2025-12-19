@@ -22,14 +22,14 @@ npm run hc:seed:sample
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Angular App   │────▶│   Admin Proxy   │────▶│    Holochain    │
+│   Angular App   │────▶│    Doorway      │────▶│    Holochain    │
 │   (Browser)     │     │   (Port 8888)   │     │   Conductor     │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
         │                       │
         │                       ▼
         │               ┌─────────────────┐
-        │               │   Auth Store    │
-        │               │ (data/users.json)│
+        │               │   Auth (JWT)    │
+        │               │  + Worker Pool  │
         │               └─────────────────┘
         ▼
 ┌─────────────────┐
@@ -41,9 +41,8 @@ npm run hc:seed:sample
 ### Components
 
 - **Angular App**: Frontend UI, runs at `localhost:4200` (or via Che endpoint)
-- **Admin Proxy**: HTTP/WebSocket proxy for Holochain, handles auth
+- **Doorway Gateway**: Rust WebSocket gateway with JWT auth and worker pool
 - **Holochain Conductor**: DHT node running the lamad-spike hApp
-- **Auth Store**: File-based storage for email/password credentials
 
 ## Commands Reference
 
@@ -51,10 +50,9 @@ npm run hc:seed:sample
 
 | Command | Description |
 |---------|-------------|
-| `npm run hc:start` | Start Holochain sandbox + proxy |
+| `npm run hc:start` | Start Holochain sandbox + Doorway |
 | `npm run hc:stop` | Stop all Holochain services |
-| `npm run hc:reset` | Full reset (clears all data including auth) |
-| `npm run hc:reset:auth` | Reset only auth credentials |
+| `npm run hc:reset` | Full reset (clears all data) |
 | `npm run hc:status` | Check service status |
 
 ### User Management
@@ -129,22 +127,7 @@ npm run hc:bootstrap -- \
   --affinities "governance,learning"
 ```
 
-### 4. Reset Just Auth (Keep Holochain Data)
-
-If you need to re-register auth credentials without losing Holochain data:
-
-```bash
-npm run hc:reset:auth         # Clear users.json only
-npm run hc:proxy:restart      # Restart proxy to reload
-
-# Re-bootstrap (will use existing Holochain human)
-npm run hc:bootstrap -- \
-  --email steward@elohim.host \
-  --password newPassword123 \
-  --name "Node Steward"
-```
-
-### 5. Full Reset (Clean Slate)
+### 4. Full Reset (Clean Slate)
 
 ```bash
 npm run hc:reset              # Clears everything
@@ -162,7 +145,7 @@ npm run hc:start              # Fresh start
 ### Hosted Human
 - Regular user with email/password login
 - Data stored in Holochain DHT
-- Auth credentials in proxy's user store
+- Auth via JWT tokens from Doorway
 
 ### Session Visitor (Future)
 - Browses without account
@@ -194,7 +177,7 @@ npm run hc:reset:auth
 This is normal - bootstrap will use the existing Holochain human.
 
 ### CORS errors in browser
-Check that the proxy is running and the Angular app detected the Che environment:
+Check that Doorway is running and the Angular app detected the Che environment:
 ```bash
 curl http://localhost:8888/health
 ```
@@ -210,10 +193,11 @@ ss -tlnp | grep holochain
 
 | Path | Description |
 |------|-------------|
-| `holochain/admin-proxy/data/users.json` | Auth credentials store |
 | `holochain/local-dev/conductor-data/` | Holochain persistent data |
+| `holochain/local-dev/.hc_ports` | Dynamic port assignments |
 | `holochain/seeder/data/lamad/` | Content seed data |
 | `holochain/dna/lamad-spike/` | Holochain DNA source |
+| `holochain/doorway/` | Doorway gateway (Rust) |
 
 ## Test Credentials
 

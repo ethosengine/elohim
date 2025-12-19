@@ -9,7 +9,7 @@ The Elohim app supports three distinct modes for connecting to Holochain, each s
 
 | Mode | Use Case | Conductor Location | DNS Required |
 |------|----------|-------------------|--------------|
-| **Local Dev (Eclipse Che)** | Development & testing | Local sandbox in Che | No (admin-proxy in DEV_MODE) |
+| **Local Dev (Eclipse Che)** | Development & testing | Local sandbox in Che | No (Doorway in dev mode) |
 | **Remote Edge Node** | Deployed infrastructure | Kubernetes cluster | Yes |
 | **Device-Local (Packaged App)** | End-user installation | User's device | No |
 
@@ -19,50 +19,61 @@ The Elohim app supports three distinct modes for connecting to Holochain, each s
 
 **Architecture:**
 ```
-Browser (Angular) → Che Endpoint (hc-dev) → Dev Proxy (:8888) → Local Conductor
-                                                                     │
-                                               ┌─────────────────────┴─────────────────────┐
-                                               │                                           │
-                                         Admin (:4444)                              App (:4445+)
+Browser (Angular) → Che Endpoint (hc-dev) → Doorway (:8888) → Local Conductor
+                                                │                    │
+                                          Worker Pool          ┌─────┴─────┐
+                                         (4 connections)       │           │
+                                                         Admin (:dynamic)  App (:4445)
 ```
 
 **When to use:** Active development, debugging, testing zome calls, Playground introspection.
 
 ### Starting the Local Stack
 
+The recommended way to start the local stack:
+
 ```bash
-# 1. Create sandbox (first time only, from holochain/local-dev/)
+# From elohim-app directory - starts sandbox + Doorway automatically
+npm run hc:start
+
+# Or with Doorway specifically
+npm run hc:start:doorway
+```
+
+Manual startup (if needed):
+
+```bash
+# 1. Start sandbox with hApp
 cd /projects/elohim/holochain/local-dev
-hc sandbox create --in-process-lair -d conductor1
+hc sandbox generate --app-id lamad-spike --in-process-lair -r=4445 ../dna/lamad-spike/workdir/lamad-spike.happ
 
-# 2. Start conductor (requires --piped for non-TTY environments like Che)
-echo "" | holochain -c /tmp/conductor1/conductor-config.yaml --piped &
+# 2. Start Doorway gateway (uses dynamic admin port from .hc_ports file)
+ADMIN_PORT=$(cat .hc_ports | grep admin_port | cut -d= -f2)
+../doorway/target/release/doorway --dev-mode --listen 0.0.0.0:8888 --conductor-url ws://localhost:$ADMIN_PORT
 
-# 3. Attach app interface (after conductor is running)
-hc sandbox call -r 4444 add-app-ws 4445
-
-# 4. Start admin-proxy (dev mode)
-cd /projects/elohim/holochain/admin-proxy
-DEV_MODE=true npm install && npm run build && npm start &
-
-# 5. (Optional) Start Holochain Playground
+# 3. (Optional) Start Holochain Playground
 npx @holochain-playground/cli ws://localhost:8888/admin &
 ```
 
-### Admin Proxy Routes (Dev Mode)
+### Doorway Gateway
 
-The admin-proxy (with DEV_MODE=true) provides path-based WebSocket routing:
+Doorway is a Rust WebSocket gateway that provides:
+
+- **Connection pooling**: 4 persistent WebSocket connections to conductor
+- **Request queuing**: Prevents thread starvation under heavy load
+- **Path-based routing**: Admin and app interfaces via single port
 
 | Path | Target | Purpose |
 |------|--------|---------|
-| `/admin` | `ws://localhost:4444` | Admin interface (install apps, generate keys) |
-| `/app/:port` | `ws://localhost:port` | App interfaces (zome calls), port range 4445-4500 |
+| `/` or `/admin` | `ws://localhost:<admin_port>` | Admin interface (via worker pool) |
+| `/app/:port` | `ws://localhost:port` | App interfaces (direct proxy) |
 | `/health` | HTTP 200 | Health check |
-| `/status` | JSON | Active connections, config |
+| `/status` | JSON | Service status, connections |
+| `/auth/*` | HTTP | Authentication endpoints |
 
 ### Accessing from Browser
 
-The Angular app auto-detects Che environment and routes through admin-proxy:
+The Angular app auto-detects Che environment and routes through Doorway:
 
 ```typescript
 // HolochainClientService automatically resolves URLs:
@@ -73,7 +84,7 @@ The Angular app auto-detects Che environment and routes through admin-proxy:
 
 **Che Endpoints:**
 - `angular-dev` (4200) → Angular app
-- `hc-dev` (8888) → Dev proxy (admin + app interfaces)
+- `hc-dev` (8888) → Doorway gateway (admin + app interfaces)
 - `ui-playground` (4201) → Holochain Playground (if bound)
 
 ### Testing Connections
@@ -116,7 +127,7 @@ Access at `http://localhost:8282` or via Che `ui-playground` endpoint.
 
 **Architecture:**
 ```
-Browser → Admin Proxy (wss://holochain-*.elohim.host) → Conductor → DHT
+Browser → Doorway Gateway (wss://holochain-*.elohim.host) → Conductor → DHT
                               │
                         IP Whitelist
                     (internal network only)
@@ -156,16 +167,15 @@ kubectl port-forward -n ethosengine deploy/elohim-edgenode-dev 4444:8444
 # Then connect to ws://localhost:4444
 ```
 
-### Admin Proxy Remote Mode
+### Doorway Remote Mode
 
-The admin-proxy can also proxy to a remote conductor (useful for debugging remote issues):
+Doorway can proxy to a remote conductor (useful for debugging remote issues):
 
 ```bash
-# Start admin-proxy in remote mode (from holochain/admin-proxy/)
-CONDUCTOR_URL=wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024 npm start
-
-# Or use the npm script
-npm run start:remote
+# Start Doorway pointing to remote conductor
+./holochain/doorway/target/release/doorway \
+  --listen 0.0.0.0:8888 \
+  --conductor-url wss://holochain-dev.elohim.host
 ```
 
 ---
@@ -196,7 +206,7 @@ Packaged App (Electron/Tauri)
 | **Keys** | Custodial (server-managed) | Self-sovereign (device-local) |
 | **Always-on** | Yes (K8s keeps it running) | No (runs when app is open) |
 | **DHT Role** | Full participant, shard holder | Intermittent participant |
-| **Admin Access** | Restricted (proxy + auth) | Full local access |
+| **Admin Access** | Restricted (gateway + auth) | Full local access |
 
 ### Packaging Requirements
 
@@ -808,21 +818,12 @@ const findContentByPattern = (pattern: string): string | null => {
 
 ### Process Management
 
-**Killing admin-proxy**: `pkill -f 'node.*admin-proxy'` may not match. Use port-based:
+**Killing Doorway**: Use port-based killing:
 
 ```bash
 fuser -k 8888/tcp 2>/dev/null
-```
-
-**Graceful port conflict handling** in admin-proxy:
-
-```typescript
-server.on('error', (err: NodeJS.ErrnoException) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${port} already in use`);
-    process.exit(1);
-  }
-});
+# Or use npm script
+npm run doorway:stop
 ```
 
 ### NPM Scripts for Holochain Dev Stack
@@ -830,8 +831,11 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 ```json
 {
   "hc:start": "./scripts/hc-start.sh",
-  "hc:stop": "pkill -f 'holochain.*conductor' ; fuser -k 8888/tcp 2>/dev/null ; echo 'Stopped'",
-  "hc:reset": "npm run hc:stop && rm -rf ../holochain/local-dev/.hc* && echo 'Cleared sandbox data'"
+  "hc:stop": "pkill -f 'holochain.*conductor' ; fuser -k 8888/tcp ; rm -f ../holochain/local-dev/.hc_live_* ; echo 'Stopped'",
+  "hc:reset": "npm run hc:stop && rm -rf ../holochain/local-dev/.hc* && echo 'Cleared sandbox data'",
+  "doorway:start": "../holochain/doorway/target/release/doorway --dev-mode --listen 0.0.0.0:8888 --conductor-url ws://localhost:4444",
+  "doorway:stop": "fuser -k 8888/tcp && echo 'Stopped Doorway'",
+  "doorway:build": "cd ../holochain/doorway && RUSTFLAGS='' cargo build --release"
 }
 ```
 
@@ -842,8 +846,8 @@ The `hc-start.sh` script handles:
 2. Check if conductor already running (idempotent)
 3. Start sandbox with socat passphrase handling
 4. Wait for conductor ready (poll for `admin_port` in log)
-5. Start admin-proxy with dynamic admin port
-6. Run seeder (idempotent, auto-fixes placeholder IDs)
+5. Start Doorway gateway with dynamic admin port
+6. Detect if Doorway needs restart (conductor port changed)
 
 ## Domain Model Architecture: Shefa / Lamad Separation
 
@@ -1185,6 +1189,6 @@ All three verticals are now complete and integrated:
 - `elohim-app/src/environments/environment*.ts` - Endpoint configuration
 - `elohim-app/scripts/hc-start.sh` - Automated dev stack startup
 - `holochain/seeder/src/seed.ts` - Content and path seeder
-- `holochain/admin-proxy/src/index.ts` - WebSocket proxy for Che (DEV_MODE) and production
+- `holochain/doorway/src/main.rs` - Rust WebSocket gateway (Doorway) for dev and production
 - `holochain/sdk/src/types.ts` - SDK type definitions (Shefa + Lamad)
 - `holochain/sdk/src/client/zome-client.ts` - Zome client with domain-namespaced methods
