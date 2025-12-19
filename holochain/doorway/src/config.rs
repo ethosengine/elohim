@@ -77,6 +77,26 @@ pub struct Args {
     /// Number of internal worker tasks (for concurrent request processing)
     #[arg(long, env = "WORKER_COUNT", default_value = "4")]
     pub worker_count: usize,
+
+    /// Enable bootstrap service for agent discovery
+    #[arg(long, env = "BOOTSTRAP_ENABLED", default_value = "true")]
+    pub bootstrap_enabled: bool,
+
+    /// Enable signal service for WebRTC signaling
+    #[arg(long, env = "SIGNAL_ENABLED", default_value = "true")]
+    pub signal_enabled: bool,
+
+    /// Maximum signal connections
+    #[arg(long, env = "SIGNAL_MAX_CLIENTS")]
+    pub signal_max_clients: Option<usize>,
+
+    /// Signal rate limit in kbps per IP
+    #[arg(long, env = "SIGNAL_RATE_LIMIT_KBPS")]
+    pub signal_rate_limit_kbps: Option<i32>,
+
+    /// Signal idle timeout in milliseconds
+    #[arg(long, env = "SIGNAL_IDLE_TIMEOUT_MS")]
+    pub signal_idle_timeout_ms: Option<i32>,
 }
 
 /// NATS connection configuration

@@ -4,8 +4,17 @@
 //!
 //! Doorway provides authenticated WebSocket access to Holochain conductors
 //! with support for multiple operators via NATS messaging and MongoDB storage.
+//!
+//! ## Services
+//!
+//! - **Gateway**: WebSocket proxy to Holochain admin and app interfaces
+//! - **Bootstrap**: Agent discovery service for DHT networks
+//! - **Signal**: WebRTC signaling relay (SBD protocol)
+//! - **Cache**: In-memory content caching for REST API
 
 pub mod auth;
+pub mod bootstrap;
+pub mod cache;
 pub mod config;
 pub mod db;
 pub mod hosts;
@@ -14,6 +23,7 @@ pub mod nats;
 pub mod proxy;
 pub mod routes;
 pub mod server;
+pub mod signal;
 pub mod types;
 pub mod worker;
 

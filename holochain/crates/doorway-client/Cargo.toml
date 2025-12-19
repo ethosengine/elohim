@@ -1,0 +1,16 @@
+[package]
+name = "doorway-client"
+description = "Shared types for Doorway cache rule protocol - used by DNAs and doorway gateway"
+version = "0.1.0"
+edition = "2021"
+authors = ["Elohim Protocol"]
+license = "Apache-2.0"
+
+[features]
+default = []
+# Enable for use in Holochain DNAs (adds hdk dependency for procedural macros)
+hdk = []
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

@@ -115,6 +115,7 @@ name = "content_store"
 version = "0.1.0"
 dependencies = [
  "content_store_integrity",
+ "doorway-client",
  "hc-rna",
  "hdk",
  "holochain_serialized_bytes",
@@ -231,6 +232,14 @@ checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer",
  "crypto-common",
+]
+
+[[package]]
+name = "doorway-client"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

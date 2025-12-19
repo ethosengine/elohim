@@ -22,9 +22,9 @@ admin_interfaces:
 
 # Network configuration
 network:
-  # Your bootstrap server for peer discovery
-  bootstrap_url: "https://holostrap.elohim.host"
-  signal_url: "wss://holostrap.elohim.host"
+  # Bootstrap and signal served by Doorway gateway
+  bootstrap_url: "https://elohim.host/bootstrap"
+  signal_url: "wss://elohim.host/signal"
 
   # Disable mDNS (not needed for web deployment)
   mdns: false

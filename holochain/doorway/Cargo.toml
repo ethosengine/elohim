@@ -54,6 +54,18 @@ thiserror = "2.0"
 anyhow = "1.0"
 base64 = "0.22"
 
+# Bootstrap service (agent discovery)
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+dashmap = "6.1"
+rand = "0.8"
+hex = "0.4"
+
+# Caching
+sha2 = "0.10"
+
+# Shared types with DNAs
+doorway-client = { path = "../crates/doorway-client" }
+
 [dev-dependencies]
 tokio-test = "0.4"
 

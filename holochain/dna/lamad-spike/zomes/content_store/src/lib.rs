@@ -5,10 +5,313 @@
 
 use hdk::prelude::*;
 use content_store_integrity::*;
+use doorway_client::{CacheRule, CacheRuleBuilder};
 use std::collections::HashMap;
 
 // Migration module for DNA version upgrades
 pub mod migration;
+
+// =============================================================================
+// Doorway Cache Configuration
+// =============================================================================
+
+/// Declares cache rules for the Doorway gateway.
+///
+/// This function is called by the Doorway to discover which zome functions
+/// can be cached and how. Returns a list of `CacheRule` structs that define:
+/// - TTL (time-to-live) for cached responses
+/// - Whether the endpoint is public or requires auth
+/// - Reach-based visibility (public if response.reach == "commons")
+/// - Which write functions invalidate these caches
+#[hdk_extern]
+pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
+    Ok(vec![
+        // =====================================================================
+        // CONTENT (reach-based visibility: public if reach == "commons")
+        // =====================================================================
+        CacheRuleBuilder::new("get_content")
+            .ttl_1h()
+            .reach_based("content.reach", "commons")
+            .invalidated_by(vec!["create_content", "bulk_create_content"])
+            .build(),
+        CacheRuleBuilder::new("get_content_by_id")
+            .ttl_1h()
+            .reach_based("content.reach", "commons")
+            .invalidated_by(vec!["create_content", "bulk_create_content"])
+            .build(),
+        CacheRuleBuilder::new("get_content_by_type")
+            .ttl_15m()
+            .reach_based("content.reach", "commons")
+            .invalidated_by(vec!["create_content", "bulk_create_content"])
+            .build(),
+        CacheRuleBuilder::new("get_content_by_tag")
+            .ttl_15m()
+            .reach_based("content.reach", "commons")
+            .invalidated_by(vec!["create_content", "bulk_create_content"])
+            .build(),
+        CacheRuleBuilder::new("get_content_by_type_paginated")
+            .ttl_15m()
+            .reach_based("items.content.reach", "commons")
+            .invalidated_by(vec!["create_content", "bulk_create_content"])
+            .build(),
+        CacheRuleBuilder::new("get_content_by_tag_paginated")
+            .ttl_15m()
+            .reach_based("items.content.reach", "commons")
+            .invalidated_by(vec!["create_content", "bulk_create_content"])
+            .build(),
+        CacheRuleBuilder::new("batch_get_content_by_ids")
+            .ttl_1h()
+            .reach_based("items.content.reach", "commons")
+            .invalidated_by(vec!["create_content", "bulk_create_content"])
+            .build(),
+        CacheRuleBuilder::new("get_content_stats")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["create_content", "bulk_create_content"])
+            .build(),
+        CacheRuleBuilder::new("get_content_graph")
+            .ttl_15m()
+            .reach_based("root.content.reach", "commons")
+            .invalidated_by(vec!["create_content", "create_relationship"])
+            .build(),
+
+        // =====================================================================
+        // LEARNING PATHS (public read, private write)
+        // =====================================================================
+        CacheRuleBuilder::new("get_all_paths")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["create_path", "update_path", "delete_path"])
+            .build(),
+        CacheRuleBuilder::new("get_path_with_steps")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_path", "update_path", "delete_path", "add_path_step", "update_step", "batch_add_path_steps"])
+            .build(),
+        CacheRuleBuilder::new("get_path_full")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_path", "update_path", "delete_path", "add_path_step", "create_chapter", "update_chapter", "update_step"])
+            .build(),
+        CacheRuleBuilder::new("get_step_by_id")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["add_path_step", "update_step"])
+            .build(),
+        CacheRuleBuilder::new("get_chapter_by_id")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_chapter", "update_chapter"])
+            .build(),
+        CacheRuleBuilder::new("get_chapters_for_path")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_chapter", "update_chapter"])
+            .build(),
+
+        // =====================================================================
+        // RELATIONSHIPS
+        // =====================================================================
+        CacheRuleBuilder::new("get_relationships")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_relationship"])
+            .build(),
+        CacheRuleBuilder::new("query_related_content")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_relationship", "create_content"])
+            .build(),
+
+        // =====================================================================
+        // HUMANS & AGENTS (public profiles, private session)
+        // =====================================================================
+        CacheRuleBuilder::new("get_human_by_id")
+            .ttl_5m()
+            .reach_based("human.profile_reach", "public")
+            .invalidated_by(vec!["create_human", "update_human_profile"])
+            .build(),
+        CacheRuleBuilder::new("get_agent_by_id")
+            .ttl_5m()
+            .reach_based("agent.visibility", "public")
+            .invalidated_by(vec!["create_agent", "update_agent_state"])
+            .build(),
+        CacheRuleBuilder::new("query_agents")
+            .ttl_5m()
+            .reach_based("agent.visibility", "public")
+            .invalidated_by(vec!["create_agent", "update_agent_state", "register_elohim"])
+            .build(),
+        CacheRuleBuilder::new("get_elohim_by_scope")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["register_elohim", "update_agent_state"])
+            .build(),
+
+        // =====================================================================
+        // CONTRIBUTOR PRESENCE (public discovery)
+        // =====================================================================
+        CacheRuleBuilder::new("get_contributor_presence_by_id")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["create_contributor_presence", "begin_stewardship", "initiate_claim", "verify_claim"])
+            .build(),
+        CacheRuleBuilder::new("query_contributor_presences")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["create_contributor_presence", "begin_stewardship", "initiate_claim", "verify_claim"])
+            .build(),
+        CacheRuleBuilder::new("get_presences_by_state")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["create_contributor_presence", "begin_stewardship", "initiate_claim", "verify_claim"])
+            .build(),
+        CacheRuleBuilder::new("get_presences_by_steward")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["begin_stewardship", "initiate_claim", "verify_claim"])
+            .build(),
+
+        // =====================================================================
+        // GOVERNANCE (public proposals, precedents, discussions)
+        // =====================================================================
+        CacheRuleBuilder::new("get_proposal_by_id")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["create_proposal"])
+            .build(),
+        CacheRuleBuilder::new("query_proposals")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["create_proposal"])
+            .build(),
+        CacheRuleBuilder::new("get_precedent_by_id")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_precedent"])
+            .build(),
+        CacheRuleBuilder::new("query_precedents")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_precedent"])
+            .build(),
+        CacheRuleBuilder::new("get_discussion_by_id")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["create_discussion"])
+            .build(),
+        CacheRuleBuilder::new("query_discussions")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["create_discussion"])
+            .build(),
+        CacheRuleBuilder::new("get_governance_state")
+            .ttl_1m()
+            .public()
+            .invalidated_by(vec!["set_governance_state"])
+            .build(),
+        CacheRuleBuilder::new("query_governance_states")
+            .ttl_1m()
+            .public()
+            .invalidated_by(vec!["set_governance_state"])
+            .build(),
+
+        // =====================================================================
+        // KNOWLEDGE MAPS & EXTENSIONS (public discovery)
+        // =====================================================================
+        CacheRuleBuilder::new("get_knowledge_map_by_id")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_knowledge_map"])
+            .build(),
+        CacheRuleBuilder::new("query_knowledge_maps")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_knowledge_map"])
+            .build(),
+        CacheRuleBuilder::new("get_path_extension_by_id")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_path_extension"])
+            .build(),
+        CacheRuleBuilder::new("query_path_extensions")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_path_extension"])
+            .build(),
+        CacheRuleBuilder::new("get_challenge_by_id")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_challenge"])
+            .build(),
+        CacheRuleBuilder::new("query_challenges")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_challenge"])
+            .build(),
+
+        // =====================================================================
+        // PREMIUM GATES (public discovery, private access)
+        // =====================================================================
+        CacheRuleBuilder::new("get_premium_gate")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["create_premium_gate"])
+            .build(),
+        CacheRuleBuilder::new("get_gates_for_resource")
+            .ttl_5m()
+            .public()
+            .invalidated_by(vec!["create_premium_gate"])
+            .build(),
+        CacheRuleBuilder::new("get_steward_credential")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_steward_credential"])
+            .build(),
+        CacheRuleBuilder::new("get_credentials_for_human")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_steward_credential"])
+            .build(),
+        CacheRuleBuilder::new("get_steward_revenue_summary")
+            .ttl_1m()
+            .public()
+            .invalidated_by(vec!["grant_access"])
+            .build(),
+
+        // =====================================================================
+        // EXPORTS (admin/migration endpoints - longer TTL)
+        // =====================================================================
+        CacheRuleBuilder::new("export_schema_version")
+            .ttl_1d()
+            .public()
+            .invalidated_by(vec![])
+            .build(),
+        CacheRuleBuilder::new("export_all_content")
+            .ttl_5m()
+            .private()
+            .invalidated_by(vec!["create_content", "bulk_create_content"])
+            .build(),
+        CacheRuleBuilder::new("export_all_paths_with_steps")
+            .ttl_5m()
+            .private()
+            .invalidated_by(vec!["create_path", "update_path", "add_path_step"])
+            .build(),
+        CacheRuleBuilder::new("export_for_migration")
+            .ttl_5m()
+            .private()
+            .invalidated_by(vec!["create_content", "create_path"])
+            .build(),
+
+        // =====================================================================
+        // USER-SPECIFIC DATA (short TTL, auth required)
+        // These use default behavior - 5 min TTL, auth required
+        // Not explicitly listed because defaults apply to get_* functions
+        // =====================================================================
+        // get_my_content, get_current_human, get_current_agent,
+        // get_my_path_progress, get_my_all_progress, get_my_mastery, etc.
+        // All require auth and use 5-minute default TTL
+    ])
+}
 
 // =============================================================================
 // Input/Output Types for Content

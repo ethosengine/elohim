@@ -40,8 +40,9 @@ data:
           # Doorway gateway handles external authentication
           allowed_origins: "*"
     network:
-      bootstrap_url: "https://holostrap.elohim.host"
-      signal_url: "wss://holostrap.elohim.host"
+      # Bootstrap and signal served by Doorway gateway
+      bootstrap_url: "https://holochain-dev.elohim.host/bootstrap"
+      signal_url: "wss://holochain-dev.elohim.host/signal"
       enable_mdns: false
       enable_relaying: true
       webrtc_config:
@@ -244,16 +245,23 @@ spec:
     environment: dev
 ---
 # Public Ingress - routes all traffic through authenticated Doorway Gateway
+# Supports: /admin, /app/*, /bootstrap/*, /signal/*, /api/v1/*
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: elohim-edgenode-dev
   namespace: ethosengine
   annotations:
+    # WebSocket support for /admin, /app/*, /signal/*
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
     nginx.ingress.kubernetes.io/websocket-services: "elohim-edgenode-dev"
+    # Required for WebSocket upgrade headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
     cert-manager.io/cluster-issuer: letsencrypt-production
 spec:
   ingressClassName: public
