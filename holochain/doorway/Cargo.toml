@@ -63,6 +63,9 @@ hex = "0.4"
 # Caching
 sha2 = "0.10"
 
+# Pin to version compatible with Rust 1.83 (base64ct 1.8.1 requires edition 2024)
+base64ct = "=1.6.0"
+
 # Shared types with DNAs
 doorway-client = { path = "../crates/doorway-client" }
 
