@@ -16,9 +16,10 @@ COPY doorway/Cargo.toml doorway/Cargo.lock ./
 COPY crates ./crates
 
 # Create dummy src to build dependencies
-RUN mkdir -p src && \
+RUN mkdir -p src/bin && \
     echo 'fn main() { println!("placeholder"); }' > src/main.rs && \
-    echo 'pub fn placeholder() {}' > src/lib.rs
+    echo 'pub fn placeholder() {}' > src/lib.rs && \
+    echo 'fn main() { println!("worker placeholder"); }' > src/bin/worker.rs
 
 # Fix the path to doorway-client (now relative to /app)
 RUN sed -i 's|path = "../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml
