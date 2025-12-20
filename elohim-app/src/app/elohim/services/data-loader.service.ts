@@ -219,8 +219,8 @@ export class DataLoaderService {
     }
   }
 
-  /** Path loading timeout in milliseconds */
-  private readonly PATH_TIMEOUT_MS = 10000;
+  /** Path loading timeout in milliseconds (30s for heavy paths) */
+  private readonly PATH_TIMEOUT_MS = 30000;
 
   /**
    * Load a LearningPath by ID.
@@ -367,8 +367,8 @@ export class DataLoaderService {
     };
   }
 
-  /** Content loading timeout in milliseconds */
-  private readonly CONTENT_TIMEOUT_MS = 5000;
+  /** Content loading timeout in milliseconds (15s for slow responses) */
+  private readonly CONTENT_TIMEOUT_MS = 15000;
 
   /**
    * Load a ContentNode by ID.
