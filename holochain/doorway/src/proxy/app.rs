@@ -18,10 +18,19 @@ pub async fn run_proxy(
     origin: Option<String>,
     query: Option<String>,
 ) -> Result<()> {
-    // Build app interface URL, preserving query params (like auth token)
+    // Build app interface URL
+    // Filter out Doorway-specific params (apiKey, token) - conductor uses its own auth
     let mut app_url = format!("ws://localhost:{}", port);
     if let Some(q) = query {
-        app_url = format!("{}?{}", app_url, q);
+        let filtered: Vec<&str> = q
+            .split('&')
+            .filter(|param| {
+                !param.starts_with("apiKey=") && !param.starts_with("token=")
+            })
+            .collect();
+        if !filtered.is_empty() {
+            app_url = format!("{}?{}", app_url, filtered.join("&"));
+        }
     }
 
     info!("Creating app proxy to {} (origin: {:?})", app_url, origin);
