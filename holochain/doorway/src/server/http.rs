@@ -20,9 +20,11 @@ use crate::cache::{self, CacheConfig, CacheRuleStore, ContentCache};
 use crate::config::Args;
 use crate::db::MongoClient;
 use crate::nats::{HostRouter, NatsClient};
+use crate::projection::{ProjectionConfig, ProjectionStore};
 use crate::routes;
 use crate::server::websocket;
 use crate::signal::{self, SignalStore, DEFAULT_MAX_CLIENTS};
+use crate::signing::{SigningConfig, SigningService};
 use crate::types::DoorwayError;
 use crate::worker::WorkerPool;
 
@@ -44,6 +46,10 @@ pub struct AppState {
     pub cache: Arc<ContentCache>,
     /// Cache rules discovered from DNAs
     pub cache_rules: Arc<CacheRuleStore>,
+    /// Projection store for one-way DHT → cache projections
+    pub projection: Option<Arc<ProjectionStore>>,
+    /// Signing service for gateway-assisted human signing
+    pub signing: Arc<SigningService>,
 }
 
 impl AppState {
@@ -62,6 +68,9 @@ impl AppState {
         };
         let cache = Arc::new(ContentCache::new(CacheConfig::from_env()));
         let cache_rules = Arc::new(CacheRuleStore::new());
+        // Projection store in memory-only mode (no MongoDB)
+        let projection = Some(Arc::new(ProjectionStore::memory_only(ProjectionConfig::default())));
+        let signing = Arc::new(SigningService::new(SigningConfig::default()));
         Self {
             args,
             mongo: None,
@@ -72,10 +81,15 @@ impl AppState {
             signal,
             cache,
             cache_rules,
+            projection,
+            signing,
         }
     }
 
     /// Create AppState with services but no worker pool (direct proxy mode)
+    ///
+    /// Projection store is initialized in memory-only mode. Use `init_projection()`
+    /// to upgrade to MongoDB-backed projection after async initialization.
     pub fn with_services(
         args: Args,
         mongo: Option<MongoClient>,
@@ -95,6 +109,9 @@ impl AppState {
         };
         let cache = Arc::new(ContentCache::new(CacheConfig::from_env()));
         let cache_rules = Arc::new(CacheRuleStore::new());
+        // Start with memory-only projection; upgrade to MongoDB via init_projection()
+        let projection = Some(Arc::new(ProjectionStore::memory_only(ProjectionConfig::default())));
+        let signing = Arc::new(SigningService::new(SigningConfig::default()));
         Self {
             args,
             mongo,
@@ -105,10 +122,15 @@ impl AppState {
             signal,
             cache,
             cache_rules,
+            projection,
+            signing,
         }
     }
 
     /// Create AppState with worker pool (pooled connection mode)
+    ///
+    /// Projection store is initialized in memory-only mode. Use `init_projection()`
+    /// to upgrade to MongoDB-backed projection after async initialization.
     pub fn with_pool(
         args: Args,
         mongo: Option<MongoClient>,
@@ -129,6 +151,9 @@ impl AppState {
         };
         let cache = Arc::new(ContentCache::new(CacheConfig::from_env()));
         let cache_rules = Arc::new(CacheRuleStore::new());
+        // Start with memory-only projection; upgrade to MongoDB via init_projection()
+        let projection = Some(Arc::new(ProjectionStore::memory_only(ProjectionConfig::default())));
+        let signing = Arc::new(SigningService::new(SigningConfig::default()));
         Self {
             args,
             mongo,
@@ -139,7 +164,57 @@ impl AppState {
             signal,
             cache,
             cache_rules,
+            projection,
+            signing,
         }
+    }
+
+    /// Create a new AppState with MongoDB-backed projection store
+    ///
+    /// This is the preferred constructor when MongoDB is available,
+    /// as it properly initializes the projection store with persistence.
+    pub async fn with_projection(
+        args: Args,
+        mongo: MongoClient,
+        nats: Option<NatsClient>,
+        pool: Option<Arc<WorkerPool>>,
+    ) -> Result<Self, DoorwayError> {
+        let router = HostRouter::new(nats.clone());
+        let bootstrap = if args.bootstrap_enabled {
+            Some(Arc::new(BootstrapStore::new()))
+        } else {
+            None
+        };
+        let signal = if args.signal_enabled {
+            let max_clients = args.signal_max_clients.unwrap_or(DEFAULT_MAX_CLIENTS);
+            Some(Arc::new(SignalStore::new(max_clients)))
+        } else {
+            None
+        };
+        let cache = Arc::new(ContentCache::new(CacheConfig::from_env()));
+        let cache_rules = Arc::new(CacheRuleStore::new());
+
+        // Initialize projection store with MongoDB
+        let projection_store = ProjectionStore::new(
+            mongo.clone(),
+            ProjectionConfig::default(),
+        ).await?;
+
+        let signing = Arc::new(SigningService::new(SigningConfig::default()));
+
+        Ok(Self {
+            args,
+            mongo: Some(mongo),
+            nats,
+            router,
+            pool,
+            bootstrap,
+            signal,
+            cache,
+            cache_rules,
+            projection: Some(Arc::new(projection_store)),
+            signing,
+        })
     }
 }
 

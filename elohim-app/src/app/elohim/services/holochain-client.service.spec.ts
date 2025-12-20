@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { HolochainClientService } from './holochain-client.service';
 
 /**
@@ -12,6 +13,7 @@ describe('HolochainClientService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
       providers: [HolochainClientService],
     });
     service = TestBed.inject(HolochainClientService);

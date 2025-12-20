@@ -83,6 +83,11 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .public()
             .invalidated_by(vec!["create_path", "update_path", "delete_path"])
             .build(),
+        CacheRuleBuilder::new("get_path_overview")
+            .ttl_15m()
+            .public()
+            .invalidated_by(vec!["create_path", "update_path", "delete_path", "add_path_step", "batch_add_path_steps"])
+            .build(),
         CacheRuleBuilder::new("get_path_with_steps")
             .ttl_15m()
             .public()
@@ -646,6 +651,15 @@ pub struct PathWithSteps {
     pub action_hash: ActionHash,
     pub path: LearningPath,
     pub steps: Vec<PathStepOutput>,
+}
+
+/// Lightweight path overview (no step content, just counts)
+/// Use this for path listings and initial load - much faster than get_path_with_steps
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PathOverview {
+    pub action_hash: ActionHash,
+    pub path: LearningPath,
+    pub step_count: usize,
 }
 
 /// Output for a path step
@@ -1652,6 +1666,56 @@ pub fn get_path_with_steps(path_id: String) -> ExternResult<Option<PathWithSteps
         action_hash: path_action_hash,
         path,
         steps,
+    }))
+}
+
+/// Get a lightweight path overview (no step content, just metadata and count)
+///
+/// This is MUCH faster than get_path_with_steps because it:
+/// - Only counts step links instead of fetching each step record
+/// - Returns path.metadata_json which contains chapter structure
+///
+/// Use for: path listings, path-overview page, initial navigation
+#[hdk_extern]
+pub fn get_path_overview(path_id: String) -> ExternResult<Option<PathOverview>> {
+    // Find path by ID
+    let anchor = StringAnchor::new("path_id", &path_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToPath)?;
+    let path_links = get_links(query, GetStrategy::default())?;
+
+    let path_link = match path_links.first() {
+        Some(link) => link,
+        None => return Ok(None),
+    };
+
+    let path_action_hash = ActionHash::try_from(path_link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+
+    let path_record = get(path_action_hash.clone(), GetOptions::default())?;
+    let path_record = match path_record {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+
+    let path: LearningPath = path_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize path".to_string()
+        )))?;
+
+    // Just count step links - don't fetch each step record
+    let step_query = LinkQuery::try_new(path_action_hash.clone(), LinkTypes::PathToStep)?;
+    let step_links = get_links(step_query, GetStrategy::default())?;
+    let step_count = step_links.len();
+
+    Ok(Some(PathOverview {
+        action_hash: path_action_hash,
+        path,
+        step_count,
     }))
 }
 
@@ -8964,4 +9028,170 @@ pub fn query_governance_states(input: QueryGovernanceStatesInput) -> ExternResul
     }
 
     Ok(results)
+}
+
+// =============================================================================
+// Post-Commit Signals for Doorway Projection
+// =============================================================================
+
+/// Signal types emitted after commits for real-time projection.
+///
+/// These signals are consumed by Doorway's Projection Engine to
+/// update the MongoDB cache in real-time as the DHT changes.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type", content = "payload")]
+pub enum ProjectionSignal {
+    /// Content entry was created or updated
+    ContentCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        content: Content,
+        author: AgentPubKey,
+    },
+    /// LearningPath was created or updated
+    PathCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        path: LearningPath,
+        author: AgentPubKey,
+    },
+    /// PathStep was created or updated
+    StepCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        step: PathStep,
+        author: AgentPubKey,
+    },
+    /// PathChapter was created or updated
+    ChapterCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        chapter: PathChapter,
+        author: AgentPubKey,
+    },
+    /// Relationship was created
+    RelationshipCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        relationship: Relationship,
+        author: AgentPubKey,
+    },
+    /// Human (agent profile) was created or updated
+    HumanCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        human: Human,
+        author: AgentPubKey,
+    },
+    /// Agent was created or updated
+    AgentCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        agent: Agent,
+        author: AgentPubKey,
+    },
+    /// ContributorPresence was created or updated
+    PresenceCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        presence: ContributorPresence,
+        author: AgentPubKey,
+    },
+    /// Generic entry committed (for extension)
+    EntryCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        entry_type: String,
+        author: AgentPubKey,
+    },
+}
+
+/// Post-commit callback - emits signals for projection.
+///
+/// Called by Holochain after each successful commit. Inspects the
+/// committed entries and emits signals that Doorway subscribes to
+/// for real-time cache updates.
+#[hdk_extern]
+pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<()> {
+    for signed_action in committed_actions {
+        let action = signed_action.hashed.content.clone();
+        let action_hash = signed_action.hashed.hash.clone();
+
+        // Only process Create and Update actions (not deletes, links, etc.)
+        let entry_hash = match &action {
+            Action::Create(create) => create.entry_hash.clone(),
+            Action::Update(update) => update.entry_hash.clone(),
+            _ => continue,
+        };
+
+        // Get the entry to determine its type and emit the appropriate signal
+        let record = match get(action_hash.clone(), GetOptions::default())? {
+            Some(r) => r,
+            None => continue,
+        };
+
+        let author = action.author().clone();
+
+        // Try to deserialize as each entry type and emit the corresponding signal
+        if let Some(content) = record.entry().to_app_option::<Content>().ok().flatten() {
+            emit_signal(ProjectionSignal::ContentCommitted {
+                action_hash,
+                entry_hash,
+                content,
+                author,
+            })?;
+        } else if let Some(path) = record.entry().to_app_option::<LearningPath>().ok().flatten() {
+            emit_signal(ProjectionSignal::PathCommitted {
+                action_hash,
+                entry_hash,
+                path,
+                author,
+            })?;
+        } else if let Some(step) = record.entry().to_app_option::<PathStep>().ok().flatten() {
+            emit_signal(ProjectionSignal::StepCommitted {
+                action_hash,
+                entry_hash,
+                step,
+                author,
+            })?;
+        } else if let Some(chapter) = record.entry().to_app_option::<PathChapter>().ok().flatten() {
+            emit_signal(ProjectionSignal::ChapterCommitted {
+                action_hash,
+                entry_hash,
+                chapter,
+                author,
+            })?;
+        } else if let Some(relationship) = record.entry().to_app_option::<Relationship>().ok().flatten() {
+            emit_signal(ProjectionSignal::RelationshipCommitted {
+                action_hash,
+                entry_hash,
+                relationship,
+                author,
+            })?;
+        } else if let Some(human) = record.entry().to_app_option::<Human>().ok().flatten() {
+            emit_signal(ProjectionSignal::HumanCommitted {
+                action_hash,
+                entry_hash,
+                human,
+                author,
+            })?;
+        } else if let Some(agent) = record.entry().to_app_option::<Agent>().ok().flatten() {
+            emit_signal(ProjectionSignal::AgentCommitted {
+                action_hash,
+                entry_hash,
+                agent,
+                author,
+            })?;
+        } else if let Some(presence) = record.entry().to_app_option::<ContributorPresence>().ok().flatten() {
+            emit_signal(ProjectionSignal::PresenceCommitted {
+                action_hash,
+                entry_hash,
+                presence,
+                author,
+            })?;
+        }
+        // Other entry types can be added here as needed
+    }
+
+    Ok(())
 }

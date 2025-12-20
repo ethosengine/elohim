@@ -11,6 +11,7 @@ use doorway::{
     config::Args,
     db::MongoClient,
     nats::NatsClient,
+    projection::{EngineConfig, ProjectionEngine, SubscriberConfig, spawn_engine_task, spawn_subscriber},
     server,
     worker::{PoolConfig, WorkerPool},
 };
@@ -118,9 +119,38 @@ async fn main() -> anyhow::Result<()> {
 
     // Create application state
     let state = if let Some(p) = pool {
-        Arc::new(server::AppState::with_pool(args, mongo, nats, p))
+        Arc::new(server::AppState::with_pool(args.clone(), mongo, nats, p))
     } else {
-        Arc::new(server::AppState::with_services(args, mongo, nats))
+        Arc::new(server::AppState::with_services(args.clone(), mongo, nats))
+    };
+
+    // Start Projection Engine (if projection store is available)
+    let _projection_handle = if let Some(ref projection_store) = state.projection {
+        // Derive app URL from conductor URL (replace admin port with app port)
+        let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
+
+        info!("Starting projection engine (app interface: {})", app_url);
+
+        // Start signal subscriber
+        let subscriber_config = SubscriberConfig {
+            app_url,
+            ..SubscriberConfig::default()
+        };
+        let (subscriber, subscriber_handle) = spawn_subscriber(subscriber_config);
+
+        // Create and start projection engine
+        let engine = Arc::new(ProjectionEngine::new(
+            projection_store.clone(),
+            EngineConfig::default(),
+        ));
+        let signal_rx = subscriber.subscribe();
+        let engine_handle = spawn_engine_task(engine, signal_rx);
+
+        info!("Projection engine started");
+        Some((subscriber_handle, engine_handle))
+    } else {
+        warn!("Projection engine not started (no projection store)");
+        None
     };
 
     // Run the server
@@ -130,4 +160,18 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Derive app WebSocket URL from conductor admin URL
+fn derive_app_url(conductor_url: &str, app_port: u16) -> String {
+    // If the URL contains "localhost" or an IP, replace the port
+    if let Some(host_start) = conductor_url.find("://") {
+        let after_scheme = &conductor_url[host_start + 3..];
+        if let Some(port_start) = after_scheme.rfind(':') {
+            let host = &after_scheme[..port_start];
+            return format!("{}://{}:{}", &conductor_url[..host_start], host, app_port);
+        }
+    }
+    // Fallback: just use the default
+    format!("ws://localhost:{}", app_port)
 }

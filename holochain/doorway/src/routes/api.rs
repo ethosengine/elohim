@@ -3,6 +3,20 @@
 //! Provides HTTP GET endpoints for cacheable zome functions.
 //! Route pattern: GET /api/v1/{dna_hash}/{zome}/{fn}?{args}
 //!
+//! ## Read Path Modes
+//!
+//! Doorway supports two read path modes:
+//!
+//! 1. **Projection Mode** (production default):
+//!    - Reads come from ProjectionStore (hot cache + MongoDB)
+//!    - Conductor is never touched for reads
+//!    - Data is populated via post_commit signals from DNA
+//!
+//! 2. **Conductor Mode** (dev/seeding):
+//!    - Direct conductor calls for reads (DEV_MODE + CONDUCTOR_READS)
+//!    - Used during database seeding and development
+//!    - Falls back to projection if conductor call fails
+//!
 //! ## Caching Behavior
 //!
 //! DNAs can optionally implement `__doorway_cache_rules` to declare caching rules.
@@ -22,8 +36,10 @@ use http_body_util::Full;
 use hyper::{Response, StatusCode};
 use serde::Serialize;
 use std::sync::Arc;
+use tracing::{debug, warn};
 
 use crate::cache::{CacheKey, DefaultRules};
+use crate::projection::ProjectionQuery;
 use crate::server::AppState;
 
 /// API error response
@@ -103,6 +119,10 @@ fn cached_response(
 }
 
 /// Handle GET /api/v1/{dna}/{zome}/{fn}
+///
+/// Query parameters:
+/// - `_conductor=true` - Bypass projection cache, read directly from conductor (DEV_MODE only)
+/// - Other params are passed as zome function arguments
 pub async fn handle_api_request(
     state: Arc<AppState>,
     path: &str,
@@ -120,76 +140,183 @@ pub async fn handle_api_request(
         }
     };
 
-    // Get args from query string
-    let args = query.unwrap_or("");
+    // Get args from query string and check for conductor bypass
+    let (args, conductor_bypass) = parse_query_args(query.unwrap_or(""));
 
-    // Look up cache rules for this function
-    let rule = state.cache_rules.get_rule(route.dna_hash, route.fn_name);
+    // Check if conductor bypass is requested and allowed
+    let use_conductor = conductor_bypass && state.args.dev_mode;
+    if conductor_bypass && !state.args.dev_mode {
+        warn!("Conductor bypass requested but DEV_MODE is disabled");
+    }
 
-    // Check if this function is cacheable
-    let rule = match rule {
-        Some(r) if r.cacheable => r,
-        Some(_) => {
-            return error_response(
-                StatusCode::METHOD_NOT_ALLOWED,
-                &format!("Function '{}' is not cacheable via REST API", route.fn_name),
-                "NOT_CACHEABLE",
-            );
-        }
-        None => {
-            // No explicit rule - check convention
-            match DefaultRules::for_function(route.fn_name) {
-                Some(r) => r,
-                None => {
-                    return error_response(
-                        StatusCode::METHOD_NOT_ALLOWED,
-                        &format!(
-                            "Function '{}' is not a get_*/list_* function and has no cache rules",
-                            route.fn_name
-                        ),
-                        "NOT_CACHEABLE",
-                    );
-                }
-            }
-        }
-    };
-
-    // Create cache key
-    let cache_key = route.cache_key(args);
+    // Create cache key (without the _conductor param)
+    let cache_key = route.cache_key(&args);
     let storage_key = cache_key.to_storage_key();
 
-    // Check cache first
-    if let Some(entry) = state.cache.get(&storage_key) {
-        let ttl = entry.remaining_ttl_secs();
-        let etag = entry.etag.clone();
-        return cached_response(
-            entry.data,
-            &etag,
-            ttl,
-            true, // cache hit
+    // =========================================================================
+    // Read Path: Direct Conductor (per-request bypass, DEV_MODE only)
+    // =========================================================================
+    if use_conductor {
+        debug!("Conductor bypass requested for {}", route.fn_name);
+
+        // Direct conductor call would go here
+        // For now, indicate that conductor reads are requested but bridge not implemented
+        return error_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            &format!(
+                "Direct conductor read requested but bridge not yet implemented. \
+                Route: {}/{}/{}. Use WebSocket for now.",
+                route.dna_hash, route.zome, route.fn_name
+            ),
+            "CONDUCTOR_BRIDGE_PENDING",
         );
     }
 
-    // Cache miss - need to make zome call
-    // TODO: Implement actual zome call to conductor
-    // For now, return a placeholder indicating the conductor connection is needed
+    // =========================================================================
+    // Read Path: Projection Cache (default for all requests)
+    // =========================================================================
+    debug!("Using projection read path for {}", route.fn_name);
 
-    // This is where we would:
-    // 1. Connect to conductor app interface
-    // 2. Make zome call: call_zome(dna_hash, zome, fn_name, args)
-    // 3. Parse response
-    // 4. Check reach_field if applicable
-    // 5. Cache if public
-    // 6. Return response
+    // Try legacy cache first (for backward compat during transition)
+    if let Some(entry) = state.cache.get(&storage_key) {
+        let ttl = entry.remaining_ttl_secs();
+        let etag = entry.etag.clone();
+        return cached_response(entry.data, &etag, ttl, true);
+    }
 
+    // Try projection store
+    if let Some(ref projection) = state.projection {
+        // Map zome function to projection query
+        if let Some(response) = query_projection(&route, &args, projection.as_ref()).await {
+            return projection_response(response);
+        }
+    }
+
+    // Projection cache miss
     error_response(
-        StatusCode::SERVICE_UNAVAILABLE,
+        StatusCode::NOT_FOUND,
         &format!(
-            "Zome call bridge not yet implemented. Route: {}/{}/{}",
-            route.dna_hash, route.zome, route.fn_name
+            "Content not found in projection cache. It may not have been created yet. \
+            Route: {}/{}/{}{}",
+            route.dna_hash, route.zome, route.fn_name,
+            if state.args.dev_mode { ". Add ?_conductor=true to bypass cache." } else { "" }
         ),
-        "NOT_IMPLEMENTED",
+        "NOT_IN_PROJECTION",
     )
+}
+
+/// Parse query string, extracting `_conductor` flag and returning clean args
+fn parse_query_args(query: &str) -> (String, bool) {
+    if query.is_empty() {
+        return (String::new(), false);
+    }
+
+    let mut conductor_bypass = false;
+    let mut clean_params = Vec::new();
+
+    for pair in query.split('&') {
+        if pair == "_conductor=true" || pair == "_conductor=1" {
+            conductor_bypass = true;
+        } else if !pair.starts_with("_conductor=") {
+            clean_params.push(pair);
+        }
+    }
+
+    (clean_params.join("&"), conductor_bypass)
+}
+
+/// Query projection store based on zome function
+async fn query_projection(
+    route: &ApiRoute<'_>,
+    args: &str,
+    projection: &crate::projection::ProjectionStore,
+) -> Option<Vec<u8>> {
+    // Parse args to extract query parameters
+    let args_json: serde_json::Value = serde_json::from_str(args).unwrap_or_default();
+
+    // Map common zome functions to projection queries
+    match route.fn_name {
+        // Content queries
+        "get_content" | "get_content_by_id" => {
+            let id = args_json.get("id")
+                .or_else(|| args_json.get("content_id"))
+                .and_then(|v| v.as_str())?;
+
+            let doc = projection.get("Content", id).await?;
+            serde_json::to_vec(&doc.data).ok()
+        }
+
+        "get_content_by_type" => {
+            let content_type = args_json.get("content_type")
+                .and_then(|v| v.as_str())?;
+
+            let query = ProjectionQuery::by_type("Content")
+                .with_limit(100);
+            // Note: We'd need to add filtering by content_type in the data
+            // For now, return all content and filter client-side
+            let docs = projection.query(query).await.ok()?;
+            let data: Vec<_> = docs.iter()
+                .filter(|d| d.data.get("content_type").and_then(|v| v.as_str()) == Some(content_type))
+                .map(|d| &d.data)
+                .collect();
+            serde_json::to_vec(&data).ok()
+        }
+
+        // Path queries
+        "get_all_paths" => {
+            let query = ProjectionQuery::by_type("LearningPath")
+                .with_limit(100);
+            let docs = projection.query(query).await.ok()?;
+            let data: Vec<_> = docs.iter().map(|d| &d.data).collect();
+            serde_json::to_vec(&data).ok()
+        }
+
+        "get_path_overview" | "get_path_with_steps" | "get_path_full" => {
+            let id = args_json.get("id")
+                .or_else(|| args_json.get("path_id"))
+                .and_then(|v| v.as_str())?;
+
+            let doc = projection.get("LearningPath", id).await?;
+            serde_json::to_vec(&doc.data).ok()
+        }
+
+        // Relationship queries
+        "get_relationships" => {
+            let source_id = args_json.get("source_id")
+                .and_then(|v| v.as_str());
+
+            let query = ProjectionQuery::by_type("Relationship")
+                .with_limit(100);
+            let docs = projection.query(query).await.ok()?;
+
+            let data: Vec<_> = if let Some(src) = source_id {
+                docs.iter()
+                    .filter(|d| d.data.get("source_id").and_then(|v| v.as_str()) == Some(src))
+                    .map(|d| &d.data)
+                    .collect()
+            } else {
+                docs.iter().map(|d| &d.data).collect()
+            };
+            serde_json::to_vec(&data).ok()
+        }
+
+        // Default: function not mapped to projection
+        _ => {
+            warn!("Zome function '{}' not mapped to projection query", route.fn_name);
+            None
+        }
+    }
+}
+
+/// Build response from projection data
+fn projection_response(data: Vec<u8>) -> Response<Full<Bytes>> {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .header("X-Source", "projection")
+        .header("Cache-Control", "public, max-age=60")
+        .body(Full::new(Bytes::from(data)))
+        .unwrap()
 }
 
 #[cfg(test)]

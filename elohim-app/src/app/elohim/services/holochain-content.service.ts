@@ -198,6 +198,16 @@ export interface HolochainPathWithSteps {
   }>;
 }
 
+/**
+ * Lightweight path overview (no step content, just counts)
+ * Use for: path listings, path-overview page, initial navigation
+ */
+export interface HolochainPathOverview {
+  action_hash: Uint8Array;
+  path: HolochainLearningPath;
+  step_count: number;
+}
+
 // =============================================================================
 // Holochain Agent Types (match Rust DNA structures)
 // =============================================================================
@@ -1125,6 +1135,30 @@ export class HolochainContentService {
     });
 
     if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Get a lightweight path overview via REST API (cached by Doorway).
+   *
+   * This is MUCH faster than getPathWithSteps because:
+   * - Only counts step links instead of fetching each step record
+   * - Uses Doorway's REST cache (15 minute TTL)
+   *
+   * Use for: path listings, path-overview page, initial navigation
+   */
+  async getPathOverviewRest(pathId: string): Promise<HolochainPathOverview | null> {
+    const result = await this.holochainClient.callZomeRest<HolochainPathOverview | null>({
+      zomeName: 'content_store',
+      fnName: 'get_path_overview',
+      payload: pathId,
+    });
+
+    if (!result.success || !result.data) {
+      console.log('[HolochainContent] getPathOverviewRest failed:', result.error);
       return null;
     }
 

@@ -19,7 +19,9 @@
  * @see https://github.com/holochain/holochain-client-js
  */
 
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import {
   AdminWebsocket,
   AppWebsocket,
@@ -48,6 +50,9 @@ import {
   providedIn: 'root',
 })
 export class HolochainClientService {
+  /** HTTP client for REST API calls */
+  private readonly http = inject(HttpClient);
+
   /** Current connection state */
   private readonly connectionSignal = signal<HolochainConnection>(INITIAL_CONNECTION_STATE);
 
@@ -505,6 +510,87 @@ export class HolochainClientService {
         error: errorMessage,
       };
     }
+  }
+
+  /**
+   * Make a zome call via REST API (uses Doorway cache for reads)
+   *
+   * This is preferred for read-only calls that benefit from caching.
+   * The Doorway gateway caches responses based on zome-defined cache rules.
+   *
+   * Endpoint: POST /api/v1/zome/{dna_hash}/{zome_name}/{fn_name}
+   */
+  async callZomeRest<T>(input: ZomeCallInput): Promise<ZomeCallResult<T>> {
+    const { cellId, state } = this.connectionSignal();
+
+    // Need cellId for DNA hash
+    if (!cellId) {
+      // If not connected but connecting, wait briefly
+      if (state === 'connecting' || state === 'authenticating') {
+        const connected = await this.waitForConnection(5000);
+        if (!connected) {
+          return { success: false, error: 'Connection timed out' };
+        }
+      } else {
+        return { success: false, error: 'Not connected - no cell ID available' };
+      }
+    }
+
+    // Get current cellId after potential wait
+    const currentCellId = this.connectionSignal().cellId;
+    if (!currentCellId) {
+      return { success: false, error: 'No cell ID available' };
+    }
+
+    // Build REST API URL
+    const dnaHash = this.uint8ArrayToBase64(currentCellId[0]);
+    const restUrl = this.resolveRestUrl(dnaHash, input.zomeName, input.fnName);
+
+    try {
+      const response = await firstValueFrom(
+        this.http.post<T>(restUrl, input.payload ?? null, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+      );
+
+      return { success: true, data: response };
+    } catch (err) {
+      let errorMessage = 'REST call failed';
+      if (err instanceof HttpErrorResponse) {
+        if (err.error?.error) {
+          errorMessage = err.error.error;
+        } else if (err.message) {
+          errorMessage = err.message;
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+
+      console.error(`[Holochain REST] ${input.zomeName}.${input.fnName} failed:`, errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Resolve REST API URL for zome calls
+   * Converts WebSocket config to HTTP endpoint
+   */
+  private resolveRestUrl(dnaHash: string, zomeName: string, fnName: string): string {
+    // Use the admin URL base, but convert to HTTPS for REST
+    const baseUrl = this.config.adminUrl
+      .replace('wss://', 'https://')
+      .replace('ws://', 'http://')
+      .replace(/\/$/, ''); // Remove trailing slash
+
+    // Add API key if configured
+    const apiKeyParam = this.config.proxyApiKey
+      ? `?apiKey=${encodeURIComponent(this.config.proxyApiKey)}`
+      : '';
+
+    // Endpoint: /api/v1/zome/{dna_hash}/{zome_name}/{fn_name}
+    return `${baseUrl}/api/v1/zome/${encodeURIComponent(dnaHash)}/${encodeURIComponent(zomeName)}/${encodeURIComponent(fnName)}${apiKeyParam}`;
   }
 
   /**

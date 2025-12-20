@@ -42,6 +42,9 @@ pub enum DoorwayError {
 
     #[error("Authentication error: {0}")]
     Auth(String),
+
+    #[error("Projection error: {0}")]
+    Projection(String),
 }
 
 impl DoorwayError {
@@ -60,6 +63,7 @@ impl DoorwayError {
             Self::Http(_) => StatusCode::BAD_REQUEST,
             Self::Config(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::Auth(_) => StatusCode::UNAUTHORIZED,
+            Self::Projection(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 

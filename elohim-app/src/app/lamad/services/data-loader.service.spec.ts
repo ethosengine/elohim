@@ -3,6 +3,7 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { HolochainContentService } from '@app/elohim/services/holochain-content.service';
 import { IndexedDBCacheService } from '@app/elohim/services/indexeddb-cache.service';
+import { ProjectionAPIService } from '@app/elohim/services/projection-api.service';
 import { LearningPath, PathIndex, ContentNode, AgentProgress } from '../models';
 import { of, throwError } from 'rxjs';
 
@@ -11,6 +12,7 @@ describe('DataLoaderService', () => {
   let httpMock: HttpTestingController;
   let mockHolochainContent: jasmine.SpyObj<HolochainContentService>;
   let mockIndexedDBCache: jasmine.SpyObj<IndexedDBCacheService>;
+  let mockProjectionApi: jasmine.SpyObj<ProjectionAPIService>;
   const basePath = '/assets/lamad-data';
 
   const mockContent: ContentNode = {
@@ -61,6 +63,31 @@ describe('DataLoaderService', () => {
       'clearAll'
     ]);
 
+    mockProjectionApi = jasmine.createSpyObj('ProjectionAPIService', [
+      'getContent',
+      'queryContent',
+      'batchGetContent',
+      'getPath',
+      'getPathOverview',
+      'queryPaths',
+      'getRelated',
+      'getStats',
+      'isHealthy'
+    ], {
+      enabled: false  // Disabled by default so tests use Holochain path
+    });
+
+    // Projection API mock returns (disabled by default)
+    mockProjectionApi.getContent.and.returnValue(of(null));
+    mockProjectionApi.queryContent.and.returnValue(of([]));
+    mockProjectionApi.batchGetContent.and.returnValue(of(new Map()));
+    mockProjectionApi.getPath.and.returnValue(of(null));
+    mockProjectionApi.getPathOverview.and.returnValue(of(null));
+    mockProjectionApi.queryPaths.and.returnValue(of([]));
+    mockProjectionApi.getRelated.and.returnValue(of([]));
+    mockProjectionApi.getStats.and.returnValue(of(null));
+    mockProjectionApi.isHealthy.and.returnValue(of(false));
+
     // Default mock returns
     mockHolochainContent.getStats.and.returnValue(of({ total_count: 0, by_type: {} }));
     mockHolochainContent.isAvailable.and.returnValue(true);
@@ -83,7 +110,8 @@ describe('DataLoaderService', () => {
       providers: [
         DataLoaderService,
         { provide: HolochainContentService, useValue: mockHolochainContent },
-        { provide: IndexedDBCacheService, useValue: mockIndexedDBCache }
+        { provide: IndexedDBCacheService, useValue: mockIndexedDBCache },
+        { provide: ProjectionAPIService, useValue: mockProjectionApi }
       ]
     });
 

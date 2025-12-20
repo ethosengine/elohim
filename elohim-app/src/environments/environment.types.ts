@@ -24,6 +24,20 @@ export interface HolochainEnvironmentConfig {
 }
 
 /**
+ * Projection API configuration
+ */
+export interface ProjectionApiConfig {
+  /** Whether projection API is enabled */
+  enabled: boolean;
+  /** Base URL for projection API (defaults to authUrl/api/v1/projection) */
+  baseUrl?: string;
+  /** Request timeout in ms */
+  timeout?: number;
+  /** Cache mode: prefer-projection (default) or prefer-holochain */
+  cacheMode?: 'prefer-projection' | 'prefer-holochain';
+}
+
+/**
  * Environment configuration interface
  */
 export interface Environment {
@@ -34,4 +48,6 @@ export interface Environment {
   /** Git commit hash for version tracking */
   gitHash: string;
   holochain?: HolochainEnvironmentConfig;
+  /** Projection API configuration (fast read path) */
+  projectionApi?: ProjectionApiConfig;
 }

@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ContentMasteryService } from './content-mastery.service';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
@@ -64,6 +65,7 @@ describe('ContentMasteryService', () => {
     sessionHumanService.getSessionId.and.returnValue(TEST_SESSION_ID);
 
     TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
       providers: [
         ContentMasteryService,
         LocalSourceChainService,

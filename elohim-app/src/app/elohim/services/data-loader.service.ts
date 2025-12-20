@@ -1,9 +1,10 @@
-import { Injectable } from '@angular/core';
-import { Observable, of, from, defer, throwError, timer, forkJoin } from 'rxjs';
-import { catchError, map, shareReplay, timeout, retry, tap, switchMap } from 'rxjs/operators';
+import { Injectable, inject } from '@angular/core';
+import { Observable, of, from, defer, throwError, timer, forkJoin, firstValueFrom } from 'rxjs';
+import { catchError, map, shareReplay, timeout, retry, tap, switchMap, take } from 'rxjs/operators';
 import {
   HolochainContentService,
   HolochainPathWithSteps,
+  HolochainPathOverview,
   HolochainPathIndex,
   HolochainAgentEntry,
   HolochainAttestationEntry,
@@ -11,6 +12,7 @@ import {
   HolochainContentGraphNode,
 } from './holochain-content.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
+import { ProjectionAPIService } from './projection-api.service';
 
 // Models from elohim (local)
 import { Agent, AgentProgress, AgentAttestation } from '../models/agent.model';
@@ -195,6 +197,9 @@ export class DataLoaderService {
   /** IndexedDB cache initialized flag */
   private idbInitialized = false;
 
+  /** Projection API service for fast cached reads */
+  private readonly projectionApi = inject(ProjectionAPIService);
+
   constructor(
     private readonly holochainContent: HolochainContentService,
     private readonly idbCache: IndexedDBCacheService
@@ -290,20 +295,130 @@ export class DataLoaderService {
   }
 
   /**
-   * Load path with IndexedDB fallback.
-   * Checks IndexedDB first, then Holochain.
+   * Load a lightweight path overview.
+   *
+   * Use this for:
+   * - Path listings (faster than loading full paths)
+   * - Initial navigation (load overview first, then full path on demand)
+   * - Any UI that only needs metadata + step count
+   *
+   * Cache hierarchy:
+   * 1. Projection API (Doorway's MongoDB cache - fastest)
+   * 2. Holochain REST API (15 minute TTL cache)
+   *
+   * @param pathId The path ID to load
+   * @returns Observable of lightweight LearningPath (steps array will be empty)
+   */
+  getPathOverview(pathId: string): Observable<LearningPath> {
+    // Try projection API first if enabled
+    if (this.projectionApi.enabled) {
+      return this.projectionApi.getPathOverview(pathId).pipe(
+        timeout(5000),
+        switchMap(result => {
+          if (result) {
+            return of(result as LearningPath);
+          }
+          // Fall back to Holochain REST
+          return this.getPathOverviewFromHolochain(pathId);
+        }),
+        catchError(() => this.getPathOverviewFromHolochain(pathId))
+      );
+    }
+
+    return this.getPathOverviewFromHolochain(pathId);
+  }
+
+  /**
+   * Load path overview from Holochain REST API (fallback).
+   */
+  private getPathOverviewFromHolochain(pathId: string): Observable<LearningPath> {
+    return defer(() => from(this.holochainContent.getPathOverviewRest(pathId))).pipe(
+      timeout(10000),
+      map(result => {
+        if (!result) {
+          throw new Error(`Path not found: ${pathId}`);
+        }
+        return this.transformHolochainPathOverview(result);
+      }),
+      catchError(err => {
+        console.warn(`[DataLoader] Path overview "${pathId}" failed:`, err.message || err);
+        throw err;
+      }),
+      shareReplay(1)
+    );
+  }
+
+  /**
+   * Transform path overview to LearningPath model.
+   * Returns path with empty steps array - use getPath() for full steps.
+   */
+  private transformHolochainPathOverview(hcPath: HolochainPathOverview): LearningPath {
+    // Parse metadata to extract chapters if available
+    let chapters: LearningPath['chapters'] | undefined;
+    try {
+      const metadata = JSON.parse(hcPath.path.metadata_json || '{}');
+      if (metadata.chapters && Array.isArray(metadata.chapters)) {
+        chapters = metadata.chapters;
+      }
+    } catch {
+      // Ignore JSON parse errors
+    }
+
+    return {
+      id: hcPath.path.id,
+      version: hcPath.path.version,
+      title: hcPath.path.title,
+      description: hcPath.path.description,
+      purpose: hcPath.path.purpose ?? '',
+      createdBy: hcPath.path.created_by,
+      contributors: [],
+      createdAt: hcPath.path.created_at,
+      updatedAt: hcPath.path.updated_at,
+      difficulty: hcPath.path.difficulty as LearningPath['difficulty'],
+      estimatedDuration: hcPath.path.estimated_duration ?? '',
+      tags: hcPath.path.tags,
+      visibility: hcPath.path.visibility as LearningPath['visibility'],
+      chapters,
+      // Empty steps - use getPath() for full step data
+      steps: [],
+      // Store step count in metadata for UI display
+      stepCount: hcPath.step_count,
+    } as LearningPath & { stepCount?: number };
+  }
+
+  /**
+   * Load path with cache fallback chain.
+   *
+   * Cache hierarchy:
+   * 1. IndexedDB (local persistent cache)
+   * 2. Projection API (Doorway's MongoDB cache - fast HTTP)
+   * 3. Holochain (direct conductor - slow, authoritative)
    */
   private async loadPathWithIDBFallback(pathId: string): Promise<LearningPath | null> {
-    // Try IndexedDB first
+    // 1. Try IndexedDB first (fastest, local)
     if (this.idbInitialized) {
       const cached = await this.idbCache.getPath(pathId);
       if (cached) {
-        console.log(`[DataLoader] Path "${pathId}" loaded from IndexedDB cache, chapters:`, cached.chapters?.length ?? 'none');
+        console.log(`[DataLoader] Path "${pathId}" loaded from IndexedDB cache`);
         return cached;
       }
     }
 
-    // Fall back to Holochain
+    // 2. Try Projection API (Doorway's MongoDB cache)
+    if (this.projectionApi.enabled) {
+      try {
+        const projected = await firstValueFrom(this.projectionApi.getPath(pathId));
+        if (projected) {
+          console.log(`[DataLoader] Path "${pathId}" loaded from projection cache`);
+          return projected;
+        }
+      } catch (err) {
+        console.debug(`[DataLoader] Projection API miss for path "${pathId}":`, err);
+        // Continue to Holochain fallback
+      }
+    }
+
+    // 3. Fall back to Holochain (authoritative source)
     console.log(`[DataLoader] Loading path "${pathId}" from Holochain...`);
     const hcPath = await this.holochainContent.getPathWithSteps(pathId);
     if (!hcPath) {
@@ -438,11 +553,15 @@ export class DataLoaderService {
   }
 
   /**
-   * Load content with IndexedDB fallback.
-   * Checks IndexedDB first, then Holochain.
+   * Load content with cache fallback chain.
+   *
+   * Cache hierarchy:
+   * 1. IndexedDB (local persistent cache)
+   * 2. Projection API (Doorway's MongoDB cache - fast HTTP)
+   * 3. Holochain (direct conductor - slow, authoritative)
    */
   private async loadContentWithIDBFallback(resourceId: string): Promise<ContentNode | null> {
-    // Try IndexedDB first
+    // 1. Try IndexedDB first (fastest, local)
     if (this.idbInitialized) {
       const cached = await this.idbCache.getContent(resourceId);
       if (cached) {
@@ -450,7 +569,19 @@ export class DataLoaderService {
       }
     }
 
-    // Fall back to Holochain
+    // 2. Try Projection API (Doorway's MongoDB cache)
+    if (this.projectionApi.enabled) {
+      try {
+        const projected = await firstValueFrom(this.projectionApi.getContent(resourceId));
+        if (projected) {
+          return projected;
+        }
+      } catch {
+        // Continue to Holochain fallback
+      }
+    }
+
+    // 3. Fall back to Holochain (authoritative source)
     const result = await this.holochainContent.getContent(resourceId).toPromise();
     return result ?? null;
   }
@@ -489,13 +620,19 @@ export class DataLoaderService {
   }
 
   /**
-   * Internal batch get with IndexedDB support.
+   * Internal batch get with full cache hierarchy.
+   *
+   * Cache hierarchy:
+   * 1. In-memory cache (checked individually)
+   * 2. IndexedDB batch lookup
+   * 3. Projection API batch lookup (Doorway's MongoDB cache)
+   * 4. Holochain batch zome call (slow, authoritative)
    */
   private async batchGetContentWithIDB(resourceIds: string[]): Promise<Map<string, ContentNode>> {
     const contentMap = new Map<string, ContentNode>();
     const uncachedIds: string[] = [];
 
-    // First pass: check in-memory cache
+    // 1. First pass: check in-memory cache
     for (const id of resourceIds) {
       if (this.contentCache.has(id)) {
         try {
@@ -515,8 +652,8 @@ export class DataLoaderService {
       return contentMap;
     }
 
-    // Second pass: check IndexedDB
-    const remainingIds: string[] = [];
+    // 2. Second pass: check IndexedDB
+    let remainingIds: string[] = [];
     if (this.idbInitialized) {
       const idbResults = await this.idbCache.getContentBatch(uncachedIds);
       for (const id of uncachedIds) {
@@ -530,15 +667,53 @@ export class DataLoaderService {
         }
       }
     } else {
-      remainingIds.push(...uncachedIds);
+      remainingIds = [...uncachedIds];
     }
 
     if (remainingIds.length === 0) {
       return contentMap;
     }
 
-    // Third pass: fetch from Holochain
-    const result = await this.holochainContent.batchGetContent(remainingIds);
+    // 3. Third pass: try Projection API batch lookup
+    let holochainIds: string[] = [];
+    if (this.projectionApi.enabled) {
+      try {
+        const projectionResults = await firstValueFrom(
+          this.projectionApi.batchGetContent(remainingIds)
+        );
+        const toCache: ContentNode[] = [];
+
+        for (const id of remainingIds) {
+          const projected = projectionResults.get(id);
+          if (projected) {
+            contentMap.set(id, projected);
+            this.contentCache.set(id, of(projected).pipe(shareReplay(1)));
+            toCache.push(projected);
+          } else {
+            holochainIds.push(id);
+          }
+        }
+
+        // Store projection hits in IndexedDB (background)
+        if (this.idbInitialized && toCache.length > 0) {
+          this.idbCache.setContentBatch(toCache).catch(() => {
+            // Ignore errors
+          });
+        }
+      } catch {
+        // Projection API failed, fall back to Holochain for all
+        holochainIds = [...remainingIds];
+      }
+    } else {
+      holochainIds = [...remainingIds];
+    }
+
+    if (holochainIds.length === 0) {
+      return contentMap;
+    }
+
+    // 4. Fourth pass: fetch from Holochain (authoritative source)
+    const result = await this.holochainContent.batchGetContent(holochainIds);
 
     // Process found content
     const toCache: ContentNode[] = [];
