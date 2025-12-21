@@ -502,7 +502,7 @@ export interface ContentMetadata {
   estimatedTime?: string;
 
   /** Embedding strategy for interactive content */
-  embedStrategy?: 'iframe' | 'native' | 'web-component';
+  embedStrategy?: 'iframe' | 'steward' | 'web-component';
 
   /** Required browser/runtime capabilities */
   requiredCapabilities?: string[];

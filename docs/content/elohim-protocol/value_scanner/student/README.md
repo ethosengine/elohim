@@ -77,7 +77,7 @@ Kenji's academic focus (environmental science) makes ecological governance parti
 
 ## Implementation Notes
 
-- **Technical**: Interface should support student realities—mobile-first (students are mobile and digital-native), budget optimization tools (severe resource constraint), roommate coordination features (shared household management), meal planning for beginners (learning to cook), community connection tools (building care networks in temporary communities). Personal_agent should function as patient teacher—helping Kenji learn care economy skills through practice with good feedback.
+- **Technical**: Interface should support student realities—mobile-first (students are mobile and digitally-fluent stewards of their own data), budget optimization tools (severe resource constraint), roommate coordination features (shared household management), meal planning for beginners (learning to cook), community connection tools (building care networks in temporary communities). Personal_agent should function as patient teacher—helping Kenji learn care economy skills through practice with good feedback.
 
 - **Privacy**: Kenji controls his own data as independent adult. He might share household information with roommates (coordinating shopping, labor), financial contributions with family (if they're supporting him), care contributions with community (accessing student resources). He's learning to manage privacy as adult practice.
 

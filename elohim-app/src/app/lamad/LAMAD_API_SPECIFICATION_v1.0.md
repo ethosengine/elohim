@@ -635,7 +635,7 @@ interface ContentNode {
   // Rendering hints and configuration (extensible metadata)
   metadata: {
     // How the renderer should embed or display content
-    embedStrategy?: 'iframe' | 'native' | 'web-component';
+    embedStrategy?: 'iframe' | 'steward' | 'web-component';
     
     // Required browser capabilities
     requiredCapabilities?: string[];  // e.g., ['webgl', 'webxr', 'audio']
@@ -674,7 +674,7 @@ The content field's type is "string or object" because its interpretation depend
 
 The metadata object is fully extensible. The fields listed in the type definition are commonly used fields, but domain-specific renderers can add their own metadata fields as needed. For example, a VR renderer might look for metadata.vrSettings containing initialization parameters. A quiz renderer might look for metadata.passingScore. The core system does not enforce any particular metadata schema beyond the common fields shown.
 
-The embedStrategy hint tells renderers how to display the content. The "iframe" strategy creates an isolated iframe element for security. The "native" strategy uses browser-native elements like video or audio tags. The "web-component" strategy loads a custom element. Renderers can ignore this hint if they have their own preferred strategy.
+The embedStrategy hint tells renderers how to display the content. The "iframe" strategy creates an isolated iframe element for security. The "steward" strategy uses browser-native elements like video or audio tags. The "web-component" strategy loads a custom element. Renderers can ignore this hint if they have their own preferred strategy.
 
 The requiredCapabilities array allows content to declare what browser features it needs. If a learner's browser lacks required capabilities, the system can show a warning or offer alternative resources. For example, VR content requiring WebXR can check if the browser supports it and offer a 2D video fallback if not.
 

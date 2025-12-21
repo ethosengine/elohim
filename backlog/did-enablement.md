@@ -14,16 +14,16 @@ Implement W3C Decentralized Identifiers (DIDs) across the Elohim Protocol's "hum
 |-------------|-------------|-------------|
 | Web2.0 Session | `did:web:gateway.elohim.host:session:{sessionId}` | Ephemeral, lowest |
 | Hosted Human | `did:web:hosted.elohim.host:humans:{humanId}` | Custodial, medium |
-| Native (via gateway) | `did:web:{operator-domain}:agents:{agentPubKey}` | Self-sovereign, high |
-| Native P2P (future) | `did:key:{base58-pubkey}` | Cryptographic, highest |
+| Steward (via gateway) | `did:web:{operator-domain}:agents:{agentPubKey}` | Self-sovereign, high |
+| Steward P2P (future) | `did:key:{base58-pubkey}` | Cryptographic, highest |
 
 ### Purpose
 
 DIDs enable users to:
-- Identify content provenance (proxy-gateway vs native Holochain)
+- Identify content provenance (proxy-gateway vs steward Holochain)
 - Make trust decisions based on content source
 - Share content from Holochain back to Web2.0 via known gateways
-- Track identity across sovereignty upgrades (session → hosted → native → P2P)
+- Track identity across sovereignty upgrades (session → hosted → steward → P2P)
 
 ---
 
@@ -41,7 +41,7 @@ DIDs enable users to:
 - DIDs aren't being populated anywhere currently
 - No DID resolution logic
 - No did:holo method spec
-- No explicit proxy vs native origin tagging
+- No explicit proxy vs steward origin tagging
 
 ---
 
@@ -53,7 +53,7 @@ DIDs enable users to:
 
 ```typescript
 export interface DIDGenerationOptions {
-  trustTier: 'session' | 'hosted' | 'native' | 'operator';
+  trustTier: 'session' | 'hosted' | 'steward' | 'operator';
   humanId?: string;
   sessionId?: string;
   agentPubKey?: string;
@@ -110,7 +110,7 @@ export interface TokenPayload {
   agentPubKey: string;
   identifier: string;
   did: string;  // NEW
-  trustTier: 'hosted' | 'native';  // NEW
+  trustTier: 'hosted' | 'steward';  // NEW
   version: number;
 }
 ```
@@ -227,7 +227,7 @@ Session (did:web:gateway.elohim.host:session:xyz)
     ↓ [User registers]
 Hosted (did:web:hosted.elohim.host:humans:abc123)
     ↓ [User exports keys]
-Native (did:web:node.alice.community:agents:uhCAk...)
+Steward (did:web:node.alice.community:agents:uhCAk...)
     ↓ [Future]
 P2P (did:key:z6Mkq...)
 ```

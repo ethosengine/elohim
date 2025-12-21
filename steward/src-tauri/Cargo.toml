@@ -1,0 +1,27 @@
+[package]
+name = "elohim-steward"
+version = "0.1.0"
+description = "Elohim Steward - Run your own Holochain node as a steward of co-creation"
+authors = ["Ethos Engine"]
+license = "Apache-2.0"
+repository = "https://github.com/ethosengine/elohim"
+edition = "2021"
+rust-version = "1.70"
+
+[lib]
+name = "steward_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.3", default-features = false }
+
+[dependencies]
+tauri = { version = "2.1.1", features = ["devtools"] }
+tauri-plugin-holochain = { git = "https://github.com/darksoil-studio/tauri-plugin-holochain", branch = "main-0.6" }
+tauri-plugin-log = "2.0.3"
+tauri-plugin-opener = "2.0.0"
+log = "0.4"
+url2 = "0.0.6"
+app_dirs2 = "2.5.5"
+tempdir = "0.3.7"
+anyhow = "1"

@@ -1,0 +1,272 @@
+/**
+ * Elohim Steward Pipeline
+ *
+ * Builds steward apps (desktop + mobile) using tauri-plugin-holochain.
+ * For those who run their own Holochain nodes as stewards of co-creation.
+ *
+ * This is a multibranch pipeline within the elohim mono-repo.
+ * Jenkins job configured to look at steward/Jenkinsfile
+ *
+ * Platforms:
+ *   - Linux: AppImage, .deb (default)
+ *   - macOS: .dmg (future, requires macOS agent)
+ *   - Windows: .exe (future, requires Windows agent)
+ *   - Android: .apk (future, requires Android SDK)
+ *
+ * Dependencies (fetched from other pipelines in mono-repo):
+ *   - lamad.happ from elohim/holochain pipeline artifacts
+ *   - Angular dist from elohim/elohim-app pipeline artifacts
+ */
+
+pipeline {
+    agent {
+        kubernetes {
+            cloud 'kubernetes'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccount: jenkins-deployer
+  nodeSelector:
+    node-type: operations
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "build"
+      effect: "NoSchedule"
+  volumes:
+    - name: cargo-cache
+      persistentVolumeClaim:
+        claimName: cargo-cache-holochain
+  containers:
+    - name: builder
+      image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
+      command: [cat]
+      tty: true
+      resources:
+        requests:
+          memory: "8Gi"
+          cpu: "4"
+        limits:
+          memory: "16Gi"
+          cpu: "8"
+      volumeMounts:
+        - name: cargo-cache
+          mountPath: /root/.cargo
+'''
+        }
+    }
+
+    environment {
+        PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
+        BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
+    }
+
+    options {
+        timeout(time: 90, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        string(
+            name: 'HAPP_VERSION',
+            defaultValue: 'dev-latest',
+            description: 'hApp version/tag to fetch from holochain pipeline'
+        )
+        string(
+            name: 'UI_VERSION',
+            defaultValue: 'dev-latest',
+            description: 'UI version/tag to fetch from elohim-app pipeline'
+        )
+        booleanParam(
+            name: 'PUBLISH_RELEASE',
+            defaultValue: false,
+            description: 'Publish to GitHub Releases'
+        )
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                container('builder') {
+                    script {
+                        sh 'git config --global --add safe.directory "*"'
+                        checkout scm
+                        echo "Building Steward for branch: ${env.BRANCH_NAME}"
+                    }
+                }
+            }
+        }
+
+        stage('Setup Nix Cache') {
+            steps {
+                container('builder') {
+                    dir('steward') {
+                        script {
+                            echo 'Configuring Nix with Holochain and Darksoil Cachix...'
+                            sh '''
+                                nix --version
+                                echo "Nix config:"
+                                nix show-config | grep -E "(substituters|trusted-public-keys)" || true
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Fetch Dependencies') {
+            steps {
+                container('builder') {
+                    dir('steward') {
+                        script {
+                            echo "Fetching hApp (${params.HAPP_VERSION}) and UI (${params.UI_VERSION})..."
+
+                            // Fetch hApp from holochain pipeline artifacts
+                            try {
+                                copyArtifacts(
+                                    projectName: 'elohim/holochain',
+                                    selector: specific(params.HAPP_VERSION),
+                                    filter: 'lamad-spike.happ',
+                                    target: 'workdir/',
+                                    optional: false
+                                )
+                                sh 'mv workdir/lamad-spike.happ workdir/lamad.happ'
+                                echo "hApp fetched successfully"
+                                sh 'ls -lh workdir/lamad.happ'
+                            } catch (Exception e) {
+                                error "Failed to fetch hApp artifact. Run holochain pipeline first with HAPP_VERSION=${params.HAPP_VERSION}"
+                            }
+
+                            // Fetch Angular UI from elohim-app pipeline
+                            try {
+                                copyArtifacts(
+                                    projectName: 'elohim/elohim-app',
+                                    selector: specific(params.UI_VERSION),
+                                    filter: 'dist/**',
+                                    target: 'ui/',
+                                    optional: false
+                                )
+                                echo "UI fetched successfully"
+                                sh 'ls -la ui/'
+                            } catch (Exception e) {
+                                error "Failed to fetch UI artifact. Run elohim-app pipeline first with UI_VERSION=${params.UI_VERSION}"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Steward App - Linux') {
+            steps {
+                container('builder') {
+                    dir('steward') {
+                        script {
+                            echo 'Building Steward app with Nix + Tauri...'
+                            echo 'First build may take 30-60 minutes. Subsequent builds use cache.'
+
+                            sh '''#!/usr/bin/env bash
+                                set -euo pipefail
+
+                                # Fix git safe.directory for containerized builds where workspace owner differs
+                                # Create explicit gitconfig file and point GIT_CONFIG_GLOBAL to it
+                                export HOME="${HOME:-/root}"
+                                mkdir -p "$HOME"
+                                echo "[safe]" > "$HOME/.gitconfig"
+                                echo "    directory = *" >> "$HOME/.gitconfig"
+                                export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+
+                                echo "=== Git config set ==="
+                                cat "$GIT_CONFIG_GLOBAL"
+
+                                echo "=== Entering Nix development shell ==="
+                                nix develop --accept-flake-config --command bash -c '
+                                    set -euo pipefail
+
+                                    echo "=== Installing npm dependencies ==="
+                                    npm install
+
+                                    echo ""
+                                    echo "=== Generating app icons ==="
+                                    # Use Elohim logo from elohim-app as source (no lettering, better for icons)
+                                    ICON_SOURCE="../elohim-app/public/images/elohim_logo_dark.png"
+                                    if [ -f "$ICON_SOURCE" ]; then
+                                        npx tauri icon "$ICON_SOURCE"
+                                        echo "Icons generated from elohim_logo_dark.png"
+                                    else
+                                        echo "Warning: Source icon not found at $ICON_SOURCE"
+                                        echo "Build may fail without icons"
+                                    fi
+
+                                    echo ""
+                                    echo "=== Building Tauri app ==="
+                                    npm run tauri:build
+
+                                    echo ""
+                                    echo "=== Build artifacts ==="
+                                    ls -lh src-tauri/target/release/bundle/appimage/ || true
+                                    ls -lh src-tauri/target/release/bundle/deb/ || true
+                                '
+                            '''
+
+                            // Archive artifacts
+                            archiveArtifacts artifacts: 'src-tauri/target/release/bundle/**/*', allowEmptyArchive: true
+                            stash name: 'steward-linux', includes: 'src-tauri/target/release/bundle/**/*.AppImage,src-tauri/target/release/bundle/**/*.deb', allowEmpty: true
+
+                            echo 'Steward build complete!'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Publish GitHub Release') {
+            when {
+                allOf {
+                    branch 'main'
+                    expression { return params.PUBLISH_RELEASE == true }
+                }
+            }
+            steps {
+                container('builder') {
+                    dir('steward') {
+                        script {
+                            def version = readFile('VERSION').trim()
+                            echo "Publishing release steward-v${version} to GitHub..."
+
+                            withCredentials([string(credentialsId: 'github-release-token', variable: 'GH_TOKEN')]) {
+                                sh """#!/usr/bin/env bash
+                                    set -euo pipefail
+
+                                    # Install GitHub CLI if needed
+                                    which gh || nix-env -iA nixpkgs.gh
+
+                                    # Create release and upload assets (to elohim mono-repo)
+                                    gh release create steward-v${version} \\
+                                        --repo ethosengine/elohim \\
+                                        --title "Elohim Steward v${version}" \\
+                                        --generate-notes \\
+                                        src-tauri/target/release/bundle/deb/*.deb \\
+                                        src-tauri/target/release/bundle/appimage/*.AppImage
+                                """
+                            }
+
+                            echo "Release steward-v${version} published!"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Steward pipeline completed successfully"
+        }
+        failure {
+            echo "Steward pipeline failed"
+            echo "If this is a first-time build, it may need more time/resources for cache population"
+        }
+    }
+}

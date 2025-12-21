@@ -885,8 +885,8 @@ LamadPointEvent               →  Learning-specific EconomicEvent
 LearnerPointBalance           →  Learning-specific EconomicResource
 LamadContributorRecognition   →  Learning-specific Appreciation
 LamadContributorDashboard     →  Aggregation view over hREA flows
-ContentMastery                →  (Lamad-native, not Shefa-derived)
-PracticePool, MasteryChallenge →  (Lamad-native learning mechanics)
+ContentMastery                →  (Lamad-steward, not Shefa-derived)
+PracticePool, MasteryChallenge →  (Lamad-steward learning mechanics)
 ```
 
 ### Why This Separation Matters

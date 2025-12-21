@@ -1,0 +1,11 @@
+---
+manifest_version: "1"
+name: lamad
+description: Lamad learning platform - Holochain DNA
+roles:
+  - name: lamad
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: lamad.dna
