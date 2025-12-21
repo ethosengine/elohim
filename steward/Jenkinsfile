@@ -38,11 +38,17 @@ spec:
     - name: cargo-cache
       persistentVolumeClaim:
         claimName: cargo-cache-holochain
+    - name: fuse
+      hostPath:
+        path: /dev/fuse
+        type: CharDevice
   containers:
     - name: builder
       image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
       command: [cat]
       tty: true
+      securityContext:
+        privileged: true
       resources:
         requests:
           memory: "8Gi"
@@ -53,6 +59,8 @@ spec:
       volumeMounts:
         - name: cargo-cache
           mountPath: /root/.cargo
+        - name: fuse
+          mountPath: /dev/fuse
 '''
         }
     }
