@@ -281,6 +281,8 @@ const timer = new PerformanceTimer();
 
 // Configuration
 // Check for local data directory first (CI/CD), then fall back to workspace path
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
 const SEEDER_DIR = path.dirname(path.dirname(__filename)); // Go up from src/ to seeder/
 const LOCAL_DATA_DIR = path.join(SEEDER_DIR, 'data', 'lamad');
 const DATA_DIR = process.env.DATA_DIR || (fs.existsSync(LOCAL_DATA_DIR) ? LOCAL_DATA_DIR : '/projects/elohim/data/lamad');
