@@ -1,0 +1,17 @@
+{
+  "id": "hrea-intent-commitment",
+  "title": "Intents and Commitments: Planning Economic Activity",
+  "content": "# Intents and Commitments: From Desire to Promise\n\n## The Planning Layer\n\nhREA distinguishes between three temporal states:\n1. **Intent**: What might happen (desired/offered)\n2. **Commitment**: What will happen (promised)\n3. **Economic Event**: What did happen (observed)\n\nThis enables coordination before action.\n\n## Intents: Offers and Requests\n\nAn Intent is a planned economic flow that hasn't been committed to yet.\n\n**As an Offer** (provider specified):\n```\nIntent: \"I can provide 10 hours of tutoring per week\"\n├── provider: tutor_amara\n├── receiver: (unspecified - open offer)\n├── action: work\n├── effortQuantity: 10 hours/week\n└── resourceConformsTo: tutoring-service\n```\n\n**As a Request** (receiver specified):\n```\nIntent: \"We need someone to repair our community laptops\"\n├── provider: (unspecified - seeking provider)\n├── receiver: community_center\n├── action: work\n├── resourceConformsTo: electronics-repair\n└── note: \"15 laptops needing maintenance\"\n```\n\n## Commitments: Promises Made\n\nWhen agents agree, intents become commitments:\n\n```\nCommitment: Tutoring Agreement\n├── provider: tutor_amara\n├── receiver: student_emeka\n├── action: work\n├── effortQuantity: 2 hours/week\n├── hasBeginning: 2024-12-01\n├── satisfies: [intent_tutoring_request]\n└── agreedIn: learning-circle-agreement\n```\n\nCommitments are **promises** that can be:\n- **Fulfilled** by economic events\n- **Tracked** for accountability\n- **Connected** to agreements\n\n## Coordination Without Central Control\n\nThis intent/commitment pattern enables:\n- **Matching**: Offers find requests automatically\n- **Negotiation**: Agents adjust until agreement\n- **Accountability**: Commitments can be tracked\n- **Trust**: Fulfillment history builds reputation\n\nNo central authority needed - just agents making and keeping promises.",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/economic_coordination/epic.md",
+  "tags": [
+    "hrea",
+    "intent",
+    "commitment",
+    "planning",
+    "coordination"
+  ],
+  "relationships": [],
+  "createdAt": "2025-12-16T03:29:00.764Z",
+  "updatedAt": "2025-12-16T03:29:00.764Z"
+}

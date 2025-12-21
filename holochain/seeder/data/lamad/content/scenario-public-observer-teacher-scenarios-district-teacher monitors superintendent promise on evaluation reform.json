@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-district-teacher monitors superintendent promise on evaluation reform",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:district-teacher monitors superintendent promise on evaluation reform",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teacher monitors superintendent promise on evaluation reform",
+  "description": "Teacher monitors superintendent promise on evaluation reform",
+  "content": "Scenario: Teacher monitors superintendent promise on evaluation reform\n    Given the superintendent promised to reduce evaluation paperwork burden\n    And teachers experience evaluation as compliance not professional growth\n    When the Observer tracks implementation over time\n    Then teachers document that paperwork actually increased\n    And evaluation time went from 8 hours to 12 hours annually\n    And no evidence of professional development benefit\n    And bring accountability data to board on broken promise\n    And administrative commitments become enforceable through transparency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:district",
+    "related_users:parent,board_member,community_organizer,administrator",
+    "related_layers:school,municipality,provincial_state,educational",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-district",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teacher monitors superintendent promise on evaluation reform",
+    "ogDescription": "Teacher monitors superintendent promise on evaluation reform",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-district-teacher monitors superintendent promise on evaluation reform",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher monitors superintendent promise on evaluation reform - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-district-teacher monitors superintendent promise on evaluation reform",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:district-teacher monitors superintendent promise on evaluation reform",
+    "name": "Teacher monitors superintendent promise on evaluation reform",
+    "description": "Teacher monitors superintendent promise on evaluation reform",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

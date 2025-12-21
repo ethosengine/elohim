@@ -1,0 +1,69 @@
+{
+  "id": "feature-value-scanner-elderly-scenarios-neighborhood",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Neighborhood Layer Community Integration for Elderly",
+  "description": "As an elderly person in the value scanner system Operating at the neighborhood governance layer I want to remain embedded in my neighborhood with dignity So that I am connected to local community rather than isolated",
+  "content": "@epic:value_scanner\n@user_type:elderly\n@governance_layer:neighborhood\n@related_users:neighbor,local_business,community_volunteer\n@related_layers:household,community,individual\n@elohim_agents:personal_agent,neighborhood_elohim\n\nFeature: Neighborhood Layer Community Integration for Elderly\n  As an elderly person in the value scanner system\n  Operating at the neighborhood governance layer\n  I want to remain embedded in my neighborhood with dignity\n  So that I am connected to local community rather than isolated\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the elderly user \"Helen\" is registered in the system\n    And Helen has lived in her neighborhood for 40 years\n    And Helen's mobility limitations affect neighborhood participation\n    And the neighborhood governance context is active\n    And the neighborhood_elohim coordinates local support networks\n\n  Scenario: Neighbors checking on elderly without surveillance feeling\n    Given Helen lives alone and neighbors are concerned\n    And informal neighborhood care networks exist\n    When neighbors check on Helen's wellbeing\n    Then the neighborhood_elohim should coordinate wellness checks\n    And neighbors should be guided to check naturally: \"Saw you haven't been out\"\n    And Helen should experience concern, not surveillance\n    And her privacy should be respected\n    And neighborhood care should feel organic, not institutional\n    And connection should preserve dignity\n    And the protocol should facilitate genuine community care\n\n  Scenario: Elderly person's neighborhood contributions made visible\n    Given Helen has contributed to neighborhood for decades\n    And she still participates in community memory-keeping\n    When Helen shares neighborhood history\n    Then her contributions should be recognized by neighborhood_elohim\n    And neighbors should see that Helen still gives to community\n    And her knowledge of neighborhood history should be valued\n    And care tokens should reflect her ongoing contributions\n    And she should experience herself as valued neighbor, not burden\n    And the protocol should make visible that care flows both ways\n    And longtime residents should have standing based on accumulated contributions\n\n  Scenario: Local business accessibility for elderly with mobility limitations\n    Given Helen needs to access local shops and services\n    And her mobility limitations make some businesses inaccessible\n    When the neighborhood_elohim assesses accessibility\n    Then it should surface which local businesses are accessible\n    And it should encourage accessibility improvements\n    And it should coordinate volunteer support for inaccessible locations\n    And Helen should be able to participate in neighborhood commerce\n    And local economy should include elderly residents\n    And the protocol should advocate for universal accessibility\n    And neighborhood should adapt to enable elder participation\n\n  Scenario: Neighborhood watch supports elderly safety with dignity\n    Given Helen is vulnerable to scams and exploitation\n    And neighborhood watch includes elder protection\n    When potential threats are identified\n    Then the neighborhood_elohim should alert Helen and support network\n    And protection should be provided without infantilizing\n    And Helen should be informed: \"Neighbors are seeing scam calls in the area\"\n    And her autonomy should be preserved while providing protection\n    And neighborhood should look out for vulnerable members\n    And safety should be communal responsibility\n    And the protocol should enable neighborhood care without surveillance\n\n  Scenario: Walking assistance from neighborhood volunteers\n    Given Helen's mobility makes walking difficult\n    And she needs assistance to remain active in neighborhood\n    When neighborhood volunteers offer walking support\n    Then the neighborhood_elohim should coordinate volunteer schedules\n    And volunteers should be matched based on availability and compatibility\n    And Helen's preferences should guide volunteer matching\n    And volunteer care work should be recognized with care tokens\n    And Helen should experience companionship, not charity\n    And the protocol should build reciprocal neighbor relationships\n    And neighborhood support should enable continued engagement\n\n  Scenario: Local events adapted for elderly participation\n    Given neighborhood events are important for community connection\n    And Helen's limitations affect her ability to participate\n    When neighborhood events are planned\n    Then the neighborhood_elohim should advocate for accessibility\n    And events should include seating, accessible locations, and quiet spaces\n    And transportation should be coordinated for those with mobility limits\n    And Helen should be able to participate in neighborhood life\n    And adaptation should enable, not separate\n    And the protocol should ensure elderly inclusion in community events\n    And neighborhood culture should include all ages and capabilities\n\n  Scenario: Intergenerational neighborhood connections maintain elder standing\n    Given Helen interacts with neighbors of all ages\n    And longtime residents have neighborhood wisdom\n    When neighborhood governance decisions are made\n    Then Helen's voice should carry weight as longtime resident\n    And her knowledge of neighborhood history should inform decisions\n    And younger neighbors should be connected to Helen for wisdom\n    And intergenerational relationships should be facilitated\n    And the neighborhood_elohim should surface opportunities for elder mentoring\n    And Helen should experience continued relevance in neighborhood life\n    And the protocol should maintain elder standing in community\n\n  Scenario: Emergency response coordinated through neighborhood networks\n    Given emergencies may occur when Helen is alone\n    And rapid response requires nearby support\n    When emergency alert is triggered\n    Then the neighborhood_elohim should contact nearby neighbors immediately\n    And neighbors should be briefed on Helen's health conditions\n    And her advance directives should guide neighbor response\n    And network should be activated before or alongside 911\n    And Helen should feel safe knowing neighbors will respond\n    And the protocol should leverage proximity for emergency care\n    And neighborhood networks should provide safety infrastructure\n\n  Scenario: Aging in place supported by neighborhood care economy\n    Given Helen wants to remain in her home and neighborhood\n    And successful aging in place requires community support\n    When the neighborhood_elohim coordinates care resources\n    Then it should connect Helen to local support services\n    And informal care networks should be strengthened\n    And volunteer help should be matched to Helen's needs\n    And Helen's accumulated contributions should create claims on support\n    And care should flow as reciprocity, not charity\n    And the protocol should demonstrate that neighborhoods can support aging in place\n    And community care economy should enable elders to remain home\n\n  Scenario: Local knowledge preservation through elderly memory keeping\n    Given Helen remembers 40 years of neighborhood changes\n    And this knowledge has cultural and practical value\n    When neighborhood planning and decisions occur\n    Then the neighborhood_elohim should surface Helen's historical knowledge\n    And her memory of neighborhood patterns should inform planning\n    And oral history should be captured for community archive\n    And Helen should be recognized as neighborhood historian\n    And her contribution to collective memory should be valued\n    And the protocol should preserve local knowledge through elder participation\n    And community memory should include longtime residents' perspectives\n\n  Scenario: Snow removal and seasonal support coordinated through neighbors\n    Given Helen cannot safely shovel snow or do seasonal maintenance\n    And neighbors have varying capabilities and availability\n    When seasonal support needs arise\n    Then the neighborhood_elohim should coordinate volunteer schedules\n    And neighbors should be matched to tasks based on capability\n    And Helen should experience this as neighborly care, not charity\n    And volunteer work should be recognized with care tokens\n    And reciprocal support should be tracked across seasons\n    And the protocol should coordinate practical mutual aid\n    And neighborhood care economy should handle seasonal challenges\n\n  Scenario: Transportation coordination enables neighborhood mobility\n    Given Helen no longer drives\n    And public transit is limited or inaccessible\n    When Helen needs to get to local appointments or events\n    Then the neighborhood_elohim should coordinate rides with neighbors\n    And volunteer drivers should be matched based on schedule compatibility\n    And Helen should maintain ability to participate in neighborhood life\n    And transportation barriers should not cause isolation\n    And driver care work should be recognized\n    And the protocol should solve last-mile transportation through care economy\n    And neighborhood networks should provide mobility infrastructure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-elderly-scenarios-neighborhood-neighbors checking on elderly without surveillance feeling",
+    "scenario-value-scanner-elderly-scenarios-neighborhood-elderly person's neighborhood contributions made visible",
+    "scenario-value-scanner-elderly-scenarios-neighborhood-local business accessibility for elderly with mobility limitations",
+    "scenario-value-scanner-elderly-scenarios-neighborhood-neighborhood watch supports elderly safety with dignity",
+    "scenario-value-scanner-elderly-scenarios-neighborhood-walking assistance from neighborhood volunteers",
+    "scenario-value-scanner-elderly-scenarios-neighborhood-local events adapted for elderly participation",
+    "scenario-value-scanner-elderly-scenarios-neighborhood-intergenerational neighborhood connections maintain elder standing",
+    "scenario-value-scanner-elderly-scenarios-neighborhood-emergency response coordinated through neighborhood networks",
+    "scenario-value-scanner-elderly-scenarios-neighborhood-aging in place supported by neighborhood care economy",
+    "scenario-value-scanner-elderly-scenarios-neighborhood-local knowledge preservation through elderly memory keeping",
+    "scenario-value-scanner-elderly-scenarios-neighborhood-snow removal and seasonal support coordinated through neighbors",
+    "scenario-value-scanner-elderly-scenarios-neighborhood-transportation coordination enables neighborhood mobility",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": "value_scanner",
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood Layer Community Integration for Elderly",
+    "ogDescription": "As an elderly person in the value scanner system Operating at the neighborhood governance layer I want to remain embedded in my neighborhood with dignity So that I am connected to local community rath",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-elderly-scenarios-neighborhood",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Neighborhood Layer Community Integration for Elderly - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-elderly-scenarios-neighborhood",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood",
+    "name": "Neighborhood Layer Community Integration for Elderly",
+    "description": "As an elderly person in the value scanner system Operating at the neighborhood governance layer I want to remain embedded in my neighborhood with dignity So that I am connected to local community rather than isolated",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

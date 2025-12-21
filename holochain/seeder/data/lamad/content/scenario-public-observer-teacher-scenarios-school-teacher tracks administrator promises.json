@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-school-teacher tracks administrator promises",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:school-teacher tracks administrator promises",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teacher tracks administrator promises",
+  "description": "Teacher tracks administrator promises",
+  "content": "Scenario: Teacher tracks administrator promises\n    Given the principal promised to reduce paperwork burden\n    And six months have passed\n    When the Observer tracks promise implementation\n    Then teachers document paperwork actually increased 15%\n    And evidence shows gap between promise and reality\n    And teachers bring accountability data to next site council\n    And administrator either delivers on commitment or explains why not\n    And promises become enforceable through transparency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:school",
+    "related_users:parent,board_member,student,administrator",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,classroom_elohim,education_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/school.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-school",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-school",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teacher tracks administrator promises",
+    "ogDescription": "Teacher tracks administrator promises",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-school-teacher tracks administrator promises",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher tracks administrator promises - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-school-teacher tracks administrator promises",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:school-teacher tracks administrator promises",
+    "name": "Teacher tracks administrator promises",
+    "description": "Teacher tracks administrator promises",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

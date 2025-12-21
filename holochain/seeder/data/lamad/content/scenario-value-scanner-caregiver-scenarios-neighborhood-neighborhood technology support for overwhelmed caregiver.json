@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood technology support for overwhelmed caregiver",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood-neighborhood technology support for overwhelmed caregiver",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood technology support for overwhelmed caregiver",
+  "description": "Neighborhood technology support for overwhelmed caregiver",
+  "content": "Scenario: Neighborhood technology support for overwhelmed caregiver\n    Given James manages complex care coordination systems\n    And technology problems become overwhelming when also caregiving\n    When the neighborhood_elohim identifies tech-skilled neighbors\n    Then neighbors should help with technology issues\n    And they should support James with care coordination tech\n    And technical support should reduce burden, not increase it\n    And neighborhood should include practical technology assistance\n    And James should access help when systems become overwhelming\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:neighborhood",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood technology support for overwhelmed caregiver",
+    "ogDescription": "Neighborhood technology support for overwhelmed caregiver",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood technology support for overwhelmed caregiver",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood technology support for overwhelmed caregiver - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood technology support for overwhelmed caregiver",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood-neighborhood technology support for overwhelmed caregiver",
+    "name": "Neighborhood technology support for overwhelmed caregiver",
+    "description": "Neighborhood technology support for overwhelmed caregiver",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

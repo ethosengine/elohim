@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-household-building household resilience through cooperation",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-building household resilience through cooperation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Building household resilience through cooperation",
+  "description": "Building household resilience through cooperation",
+  "content": "Scenario: Building household resilience through cooperation\n    Given shared households can pool resources and reduce individual burden\n    When we practice care economy cooperation\n    Then the protocol should help us maximize mutual benefit\n    And identify opportunities for efficiency through sharing\n    And support us in building household community\n    And demonstrate that cooperative care reduces costs and increases well-being\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-household",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Building household resilience through cooperation",
+    "ogDescription": "Building household resilience through cooperation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-building household resilience through cooperation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building household resilience through cooperation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-building household resilience through cooperation",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-building household resilience through cooperation",
+    "name": "Building household resilience through cooperation",
+    "description": "Building household resilience through cooperation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

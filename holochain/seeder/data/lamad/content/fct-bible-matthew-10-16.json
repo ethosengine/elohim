@@ -1,0 +1,60 @@
+{
+  "id": "fct-bible-matthew-10-16",
+  "contentType": "bible-verse",
+  "title": "Matthew 10:16",
+  "description": "Scripture reference used in FCT Module 4",
+  "content": {
+    "reference": "Matthew 10:16",
+    "book": "Matthew",
+    "chapter": 10,
+    "verseStart": 16,
+    "verseEnd": null,
+    "contextInModule": "Matthew 10:16 \u201cI am sending you out like sheep among wolves. Therefore be as shrewd as snakes and as innocent as doves. 17 Be on your guard; you will be handed over to the local councils and be flogged in the synagogues.\nPeace-Making is Coupled to Wisdom",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 4 - Setting the Stage -__The Need for Scaling Wisdom, __Acting as a Christian.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "matthew",
+    "setting-stage"
+  ],
+  "relatedNodeIds": [
+    "fct-module-04-scaling-wisdom"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-04-scaling-wisdom",
+    "thematicContext": "Setting the Stage: Scaling Wisdom"
+  },
+  "createdAt": "2025-11-28T21:10:19.196483",
+  "updatedAt": "2025-11-28T21:10:19.196485",
+  "did": "did:web:elohim.host:content:fct:module 4 - setting the stage -the need for scaling wisdom, -acting as a christian",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Matthew 10:16",
+    "ogDescription": "Scripture reference used in FCT Module 4",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-matthew-10-16",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Matthew 10:16 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-matthew-10-16",
+    "identifier": "did:web:elohim.host:content:fct:module 4 - setting the stage -the need for scaling wisdom, -acting as a christian",
+    "name": "Matthew 10:16",
+    "description": "Scripture reference used in FCT Module 4",
+    "dateCreated": "2025-11-28T21:10:19.196483",
+    "dateModified": "2025-11-28T21:10:19.196485",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

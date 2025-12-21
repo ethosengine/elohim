@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-workplace-organizational-understanding workplace labor as care economy contribution",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational-understanding workplace labor as care economy contribution",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Understanding workplace labor as care economy contribution",
+  "description": "Understanding workplace labor as care economy contribution",
+  "content": "Scenario: Understanding workplace labor as care economy contribution\n    Given Kenji serves food to community members\n    And service work directly contributes to people's daily needs\n    When the workplace_elohim frames his work through care economy\n    Then it should recognize that feeding people is care work\n    And it should value service labor as community care contribution\n    And it should accumulate care tokens for workplace care labor\n    And it should help Kenji see his work as meaningful contribution\n    And the system should dignify service work as care economy participation\n    And Kenji should understand his labor as serving community flourishing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employee,young_adult,manager",
+    "related_layers:individual,educational,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Understanding workplace labor as care economy contribution",
+    "ogDescription": "Understanding workplace labor as care economy contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-workplace-organizational-understanding workplace labor as care economy contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Understanding workplace labor as care economy contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-workplace-organizational-understanding workplace labor as care economy contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational-understanding workplace labor as care economy contribution",
+    "name": "Understanding workplace labor as care economy contribution",
+    "description": "Understanding workplace labor as care economy contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

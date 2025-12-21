@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-community-seeing patterns across multiple appeals inform community calibration",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-seeing patterns across multiple appeals inform community calibration",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Seeing patterns across multiple appeals inform community calibration",
+  "description": "Seeing patterns across multiple appeals inform community calibration",
+  "content": "Scenario: Seeing patterns across multiple appeals inform community calibration\n    Given our council has reviewed 50 appeals over two months\n    And I notice recurring themes and tensions\n    When I observe patterns in appeal types and outcomes\n    Then I see: many adolescent autonomy conflicts emerging\n    And I notice: three business loan denials with similar criteria\n    And I identify: recurring privacy threshold concerns\n    And I share: these observations with community leader\n    And community can: consider local protocol calibration\n    And my service: informs democratic governance beyond individual cases\n    And patterns reveal: community-wide issues requiring deliberation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:community",
+    "related_users:appellant,technical_expert,community_leader,researcher",
+    "related_layers:provincial_state,family,individual",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-community",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Seeing patterns across multiple appeals inform community calibration",
+    "ogDescription": "Seeing patterns across multiple appeals inform community calibration",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-seeing patterns across multiple appeals inform community calibration",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Seeing patterns across multiple appeals inform community calibration - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-seeing patterns across multiple appeals inform community calibration",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-seeing patterns across multiple appeals inform community calibration",
+    "name": "Seeing patterns across multiple appeals inform community calibration",
+    "description": "Seeing patterns across multiple appeals inform community calibration",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

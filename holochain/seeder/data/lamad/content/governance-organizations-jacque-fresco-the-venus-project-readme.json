@@ -1,0 +1,62 @@
+{
+  "id": "governance-organizations-jacque-fresco-the-venus-project-readme",
+  "did": "did:web:elohim.host:content:governance:organizations:jacque-fresco-the-venus-project:readme",
+  "contentType": "organization",
+  "activityPubType": "Organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "Jacque Fresco is an industrial designer and social engineer. He\u2019s also active in the field of Human Factors, where he developed an integrated social system.",
+  "content": "---\nnode_type: organization\norg_id: jacque_fresco_the_venus_project\nname: \"Jacque Fresco | The Venus Project\"\nurl: \"https://www.thevenusproject.com/the-venus-project/jacque-fresco/\"\ngem_id: \"iCIwGJogSIO1DVmaRMjC\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How Jacque Fresco | The Venus Project inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Jacque Fresco | The Venus Project\n\n## Description\n\nJacque Fresco is an industrial designer and social engineer. He\u2019s also active in the field of Human Factors, where he developed an integrated social system.\n\n**Publisher:** The Venus Project\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how Jacque Fresco | The Venus Project relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.thevenusproject.com/the-venus-project/jacque-fresco/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "governance"
+  ],
+  "sourcePath": "governance/organizations/jacque_fresco_the_venus_project/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "governance",
+    "related_epics": [],
+    "primary_epic": "governance",
+    "url": "https://www.thevenusproject.com/the-venus-project/jacque-fresco/",
+    "name": "Jacque Fresco | The Venus Project",
+    "org_id": "jacque_fresco_the_venus_project",
+    "gem_id": "iCIwGJogSIO1DVmaRMjC",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "The Venus Project",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How Jacque Fresco | The Venus Project inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "Jacque Fresco is an industrial designer and social engineer. He\u2019s also active in the field of Human Factors, where he developed an integrated social system.",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/governance-organizations-jacque-fresco-the-venus-project-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/governance-organizations-jacque-fresco-the-venus-project-readme",
+    "identifier": "did:web:elohim.host:content:governance:organizations:jacque-fresco-the-venus-project:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "Jacque Fresco is an industrial designer and social engineer. He\u2019s also active in the field of Human Factors, where he developed an integrated social system.",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

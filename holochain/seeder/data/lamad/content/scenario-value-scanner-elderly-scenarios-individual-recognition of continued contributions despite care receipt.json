@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-individual-recognition of continued contributions despite care receipt",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:individual-recognition of continued contributions despite care receipt",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Recognition of continued contributions despite care receipt",
+  "description": "Recognition of continued contributions despite care receipt",
+  "content": "Scenario: Recognition of continued contributions despite care receipt\n    Given Helen receives substantial care from family and community\n    And she also contributes through mentoring and wisdom sharing\n    When Helen shares family stories with great-grandchildren\n    Then her care contribution should be recognized and valued\n    And her personal_agent should note: \"Your stories preserve our family history\"\n    And care tokens should reflect her continued giving\n    And the system should make visible that care flows both directions\n    And Helen should experience herself as valued person, not burden\n    And reciprocity should be visible even when care flows are asymmetric\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:individual",
+    "related_users:senior,caregiver,family_member,medical_professional",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Recognition of continued contributions despite care receipt",
+    "ogDescription": "Recognition of continued contributions despite care receipt",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-individual-recognition of continued contributions despite care receipt",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognition of continued contributions despite care receipt - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-individual-recognition of continued contributions despite care receipt",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:individual-recognition of continued contributions despite care receipt",
+    "name": "Recognition of continued contributions despite care receipt",
+    "description": "Recognition of continued contributions despite care receipt",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

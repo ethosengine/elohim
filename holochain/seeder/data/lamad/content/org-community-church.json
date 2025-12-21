@@ -1,0 +1,33 @@
+{
+  "id": "org-community-church",
+  "did": "did:web:elohim.host:org:community-church",
+  "contentType": "organization",
+  "activityPubType": "Organization",
+  "title": "Community Church",
+  "description": "Organization with 1 members",
+  "content": {
+    "name": "Community Church",
+    "memberCount": 1,
+    "members": [
+      {
+        "humanId": "human-pete-pastor",
+        "role": "pastor"
+      }
+    ]
+  },
+  "contentFormat": "html",
+  "tags": [
+    "organization",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-pete-pastor"
+  ],
+  "metadata": {
+    "category": "organization",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z"
+}

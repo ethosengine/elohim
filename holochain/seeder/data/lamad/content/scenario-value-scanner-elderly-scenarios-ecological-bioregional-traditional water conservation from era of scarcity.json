@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-ecological-bioregional-traditional water conservation from era of scarcity",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-traditional water conservation from era of scarcity",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Traditional water conservation from era of scarcity",
+  "description": "Traditional water conservation from era of scarcity",
+  "content": "Scenario: Traditional water conservation from era of scarcity\n    Given Helen learned water conservation in era without modern plumbing\n    And water scarcity is increasing due to climate change\n    When Helen teaches water conservation practices\n    Then her knowledge should inform community water management\n    And traditional conservation practices should be revived\n    And younger generations should learn from those who conserved by necessity\n    And Helen should be recognized as expert in water conservation\n    And the protocol should preserve water wisdom before it's lost\n    And bioregional water management should incorporate elder knowledge\n    And Helen's experience should increase community water resilience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:ecological_bioregional",
+    "related_users:community_member,environmental_steward,young_adult",
+    "related_layers:community,educational,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Traditional water conservation from era of scarcity",
+    "ogDescription": "Traditional water conservation from era of scarcity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-traditional water conservation from era of scarcity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Traditional water conservation from era of scarcity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-traditional water conservation from era of scarcity",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-traditional water conservation from era of scarcity",
+    "name": "Traditional water conservation from era of scarcity",
+    "description": "Traditional water conservation from era of scarcity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

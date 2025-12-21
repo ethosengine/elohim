@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-county-regional-developer coordinates multi-jurisdictional project transparently",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:county-regional-developer coordinates multi-jurisdictional project transparently",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Developer coordinates multi-jurisdictional project transparently",
+  "description": "Developer coordinates multi-jurisdictional project transparently",
+  "content": "Scenario: Developer coordinates multi-jurisdictional project transparently\n    Given a developer is planning development spanning three municipalities\n    And wants to navigate regional coordination requirements\n    When the Observer provides regional process navigation\n    Then the developer sees: county planning requirements affect all three jurisdictions\n    And identifies regional coordination bodies and approval pathways\n    And understands environmental review at regional scale\n    And accesses precedents for similar multi-jurisdictional projects\n    And navigates complexity transparently not through manipulation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:county_regional",
+    "related_users:politician,board_member,citizen,community_organizer",
+    "related_layers:municipality,provincial_state,ecological",
+    "elohim_agents:public_observer,regional_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Developer coordinates multi-jurisdictional project transparently",
+    "ogDescription": "Developer coordinates multi-jurisdictional project transparently",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-county-regional-developer coordinates multi-jurisdictional project transparently",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer coordinates multi-jurisdictional project transparently - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-county-regional-developer coordinates multi-jurisdictional project transparently",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:county-regional-developer coordinates multi-jurisdictional project transparently",
+    "name": "Developer coordinates multi-jurisdictional project transparently",
+    "description": "Developer coordinates multi-jurisdictional project transparently",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

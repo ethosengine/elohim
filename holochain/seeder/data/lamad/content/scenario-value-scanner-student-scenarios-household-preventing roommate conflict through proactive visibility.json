@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-household-preventing roommate conflict through proactive visibility",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:household-preventing roommate conflict through proactive visibility",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Preventing roommate conflict through proactive visibility",
+  "description": "Preventing roommate conflict through proactive visibility",
+  "content": "Scenario: Preventing roommate conflict through proactive visibility\n    Given household labor imbalances breed resentment\n    And students often avoid difficult conversations\n    When the household_elohim detects emerging conflict patterns\n    Then it should surface issues before they become conflicts\n    And it should show data: \"Jordan hasn't contributed household labor in 3 weeks\"\n    And it should facilitate constructive conversation with neutral framing\n    And it should help roommates renegotiate responsibilities\n    And preventive intervention should maintain household harmony\n    And the system should support healthy household dynamics\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:household",
+    "related_users:young_adult,adult,roommate",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Preventing roommate conflict through proactive visibility",
+    "ogDescription": "Preventing roommate conflict through proactive visibility",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-preventing roommate conflict through proactive visibility",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Preventing roommate conflict through proactive visibility - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-preventing roommate conflict through proactive visibility",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:household-preventing roommate conflict through proactive visibility",
+    "name": "Preventing roommate conflict through proactive visibility",
+    "description": "Preventing roommate conflict through proactive visibility",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

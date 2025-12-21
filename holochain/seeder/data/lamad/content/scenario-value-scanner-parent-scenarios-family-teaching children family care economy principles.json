@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-family-teaching children family care economy principles",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-teaching children family care economy principles",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teaching children family care economy principles",
+  "description": "Teaching children family care economy principles",
+  "content": "Scenario: Teaching children family care economy principles\n    Given Sarah is raising Tommy and Emma in care economy framework\n    And she wants them to understand family care relationships\n    When Sarah teaches children about family care\n    Then the family_elohim should support value literacy education\n    And children should learn that grandparents' help is valuable work\n    And they should understand that Sarah cares for her parents too\n    And they should see care as reciprocal across generations\n    And the next generation should internalize care economy principles\n    And family culture should be transformed through children's education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:family",
+    "related_users:child,grandparent,partner,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teaching children family care economy principles",
+    "ogDescription": "Teaching children family care economy principles",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-teaching children family care economy principles",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching children family care economy principles - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-teaching children family care economy principles",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-teaching children family care economy principles",
+    "name": "Teaching children family care economy principles",
+    "description": "Teaching children family care economy principles",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

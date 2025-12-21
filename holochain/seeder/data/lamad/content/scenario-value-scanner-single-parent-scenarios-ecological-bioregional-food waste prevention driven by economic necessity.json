@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-ecological-bioregional-food waste prevention driven by economic necessity",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-food waste prevention driven by economic necessity",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Food waste prevention driven by economic necessity",
+  "description": "Food waste prevention driven by economic necessity",
+  "content": "Scenario: Food waste prevention driven by economic necessity\n    Given Maria cannot afford to waste food on $175/week grocery budget\n    And she carefully plans meals, uses leftovers, and minimizes spoilage\n    When household food waste is tracked\n    Then the bioregional_elohim should quantify her minimal food waste\n    And it should recognize that she achieves what environmental advocates aim for\n    And her food waste prevention should be valued as ecological contribution\n    And economic necessity should be honored as environmental effectiveness\n    And Maria should be recognized as food sustainability leader\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,household,community_member,environmental_advocate",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Food waste prevention driven by economic necessity",
+    "ogDescription": "Food waste prevention driven by economic necessity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-food waste prevention driven by economic necessity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Food waste prevention driven by economic necessity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-food waste prevention driven by economic necessity",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-food waste prevention driven by economic necessity",
+    "name": "Food waste prevention driven by economic necessity",
+    "description": "Food waste prevention driven by economic necessity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

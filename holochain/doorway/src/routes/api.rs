@@ -92,6 +92,7 @@ fn error_response(status: StatusCode, message: &str, code: &'static str) -> Resp
         .status(status)
         .header("Content-Type", "application/json")
         .header("Cache-Control", "no-cache")
+        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(body)))
         .unwrap_or_else(|_| {
             Response::builder()
@@ -114,6 +115,7 @@ fn cached_response(
         .header("Cache-Control", format!("public, max-age={}, stale-while-revalidate=60", ttl_secs))
         .header("ETag", etag)
         .header("X-Cache", if cache_hit { "HIT" } else { "MISS" })
+        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(data)))
         .unwrap()
 }
@@ -315,6 +317,7 @@ fn projection_response(data: Vec<u8>) -> Response<Full<Bytes>> {
         .header("Content-Type", "application/json")
         .header("X-Source", "projection")
         .header("Cache-Control", "public, max-age=60")
+        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(data)))
         .unwrap()
 }

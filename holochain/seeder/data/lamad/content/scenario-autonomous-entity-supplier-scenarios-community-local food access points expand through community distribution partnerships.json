@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-community-local food access points expand through community distribution partnerships",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:community-local food access points expand through community distribution partnerships",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Local food access points expand through community distribution partnerships",
+  "description": "Local food access points expand through community distribution partnerships",
+  "content": "Scenario: Local food access points expand through community distribution partnerships\n    Given farmers markets and farm visits are not accessible to all community members\n    And transportation and schedule barriers limit food access\n    When democratic farm partners with community organizations for distribution\n    Then produce is delivered to senior centers, community centers, and schools\n    And distribution partnerships increase food access for mobility-limited residents\n    And community institutions become food access points supporting local agriculture\n    And equitable distribution ensures farm benefits entire community\n    And community_elohim coordinates community distribution partnerships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,small_business_owner]",
+    "related_layers:[workplace_organizational,industry_sector,ecological_bioregional]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Local food access points expand through community distribution partnerships",
+    "ogDescription": "Local food access points expand through community distribution partnerships",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-community-local food access points expand through community distribution partnerships",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Local food access points expand through community distribution partnerships - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-community-local food access points expand through community distribution partnerships",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:community-local food access points expand through community distribution partnerships",
+    "name": "Local food access points expand through community distribution partnerships",
+    "description": "Local food access points expand through community distribution partnerships",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

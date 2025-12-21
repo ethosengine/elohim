@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-global-activist prevents extraction by powerful institutions",
+  "did": "did:web:elohim.host:content:social-medium:activist:scenarios:global-activist prevents extraction by powerful institutions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Activist prevents extraction by powerful institutions",
+  "description": "Activist prevents extraction by powerful institutions",
+  "content": "Scenario: Activist prevents extraction by powerful institutions\n    Given major foundations want to \"support\" the climate movement\n    And they offer funding that would create dependency and moderate demands\n    When the network evaluates the funding opportunity\n    Then historical patterns of movement capture surface for consideration\n    And communities who worked with these funders share experiences\n    And the network collectively evaluates risks and benefits\n    And alternative solidarity economy models are proposed\n    And the movement maintains independence while building sustainable support\n    And extractive relationships are refused through collective accountability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:global",
+    "related_users:refugee,displaced_person,activist,content_creator",
+    "related_layers:nation_state,continental,affinity_network,cultural_linguistic",
+    "elohim_agents:translation_agent,verification_agent,pattern_recognition_agent,protection_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-global",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-global",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Activist prevents extraction by powerful institutions",
+    "ogDescription": "Activist prevents extraction by powerful institutions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-global-activist prevents extraction by powerful institutions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist prevents extraction by powerful institutions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-global-activist prevents extraction by powerful institutions",
+    "identifier": "did:web:elohim.host:content:social-medium:activist:scenarios:global-activist prevents extraction by powerful institutions",
+    "name": "Activist prevents extraction by powerful institutions",
+    "description": "Activist prevents extraction by powerful institutions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

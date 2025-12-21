@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-individual-managing self-care with unpredictable work schedule",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual-managing self-care with unpredictable work schedule",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Managing self-care with unpredictable work schedule",
+  "description": "Managing self-care with unpredictable work schedule",
+  "content": "Scenario: Managing self-care with unpredictable work schedule\n    Given my work schedule changes weekly with different shift patterns\n    And I need to maintain basic nutrition and rest\n    When my personal_agent detects schedule changes\n    Then it should adapt my meal planning to available time slots\n    And suggest efficient meal prep strategies for my schedule\n    And protect time blocks for essential self-care\n    And remind me that my well-being matters despite work demands\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-individual",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Managing self-care with unpredictable work schedule",
+    "ogDescription": "Managing self-care with unpredictable work schedule",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-individual-managing self-care with unpredictable work schedule",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing self-care with unpredictable work schedule - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-individual-managing self-care with unpredictable work schedule",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual-managing self-care with unpredictable work schedule",
+    "name": "Managing self-care with unpredictable work schedule",
+    "description": "Managing self-care with unpredictable work schedule",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

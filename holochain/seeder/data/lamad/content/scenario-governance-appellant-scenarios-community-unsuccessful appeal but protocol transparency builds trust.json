@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-appellant-scenarios-community-unsuccessful appeal but protocol transparency builds trust",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:community-unsuccessful appeal but protocol transparency builds trust",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Unsuccessful appeal but protocol transparency builds trust",
+  "description": "Unsuccessful appeal but protocol transparency builds trust",
+  "content": "Scenario: Unsuccessful appeal but protocol transparency builds trust\n    Given my appeal was reviewed and the agent's decision was affirmed\n    And I didn't get the outcome I wanted\n    When I receive the Constitutional Council's detailed reasoning\n    Then I can see that my appeal was genuinely considered not dismissed\n    And I understand the constitutional principles that were applied\n    And I see how my case compares to similar precedents\n    And I know I had meaningful recourse even though I didn't prevail\n    And The transparency helps me trust the process even in defeat\n    And Trust in community governance is maintained through honest engagement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,technical_expert",
+    "related_layers:family,district,municipality",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-community",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Unsuccessful appeal but protocol transparency builds trust",
+    "ogDescription": "Unsuccessful appeal but protocol transparency builds trust",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-unsuccessful appeal but protocol transparency builds trust",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Unsuccessful appeal but protocol transparency builds trust - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-unsuccessful appeal but protocol transparency builds trust",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:community-unsuccessful appeal but protocol transparency builds trust",
+    "name": "Unsuccessful appeal but protocol transparency builds trust",
+    "description": "Unsuccessful appeal but protocol transparency builds trust",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-family-family memory preservation through elderly storytelling",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:family-family memory preservation through elderly storytelling",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family memory preservation through elderly storytelling",
+  "description": "Family memory preservation through elderly storytelling",
+  "content": "Scenario: Family memory preservation through elderly storytelling\n    Given Helen holds decades of family history\n    And dementia threatens loss of collective memory\n    When Helen shares family stories\n    Then the family_elohim should help capture and preserve these memories\n    And Helen's storytelling should be recognized as valuable contribution\n    And great-grandchildren should learn family history from Helen\n    And her role as family memory keeper should be honored\n    And preservation should happen while she can still share\n    And the protocol should recognize cultural value of elder wisdom\n    And family heritage should be maintained through elder participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:family",
+    "related_users:adult_child,grandchild,great_grandchild,caregiver",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family memory preservation through elderly storytelling",
+    "ogDescription": "Family memory preservation through elderly storytelling",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-family-family memory preservation through elderly storytelling",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family memory preservation through elderly storytelling - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-family-family memory preservation through elderly storytelling",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:family-family memory preservation through elderly storytelling",
+    "name": "Family memory preservation through elderly storytelling",
+    "description": "Family memory preservation through elderly storytelling",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

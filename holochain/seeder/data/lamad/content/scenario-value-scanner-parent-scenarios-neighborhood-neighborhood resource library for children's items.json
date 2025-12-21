@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-neighborhood-neighborhood resource library for children's items",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:neighborhood-neighborhood resource library for children's items",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood resource library for children's items",
+  "description": "Neighborhood resource library for children's items",
+  "content": "Scenario: Neighborhood resource library for children's items\n    Given children outgrow clothing, toys, and equipment rapidly\n    And buying everything new is expensive and wasteful\n    When the neighborhood_elohim coordinates resource sharing\n    Then it should enable lending libraries for children's items\n    And it should track who has what available to share\n    And it should facilitate borrowing rather than buying\n    And resource sharing should be recognized as care contribution\n    And neighborhood sustainability should reduce family expenses\n    And the system should enable circular economy for child-rearing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,child,neighbor,community_member",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood resource library for children's items",
+    "ogDescription": "Neighborhood resource library for children's items",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-neighborhood-neighborhood resource library for children's items",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood resource library for children's items - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-neighborhood-neighborhood resource library for children's items",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:neighborhood-neighborhood resource library for children's items",
+    "name": "Neighborhood resource library for children's items",
+    "description": "Neighborhood resource library for children's items",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

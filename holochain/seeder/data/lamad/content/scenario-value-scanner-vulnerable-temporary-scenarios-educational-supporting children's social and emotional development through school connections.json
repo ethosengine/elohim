@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-supporting children's social and emotional development through school connections",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational-supporting children's social and emotional development through school connections",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Supporting children's social and emotional development through school connections",
+  "description": "Supporting children's social and emotional development through school connections",
+  "content": "Scenario: Supporting children's social and emotional development through school connections\n    Given children need peer relationships and social development\n    And school provides important social context during crisis\n    When I support children's social development through education\n    Then the Value Scanner helps me facilitate children's school friendships\n    And coordinates children's participation in social activities (clubs, sports, events)\n    And accesses resources for children's social activities despite cost barriers\n    And tracks children's social development and peer relationships\n    And validates that social development is as important as academics\n    And my personal_agent reminds me of school social events children care about\n    And recognizes social development facilitation as care work\n    And celebrates children's friendships and belonging\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Supporting children's social and emotional development through school connections",
+    "ogDescription": "Supporting children's social and emotional development through school connections",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-educational-supporting children's social and emotional development through school connections",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Supporting children's social and emotional development through school connections - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-educational-supporting children's social and emotional development through school connections",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational-supporting children's social and emotional development through school connections",
+    "name": "Supporting children's social and emotional development through school connections",
+    "description": "Supporting children's social and emotional development through school connections",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

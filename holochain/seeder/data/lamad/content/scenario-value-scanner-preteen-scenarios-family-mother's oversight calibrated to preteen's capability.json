@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-family-mother's oversight calibrated to preteen's capability",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-mother's oversight calibrated to preteen's capability",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Mother's oversight calibrated to preteen's capability",
+  "description": "Mother's oversight calibrated to preteen's capability",
+  "content": "Scenario: Mother's oversight calibrated to preteen's capability\n    Given Sarah works two jobs with limited time\n    And she needs to trust Marcus while maintaining responsibility\n    When Sarah monitors Marcus's scanner usage\n    Then she should have full visibility into his activities\n    And the family_elohim should alert her when Marcus needs support\n    And she should be informed of nutrition concerns or budget crises\n    And routine successes should be summarized to build her confidence\n    And the system should help her calibrate autonomy levels appropriately\n    And she should not experience constant anxiety about delegating responsibility\n    And trust should be built through visible competence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:family",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,neighborhood,community,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Mother's oversight calibrated to preteen's capability",
+    "ogDescription": "Mother's oversight calibrated to preteen's capability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-mother's oversight calibrated to preteen's capability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Mother's oversight calibrated to preteen's capability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-mother's oversight calibrated to preteen's capability",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-mother's oversight calibrated to preteen's capability",
+    "name": "Mother's oversight calibrated to preteen's capability",
+    "description": "Mother's oversight calibrated to preteen's capability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

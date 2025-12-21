@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-county-regional-journalist coordinates regional investigation across 15 municipalities",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:county-regional-journalist coordinates regional investigation across 15 municipalities",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Journalist coordinates regional investigation across 15 municipalities",
+  "description": "Journalist coordinates regional investigation across 15 municipalities",
+  "content": "Scenario: Journalist coordinates regional investigation across 15 municipalities\n    Given affordable housing crisis affects entire metropolitan region\n    And the journalist collaborates with reporters in neighboring coverage areas\n    When the Observer provides civic surveillance across all municipalities\n    Then journalists access comprehensive data from all 15 cities\n    And identify common patterns in zoning and development approval\n    And compare policy approaches and housing production outcomes\n    And publish coordinated regional investigation\n    And local stories reveal regional systemic failure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:county_regional",
+    "related_users:journalist,activist,politician,citizen",
+    "related_layers:municipality,provincial_state,community",
+    "elohim_agents:public_observer,regional_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Journalist coordinates regional investigation across 15 municipalities",
+    "ogDescription": "Journalist coordinates regional investigation across 15 municipalities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-county-regional-journalist coordinates regional investigation across 15 municipalities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist coordinates regional investigation across 15 municipalities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-county-regional-journalist coordinates regional investigation across 15 municipalities",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:county-regional-journalist coordinates regional investigation across 15 municipalities",
+    "name": "Journalist coordinates regional investigation across 15 municipalities",
+    "description": "Journalist coordinates regional investigation across 15 municipalities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-community-environmental stewardship practices improve through community accountability",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:community-environmental stewardship practices improve through community accountability",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Environmental stewardship practices improve through community accountability",
+  "description": "Environmental stewardship practices improve through community accountability",
+  "content": "Scenario: Environmental stewardship practices improve through community accountability\n    Given individual ownership limited environmental investment\n    And community bears environmental impacts of business operations\n    When democratic governance with community input prioritizes sustainability\n    Then auto shop invests in proper waste disposal and recycling\n    And hazardous materials (oil, antifreeze, batteries) are handled responsibly\n    And workers implement environmental improvements community values\n    And transparency about environmental practices builds community trust\n    And community_elohim documents environmental stewardship for neighborhood benefit\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Environmental stewardship practices improve through community accountability",
+    "ogDescription": "Environmental stewardship practices improve through community accountability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-community-environmental stewardship practices improve through community accountability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Environmental stewardship practices improve through community accountability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-community-environmental stewardship practices improve through community accountability",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:community-environmental stewardship practices improve through community accountability",
+    "name": "Environmental stewardship practices improve through community accountability",
+    "description": "Environmental stewardship practices improve through community accountability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

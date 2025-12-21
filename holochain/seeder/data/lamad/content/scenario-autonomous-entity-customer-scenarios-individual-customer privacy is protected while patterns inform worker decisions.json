@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-individual-customer privacy is protected while patterns inform worker decisions",
+  "did": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual-customer privacy is protected while patterns inform worker decisions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Customer privacy is protected while patterns inform worker decisions",
+  "description": "Customer privacy is protected while patterns inform worker decisions",
+  "content": "Scenario: Customer privacy is protected while patterns inform worker decisions\n    Given corporate surveillance tracks customers for manipulative marketing\n    And Ms. Johnson values privacy but also appreciates being known\n    When democratic business respects privacy while valuing relationships\n    Then workers remember her through human relationship, not algorithmic tracking\n    And no customer data is sold or used for manipulation\n    And aggregate patterns (many customers requesting vegan options) inform decisions without individual surveillance\n    And privacy and personalization coexist through human dignity, not data extraction\n    And community_elohim ensures privacy-protecting pattern recognition\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:individual",
+    "related_users:[worker,manager,supplier,community_investor]",
+    "related_layers:[community]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Customer privacy is protected while patterns inform worker decisions",
+    "ogDescription": "Customer privacy is protected while patterns inform worker decisions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-customer-scenarios-individual-customer privacy is protected while patterns inform worker decisions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Customer privacy is protected while patterns inform worker decisions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-customer-scenarios-individual-customer privacy is protected while patterns inform worker decisions",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual-customer privacy is protected while patterns inform worker decisions",
+    "name": "Customer privacy is protected while patterns inform worker decisions",
+    "description": "Customer privacy is protected while patterns inform worker decisions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

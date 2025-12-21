@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-community-community volunteering contributions quantified and recognized",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:community-community volunteering contributions quantified and recognized",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community volunteering contributions quantified and recognized",
+  "description": "Community volunteering contributions quantified and recognized",
+  "content": "Scenario: Community volunteering contributions quantified and recognized\n    Given Margaret volunteers 10 hours/week across community organizations\n    And this represents ~500 hours/year of community labor\n    When the community_elohim tracks volunteer contributions\n    Then all volunteer hours should be quantified and valued\n    And the economic value of her labor should be calculated\n    And community care tokens should accumulate to reflect contributions\n    And Margaret's productivity should be visible despite retirement status\n    And the narrative that retirees \"don't work\" should be countered\n    And her community standing should reflect her contributions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:community",
+    "related_users:middle_aged,elderly,retired,volunteer,community_organizer,civic_leader",
+    "related_layers:individual,household,family,neighborhood,municipality",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community volunteering contributions quantified and recognized",
+    "ogDescription": "Community volunteering contributions quantified and recognized",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-community-community volunteering contributions quantified and recognized",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community volunteering contributions quantified and recognized - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-community-community volunteering contributions quantified and recognized",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:community-community volunteering contributions quantified and recognized",
+    "name": "Community volunteering contributions quantified and recognized",
+    "description": "Community volunteering contributions quantified and recognized",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-child-scenarios-family-child blocked from exposure to harmful content",
+  "did": "did:web:elohim.host:content:social-medium:child:scenarios:family-child blocked from exposure to harmful content",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Child blocked from exposure to harmful content",
+  "description": "Child blocked from exposure to harmful content",
+  "content": "Scenario: Child blocked from exposure to harmful content\n    Given Emma's uncle shares a news article about violence\n    And the content is appropriate for adults but not children\n    When the article is contributed to the family space\n    Then the guardian agent evaluates age-appropriateness\n    And Emma's view is automatically filtered or summarized\n    And her parents can choose to discuss the topic with her directly\n    And Emma never sees graphic or traumatizing content\n    And family communication continues without disruption\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:elder,content_creator",
+    "related_layers:individual,neighborhood",
+    "elohim_agents:guardian_agent,parental_guidance_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-child-scenarios-family",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-child-scenarios-family",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Child blocked from exposure to harmful content",
+    "ogDescription": "Child blocked from exposure to harmful content",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-family-child blocked from exposure to harmful content",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Child blocked from exposure to harmful content - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-family-child blocked from exposure to harmful content",
+    "identifier": "did:web:elohim.host:content:social-medium:child:scenarios:family-child blocked from exposure to harmful content",
+    "name": "Child blocked from exposure to harmful content",
+    "description": "Child blocked from exposure to harmful content",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-educational-financial and resource management education for fixed income",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational-financial and resource management education for fixed income",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Financial and resource management education for fixed income",
+  "description": "Financial and resource management education for fixed income",
+  "content": "Scenario: Financial and resource management education for fixed income\n    Given Margaret manages limited resources\n    And financial literacy supports economic security\n    When the educational_elohim provides financial education\n    Then senior-specific financial planning should be available\n    And budget management on fixed income should be taught\n    And education should be empowering, not condescending\n    And Margaret should learn strategies for resource optimization\n    And financial literacy should support independence\n    And education should be practical and immediately applicable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:educational",
+    "related_users:middle_aged,elderly,retired,teacher,mentor,student,learner",
+    "related_layers:individual,family,community,neighborhood",
+    "elohim_agents:personal_agent,community_elohim,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Financial and resource management education for fixed income",
+    "ogDescription": "Financial and resource management education for fixed income",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-educational-financial and resource management education for fixed income",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Financial and resource management education for fixed income - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-educational-financial and resource management education for fixed income",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational-financial and resource management education for fixed income",
+    "name": "Financial and resource management education for fixed income",
+    "description": "Financial and resource management education for fixed income",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

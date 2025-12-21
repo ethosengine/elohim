@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-family consumption patterns aligned with ecological values",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-family consumption patterns aligned with ecological values",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family consumption patterns aligned with ecological values",
+  "description": "Family consumption patterns aligned with ecological values",
+  "content": "Scenario: Family consumption patterns aligned with ecological values\n    Given Sarah manages household purchasing decisions\n    And she wants to minimize environmental harm\n    When the Value Scanner tracks family consumption\n    Then it should provide ecological impact information\n    And it should help Sarah make environmentally responsible choices\n    And it should recognize trade-offs between budget and sustainability\n    And the system should support ecological decision-making\n    And family care economy should include environmental care\n    And Sarah's work to reduce harm should be valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,community_member,future_generations",
+    "related_layers:family,community,educational",
+    "elohim_agents:personal_agent,ecological_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family consumption patterns aligned with ecological values",
+    "ogDescription": "Family consumption patterns aligned with ecological values",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-family consumption patterns aligned with ecological values",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family consumption patterns aligned with ecological values - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-family consumption patterns aligned with ecological values",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-family consumption patterns aligned with ecological values",
+    "name": "Family consumption patterns aligned with ecological values",
+    "description": "Family consumption patterns aligned with ecological values",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

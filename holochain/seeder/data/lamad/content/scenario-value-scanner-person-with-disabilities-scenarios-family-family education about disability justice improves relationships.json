@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-family-family education about disability justice improves relationships",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family-family education about disability justice improves relationships",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family education about disability justice improves relationships",
+  "description": "Family education about disability justice improves relationships",
+  "content": "Scenario: Family education about disability justice improves relationships\n    Given family relationships improve when family understands disability better\n    And many families lack disability justice frameworks\n    When the family_elohim detects ableist patterns\n    Then it should provide family members with educational resources\n    And it should prompt family toward social model understanding\n    And it should share disability culture and community perspectives\n    And family should be invited to learn from Alex's expertise\n    And education should be offered supportively, not punitively\n    And the goal should be transforming family culture toward inclusion\n    And better understanding should enable healthier family relationships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:family",
+    "related_users:adult,parent,sibling,grandparent,elderly",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family education about disability justice improves relationships",
+    "ogDescription": "Family education about disability justice improves relationships",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-family-family education about disability justice improves relationships",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family education about disability justice improves relationships - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-family-family education about disability justice improves relationships",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family-family education about disability justice improves relationships",
+    "name": "Family education about disability justice improves relationships",
+    "description": "Family education about disability justice improves relationships",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

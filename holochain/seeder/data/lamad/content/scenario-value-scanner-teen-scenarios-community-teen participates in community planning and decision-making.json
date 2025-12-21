@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-community-teen participates in community planning and decision-making",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:community-teen participates in community planning and decision-making",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teen participates in community planning and decision-making",
+  "description": "Teen participates in community planning and decision-making",
+  "content": "Scenario: Teen participates in community planning and decision-making\n    Given the community is planning a new youth recreation facility\n    And Jasmine has relevant knowledge as a current user of community spaces\n    When the community_elohim facilitates community input\n    Then Jasmine's voice should be actively solicited\n    And her input should carry weight in planning decisions\n    And her care contributions should give her standing in the conversation\n    And community planners should engage her as a legitimate stakeholder\n    And she should learn that civic participation is her right and responsibility\n    And youth voice should shape systems designed for collective flourishing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:community",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:neighborhood,municipality,educational,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teen participates in community planning and decision-making",
+    "ogDescription": "Teen participates in community planning and decision-making",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-community-teen participates in community planning and decision-making",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teen participates in community planning and decision-making - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-community-teen participates in community planning and decision-making",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:community-teen participates in community planning and decision-making",
+    "name": "Teen participates in community planning and decision-making",
+    "description": "Teen participates in community planning and decision-making",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-ecological-bioregional-resource constraints create low consumption footprint",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-resource constraints create low consumption footprint",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Resource constraints create low consumption footprint",
+  "description": "Resource constraints create low consumption footprint",
+  "content": "Scenario: Resource constraints create low consumption footprint\n    Given Maria cannot afford unnecessary purchases or waste\n    And she maximizes every dollar and minimizes consumption\n    When her household's environmental impact is assessed\n    Then the bioregional_elohim should recognize her low consumption footprint\n    And it should frame her thrift as environmental virtue, not just poverty\n    And her resource efficiency should be celebrated as ecological stewardship\n    And economic constraint should be reframed as environmental contribution\n    And Maria should see her household as environmentally exemplary\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,household,community_member,environmental_advocate",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Resource constraints create low consumption footprint",
+    "ogDescription": "Resource constraints create low consumption footprint",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-resource constraints create low consumption footprint",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Resource constraints create low consumption footprint - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-resource constraints create low consumption footprint",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-resource constraints create low consumption footprint",
+    "name": "Resource constraints create low consumption footprint",
+    "description": "Resource constraints create low consumption footprint",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

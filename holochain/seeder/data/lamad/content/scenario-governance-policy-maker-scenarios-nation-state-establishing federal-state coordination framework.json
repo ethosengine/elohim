@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-nation-state-establishing federal-state coordination framework",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:nation-state-establishing federal-state coordination framework",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Establishing federal-state coordination framework",
+  "description": "Establishing federal-state coordination framework",
+  "content": "Scenario: Establishing federal-state coordination framework\n    Given protocol operates at multiple layers\n    And coordination is needed without centralization\n    When I create federal-state cooperation legislation\n    Then I establish: funding programs respecting state sovereignty\n    And I create: interstate coordination mechanisms\n    And I specify: federal role as support not control\n    And I protect: community and state autonomy\n    And I enable: national coherence with local diversity\n    And I demonstrate: federalism working for AI governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,researcher,technical_expert,community_leader",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Establishing federal-state coordination framework",
+    "ogDescription": "Establishing federal-state coordination framework",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-nation-state-establishing federal-state coordination framework",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Establishing federal-state coordination framework - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-nation-state-establishing federal-state coordination framework",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:nation-state-establishing federal-state coordination framework",
+    "name": "Establishing federal-state coordination framework",
+    "description": "Establishing federal-state coordination framework",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

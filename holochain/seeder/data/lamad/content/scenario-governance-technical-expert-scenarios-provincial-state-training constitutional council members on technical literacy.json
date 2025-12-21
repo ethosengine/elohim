@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-provincial-state-training constitutional council members on technical literacy",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state-training constitutional council members on technical literacy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Training Constitutional Council members on technical literacy",
+  "description": "Training Constitutional Council members on technical literacy",
+  "content": "Scenario: Training Constitutional Council members on technical literacy\n    Given new council members need technical foundations\n    And I contribute to their 3-week training program\n    When I teach about AI systems and cryptographic verification\n    Then I provide: conceptual understanding without overwhelming detail\n    And I enable: critical engagement with technical testimony\n    And I avoid: indoctrination about \"correct\" technical approaches\n    And I develop: their capacity to question experts\n    And I empower: them to judge despite not being specialists\n    And I demonstrate: how ordinary citizens can govern complex technology\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,appellant,policy_maker,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Training Constitutional Council members on technical literacy",
+    "ogDescription": "Training Constitutional Council members on technical literacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-provincial-state-training constitutional council members on technical literacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Training Constitutional Council members on technical literacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-provincial-state-training constitutional council members on technical literacy",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state-training constitutional council members on technical literacy",
+    "name": "Training Constitutional Council members on technical literacy",
+    "description": "Training Constitutional Council members on technical literacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

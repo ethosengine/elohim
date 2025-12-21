@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-bioregional food networks could serve families like marcus's",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-bioregional food networks could serve families like marcus's",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Bioregional food networks could serve families like Marcus's",
+  "description": "Bioregional food networks could serve families like Marcus's",
+  "content": "Scenario: Bioregional food networks could serve families like Marcus's\n    Given Marcus's family struggles with food budget\n    And bioregional food networks could provide affordable access\n    When the community_elohim identifies bioregional opportunities\n    Then it should connect Marcus to local food networks\n    And it should help him access CSA programs, food cooperatives, gleaning\n    And bioregional connection should reduce his economic burden\n    And local food systems should serve food security goals\n    And care economy should operate at bioregional scale\n    And connection to land and farmers should benefit all parties\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community,educational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Bioregional food networks could serve families like Marcus's",
+    "ogDescription": "Bioregional food networks could serve families like Marcus's",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-bioregional food networks could serve families like marcus's",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Bioregional food networks could serve families like Marcus's - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-bioregional food networks could serve families like marcus's",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-bioregional food networks could serve families like marcus's",
+    "name": "Bioregional food networks could serve families like Marcus's",
+    "description": "Bioregional food networks could serve families like Marcus's",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

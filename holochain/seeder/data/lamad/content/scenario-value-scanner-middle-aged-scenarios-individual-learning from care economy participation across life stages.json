@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-individual-learning from care economy participation across life stages",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:individual-learning from care economy participation across life stages",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Learning from care economy participation across life stages",
+  "description": "Learning from care economy participation across life stages",
+  "content": "Scenario: Learning from care economy participation across life stages\n    Given Robert has participated in care economy as child, parent, and adult child\n    And he now sees care patterns across the full lifecycle\n    When his personal_agent helps him reflect on his care economy journey\n    Then it should surface insights from his accumulated experience\n    And help him recognize: \"You learned care reciprocity from your parents' care for their parents\"\n    And connect past care received to present care given\n    And support him in understanding care as lifecycle reciprocity\n    And validate that his care contributions across decades have genuine value\n    And help him see that he's building care economy that will serve his own aging\n    And recognize his whole life as care economy participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:individual",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,family,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Learning from care economy participation across life stages",
+    "ogDescription": "Learning from care economy participation across life stages",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-individual-learning from care economy participation across life stages",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning from care economy participation across life stages - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-individual-learning from care economy participation across life stages",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:individual-learning from care economy participation across life stages",
+    "name": "Learning from care economy participation across life stages",
+    "description": "Learning from care economy participation across life stages",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

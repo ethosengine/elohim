@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-municipality-coordinating across neighborhoods with different needs",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-coordinating across neighborhoods with different needs",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Coordinating across neighborhoods with different needs",
+  "description": "Coordinating across neighborhoods with different needs",
+  "content": "Scenario: Coordinating across neighborhoods with different needs\n    Given Riverside has neighborhoods with different priorities\n    And downtown needs economic development\n    And residential areas prioritize environmental protection\n    And outskirts need infrastructure investment\n    When I facilitate municipal coordination\n    Then Municipal Elohim: helps identify resource flows and conflicts\n    And city council: deliberates on balancing neighborhood needs\n    And we ensure: each neighborhood has voice in decisions\n    And we negotiate: resource allocation serving whole city\n    And protocol enables: coordination without centralization\n    And neighborhoods retain: autonomy within municipal framework\n    And I facilitate: democratic negotiation across differences\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipality",
+    "related_users:constitutional_council_member,community_leader,policy_maker,technical_expert",
+    "related_layers:community,county_regional",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-municipality",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-municipality",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating across neighborhoods with different needs",
+    "ogDescription": "Coordinating across neighborhoods with different needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-coordinating across neighborhoods with different needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating across neighborhoods with different needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-coordinating across neighborhoods with different needs",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-coordinating across neighborhoods with different needs",
+    "name": "Coordinating across neighborhoods with different needs",
+    "description": "Coordinating across neighborhoods with different needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

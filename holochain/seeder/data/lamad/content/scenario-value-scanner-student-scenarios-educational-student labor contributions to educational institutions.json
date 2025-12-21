@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-student labor contributions to educational institutions",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-student labor contributions to educational institutions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Student labor contributions to educational institutions",
+  "description": "Student labor contributions to educational institutions",
+  "content": "Scenario: Student labor contributions to educational institutions\n    Given Kenji might do research work, TA work, or other academic labor\n    And universities benefit from student labor beyond tuition\n    When the educational_elohim tracks student labor\n    Then it should recognize unpaid or underpaid student work for institution\n    And it should help Kenji understand fair compensation for academic labor\n    And it should accumulate care tokens for labor that benefits university\n    And student labor should be recognized and fairly compensated\n    And the system should help students identify labor exploitation\n    And educational institutions should not extract uncompensated labor\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Student labor contributions to educational institutions",
+    "ogDescription": "Student labor contributions to educational institutions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-student labor contributions to educational institutions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Student labor contributions to educational institutions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-student labor contributions to educational institutions",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-student labor contributions to educational institutions",
+    "name": "Student labor contributions to educational institutions",
+    "description": "Student labor contributions to educational institutions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

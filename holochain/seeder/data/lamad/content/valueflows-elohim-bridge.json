@@ -1,0 +1,23 @@
+{
+  "id": "valueflows-elohim-bridge",
+  "title": "ValueFlows to Elohim: The Care Economy Bridge",
+  "content": "# From ValueFlows to Elohim: Building the Care Economy\n\n## ValueFlows: The Vocabulary\n\nValueFlows is the vocabulary specification that hREA implements. It defines how to describe economic activity in a way that's:\n- **Network-native**: Designed for P2P systems\n- **Agent-centric**: Humans, not institutions, are primary\n- **Value-aware**: Tracks actual value, not just money\n\n## The Elohim Extension\n\nThe Elohim Protocol extends ValueFlows for care economies:\n\n| ValueFlows Concept | Elohim Extension |\n|-------------------|------------------|\n| Agent | + Care tokens, skill attestations, creator presence |\n| EconomicEvent | + Witnessed care work, invisible labor visibility |\n| Resource | + Time, attention, emotional labor as resources |\n| Appreciation | + Care token grants, community recognition |\n| Process | + Care processes, teaching, mentoring |\n\n## Constitutional Flow Control\n\nElohim adds governance layers that ValueFlows doesn't specify:\n\n```\nELOHIM VALUE FLOW CONSTITUTION\n\nLayer 1: Existential Minimums\n- Basic needs flow first\n- Care labor always recognized\n- Dignity threshold maintained\n\nLayer 2: Contribution Recognition\n- Value flows to creators\n- Absent creators accumulate in trust\n- Derivatives share with sources\n\nLayer 3: Community Circulation\n- Velocity requirements\n- Accumulation limits\n- Community pools\n\nLayer 4: Network Development\n- Infrastructure maintenance\n- Next community liberation\n- Coordination sustainability\n```\n\n## The Technical Bridge\n\n```\nhREA (Holochain)\n    ↓ implements\nValueFlows (Vocabulary)\n    ↓ extends\nElohim Protocol (Care Economy Rules)\n    ↓ serves\nHuman Flourishing (Purpose)\n```\n\n## Shared Concepts, Aligned Purpose\n\nBoth hREA and Elohim share:\n- **Visibility**: Making value flows transparent\n- **Agency**: Humans control their economic participation\n- **Coordination**: Enabling cooperation without central control\n- **Recognition**: Valuing contribution beyond monetary payment\n\nhREA provides the infrastructure.\nElohim provides the constitutional purpose.\nTogether: a care-based economy.",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/economic_coordination/epic.md",
+  "tags": [
+    "valueflows",
+    "hrea",
+    "elohim",
+    "care-economy",
+    "bridge",
+    "constitution"
+  ],
+  "relationships": [
+    {
+      "target": "care-economy-visibility",
+      "type": "prereq"
+    }
+  ],
+  "createdAt": "2025-12-16T03:29:02.532Z",
+  "updatedAt": "2025-12-16T03:29:41.782Z"
+}

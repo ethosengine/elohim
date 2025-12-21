@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-workplace-organizational-democratic value distribution replaces hierarchical extraction",
+  "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:workplace-organizational-democratic value distribution replaces hierarchical extraction",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Democratic value distribution replaces hierarchical extraction",
+  "description": "Democratic value distribution replaces hierarchical extraction",
+  "content": "Scenario: Democratic value distribution replaces hierarchical extraction\n    Given ChickenMax generates $100K monthly revenue\n    And elimination of franchise fees freed $48K annually\n    When workers hold their quarterly value distribution governance meeting\n    Then transparent REA accounting shows complete revenue and cost breakdown\n    And workers democratically decide wage allocation ($60K to wages)\n    And workers vote on community program funding ($10K to senior meals)\n    And workers approve environmental sustainability investment ($8K to regenerative sourcing)\n    And every worker sees exactly how value flows and why\n    And workers can modify distribution algorithms democratically\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:workplace_organizational",
+    "related_users:[manager,supplier,small_business_owner,franchise_operator]",
+    "related_layers:[individual,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Democratic value distribution replaces hierarchical extraction",
+    "ogDescription": "Democratic value distribution replaces hierarchical extraction",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-workplace-organizational-democratic value distribution replaces hierarchical extraction",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Democratic value distribution replaces hierarchical extraction - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-workplace-organizational-democratic value distribution replaces hierarchical extraction",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:workplace-organizational-democratic value distribution replaces hierarchical extraction",
+    "name": "Democratic value distribution replaces hierarchical extraction",
+    "description": "Democratic value distribution replaces hierarchical extraction",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

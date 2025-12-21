@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-community-journalist investigates playground neglect in underserved neighborhood",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:community-journalist investigates playground neglect in underserved neighborhood",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Journalist investigates playground neglect in underserved neighborhood",
+  "description": "Journalist investigates playground neglect in underserved neighborhood",
+  "content": "Scenario: Journalist investigates playground neglect in underserved neighborhood\n    Given residents complain about dangerous playground conditions\n    And the journalist needs context on maintenance patterns\n    When the Observer provides hyperlocal infrastructure data\n    Then the journalist sees playground hasn't been maintained in 5 years\n    And compares to monthly maintenance in affluent neighborhoods\n    And documents injury reports and resident complaints ignored\n    And tracks city budget showing maintenance disparities\n    And publishes accountability story on infrastructure racism\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:community",
+    "related_users:citizen,activist,community_organizer,parent",
+    "related_layers:municipality,neighborhood,district",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-community",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Journalist investigates playground neglect in underserved neighborhood",
+    "ogDescription": "Journalist investigates playground neglect in underserved neighborhood",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-community-journalist investigates playground neglect in underserved neighborhood",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist investigates playground neglect in underserved neighborhood - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-community-journalist investigates playground neglect in underserved neighborhood",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:community-journalist investigates playground neglect in underserved neighborhood",
+    "name": "Journalist investigates playground neglect in underserved neighborhood",
+    "description": "Journalist investigates playground neglect in underserved neighborhood",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

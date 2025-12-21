@@ -1,0 +1,65 @@
+{
+  "id": "human-pete-pastor",
+  "displayName": "Pastor Pete",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "Shepherd of Community Church. Committed to helping people grow in faith and community.",
+  "avatarUrl": "assets/avatars/human-pete-pastor.jpg",
+  "primaryLocation": {
+    "layer": "community",
+    "displayName": "Valley Community",
+    "reach": "community",
+    "type": "community"
+  },
+  "organizationIds": [
+    "org-community-church"
+  ],
+  "communityIds": [
+    "community-local-church",
+    "community-pastoral-network"
+  ],
+  "affinityGroupIds": [
+    "affinity-christian-theology",
+    "affinity-pastoral-care",
+    "affinity-community-building",
+    "affinity-discipleship",
+    "affinity-faith-and-technology"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-christian-theology",
+    "concept-pastoral-care",
+    "concept-community-building",
+    "concept-discipleship",
+    "concept-faith-and-technology"
+  ],
+  "relationshipIds": [
+    "rel-0007",
+    "rel-0015",
+    "rel-0016",
+    "rel-0017",
+    "rel-0020"
+  ],
+  "trustedConnectionCount": 2,
+  "_metadata": {
+    "category": "affinity",
+    "governanceLayers": [
+      "community",
+      "workplace"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": null
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

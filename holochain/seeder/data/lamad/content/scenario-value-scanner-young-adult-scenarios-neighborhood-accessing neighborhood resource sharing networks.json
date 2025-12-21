@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-accessing neighborhood resource sharing networks",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:neighborhood-accessing neighborhood resource sharing networks",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Accessing neighborhood resource sharing networks",
+  "description": "Accessing neighborhood resource sharing networks",
+  "content": "Scenario: Accessing neighborhood resource sharing networks\n    Given neighbors share tools and resources\n    And Aisha occasionally needs items she doesn't own\n    When Aisha needs to borrow something\n    Then the neighborhood_elohim should connect her to resource sharing\n    And it should facilitate tool libraries and sharing arrangements\n    And it should track care tokens for borrowing and lending\n    And the system should build neighborhood mutual aid\n    And resource sharing should reduce individual costs\n    And neighborhood cooperation should meet practical needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Accessing neighborhood resource sharing networks",
+    "ogDescription": "Accessing neighborhood resource sharing networks",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-neighborhood-accessing neighborhood resource sharing networks",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing neighborhood resource sharing networks - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-neighborhood-accessing neighborhood resource sharing networks",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:neighborhood-accessing neighborhood resource sharing networks",
+    "name": "Accessing neighborhood resource sharing networks",
+    "description": "Accessing neighborhood resource sharing networks",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

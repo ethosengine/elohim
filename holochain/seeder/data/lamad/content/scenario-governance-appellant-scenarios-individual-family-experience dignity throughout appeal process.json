@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-family-experience dignity throughout appeal process",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family-experience dignity throughout appeal process",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Experience dignity throughout appeal process",
+  "description": "Experience dignity throughout appeal process",
+  "content": "Scenario: Experience dignity throughout appeal process\n    Given Marcus is appealing an agent decision\n    And Marcus is angry and feels violated\n    When Marcus interacts with the appeal system\n    Then the system treats his anger as legitimate data about dignity violation\n    And the system does not dismiss him as irrational or ungrateful\n    And the system provides empathetic language acknowledging his concern\n    And Constitutional Council members listen without judgment\n    And Marcus's right to appeal is honored without punishment\n    And future agent interactions are not biased by his appeal history\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual_family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:community,provincial_state",
+    "elohim_agents:family_elohim,individual_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual_family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual-family",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Experience dignity throughout appeal process",
+    "ogDescription": "Experience dignity throughout appeal process",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-family-experience dignity throughout appeal process",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Experience dignity throughout appeal process - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-family-experience dignity throughout appeal process",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family-experience dignity throughout appeal process",
+    "name": "Experience dignity throughout appeal process",
+    "description": "Experience dignity throughout appeal process",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

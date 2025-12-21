@@ -280,7 +280,10 @@ class PerformanceTimer {
 const timer = new PerformanceTimer();
 
 // Configuration
-const DATA_DIR = process.env.DATA_DIR || '/projects/elohim/data/lamad';
+// Check for local data directory first (CI/CD), then fall back to workspace path
+const SEEDER_DIR = path.dirname(path.dirname(__filename)); // Go up from src/ to seeder/
+const LOCAL_DATA_DIR = path.join(SEEDER_DIR, 'data', 'lamad');
+const DATA_DIR = process.env.DATA_DIR || (fs.existsSync(LOCAL_DATA_DIR) ? LOCAL_DATA_DIR : '/projects/elohim/data/lamad');
 const LOCAL_DEV_DIR = process.env.LOCAL_DEV_DIR || '/projects/elohim/holochain/local-dev';
 const HC_PORTS_FILE = process.env.HC_PORTS_FILE || path.join(LOCAL_DEV_DIR, '.hc_ports');
 const APP_ID = 'lamad-spike';

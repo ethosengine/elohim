@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-family-siblings learning from student care economy practices",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:family-siblings learning from student care economy practices",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Siblings learning from student care economy practices",
+  "description": "Siblings learning from student care economy practices",
+  "content": "Scenario: Siblings learning from student care economy practices\n    Given Kenji has younger siblings who will become students\n    And he's learning valuable care economy skills\n    When the family_elohim tracks knowledge transfer\n    Then it should recognize Kenji mentoring siblings in life skills\n    And it should value his teaching them budgeting, cooking, household management\n    And it should accumulate care tokens for mentorship work\n    And older siblings should be recognized as teachers for younger ones\n    And the system should value peer education within families\n    And Kenji's student experience should benefit future student siblings\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:family",
+    "related_users:parent,adult,young_adult,sibling",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Siblings learning from student care economy practices",
+    "ogDescription": "Siblings learning from student care economy practices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-siblings learning from student care economy practices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Siblings learning from student care economy practices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-siblings learning from student care economy practices",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:family-siblings learning from student care economy practices",
+    "name": "Siblings learning from student care economy practices",
+    "description": "Siblings learning from student care economy practices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

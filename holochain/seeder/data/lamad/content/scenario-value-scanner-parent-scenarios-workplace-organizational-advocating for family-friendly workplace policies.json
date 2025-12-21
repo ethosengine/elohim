@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-advocating for family-friendly workplace policies",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:workplace-organizational-advocating for family-friendly workplace policies",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Advocating for family-friendly workplace policies",
+  "description": "Advocating for family-friendly workplace policies",
+  "content": "Scenario: Advocating for family-friendly workplace policies\n    Given Sarah needs flexible scheduling to manage children's needs\n    And current workplace policies assume workers have no care responsibilities\n    When Sarah advocates for policy change\n    Then the workplace_elohim should provide supporting data\n    And it should show that working parents need flexibility\n    And it should help Sarah make evidence-based case for change\n    And advocacy labor should accumulate care tokens\n    And the system should amplify parent voices in workplace governance\n    And workplace should adopt policies that enable sustainable parenting\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employer,colleague,child",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Advocating for family-friendly workplace policies",
+    "ogDescription": "Advocating for family-friendly workplace policies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-workplace-organizational-advocating for family-friendly workplace policies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advocating for family-friendly workplace policies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-workplace-organizational-advocating for family-friendly workplace policies",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:workplace-organizational-advocating for family-friendly workplace policies",
+    "name": "Advocating for family-friendly workplace policies",
+    "description": "Advocating for family-friendly workplace policies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

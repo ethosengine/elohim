@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-pre-specifying preferences after successful appeal",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual-pre-specifying preferences after successful appeal",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Pre-specifying preferences after successful appeal",
+  "description": "Pre-specifying preferences after successful appeal",
+  "content": "Scenario: Pre-specifying preferences after successful appeal\n    Given my appeal was resolved and I gained the right to set preferences\n    When I access my preference settings through the interface\n    Then I can specify alert preferences for future interventions\n    And I can set thresholds like \"family alert only after three-day pattern\"\n    And I can balance my privacy needs with care considerations\n    And The agent respects my preferences in future decisions\n    And I feel ownership over my own protection rather than being controlled\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual",
+    "related_users:constitutional_council_member,technical_expert,community_leader",
+    "related_layers:family,community",
+    "elohim_agents:family_elohim,individual_support_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Pre-specifying preferences after successful appeal",
+    "ogDescription": "Pre-specifying preferences after successful appeal",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-pre-specifying preferences after successful appeal",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Pre-specifying preferences after successful appeal - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-pre-specifying preferences after successful appeal",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:individual-pre-specifying preferences after successful appeal",
+    "name": "Pre-specifying preferences after successful appeal",
+    "description": "Pre-specifying preferences after successful appeal",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

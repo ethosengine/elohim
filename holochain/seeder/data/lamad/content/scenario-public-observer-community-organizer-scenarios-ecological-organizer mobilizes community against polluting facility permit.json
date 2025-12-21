@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-ecological-organizer mobilizes community against polluting facility permit",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:ecological-organizer mobilizes community against polluting facility permit",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Organizer mobilizes community against polluting facility permit",
+  "description": "Organizer mobilizes community against polluting facility permit",
+  "content": "Scenario: Organizer mobilizes community against polluting facility permit\n    Given a company seeks permit for facility in Black neighborhood\n    And already has history of violations\n    When the organizer uses Observer to support community opposition\n    Then they access company's complete violation and enforcement record\n    And see health impacts from similar facilities elsewhere\n    And calculate cumulative pollution burden on neighborhood\n    And organize residents for powerful testimony at permit hearing\n    And environmental organizing prevents new pollution in overburdened community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,parent,politician",
+    "related_layers:community,municipality,bioregional",
+    "elohim_agents:public_observer,ecological_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Organizer mobilizes community against polluting facility permit",
+    "ogDescription": "Organizer mobilizes community against polluting facility permit",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-ecological-organizer mobilizes community against polluting facility permit",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer mobilizes community against polluting facility permit - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-ecological-organizer mobilizes community against polluting facility permit",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:ecological-organizer mobilizes community against polluting facility permit",
+    "name": "Organizer mobilizes community against polluting facility permit",
+    "description": "Organizer mobilizes community against polluting facility permit",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

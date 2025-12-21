@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-national-establish 10-year longitudinal study tracking protocol evolution",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:national-establish 10-year longitudinal study tracking protocol evolution",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Establish 10-year longitudinal study tracking protocol evolution",
+  "description": "Establish 10-year longitudinal study tracking protocol evolution",
+  "content": "Scenario: Establish 10-year longitudinal study tracking protocol evolution\n    Given James begins study in 2025 when protocol is newly adopted\n    And he wants to understand long-term transformation effects\n    When James designs the longitudinal research\n    Then he selects cohort of 50 diverse communities to track\n    And he recruits sample of Constitutional Council members to follow\n    And he establishes baseline measurements before protocol adoption\n    And he plans annual follow-up measurements for 10 years\n    And he commits to capturing both positive and negative long-term effects\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:national",
+    "related_users:constitutional_council_member,policy_maker,technical_expert",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/national.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-national",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-national",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Establish 10-year longitudinal study tracking protocol evolution",
+    "ogDescription": "Establish 10-year longitudinal study tracking protocol evolution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-establish 10-year longitudinal study tracking protocol evolution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Establish 10-year longitudinal study tracking protocol evolution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-establish 10-year longitudinal study tracking protocol evolution",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:national-establish 10-year longitudinal study tracking protocol evolution",
+    "name": "Establish 10-year longitudinal study tracking protocol evolution",
+    "description": "Establish 10-year longitudinal study tracking protocol evolution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

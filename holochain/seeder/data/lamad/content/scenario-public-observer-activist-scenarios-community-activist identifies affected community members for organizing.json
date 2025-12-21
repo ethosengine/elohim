@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-community-activist identifies affected community members for organizing",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:community-activist identifies affected community members for organizing",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Activist identifies affected community members for organizing",
+  "description": "Activist identifies affected community members for organizing",
+  "content": "Scenario: Activist identifies affected community members for organizing\n    Given a city policy will impact 300 residents in the neighborhood\n    And the activist needs to build organized base\n    When the Observer detects affected residents\n    Then the activist can see community impact patterns\n    And identify residents most affected by the issue\n    And facilitate grassroots testimony development\n    And build coalition grounded in lived experience\n    And transform policy analysis into community power\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:community",
+    "related_users:community_organizer,citizen,parent",
+    "related_layers:municipality,neighborhood,district",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-community",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Activist identifies affected community members for organizing",
+    "ogDescription": "Activist identifies affected community members for organizing",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-community-activist identifies affected community members for organizing",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist identifies affected community members for organizing - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-community-activist identifies affected community members for organizing",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:community-activist identifies affected community members for organizing",
+    "name": "Activist identifies affected community members for organizing",
+    "description": "Activist identifies affected community members for organizing",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

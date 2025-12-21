@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-learning disabilities and accommodations as care economy",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-learning disabilities and accommodations as care economy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Learning disabilities and accommodations as care economy",
+  "description": "Learning disabilities and accommodations as care economy",
+  "content": "Scenario: Learning disabilities and accommodations as care economy\n    Given some students need educational accommodations\n    And accommodations require advocacy and coordination\n    When students access disability services\n    Then the educational_elohim should support accommodation advocacy\n    And it should recognize student labor of managing accommodations\n    And it should value disability services as institutional care work\n    And accommodation should be understood as educational care economy\n    And the system should support equitable access to education\n    And disability justice should be core to educational care economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Learning disabilities and accommodations as care economy",
+    "ogDescription": "Learning disabilities and accommodations as care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-learning disabilities and accommodations as care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning disabilities and accommodations as care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-learning disabilities and accommodations as care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-learning disabilities and accommodations as care economy",
+    "name": "Learning disabilities and accommodations as care economy",
+    "description": "Learning disabilities and accommodations as care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

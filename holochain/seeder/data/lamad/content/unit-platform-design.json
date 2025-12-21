@@ -1,0 +1,27 @@
+{
+  "id": "unit-platform-design",
+  "title": "Platform Design: From Extraction to Flourishing",
+  "content": "# Platform Design: From Extraction to Flourishing\n\n## The Extraction Economy\n\nCurrent social platforms are designed to extract:\n- **Attention**: Keep you scrolling as long as possible\n- **Data**: Harvest everything you do for advertisers\n- **Content**: Your creativity is their inventory\n- **Connections**: Your relationships are their network effects\n\nThe business model is simple: you are the product.\n\n## What Extraction Looks Like\n\n### The Engagement Trap\nPlatforms optimize for time-on-site, not value-to-user:\n- Infinite scroll eliminates natural stopping points\n- Notifications interrupt real life\n- Variable reward schedules (like slot machines)\n- Outrage drives more engagement than insight\n\n### The Algorithmic Feed\nYou don't choose what you see; algorithms do:\n- Optimized for engagement, not relevance\n- Creates filter bubbles and echo chambers\n- Amplifies extreme content\n- Changes without notice or consent\n\n### The Data Harvest\nEverything you do is captured and sold:\n- Location, contacts, browsing history\n- Typing patterns, attention duration\n- Emotional states inferred from behavior\n- Shared with thousands of \"partners\"\n\n### The Creator Squeeze\nContent creators face:\n- Algorithmic changes that destroy businesses overnight\n- Demonetization without explanation\n- Platform takes growing cut of revenue\n- Terms that grant perpetual content rights\n\n## Alternative Design Principles\n\n### Relationship-Centered\nDesign around relationships, not content:\n- Who matters to you, not what's trending\n- Quality of connection, not quantity of followers\n- Conversations, not broadcasts\n- Trust circles, not public squares\n\n### User-Sovereign\nYou own your data, connections, and experience:\n- Export everything anytime\n- Choose what's shared with whom\n- Control your own algorithm (or turn it off)\n- Leave without losing your network\n\n### Attention-Respecting\nProtect users' time and focus:\n- No infinite scroll; natural endpoints\n- Notification batching, not interruption\n- \"Time well spent\" metrics\n- Features that help you disengage\n\n### Value-Aligned\nBusiness model aligned with user benefit:\n- Subscription over advertising\n- No incentive to addict or manipulate\n- Success measured by user flourishing\n- Transparent about trade-offs\n\n## The Elohim Approach\n\nThe Social Medium epic designs platforms that embody these principles:\n\n### Personal AI Mediation\nYour Elohim helps you navigate:\n- Filters content according to your values\n- Protects you from manipulation\n- Maintains relationships proactively\n- Represents you when you're not present\n\n### Distributed Infrastructure\nNo single company controls the network:\n- Holochain: each community hosts its own\n- Interoperability between communities\n- Data stays with users, not platforms\n- Governance by communities, not shareholders\n\n### Trust-Based Curation\nContent visibility based on trust networks:\n- See content from people you trust\n- Trust propagates through networks\n- Manipulation is visible and addressable\n- Communities set their own norms\n\n## For Policy Makers: Regulating Platforms\n\nCurrent regulation struggles with platforms:\n- Section 230 debates miss the design question\n- Privacy laws don't address attention extraction\n- Antitrust focuses on competition, not harm\n- Content moderation is symptom, not cause\n\nBetter approaches:\n- Mandate data portability and interoperability\n- Require algorithmic transparency\n- Tax attention extraction (not just data collection)\n- Support alternative ownership models\n\n## For Developers: Building Different\n\nTechnical choices embed values:\n- Centralized vs. distributed architecture\n- Advertising vs. subscription business models\n- Engagement vs. wellbeing metrics\n- Proprietary vs. interoperable protocols\n\nYou can build differently. The Elohim Protocol shows how.\n\n## For Influencers: Your Complicity and Power\n\nYou benefit from and suffer under current platforms:\n- Reach depends on algorithmic favor\n- Success requires playing engagement games\n- Your audience is not really yours\n\nBut you also have power:\n- Your audience follows you, not just platforms\n- You can demand better terms\n- You can support alternative platforms\n- You can model different relationships with audiences\n\n## Connection to Digital Dignity\n\nDesign shapes experience. The next unit explores what it means to have dignity in digital spaces—to be treated as a person, not a user.",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/social_medium/epic.md",
+  "tags": [
+    "social-medium",
+    "platform",
+    "design",
+    "unit",
+    "attention",
+    "extraction"
+  ],
+  "relationships": [
+    {
+      "target": "social-medium-epic",
+      "type": "DERIVED_FROM"
+    },
+    {
+      "target": "unit-five-epics",
+      "type": "DEPENDS_ON"
+    }
+  ],
+  "createdAt": "2025-12-17T01:40:58.835Z",
+  "updatedAt": "2025-12-17T01:41:18.422Z"
+}

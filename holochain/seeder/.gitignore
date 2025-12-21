@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.js
+*.js.map
+*.d.ts
+
+# Local dev files
+.hc_ports
+last-seed-report.json
+
+# OS files
+.DS_Store
+Thumbs.db

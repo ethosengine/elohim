@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-coordination of support services with alex maintaining authority",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-coordination of support services with alex maintaining authority",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Coordination of support services with Alex maintaining authority",
+  "description": "Coordination of support services with Alex maintaining authority",
+  "content": "Scenario: Coordination of support services with Alex maintaining authority\n    Given Alex requires assistance with some physical tasks\n    And Alex coordinates support workers for specific needs\n    When support services are scheduled\n    Then Alex should have complete authority over service direction\n    And the personal_agent should help coordinate schedules efficiently\n    And Alex should be able to communicate needs clearly\n    And support quality should be tracked per Alex's assessment\n    And Alex should experience professional partnership, not caretaking\n    And the relationship should be employer/coordinator to service provider\n    And Alex's autonomy should be structurally protected\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:individual",
+    "related_users:adult,young_adult,elderly,idd_community,vulnerable_temporary,caregiver",
+    "related_layers:household,family,community,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Coordination of support services with Alex maintaining authority",
+    "ogDescription": "Coordination of support services with Alex maintaining authority",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-coordination of support services with alex maintaining authority",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordination of support services with Alex maintaining authority - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-coordination of support services with alex maintaining authority",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-coordination of support services with alex maintaining authority",
+    "name": "Coordination of support services with Alex maintaining authority",
+    "description": "Coordination of support services with Alex maintaining authority",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

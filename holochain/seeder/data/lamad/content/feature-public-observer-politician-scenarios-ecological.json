@@ -1,0 +1,67 @@
+{
+  "id": "feature-public-observer-politician-scenarios-ecological",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:ecological",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Environmental and Climate Policy Governance for Elected Representative",
+  "description": "As a politician in the public_observer system Operating at the ecological governance layer I want to make informed environmental policy decisions So that I can balance environmental protection with economic development and serve long-term community resilience",
+  "content": "@epic:public_observer\n@user_type:politician\n@governance_layer:ecological\n@related_users:citizen,activist,scientist,community_organizer,developer_interests\n@related_layers:municipality,county_regional,provincial_state,ecological_bioregional\n@elohim_agents:public_observer,ecological_elohim,municipal_elohim,regional_elohim\n\nFeature: Environmental and Climate Policy Governance for Elected Representative\n  As a politician in the public_observer system\n  Operating at the ecological governance layer\n  I want to make informed environmental policy decisions\n  So that I can balance environmental protection with economic development and serve long-term community resilience\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the politician user is registered in the system\n    And the ecological governance context is active\n\n  Scenario: Politician understands environmental justice patterns in jurisdiction\n    Given the politician governs environmental policy at city or state level\n    And suspects environmental burdens fall disproportionately\n    When the Observer maps environmental conditions and demographics\n    Then they see pollution sources concentrated in communities of color\n    And identify park access disparities by neighborhood income\n    And understand health impact patterns from environmental exposure\n    And learn which communities bear cumulative environmental burdens\n    And champion environmental justice policies with documented inequities\n\n  Scenario: Politician evaluates polluting facility permit with comprehensive analysis\n    Given company applies for permit to operate polluting facility\n    And promises economic benefits and claims minimal environmental impact\n    When the Observer analyzes facility proposal and company track record\n    Then they see company's violation history at other locations\n    And understand health impacts on nearby residential populations\n    And identify existing pollution burden in target neighborhood\n    And review economic claims against actual job creation in similar facilities\n    And make informed decision balancing economics with environmental protection\n\n  Scenario: Politician tracks accountability for climate action commitments\n    Given the politician pledged to reduce municipal carbon emissions\n    And committed to specific climate resilience investments\n    When the Observer monitors climate commitment implementation\n    Then they see actual emissions trends versus reduction targets\n    And identify which climate initiatives launched versus stalled\n    And understand budget allocation for climate versus other priorities\n    And receive alerts when commitments fall behind schedule\n    And maintain accountability for climate action promises\n\n  Scenario: Politician surfaces constituent environmental priorities beyond loudest voices\n    Given the politician hears from passionate environmental activists\n    But uncertain whether priorities reflect broader community\n    When the Observer aggregates constituent environmental sentiment\n    Then they see working families prioritize air quality and park access\n    And learn parents care about safe outdoor spaces for children\n    And identify senior concerns about extreme heat vulnerability\n    And understand environmental priorities across diverse constituents\n    And align policy with community environmental needs\n\n  Scenario: Politician evaluates climate adaptation investments with equity focus\n    Given climate change requires infrastructure resilience investments\n    And limited resources force priority-setting across neighborhoods\n    When the Observer analyzes climate vulnerability and adaptation patterns\n    Then they see flood risk concentrated in low-income neighborhoods\n    And identify heat island effects in communities lacking tree canopy\n    And understand which populations most vulnerable to climate impacts\n    And ensure resilience investments prioritize environmental justice\n    And allocate climate adaptation funding equitably\n\n  Scenario: Politician builds coalition for green infrastructure investment\n    Given the politician champions urban tree canopy expansion\n    And needs support across diverse constituencies\n    When the Observer identifies coalition building opportunities\n    Then they see environmental groups support ecological benefits\n    And identify public health advocates concerned about heat and air quality\n    And connect with neighborhood groups seeking park improvements\n    And facilitate coalition across environmental and equity interests\n    And build broad-based support for green infrastructure\n\n  Scenario: Politician distinguishes industry fear-mongering from legitimate economic concerns\n    Given industry lobbyists claim environmental regulation will destroy jobs\n    And present catastrophic economic projections\n    When the Observer fact-checks industry claims with evidence\n    Then they see similar regulations in comparable jurisdictions\n    And review actual employment impacts versus predicted job losses\n    And identify compliance costs versus health and environmental benefits\n    And understand which industries adapted successfully to regulations\n    And resist manipulation through evidence-based economic analysis\n\n  Scenario: Politician monitors environmental agency enforcement patterns\n    Given the politician has oversight of environmental regulators\n    And community groups report lax enforcement\n    When the Observer tracks environmental compliance and enforcement\n    Then they see violation patterns by facility and location\n    And identify enforcement disparities by neighborhood demographics\n    And understand whether penalties effectively deter violations\n    And learn which facilities are repeat violators\n    And demand stronger enforcement protecting community health\n\n  Scenario: Politician evaluates renewable energy policy with comprehensive analysis\n    Given competing proposals for renewable energy development\n    And conflicting claims about costs and benefits\n    When the Observer analyzes renewable energy options and impacts\n    Then they see cost trajectories of different energy sources\n    And understand job creation in renewable versus fossil fuel sectors\n    And identify environmental and health benefits of clean energy\n    And review successful renewable policies in other jurisdictions\n    And make informed energy policy decisions beyond ideology\n\n  Scenario: Politician navigates development pressure with environmental accountability\n    Given developer proposes project with environmental impacts\n    And campaign contributions create perception of conflict\n    When the Observer documents environmental impacts and relationships\n    Then they see project's environmental footprint objectively analyzed\n    And identify developer's environmental track record\n    And understand campaign finance relationships made publicly visible\n    And review community environmental concerns systematically\n    And make transparent decision accountable to environmental and community interests\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,scientist,community_organizer,developer_interests",
+    "related_layers:municipality,county_regional,provincial_state,ecological_bioregional",
+    "elohim_agents:public_observer,ecological_elohim,municipal_elohim,regional_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-politician-scenarios-ecological-politician understands environmental justice patterns in jurisdiction",
+    "scenario-public-observer-politician-scenarios-ecological-politician evaluates polluting facility permit with comprehensive analysis",
+    "scenario-public-observer-politician-scenarios-ecological-politician tracks accountability for climate action commitments",
+    "scenario-public-observer-politician-scenarios-ecological-politician surfaces constituent environmental priorities beyond loudest voices",
+    "scenario-public-observer-politician-scenarios-ecological-politician evaluates climate adaptation investments with equity focus",
+    "scenario-public-observer-politician-scenarios-ecological-politician builds coalition for green infrastructure investment",
+    "scenario-public-observer-politician-scenarios-ecological-politician distinguishes industry fear-mongering from legitimate economic concerns",
+    "scenario-public-observer-politician-scenarios-ecological-politician monitors environmental agency enforcement patterns",
+    "scenario-public-observer-politician-scenarios-ecological-politician evaluates renewable energy policy with comprehensive analysis",
+    "scenario-public-observer-politician-scenarios-ecological-politician navigates development pressure with environmental accountability",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 10
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Environmental and Climate Policy Governance for Elected Representative",
+    "ogDescription": "As a politician in the public_observer system Operating at the ecological governance layer I want to make informed environmental policy decisions So that I can balance environmental protection with ec",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-politician-scenarios-ecological",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Environmental and Climate Policy Governance for Elected Representative - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-politician-scenarios-ecological",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:ecological",
+    "name": "Environmental and Climate Policy Governance for Elected Representative",
+    "description": "As a politician in the public_observer system Operating at the ecological governance layer I want to make informed environmental policy decisions So that I can balance environmental protection with economic development and serve long-term community resilience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

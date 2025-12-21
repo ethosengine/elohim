@@ -1,0 +1,31 @@
+{
+  "id": "concept-community-wisdom-at-scale",
+  "contentType": "concept",
+  "title": "Community Wisdom at Scale",
+  "description": "Distributed governance systems where local communities steward their own spaces while maintaining connection to broader networks.",
+  "content": "Distributed governance systems where local communities steward their own spaces while maintaining connection to broader networks.",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/design-principles/concept-community-wisdom-at-scale.json",
+  "tags": [
+    "governance",
+    "subsidiarity",
+    "community",
+    "design-principle",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "governance-epic",
+    "public-observer-epic",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "design-principles",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:56.999917",
+  "updatedAt": "2025-11-28T17:11:56.999917"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-educational-educational policy informed by teen care economy participation",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:educational-educational policy informed by teen care economy participation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Educational policy informed by teen care economy participation",
+  "description": "Educational policy informed by teen care economy participation",
+  "content": "Scenario: Educational policy informed by teen care economy participation\n    Given aggregate data shows how teens balance education with care work\n    And many teens provide substantial household labor while in school\n    When educational_elohim analyzes patterns across student populations\n    Then it should surface insights about care work burden on students\n    And inform educational policy about homework loads and scheduling\n    And show how household responsibilities affect educational outcomes\n    And advocate for policies that recognize student care economy participation\n    And push schools to consider whole lives of students, not just academic performance\n    And support evidence-based educational policy grounded in student realities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:educational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Educational policy informed by teen care economy participation",
+    "ogDescription": "Educational policy informed by teen care economy participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-educational-educational policy informed by teen care economy participation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Educational policy informed by teen care economy participation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-educational-educational policy informed by teen care economy participation",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:educational-educational policy informed by teen care economy participation",
+    "name": "Educational policy informed by teen care economy participation",
+    "description": "Educational policy informed by teen care economy participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

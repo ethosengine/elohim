@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-nation-state-national research infrastructure enabling cumulative knowledge",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state-national research infrastructure enabling cumulative knowledge",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "National research infrastructure enabling cumulative knowledge",
+  "description": "National research infrastructure enabling cumulative knowledge",
+  "content": "Scenario: National research infrastructure enabling cumulative knowledge\n    Given sustainable research requires ongoing data access and funding\n    And I advocate for long-term research infrastructure\n    When national research program is established with public funding\n    Then independent researchers gain: anonymized data access with privacy protection\n    And longitudinal tracking becomes: possible across decades\n    And replication and extension: of findings is enabled\n    And peer review and quality control: maintain scientific standards\n    And research independence from: protocol developers is preserved\n    And Knowledge accumulates: rather than being rediscovered each generation\n    And Democratic AI governance becomes: evidence-based rather than ideological\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:nation_state",
+    "related_users:policy_maker,constitutional_council_member,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "National research infrastructure enabling cumulative knowledge",
+    "ogDescription": "National research infrastructure enabling cumulative knowledge",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-nation-state-national research infrastructure enabling cumulative knowledge",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "National research infrastructure enabling cumulative knowledge - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-nation-state-national research infrastructure enabling cumulative knowledge",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state-national research infrastructure enabling cumulative knowledge",
+    "name": "National research infrastructure enabling cumulative knowledge",
+    "description": "National research infrastructure enabling cumulative knowledge",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

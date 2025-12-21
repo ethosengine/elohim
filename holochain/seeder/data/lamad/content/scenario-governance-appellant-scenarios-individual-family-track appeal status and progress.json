@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-family-track appeal status and progress",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family-track appeal status and progress",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Track appeal status and progress",
+  "description": "Track appeal status and progress",
+  "content": "Scenario: Track appeal status and progress\n    Given Marcus has submitted an appeal\n    When Marcus checks his appeal status\n    Then he sees current review stage clearly displayed\n    And he sees estimated timeline for each stage\n    And he receives notifications at key milestones\n    And he can compare his case to similar anonymized appeals\n    And he can access precedent cases involving mental health interventions\n    And the tracking interface is accessible on all his devices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual_family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:community,provincial_state",
+    "elohim_agents:family_elohim,individual_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual_family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual-family",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Track appeal status and progress",
+    "ogDescription": "Track appeal status and progress",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-family-track appeal status and progress",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Track appeal status and progress - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-family-track appeal status and progress",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family-track appeal status and progress",
+    "name": "Track appeal status and progress",
+    "description": "Track appeal status and progress",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

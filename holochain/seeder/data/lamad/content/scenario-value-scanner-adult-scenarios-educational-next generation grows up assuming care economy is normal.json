@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-next generation grows up assuming care economy is normal",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-next generation grows up assuming care economy is normal",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Next generation grows up assuming care economy is normal",
+  "description": "Next generation grows up assuming care economy is normal",
+  "content": "Scenario: Next generation grows up assuming care economy is normal\n    Given Sarah is teaching value literacy to many children\n    And children form baseline expectations from early experience\n    When children who learn care economy reach adulthood\n    Then they should assume care work creates value\n    And they should expect care to be visible and recognized\n    And they should see care economy as normal, not alternative\n    And Sarah's teaching should transform next generation's economic understanding\n    And cultural transformation should happen through education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Next generation grows up assuming care economy is normal",
+    "ogDescription": "Next generation grows up assuming care economy is normal",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-next generation grows up assuming care economy is normal",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Next generation grows up assuming care economy is normal - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-next generation grows up assuming care economy is normal",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-next generation grows up assuming care economy is normal",
+    "name": "Next generation grows up assuming care economy is normal",
+    "description": "Next generation grows up assuming care economy is normal",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

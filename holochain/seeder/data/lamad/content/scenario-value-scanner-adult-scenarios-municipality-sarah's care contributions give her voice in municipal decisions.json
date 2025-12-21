@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-municipality-sarah's care contributions give her voice in municipal decisions",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality-sarah's care contributions give her voice in municipal decisions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Sarah's care contributions give her voice in municipal decisions",
+  "description": "Sarah's care contributions give her voice in municipal decisions",
+  "content": "Scenario: Sarah's care contributions give her voice in municipal decisions\n    Given Sarah has accumulated substantial care tokens through community work\n    And municipal governance affects her family's well-being\n    When municipal decisions are being made\n    Then Sarah's care contributions should give her legitimate standing\n    And her voice should carry weight based on demonstrated care\n    And municipal democracy should recognize care work as civic participation\n    And those who contribute to community should influence community governance\n    And care economy should create accountable municipal leadership\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:municipality",
+    "related_users:parent,worker,caregiver,community_member,citizen",
+    "related_layers:community,neighborhood,household",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Sarah's care contributions give her voice in municipal decisions",
+    "ogDescription": "Sarah's care contributions give her voice in municipal decisions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-municipality-sarah's care contributions give her voice in municipal decisions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Sarah's care contributions give her voice in municipal decisions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-municipality-sarah's care contributions give her voice in municipal decisions",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality-sarah's care contributions give her voice in municipal decisions",
+    "name": "Sarah's care contributions give her voice in municipal decisions",
+    "description": "Sarah's care contributions give her voice in municipal decisions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood care token recognition for caregiver contributions",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood-neighborhood care token recognition for caregiver contributions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood care token recognition for caregiver contributions",
+  "description": "Neighborhood care token recognition for caregiver contributions",
+  "content": "Scenario: Neighborhood care token recognition for caregiver contributions\n    Given James contributes to community by caring for David\n    And he's reducing burden on institutional care systems\n    When neighborhood care economy evaluates contributions\n    Then James should accumulate care tokens for caregiving work\n    And neighborhood should recognize his care as community contribution\n    And care tokens should give him standing to access support\n    And caregiving should be valued within neighborhood economy\n    And James should be able to access help based on his contributions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:neighborhood",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood care token recognition for caregiver contributions",
+    "ogDescription": "Neighborhood care token recognition for caregiver contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood care token recognition for caregiver contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood care token recognition for caregiver contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood care token recognition for caregiver contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood-neighborhood care token recognition for caregiver contributions",
+    "name": "Neighborhood care token recognition for caregiver contributions",
+    "description": "Neighborhood care token recognition for caregiver contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-household-household downsizing and simplification support",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:household-household downsizing and simplification support",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Household downsizing and simplification support",
+  "description": "Household downsizing and simplification support",
+  "content": "Scenario: Household downsizing and simplification support\n    Given Margaret is transitioning to retirement household patterns\n    And she may need to simplify or downsize\n    When Margaret considers household changes\n    Then the household_elohim should provide decision support\n    And it should help evaluate different living arrangements\n    And it should calculate cost implications of changes\n    And it should preserve Margaret's autonomy in decisions\n    And practical information should support her choices\n    And the system should help her age in place if she wishes\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:household",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver,spouse",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Household downsizing and simplification support",
+    "ogDescription": "Household downsizing and simplification support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-household-household downsizing and simplification support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household downsizing and simplification support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-household-household downsizing and simplification support",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:household-household downsizing and simplification support",
+    "name": "Household downsizing and simplification support",
+    "description": "Household downsizing and simplification support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

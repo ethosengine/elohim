@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-appellant-scenarios-community-appeal includes community context testimony",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:community-appeal includes community context testimony",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Appeal includes community context testimony",
+  "description": "Appeal includes community context testimony",
+  "content": "Scenario: Appeal includes community context testimony\n    Given I filed an appeal that requires local knowledge to understand\n    And the Constitutional Council needs community context\n    When Community Leader provides testimony about local circumstances\n    Then the leader explains relevant history, cultural factors, and relationships\n    And The context helps council understand what might seem unusual to outsiders\n    And The leader doesn't advocate for outcome, just provides information\n    And The council weighs local context alongside constitutional principles\n    And Community knowledge enriches constitutional interpretation\n    And My appeal benefits from those who understand our community deeply\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,technical_expert",
+    "related_layers:family,district,municipality",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-community",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Appeal includes community context testimony",
+    "ogDescription": "Appeal includes community context testimony",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-appeal includes community context testimony",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appeal includes community context testimony - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-appeal includes community context testimony",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:community-appeal includes community context testimony",
+    "name": "Appeal includes community context testimony",
+    "description": "Appeal includes community context testimony",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

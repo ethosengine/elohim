@@ -1,0 +1,44 @@
+{
+  "id": "scenario-governance-policy-maker-building-international-coalition-resisting-corpora",
+  "contentType": "scenario",
+  "title": "Building international coalition resisting corporate capture",
+  "description": "corporations lobby internationally for favorable regulation; they use different nations to triangulate pressure; I coordinate with international policy maker allies... (10 steps total)",
+  "content": "Given corporations lobby internationally for favorable regulation\nAnd they use different nations to triangulate pressure\nWhen I coordinate with international policy maker allies\nThen we share: intelligence about lobbying tactics\nAnd we coordinate: resistance to capture attempts\nAnd we establish: transparency requirements for global lobbying\nAnd we support: each other under corporate pressure\nAnd we create: race-to-top rather than race-to-bottom\nAnd we demonstrate: democratic solidarity across nations\nAnd we protect: protocol sovereignty through collective action",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "governance",
+    "user_type",
+    "policy_maker",
+    "governance_layer",
+    "global",
+    "related_users",
+    "constitutional_council_member",
+    "related_layers",
+    "nation_state",
+    "elohim_agents",
+    "global_constitutional_agent",
+    "policy-maker",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-global",
+    "source-governance-policy-maker-global"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "governance",
+    "userType": "policy_maker",
+    "featureId": "feature-governance-policy-maker-global",
+    "stepCount": 10,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-governance-policy-maker-global",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.232Z",
+  "updatedAt": "2025-12-05T18:41:24.232Z"
+}

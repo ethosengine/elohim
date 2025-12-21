@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-deliberating on ecological standing constitutional amendment",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-deliberating on ecological standing constitutional amendment",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Deliberating on ecological standing constitutional amendment",
+  "description": "Deliberating on ecological standing constitutional amendment",
+  "content": "Scenario: Deliberating on ecological standing constitutional amendment\n    Given proposal to grant ecosystems legal personhood at scale\n    And this challenges human-centered constitutional framework\n    When we deliberate whether nature has standing in protocol governance\n    Then we hear: indigenous perspectives on human-nature relationships\n    And we consider: ecological science and planetary boundaries\n    And we examine: practical implications for resource allocation\n    And we grapple: with expanding moral circle beyond humanity\n    And we discuss: what dignity means for non-human beings\n    And we create: constitutional framework for planetary flourishing\n    And we show: citizens can address civilizational questions with wisdom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Deliberating on ecological standing constitutional amendment",
+    "ogDescription": "Deliberating on ecological standing constitutional amendment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-deliberating on ecological standing constitutional amendment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Deliberating on ecological standing constitutional amendment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-deliberating on ecological standing constitutional amendment",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-deliberating on ecological standing constitutional amendment",
+    "name": "Deliberating on ecological standing constitutional amendment",
+    "description": "Deliberating on ecological standing constitutional amendment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

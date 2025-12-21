@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-individual-maintaining independence through effective resource management",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:individual-maintaining independence through effective resource management",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Maintaining independence through effective resource management",
+  "description": "Maintaining independence through effective resource management",
+  "content": "Scenario: Maintaining independence through effective resource management\n    Given Frank values his independence and self-sufficiency\n    And he wants to continue contributing without becoming \"a burden\"\n    When Frank uses the Value Scanner over time\n    Then it should help him maintain self-sufficiency and capability\n    And it should optimize his resources for maximum independence\n    And it should connect him to community resources without stigma\n    And it should make his care contributions visible and valued\n    And Frank should experience continued agency and autonomy\n    And the system should support him in aging on his own terms\n    And his continued productivity should be recognized and celebrated\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:individual",
+    "related_users:senior,elderly,middle_aged,worker,volunteer",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Maintaining independence through effective resource management",
+    "ogDescription": "Maintaining independence through effective resource management",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-individual-maintaining independence through effective resource management",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Maintaining independence through effective resource management - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-individual-maintaining independence through effective resource management",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:individual-maintaining independence through effective resource management",
+    "name": "Maintaining independence through effective resource management",
+    "description": "Maintaining independence through effective resource management",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-educational-nutrition education integrated with shopping decisions",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:educational-nutrition education integrated with shopping decisions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Nutrition education integrated with shopping decisions",
+  "description": "Nutrition education integrated with shopping decisions",
+  "content": "Scenario: Nutrition education integrated with shopping decisions\n    Given Aisha wants to eat healthfully\n    And she has limited nutrition knowledge\n    When Aisha selects food items\n    Then the personal_agent should provide nutrition education\n    And it should explain nutritional value of options\n    And it should teach balancing nutrition with budget\n    And it should help her understand dietary needs\n    And learning should integrate seamlessly with decision-making\n    And nutrition literacy should develop through practice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:educational",
+    "related_users:student,adult,worker,mentor",
+    "related_layers:individual,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Nutrition education integrated with shopping decisions",
+    "ogDescription": "Nutrition education integrated with shopping decisions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-educational-nutrition education integrated with shopping decisions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Nutrition education integrated with shopping decisions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-educational-nutrition education integrated with shopping decisions",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:educational-nutrition education integrated with shopping decisions",
+    "name": "Nutrition education integrated with shopping decisions",
+    "description": "Nutrition education integrated with shopping decisions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

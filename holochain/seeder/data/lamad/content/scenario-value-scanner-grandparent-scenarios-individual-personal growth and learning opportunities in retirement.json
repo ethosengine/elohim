@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-individual-personal growth and learning opportunities in retirement",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual-personal growth and learning opportunities in retirement",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Personal growth and learning opportunities in retirement",
+  "description": "Personal growth and learning opportunities in retirement",
+  "content": "Scenario: Personal growth and learning opportunities in retirement\n    Given Margaret is in early retirement with decades of life ahead\n    And she values continued learning and development\n    When the personal_agent tracks Margaret's activities\n    Then it should encourage and support continued education\n    And it should suggest learning opportunities aligned with her interests\n    And it should recognize that retirement is not the end of growth\n    And it should help her balance caregiving with personal development\n    And Margaret should experience retirement as liberation for new pursuits\n    And the system should affirm her capacity for continued growth and contribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:individual",
+    "related_users:senior,middle_aged,parent,child,elderly",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Personal growth and learning opportunities in retirement",
+    "ogDescription": "Personal growth and learning opportunities in retirement",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-individual-personal growth and learning opportunities in retirement",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal growth and learning opportunities in retirement - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-individual-personal growth and learning opportunities in retirement",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual-personal growth and learning opportunities in retirement",
+    "name": "Personal growth and learning opportunities in retirement",
+    "description": "Personal growth and learning opportunities in retirement",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

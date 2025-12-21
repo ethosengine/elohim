@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-municipality-parent advocates for safe routes to school infrastructure",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality-parent advocates for safe routes to school infrastructure",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parent advocates for safe routes to school infrastructure",
+  "description": "Parent advocates for safe routes to school infrastructure",
+  "content": "Scenario: Parent advocates for safe routes to school infrastructure\n    Given the parent's child walks to school along unsafe streets\n    And lacks sidewalks and safe crossings for two blocks\n    When the parent reviews municipal transportation budget\n    Then they see $4M allocated for downtown streetscape improvements\n    And learn zero dollars budgeted for school route safety\n    And connect with other parents whose children walk same routes\n    And present coordinated testimony at city council meeting\n    And municipal infrastructure priorities include children's safety\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,board_member",
+    "related_layers:district,community,educational,ecological",
+    "elohim_agents:public_observer,community_elohim,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parent advocates for safe routes to school infrastructure",
+    "ogDescription": "Parent advocates for safe routes to school infrastructure",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-municipality-parent advocates for safe routes to school infrastructure",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent advocates for safe routes to school infrastructure - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-municipality-parent advocates for safe routes to school infrastructure",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality-parent advocates for safe routes to school infrastructure",
+    "name": "Parent advocates for safe routes to school infrastructure",
+    "description": "Parent advocates for safe routes to school infrastructure",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

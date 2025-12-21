@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-family-request explainable agent reasoning during appeal",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family-request explainable agent reasoning during appeal",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Request explainable agent reasoning during appeal",
+  "description": "Request explainable agent reasoning during appeal",
+  "content": "Scenario: Request explainable agent reasoning during appeal\n    Given Marcus has filed an appeal against his Family Elohim\n    And the agent made a mental health intervention decision\n    When Marcus requests detailed explanation of the decision\n    Then the agent provides layered explanation starting with plain language summary\n    And the agent explains which constitutional principles were applied\n    And the agent shows what data patterns triggered the decision\n    And the agent presents counterfactual scenarios showing what would change outcome\n    And technical audit trail is available for expert review\n    And Marcus can adjust detail level based on his understanding needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual_family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:community,provincial_state",
+    "elohim_agents:family_elohim,individual_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual_family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual-family",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Request explainable agent reasoning during appeal",
+    "ogDescription": "Request explainable agent reasoning during appeal",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-family-request explainable agent reasoning during appeal",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Request explainable agent reasoning during appeal - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-family-request explainable agent reasoning during appeal",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family-request explainable agent reasoning during appeal",
+    "name": "Request explainable agent reasoning during appeal",
+    "description": "Request explainable agent reasoning during appeal",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

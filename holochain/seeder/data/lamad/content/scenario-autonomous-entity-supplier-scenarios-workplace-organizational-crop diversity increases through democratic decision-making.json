@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-workplace-organizational-crop diversity increases through democratic decision-making",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:workplace-organizational-crop diversity increases through democratic decision-making",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Crop diversity increases through democratic decision-making",
+  "description": "Crop diversity increases through democratic decision-making",
+  "content": "Scenario: Crop diversity increases through democratic decision-making\n    Given Tom focused on high-value crops to maximize revenue under thin margins\n    And crop diversity benefits soil health and risk distribution\n    When democratic governance enables longer-term thinking\n    Then workers vote to increase crop diversity supporting soil health\n    And diversification reduces dependence on single crop market fluctuations\n    And biodiversity increases through worker interest in varied cultivation\n    And farm resilience improves through democratic long-term planning\n    And workplace_elohim documents crop diversity benefits for economic and ecological health\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,small_business_owner]",
+    "related_layers:[industry_sector,community,ecological_bioregional]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Crop diversity increases through democratic decision-making",
+    "ogDescription": "Crop diversity increases through democratic decision-making",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-workplace-organizational-crop diversity increases through democratic decision-making",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Crop diversity increases through democratic decision-making - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-workplace-organizational-crop diversity increases through democratic decision-making",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:workplace-organizational-crop diversity increases through democratic decision-making",
+    "name": "Crop diversity increases through democratic decision-making",
+    "description": "Crop diversity increases through democratic decision-making",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

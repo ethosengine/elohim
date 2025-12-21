@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-protecting alex from quality of life assumptions",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:healthcare-medical-protecting alex from quality of life assumptions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Protecting Alex from quality of life assumptions",
+  "description": "Protecting Alex from quality of life assumptions",
+  "content": "Scenario: Protecting Alex from quality of life assumptions\n    Given medical providers often make negative assumptions about disabled people's quality of life\n    And these assumptions can lead to withheld or substandard care\n    When providers discuss treatment options\n    Then the personal_agent should help Alex challenge quality of life assumptions\n    And it should assert that Alex's life is valuable and worth full treatment\n    And it should document when providers suggest limiting care based on disability\n    And Alex should receive same standard of care as non-disabled patients\n    And the protocol should recognize that quality of life bias is discrimination\n    And Alex's right to full medical care should be defended\n    And assumptions about disability should never limit treatment options\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,elderly,caregiver,patient,chronic_illness",
+    "related_layers:individual,household,community,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Protecting Alex from quality of life assumptions",
+    "ogDescription": "Protecting Alex from quality of life assumptions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-protecting alex from quality of life assumptions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Protecting Alex from quality of life assumptions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-protecting alex from quality of life assumptions",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:healthcare-medical-protecting alex from quality of life assumptions",
+    "name": "Protecting Alex from quality of life assumptions",
+    "description": "Protecting Alex from quality of life assumptions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

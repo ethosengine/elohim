@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-educational-journalist develops teacher sources on unsafe conditions",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:educational-journalist develops teacher sources on unsafe conditions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Journalist develops teacher sources on unsafe conditions",
+  "description": "Journalist develops teacher sources on unsafe conditions",
+  "content": "Scenario: Journalist develops teacher sources on unsafe conditions\n    Given teachers report unsafe building conditions\n    And fear retaliation for speaking publicly\n    When the Observer provides secure anonymous channel\n    Then teachers share evidence of mold, failing HVAC, and structural issues\n    And journalist investigates without exposing individual sources\n    And verifies claims through building inspection records\n    And documents district knowledge and inaction\n    And publishes investigation forcing accountability\n    And source protection enables teachers to speak truth\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:educational",
+    "related_users:teacher,parent,student,board_member,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,education_elohim,district_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Journalist develops teacher sources on unsafe conditions",
+    "ogDescription": "Journalist develops teacher sources on unsafe conditions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-educational-journalist develops teacher sources on unsafe conditions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist develops teacher sources on unsafe conditions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-educational-journalist develops teacher sources on unsafe conditions",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:educational-journalist develops teacher sources on unsafe conditions",
+    "name": "Journalist develops teacher sources on unsafe conditions",
+    "description": "Journalist develops teacher sources on unsafe conditions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

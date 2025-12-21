@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-teaching value literacy to own children through value scanner",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-teaching value literacy to own children through value scanner",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teaching value literacy to own children through Value Scanner",
+  "description": "Teaching value literacy to own children through Value Scanner",
+  "content": "Scenario: Teaching value literacy to own children through Value Scanner\n    Given Sarah is raising Tommy (5) and Emma (8)\n    And she wants them to learn care economy principles\n    When Sarah uses the Value Scanner with her children\n    Then she should model value literacy through her actions\n    And Tommy should learn at developmentally appropriate level (wonder-preservation)\n    And Emma should learn at her developmental stage (guided autonomy)\n    And the educational_elohim should support Sarah's teaching\n    And children should internalize care creates value through family practice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teaching value literacy to own children through Value Scanner",
+    "ogDescription": "Teaching value literacy to own children through Value Scanner",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-teaching value literacy to own children through value scanner",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching value literacy to own children through Value Scanner - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-teaching value literacy to own children through value scanner",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-teaching value literacy to own children through value scanner",
+    "name": "Teaching value literacy to own children through Value Scanner",
+    "description": "Teaching value literacy to own children through Value Scanner",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

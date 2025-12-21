@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-neighborhood-connecting to neighborhood resources appropriate for students",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood-connecting to neighborhood resources appropriate for students",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Connecting to neighborhood resources appropriate for students",
+  "description": "Connecting to neighborhood resources appropriate for students",
+  "content": "Scenario: Connecting to neighborhood resources appropriate for students\n    Given Kenji has limited budget and might face emergencies\n    And neighborhoods often have resources (food banks, tool libraries, mutual aid)\n    When the neighborhood_elohim connects Kenji to resources\n    Then it should inform him of neighborhood food bank access\n    And it should show shared resources: \"Neighborhood tool library 3 blocks away\"\n    And it should reduce barriers to accessing community support\n    And it should normalize resource sharing as care economy\n    And the system should connect students to neighborhood safety nets\n    And resource access should be dignified and easy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:neighborhood",
+    "related_users:resident,adult,young_adult,worker",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Connecting to neighborhood resources appropriate for students",
+    "ogDescription": "Connecting to neighborhood resources appropriate for students",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-neighborhood-connecting to neighborhood resources appropriate for students",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connecting to neighborhood resources appropriate for students - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-neighborhood-connecting to neighborhood resources appropriate for students",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood-connecting to neighborhood resources appropriate for students",
+    "name": "Connecting to neighborhood resources appropriate for students",
+    "description": "Connecting to neighborhood resources appropriate for students",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

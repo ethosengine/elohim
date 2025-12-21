@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-community-temporary community building as lifelong skill",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:community-temporary community building as lifelong skill",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Temporary community building as lifelong skill",
+  "description": "Temporary community building as lifelong skill",
+  "content": "Scenario: Temporary community building as lifelong skill\n    Given Kenji's college community is temporary\n    And he will leave after graduation\n    When the personal_agent reflects on community participation\n    Then it should help Kenji see community building as transferable skill\n    And it should validate that temporary communities are still real\n    And it should teach him that community is built through care relationships\n    And the agent should help him understand he'll build community wherever he goes\n    And the system should frame student community as practice for lifelong participation\n    And Kenji should learn that community is created, not just inherited\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:community",
+    "related_users:student,young_adult,adult,community_member",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Temporary community building as lifelong skill",
+    "ogDescription": "Temporary community building as lifelong skill",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-community-temporary community building as lifelong skill",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Temporary community building as lifelong skill - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-community-temporary community building as lifelong skill",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:community-temporary community building as lifelong skill",
+    "name": "Temporary community building as lifelong skill",
+    "description": "Temporary community building as lifelong skill",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

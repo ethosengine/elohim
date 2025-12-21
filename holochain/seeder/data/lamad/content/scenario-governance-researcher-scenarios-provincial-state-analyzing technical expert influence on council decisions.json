@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-provincial-state-analyzing technical expert influence on council decisions",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:provincial-state-analyzing technical expert influence on council decisions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Analyzing technical expert influence on council decisions",
+  "description": "Analyzing technical expert influence on council decisions",
+  "content": "Scenario: Analyzing technical expert influence on council decisions\n    Given councils rely on experts like Dr. Okonkwo for technical understanding\n    And I question whether experts dominate rather than inform\n    When I analyze correlation between expert testimony and council decisions\n    Then I examine: how often councils follow expert recommendations\n    And I identify: cases where councils override expert advice\n    And I assess: whether expert testimony quality predicts council confidence\n    And I explore: whether some experts influence more than others\n    And I investigate: warning signs of expert capture vs healthy advice\n    And My research reveals: whether technical-democratic balance is working\n    And Findings inform: expert testimony guidelines and council training\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,community_leader",
+    "related_layers:community,nation_state,global",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Analyzing technical expert influence on council decisions",
+    "ogDescription": "Analyzing technical expert influence on council decisions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-provincial-state-analyzing technical expert influence on council decisions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Analyzing technical expert influence on council decisions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-provincial-state-analyzing technical expert influence on council decisions",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:provincial-state-analyzing technical expert influence on council decisions",
+    "name": "Analyzing technical expert influence on council decisions",
+    "description": "Analyzing technical expert influence on council decisions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

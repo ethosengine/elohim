@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-municipality-citizen verifies municipal service delivery claims",
+  "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:municipality-citizen verifies municipal service delivery claims",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Citizen verifies municipal service delivery claims",
+  "description": "Citizen verifies municipal service delivery claims",
+  "content": "Scenario: Citizen verifies municipal service delivery claims\n    Given city officials claim streets are maintained equitably\n    And the citizen's neighborhood has persistent potholes\n    When the Observer tracks service delivery patterns\n    Then the citizen sees which neighborhoods receive infrastructure investment\n    And compares response times across different areas\n    And identifies disparities in municipal services\n    And presents evidence for accountability demands\n    And equitable service delivery becomes measurable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:municipality",
+    "related_users:activist,politician,board_member,journalist",
+    "related_layers:community,district,county_regional",
+    "elohim_agents:public_observer,municipal_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Citizen verifies municipal service delivery claims",
+    "ogDescription": "Citizen verifies municipal service delivery claims",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-municipality-citizen verifies municipal service delivery claims",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Citizen verifies municipal service delivery claims - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-municipality-citizen verifies municipal service delivery claims",
+    "identifier": "did:web:elohim.host:content:public-observer:citizen:scenarios:municipality-citizen verifies municipal service delivery claims",
+    "name": "Citizen verifies municipal service delivery claims",
+    "description": "Citizen verifies municipal service delivery claims",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -500,6 +500,48 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        stage('Seed Dev Database') {
+            when {
+                allOf {
+                    changeset "holochain/**"
+                    anyOf {
+                        branch 'dev'
+                        expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                        expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                    }
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        echo "Seeding Holochain dev database..."
+
+                        // Wait for deployment to be ready
+                        sh 'sleep 10'
+
+                        dir('holochain/seeder') {
+                            sh '''#!/bin/bash
+                                set -euo pipefail
+
+                                echo "=== Installing seeder dependencies ==="
+                                npm ci
+
+                                echo ""
+                                echo "=== Running seeder against dev environment ==="
+                                HOLOCHAIN_ADMIN_URL="wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024" \
+                                    npx tsx src/seed.ts
+
+                                echo ""
+                                echo "=== Seeding complete ==="
+                            '''
+                        }
+
+                        echo "Dev database seeded with lamad content"
+                    }
+                }
+            }
+        }
+
         // NOTE: Alpha edge node deployment removed.
         // Consolidated architecture: holochain-dev.elohim.host serves both alpha and staging apps.
         // holochain.elohim.host (production) deployed from main branch.

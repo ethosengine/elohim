@@ -1,0 +1,70 @@
+{
+  "id": "autonomous-entity-organizations-integrity-institute-readme",
+  "did": "did:web:elohim.host:content:autonomous-entity:organizations:integrity-institute:readme",
+  "contentType": "organization",
+  "activityPubType": "Organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "We are a community of integrity professionals, who want a social internet that helps individuals, societies, and democracies thrive. We are here to explore, research, and tech - each other, the platforms, and the world - how to do that best.",
+  "content": "---\nnode_type: organization\norg_id: integrity_institute\nname: \"Integrity Institute\"\nurl: \"https://integrityinstitute.org/\"\ngem_id: \"9dxrmbEj2c6nP2NUJSBi\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: autonomous_entity\nrelated_epics: [social_medium]\n\nepic_relationships:\n  autonomous_entity:\n    inspiration: \"[How Integrity Institute inspires the autonomous_entity epic]\"\n    parallel_work: []\n  social_medium:\n    inspiration: \"[How Integrity Institute inspires the social_medium epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Integrity Institute\n\n## Description\n\nWe are a community of integrity professionals, who want a social internet that helps individuals, societies, and democracies thrive. We are here to explore, research, and tech - each other, the platforms, and the world - how to do that best.\n\n**Publisher:** Integrity Institute\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: autonomous_entity\n\n[Detailed explanation of how Integrity Institute relates to and inspires the autonomous_entity epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: social_medium\n\n[How Integrity Institute also inspires the social_medium epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://integrityinstitute.org/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `autonomous_entity` - Primary focus and location\n- `social_medium` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "autonomous-entity"
+  ],
+  "sourcePath": "autonomous_entity/organizations/integrity_institute/README.md",
+  "relatedNodeIds": [
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "related_epics": [
+      "social_medium"
+    ],
+    "primary_epic": "autonomous_entity",
+    "url": "https://integrityinstitute.org/",
+    "name": "Integrity Institute",
+    "org_id": "integrity_institute",
+    "gem_id": "9dxrmbEj2c6nP2NUJSBi",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Integrity Institute",
+    "epic_relationships": {
+      "autonomous_entity": {
+        "inspiration": "[How Integrity Institute inspires the autonomous_entity epic]",
+        "parallel_work": []
+      },
+      "social_medium": {
+        "inspiration": "[How Integrity Institute inspires the social_medium epic]",
+        "parallel_work": []
+      }
+    }
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "We are a community of integrity professionals, who want a social internet that helps individuals, societies, and democracies thrive. We are here to explore, research, and tech - each other, the platfo",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/autonomous-entity-organizations-integrity-institute-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/autonomous-entity-organizations-integrity-institute-readme",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:organizations:integrity-institute:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "We are a community of integrity professionals, who want a social internet that helps individuals, societies, and democracies thrive. We are here to explore, research, and tech - each other, the platforms, and the world - how to do that best.",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-community-research findings immediately improve local governance",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:community-research findings immediately improve local governance",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Research findings immediately improve local governance",
+  "description": "Research findings immediately improve local governance",
+  "content": "Scenario: Research findings immediately improve local governance\n    Given my research identified that Constitutional Council deliberations improve with certain information tools\n    And I shared findings with Mayor Jamal and council members\n    When community decides to implement recommended improvements\n    Then research serves practical improvement not just academic knowledge\n    And Rapid feedback loop connects insight to implementation\n    And Community sees research benefiting them directly\n    And Researcher-community trust strengthens through mutual value\n    And Knowledge serves flourishing not just publication\n    And Research demonstrates: scholarship in service of democracy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,appellant,technical_expert",
+    "related_layers:provincial_state,nation_state",
+    "elohim_agents:community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-community",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Research findings immediately improve local governance",
+    "ogDescription": "Research findings immediately improve local governance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-community-research findings immediately improve local governance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Research findings immediately improve local governance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-community-research findings immediately improve local governance",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:community-research findings immediately improve local governance",
+    "name": "Research findings immediately improve local governance",
+    "description": "Research findings immediately improve local governance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-community-community advocacy for senior issues and care economy",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:community-community advocacy for senior issues and care economy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community advocacy for senior issues and care economy",
+  "description": "Community advocacy for senior issues and care economy",
+  "content": "Scenario: Community advocacy for senior issues and care economy\n    Given Margaret understands both care economy and senior needs\n    And community policy affects senior quality of life\n    When the community_elohim supports advocacy efforts\n    Then Margaret should be connected to senior advocacy\n    And her voice should inform policy on retirement, care, and aging\n    And care economy principles should be advanced through advocacy\n    And seniors should organize for systemic change\n    And Margaret's generation could reshape retirement policy\n    And political power should be built through care economy visibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:community",
+    "related_users:middle_aged,elderly,retired,volunteer,community_organizer,civic_leader",
+    "related_layers:individual,household,family,neighborhood,municipality",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community advocacy for senior issues and care economy",
+    "ogDescription": "Community advocacy for senior issues and care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-community-community advocacy for senior issues and care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community advocacy for senior issues and care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-community-community advocacy for senior issues and care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:community-community advocacy for senior issues and care economy",
+    "name": "Community advocacy for senior issues and care economy",
+    "description": "Community advocacy for senior issues and care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

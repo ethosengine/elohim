@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-provincial-state-natural experiment comparing communities with vs without protocol",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:provincial-state-natural experiment comparing communities with vs without protocol",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Natural experiment comparing communities with vs without protocol",
+  "description": "Natural experiment comparing communities with vs without protocol",
+  "content": "Scenario: Natural experiment comparing communities with vs without protocol\n    Given some adjacent communities adopted protocol while neighbors didn't\n    And these communities are similar in demographics and economics\n    When I study outcomes comparing adopters to non-adopters\n    Then I isolate: protocol effects from confounding factors\n    And I measure: differences in wellbeing, crisis response, social cohesion\n    And I examine: spillover effects across community boundaries\n    And I analyze: why some communities adopted and others resisted\n    And I provide: quasi-experimental evidence about causality\n    And My findings distinguish: correlation from causation in protocol effects\n    And Evidence serves policymakers deciding whether to support adoption\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,community_leader",
+    "related_layers:community,nation_state,global",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Natural experiment comparing communities with vs without protocol",
+    "ogDescription": "Natural experiment comparing communities with vs without protocol",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-provincial-state-natural experiment comparing communities with vs without protocol",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Natural experiment comparing communities with vs without protocol - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-provincial-state-natural experiment comparing communities with vs without protocol",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:provincial-state-natural experiment comparing communities with vs without protocol",
+    "name": "Natural experiment comparing communities with vs without protocol",
+    "description": "Natural experiment comparing communities with vs without protocol",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

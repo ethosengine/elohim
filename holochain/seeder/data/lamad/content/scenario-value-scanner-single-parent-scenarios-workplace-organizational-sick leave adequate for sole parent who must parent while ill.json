@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-sick leave adequate for sole parent who must parent while ill",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:workplace-organizational-sick leave adequate for sole parent who must parent while ill",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Sick leave adequate for sole parent who must parent while ill",
+  "description": "Sick leave adequate for sole parent who must parent while ill",
+  "content": "Scenario: Sick leave adequate for sole parent who must parent while ill\n    Given Maria still parents three children even when sick\n    And she has no co-parent to take over when she's unwell\n    When Maria needs sick leave\n    Then workplace should provide adequate paid sick leave\n    And leave should cover both her own illness and children's illnesses\n    And sick leave should not be punitive or risk her job security\n    And policies should recognize single parents need more sick leave than partnered workers\n    And Maria should be able to recover and care for sick children without financial penalty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,single_parent,employer,colleague",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Sick leave adequate for sole parent who must parent while ill",
+    "ogDescription": "Sick leave adequate for sole parent who must parent while ill",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-workplace-organizational-sick leave adequate for sole parent who must parent while ill",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Sick leave adequate for sole parent who must parent while ill - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-workplace-organizational-sick leave adequate for sole parent who must parent while ill",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:workplace-organizational-sick leave adequate for sole parent who must parent while ill",
+    "name": "Sick leave adequate for sole parent who must parent while ill",
+    "description": "Sick leave adequate for sole parent who must parent while ill",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

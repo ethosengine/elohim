@@ -1,0 +1,30 @@
+{
+  "id": "community-utility-workers",
+  "did": "did:web:elohim.host:community:utility-workers",
+  "contentType": "organization",
+  "activityPubType": "Group",
+  "title": "Utility Workers",
+  "description": "Community with 1 members",
+  "content": {
+    "name": "Utility Workers",
+    "memberCount": 1,
+    "memberIds": [
+      "human-lenny-lineworker"
+    ]
+  },
+  "contentFormat": "html",
+  "tags": [
+    "community",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-lenny-lineworker"
+  ],
+  "metadata": {
+    "category": "community",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z"
+}

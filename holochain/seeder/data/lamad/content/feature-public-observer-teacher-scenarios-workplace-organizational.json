@@ -1,0 +1,67 @@
+{
+  "id": "feature-public-observer-teacher-scenarios-workplace-organizational",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Teacher Working Conditions and Labor Rights for Teacher",
+  "description": "As a teacher in the public_observer system Operating at the workplace_organizational governance layer I want transparency and advocacy power for working conditions So that teaching becomes sustainable and professionally respected work",
+  "content": "@epic:public_observer\n@user_type:teacher\n@governance_layer:workplace_organizational\n@related_users:union_representative,administrator,board_member,worker\n@related_layers:district,school,provincial_state\n@elohim_agents:public_observer,union_elohim,workplace_elohim\n\nFeature: Teacher Working Conditions and Labor Rights for Teacher\n  As a teacher in the public_observer system\n  Operating at the workplace_organizational governance layer\n  I want transparency and advocacy power for working conditions\n  So that teaching becomes sustainable and professionally respected work\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the teacher user is registered in the system\n    And the workplace_organizational governance context is active\n\n  Scenario: Teacher documents unpaid overtime and workload\n    Given teachers work far beyond contracted hours\n    And administration claims workload is reasonable\n    When teachers track actual working hours through Observer\n    Then aggregated data shows teachers average 52 hours weekly vs 40 contracted\n    And 12 hours weekly of unpaid overtime is documented\n    And workload breakdown reveals what consumes time (grading, paperwork, meetings)\n    And union uses evidence in contract negotiations for compensation or reduction\n    And working conditions transparency creates accountability pressure\n\n  Scenario: Teacher exposes planning time inequities across schools\n    Given some schools provide adequate planning time while others don't\n    And teachers don't know if their conditions are typical or problematic\n    When the Observer documents planning time across district\n    Then teachers see stark disparities (30 min vs 90 min daily planning)\n    And identify which principals prioritize teacher planning time\n    And understand patterns (wealthy schools get more planning time)\n    And coordinate advocacy for district-wide planning time standards\n    And working conditions comparison drives equity\n\n  Scenario: Teacher advocates for mental health and wellness support\n    Given teaching is emotionally demanding work with high burnout\n    And district provides minimal employee mental health support\n    When teachers document wellness needs and impacts through Observer\n    Then data shows 68% of teachers experience burnout symptoms\n    And 82% say job stress affects personal life and health\n    And teachers identify needed supports (counseling, reasonable workload, respect)\n    And union negotiates wellness provisions in contract\n    And teacher wellbeing becomes labor rights priority\n\n  Scenario: Teacher challenges administrator retaliation safely\n    Given a principal retaliates against teachers who question decisions\n    And individual teachers fear speaking up\n    When teachers report concerns anonymously through Observer\n    Then patterns of retaliation become visible (negative evaluations after dissent)\n    And aggregated evidence protects individual teachers\n    And union files grievance based on documented pattern\n    And district addresses hostile administrator behavior\n    And anonymous reporting enables accountability without individual risk\n\n  Scenario: Teacher compares compensation across districts\n    Given teacher salaries vary significantly across nearby districts\n    And teachers lack comparative compensation information\n    When the Observer analyzes teacher compensation regionally\n    Then teachers see their district pays $8,000 below regional average\n    And understand total compensation including benefits and workload\n    And learn which districts have better contracts and why\n    And use evidence in contract negotiations and recruitment crisis advocacy\n    And compensation transparency drives labor market awareness\n\n  Scenario: Teacher documents personal spending on classroom supplies\n    Given teachers spend personal money on student supplies\n    And administration doesn't acknowledge this burden\n    When teachers track personal spending through Observer\n    Then district-wide data shows teachers spend average $600 annually\n    And spending patterns reveal systematic resource inadequacy\n    And teachers document impact on lower-income teachers\n    And advocate for adequate classroom budgets as equity issue\n    And working conditions transparency exposes hidden subsidies teachers provide\n\n  Scenario: Teacher advocates for professional development that actually helps\n    Given district mandates professional development hours\n    But most PD is generic and doesn't improve teaching\n    When teachers evaluate professional development through Observer\n    Then teachers rate 75% of required PD as not useful for their teaching\n    And identify what actually helps (job-embedded coaching, subject-specific content)\n    And document time wasted on compliance PD vs productive professional learning\n    And negotiate for teacher voice in PD planning and evaluation\n    And professional development becomes professional not bureaucratic\n\n  Scenario: Teacher tracks contract implementation and enforcement\n    Given union contract includes working condition provisions\n    But contract enforcement is inconsistent across schools\n    When the Observer monitors contract implementation\n    Then teachers document where contract is violated (planning time, class sizes, duties)\n    And patterns show which administrators ignore contract provisions\n    And union identifies systemic enforcement gaps vs isolated violations\n    And brings accountability data to district and grievance process\n    And contract becomes enforceable through transparency\n\n  Scenario: Teacher builds solidarity across educator roles\n    Given teachers, paraprofessionals, and support staff share labor interests\n    But often lack coordination and mutual understanding\n    When the Observer facilitates cross-role working conditions analysis\n    Then educators see shared challenges (understaffing, disrespect, inadequate pay)\n    And identify how working conditions affect student support\n    And build coalition across educator roles for contract negotiations\n    And solidarity emerges from shared evidence and common interests\n    And labor advocacy becomes comprehensive not siloed\n\n  Scenario: Teacher connects working conditions to student learning\n    Given administrators claim teacher working conditions are \"employee issues\"\n    And dismiss working condition advocacy as self-interested\n    When teachers document connection between conditions and student outcomes\n    Then data shows schools with better planning time have better student results\n    And adequate support staff correlates with student wellbeing\n    And sustainable teacher workload predicts teacher retention and student consistency\n    And working conditions advocacy is reframed as student-centered\n    And labor rights and educational quality become aligned not opposed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:workplace_organizational",
+    "related_users:union_representative,administrator,board_member,worker",
+    "related_layers:district,school,provincial_state",
+    "elohim_agents:public_observer,union_elohim,workplace_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher documents unpaid overtime and workload",
+    "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher exposes planning time inequities across schools",
+    "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher advocates for mental health and wellness support",
+    "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher challenges administrator retaliation safely",
+    "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher compares compensation across districts",
+    "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher documents personal spending on classroom supplies",
+    "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher advocates for professional development that actually helps",
+    "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher tracks contract implementation and enforcement",
+    "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher builds solidarity across educator roles",
+    "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher connects working conditions to student learning",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 10
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teacher Working Conditions and Labor Rights for Teacher",
+    "ogDescription": "As a teacher in the public_observer system Operating at the workplace_organizational governance layer I want transparency and advocacy power for working conditions So that teaching becomes sustainable",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-teacher-scenarios-workplace-organizational",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Teacher Working Conditions and Labor Rights for Teacher - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-teacher-scenarios-workplace-organizational",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational",
+    "name": "Teacher Working Conditions and Labor Rights for Teacher",
+    "description": "As a teacher in the public_observer system Operating at the workplace_organizational governance layer I want transparency and advocacy power for working conditions So that teaching becomes sustainable and professionally respected work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

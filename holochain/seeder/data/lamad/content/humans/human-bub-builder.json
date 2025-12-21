@@ -1,0 +1,70 @@
+{
+  "id": "human-bub-builder",
+  "displayName": "Bub",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "General contractor. Building homes and communities for 25 years. Teaching the next generation the trade.",
+  "avatarUrl": "assets/avatars/human-bub-builder.jpg",
+  "primaryLocation": {
+    "layer": "county_regional",
+    "displayName": "Valley County",
+    "reach": "community",
+    "type": "county_regional"
+  },
+  "organizationIds": [
+    "org-bub-construction"
+  ],
+  "communityIds": [
+    "community-builders-guild",
+    "community-apprenticeship-program",
+    "community-local-church"
+  ],
+  "affinityGroupIds": [
+    "affinity-construction",
+    "affinity-skilled-trades",
+    "affinity-apprenticeship",
+    "affinity-quality-craftsmanship",
+    "affinity-sustainable-building"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-construction",
+    "concept-skilled-trades",
+    "concept-apprenticeship",
+    "concept-quality-craftsmanship",
+    "concept-sustainable-building"
+  ],
+  "publicAttestationIds": [
+    "attestation-general-contractor-license",
+    "attestation-master-builder"
+  ],
+  "relationshipIds": [
+    "rel-0011",
+    "rel-0012",
+    "rel-0013",
+    "rel-0015"
+  ],
+  "trustedConnectionCount": 2,
+  "_metadata": {
+    "category": "local-economy",
+    "governanceLayers": [
+      "community",
+      "workplace",
+      "county_regional"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": null
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

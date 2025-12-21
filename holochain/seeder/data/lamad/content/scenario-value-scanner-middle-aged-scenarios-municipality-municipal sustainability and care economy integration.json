@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-municipality-municipal sustainability and care economy integration",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal sustainability and care economy integration",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Municipal sustainability and care economy integration",
+  "description": "Municipal sustainability and care economy integration",
+  "content": "Scenario: Municipal sustainability and care economy integration\n    Given care economy and ecological sustainability are connected\n    And Robert's care practices affect environmental sustainability\n    And municipal sustainability policy should include care economy\n    When municipal_elohim connects care and sustainability\n    Then it should help Robert see connections between care economy and ecological sustainability\n    And support advocacy for municipal policy that integrates both\n    And recognize that care for people and care for planet are linked\n    And build municipal sustainability that includes care economy principles\n    And demonstrate that sustainable communities require care economy\n    And create municipalities that support both human and ecological flourishing\n    And recognize that his generation can integrate these priorities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:municipality",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:community,neighborhood,workplace_organizational,family",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Municipal sustainability and care economy integration",
+    "ogDescription": "Municipal sustainability and care economy integration",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal sustainability and care economy integration",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal sustainability and care economy integration - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal sustainability and care economy integration",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal sustainability and care economy integration",
+    "name": "Municipal sustainability and care economy integration",
+    "description": "Municipal sustainability and care economy integration",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

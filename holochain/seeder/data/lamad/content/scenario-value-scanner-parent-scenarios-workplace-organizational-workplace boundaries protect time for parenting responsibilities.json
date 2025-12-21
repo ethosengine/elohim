@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-workplace boundaries protect time for parenting responsibilities",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:workplace-organizational-workplace boundaries protect time for parenting responsibilities",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Workplace boundaries protect time for parenting responsibilities",
+  "description": "Workplace boundaries protect time for parenting responsibilities",
+  "content": "Scenario: Workplace boundaries protect time for parenting responsibilities\n    Given Sarah has legitimate parenting obligations\n    And work often encroaches on family time\n    When the workplace_elohim monitors work-life boundaries\n    Then it should flag when work is consuming family time\n    And it should help Sarah protect necessary parenting time\n    And it should validate that parenting obligations are real constraints\n    And the system should support boundary-setting with employer\n    And workplace demands should not be allowed to destroy family care\n    And Sarah should be empowered to say no to overwork\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employer,colleague,child",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Workplace boundaries protect time for parenting responsibilities",
+    "ogDescription": "Workplace boundaries protect time for parenting responsibilities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-workplace-organizational-workplace boundaries protect time for parenting responsibilities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace boundaries protect time for parenting responsibilities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-workplace-organizational-workplace boundaries protect time for parenting responsibilities",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:workplace-organizational-workplace boundaries protect time for parenting responsibilities",
+    "name": "Workplace boundaries protect time for parenting responsibilities",
+    "description": "Workplace boundaries protect time for parenting responsibilities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

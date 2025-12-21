@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-national-track how riverside community evolves over 10 years",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:national-track how riverside community evolves over 10 years",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Track how Riverside community evolves over 10 years",
+  "description": "Track how Riverside community evolves over 10 years",
+  "content": "Scenario: Track how Riverside community evolves over 10 years\n    Given Riverside adopted protocol in Year 1 of study\n    When James returns annually to measure changes\n    Then he tracks wellbeing indicators over full decade\n    And he documents how trust builds incrementally not instantaneously\n    And he observes how civic participation increases over time\n    And he identifies challenges that emerge only after years of operation\n    And he captures transformation that short-term studies miss\n    And longitudinal design reveals cumulative effects\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:national",
+    "related_users:constitutional_council_member,policy_maker,technical_expert",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/national.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-national",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-national",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Track how Riverside community evolves over 10 years",
+    "ogDescription": "Track how Riverside community evolves over 10 years",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-track how riverside community evolves over 10 years",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Track how Riverside community evolves over 10 years - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-track how riverside community evolves over 10 years",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:national-track how riverside community evolves over 10 years",
+    "name": "Track how Riverside community evolves over 10 years",
+    "description": "Track how Riverside community evolves over 10 years",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

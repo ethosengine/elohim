@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-family-family governance includes frank's voice in his own care planning",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-family governance includes frank's voice in his own care planning",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family governance includes Frank's voice in his own care planning",
+  "description": "Family governance includes Frank's voice in his own care planning",
+  "content": "Scenario: Family governance includes Frank's voice in his own care planning\n    Given family makes decisions that affect Frank's future\n    And decisions about his care must honor his autonomy\n    When family_elohim facilitates governance decisions\n    Then Frank must have primary voice in his own care planning\n    And adult children should participate but not dominate\n    And Frank's preferences and values must be centered\n    And family should plan with him, not for him\n    And his decades of life experience should be respected\n    And autonomy should be preserved even as needs increase\n    And family governance should empower, never infantilize\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family governance includes Frank's voice in his own care planning",
+    "ogDescription": "Family governance includes Frank's voice in his own care planning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-family governance includes frank's voice in his own care planning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family governance includes Frank's voice in his own care planning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-family governance includes frank's voice in his own care planning",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-family governance includes frank's voice in his own care planning",
+    "name": "Family governance includes Frank's voice in his own care planning",
+    "description": "Family governance includes Frank's voice in his own care planning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

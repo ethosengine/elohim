@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-learning self-advocacy skills for empowerment",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational-learning self-advocacy skills for empowerment",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Learning self-advocacy skills for empowerment",
+  "description": "Learning self-advocacy skills for empowerment",
+  "content": "Scenario: Learning self-advocacy skills for empowerment\n    Given Jordan wants to speak up for their needs and preferences\n    And self-advocacy skills support autonomy and dignity\n    When Jordan participates in self-advocacy training\n    Then Jordan learns to identify and express their needs\n    And the training uses accessible methods (visual aids, role-play, practice)\n    And Jordan practices advocating in low-stakes situations\n    And Jordan's advocacy voice grows stronger over time\n    And support workers honor Jordan's self-advocacy\n    And Jordan experiences empowerment through skill development\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Learning self-advocacy skills for empowerment",
+    "ogDescription": "Learning self-advocacy skills for empowerment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-educational-learning self-advocacy skills for empowerment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning self-advocacy skills for empowerment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-educational-learning self-advocacy skills for empowerment",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational-learning self-advocacy skills for empowerment",
+    "name": "Learning self-advocacy skills for empowerment",
+    "description": "Learning self-advocacy skills for empowerment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

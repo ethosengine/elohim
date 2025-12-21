@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-community-community care economy education delivered by experienced practitioners",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community care economy education delivered by experienced practitioners",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community care economy education delivered by experienced practitioners",
+  "description": "Community care economy education delivered by experienced practitioners",
+  "content": "Scenario: Community care economy education delivered by experienced practitioners\n    Given Robert has decades of care economy participation\n    And many community members don't understand care economy principles\n    And his experience makes him credible educator\n    When community_elohim identifies education opportunities\n    Then it should connect Robert to community education initiatives\n    And recognize him as qualified to teach care economy practices\n    And support him in leading workshops, presentations, or courses\n    And value his teaching as community care contribution\n    And help community members learn from practitioners, not just theorists\n    And build community care economy literacy through peer education\n    And demonstrate that care economy spreads through experienced advocates\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:community",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,municipality,workplace_organizational,family",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community care economy education delivered by experienced practitioners",
+    "ogDescription": "Community care economy education delivered by experienced practitioners",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community care economy education delivered by experienced practitioners",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community care economy education delivered by experienced practitioners - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community care economy education delivered by experienced practitioners",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community care economy education delivered by experienced practitioners",
+    "name": "Community care economy education delivered by experienced practitioners",
+    "description": "Community care economy education delivered by experienced practitioners",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

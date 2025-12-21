@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-nation-state-evaluating national policy impact on protocol outcomes",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state-evaluating national policy impact on protocol outcomes",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Evaluating national policy impact on protocol outcomes",
+  "description": "Evaluating national policy impact on protocol outcomes",
+  "content": "Scenario: Evaluating national policy impact on protocol outcomes\n    Given Senator Ruiz passed legislation supporting protocol adoption\n    And I want to assess whether policy actually improved outcomes\n    When I analyze communities before and after policy implementation\n    Then I examine: whether funding increased adoption rates\n    And I assess: whether legal recognition improved legitimacy\n    And I measure: whether infrastructure support reduced access barriers\n    And I explore: whether regulatory protection prevented capture\n    And I identify: which policy mechanisms worked and which didn't\n    And My evaluation provides: evidence for continued funding and policy refinement\n    And Research serves: accountability and improvement of democratic policy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:nation_state",
+    "related_users:policy_maker,constitutional_council_member,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Evaluating national policy impact on protocol outcomes",
+    "ogDescription": "Evaluating national policy impact on protocol outcomes",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-nation-state-evaluating national policy impact on protocol outcomes",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Evaluating national policy impact on protocol outcomes - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-nation-state-evaluating national policy impact on protocol outcomes",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state-evaluating national policy impact on protocol outcomes",
+    "name": "Evaluating national policy impact on protocol outcomes",
+    "description": "Evaluating national policy impact on protocol outcomes",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

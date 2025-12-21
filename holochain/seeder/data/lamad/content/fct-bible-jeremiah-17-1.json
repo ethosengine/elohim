@@ -1,0 +1,60 @@
+{
+  "id": "fct-bible-jeremiah-17-1",
+  "contentType": "bible-verse",
+  "title": "Jeremiah 17:1",
+  "description": "Scripture reference used in FCT Module 1",
+  "content": {
+    "reference": "Jeremiah 17:1",
+    "book": "Jeremiah",
+    "chapter": 17,
+    "verseStart": 1,
+    "verseEnd": null,
+    "contextInModule": "Jeremiah 17\n9 The heart is deceitful above all things,\nand desperately sick;\nwho can understand it?\n10 \u201cI the Lord search the heart\nand test the mind,\nto give every man according to his ways,\naccording to the fruit of his deeds.\u201d\n11 Like the partridge that gathers a brood that she did not hatch,\nso is he who gets riches but not by justice;\nin the midst of his days they will leave him,\nand at his end he will be a fool.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "jeremiah",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "thematicContext": "The Church Dilemma"
+  },
+  "createdAt": "2025-11-28T21:10:19.181669",
+  "updatedAt": "2025-11-28T21:10:19.181671",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Jeremiah 17:1",
+    "ogDescription": "Scripture reference used in FCT Module 1",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-jeremiah-17-1",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Jeremiah 17:1 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-jeremiah-17-1",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Jeremiah 17:1",
+    "description": "Scripture reference used in FCT Module 1",
+    "dateCreated": "2025-11-28T21:10:19.181669",
+    "dateModified": "2025-11-28T21:10:19.181671",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

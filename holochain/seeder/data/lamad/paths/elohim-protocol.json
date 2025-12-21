@@ -1,0 +1,576 @@
+{
+  "id": "elohim-protocol",
+  "version": "3.1.0",
+  "title": "Elohim Protocol: Living Documentation",
+  "description": "A comprehensive journey through the Elohim Protocol - from foundational vision to mastery of each domain",
+  "purpose": "Understand the Elohim Protocol and develop deep competency across all five epic domains",
+  "audienceArchetype": "policy-developer-blogger",
+  "createdBy": "system",
+  "contributors": [
+    "steward-governance",
+    "steward-economics",
+    "steward-curriculum"
+  ],
+  "contributorPresences": [
+    {
+      "id": "matthew-dowell",
+      "name": "Matthew Dowell",
+      "role": "Human Steward",
+      "contribution": "Creator and steward of the Elohim Protocol vision. Responsible for the manifesto, constitutional architecture, and integration of care economy principles with decentralized governance.",
+      "status": "claimed",
+      "stewardshipScope": [
+        "protocol-vision",
+        "constitutional-architecture",
+        "care-economy-integration"
+      ]
+    }
+  ],
+  "createdAt": "2025-11-28T21:09:48.296129",
+  "updatedAt": "2025-12-17T00:00:00.000000",
+  "thumbnailUrl": "/images/elohim_protocol_logo_light.png",
+  "thumbnailAlt": "Elohim Protocol logo",
+  "chapters": [
+    {
+      "id": "chapter-1-vision",
+      "title": "The Vision",
+      "description": "Begin with the foundational vision of the Elohim Protocol - understanding why this matters and where you fit",
+      "order": 1,
+      "modules": [
+        {
+          "id": "mod-discovering-vision",
+          "title": "Discovering the Protocol Vision",
+          "description": "Explore the manifesto, understand the five domains, and discover where you fit",
+          "order": 1,
+          "sections": [
+            {
+              "id": "sec-manifesto-foundations",
+              "title": "Digital Infrastructure for Human Flourishing",
+              "description": "The manifesto introduces the crisis we face and the architectural response - connecting it to your values and interests",
+              "order": 1,
+              "estimatedMinutes": 55,
+              "conceptIds": [
+                "manifesto",
+                "elohim-lamad",
+                "quiz-who-are-you"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-protocol-vision-core",
+                  "title": "Protocol Vision",
+                  "type": "core",
+                  "description": "Identify the five epic domains and core principles"
+                },
+                {
+                  "id": "skill-domain-alignment",
+                  "title": "Domain Alignment",
+                  "type": "applied",
+                  "description": "Identify your primary domain of interest based on your values"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "attestationGranted": "protocol-explorer",
+      "estimatedDuration": "55 minutes"
+    },
+    {
+      "id": "chapter-2-governance",
+      "title": "AI Governance",
+      "description": "Constitutional oversight, appeals, and democratic AI governance - how agents serve without ruling",
+      "order": 2,
+      "modules": [
+        {
+          "id": "mod-constitutional-architecture",
+          "title": "Understanding Constitutional Architecture",
+          "description": "Learn how the layered governance model enables both local autonomy and global coherence",
+          "order": 1,
+          "sections": [
+            {
+              "id": "sec-governance-foundations",
+              "title": "The Constitutional Hierarchy",
+              "description": "How governance operates across layers from individual to global, explored through community leader and council perspectives",
+              "order": 1,
+              "estimatedMinutes": 50,
+              "conceptIds": [
+                "governance-epic",
+                "governance-community-leader-readme",
+                "governance-constitutional-council-member-readme",
+                "quiz-governance-foundations"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-governance-layers-core",
+                  "title": "Governance Layers",
+                  "type": "core",
+                  "description": "Identify and explain the constitutional layers"
+                },
+                {
+                  "id": "skill-governance-layers-applied",
+                  "title": "Governance Layers - Scenarios",
+                  "type": "applied",
+                  "description": "Apply layer concepts to governance scenarios"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mod-stakeholder-navigation",
+          "title": "Navigating the System as a Stakeholder",
+          "description": "Understand how different roles interact with constitutional governance",
+          "order": 2,
+          "sections": [
+            {
+              "id": "sec-policy-and-appeals",
+              "title": "Policy Making and the Appeals Process",
+              "description": "How policy makers propose changes and how individuals escalate concerns - the two sides of constitutional navigation",
+              "order": 1,
+              "estimatedMinutes": 55,
+              "conceptIds": [
+                "governance-policy-maker-readme",
+                "governance-appellant-readme",
+                "governance-researcher-readme",
+                "governance-technical-expert-readme"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-policy-interface-core",
+                  "title": "Policy Maker Tools",
+                  "type": "core",
+                  "description": "Understand policy maker capabilities and constraints"
+                },
+                {
+                  "id": "skill-appeals-core",
+                  "title": "Appeals Process",
+                  "type": "core",
+                  "description": "Navigate the appeals hierarchy"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mod-constitutional-reasoning",
+          "title": "Demonstrating Constitutional Reasoning",
+          "description": "Apply constitutional principles to novel scenarios and complex trade-offs",
+          "order": 3,
+          "sections": [
+            {
+              "id": "sec-constitutional-application",
+              "title": "Reasoning Through Trade-offs",
+              "description": "Practice applying constitutional principles when values conflict across governance layers",
+              "order": 1,
+              "estimatedMinutes": 45,
+              "conceptIds": [
+                "scenario-governance-appellant-scenarios-community-appeal escalation path when community review insufficient",
+                "scenario-governance-appellant-scenarios-community-community elohim identifies clear error in family elohim decision",
+                "scenario-governance-appellant-scenarios-community-multiple appellants challenge same community decision",
+                "assessment-constitutional-reasoning"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-constitutional-reasoning",
+                  "title": "Constitutional Reasoning",
+                  "type": "synthesis",
+                  "description": "Apply constitutional principles to complex scenarios"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "attestationGranted": "governance-practitioner",
+      "estimatedDuration": "150 minutes"
+    },
+    {
+      "id": "chapter-3-value-scanner",
+      "title": "Value Scanner",
+      "description": "Supporting caregivers and recognizing invisible work - when a boy buying strawberries changes everything",
+      "order": 3,
+      "modules": [
+        {
+          "id": "mod-invisible-economy",
+          "title": "Recognizing the Invisible Economy",
+          "description": "Discover the vast landscape of unrecognized care work and how to make it visible",
+          "order": 1,
+          "sections": [
+            {
+              "id": "sec-care-foundations",
+              "title": "The Scale of Invisible Work",
+              "description": "Understanding care economy principles through the perspectives of those who give and receive care",
+              "order": 1,
+              "estimatedMinutes": 50,
+              "conceptIds": [
+                "value-scanner-epic",
+                "value-scanner-caregiver-readme",
+                "value-scanner-parent-readme",
+                "value-scanner-elderly-readme",
+                "quiz-care-economics"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-care-economics-core",
+                  "title": "Care Economics",
+                  "type": "core",
+                  "description": "Explain the scale and nature of invisible work"
+                },
+                {
+                  "id": "skill-rea-principles",
+                  "title": "REA Value Recognition",
+                  "type": "applied",
+                  "description": "Apply REA principles to care work scenarios"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mod-personal-values",
+          "title": "Connecting to Personal Values",
+          "description": "Reflect on your own values around care, contribution, and recognition",
+          "order": 2,
+          "sections": [
+            {
+              "id": "sec-values-reflection",
+              "title": "Your Values Hierarchy",
+              "description": "Identify your personal values and connect them to care work recognition through multiple life stages",
+              "order": 1,
+              "estimatedMinutes": 40,
+              "conceptIds": [
+                "value-scanner-adult-readme",
+                "value-scanner-worker-readme",
+                "assessment-personal-values",
+                "assessment-values-hierarchy"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-values-articulation",
+                  "title": "Values Articulation",
+                  "type": "applied",
+                  "description": "Articulate your personal values hierarchy"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "attestationGranted": "values-explorer",
+      "estimatedDuration": "90 minutes"
+    },
+    {
+      "id": "chapter-4-public-observer",
+      "title": "Public Observer",
+      "description": "Civic participation and public oversight - when AI becomes your town's memory",
+      "order": 4,
+      "modules": [
+        {
+          "id": "mod-civic-participation",
+          "title": "Understanding Civic Participation",
+          "description": "How everyday citizens participate in AI oversight and democratic accountability",
+          "order": 1,
+          "sections": [
+            {
+              "id": "sec-citizen-role",
+              "title": "The Citizen's Role in AI Oversight",
+              "description": "Public observer responsibilities from citizen, journalist, and community organizer perspectives",
+              "order": 1,
+              "estimatedMinutes": 45,
+              "conceptIds": [
+                "public-observer-epic",
+                "public-observer-citizen-readme",
+                "public-observer-journalist-readme",
+                "public-observer-community-organizer-readme",
+                "elohim-observer-protocol"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-civic-role-core",
+                  "title": "Public Observer Role",
+                  "type": "core",
+                  "description": "Understand public observer responsibilities"
+                },
+                {
+                  "id": "skill-observation-mechanics",
+                  "title": "Observation Mechanics",
+                  "type": "core",
+                  "description": "Explain how observation protocols function"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mod-civic-engagement-practice",
+          "title": "Practicing Civic Engagement",
+          "description": "Apply civic participation principles to real oversight scenarios",
+          "order": 2,
+          "sections": [
+            {
+              "id": "sec-civic-readiness",
+              "title": "Civic Engagement in Action",
+              "description": "See how different stakeholders engage in civic oversight - from activists to politicians to educators",
+              "order": 1,
+              "estimatedMinutes": 35,
+              "conceptIds": [
+                "public-observer-activist-readme",
+                "public-observer-politician-readme",
+                "public-observer-teacher-readme",
+                "quiz-civic-engagement"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-civic-engagement-synthesis",
+                  "title": "Civic Engagement",
+                  "type": "synthesis",
+                  "description": "Apply civic engagement principles to scenarios"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "attestationGranted": "civic-participant",
+      "estimatedDuration": "80 minutes"
+    },
+    {
+      "id": "chapter-5-autonomous-entity",
+      "title": "Autonomous Entity",
+      "description": "Transforming workplace ownership and governance - when AI buys your boss",
+      "order": 5,
+      "modules": [
+        {
+          "id": "mod-reimagining-ownership",
+          "title": "Reimagining Organizational Ownership",
+          "description": "Explore how autonomous entities transform traditional ownership and governance structures",
+          "order": 1,
+          "sections": [
+            {
+              "id": "sec-ownership-principles",
+              "title": "Beyond Traditional Ownership",
+              "description": "Autonomous entity principles explored through worker, manager, and investor perspectives",
+              "order": 1,
+              "estimatedMinutes": 50,
+              "conceptIds": [
+                "autonomous-entity-epic",
+                "autonomous-entity-worker-readme",
+                "autonomous-entity-manager-readme",
+                "autonomous-entity-community-investor-readme"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-ownership-models-core",
+                  "title": "Ownership Models",
+                  "type": "core",
+                  "description": "Explain autonomous entity principles"
+                },
+                {
+                  "id": "skill-worker-agency-core",
+                  "title": "Worker Agency",
+                  "type": "core",
+                  "description": "Understand worker ownership models and rights"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mod-ownership-in-practice",
+          "title": "Ownership Transformation in Practice",
+          "description": "See how autonomous entities work from different stakeholder perspectives",
+          "order": 2,
+          "sections": [
+            {
+              "id": "sec-stakeholder-transitions",
+              "title": "Stakeholder Transitions",
+              "description": "How different participants experience the transition to distributed ownership",
+              "order": 1,
+              "estimatedMinutes": 45,
+              "conceptIds": [
+                "autonomous-entity-franchise-operator-readme",
+                "autonomous-entity-small-business-owner-readme",
+                "autonomous-entity-customer-readme",
+                "autonomous-entity-supplier-readme",
+                "quiz-distributed-ownership"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-ownership-synthesis",
+                  "title": "Ownership Synthesis",
+                  "type": "synthesis",
+                  "description": "Apply ownership principles to organizational scenarios"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "attestationGranted": "ownership-explorer",
+      "estimatedDuration": "95 minutes"
+    },
+    {
+      "id": "chapter-6-social-medium",
+      "title": "Social Medium",
+      "description": "Building healthier digital communication spaces - when social media becomes sacred space",
+      "order": 6,
+      "modules": [
+        {
+          "id": "mod-platform-dynamics",
+          "title": "Understanding Platform Dynamics",
+          "description": "How platform design shapes human behavior and what dignity-preserving alternatives look like",
+          "order": 1,
+          "sections": [
+            {
+              "id": "sec-medium-message",
+              "title": "The Medium is the Message",
+              "description": "Understanding attention economics through the eyes of activists, moderators, and content creators",
+              "order": 1,
+              "estimatedMinutes": 45,
+              "conceptIds": [
+                "social-medium-epic",
+                "social-medium-activist-readme",
+                "social-medium-community-moderator-readme",
+                "social-medium-content-creator-readme"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-platform-dynamics-core",
+                  "title": "Platform Dynamics",
+                  "type": "core",
+                  "description": "Explain how platform design shapes behavior"
+                },
+                {
+                  "id": "skill-stakeholder-needs-core",
+                  "title": "Stakeholder Needs",
+                  "type": "core",
+                  "description": "Identify needs of different platform participants"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mod-vulnerable-populations",
+          "title": "Protecting Vulnerable Populations",
+          "description": "How dignity-preserving platforms serve those most at risk in digital spaces",
+          "order": 2,
+          "sections": [
+            {
+              "id": "sec-vulnerable-perspectives",
+              "title": "Voices Often Unheard",
+              "description": "Understanding platform needs from the perspective of children, elders, and displaced persons",
+              "order": 1,
+              "estimatedMinutes": 40,
+              "conceptIds": [
+                "social-medium-child-readme",
+                "social-medium-elder-readme",
+                "social-medium-displaced-person-readme",
+                "social-medium-refugee-readme"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-vulnerable-needs",
+                  "title": "Vulnerable Population Needs",
+                  "type": "applied",
+                  "description": "Design for vulnerable populations in digital spaces"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mod-social-medium-application",
+          "title": "Applying Dignity-Preserving Principles",
+          "description": "Practice applying social medium principles to real platform scenarios",
+          "order": 3,
+          "sections": [
+            {
+              "id": "sec-digital-dignity",
+              "title": "Designing for Digital Dignity",
+              "description": "Apply dignity-preserving design patterns through scenarios and assessment",
+              "order": 1,
+              "estimatedMinutes": 30,
+              "conceptIds": [
+                "scenario-social-medium-activist-activist-creates-community-organizing-space",
+                "social-medium-articles-new-public-readme",
+                "quiz-digital-dignity"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-dignity-synthesis",
+                  "title": "Digital Dignity Synthesis",
+                  "type": "synthesis",
+                  "description": "Apply dignity-preserving principles to platform design"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "attestationGranted": "dignity-advocate",
+      "estimatedDuration": "115 minutes"
+    },
+    {
+      "id": "chapter-7-economic-coordination",
+      "title": "Economic Coordination",
+      "description": "REA-based value flows, creator recognition, and network economics - De Beers' Cybersyn on P2P",
+      "order": 7,
+      "modules": [
+        {
+          "id": "mod-network-economics",
+          "title": "Understanding Network Economics",
+          "description": "How value flows through the protocol using REA principles and creator recognition",
+          "order": 1,
+          "sections": [
+            {
+              "id": "sec-value-flows",
+              "title": "REA-Based Value Flows",
+              "description": "Understanding Resource-Event-Agent accounting and how it connects to care economy visibility",
+              "order": 1,
+              "estimatedMinutes": 40,
+              "conceptIds": [
+                "economic-coordination-epic",
+                "care-economy-visibility",
+                "hrea-care-economy-intro",
+                "hrea-overview"
+              ],
+              "assessments": [
+                {
+                  "id": "skill-rea-accounting-core",
+                  "title": "REA Accounting",
+                  "type": "core",
+                  "description": "Explain REA principles for value flows"
+                },
+                {
+                  "id": "skill-creator-recognition",
+                  "title": "Creator Recognition",
+                  "type": "applied",
+                  "description": "Apply creator recognition mechanisms to content scenarios"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "estimatedDuration": "40 minutes"
+    }
+  ],
+  "tags": [
+    "foundation",
+    "protocol",
+    "comprehensive",
+    "onboarding"
+  ],
+  "difficulty": "beginner-to-intermediate",
+  "estimatedDuration": "6-8 hours",
+  "visibility": "public",
+  "pathType": "journey",
+  "attestationsGranted": [
+    "protocol-explorer",
+    "governance-practitioner",
+    "values-explorer",
+    "civic-participant",
+    "ownership-explorer",
+    "dignity-advocate"
+  ]
+}

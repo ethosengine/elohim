@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-family-teen coordinates her schedule with family needs",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:family-teen coordinates her schedule with family needs",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teen coordinates her schedule with family needs",
+  "description": "Teen coordinates her schedule with family needs",
+  "content": "Scenario: Teen coordinates her schedule with family needs\n    Given Jasmine works part-time with variable hours\n    And the family has commitments that require coordination\n    And Jordan needs after-school supervision\n    When Jasmine's work schedule is set\n    Then her personal_agent should communicate with family_elohim\n    And flag potential conflicts: \"Jordan needs supervision Tuesday 3-6pm\"\n    And help Jasmine balance her work commitments with family responsibilities\n    And recognize her care contributions when she adjusts her schedule for family\n    And support the family in coordinating across multiple schedules\n    And demonstrate that family functioning requires mutual care and flexibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:family",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teen coordinates her schedule with family needs",
+    "ogDescription": "Teen coordinates her schedule with family needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-family-teen coordinates her schedule with family needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teen coordinates her schedule with family needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-family-teen coordinates her schedule with family needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:family-teen coordinates her schedule with family needs",
+    "name": "Teen coordinates her schedule with family needs",
+    "description": "Teen coordinates her schedule with family needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

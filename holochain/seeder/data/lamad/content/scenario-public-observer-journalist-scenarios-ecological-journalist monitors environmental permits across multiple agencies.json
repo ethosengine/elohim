@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-ecological-journalist monitors environmental permits across multiple agencies",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:ecological-journalist monitors environmental permits across multiple agencies",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Journalist monitors environmental permits across multiple agencies",
+  "description": "Journalist monitors environmental permits across multiple agencies",
+  "content": "Scenario: Journalist monitors environmental permits across multiple agencies\n    Given the journalist covers regional environmental issues\n    And must track city, county, state, and federal environmental agencies\n    When the Observer monitors all environmental agencies simultaneously\n    Then the journalist reviews all permit applications and approvals\n    And receives alerts for controversial permits and violations\n    And tracks cumulative environmental impacts across jurisdictions\n    And comprehensive environmental surveillance becomes sustainable\n    And polluters cannot hide in bureaucratic complexity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:ecological",
+    "related_users:activist,citizen,scientist,politician",
+    "related_layers:municipality,county_regional,provincial_state,bioregional",
+    "elohim_agents:public_observer,ecological_elohim,pattern_elohim,research_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Journalist monitors environmental permits across multiple agencies",
+    "ogDescription": "Journalist monitors environmental permits across multiple agencies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-ecological-journalist monitors environmental permits across multiple agencies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist monitors environmental permits across multiple agencies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-ecological-journalist monitors environmental permits across multiple agencies",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:ecological-journalist monitors environmental permits across multiple agencies",
+    "name": "Journalist monitors environmental permits across multiple agencies",
+    "description": "Journalist monitors environmental permits across multiple agencies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

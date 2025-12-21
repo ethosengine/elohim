@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-community-contributing to community through volunteer work",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community-contributing to community through volunteer work",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Contributing to community through volunteer work",
+  "description": "Contributing to community through volunteer work",
+  "content": "Scenario: Contributing to community through volunteer work\n    Given the local food bank needs volunteers\n    And Jordan wants to help community members in need\n    When Jordan volunteers at the food bank\n    Then tasks are adapted to Jordan's capabilities (sorting, carrying)\n    And volunteer coordinators provide clear, accessible instructions\n    And Jordan's work genuinely contributes to food bank operations\n    And Jordan accumulates care tokens for volunteer service\n    And Jordan is recognized as a valued volunteer, not as someone being helped\n    And Jordan experiences being a community care provider\n    And Jordan's contributions are celebrated authentically\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-community",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Contributing to community through volunteer work",
+    "ogDescription": "Contributing to community through volunteer work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-community-contributing to community through volunteer work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Contributing to community through volunteer work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-community-contributing to community through volunteer work",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community-contributing to community through volunteer work",
+    "name": "Contributing to community through volunteer work",
+    "description": "Contributing to community through volunteer work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

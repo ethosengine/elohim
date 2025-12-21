@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-my healthcare amendment proposal passes convention",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-my healthcare amendment proposal passes convention",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "My healthcare amendment proposal passes convention",
+  "description": "My healthcare amendment proposal passes convention",
+  "content": "Scenario: My healthcare amendment proposal passes convention\n    Given my nursing experience revealed healthcare as dignity issue\n    And I proposed amendment recognizing healthcare as constitutional right\n    When convention deliberates my proposal\n    Then delegates hear: my testimony about dignity in healthcare\n    And they discuss: healthcare across diverse economic contexts\n    And they debate: what healthcare dignity requires constitutionally\n    And they refine: language to work across cultures and nations\n    And they vote: and my amendment passes\n    And I have: shaped constitution for human-AI partnership\n    And I know: ordinary nurse from small town helped write law for humanity\n    And I embody: democratic possibility that anyone can govern\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "My healthcare amendment proposal passes convention",
+    "ogDescription": "My healthcare amendment proposal passes convention",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-my healthcare amendment proposal passes convention",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "My healthcare amendment proposal passes convention - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-my healthcare amendment proposal passes convention",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-my healthcare amendment proposal passes convention",
+    "name": "My healthcare amendment proposal passes convention",
+    "description": "My healthcare amendment proposal passes convention",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

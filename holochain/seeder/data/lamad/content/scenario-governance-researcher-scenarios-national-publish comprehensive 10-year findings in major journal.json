@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-national-publish comprehensive 10-year findings in major journal",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:national-publish comprehensive 10-year findings in major journal",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Publish comprehensive 10-year findings in major journal",
+  "description": "Publish comprehensive 10-year findings in major journal",
+  "content": "Scenario: Publish comprehensive 10-year findings in major journal\n    Given James has completed decade-long study\n    When he prepares comprehensive research report\n    Then he documents methodology with full transparency\n    And he presents both positive findings and disappointments\n    And he acknowledges uncertainties and limitations\n    And he makes full dataset available for replication\n    And he publishes open access in multiple formats\n    And he contributes definitive evidence about democratic AI governance at scale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:national",
+    "related_users:constitutional_council_member,policy_maker,technical_expert",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/national.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-national",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-national",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Publish comprehensive 10-year findings in major journal",
+    "ogDescription": "Publish comprehensive 10-year findings in major journal",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-publish comprehensive 10-year findings in major journal",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Publish comprehensive 10-year findings in major journal - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-publish comprehensive 10-year findings in major journal",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:national-publish comprehensive 10-year findings in major journal",
+    "name": "Publish comprehensive 10-year findings in major journal",
+    "description": "Publish comprehensive 10-year findings in major journal",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

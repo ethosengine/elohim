@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-community-retired residents as experienced community leaders and organizers",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-retired residents as experienced community leaders and organizers",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Retired residents as experienced community leaders and organizers",
+  "description": "Retired residents as experienced community leaders and organizers",
+  "content": "Scenario: Retired residents as experienced community leaders and organizers\n    Given Frank has decades of community experience\n    And he understands community dynamics and history\n    When the community_elohim facilitates leadership\n    Then Frank's accumulated experience should position him for leadership\n    And his knowledge should inform community organizing and policy\n    And community should actively seek his participation in decision-making\n    And decades of community investment should confer legitimate authority\n    And elder leadership should be welcomed and valued\n    And Frank should experience himself as community leader, not marginal participant\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:community",
+    "related_users:volunteer,senior,worker,organizer,neighbor,elder",
+    "related_layers:neighborhood,municipality,individual,household",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Retired residents as experienced community leaders and organizers",
+    "ogDescription": "Retired residents as experienced community leaders and organizers",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-retired residents as experienced community leaders and organizers",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Retired residents as experienced community leaders and organizers - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-retired residents as experienced community leaders and organizers",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-retired residents as experienced community leaders and organizers",
+    "name": "Retired residents as experienced community leaders and organizers",
+    "description": "Retired residents as experienced community leaders and organizers",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

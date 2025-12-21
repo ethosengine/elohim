@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-ecological-bioregional-waste reduction and circular economy practices tracked",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:ecological-bioregional-waste reduction and circular economy practices tracked",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Waste reduction and circular economy practices tracked",
+  "description": "Waste reduction and circular economy practices tracked",
+  "content": "Scenario: Waste reduction and circular economy practices tracked\n    Given Jasmine practices waste reduction and composting\n    And she chooses products with minimal packaging\n    When bioregional_elohim tracks her waste and resource patterns\n    Then it should recognize waste reduction as bioregional care work\n    And calculate diversion from landfill and resource conservation\n    And value her participation in circular economy practices\n    And connect individual waste choices to bioregional resource flows\n    And demonstrate that waste reduction is care for ecosystem health\n    And support transition from linear to circular economic thinking\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:ecological_bioregional",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Waste reduction and circular economy practices tracked",
+    "ogDescription": "Waste reduction and circular economy practices tracked",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-ecological-bioregional-waste reduction and circular economy practices tracked",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Waste reduction and circular economy practices tracked - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-ecological-bioregional-waste reduction and circular economy practices tracked",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:ecological-bioregional-waste reduction and circular economy practices tracked",
+    "name": "Waste reduction and circular economy practices tracked",
+    "description": "Waste reduction and circular economy practices tracked",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

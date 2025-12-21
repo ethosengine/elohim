@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-appellant-scenarios-provincial-state-rapid appeal review during regional crisis",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:provincial-state-rapid appeal review during regional crisis",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Rapid appeal review during regional crisis",
+  "description": "Rapid appeal review during regional crisis",
+  "content": "Scenario: Rapid appeal review during regional crisis\n    Given a regional crisis requires many urgent agent decisions\n    And I need to appeal a crisis-related decision quickly\n    When Regional Constitutional Council convenes emergency session\n    Then they balance speed with deliberation quality\n    And They evaluate if emergency protocols were properly invoked\n    And They examine if crisis urgency justified departures from normal process\n    And They provide expedited review (48-72 hours) while maintaining rigor\n    And They create precedent for crisis governance\n    And My appeal ensures democratic accountability even under emergency conditions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,technical_expert,policy_maker,researcher",
+    "related_layers:community,nation_state",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Rapid appeal review during regional crisis",
+    "ogDescription": "Rapid appeal review during regional crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-provincial-state-rapid appeal review during regional crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Rapid appeal review during regional crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-provincial-state-rapid appeal review during regional crisis",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:provincial-state-rapid appeal review during regional crisis",
+    "name": "Rapid appeal review during regional crisis",
+    "description": "Rapid appeal review during regional crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

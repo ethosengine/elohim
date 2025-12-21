@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-peer reviewing other expert testimony for quality assurance",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state-peer reviewing other expert testimony for quality assurance",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Peer reviewing other expert testimony for quality assurance",
+  "description": "Peer reviewing other expert testimony for quality assurance",
+  "content": "Scenario: Peer reviewing other expert testimony for quality assurance\n    Given multiple experts advise National Council\n    And peer review prevents individual capture or error\n    When I review fellow expert's testimony\n    Then I assess: technical accuracy and completeness\n    And I identify: bias or conflicts of interest\n    And I check: if alternative interpretations exist\n    And I verify: adherence to testimony guidelines\n    And I provide: constructive critique\n    And I accept: critique of my own testimony\n    And peer review: maintains expertise quality and independence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Peer reviewing other expert testimony for quality assurance",
+    "ogDescription": "Peer reviewing other expert testimony for quality assurance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-nation-state-peer reviewing other expert testimony for quality assurance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Peer reviewing other expert testimony for quality assurance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-nation-state-peer reviewing other expert testimony for quality assurance",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state-peer reviewing other expert testimony for quality assurance",
+    "name": "Peer reviewing other expert testimony for quality assurance",
+    "description": "Peer reviewing other expert testimony for quality assurance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

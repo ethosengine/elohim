@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-individual-social connection preserved against isolation",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-social connection preserved against isolation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Social connection preserved against isolation",
+  "description": "Social connection preserved against isolation",
+  "content": "Scenario: Social connection preserved against isolation\n    Given intensive caregiving creates profound isolation\n    And James loses social connections as care intensifies\n    When the personal_agent monitors social isolation\n    Then it should recognize dangerous isolation patterns\n    And it should prompt James to maintain key relationships\n    And it should suggest respite opportunities for social connection\n    And it should connect him to other caregivers who understand\n    And social isolation should be actively prevented\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:individual",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Social connection preserved against isolation",
+    "ogDescription": "Social connection preserved against isolation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-social connection preserved against isolation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Social connection preserved against isolation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-social connection preserved against isolation",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-social connection preserved against isolation",
+    "name": "Social connection preserved against isolation",
+    "description": "Social connection preserved against isolation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

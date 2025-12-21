@@ -1,0 +1,57 @@
+{
+  "id": "human-nancy-neighbor",
+  "displayName": "Nancy",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "Long-time resident of Tech Valley. Community organizer, block captain, and believer in the power of neighbors helping neighbors.",
+  "avatarUrl": "assets/avatars/human-nancy-neighbor.jpg",
+  "primaryLocation": {
+    "layer": "neighborhood",
+    "displayName": "Tech Valley",
+    "reach": "community",
+    "type": "neighborhood"
+  },
+  "communityIds": [
+    "community-neighborhood-association",
+    "community-local-church"
+  ],
+  "affinityGroupIds": [
+    "affinity-community-organizing",
+    "affinity-local-government",
+    "affinity-neighborhood-safety",
+    "affinity-mutual-aid"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-community-organizing",
+    "concept-local-government",
+    "concept-neighborhood-safety",
+    "concept-mutual-aid"
+  ],
+  "relationshipIds": [
+    "rel-0006",
+    "rel-0018"
+  ],
+  "trustedConnectionCount": 0,
+  "_metadata": {
+    "category": "community",
+    "governanceLayers": [
+      "community",
+      "neighborhood"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": null
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

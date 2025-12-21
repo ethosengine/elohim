@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-study group coordination as care economy practice",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-study group coordination as care economy practice",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Study group coordination as care economy practice",
+  "description": "Study group coordination as care economy practice",
+  "content": "Scenario: Study group coordination as care economy practice\n    Given Kenji participates in study groups with peers\n    And study groups require coordination, hosting, and emotional labor\n    When the educational_elohim tracks study group participation\n    Then it should recognize hosting study group as care contribution\n    And it should value coordinating schedules and managing group dynamics\n    And it should accumulate care tokens for creating learning spaces\n    And study group labor should be visible and valued\n    And the system should recognize collective learning as care economy\n    And academic collaboration should be understood as mutual care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Study group coordination as care economy practice",
+    "ogDescription": "Study group coordination as care economy practice",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-study group coordination as care economy practice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Study group coordination as care economy practice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-study group coordination as care economy practice",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-study group coordination as care economy practice",
+    "name": "Study group coordination as care economy practice",
+    "description": "Study group coordination as care economy practice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

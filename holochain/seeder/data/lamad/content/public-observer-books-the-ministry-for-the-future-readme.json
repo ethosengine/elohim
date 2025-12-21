@@ -1,0 +1,62 @@
+{
+  "id": "public-observer-books-the-ministry-for-the-future-readme",
+  "did": "did:web:elohim.host:content:public-observer:books:the-ministry-for-the-future:readme",
+  "contentType": "book-chapter",
+  "activityPubType": "Document",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "ONE OF BARACK OBAMA\u2019S FAVORITE BOOKS OF THE YEAR \u201cThe best science-fiction nonfiction novel I\u2019ve ever read.\u201d --Jonathan Lethem \u201cIf I could get policymakers, and citizens, everywhere to read just one book this year, it would be Kim Stanley Robinson\u2019s The Ministry for the Future.\u201d --Ezra Klein (\u2026",
+  "content": "---\nnode_type: book\norg_id: the_ministry_for_the_future\nname: \"The Ministry for the Future\"\nurl: \"https://www.google.com/books/edition/_/VHZGzQEACAAJ?sa=X&ved=2ahUKEwi_pvnGhYL2AhUYhHIEHayKCDcQre8FegQIKBAb\"\ngem_id: \"Ds7Stmd6z7KuGHmYyGHr\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: public_observer\nrelated_epics: []\n\nepic_relationships:\n  public_observer:\n    inspiration: \"[How The Ministry for the Future inspires the public_observer epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# The Ministry for the Future\n\n## Description\n\nONE OF BARACK OBAMA\u2019S FAVORITE BOOKS OF THE YEAR \u201cThe best science-fiction nonfiction novel I\u2019ve ever read.\u201d --Jonathan Lethem \u201cIf I could get policymakers, and citizens, everywhere to read just one book this year, it would be Kim Stanley Robinson\u2019s The Ministry for the Future.\u201d --Ezra Klein (\u2026\n\n**Publisher:** Google Books\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: public_observer\n\n[Detailed explanation of how The Ministry for the Future relates to and inspires the public_observer epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.google.com/books/edition/_/VHZGzQEACAAJ?sa=X&ved=2ahUKEwi_pvnGhYL2AhUYhHIEHayKCDcQre8FegQIKBAb\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `public_observer` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "public-observer",
+    "book-chapter"
+  ],
+  "sourcePath": "public_observer/books/the_ministry_for_the_future/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "public-observer",
+    "related_epics": [],
+    "primary_epic": "public_observer",
+    "url": "https://www.google.com/books/edition/_/VHZGzQEACAAJ?sa=X&ved=2ahUKEwi_pvnGhYL2AhUYhHIEHayKCDcQre8FegQIKBAb",
+    "name": "The Ministry for the Future",
+    "org_id": "the_ministry_for_the_future",
+    "gem_id": "Ds7Stmd6z7KuGHmYyGHr",
+    "node_type": "book",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Google Books",
+    "epic_relationships": {
+      "public_observer": {
+        "inspiration": "[How The Ministry for the Future inspires the public_observer epic]",
+        "parallel_work": []
+      }
+    }
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "ONE OF BARACK OBAMA\u2019S FAVORITE BOOKS OF THE YEAR \u201cThe best science-fiction nonfiction novel I\u2019ve ever read.\u201d --Jonathan Lethem \u201cIf I could get policymakers, and citizens, everywhere to read just one b",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/public-observer-books-the-ministry-for-the-future-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book-chapter.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Chapter",
+    "@id": "https://elohim-protocol.org/content/public-observer-books-the-ministry-for-the-future-readme",
+    "identifier": "did:web:elohim.host:content:public-observer:books:the-ministry-for-the-future:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "ONE OF BARACK OBAMA\u2019S FAVORITE BOOKS OF THE YEAR \u201cThe best science-fiction nonfiction novel I\u2019ve ever read.\u201d --Jonathan Lethem \u201cIf I could get policymakers, and citizens, everywhere to read just one book this year, it would be Kim Stanley Robinson\u2019s The Ministry for the Future.\u201d --Ezra Klein (\u2026",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

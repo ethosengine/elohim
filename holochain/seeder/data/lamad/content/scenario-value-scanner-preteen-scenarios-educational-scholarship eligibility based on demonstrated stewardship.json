@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-educational-scholarship eligibility based on demonstrated stewardship",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:educational-scholarship eligibility based on demonstrated stewardship",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Scholarship eligibility based on demonstrated stewardship",
+  "description": "Scholarship eligibility based on demonstrated stewardship",
+  "content": "Scenario: Scholarship eligibility based on demonstrated stewardship\n    Given Marcus demonstrates exceptional capability and commitment\n    And scholarships should go to deserving students\n    When scholarship decisions are made\n    Then Marcus's household stewardship should be powerful evidence\n    And his care contributions should qualify as exceptional achievement\n    And community should invest in young people proving their capability\n    And care economy framework should influence scholarship criteria\n    And his real-world responsibility should be valued over traditional metrics\n    And educational opportunity should flow to those demonstrating care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:educational",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Scholarship eligibility based on demonstrated stewardship",
+    "ogDescription": "Scholarship eligibility based on demonstrated stewardship",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-educational-scholarship eligibility based on demonstrated stewardship",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Scholarship eligibility based on demonstrated stewardship - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-educational-scholarship eligibility based on demonstrated stewardship",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:educational-scholarship eligibility based on demonstrated stewardship",
+    "name": "Scholarship eligibility based on demonstrated stewardship",
+    "description": "Scholarship eligibility based on demonstrated stewardship",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

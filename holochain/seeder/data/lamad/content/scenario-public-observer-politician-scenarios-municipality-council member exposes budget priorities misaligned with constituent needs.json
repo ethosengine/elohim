@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-municipality-council member exposes budget priorities misaligned with constituent needs",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:municipality-council member exposes budget priorities misaligned with constituent needs",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Council member exposes budget priorities misaligned with constituent needs",
+  "description": "Council member exposes budget priorities misaligned with constituent needs",
+  "content": "Scenario: Council member exposes budget priorities misaligned with constituent needs\n    Given the politician suspects budget doesn't reflect community priorities\n    When the Observer analyzes municipal spending patterns\n    Then they see infrastructure investment concentrated in affluent neighborhoods\n    And identify underinvestment in working-class areas\n    And calculate service delivery disparities by district\n    And present evidence-based budget amendments\n    And advocate for equitable resource distribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,journalist,developer_interests,board_member",
+    "related_layers:community,district,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,constituent_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Council member exposes budget priorities misaligned with constituent needs",
+    "ogDescription": "Council member exposes budget priorities misaligned with constituent needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-municipality-council member exposes budget priorities misaligned with constituent needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Council member exposes budget priorities misaligned with constituent needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-municipality-council member exposes budget priorities misaligned with constituent needs",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:municipality-council member exposes budget priorities misaligned with constituent needs",
+    "name": "Council member exposes budget priorities misaligned with constituent needs",
+    "description": "Council member exposes budget priorities misaligned with constituent needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-family-family cultural values shape child's economic reasoning",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:family-family cultural values shape child's economic reasoning",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family cultural values shape child's economic reasoning",
+  "description": "Family cultural values shape child's economic reasoning",
+  "content": "Scenario: Family cultural values shape child's economic reasoning\n    Given Emma's family has specific cultural framework\n    And these values are configured in family_elohim\n    When Emma makes value decisions\n    Then guidance should align with family cultural context\n    And her personal_agent should reinforce family values\n    And economic literacy should be culturally appropriate\n    And the protocol should serve family's chosen framework\n    And diverse family cultures should be respected\n    And value formation should honor family identity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,neighborhood,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family cultural values shape child's economic reasoning",
+    "ogDescription": "Family cultural values shape child's economic reasoning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-family-family cultural values shape child's economic reasoning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family cultural values shape child's economic reasoning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-family-family cultural values shape child's economic reasoning",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:family-family cultural values shape child's economic reasoning",
+    "name": "Family cultural values shape child's economic reasoning",
+    "description": "Family cultural values shape child's economic reasoning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

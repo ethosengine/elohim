@@ -1,0 +1,30 @@
+{
+  "id": "unit-five-epics",
+  "title": "The Five Epics: A Map of Systemic Change",
+  "content": "# The Five Epics: A Map of Systemic Change\n\n## Why Five Domains?\n\nThe Elohim Protocol doesn't try to solve everything at once. It identifies five interconnected domains where systemic change is both necessary and achievable. Each \"epic\" addresses a specific coordination failure while contributing to the whole.\n\nThink of them as pressure points in the current system—places where targeted intervention can cascade into broader transformation.\n\n## Overview of the Five Epics\n\n### 🏛️ Epic 1: AI Governance\n\n**The Problem**: AI systems increasingly shape our lives, but we have no democratic way to govern them.\n\n**The Solution**: Constitutional frameworks for AI that distribute oversight across stakeholders, with explicit appeals processes and separation of powers.\n\n**For policy makers**: This is the regulatory framework you've been looking for—one that actually works at AI speed.\n\n**Key concepts**: Constitutional councils, separation of powers, appeals process, AI oversight\n\n---\n\n### 📊 Epic 2: Value Scanner\n\n**The Problem**: Economic systems only see market transactions, missing the vast care economy that sustains society.\n\n**The Solution**: Technology that makes invisible value visible—caregiving, mentorship, ecological stewardship—without forcing it into market logic.\n\n**For content creators**: Imagine if the value you create for your community was actually recognized, not just your ad impressions.\n\n**Key concepts**: Care economy, REA accounting, value flows, recognition systems\n\n---\n\n### 👁️ Epic 3: Public Observer\n\n**The Problem**: Civic participation has been reduced to voting every few years while decisions happen behind closed doors.\n\n**The Solution**: Continuous, contextual participation where affected stakeholders have voice and visibility into decisions that affect them.\n\n**For influencers**: Your audience isn't just consumers—they're citizens who need better tools for collective action.\n\n**Key concepts**: Transparency, civic participation, trust networks, observer protocol\n\n---\n\n### 🏢 Epic 4: Autonomous Entity\n\n**The Problem**: Workplaces still operate like 19th-century hierarchies, while workers have 21st-century expectations.\n\n**The Solution**: Distributed governance models that give workers genuine agency, supported by AI that serves their interests.\n\n**For developers**: This is the DAO concept, but grounded in labor economics and worker experience.\n\n**Key concepts**: Worker ownership, distributed governance, cooperative structures, workplace democracy\n\n---\n\n### 💬 Epic 5: Social Medium\n\n**The Problem**: Social media optimizes for engagement, not wellbeing, fragmenting public discourse and extracting attention.\n\n**The Solution**: Communication platforms designed around relationships and dignity, not advertising metrics.\n\n**For everyone**: What if your social feed helped you flourish instead of addicting you?\n\n**Key concepts**: Humane design, relationship-centered communication, moderation, digital dignity\n\n---\n\n## How the Epics Connect\n\nThese aren't separate initiatives—they're interdependent:\n\n```\nAI Governance ←→ All epics need AI oversight\n     ↓\nValue Scanner → Enables fair economic participation\n     ↓\nPublic Observer → Provides transparency and accountability\n     ↓\nAutonomous Entity → Transforms how we organize work\n     ↓\nSocial Medium → Transforms how we communicate\n```\n\nEach epic creates conditions for the others to succeed. Constitutional AI makes value scanning trustworthy. Value recognition enables worker agency. Civic participation legitimizes all the rest.\n\n## Choosing Your Entry Point\n\nYou don't need to master all five epics. Start where your expertise and interest align:\n\n- **Policy makers**: Start with AI Governance\n- **Developers**: Start with Value Scanner or Autonomous Entity\n- **Influencers/Creators**: Start with Social Medium or Public Observer\n- **Everyone**: Start with whatever sparks your curiosity\n\nThe following chapters dive deep into each epic.",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/manifesto.md",
+  "tags": [
+    "vision",
+    "epics",
+    "overview",
+    "unit",
+    "governance",
+    "value-scanner",
+    "public-observer",
+    "autonomous-entity",
+    "social-medium"
+  ],
+  "relationships": [
+    {
+      "target": "manifesto",
+      "type": "DERIVED_FROM"
+    },
+    {
+      "target": "unit-core-principles",
+      "type": "DEPENDS_ON"
+    }
+  ],
+  "createdAt": "2025-12-17T01:30:44.347Z",
+  "updatedAt": "2025-12-17T01:30:54.747Z"
+}

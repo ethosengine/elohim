@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-neighbors checking on elderly without surveillance feeling",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-neighbors checking on elderly without surveillance feeling",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighbors checking on elderly without surveillance feeling",
+  "description": "Neighbors checking on elderly without surveillance feeling",
+  "content": "Scenario: Neighbors checking on elderly without surveillance feeling\n    Given Helen lives alone and neighbors are concerned\n    And informal neighborhood care networks exist\n    When neighbors check on Helen's wellbeing\n    Then the neighborhood_elohim should coordinate wellness checks\n    And neighbors should be guided to check naturally: \"Saw you haven't been out\"\n    And Helen should experience concern, not surveillance\n    And her privacy should be respected\n    And neighborhood care should feel organic, not institutional\n    And connection should preserve dignity\n    And the protocol should facilitate genuine community care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighbors checking on elderly without surveillance feeling",
+    "ogDescription": "Neighbors checking on elderly without surveillance feeling",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-neighbors checking on elderly without surveillance feeling",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighbors checking on elderly without surveillance feeling - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-neighbors checking on elderly without surveillance feeling",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-neighbors checking on elderly without surveillance feeling",
+    "name": "Neighbors checking on elderly without surveillance feeling",
+    "description": "Neighbors checking on elderly without surveillance feeling",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

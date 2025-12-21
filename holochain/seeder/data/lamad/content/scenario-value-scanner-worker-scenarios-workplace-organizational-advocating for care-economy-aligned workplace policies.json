@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-advocating for care-economy-aligned workplace policies",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational-advocating for care-economy-aligned workplace policies",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Advocating for care-economy-aligned workplace policies",
+  "description": "Advocating for care-economy-aligned workplace policies",
+  "content": "Scenario: Advocating for care-economy-aligned workplace policies\n    Given my workplace treats me as labor unit without care needs\n    When I want to advocate for care-supportive policies\n    Then the protocol should help me propose specific policies\n    Such as paid sick leave, predictable scheduling, living wages, meal provisions\n    And provide evidence for why these policies support workers' flourishing\n    And help me communicate needs to management\n    And support pushing for workplace transformation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Advocating for care-economy-aligned workplace policies",
+    "ogDescription": "Advocating for care-economy-aligned workplace policies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-workplace-organizational-advocating for care-economy-aligned workplace policies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advocating for care-economy-aligned workplace policies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-workplace-organizational-advocating for care-economy-aligned workplace policies",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational-advocating for care-economy-aligned workplace policies",
+    "name": "Advocating for care-economy-aligned workplace policies",
+    "description": "Advocating for care-economy-aligned workplace policies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

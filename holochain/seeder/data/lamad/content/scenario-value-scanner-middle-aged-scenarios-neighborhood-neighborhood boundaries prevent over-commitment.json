@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood boundaries prevent over-commitment",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood boundaries prevent over-commitment",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood boundaries prevent over-commitment",
+  "description": "Neighborhood boundaries prevent over-commitment",
+  "content": "Scenario: Neighborhood boundaries prevent over-commitment\n    Given Robert has limited capacity amid other demands\n    And neighborhood participation could expand indefinitely\n    And sustainable participation requires boundaries\n    When neighborhood_elohim monitors Robert's neighborhood engagement\n    Then it should recognize when neighborhood demands exceed his capacity\n    And help him set healthy boundaries on neighborhood participation\n    And surface when he's taking on too much neighborhood responsibility\n    And support him in saying no to additional commitments\n    And ensure neighborhood participation enhances rather than depletes him\n    And protect him from burnout through over-commitment\n    And help him maintain sustainable neighborhood engagement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:neighborhood",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,community,family,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood boundaries prevent over-commitment",
+    "ogDescription": "Neighborhood boundaries prevent over-commitment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood boundaries prevent over-commitment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood boundaries prevent over-commitment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood boundaries prevent over-commitment",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood boundaries prevent over-commitment",
+    "name": "Neighborhood boundaries prevent over-commitment",
+    "description": "Neighborhood boundaries prevent over-commitment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

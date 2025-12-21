@@ -1,0 +1,60 @@
+{
+  "id": "fct-bible-exodus-19-5-6",
+  "contentType": "bible-verse",
+  "title": "Exodus 19:5-6",
+  "description": "Scripture reference used in FCT Module 3",
+  "content": {
+    "reference": "Exodus 19:5-6",
+    "book": "Exodus",
+    "chapter": 19,
+    "verseStart": 5,
+    "verseEnd": 6,
+    "contextInModule": "Exodus 19:5-6: Through the covenant at Sinai, God sets apart the Israelites as a \"kingdom of priests and a holy nation,\" tasked with upholding divine laws that include moral and ethical standards, such as the prohibition of practices like human sacrifice found among their neighbors.\nNew Testament Themes:\nThe Kingdom of Heaven and a New Way of Living:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 3 - A Problem Well Stated - Exponential Techonolgy, Our Divided Attention.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "exodus",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-03-problem-well-stated"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-03-problem-well-stated",
+    "thematicContext": "A Problem Well Stated"
+  },
+  "createdAt": "2025-11-28T21:10:19.195654",
+  "updatedAt": "2025-11-28T21:10:19.195655",
+  "did": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Exodus 19:5-6",
+    "ogDescription": "Scripture reference used in FCT Module 3",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-exodus-19-5-6",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Exodus 19:5-6 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-exodus-19-5-6",
+    "identifier": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+    "name": "Exodus 19:5-6",
+    "description": "Scripture reference used in FCT Module 3",
+    "dateCreated": "2025-11-28T21:10:19.195654",
+    "dateModified": "2025-11-28T21:10:19.195655",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

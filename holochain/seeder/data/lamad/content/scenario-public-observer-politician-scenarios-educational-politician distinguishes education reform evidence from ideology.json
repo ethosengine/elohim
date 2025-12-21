@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-educational-politician distinguishes education reform evidence from ideology",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:educational-politician distinguishes education reform evidence from ideology",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Politician distinguishes education reform evidence from ideology",
+  "description": "Politician distinguishes education reform evidence from ideology",
+  "content": "Scenario: Politician distinguishes education reform evidence from ideology\n    Given competing reform proposals claim research support\n    And ideological advocacy masks as evidence-based policy\n    When the Observer evaluates education research rigorously\n    Then they see which reforms have strong evidence base\n    And identify advocacy research versus peer-reviewed findings\n    And understand limitations and contexts of research claims\n    And compare reform outcomes across diverse implementation sites\n    And make evidence-based policy decisions beyond ideological fights\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,board_member,administrator,activist",
+    "related_layers:district,municipality,provincial_state,school",
+    "elohim_agents:public_observer,education_elohim,district_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Politician distinguishes education reform evidence from ideology",
+    "ogDescription": "Politician distinguishes education reform evidence from ideology",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-educational-politician distinguishes education reform evidence from ideology",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician distinguishes education reform evidence from ideology - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-educational-politician distinguishes education reform evidence from ideology",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:educational-politician distinguishes education reform evidence from ideology",
+    "name": "Politician distinguishes education reform evidence from ideology",
+    "description": "Politician distinguishes education reform evidence from ideology",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}
