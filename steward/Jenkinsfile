@@ -125,22 +125,30 @@ spec:
                             // TODO: Enable copyArtifacts when Copy Artifact plugin is installed
                             // For now, copy from local mono-repo build outputs if available
 
-                            // Try to find hApp from holochain pipeline output
-                            def happFound = sh(script: '''
-                                if [ -f ../holochain/dna/lamad-spike/lamad-spike.happ ]; then
-                                    cp ../holochain/dna/lamad-spike/lamad-spike.happ workdir/lamad.happ
-                                    echo "hApp copied from local holochain build"
-                                    exit 0
-                                else
-                                    echo "No local hApp found - build will fail at compile time"
-                                    exit 1
-                                fi
-                            ''', returnStatus: true)
+                            // Build hApp from mono-repo holochain directory
+                            sh '''#!/usr/bin/env bash
+                                set -euo pipefail
 
-                            if (happFound != 0) {
-                                echo "WARNING: No hApp available. Rust build will fail."
-                                echo "Run holochain pipeline first, or install Copy Artifact plugin."
-                            }
+                                # Fix git safe.directory for nix
+                                export HOME="${HOME:-/root}"
+                                mkdir -p "$HOME"
+                                echo "[safe]" > "$HOME/.gitconfig"
+                                echo "    directory = *" >> "$HOME/.gitconfig"
+                                export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+
+                                cd ../holochain/dna/lamad-spike
+
+                                echo "Building hApp from mono-repo..."
+                                nix develop --accept-flake-config --command bash -c '
+                                    set -euo pipefail
+                                    cargo build --release --target wasm32-unknown-unknown
+                                    hc dna pack . -o workdir/lamad_spike.dna
+                                    hc app pack workdir -o lamad-spike.happ
+                                '
+
+                                cp lamad-spike.happ ../../../steward/workdir/lamad.happ
+                                echo "hApp built and copied to steward/workdir/"
+                            '''
 
                             // Try to find UI from elohim-app build output
                             def uiFound = sh(script: '''

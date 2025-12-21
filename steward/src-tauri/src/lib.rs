@@ -1,3 +1,4 @@
+use std::io::Cursor;
 use std::path::PathBuf;
 use tauri_plugin_holochain::{HolochainExt, HolochainPluginConfig, NetworkConfig, vec_to_locked, AppBundle};
 use tauri::{AppHandle, Listener};
@@ -7,7 +8,7 @@ const APP_ID: &str = "lamad";
 /// Load the Lamad hApp bundle from embedded bytes
 pub fn lamad_happ() -> AppBundle {
     let bytes = include_bytes!("../../workdir/lamad.happ");
-    AppBundle::decode(bytes).expect("Failed to decode lamad happ")
+    AppBundle::unpack(Cursor::new(bytes)).expect("Failed to unpack lamad happ")
 }
 
 /// Configure the Holochain network for Elohim
