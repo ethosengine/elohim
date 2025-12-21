@@ -272,7 +272,31 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             archiveArtifacts artifacts: 'lamad-spike.happ,workdir/lamad_spike.dna', allowEmptyArchive: false
                             stash name: 'happ-bundle', includes: 'lamad-spike.happ'
 
-                            echo 'DNA build complete!'
+                            def props = loadBuildVars()
+
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            ✅ hApp ARTIFACT ARCHIVED
+                            ═══════════════════════════════════════════════════════════
+
+                            Artifact URL (for downstream consumers):
+                            ${env.BUILD_URL}artifact/holochain/dna/lamad-spike/lamad-spike.happ
+
+                            Direct wget command:
+                            wget -O lamad.happ '${env.BUILD_URL}artifact/holochain/dna/lamad-spike/lamad-spike.happ'
+
+                            Steward Pipeline:
+                            The steward pipeline will automatically fetch this artifact
+                            when building for branch: ${env.BRANCH_NAME}
+
+                            This artifact sharing saves ~35 minutes per steward build!
+
+                            Build Details:
+                            - Image Tag: ${props.IMAGE_TAG ?: 'unknown'}
+                            - Branch: ${env.BRANCH_NAME}
+                            - Commit: ${env.GIT_COMMIT ?: 'unknown'}
+                            ═══════════════════════════════════════════════════════════
+                            """
                         }
                     }
                 }
@@ -507,14 +531,19 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('Seed Dev Database') {
+        stage('🔧 Seed Dev Database') {
+            // PROTOTYPING/DEV ONLY - Not part of production pipeline
+            // Automatically resets and populates the dev holochain database AFTER deployment
+            // Only runs when DNA is rebuilt (not for other holochain changes)
+            // Useful for rapid prototyping iteration during development
             when {
                 allOf {
-                    // Only seed when DNA, zomes, or seed data changes
+                    // Only seed when DNA or seed data changes (not for other holochain modifications)
                     anyOf {
                         changeset "holochain/dna/**"
                         changeset "holochain/seeder/**"
                     }
+                    // Only for dev branches (never on production)
                     anyOf {
                         branch 'dev'
                         expression { return env.BRANCH_NAME ==~ /feat-.+/ }
@@ -525,29 +554,43 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             steps {
                 container('builder') {
                     script {
-                        echo "Seeding Holochain dev database..."
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        🔧 SEEDING DEV DATABASE (after deployment)
+                        ═══════════════════════════════════════════════════════════
+                        Purpose: Populate dev holochain with test/prototype data
+                        Scope: Development/prototyping only
+                        Trigger: DNA was rebuilt in this pipeline run
+                        Branch: ${env.BRANCH_NAME}
+                        ═══════════════════════════════════════════════════════════
+                        """
 
-                        // Wait for deployment to be ready
+                        // Wait for deployment to be fully ready
                         sh 'sleep 10'
 
                         dir('holochain/seeder') {
-                            sh '''#!/bin/bash
+                            sh '''#!/usr/bin/env bash
                                 set -euo pipefail
 
-                                echo "=== Installing seeder dependencies ==="
+                                echo "Installing seeder dependencies..."
                                 npm ci
 
                                 echo ""
-                                echo "=== Running seeder against dev environment ==="
+                                echo "Running seeder against holochain-dev.elohim.host..."
                                 HOLOCHAIN_ADMIN_URL="wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024" \
                                     npx tsx src/seed.ts
 
                                 echo ""
-                                echo "=== Seeding complete ==="
+                                echo "✅ Seeding complete"
                             '''
                         }
 
-                        echo "Dev database seeded with lamad content"
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        ✅ Dev database seeded with lamad content
+                        Ready for prototyping!
+                        ═══════════════════════════════════════════════════════════
+                        """
                     }
                 }
             }

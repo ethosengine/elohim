@@ -127,6 +127,155 @@ spec:
             }
         }
 
+        stage('🚀 Orchestrate Mono-Repo Builds') {
+            steps {
+                container('builder') {
+                    script {
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        📋 ELOHIM MONO-REPO BUILD ORCHESTRATION
+                        ═══════════════════════════════════════════════════════════
+                        Branch: ${env.BRANCH_NAME}
+                        Commit: ${env.GIT_COMMIT ?: 'unknown'}
+                        Build: ${env.BUILD_NUMBER}
+                        ═══════════════════════════════════════════════════════════
+                        """
+
+                        // Detect changesets
+                        def changesetElohimApp = sh(
+                            script: '''
+                                git diff --name-only HEAD~1 2>/dev/null | \
+                                grep -E "^(elohim-app/|elohim-library/|Jenkinsfile|VERSION)" || echo ""
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        def changesetHolochain = sh(
+                            script: '''
+                                git diff --name-only HEAD~1 2>/dev/null | \
+                                grep -E "^holochain/" || echo ""
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        def changesetSteward = sh(
+                            script: '''
+                                git diff --name-only HEAD~1 2>/dev/null | \
+                                grep -E "^(steward/|holochain/dna/|elohim-app/src/|VERSION)" || echo ""
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        // Build matrix - determine which pipelines to trigger
+                        def buildMatrix = [
+                            'elohim-app': !changesetElohimApp.isEmpty() ||
+                                env.BRANCH_NAME == 'main' ||
+                                env.BRANCH_NAME == 'staging' ||
+                                env.BRANCH_NAME == 'dev',
+                            'holochain': !changesetHolochain.isEmpty(),
+                            'steward': !changesetSteward.isEmpty()
+                        ]
+
+                        echo """
+                        📊 CHANGESET ANALYSIS
+                        ─────────────────────────────────────────────────────────────
+                        """
+
+                        if (!changesetElohimApp.isEmpty()) {
+                            echo "  elohim-app changes detected:"
+                            changesetElohimApp.split('\n').each { echo "    - \$it" }
+                        }
+
+                        if (!changesetHolochain.isEmpty()) {
+                            echo "  holochain changes detected:"
+                            changesetHolochain.split('\n').each { echo "    - \$it" }
+                        }
+
+                        if (!changesetSteward.isEmpty()) {
+                            echo "  steward changes detected:"
+                            changesetSteward.split('\n').each { echo "    - \$it" }
+                        }
+
+                        echo """
+                        🎯 BUILD MATRIX
+                        ─────────────────────────────────────────────────────────────
+                        ${buildMatrix.collect { k, v ->
+                            "  ${v ? '✅ BUILD' : '⏭️  SKIP'} ${k}"
+                        }.join('\n')}
+                        ═══════════════════════════════════════════════════════════
+                        """
+
+                        // Update build description with matrix
+                        currentBuild.description = buildMatrix.collect { k, v ->
+                            "${v ? '✅' : '⏭️'} ${k}"
+                        }.join(' | ')
+
+                        // Trigger child pipelines (non-blocking)
+                        def triggers = [:]
+
+                        if (buildMatrix['holochain']) {
+                            triggers['holochain'] = {
+                                try {
+                                    echo "▶️  Triggering holochain pipeline for branch: ${env.BRANCH_NAME}"
+                                    build(
+                                        job: "elohim-holochain/${env.BRANCH_NAME}",
+                                        wait: false,
+                                        propagate: false,
+                                        parameters: [
+                                            string(name: 'PARENT_BUILD_ID', value: env.BUILD_ID ?: '0'),
+                                            string(name: 'TRIGGERED_BY', value: 'orchestrator')
+                                        ]
+                                    )
+                                    echo "✅ Holochain pipeline triggered"
+                                } catch (Exception e) {
+                                    echo "⚠️  Failed to trigger holochain pipeline: \${e.message}"
+                                    // Non-blocking - continue even if trigger fails
+                                }
+                            }
+                        }
+
+                        if (buildMatrix['steward']) {
+                            triggers['steward'] = {
+                                try {
+                                    echo "▶️  Triggering steward pipeline for branch: ${env.BRANCH_NAME}"
+                                    build(
+                                        job: "elohim-steward/${env.BRANCH_NAME}",
+                                        wait: false,
+                                        propagate: false,
+                                        parameters: [
+                                            string(name: 'PARENT_BUILD_ID', value: env.BUILD_ID ?: '0'),
+                                            string(name: 'TRIGGERED_BY', value: 'orchestrator')
+                                        ]
+                                    )
+                                    echo "✅ Steward pipeline triggered"
+                                } catch (Exception e) {
+                                    echo "⚠️  Failed to trigger steward pipeline: \${e.message}"
+                                    // Non-blocking - continue even if trigger fails
+                                }
+                            }
+                        }
+
+                        if (triggers) {
+                            echo """
+                            🔄 TRIGGERING PIPELINES
+                            ─────────────────────────────────────────────────────────────
+                            """
+                            parallel triggers
+                            echo """
+                            ✅ Child pipelines triggered successfully (non-blocking)
+                            ═══════════════════════════════════════════════════════════
+                            """
+                        } else {
+                            echo """
+                            ℹ️  No child pipelines needed for this change
+                            ═══════════════════════════════════════════════════════════
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Setup Version') {
             steps {
                 container('builder'){
