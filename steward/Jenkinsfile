@@ -71,11 +71,6 @@ spec:
 
     parameters {
         string(
-            name: 'PARENT_BUILD_ID',
-            defaultValue: '',
-            description: 'Build ID of parent orchestrator (for tracking)'
-        )
-        string(
             name: 'HAPP_VERSION',
             defaultValue: 'dev-latest',
             description: 'hApp version/tag to fetch from holochain pipeline'
@@ -105,7 +100,6 @@ spec:
                         📦 STEWARD BUILD CONTEXT
                         ═══════════════════════════════════════════════════════════
                         Branch: ${env.BRANCH_NAME}
-                        Parent Build: ${params.PARENT_BUILD_ID ?: 'none (manual trigger)'}
                         hApp Version: ${params.HAPP_VERSION}
                         UI Version: ${params.UI_VERSION}
                         Publish Release: ${params.PUBLISH_RELEASE}

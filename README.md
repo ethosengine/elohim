@@ -127,33 +127,41 @@ This monorepo uses a three-pipeline Jenkins architecture to manage builds effici
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ ROOT ORCHESTRATOR PIPELINE                                  │
-│ (/projects/elohim/Jenkinsfile)                              │
-│                                                             │
-│ • Detects changesets (git diff analysis)                    │
-│ • Builds matrix: which pipelines to trigger?                │
-│ • Non-blocking triggers to child pipelines                  │
-│ • Updates build description with status                     │
+│ GITHUB WEBHOOK (on monorepo push)                           │
+│ Triggers all 3 Jenkins multibranch jobs                     │
 └─────────────────────────────────────────────────────────────┘
-        ↓ Triggers (non-blocking)
-        │
+        ↓
     ┌───┴────┬──────────┬───────────┐
     │        │          │           │
     ▼        ▼          ▼           │
 ┌────────┐┌──────────┐┌─────────┐  │
 │Elohim  ││Holochain││Steward  │  │
 │App     ││Pipeline ││Pipeline │  │
-│Build   ││         ││         │  │
+│Job     ││Job      ││Job      │  │
 └────────┘└──────────┘└─────────┘  │
     │        │          │          │
-    │        └──────────┼──────────┘
-    │                   │
-    │          Artifact Sharing
-    │          (hApp binary)
-    │                   │
-    │    ┌──────────────┘
-    │    │
-    ▼    ▼
+    │    ┌───┴──────────┘          │
+    │    │                         │
+    │    │  Artifact Sharing       │
+    │    │  (hApp from holochain)  │
+    │    │                         │
+    │    └─────────┐               │
+    │              │               │
+    ▼              ▼               │
+   Steward        (Builds with     │
+   Fetches        fetched artifact)│
+   hApp           30 sec vs 40 min │
+                                  │
+ROOT JOB ORCHESTRATOR:             │
+┌──────────────────────────────────┘
+│ 🚀 Detects changesets
+│ 📊 Shows build matrix (what will run)
+│ 📡 Updates description with status
+│ ℹ️  Provides visibility into decisions
+└──────────────────────────────────
+
+Each pipeline respects its own when{} conditions:
+    ▼
    Docker Images → Harbor Registry
    (Production Deployment)
 ```
@@ -290,12 +298,13 @@ The build description shows a quick summary:
 
 ### Key Design Principles
 
-1. **Non-blocking triggers:** Pipelines run in parallel; parent doesn't wait or fail
-2. **Smart changesets:** Pipelines only run when relevant files change
-3. **Artifact reuse:** No redundant builds; steward fetches hApp from holochain
-4. **Graceful fallback:** Builds always succeed (fetch → build → fail)
-5. **Visibility:** Self-documenting logs explain every decision
-6. **No external dependencies:** Uses Jenkins native features (artifact archive, wget)
+1. **Webhook-driven triggers:** All 3 jobs fire from GitHub webhook, each respects its own when{} conditions
+2. **Orchestrator provides visibility:** Root job analyzes changesets and shows what will run (no actual triggering)
+3. **Smart changesets:** Each pipeline only runs when relevant files change (changeset filtering in when{})
+4. **Artifact reuse:** No redundant builds; steward fetches hApp from holochain archives
+5. **Graceful fallback:** Steward builds always succeed (fetch → build → fail)
+6. **Self-documenting logs:** Clear explanations of what's happening and why
+7. **No Jenkins config changes needed:** Orchestrator works with existing webhook setup
 
 ### Troubleshooting
 

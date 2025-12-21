@@ -210,67 +210,21 @@ spec:
                             "${v ? '✅' : '⏭️'} ${k}"
                         }.join(' | ')
 
-                        // Trigger child pipelines (non-blocking)
-                        def triggers = [:]
+                        // Pipeline triggering is handled by GitHub webhooks
+                        // This orchestrator provides visibility and planning
+                        echo """
+                        📡 ORCHESTRATION PLAN
+                        ─────────────────────────────────────────────────────────────
+                        Webhook will trigger these pipelines based on changesets:
+                        ${buildMatrix.collect { k, v ->
+                            "  ${v ? '✅ WILL RUN' : '⏭️  SKIP'} ${k} pipeline"
+                        }.join('\n')}
 
-                        if (buildMatrix['holochain']) {
-                            triggers['holochain'] = {
-                                try {
-                                    echo "▶️  Triggering holochain pipeline for branch: ${env.BRANCH_NAME}"
-                                    build(
-                                        job: "elohim-holochain/${env.BRANCH_NAME}",
-                                        wait: false,
-                                        propagate: false,
-                                        parameters: [
-                                            string(name: 'PARENT_BUILD_ID', value: env.BUILD_ID ?: '0'),
-                                            string(name: 'TRIGGERED_BY', value: 'orchestrator')
-                                        ]
-                                    )
-                                    echo "✅ Holochain pipeline triggered"
-                                } catch (Exception e) {
-                                    echo "⚠️  Failed to trigger holochain pipeline: \${e.message}"
-                                    // Non-blocking - continue even if trigger fails
-                                }
-                            }
-                        }
-
-                        if (buildMatrix['steward']) {
-                            triggers['steward'] = {
-                                try {
-                                    echo "▶️  Triggering steward pipeline for branch: ${env.BRANCH_NAME}"
-                                    build(
-                                        job: "elohim-steward/${env.BRANCH_NAME}",
-                                        wait: false,
-                                        propagate: false,
-                                        parameters: [
-                                            string(name: 'PARENT_BUILD_ID', value: env.BUILD_ID ?: '0'),
-                                            string(name: 'TRIGGERED_BY', value: 'orchestrator')
-                                        ]
-                                    )
-                                    echo "✅ Steward pipeline triggered"
-                                } catch (Exception e) {
-                                    echo "⚠️  Failed to trigger steward pipeline: \${e.message}"
-                                    // Non-blocking - continue even if trigger fails
-                                }
-                            }
-                        }
-
-                        if (triggers) {
-                            echo """
-                            🔄 TRIGGERING PIPELINES
-                            ─────────────────────────────────────────────────────────────
-                            """
-                            parallel triggers
-                            echo """
-                            ✅ Child pipelines triggered successfully (non-blocking)
-                            ═══════════════════════════════════════════════════════════
-                            """
-                        } else {
-                            echo """
-                            ℹ️  No child pipelines needed for this change
-                            ═══════════════════════════════════════════════════════════
-                            """
-                        }
+                        Each pipeline respects its own when{} conditions and
+                        changeset filters. This orchestrator provides visibility
+                        into what's expected to run and why.
+                        ═══════════════════════════════════════════════════════════
+                        """
                     }
                 }
             }
