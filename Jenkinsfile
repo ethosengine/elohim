@@ -89,19 +89,7 @@ spec:
     
     stages {
         stage('Checkout') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'staging'
-                    branch 'dev'
-                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /staging-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                    changeRequest()
-                }
-            }
+            // Always checkout - other stages have their own when conditions
             steps {
                 container('builder'){
                     script {
