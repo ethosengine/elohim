@@ -503,7 +503,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Seed Dev Database') {
             when {
                 allOf {
-                    changeset "holochain/**"
+                    // Only seed when DNA, zomes, or seed data changes
+                    anyOf {
+                        changeset "holochain/dna/**"
+                        changeset "holochain/seeder/**"
+                    }
                     anyOf {
                         branch 'dev'
                         expression { return env.BRANCH_NAME ==~ /feat-.+/ }
