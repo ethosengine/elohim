@@ -347,6 +347,8 @@ spec:
                                     echo "=== Building Tauri app ==="
                                     # Required for AppImage bundling in containers without FUSE
                                     export APPIMAGE_EXTRACT_AND_RUN=1
+                                    # Prevent strip failures on Nix-built binaries with .relr.dyn sections
+                                    export NO_STRIP=true
                                     npm run tauri:build
 
                                     echo ""
