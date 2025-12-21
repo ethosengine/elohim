@@ -231,11 +231,18 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             sh '''#!/usr/bin/env bash
                                 set -euo pipefail
 
+                                # Fix git safe.directory for containerized builds
+                                export HOME="${HOME:-/root}"
+                                mkdir -p "$HOME"
+                                echo "[safe]" > "$HOME/.gitconfig"
+                                echo "    directory = *" >> "$HOME/.gitconfig"
+                                export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+
                                 echo "=== Entering Nix development shell ==="
                                 echo "This will download/build Holochain toolchain from Cachix..."
 
                                 # Use nix develop to enter the flake environment and build
-                                nix develop --command bash -c '
+                                nix develop --accept-flake-config --command bash -c '
                                     set -euo pipefail
 
                                     echo "=== Holochain toolchain ready ==="
