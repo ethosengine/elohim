@@ -86,7 +86,13 @@ spec:
         // Only set static values here
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
     }
-    
+
+    options {
+        // Skip default checkout - it uses sparse checkout with 0% files
+        // We do explicit full checkout in the Checkout stage
+        skipDefaultCheckout(true)
+    }
+
     stages {
         stage('Checkout') {
             // Always checkout - other stages have their own when conditions
