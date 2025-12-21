@@ -102,11 +102,19 @@ spec:
                         // Configure git safe directory before any git operations
                         sh 'git config --global --add safe.directory "*"'
 
-                        checkout scm
-
-                        // Ensure clean git state to prevent cached workspace issues
-                        sh 'git clean -fdx'
-                        sh 'git reset --hard HEAD'
+                        // Explicit checkout - bypass sparse checkout config in job
+                        checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: "*/${env.BRANCH_NAME ?: 'dev'}"]],
+                            extensions: [
+                                [$class: 'CloneOption', shallow: false, noTags: true],
+                                [$class: 'CleanBeforeCheckout']
+                            ],
+                            userRemoteConfigs: [[
+                                url: 'https://github.com/ethosengine/elohim.git',
+                                credentialsId: 'ee-bot-pat'
+                            ]]
+                        ])
 
                         echo "Building branch: ${env.BRANCH_NAME}"
                         echo "Change request: ${env.CHANGE_ID ?: 'None'}"
