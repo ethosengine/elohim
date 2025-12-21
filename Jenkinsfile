@@ -89,19 +89,6 @@ spec:
     
     stages {
         stage('Checkout') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'staging'
-                    branch 'dev'
-                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /staging-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                    changeRequest()
-                }
-            }
             steps {
                 container('builder'){
                     script {
@@ -120,6 +107,10 @@ spec:
                         // Verify git state
                         sh 'git rev-parse --short HEAD'
                         sh 'git status'
+
+                        // Verify VERSION file exists
+                        sh 'test -f VERSION && echo "✅ VERSION file found" || echo "❌ VERSION file missing"'
+                        sh 'ls -la VERSION'
                     }
                 }
             }
