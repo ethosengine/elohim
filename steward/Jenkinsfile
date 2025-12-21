@@ -352,6 +352,16 @@ spec:
                                     fi
 
                                     echo ""
+                                    echo "=== Debug: Testing linuxdeploy ==="
+                                    # Download and test linuxdeploy directly to see actual errors
+                                    curl -L -o /tmp/linuxdeploy https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy/linuxdeploy-x86_64.AppImage
+                                    chmod +x /tmp/linuxdeploy
+                                    echo "Testing linuxdeploy execution..."
+                                    ls -la /dev/fuse || echo "FUSE device not found"
+                                    /tmp/linuxdeploy --help 2>&1 || echo "linuxdeploy --help failed with exit code $?"
+                                    echo "=== End debug ==="
+
+                                    echo ""
                                     echo "=== Building Tauri app ==="
                                     # Required for AppImage bundling in containers without FUSE
                                     export APPIMAGE_EXTRACT_AND_RUN=1
