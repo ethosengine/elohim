@@ -352,13 +352,23 @@ spec:
                                     fi
 
                                     echo ""
-                                    echo "=== Debug: Testing linuxdeploy ==="
-                                    # Download and test linuxdeploy directly to see actual errors
+                                    echo "=== Debug: Testing linuxdeploy & plugin ==="
+                                    # Download and test both linuxdeploy and the appimage plugin
                                     curl -L -o /tmp/linuxdeploy https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy/linuxdeploy-x86_64.AppImage
-                                    chmod +x /tmp/linuxdeploy
-                                    echo "Testing linuxdeploy execution..."
+                                    curl -L -o /tmp/linuxdeploy-plugin-appimage https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage
+                                    chmod +x /tmp/linuxdeploy /tmp/linuxdeploy-plugin-appimage
+
+                                    echo "FUSE device:"
                                     ls -la /dev/fuse || echo "FUSE device not found"
-                                    /tmp/linuxdeploy --help 2>&1 || echo "linuxdeploy --help failed with exit code $?"
+
+                                    echo ""
+                                    echo "Testing linuxdeploy..."
+                                    /tmp/linuxdeploy --version 2>&1 || echo "linuxdeploy failed with exit code $?"
+
+                                    echo ""
+                                    echo "Testing linuxdeploy-plugin-appimage..."
+                                    /tmp/linuxdeploy-plugin-appimage --help 2>&1 || echo "plugin failed with exit code $?"
+
                                     echo "=== End debug ==="
 
                                     echo ""
