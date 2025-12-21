@@ -349,6 +349,9 @@ spec:
                                     export APPIMAGE_EXTRACT_AND_RUN=1
                                     # Prevent strip failures on Nix-built binaries with .relr.dyn sections
                                     export NO_STRIP=true
+                                    # Verbose output from linuxdeploy for debugging
+                                    export LDAI_VERBOSE=1
+                                    export DEBUG=1
                                     npm run tauri:build
 
                                     echo ""
