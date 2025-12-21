@@ -380,7 +380,8 @@ spec:
                                     # Verbose output from linuxdeploy for debugging
                                     export LDAI_VERBOSE=1
                                     export DEBUG=1
-                                    npm run tauri:build
+                                    # Build with verbose output to see actual errors
+                                    npx tauri build --verbose
 
                                     echo ""
                                     echo "=== Build artifacts ==="
