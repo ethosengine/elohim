@@ -71,6 +71,11 @@ spec:
 
     parameters {
         string(
+            name: 'PARENT_BUILD_ID',
+            defaultValue: '',
+            description: 'Build ID of parent orchestrator (for tracking)'
+        )
+        string(
             name: 'HAPP_VERSION',
             defaultValue: 'dev-latest',
             description: 'hApp version/tag to fetch from holochain pipeline'
@@ -94,13 +99,34 @@ spec:
                     script {
                         sh 'git config --global --add safe.directory "*"'
                         checkout scm
-                        echo "Building Steward for branch: ${env.BRANCH_NAME}"
+
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        📦 STEWARD BUILD CONTEXT
+                        ═══════════════════════════════════════════════════════════
+                        Branch: ${env.BRANCH_NAME}
+                        Parent Build: ${params.PARENT_BUILD_ID ?: 'none (manual trigger)'}
+                        hApp Version: ${params.HAPP_VERSION}
+                        UI Version: ${params.UI_VERSION}
+                        Publish Release: ${params.PUBLISH_RELEASE}
+                        ═══════════════════════════════════════════════════════════
+                        """
                     }
                 }
             }
         }
 
         stage('Setup Nix Cache') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'dev'
+                    changeset "steward/**"
+                    changeset "holochain/dna/**"
+                    changeset "elohim-app/src/**"
+                    changeset "VERSION"
+                }
+            }
             steps {
                 container('builder') {
                     dir('steward') {
@@ -117,56 +143,152 @@ spec:
             }
         }
 
-        stage('Fetch Dependencies') {
+        stage('📦 Fetch hApp Artifact') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'dev'
+                    changeset "steward/**"
+                    changeset "holochain/dna/**"
+                    changeset "elohim-app/src/**"
+                    changeset "VERSION"
+                }
+            }
             steps {
                 container('builder') {
                     dir('steward') {
                         script {
-                            echo "Fetching hApp and UI dependencies..."
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            📦 FETCHING hApp ARTIFACT
+                            ═══════════════════════════════════════════════════════════
+                            Target version: ${params.HAPP_VERSION}
+                            Branch: ${env.BRANCH_NAME}
+                            ═══════════════════════════════════════════════════════════
+                            """
 
-                            // TODO: Enable copyArtifacts when Copy Artifact plugin is installed
-                            // For now, copy from local mono-repo build outputs if available
+                            // Strategy: Three-tier fallback for maximum reliability
+                            // 1. Fetch from Jenkins artifacts (fast, ~30 sec)
+                            // 2. Fall back to local build (slow, ~20-40 min)
+                            // 3. Error if neither works
 
-                            // Build hApp from mono-repo holochain directory
-                            sh '''#!/usr/bin/env bash
-                                set -euo pipefail
+                            def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ"
 
-                                # Fix git safe.directory for nix
-                                export HOME="${HOME:-/root}"
-                                mkdir -p "$HOME"
-                                echo "[safe]" > "$HOME/.gitconfig"
-                                echo "    directory = *" >> "$HOME/.gitconfig"
-                                export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+                            // Ensure workdir exists
+                            sh 'mkdir -p workdir'
 
-                                cd ../holochain/dna/lamad-spike
+                            // Strategy 1: Try to fetch from Jenkins artifacts
+                            echo """
+                            🔄 STRATEGY 1: Fetching from Jenkins artifacts...
+                            URL: ${artifactUrl}
+                            """
 
-                                echo "Building hApp from mono-repo..."
-                                nix develop --accept-flake-config --command bash -c '
+                            def fetched = sh(
+                                script: """
+                                    set +e
+                                    wget --timeout=30 --tries=3 -O workdir/lamad.happ '${artifactUrl}' 2>&1
+                                    exit_code=\$?
+                                    set -e
+                                    exit \$exit_code
+                                """,
+                                returnStatus: true
+                            ) == 0
+
+                            if (fetched && fileExists('workdir/lamad.happ')) {
+                                def fileSize = sh(script: 'ls -lh workdir/lamad.happ | awk \'{print \$5}\'', returnStdout: true).trim()
+                                echo """
+                                ✅ hApp fetched from Jenkins artifacts (${fileSize})
+
+                                ═══════════════════════════════════════════════════════════
+                                ⏱️  Artifact fetch completed in ~30 seconds
+                                💰 Saved ~35 minutes vs local build!
+                                ═══════════════════════════════════════════════════════════
+                                """
+                            } else {
+                                // Strategy 2: Fallback to local build
+                                echo """
+                                ⚠️  STRATEGY 2: Artifact not found in Jenkins
+                                ⚠️  Falling back to local hApp build (20-40 minutes)
+
+                                This should rarely happen. If you see this often:
+                                - Check holochain pipeline succeeded
+                                - Verify artifacts are archived correctly
+                                - Check network connectivity to Jenkins
+                                ═══════════════════════════════════════════════════════════
+                                """
+
+                                sh '''#!/usr/bin/env bash
                                     set -euo pipefail
-                                    cargo build --release --target wasm32-unknown-unknown
-                                    hc dna pack . -o workdir/lamad_spike.dna
-                                    hc app pack workdir -o lamad-spike.happ
-                                '
 
-                                cp lamad-spike.happ ../../../steward/workdir/lamad.happ
-                                echo "hApp built and copied to steward/workdir/"
-                            '''
+                                    export HOME="${HOME:-/root}"
+                                    mkdir -p "$HOME"
+                                    echo "[safe]" > "$HOME/.gitconfig"
+                                    echo "    directory = *" >> "$HOME/.gitconfig"
+                                    export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+
+                                    cd ../holochain/dna/lamad-spike
+
+                                    echo "Building hApp from source (this will take 20-40 minutes)..."
+                                    nix develop --accept-flake-config --command bash -c '
+                                        set -euo pipefail
+                                        cargo build --release --target wasm32-unknown-unknown
+                                        hc dna pack . -o workdir/lamad_spike.dna
+                                        hc app pack workdir -o lamad-spike.happ
+                                    '
+
+                                    cp lamad-spike.happ ../../../steward/workdir/lamad.happ
+                                    echo "✅ Local hApp build completed"
+                                '''
+                            }
+
+                            // Strategy 3: Verify artifact exists (error if missing)
+                            if (!fileExists('workdir/lamad.happ')) {
+                                error "hApp artifact not found after fetch/build attempt"
+                            }
+
+                            sh 'echo "Final artifact:"; ls -lh workdir/lamad.happ'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('📦 Fetch UI') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'dev'
+                    changeset "steward/**"
+                    changeset "elohim-app/src/**"
+                    changeset "VERSION"
+                }
+            }
+            steps {
+                container('builder') {
+                    dir('steward') {
+                        script {
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            📱 FETCHING UI
+                            ═══════════════════════════════════════════════════════════
+                            """
 
                             // Try to find UI from elohim-app build output
                             def uiFound = sh(script: '''
                                 if [ -d ../elohim-app/dist/elohim-app/browser ]; then
+                                    mkdir -p ui
                                     cp -r ../elohim-app/dist/elohim-app/browser/* ui/
-                                    echo "UI copied from local elohim-app build"
+                                    echo "✅ UI copied from local elohim-app build"
                                     exit 0
                                 else
-                                    echo "No local UI found - using placeholder"
+                                    echo "⚠️  No local UI found - using placeholder"
                                     mkdir -p ui
                                     echo "<html><body><h1>Elohim Steward</h1><p>UI not bundled</p></body></html>" > ui/index.html
                                     exit 0
                                 fi
                             ''', returnStatus: true)
 
-                            sh 'ls -la workdir/ ui/'
+                            sh 'echo "UI directory:"; ls -la ui/'
                         }
                     }
                 }
@@ -174,6 +296,16 @@ spec:
         }
 
         stage('Build Steward App - Linux') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'dev'
+                    changeset "steward/**"
+                    changeset "holochain/dna/**"
+                    changeset "elohim-app/src/**"
+                    changeset "VERSION"
+                }
+            }
             steps {
                 container('builder') {
                     dir('steward') {
@@ -219,6 +351,8 @@ spec:
 
                                     echo ""
                                     echo "=== Building Tauri app ==="
+                                    # Required for AppImage bundling in containers without FUSE
+                                    export APPIMAGE_EXTRACT_AND_RUN=1
                                     npm run tauri:build
 
                                     echo ""
