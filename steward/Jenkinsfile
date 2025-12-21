@@ -120,38 +120,43 @@ spec:
                 container('builder') {
                     dir('steward') {
                         script {
-                            echo "Fetching hApp (${params.HAPP_VERSION}) and UI (${params.UI_VERSION})..."
+                            echo "Fetching hApp and UI dependencies..."
 
-                            // Fetch hApp from holochain pipeline artifacts
-                            try {
-                                copyArtifacts(
-                                    projectName: 'elohim/holochain',
-                                    selector: specific(params.HAPP_VERSION),
-                                    filter: 'lamad-spike.happ',
-                                    target: 'workdir/',
-                                    optional: false
-                                )
-                                sh 'mv workdir/lamad-spike.happ workdir/lamad.happ'
-                                echo "hApp fetched successfully"
-                                sh 'ls -lh workdir/lamad.happ'
-                            } catch (Exception e) {
-                                error "Failed to fetch hApp artifact. Run holochain pipeline first with HAPP_VERSION=${params.HAPP_VERSION}"
+                            // TODO: Enable copyArtifacts when Copy Artifact plugin is installed
+                            // For now, copy from local mono-repo build outputs if available
+
+                            // Try to find hApp from holochain pipeline output
+                            def happFound = sh(script: '''
+                                if [ -f ../holochain/dna/lamad-spike/lamad-spike.happ ]; then
+                                    cp ../holochain/dna/lamad-spike/lamad-spike.happ workdir/lamad.happ
+                                    echo "hApp copied from local holochain build"
+                                    exit 0
+                                else
+                                    echo "No local hApp found - build will fail at compile time"
+                                    exit 1
+                                fi
+                            ''', returnStatus: true)
+
+                            if (happFound != 0) {
+                                echo "WARNING: No hApp available. Rust build will fail."
+                                echo "Run holochain pipeline first, or install Copy Artifact plugin."
                             }
 
-                            // Fetch Angular UI from elohim-app pipeline
-                            try {
-                                copyArtifacts(
-                                    projectName: 'elohim/elohim-app',
-                                    selector: specific(params.UI_VERSION),
-                                    filter: 'dist/**',
-                                    target: 'ui/',
-                                    optional: false
-                                )
-                                echo "UI fetched successfully"
-                                sh 'ls -la ui/'
-                            } catch (Exception e) {
-                                error "Failed to fetch UI artifact. Run elohim-app pipeline first with UI_VERSION=${params.UI_VERSION}"
-                            }
+                            // Try to find UI from elohim-app build output
+                            def uiFound = sh(script: '''
+                                if [ -d ../elohim-app/dist/elohim-app/browser ]; then
+                                    cp -r ../elohim-app/dist/elohim-app/browser/* ui/
+                                    echo "UI copied from local elohim-app build"
+                                    exit 0
+                                else
+                                    echo "No local UI found - using placeholder"
+                                    mkdir -p ui
+                                    echo "<html><body><h1>Elohim Steward</h1><p>UI not bundled</p></body></html>" > ui/index.html
+                                    exit 0
+                                fi
+                            ''', returnStatus: true)
+
+                            sh 'ls -la workdir/ ui/'
                         }
                     }
                 }
