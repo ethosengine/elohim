@@ -60,6 +60,8 @@ spec:
     environment {
         PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
+        // Required for AppImage bundling in containerized environments without FUSE
+        APPIMAGE_EXTRACT_AND_RUN = '1'
     }
 
     options {
