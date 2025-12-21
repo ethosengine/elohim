@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Override root .gitignore to track lockfile
+!package-lock.json
+
 # Build output
 dist/
 *.js
