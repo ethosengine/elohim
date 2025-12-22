@@ -362,14 +362,14 @@ spec:
 
                                     echo ""
                                     echo "=== Generating app icons ==="
-                                    # Use Elohim logo from elohim-app as source (no lettering, better for icons)
-                                    ICON_SOURCE="../elohim-app/public/images/elohim_logo_dark.png"
+                                    # Use Elohim app logo (solid background, pops better as icon)
+                                    ICON_SOURCE="../elohim-app/public/images/elohim_protocol_app_logo.png"
                                     if [ -f "$ICON_SOURCE" ]; then
-                                        # Make square by padding to largest dimension (692x573 -> 692x692)
+                                        # Make square by padding to largest dimension (732x625 -> 732x732)
                                         mkdir -p src-tauri/icons
-                                        convert "$ICON_SOURCE" -gravity center -background transparent -extent 692x692 src-tauri/icons/icon-square.png
+                                        convert "$ICON_SOURCE" -gravity center -background white -extent 732x732 src-tauri/icons/icon-square.png
                                         npx tauri icon src-tauri/icons/icon-square.png
-                                        echo "Icons generated from elohim_logo_dark.png (padded to square)"
+                                        echo "Icons generated from elohim_protocol_app_logo.png (padded to square)"
                                     else
                                         echo "Warning: Source icon not found at $ICON_SOURCE"
                                         echo "Build may fail without icons"
