@@ -3,7 +3,7 @@
 //! Analyzes Rust DNA structures to extract entry type information needed for
 //! provider template generation.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use regex::Regex;
 
 /// Represents a field in an entry type

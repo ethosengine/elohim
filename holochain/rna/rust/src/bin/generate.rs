@@ -51,10 +51,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut analyzer = DNAAnalyzer::new();
     analyzer.parse_source(&integrity_source)?;
 
-    let entry_types = analyzer.entry_types();
     if args.verbose {
-        println!("✓ Found {} entry types:", entry_types.len());
-        for entry_type in entry_types {
+        println!("✓ Found {} entry types:", analyzer.entry_types().len());
+        for entry_type in analyzer.entry_types() {
             println!(
                 "  - {} (entry_type: \"{}\")",
                 entry_type.name,
@@ -69,6 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let generator = ProviderGenerator::new(analyzer);
+    let entry_type_count = generator.analyzer.entry_types().len();
     let generated_code = generator.generate_providers_file();
 
     // Display or write output
@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!(
             "✅ Successfully generated providers for {} entry types!",
-            entry_types.len()
+            entry_type_count
         );
         println!("\n📋 Next steps:");
         println!("  1. Review the generated {} file", args.output.display());

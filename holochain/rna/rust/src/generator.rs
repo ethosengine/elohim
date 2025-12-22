@@ -7,7 +7,7 @@ use std::fmt::Write as FmtWrite;
 
 /// Generates provider template code
 pub struct ProviderGenerator {
-    analyzer: DNAAnalyzer,
+    pub analyzer: DNAAnalyzer,
 }
 
 impl ProviderGenerator {
