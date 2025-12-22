@@ -37,6 +37,101 @@ import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
 // Re-export GeographicContext for backward compatibility
 export type { GeographicContext } from '@app/elohim/models/protocol-core.model';
 
+/**
+ * ContentBlob - Reference to large binary media for P2P distribution.
+ *
+ * Blobs are NOT stored in DHT (too large). Instead, ContentBlob stores:
+ * - Cryptographic hash for integrity verification
+ * - Size for cache planning
+ * - Fallback URLs for resilience
+ * - Bitrate variants for adaptive streaming
+ *
+ * Blobs are distributed via:
+ * - HTTP Range requests (resume)
+ * - HLS/DASH streaming (adaptive)
+ * - Custodian network replication (P2P)
+ */
+export interface ContentBlob {
+  /** Cryptographic hash of blob (SHA256 hex string) */
+  hash: string;
+
+  /** Size in bytes - used for cache allocation and streaming decisions */
+  sizeBytes: number;
+
+  /** MIME type (e.g., "video/mp4", "audio/mpeg", "application/pdf") */
+  mimeType: string;
+
+  /** Primary + fallback URLs for resilience (try in order) */
+  fallbackUrls: string[];
+
+  /** Bitrate in Mbps (useful for codec/quality tracking) */
+  bitrateMbps?: number;
+
+  /** Duration in seconds (for audio/video) */
+  durationSeconds?: number;
+
+  /** Codec information (H.264, H.265, VP9, AV1, AAC, OPUS, etc.) */
+  codec?: string;
+
+  /** Resolutions/bitrate variants for adaptive streaming */
+  variants?: ContentBlobVariant[];
+
+  /** Subtitle/caption tracks */
+  captions?: ContentBlobCaption[];
+
+  /** When this blob was created */
+  createdAt?: string;
+
+  /** When this blob was last verified/updated */
+  verifiedAt?: string;
+}
+
+/**
+ * Variant of a blob for adaptive streaming (e.g., 480p, 720p, 1080p, 4K).
+ */
+export interface ContentBlobVariant {
+  /** Resolution (e.g., "1080p", "720p", "480p") or bitrate (e.g., "5000k") */
+  label: string;
+
+  /** Bitrate in Mbps */
+  bitrateMbps: number;
+
+  /** Width in pixels (for video) */
+  width?: number;
+
+  /** Height in pixels (for video) */
+  height?: number;
+
+  /** Fallback URLs for this variant (same structure as parent) */
+  fallbackUrls: string[];
+
+  /** Hash of this variant for verification */
+  hash: string;
+
+  /** Size in bytes */
+  sizeBytes: number;
+}
+
+/**
+ * Subtitle or caption track for media.
+ */
+export interface ContentBlobCaption {
+  /** Language code (ISO 639-1: "en", "es", "fr", etc.) */
+  language: string;
+
+  /** Human-readable label ("English", "Spanish", "French with SDH") */
+  label: string;
+
+  /** Format (webvtt, srt, vtt, etc.) */
+  format: 'webvtt' | 'srt' | 'vtt' | 'ass' | 'ssa';
+
+  /** URL to caption file */
+  url: string;
+
+  /** Whether captions include hearing impaired info */
+  isHardOfHearing?: boolean;
+}
+
 export interface ContentNode {
   /** Unique identifier (ActionHash in Holochain) */
   id: string;
@@ -73,6 +168,9 @@ export interface ContentNode {
 
   /** Flexible metadata for domain-specific data */
   metadata: ContentMetadata;
+
+  /** Large binary media (videos, podcasts, etc.) - Phase 1 blob pointer system */
+  blobs?: ContentBlob[];
 
   // =========================================================================
   // Trust & Reach (Bidirectional Attestation Model)

@@ -99,6 +99,51 @@ pub const ENGAGEMENT_TYPES: [&str; 8] = [
     "refresh",    // Explicit refresh engagement
 ];
 
+// =============================================================================
+// Blob Management - Phase 1: Large Media Support (Video, Podcasts)
+// =============================================================================
+
+/// Video/audio codec types (track codec obsolescence for adaptive delivery)
+pub const CODEC_TYPES: [&str; 15] = [
+    // Video codecs (H.264, H.265, VP9, AV1)
+    "h264",     // H.264/AVC (backward compatible, widely supported)
+    "h265",     // H.265/HEVC (more efficient, newer devices)
+    "vp8",      // VP8 (WebRTC, WebM)
+    "vp9",      // VP9 (YouTube, WebM)
+    "av1",      // AV1 (next-gen, highest compression)
+    // Audio codecs (AAC, Opus, FLAC, MP3)
+    "aac",      // AAC (standard audio)
+    "opus",     // Opus (modern, variable bitrate)
+    "flac",     // FLAC (lossless)
+    "mp3",      // MP3 (legacy, universal)
+    "vorbis",   // Vorbis (open source audio)
+    // Container/other
+    "mp4",      // MP4 container
+    "webm",     // WebM container
+    "mkv",      // Matroska container
+    "mov",      // QuickTime container
+    "unknown",  // Unknown/undeclared
+];
+
+/// Video resolution variants for adaptive streaming
+pub const VIDEO_VARIANTS: [&str; 6] = [
+    "480p",   // 854x480 - mobile minimum
+    "720p",   // 1280x720 - HD
+    "1080p",  // 1920x1080 - Full HD
+    "1440p",  // 2560x1440 - QHD
+    "2160p",  // 3840x2160 - 4K
+    "4320p",  // 7680x4320 - 8K
+];
+
+/// Caption/subtitle formats
+pub const CAPTION_FORMATS: [&str; 5] = [
+    "webvtt",  // WebVTT (web standard)
+    "srt",     // SubRip (simple)
+    "vtt",     // VTT (alias for webvtt)
+    "ass",     // ASS/SSA (advanced formatting)
+    "ssa",     // SSA (older format)
+];
+
 /// Attestation categories
 pub const ATTESTATION_CATEGORIES: [&str; 4] = [
     "domain-mastery",   // Earned via sustained concept mastery
@@ -421,6 +466,11 @@ pub struct Content {
     pub metadata_json: String,
     pub created_at: String,
     pub updated_at: String,
+    // Self-healing DNA fields (for schema evolution support)
+    #[serde(default)]
+    pub schema_version: u32,             // Increment when Content schema changes
+    #[serde(default)]
+    pub validation_status: String,       // Valid, Migrated, Degraded, Healing
 }
 
 // =============================================================================
@@ -446,6 +496,11 @@ pub struct LearningPath {
     pub metadata_json: String,
     pub created_at: String,
     pub updated_at: String,
+    // Self-healing DNA fields
+    #[serde(default)]
+    pub schema_version: u32,
+    #[serde(default)]
+    pub validation_status: String,
 }
 
 /// Path step entry - represents a single learning activity
@@ -475,6 +530,11 @@ pub struct PathStep {
     pub metadata_json: String,
     pub created_at: String,
     pub updated_at: String,
+    // Self-healing DNA fields
+    #[serde(default)]
+    pub schema_version: u32,
+    #[serde(default)]
+    pub validation_status: String,
 }
 
 /// Step types for PathStep.step_type
@@ -679,6 +739,11 @@ pub struct ContentMastery {
     pub privileges_json: String,          // ContentPrivilege[] as JSON
     pub created_at: String,
     pub updated_at: String,
+    // Self-healing DNA fields
+    #[serde(default)]
+    pub schema_version: u32,
+    #[serde(default)]
+    pub validation_status: String,
 }
 
 /// Attestation - Permanent achievement record.

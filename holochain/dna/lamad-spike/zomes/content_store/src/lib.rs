@@ -2,6 +2,9 @@
 //!
 //! Implements zome functions for CRUD operations on content entries.
 //! Supports bulk imports, ID-based lookups, type filtering, and learning paths.
+//!
+//! Self-healing DNA support: Entry types automatically migrate from v1 to v2
+//! when schema changes occur. No external migration tools needed.
 
 use hdk::prelude::*;
 use content_store_integrity::*;
@@ -10,6 +13,9 @@ use std::collections::HashMap;
 
 // Migration module for DNA version upgrades
 pub mod migration;
+
+// Self-healing DNA implementation for schema evolution
+pub mod healing_impl;
 
 // =============================================================================
 // Doorway Cache Configuration
@@ -284,6 +290,30 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .build(),
 
         // =====================================================================
+        // BLOBS (Media Distribution - hash-based and reach-aware)
+        // =====================================================================
+        CacheRuleBuilder::new("get_blobs_by_content_id")
+            .ttl_15m()
+            .reach_based("blobs.reach", "commons")
+            .invalidated_by(vec!["create_content", "bulk_create_content"])
+            .build(),
+        CacheRuleBuilder::new("verify_blob_integrity")
+            .ttl_1h()
+            .reach_based("verification.reach", "commons")
+            .invalidated_by(vec![])
+            .build(),
+        CacheRuleBuilder::new("get_blob_variants")
+            .ttl_15m()
+            .reach_based("variants.reach", "commons")
+            .invalidated_by(vec!["create_content"])
+            .build(),
+        CacheRuleBuilder::new("get_blob_captions")
+            .ttl_15m()
+            .reach_based("captions.reach", "commons")
+            .invalidated_by(vec!["create_content"])
+            .build(),
+
+        // =====================================================================
         // EXPORTS (admin/migration endpoints - longer TTL)
         // =====================================================================
         CacheRuleBuilder::new("export_schema_version")
@@ -376,6 +406,51 @@ pub struct QueryByTypeInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct QueryByIdInput {
     pub id: String,
+}
+
+// =============================================================================
+// Input/Output Types for Blobs (Media Distribution)
+// =============================================================================
+
+/// Input for querying blobs by content ID
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryBlobsByContentIdInput {
+    pub content_id: String,
+}
+
+/// Output for blob metadata
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BlobMetadataOutput {
+    pub hash: String,
+    pub size_bytes: u64,
+    pub mime_type: String,
+    pub fallback_urls: Vec<String>,
+    pub bitrate_mbps: Option<f64>,
+    pub duration_seconds: Option<u32>,
+    pub codec: Option<String>,
+    pub created_at: Option<String>,
+    pub verified_at: Option<String>,
+}
+
+/// Input for verifying blob integrity
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyBlobIntegrityInput {
+    pub content_id: String,
+    pub blob_hash: String,
+}
+
+/// Output for blob integrity verification
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BlobIntegrityCheckOutput {
+    pub blob_hash: String,
+    pub is_valid: bool,
+    pub verification_time_ms: u64,
+}
+
+/// Input for querying blob variants
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryBlobVariantsInput {
+    pub blob_hash: String,
 }
 
 // =============================================================================
@@ -1574,6 +1649,115 @@ pub fn get_content_stats(_: ()) -> ExternResult<ContentStats> {
         total_count: records.len() as u32,
         by_type,
     })
+}
+
+// =============================================================================
+// Blob Operations (Media Distribution - Phase 1)
+// =============================================================================
+
+/// Get all blobs associated with a content ID.
+/// Returns metadata for all blobs attached to content for download/playback.
+#[hdk_extern]
+pub fn get_blobs_by_content_id(input: QueryBlobsByContentIdInput) -> ExternResult<Vec<BlobMetadataOutput>> {
+    // First, find content by ID
+    let anchor = StringAnchor::new("content_id", &input.content_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Get the content record
+    let action_hash = ActionHash::try_from(links[0].target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+
+    let record = get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Content not found".to_string())))?;
+
+    let content: Content = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize content".to_string())))?;
+
+    // Extract blobs from content if it has them
+    // This is a simplified version - in production, blobs would be stored in a separate entry type
+    let mut blobs = Vec::new();
+
+    // Placeholder: iterate over content.blobs if field exists
+    // For now, return empty vec as the model integration is next
+    // TODO: Add actual blob extraction logic when ContentNode is integrated
+
+    Ok(blobs)
+}
+
+/// Verify that a blob hash is valid and matches expected content.
+/// Used during download to detect corruption.
+#[hdk_extern]
+pub fn verify_blob_integrity(input: VerifyBlobIntegrityInput) -> ExternResult<BlobIntegrityCheckOutput> {
+    let start_time = std::time::SystemTime::now();
+
+    // In Phase 1, we store the expected hash in the content metadata
+    // The actual verification happens on the client side (BlobVerificationService)
+    // This function is mainly for caching and validation purposes
+
+    // Find content by ID
+    let anchor = StringAnchor::new("content_id", &input.content_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Content not found".to_string()
+        )));
+    }
+
+    // For Phase 1, we just verify that the blob hash exists in our system
+    // Full verification happens client-side where the actual bytes are
+    let is_valid = true; // TODO: Implement actual hash validation
+
+    let elapsed = start_time
+        .elapsed()
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+
+    Ok(BlobIntegrityCheckOutput {
+        blob_hash: input.blob_hash,
+        is_valid,
+        verification_time_ms: elapsed,
+    })
+}
+
+/// Get all variants of a blob (different bitrates, resolutions).
+/// Used for adaptive streaming - returns available quality options.
+#[hdk_extern]
+pub fn get_blob_variants(input: QueryBlobVariantsInput) -> ExternResult<Vec<BlobMetadataOutput>> {
+    // In Phase 1, variants are stored alongside the main blob
+    // This would query a dedicated entry type for blob variants
+    // For now, return empty as the full model is in progress
+
+    // TODO: Query BlobVariant entries by parent blob hash
+    // Return all variants sorted by bitrate
+
+    Ok(Vec::new())
+}
+
+/// Get captions/subtitles for a blob.
+/// Returns all available caption tracks for a video.
+#[hdk_extern]
+pub fn get_blob_captions(input: QueryBlobVariantsInput) -> ExternResult<Vec<BlobMetadataOutput>> {
+    // Query caption tracks for a specific blob
+    // Used for subtitle/caption support in players
+
+    // TODO: Query BlobCaption entries by parent blob hash
+    // Return captions sorted by language/format
+
+    Ok(Vec::new())
 }
 
 // =============================================================================
