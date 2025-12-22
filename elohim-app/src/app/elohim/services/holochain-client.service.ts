@@ -46,12 +46,17 @@ import {
   SIGNING_CREDENTIALS_KEY,
 } from '../models/holochain-connection.model';
 
+import { PerformanceMetricsService } from './performance-metrics.service';
+
 @Injectable({
   providedIn: 'root',
 })
 export class HolochainClientService {
   /** HTTP client for REST API calls */
   private readonly http = inject(HttpClient);
+
+  /** Performance metrics service for recording zome call metrics */
+  private readonly metrics = inject(PerformanceMetricsService);
 
   /** Current connection state */
   private readonly connectionSignal = signal<HolochainConnection>(INITIAL_CONNECTION_STATE);
@@ -439,12 +444,18 @@ export class HolochainClientService {
 
   /**
    * Make a zome call (waits for connection if not yet established)
+   * Records performance metrics for all calls.
    */
   async callZome<T>(input: ZomeCallInput): Promise<ZomeCallResult<T>> {
     let { appWs, cellId, state } = this.connectionSignal();
 
+    // Record start time for metrics
+    const startTime = Date.now();
+
     // Return immediately if in disconnected or error state
     if (state === 'disconnected' || state === 'error') {
+      const duration = Date.now() - startTime;
+      this.metrics.recordQuery(duration, false);
       return {
         success: false,
         error: 'Not connected to Holochain conductor',
@@ -457,6 +468,8 @@ export class HolochainClientService {
         console.log('[HolochainClient] Waiting for connection before zome call...');
         const connected = await this.waitForConnection();
         if (!connected) {
+          const duration = Date.now() - startTime;
+          this.metrics.recordQuery(duration, false);
           return {
             success: false,
             error: 'Connection timed out',
@@ -468,6 +481,8 @@ export class HolochainClientService {
     }
 
     if (!appWs || !cellId) {
+      const duration = Date.now() - startTime;
+      this.metrics.recordQuery(duration, false);
       return {
         success: false,
         error: 'Not connected to Holochain conductor',
@@ -482,12 +497,20 @@ export class HolochainClientService {
         payload: input.payload,
       });
 
+      // Record successful query
+      const duration = Date.now() - startTime;
+      this.metrics.recordQuery(duration, true);
+
       return {
         success: true,
         data: result as T,
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Zome call failed';
+
+      // Record failed query
+      const duration = Date.now() - startTime;
+      this.metrics.recordQuery(duration, false);
 
       // Detect connection-related errors and only log once
       const isConnectionError = errorMessage.includes('Websocket') ||
@@ -517,11 +540,13 @@ export class HolochainClientService {
    *
    * This is preferred for read-only calls that benefit from caching.
    * The Doorway gateway caches responses based on zome-defined cache rules.
+   * Records performance metrics for all calls.
    *
    * Endpoint: POST /api/v1/zome/{dna_hash}/{zome_name}/{fn_name}
    */
   async callZomeRest<T>(input: ZomeCallInput): Promise<ZomeCallResult<T>> {
     const { cellId, state } = this.connectionSignal();
+    const startTime = Date.now();
 
     // Need cellId for DNA hash
     if (!cellId) {
@@ -529,9 +554,13 @@ export class HolochainClientService {
       if (state === 'connecting' || state === 'authenticating') {
         const connected = await this.waitForConnection(5000);
         if (!connected) {
+          const duration = Date.now() - startTime;
+          this.metrics.recordQuery(duration, false);
           return { success: false, error: 'Connection timed out' };
         }
       } else {
+        const duration = Date.now() - startTime;
+        this.metrics.recordQuery(duration, false);
         return { success: false, error: 'Not connected - no cell ID available' };
       }
     }
@@ -539,6 +568,8 @@ export class HolochainClientService {
     // Get current cellId after potential wait
     const currentCellId = this.connectionSignal().cellId;
     if (!currentCellId) {
+      const duration = Date.now() - startTime;
+      this.metrics.recordQuery(duration, false);
       return { success: false, error: 'No cell ID available' };
     }
 
@@ -555,6 +586,10 @@ export class HolochainClientService {
         })
       );
 
+      // Record successful REST call
+      const duration = Date.now() - startTime;
+      this.metrics.recordQuery(duration, true);
+
       return { success: true, data: response };
     } catch (err) {
       let errorMessage = 'REST call failed';
@@ -567,6 +602,10 @@ export class HolochainClientService {
       } else if (err instanceof Error) {
         errorMessage = err.message;
       }
+
+      // Record failed REST call
+      const duration = Date.now() - startTime;
+      this.metrics.recordQuery(duration, false);
 
       console.error(`[Holochain REST] ${input.zomeName}.${input.fnName} failed:`, errorMessage);
       return { success: false, error: errorMessage };

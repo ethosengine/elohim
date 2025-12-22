@@ -18,10 +18,11 @@
  * @see DataLoaderService for the primary content abstraction (delegates here when ready)
  */
 
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, signal, inject } from '@angular/core';
 import { Observable, of, from, defer, Subject, BehaviorSubject } from 'rxjs';
 import { map, catchError, shareReplay, switchMap, tap, debounceTime, buffer } from 'rxjs/operators';
 import { HolochainClientService } from './holochain-client.service';
+import { CustodianSelectionService } from './custodian-selection.service';
 import { ContentNode, ContentType, ContentFormat, ContentMetadata } from '../../lamad/models/content-node.model';
 
 // =============================================================================
@@ -682,6 +683,9 @@ export class HolochainContentService {
   private readonly pendingBatchRequests = new Map<string, { resolve: (content: ContentNode | null) => void; reject: (err: any) => void }[]>();
   private batchRequestTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly BATCH_DEBOUNCE_MS = 50; // Collect requests for 50ms before batching
+
+  // Custodian selection service for CDN-like content serving
+  private readonly custodianSelection = inject(CustodianSelectionService);
 
   constructor(private readonly holochainClient: HolochainClientService) {}
 
@@ -1525,6 +1529,24 @@ export class HolochainContentService {
    * Fetch single content by ID from Holochain
    */
   private async fetchContentById(id: string): Promise<ContentNode | null> {
+    // Try to select a custodian for CDN-like serving (optional optimization)
+    try {
+      const custodian = await this.custodianSelection.selectBestCustodian(id);
+      if (custodian) {
+        console.log(`[HolochainContent] Selected custodian for "${id}":`, {
+          custodianId: custodian.custodian.id.slice(0, 12) + '...',
+          score: custodian.finalScore.toFixed(1),
+        });
+        // TODO: When doorway service is ready, fetch from custodian endpoint here
+        // const content = await this.fetchFromCustodian(custodian.custodian.endpoint, id);
+        // if (content) return content;
+      }
+    } catch (err) {
+      console.debug('[HolochainContent] Custodian selection failed (non-critical):', err);
+      // Continue with DHT fallback
+    }
+
+    // Fall back to DHT query
     const result = await this.holochainClient.callZome<HolochainContentOutput | null>({
       zomeName: 'content_store',
       fnName: 'get_content_by_id',

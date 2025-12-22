@@ -5,6 +5,7 @@ import { Routes } from '@angular/router';
  *
  * Routes:
  * - /shefa - Economy home (landing page)
+ * - /shefa/dashboard - Network health and custodian metrics (operator view)
  *
  * Future routes:
  * - /shefa/human - Economy-specific profile settings
@@ -30,6 +31,20 @@ export const SHEFA_ROUTES: Routes = [
           seo: {
             title: 'Shefa Economy',
             description: 'Economic coordination layer implementing ValueFlows patterns for multi-dimensional value tracking.',
+          }
+        }
+      },
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('../elohim/components/shefa-dashboard/shefa-dashboard.component').then(
+            m => m.ShefaDashboardComponent
+          ),
+        data: {
+          title: 'Shefa Dashboard - Network Metrics',
+          seo: {
+            title: 'Shefa Dashboard',
+            description: 'Network health overview and custodian performance metrics for operators.',
           }
         }
       }
