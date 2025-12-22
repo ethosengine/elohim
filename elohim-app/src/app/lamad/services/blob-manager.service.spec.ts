@@ -248,9 +248,9 @@ describe('BlobManagerService', () => {
         },
       ]);
 
-      const health = service.getUrlHealth(contentBlob);
+      const health = service.getUrlHealth(contentBlob) as UrlHealth[];
 
-      expect(health).toHaveLength(1);
+      expect(health.length).toBe(1);
       expect(health[0].isHealthy).toBe(true);
     });
 
@@ -297,9 +297,9 @@ describe('BlobManagerService', () => {
         ])
       );
 
-      const health = await service.testBlobAccess(contentBlob);
+      const health = (await service.testBlobAccess(contentBlob)) as UrlHealth[];
 
-      expect(health).toHaveLength(1);
+      expect(health.length).toBe(1);
       expect(health[0].isHealthy).toBe(true);
     });
   });
@@ -322,8 +322,8 @@ describe('BlobManagerService', () => {
       service['blobCache'].set(blob1.hash, new Blob(['data1']));
       service['blobCache'].set(blob2.hash, new Blob(['data2']));
 
-      service.downloadBlobs([blob1, blob2]).subscribe((results) => {
-        expect(results).toHaveLength(2);
+      service.downloadBlobs([blob1, blob2]).subscribe((results: BlobDownloadResult[]) => {
+        expect(results.length).toBe(2);
         expect(results[0].wasCached).toBe(true);
         expect(results[1].wasCached).toBe(true);
         done();

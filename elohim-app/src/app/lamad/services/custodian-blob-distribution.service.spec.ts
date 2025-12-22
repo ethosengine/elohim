@@ -219,9 +219,9 @@ describe('CustodianBlobDistributionService', () => {
 
       service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(() => {
         service.createBlobCommitment('content_123', blob, 'custodian_2').subscribe(() => {
-          const commitments = service.getCommitmentsForBlob('content_123', blob.hash);
+          const commitments = service.getCommitmentsForBlob('content_123', blob.hash) as CustodianBlobCommitment[];
 
-          expect(commitments).toHaveLength(2);
+          expect(commitments.length).toBe(2);
           expect(commitments.map((c) => c.custodianId)).toContain('custodian_1');
           expect(commitments.map((c) => c.custodianId)).toContain('custodian_2');
           done();

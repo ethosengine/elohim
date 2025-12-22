@@ -162,8 +162,8 @@ describe('BlobVerificationService', () => {
               [blob1, hash1],
               [blob2, hash2],
             ])
-            .subscribe((results) => {
-              expect(results).toHaveLength(2);
+            .subscribe((results: BlobVerificationResult[]) => {
+              expect(results.length).toBe(2);
               expect(results[0].isValid).toBe(true);
               expect(results[1].isValid).toBe(true);
               done();
@@ -182,8 +182,8 @@ describe('BlobVerificationService', () => {
               [blob1, hash1],
               [blob2, hash2],
             ])
-            .subscribe((results) => {
-              expect(results).toHaveLength(2);
+            .subscribe((results: BlobVerificationResult[]) => {
+              expect(results.length).toBe(2);
               expect(results[0].isValid).toBe(true);
               expect(results[1].isValid).toBe(true);
               done();

@@ -1568,6 +1568,296 @@ pub const MATCH_STATUSES: [&str; 5] = [
 ];
 
 // =============================================================================
+// Shefa: Stewarded Resources (Resource Stewardship & Accountability)
+// =============================================================================
+
+/// StewardedResource - A resource tracked and managed by a human
+/// Tracks capacity, allocation, usage, and governance
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct StewardedResource {
+    pub id: String,
+    pub resource_number: String,          // RES-XXXXXXXXXX
+    pub steward_id: String,               // Agent ID who stewards
+    pub category: String,                 // energy, compute, water, food, shelter, etc.
+    pub subcategory: String,
+    pub name: String,
+    pub description: Option<String>,
+
+    // Capacity & Measurement
+    pub dimension_unit: String,           // kWh, GB, liters, etc.
+    pub dimension_label: String,
+    pub total_capacity_value: f64,
+    pub total_capacity_unit: String,
+    pub allocatable_capacity_value: f64,
+    pub allocatable_capacity_unit: String,
+
+    // Current State
+    pub total_allocated_value: f64,
+    pub total_used_value: f64,
+    pub available_value: f64,
+
+    // Governance
+    pub governance_level: String,         // individual, household, community, network, constitutional
+    pub governed_by: Option<String>,
+    pub can_modify_allocations: bool,
+
+    // Allocations & Usage
+    pub allocations_json: String,         // AllocationBlock[] as JSON
+    pub allocation_strategy: String,      // manual, automatic, hybrid
+    pub recent_usage_json: String,        // UsageRecord[] as JSON
+    pub trends_json: String,              // ResourceTrend[] as JSON
+
+    // Tracking
+    pub observer_enabled: bool,
+    pub observer_agent_id: Option<String>,
+    pub is_shared: bool,
+    pub visibility: String,               // private, household, community, public
+    pub data_quality: String,             // measured, estimated, manual, mixed
+    pub last_verified_at: Option<String>,
+
+    // Economic Integration
+    pub resource_spec_id: Option<String>, // hREA ResourceSpecification
+    pub commons_pool_id: Option<String>,
+    pub allocation_event_ids_json: String, // EconomicEvent IDs
+    pub usage_event_ids_json: String,
+
+    // Metadata
+    pub schema_version: u32,
+    pub validation_status: String,        // Valid, Migrated, Degraded, Healing
+    pub metadata_json: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// FinancialAsset - Tracking of money, investments, obligations
+/// Supports transparency about financial situation and UBA/UBI eligibility
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct FinancialAsset {
+    pub id: String,
+    pub steward_id: String,
+    pub asset_type: String,               // fiat-currency, mutual-credit, crypto, stock, bond, etc.
+    pub currency_code: Option<String>,    // USD, EUR, BTC
+    pub account_number_hash: Option<String>,  // Hashed for privacy
+    pub account_institution: Option<String>,
+
+    // Account State
+    pub account_balance: f64,
+    pub available_balance: f64,
+    pub account_status: String,           // active, frozen, closed
+    pub pending_transactions_json: String, // Transaction[] as JSON
+
+    // Income Streams
+    pub income_streams_json: String,      // IncomeStream[] as JSON
+    pub monthly_income: f64,              // Guaranteed income
+    pub expected_monthly_income: f64,     // With uncertain streams
+
+    // Obligations & Liabilities
+    pub obligations_json: String,         // FinancialObligation[] as JSON
+    pub total_liability: f64,
+    pub monthly_obligations: f64,
+
+    // UBA/UBI Status
+    pub uba_eligible: bool,
+    pub uba_status: String,               // active, pending, paused, inactive
+    pub uba_monthly_amount: Option<f64>,
+    pub uba_last_payment: Option<String>,
+
+    // Financial Health
+    pub burn_rate: Option<f64>,           // Per day
+    pub runway_days: Option<u32>,         // Days until depleted
+    pub debt_to_income_ratio: Option<f64>,
+    pub credit_score: Option<u32>,
+    pub confidence_score: u32,            // Data confidence 0-100
+
+    // Verification
+    pub data_source: String,              // bank-api, manual, blockchain, mixed
+    pub last_verified_at: Option<String>,
+    pub verification_method: Option<String>,
+
+    // Metadata
+    pub schema_version: u32,
+    pub validation_status: String,
+    pub metadata_json: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// UBAEligibility - Tracks if human qualifies for Universal Basic Assets/Income
+/// Constitutional floor of dignity while transitioning to Elohim economy
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct UBAEligibility {
+    pub id: String,
+    pub human_id: String,
+    pub eligible: bool,
+    pub eligibility_reason: Option<String>,
+
+    // Entitlements
+    pub basic_assets_json: String,        // BasicAssetEntitlement[] as JSON
+    pub basic_income_json: Option<String>, // BasicIncomeEntitlement as JSON
+    pub dignity_floor_json: String,       // DignityFloor as JSON
+
+    // Verification
+    pub verified_at: Option<String>,
+    pub verified_by: Option<String>,      // Governance entity
+    pub documentation_links_json: String, // String[] as JSON
+
+    // Metadata
+    pub schema_version: u32,
+    pub validation_status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// AccountingBridge - Bridge between legacy accounting and hREA/ValueFlows
+///
+/// This entry type acts as the "AccountingBridge module" - mapping legacy
+/// financial assets (stocks, bonds, CoDs, AR/AP) to hREA ResourceSpecification
+/// for transparent economic coordination.
+///
+/// Enables:
+/// - Transparent portfolio tracking
+/// - Equity asset stewardship
+/// - Accounts receivable/payable in hREA
+/// - Financial statements through hREA primitives
+/// - Full economic integration of all assets
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct AccountingBridge {
+    pub id: String,
+    pub agent_id: String,                 // Who owns this asset
+    pub asset_name: String,               // "Apple Stock", "US Treasury Bond", etc.
+    pub asset_type: String,               // Maps to FINANCIAL_ASSET_TYPES
+    pub asset_category: String,           // equity, debt, receivable, payable, real-estate
+
+    // Core Asset Data
+    pub quantity: f64,                    // Number of shares, par value, etc.
+    pub unit: String,                     // "shares", "dollars", "units"
+    pub current_value: f64,               // Current market/book value
+    pub cost_basis: f64,                  // Original purchase price
+    pub currency_code: String,            // USD, EUR, etc.
+
+    // Equity Assets (stocks, bonds, mutual funds, ETFs)
+    pub ticker_symbol: Option<String>,    // AAPL, MSFT, etc.
+    pub exchange: Option<String>,         // NASDAQ, NYSE, etc.
+    pub industry: Option<String>,         // Sector/industry classification
+
+    // Debt Assets (bonds, CoDs, notes)
+    pub maturity_date: Option<String>,    // ISO 8601 date
+    pub coupon_rate: Option<f64>,         // Interest rate
+    pub par_value: Option<f64>,           // Face value
+    pub credit_rating: Option<String>,    // AAA, A, BBB, etc.
+
+    // Receivables & Payables
+    pub debtor_id: Option<String>,        // For AR: who owes money
+    pub creditor_id: Option<String>,      // For AP: who we owe
+    pub due_date: Option<String>,
+    pub terms: Option<String>,            // Net-30, Net-60, etc.
+
+    // Real Estate
+    pub property_address: Option<String>,
+    pub property_type: Option<String>,    // residential, commercial, land
+    pub square_feet: Option<f64>,
+    pub mortgage_balance: Option<f64>,    // If mortgaged
+    pub loan_terms: Option<String>,
+
+    // hREA Integration
+    pub resource_spec_id: String,         // Maps to hREA ResourceSpecification
+    pub commitment_ids_json: String,      // hREA Commitments
+    pub event_ids_json: String,           // Economic events tracking changes
+
+    // Accounting Records
+    pub acquisition_date: String,
+    pub acquisition_event_id: Option<String>, // EconomicEvent when acquired
+    pub last_valuation_date: String,
+    pub last_valuation_event_id: Option<String>, // EconomicEvent for revaluation
+    pub dividend_or_interest_events_json: String, // Vec<String> - dividend/interest payments
+
+    // Governance & Transparency
+    pub governance_level: String,         // individual, household, community
+    pub visibility: String,               // private, household, public
+    pub account_number_hash: Option<String>, // Hashed for privacy
+    pub custodian_id: Option<String>,     // Who holds/manages (brokerage, etc.)
+
+    // Verification & Quality
+    pub data_source: String,              // manual, api, blockchain, third-party
+    pub last_verified_at: Option<String>,
+    pub verification_source: Option<String>, // Where data came from
+
+    // Accounting Calculations
+    pub unrealized_gain_loss: f64,        // Current value - cost basis
+    pub unrealized_gain_loss_percent: f64,
+    pub tax_lot_details_json: String,     // For complex tax calculations
+
+    // Metadata
+    pub schema_version: u32,
+    pub validation_status: String,        // Valid, Migrated, Degraded, Healing
+    pub metadata_json: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// Constants for Financial/Resource Status
+/// FinancialAsset types - supporting equity, debt, and hREA bridge
+/// These map to hREA ResourceSpecification for economic coordination
+pub const FINANCIAL_ASSET_TYPES: [&str; 15] = [
+    // Liquid assets
+    "fiat-currency",
+    "mutual-credit",
+    "cryptocurrency",
+
+    // Equity assets (stocks, bonds)
+    "stock",
+    "bond",
+    "cod",                    // Certificate of Deposit
+    "mutual-fund",
+    "etf",
+
+    // Real estate & property
+    "property-equity",
+    "real-estate-investment-trust",
+
+    // Receivables & obligations
+    "account-receivable",     // Money owed TO you
+    "account-payable",        // Money owed BY you (liability)
+    "promissory-note",
+
+    // Other
+    "debt",
+    "other",
+];
+
+pub const ACCOUNT_STATUSES: [&str; 3] = ["active", "frozen", "closed"];
+
+pub const UBA_STATUSES: [&str; 4] = ["active", "pending", "paused", "inactive"];
+
+pub const RESOURCE_CATEGORIES: [&str; 13] = [
+    "energy",
+    "compute",
+    "water",
+    "food",
+    "shelter",
+    "transportation",
+    "property",
+    "equipment",
+    "inventory",
+    "knowledge",
+    "reputation",
+    "financial-asset",
+    "uba",
+];
+
+pub const GOVERNANCE_LEVELS: [&str; 5] = [
+    "individual",
+    "household",
+    "community",
+    "network",
+    "constitutional",
+];
+
+// =============================================================================
 // Lamad: Practice Pool & Mastery Challenges
 // =============================================================================
 
@@ -2528,6 +2818,12 @@ pub enum EntryTypes {
     ServiceOffer(ServiceOffer),
     ServiceMatch(ServiceMatch),
 
+    // Shefa: Stewarded Resources (Resource Stewardship & Transparency)
+    StewardedResource(StewardedResource),
+    FinancialAsset(FinancialAsset),
+    UBAEligibility(UBAEligibility),
+    AccountingBridge(AccountingBridge),
+
     // Lamad: Steward Economy
     StewardCredential(StewardCredential),
     PremiumGate(PremiumGate),
@@ -2784,6 +3080,32 @@ pub enum LinkTypes {
     RequestToMatch,             // ServiceRequest -> ServiceMatch
     OfferToMatch,               // ServiceOffer -> ServiceMatch
     MatchByStatus,              // Anchor(status) -> ServiceMatch
+
+    // =========================================================================
+    // Shefa: Stewarded Resources links
+    // =========================================================================
+    // StewardedResource
+    IdToStewardedResource,      // Anchor(resource_id) -> StewardedResource
+    StewardToResource,          // Anchor(steward_id) -> StewardedResource
+    ResourceByCategory,         // Anchor(category) -> StewardedResource
+    ResourceByGovernance,       // Anchor(governance_level) -> StewardedResource
+
+    // FinancialAsset
+    IdToFinancialAsset,         // Anchor(asset_id) -> FinancialAsset
+    StewardToFinancialAsset,    // Anchor(steward_id) -> FinancialAsset
+    FinancialAssetByType,       // Anchor(asset_type) -> FinancialAsset
+    FinancialAssetByStatus,     // Anchor(account_status) -> FinancialAsset
+
+    // UBAEligibility
+    IdToUBAEligibility,         // Anchor(eligibility_id) -> UBAEligibility
+    HumanToUBA,                 // Anchor(human_id) -> UBAEligibility
+    UBAByStatus,                // Anchor(eligible) -> UBAEligibility
+
+    // AccountingBridge
+    IdToAccountingBridge,       // Anchor(bridge_id) -> AccountingBridge
+    AgentToAccountingBridge,    // Anchor(agent_id) -> AccountingBridge
+    BridgeByAssetType,          // Anchor(asset_type) -> AccountingBridge
+    BridgeByCategory,           // Anchor(asset_category) -> AccountingBridge
 
     // =========================================================================
     // Lamad: Steward Economy links

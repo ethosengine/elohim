@@ -19,21 +19,30 @@ describe('BlobStreamingService', () => {
       variants: [
         {
           hash: 'test_hash_480p',
-          resolution: '480p',
+          label: '480p',
           bitrateMbps: 1.5,
-          codec: 'h264',
+          height: 480,
+          width: 854,
+          sizeBytes: 50000000,
+          fallbackUrls: ['http://cdn.example.com/480p.mp4'],
         },
         {
           hash: 'test_hash_720p',
-          resolution: '720p',
+          label: '720p',
           bitrateMbps: 3,
-          codec: 'h264',
+          height: 720,
+          width: 1280,
+          sizeBytes: 100000000,
+          fallbackUrls: ['http://cdn.example.com/720p.mp4'],
         },
         {
           hash: 'test_hash_1080p',
-          resolution: '1080p',
+          label: '1080p',
           bitrateMbps: 5,
-          codec: 'h264',
+          height: 1080,
+          width: 1920,
+          sizeBytes: 200000000,
+          fallbackUrls: ['http://cdn.example.com/1080p.mp4'],
         },
       ],
     }),
@@ -167,7 +176,7 @@ describe('BlobStreamingService', () => {
       // Should recommend lowest quality
       expect(recommendation.variant).toBe('480p');
       // Bitrate should be <= 0.4 Mbps (80% headroom)
-      expect(recommendation.bitrateMbps).toBeLessThanOrEqual(0.5 * 0.8);
+      expect(recommendation.bitrateMbps!).toBeLessThanOrEqual(0.5 * 0.8);
     });
 
     it('should handle single-bitrate blobs', () => {

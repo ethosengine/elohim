@@ -307,6 +307,7 @@ export class BlobFallbackService {
       url,
       successCount: 0,
       failureCount: 0,
+      isHealthy: true,
     };
 
     health.successCount++;
@@ -327,6 +328,7 @@ export class BlobFallbackService {
       url,
       successCount: 0,
       failureCount: 0,
+      isHealthy: false,
     };
 
     health.failureCount++;

@@ -295,6 +295,6 @@ export class BlobVerificationService {
       this.verifyBlob(blob, hash),
     );
 
-    return from(Promise.all(verifications.map((v) => v.toPromise())));
+    return from(Promise.all(verifications.map((v) => v.toPromise() as Promise<BlobVerificationResult>)));
   }
 }

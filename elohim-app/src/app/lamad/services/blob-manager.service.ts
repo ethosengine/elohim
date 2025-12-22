@@ -250,7 +250,7 @@ export class BlobManagerService {
       this.downloadBlob(metadata, progressCallback),
     );
 
-    return from(Promise.all(downloads.map((d) => d.toPromise())));
+    return from(Promise.all(downloads.map((d) => d.toPromise() as Promise<BlobDownloadResult>)));
   }
 
   /**

@@ -100,6 +100,26 @@ export interface QualityRecommendation {
   reasoningScore: number; // 0.0-1.0 confidence
 }
 
+/**
+ * Download performance metrics for auto-tuning
+ */
+export interface DownloadPerformanceMetrics {
+  /** Number of parallel chunks used */
+  parallelChunks: number;
+
+  /** Actual bandwidth achieved in Mbps */
+  achievedBandwidthMbps: number;
+
+  /** Success rate (0.0-1.0) */
+  successRate: number;
+
+  /** Average chunk duration in milliseconds */
+  avgChunkDurationMs: number;
+
+  /** Whether network seemed congested */
+  wasCongested: boolean;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -110,13 +130,161 @@ export class BlobStreamingService {
   /** Timeout for individual chunk downloads */
   chunkTimeoutMs = 30000;
 
-  /** Maximum parallel chunks to download */
+  /** Maximum parallel chunks to download (auto-tuned between 1 and 16) */
   maxParallelChunks = 4;
+
+  /** Minimum parallel chunks (for stability) */
+  private minParallelChunks = 1;
+
+  /** Maximum parallel chunks (limit resource usage) */
+  private maxMaxParallelChunks = 16;
 
   /** Cached bandwidth probes (expires after 10 minutes) */
   private bandwidthCache = new Map<string, { result: BandwidthProbeResult; timestamp: number }>();
 
+  /** Performance metrics history for auto-tuning */
+  private performanceHistory: DownloadPerformanceMetrics[] = [];
+
+  /** Maximum history entries to keep */
+  private maxHistorySize = 20;
+
   constructor(private http: HttpClient) {}
+
+  /**
+   * Get download performance history for diagnostics.
+   *
+   * @returns Array of recent download performance metrics
+   */
+  getPerformanceHistory(): DownloadPerformanceMetrics[] {
+    return [...this.performanceHistory];
+  }
+
+  /**
+   * Calculate optimal number of parallel chunks based on bandwidth.
+   *
+   * Uses heuristic:
+   * - Slow networks (<5 Mbps): 1-2 chunks
+   * - Medium networks (5-20 Mbps): 2-4 chunks
+   * - Fast networks (20-100 Mbps): 4-8 chunks
+   * - Very fast networks (>100 Mbps): 8-16 chunks
+   *
+   * @param bandwidthMbps Available bandwidth in Mbps
+   * @param latencyMs Network latency in milliseconds
+   * @returns Optimal number of parallel chunks
+   */
+  calculateOptimalParallelChunks(bandwidthMbps: number, latencyMs: number): number {
+    // Base calculation on bandwidth
+    let optimal = 1;
+
+    if (bandwidthMbps < 5) {
+      optimal = 1; // Very slow - single chunk
+    } else if (bandwidthMbps < 20) {
+      optimal = 2; // Slow
+    } else if (bandwidthMbps < 50) {
+      optimal = 4; // Medium
+    } else if (bandwidthMbps < 100) {
+      optimal = 8; // Fast
+    } else {
+      optimal = 12; // Very fast
+    }
+
+    // Adjust for latency (high latency benefits from more parallelism)
+    if (latencyMs > 200) {
+      optimal = Math.min(optimal + 2, this.maxMaxParallelChunks);
+    }
+
+    return Math.max(this.minParallelChunks, Math.min(optimal, this.maxMaxParallelChunks));
+  }
+
+  /**
+   * Auto-tune parallel chunk count based on recent performance.
+   *
+   * Increases parallelism if:
+   * - Recent downloads show high success rate (>95%)
+   * - No congestion detected
+   * - Bandwidth usage not maxed out
+   *
+   * Decreases parallelism if:
+   * - Recent failures detected (<80% success rate)
+   * - Congestion indicators found
+   * - Timeout rate too high
+   *
+   * @returns New optimal parallel chunk count
+   */
+  autoTuneParallelChunks(): number {
+    if (this.performanceHistory.length === 0) {
+      return this.maxParallelChunks;
+    }
+
+    // Calculate average metrics from recent history
+    const recent = this.performanceHistory.slice(-5);
+    const avgSuccessRate = recent.reduce((sum, m) => sum + m.successRate, 0) / recent.length;
+    const congestionCount = recent.filter((m) => m.wasCongested).length;
+
+    let newValue = this.maxParallelChunks;
+
+    if (avgSuccessRate < 0.8 || congestionCount > 2) {
+      // Network issues detected - reduce parallelism
+      newValue = Math.max(this.minParallelChunks, this.maxParallelChunks - 1);
+      console.info(
+        `[BlobStreaming] Reducing parallelism to ${newValue} (success rate: ${(avgSuccessRate * 100).toFixed(0)}%)`,
+      );
+    } else if (avgSuccessRate > 0.95 && congestionCount === 0 && this.maxParallelChunks < this.maxMaxParallelChunks) {
+      // Network performing well - try to increase parallelism
+      newValue = Math.min(this.maxMaxParallelChunks, this.maxParallelChunks + 1);
+      console.info(`[BlobStreaming] Increasing parallelism to ${newValue} (strong network detected)`);
+    }
+
+    this.maxParallelChunks = newValue;
+    return newValue;
+  }
+
+  /**
+   * Record download performance metrics for auto-tuning feedback.
+   *
+   * @param metrics Performance metrics from a download
+   */
+  recordDownloadMetrics(metrics: DownloadPerformanceMetrics): void {
+    this.performanceHistory.push(metrics);
+
+    // Keep history size bounded
+    if (this.performanceHistory.length > this.maxHistorySize) {
+      this.performanceHistory.shift();
+    }
+
+    // Auto-tune based on recent history
+    this.autoTuneParallelChunks();
+  }
+
+  /**
+   * Get average download performance statistics.
+   *
+   * Useful for diagnostics and monitoring.
+   *
+   * @returns Average metrics across all recorded downloads
+   */
+  getAveragePerformance(): Partial<DownloadPerformanceMetrics> | null {
+    if (this.performanceHistory.length === 0) {
+      return null;
+    }
+
+    const history = this.performanceHistory;
+    return {
+      parallelChunks: history.reduce((sum, m) => sum + m.parallelChunks, 0) / history.length,
+      achievedBandwidthMbps: history.reduce((sum, m) => sum + m.achievedBandwidthMbps, 0) / history.length,
+      successRate: history.reduce((sum, m) => sum + m.successRate, 0) / history.length,
+      avgChunkDurationMs: history.reduce((sum, m) => sum + m.avgChunkDurationMs, 0) / history.length,
+      wasCongested: history.filter((m) => m.wasCongested).length > 0,
+    };
+  }
+
+  /**
+   * Reset performance history (useful for testing or after network change).
+   */
+  resetPerformanceMetrics(): void {
+    this.performanceHistory = [];
+    this.maxParallelChunks = 4; // Reset to default
+  }
 
   /**
    * Download blob in resumable chunks.
@@ -368,9 +536,9 @@ export class BlobStreamingService {
             // ONLY 206 indicates Range support
             // NEVER accept 200 as Range support - that means server ignored the Range header
             const contentRange = response.headers.get('Content-Range');
-            const isRangeSupported =
+            const isRangeSupported: boolean =
               response.status === 206 &&
-              contentRange &&
+              !!contentRange &&
               contentRange.includes('0-1');
 
             if (response.status === 200 && response.headers.has('Accept-Ranges')) {
@@ -531,7 +699,7 @@ export class BlobStreamingService {
     for (const tier of qualityTiers) {
       // Check if blob has this variant
       const hasVariant = blob.variants.some(
-        (v) => v.resolution === tier.variant
+        (v) => v.label === tier.variant
       );
       if (!hasVariant) continue;
 
@@ -572,8 +740,9 @@ export class BlobStreamingService {
 
     // Add variant streams (for HLS variant selection)
     for (const variant of blob.variants) {
+      const resolution = variant.width && variant.height ? `${variant.width}x${variant.height}` : variant.label;
       lines.push(
-        `#EXT-X-STREAM-INF:BANDWIDTH=${(variant.bitrateMbps || 5) * 1000000},RESOLUTION=${variant.resolution}`
+        `#EXT-X-STREAM-INF:BANDWIDTH=${(variant.bitrateMbps || 5) * 1000000},RESOLUTION=${resolution}`
       );
       lines.push(`${baseUrl}/${variant.hash}.m3u8`);
     }
@@ -635,12 +804,10 @@ export class BlobStreamingService {
 
     if (blob.variants && blob.variants.length > 0) {
       for (const variant of blob.variants) {
+        const width = variant.width || 1920;
+        const height = variant.height || 1080;
         xml += `
-      <Representation id="${variant.hash}" width="${this.extractResolutionWidth(
-          variant.resolution
-        )}" height="${this.extractResolutionHeight(
-          variant.resolution
-        )}" bandwidth="${(variant.bitrateMbps || 5) * 1000000}">
+      <Representation id="${variant.hash}" width="${width}" height="${height}" bandwidth="${(variant.bitrateMbps || 5) * 1000000}">
         <BaseURL>${baseUrl}/${variant.hash}/manifest.mpd</BaseURL>
       </Representation>`;
       }
