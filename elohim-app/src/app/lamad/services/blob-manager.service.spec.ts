@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { BlobManagerService, BlobDownloadResult, BlobDownloadProgress } from './blob-manager.service';
 import { BlobVerificationService } from './blob-verification.service';
-import { BlobFallbackService } from './blob-fallback.service';
+import { BlobFallbackService, UrlHealth } from './blob-fallback.service';
 import { ContentBlob } from '../models/content-node.model';
 
 describe('BlobManagerService', () => {

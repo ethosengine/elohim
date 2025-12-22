@@ -3,6 +3,7 @@ import {
   CustodianBlobDistributionService,
   CustodianSelectionCriteria,
   CustodianCapability,
+  CustodianBlobCommitment,
 } from './custodian-blob-distribution.service';
 import { ContentBlob } from '../models/content-node.model';
 

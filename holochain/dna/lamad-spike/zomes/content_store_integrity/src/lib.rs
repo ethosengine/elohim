@@ -1857,6 +1857,360 @@ pub const GOVERNANCE_LEVELS: [&str; 5] = [
     "constitutional",
 ];
 
+pub const ENFORCEMENT_METHODS: [&str; 3] = [
+    "voluntary",   // Voluntary compliance, no enforcement
+    "progressive", // Incentive-based, gentle nudges
+    "hard",        // Mandatory enforcement with hard stops
+];
+
+pub const TRANSITION_STATUSES: [&str; 6] = [
+    "proposal",      // Initial proposal
+    "negotiating",   // In negotiation phase
+    "agreed",        // Agreement reached
+    "executing",     // Execution in progress
+    "completed",     // Transition complete
+    "blocked",       // Blocked or disputed
+];
+
+pub const PHASE_STATUSES: [&str; 4] = [
+    "pending",      // Waiting to start
+    "in_progress",  // Currently executing
+    "completed",    // Successfully completed
+    "blocked",      // Failed or blocked
+];
+
+pub const ACTION_TYPES: [&str; 7] = [
+    "sell",       // Sell asset
+    "transfer",   // Transfer to another holder
+    "liquidate",  // Convert to liquid currency
+    "convert",    // Convert to different asset type
+    "register",   // Register with governance
+    "authorize",  // Get authorization
+    "other",      // Other action type
+];
+
+pub const POSITION_TYPES: [&str; 5] = [
+    "below-floor",
+    "at-floor",
+    "in-safe-zone",
+    "above-ceiling",
+    "far-above-ceiling",
+];
+
+// =============================================================================
+// Shefa: Constitutional Limits & Resource Position
+// =============================================================================
+
+/// ConstitutionalLimit - Defines floor and ceiling bounds for resources
+///
+/// Implements donut economy and limitarianism principles:
+/// - FLOOR: Dignity minimum (constitutional entitlement)
+/// - CEILING: Constitutional maximum (beyond which extractive)
+/// - SAFE ZONE: Healthy operating space between floor and ceiling
+///
+/// Enables constitutional compliance and transition to community stewardship.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ConstitutionalLimit {
+    pub id: String,
+    pub category: String,                    // Maps to RESOURCE_CATEGORIES
+    pub dimension: String,                   // e.g., "dollars", "hours", "cpu-cores"
+
+    // Floor and Ceiling Values
+    pub floor_value: f64,                    // Dignity minimum
+    pub floor_rationale: String,             // Why this floor?
+    pub ceiling_value: f64,                  // Constitutional maximum
+    pub ceiling_rationale: String,           // Why this ceiling?
+
+    // Safe Operating Space
+    pub safe_min_value: f64,                 // Recommended minimum
+    pub safe_max_value: f64,                 // Recommended maximum
+
+    // Enforcement
+    pub enforcement_method: String,          // voluntary, progressive, hard
+    pub transition_deadline: String,         // ISO 8601 date for voluntary → progressive
+    pub hard_stop_date: Option<String>,      // ISO 8601 date for hard enforcement
+
+    // Constitutional Basis
+    pub constitutional_basis_key: String,    // Reference to constitutional principle
+    pub governance_level: String,            // Which governance level sets this?
+    pub governed_by: String,                 // Entity ID of governing body
+
+    // Metadata
+    pub schema_version: u32,
+    pub validation_status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// ResourcePosition - Assessment of where a resource stands relative to constitutional bounds
+///
+/// Answers: "Is this resource within constitutional limits?"
+/// Identifies excess holdings and enables transition planning.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ResourcePosition {
+    pub id: String,
+    pub resource_id: String,                 // StewardedResource this assesses
+    pub limit_id: String,                    // ConstitutionalLimit applied
+    pub assessment_date: String,             // When assessed (ISO 8601)
+
+    // Position Assessment
+    pub position_type: String,               // below-floor, at-floor, in-safe-zone, above-ceiling, far-above-ceiling
+    pub current_value: f64,                  // Current amount of resource
+    pub distance_from_floor: f64,            // How far below/above floor (negative = below)
+    pub distance_from_ceiling: f64,          // How far below/above ceiling (negative = below)
+
+    // Excess Calculation
+    pub excess_above_ceiling: f64,           // Amount exceeding ceiling (0 if below)
+    pub excess_percentage: f64,              // Percentage above ceiling (0 if below)
+    pub surplus_available_for_transition: f64, // Recommended transition amount
+
+    // Compliance Status
+    pub compliant: bool,                     // Is this position compliant?
+    pub warning_level: String,               // "none", "caution", "warning", "critical"
+    pub days_to_hard_stop: Option<i32>,      // Days until hard enforcement (if applicable)
+
+    // Transition Info
+    pub has_active_transition: bool,         // Is there an active transition path?
+    pub transition_path_id: Option<String>,  // If yes, which one?
+    pub transition_status: Option<String>,   // Current transition status
+
+    // Metadata
+    pub schema_version: u32,
+    pub validation_status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// TransitionPath - Structured process for moving excess assets to community stewardship
+///
+/// Enables constitutional compliance through:
+/// - Transparent negotiation of splits
+/// - Phased execution with governance oversight
+/// - Immutable event recording
+/// - Reputation/governance credit tracking
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct TransitionPath {
+    pub id: String,
+    pub steward_id: String,                  // Who's transitioning assets
+    pub resource_id: String,                 // Which resource/asset
+    pub limit_id: String,                    // Which constitutional limit applies
+
+    // Asset Details
+    pub current_value: f64,                  // Total asset value
+    pub constitutional_ceiling: f64,         // Ceiling this asset should follow
+    pub excess_amount: f64,                  // Amount to transition
+
+    // Proposed Splits (how to divide the excess)
+    pub proposed_splits_json: String,        // Vec<AssetSplit> as JSON
+
+    // Status & Timeline
+    pub status: String,                      // proposal, negotiating, agreed, executing, completed, blocked
+    pub initiated_at: String,                // ISO 8601 timestamp
+    pub negotiation_deadline: String,        // 90 days from initiation by default
+    pub execution_start_date: Option<String>,
+    pub target_completion_date: Option<String>,
+    pub actual_completion_date: Option<String>,
+
+    // Governance & Oversight
+    pub governance_level: String,            // Which level has oversight?
+    pub governing_body: String,              // Entity ID (e.g., household council, community court)
+    pub approval_status: String,             // pending, approved, rejected
+    pub approval_date: Option<String>,
+    pub approved_by: Option<String>,         // Who approved?
+
+    // Transparency
+    pub visibility: String,                  // private, household, community, public
+    pub rationale: String,                   // Why this transition path?
+
+    // Execution Phases
+    pub phases_json: String,                 // Vec<TransitionPhase> as JSON
+    pub current_phase: u32,                  // Which phase are we executing?
+
+    // Immutable Records
+    pub transition_event_ids_json: String,   // Vec<String> - EconomicEvent IDs
+    pub governance_proposal_event_id: Option<String>,
+
+    // Block/Dispute Info
+    pub block_reason: Option<String>,
+    pub blocked_at: Option<String>,
+    pub disputed: bool,
+
+    // Metadata
+    pub schema_version: u32,
+    pub validation_status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// AssetSplit - How excess asset is divided among destinations
+///
+/// Each split represents one recipient of the excess asset.
+/// Examples:
+/// - 60% to Commons Pool
+/// - 30% to Community Benefit Corp
+/// - 10% to Land Trust
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct AssetSplit {
+    pub id: String,
+    pub transition_path_id: String,
+    pub split_name: String,                  // e.g., "Commons Pool", "Community Benefit Corp"
+    pub destination_type: String,            // individual, organization, commons-pool, trust, coop, etc.
+    pub destination_id: String,              // Recipient entity ID
+    pub amount: f64,                         // Amount for this split
+    pub percentage: f64,                     // Percentage of excess (0-100)
+
+    // Governance Role
+    pub legacy_role: Option<String>,         // If steward keeps a role (e.g., board member)
+    pub legacy_role_details: Option<String>, // Details about the maintained role
+
+    // Status & Timeline
+    pub status: String,                      // pending, agreed, executing, completed, blocked
+    pub agreed_at: Option<String>,
+    pub completed_at: Option<String>,
+
+    // Rationale & Transparency
+    pub rationale: String,                   // Why this split?
+    pub terms: Option<String>,               // Any special terms?
+    pub conditions: Option<String>,          // Any conditions for this split?
+
+    // Metadata
+    pub schema_version: u32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// TransitionPhase - Sequential phase in the execution of a transition
+///
+/// Each phase represents a milestone in converting excess assets to community stewardship.
+/// Example phases:
+/// 1. "Get appraisals" → determine actual value
+/// 2. "Receive board approvals" → governance sign-off
+/// 3. "Execute transfers" → move assets
+/// 4. "Update registrations" → legal/official updates
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct TransitionPhase {
+    pub id: String,
+    pub transition_path_id: String,
+    pub sequence_number: u32,                // Execution order
+    pub name: String,                        // e.g., "Get Appraisals", "Board Approval", "Execute Transfer"
+    pub description: String,                 // What happens in this phase?
+
+    // Timeline
+    pub target_start_date: String,           // ISO 8601
+    pub target_end_date: String,
+    pub actual_start_date: Option<String>,
+    pub actual_end_date: Option<String>,
+
+    // Amount in This Phase
+    pub amount_in_phase: f64,                // How much transitions in this phase
+
+    // Actions to Execute
+    pub actions_json: String,                // Vec<TransitionAction> as JSON
+    pub total_actions: u32,
+    pub completed_actions: u32,
+    pub failed_actions: u32,
+
+    // Status
+    pub status: String,                      // pending, in_progress, completed, blocked
+    pub block_reason: Option<String>,        // If blocked, why?
+    pub block_date: Option<String>,
+
+    // Metadata
+    pub schema_version: u32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// TransitionAction - Specific action within a phase
+///
+/// Examples:
+/// - "Sell 100 shares of AAPL"
+/// - "Transfer to Community Benefit Corp"
+/// - "Register with SEC"
+/// - "Update broker account"
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct TransitionAction {
+    pub id: String,
+    pub phase_id: String,
+    pub action_type: String,                 // sell, transfer, liquidate, convert, register, authorize, other
+    pub action_description: String,          // What specifically to do
+
+    // Responsibility
+    pub responsible_party: String,           // Who executes? (agent ID or role)
+    pub assigned_to: Option<String>,         // Person/entity assigned
+
+    // Timeline
+    pub target_date: String,                 // When should this happen?
+    pub actual_date: Option<String>,         // When did it happen?
+    pub deadline_critical: bool,             // Is this a hard deadline?
+
+    // Status & Results
+    pub status: String,                      // pending, completed, failed
+    pub completion_notes: Option<String>,    // How did it go?
+    pub failure_reason: Option<String>,      // If failed, why?
+
+    // Immutable Record
+    pub economic_event_id: Option<String>,   // EconomicEvent recording this action
+
+    // Metadata
+    pub schema_version: u32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// CommonsContribution - Recognition when asset transitions to community stewardship
+///
+/// Tracks the steward's contribution to commons and enables:
+/// - Governance credit attribution
+/// - Public recognition (if desired)
+/// - Historical record of community building
+/// - Future claim to benefits from commons
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CommonsContribution {
+    pub id: String,
+    pub steward_id: String,                  // Who made the contribution
+    pub transition_path_id: String,          // Which transition path
+    pub asset_split_id: String,              // Which split (if to commons)
+
+    // Contribution Details
+    pub original_holding: f64,                // What they originally held
+    pub contributed_amount: f64,             // What they contributed
+    pub contribution_date: String,           // ISO 8601 timestamp
+
+    // Commons Pool
+    pub destination_commons_pool: String,    // Which commons pool received this
+    pub commons_pool_id: String,             // Entity ID
+
+    // Governance Credit
+    pub governance_credit_amount: f64,       // How much governance credit earned
+    pub governance_credit_category: String,  // Type of credit (reputation, voting power, etc.)
+
+    // Legacy Role
+    pub legacy_role: Option<String>,         // If they maintain a role
+    pub legacy_role_details: Option<String>, // Details of maintained role
+
+    // Recognition
+    pub public_recognition: bool,            // May we publicly recognize this?
+    pub recognition_statement: Option<String>, // How to describe it publicly
+    pub recognition_date: Option<String>,    // When published
+
+    // Immutable Record
+    pub economic_event_id: String,           // EconomicEvent recording contribution
+    pub governance_proposal_id: Option<String>,
+
+    // Metadata
+    pub schema_version: u32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 // =============================================================================
 // Lamad: Practice Pool & Mastery Challenges
 // =============================================================================
