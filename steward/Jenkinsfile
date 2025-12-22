@@ -372,16 +372,24 @@ spec:
                                     echo "=== End debug ==="
 
                                     echo ""
-                                    echo "=== Building Tauri app ==="
-                                    # Required for AppImage bundling in containers without FUSE
-                                    export APPIMAGE_EXTRACT_AND_RUN=1
-                                    # Prevent strip failures on Nix-built binaries with .relr.dyn sections
-                                    export NO_STRIP=true
-                                    # Verbose output from linuxdeploy for debugging
-                                    export LDAI_VERBOSE=1
-                                    export DEBUG=1
-                                    # Build with verbose output to see actual errors
-                                    npx tauri build --verbose
+                                    echo "=== Building Tauri app (compile only) ==="
+                                    # Build without bundling first
+                                    npx tauri build --no-bundle --verbose
+
+                                    echo ""
+                                    echo "=== Patching binary for non-Nix systems ==="
+                                    # Fix the interpreter path so binary works on standard Linux
+                                    BINARY="src-tauri/target/release/elohim-steward"
+                                    echo "Before patching:"
+                                    patchelf --print-interpreter "$BINARY" || true
+                                    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "$BINARY"
+                                    echo "After patching:"
+                                    patchelf --print-interpreter "$BINARY"
+
+                                    echo ""
+                                    echo "=== Bundling .deb package ==="
+                                    # Now bundle with the patched binary
+                                    npx tauri bundle --verbose
 
                                     echo ""
                                     echo "=== Build artifacts ==="

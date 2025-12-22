@@ -35,6 +35,7 @@
             pkgs.nodejs_22
             pkgs.pnpm
             pkgs.imagemagick  # For making icon square
+            pkgs.patchelf     # For fixing interpreter in built binaries
           ];
         };
 
