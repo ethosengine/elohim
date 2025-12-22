@@ -2212,6 +2212,204 @@ pub struct CommonsContribution {
 }
 
 // =============================================================================
+// Shefa: Flow Planning, Simulation, and Budgeting
+// =============================================================================
+
+/// FlowPlan - Top-level planning entity
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct FlowPlan {
+    pub id: String,
+    pub plan_number: String,                 // FP-XXXXXXXXXX
+    pub steward_id: AgentPubKey,
+    pub name: String,
+    pub description: Option<String>,
+    pub time_horizon: String,                // TimeHorizon as string
+    pub plan_period_start: Timestamp,
+    pub plan_period_end: Timestamp,
+    pub resource_scopes: Vec<String>,        // ResourceCategory[]
+    pub included_resource_ids: Vec<String>,
+    pub goals: Vec<String>,                  // FlowGoal IDs
+    pub milestones: Vec<String>,             // FlowMilestone IDs
+    pub budgets: Vec<String>,                // FlowBudget IDs
+    pub status: String,                      // PlanStatus
+    pub confidence_score: u8,                // 0-100
+    pub completion_percent: u8,              // 0-100
+    pub created_at: Timestamp,
+    pub activated_at: Option<Timestamp>,
+    pub completed_at: Option<Timestamp>,
+    pub last_reviewed_at: Option<Timestamp>,
+    pub next_review_due: Timestamp,
+    pub plan_event_ids_json: String,         // Vec<String> as JSON
+    pub schema_version: u32,
+    pub validation_status: String,
+    pub metadata_json: String,
+}
+
+/// FlowBudget - Prescriptive allocation
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct FlowBudget {
+    pub id: String,
+    pub budget_number: String,               // FB-XXXXXXXXXX
+    pub plan_id: String,
+    pub steward_id: AgentPubKey,
+    pub name: String,
+    pub description: Option<String>,
+    pub budget_period: String,               // weekly|monthly|quarterly|annual
+    pub period_start: Timestamp,
+    pub period_end: Timestamp,
+    pub categories_json: String,             // BudgetCategory[] as JSON
+    pub total_planned: f64,
+    pub total_actual: f64,
+    pub variance: f64,
+    pub variance_percent: f64,
+    pub status: String,                      // BudgetStatus
+    pub health_status: String,               // healthy|warning|critical
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub last_reconciled: Timestamp,
+    pub budget_event_ids_json: String,       // Vec<String> as JSON
+    pub schema_version: u32,
+    pub validation_status: String,
+}
+
+/// FlowGoal - Specific target to achieve
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct FlowGoal {
+    pub id: String,
+    pub goal_number: String,                 // FG-XXXXXXXXXX
+    pub plan_id: String,
+    pub steward_id: AgentPubKey,
+    pub name: String,
+    pub description: Option<String>,
+    pub goal_type: String,                   // savings|debt-reduction|income-increase|allocation-shift|milestone|custom
+    pub target_metric: String,
+    pub target_value: f64,
+    pub target_unit: String,
+    pub current_value: f64,
+    pub starting_value: f64,
+    pub deadline: Timestamp,
+    pub progress_percent: u8,                // 0-100
+    pub on_track: bool,
+    pub estimated_completion_date: Option<Timestamp>,
+    pub linked_resource_ids_json: String,    // Vec<String> as JSON
+    pub linked_budget_ids_json: String,      // Vec<String> as JSON
+    pub blocked_by_json: String,             // Vec<String> as JSON
+    pub status: String,                      // GoalStatus
+    pub created_at: Timestamp,
+    pub started_at: Option<Timestamp>,
+    pub completed_at: Option<Timestamp>,
+    pub goal_event_ids_json: String,         // Vec<String> as JSON
+    pub schema_version: u32,
+    pub validation_status: String,
+}
+
+/// FlowMilestone - Key checkpoint in plan
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct FlowMilestone {
+    pub id: String,
+    pub milestone_number: String,            // FM-XXXXXXXXXX
+    pub plan_id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub target_date: Timestamp,
+    pub actual_date: Option<Timestamp>,
+    pub success_criteria_json: String,       // MilestoneSuccessCriterion[] as JSON
+    pub all_criteria_met: bool,
+    pub depends_on_goals_json: String,       // Vec<String> as JSON
+    pub depends_on_milestones_json: String,  // Vec<String> as JSON
+    pub blocks_goals_json: String,           // Vec<String> as JSON
+    pub status: String,                      // MilestoneStatus
+    pub achieved_at: Option<Timestamp>,
+    pub milestone_event_ids_json: String,    // Vec<String> as JSON
+    pub schema_version: u32,
+    pub validation_status: String,
+}
+
+/// FlowScenario - What-if simulation
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct FlowScenario {
+    pub id: String,
+    pub scenario_number: String,             // FS-XXXXXXXXXX
+    pub plan_id: String,
+    pub steward_id: AgentPubKey,
+    pub name: String,
+    pub description: Option<String>,
+    pub scenario_type: String,               // optimistic|pessimistic|baseline|target|what-if
+    pub changes_json: String,                // ScenarioChange[] as JSON
+    pub projections_json: String,            // Vec<String> as JSON (FlowProjection IDs)
+    pub baseline_scenario_id: Option<String>,
+    pub delta_metrics_json: String,          // Record<String, f64> as JSON
+    pub status: String,                      // ScenarioStatus
+    pub simulated_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub scenario_event_ids_json: String,     // Vec<String> as JSON
+    pub schema_version: u32,
+    pub validation_status: String,
+}
+
+/// FlowProjection - Time series forecast
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct FlowProjection {
+    pub id: String,
+    pub projection_number: String,           // FP-XXXXXXXXXX
+    pub plan_id: Option<String>,
+    pub scenario_id: Option<String>,
+    pub steward_id: AgentPubKey,
+    pub resource_category: String,
+    pub resource_id: Option<String>,
+    pub projection_start: Timestamp,
+    pub projection_end: Timestamp,
+    pub projection_horizon: String,          // TimeHorizon
+    pub data_points_json: String,            // ProjectionDataPoint[] as JSON
+    pub confidence_level: String,            // low|medium|high
+    pub confidence_percent: u8,              // 0-100
+    pub projection_method: String,           // trend-extrapolation|pattern-based|scenario-driven|constraint-optimized
+    pub assumptions_json: String,            // Vec<String> as JSON
+    pub breakpoints_json: String,            // ProjectionBreakpoint[] as JSON
+    pub created_at: Timestamp,
+    pub schema_version: u32,
+    pub validation_status: String,
+}
+
+/// RecurringPattern - Life cadence modeling
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RecurringPattern {
+    pub id: String,
+    pub pattern_number: String,              // RP-XXXXXXXXXX
+    pub steward_id: AgentPubKey,
+    pub label: String,
+    pub description: Option<String>,
+    pub frequency: String,                   // daily|weekly|biweekly|monthly|quarterly|semi-annual|annual|irregular|one-time
+    pub frequency_value: Option<u32>,        // For "every N" patterns
+    pub expected_amount: f64,
+    pub expected_unit: String,
+    pub variance_expected: u8,               // 0-100 percentage
+    pub start_date: Timestamp,
+    pub end_date: Option<Timestamp>,
+    pub next_due_date: Timestamp,
+    pub resource_category: String,
+    pub pattern_type: String,                // income|expense|allocation|event
+    pub auto_generate: bool,
+    pub historical_occurrences_json: String, // Vec<String> as JSON (event IDs)
+    pub missed_occurrences: u32,
+    pub average_actual_amount: Option<f64>,
+    pub reliability: u8,                     // 0-100 consistency score
+    pub status: String,                      // active|paused|ended
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub schema_version: u32,
+    pub validation_status: String,
+}
+
+// =============================================================================
 // Lamad: Practice Pool & Mastery Challenges
 // =============================================================================
 
@@ -3187,6 +3385,15 @@ pub enum EntryTypes {
     TransitionAction(TransitionAction),
     CommonsContribution(CommonsContribution),
 
+    // Shefa: Flow Planning, Simulation, and Budgeting
+    FlowPlan(FlowPlan),
+    FlowBudget(FlowBudget),
+    FlowGoal(FlowGoal),
+    FlowMilestone(FlowMilestone),
+    FlowScenario(FlowScenario),
+    FlowProjection(FlowProjection),
+    RecurringPattern(RecurringPattern),
+
     // Lamad: Steward Economy
     StewardCredential(StewardCredential),
     PremiumGate(PremiumGate),
@@ -3516,6 +3723,23 @@ pub enum LinkTypes {
     TransitionToContribution,   // Anchor(transition_path_id) -> CommonsContribution
     PoolToContribution,         // Anchor(commons_pool_id) -> CommonsContribution
     ContributionByRecognition,  // Anchor(public_recognition) -> CommonsContribution
+
+    // =========================================================================
+    // Shefa: Flow Planning links (Consolidated - essential navigation only)
+    // =========================================================================
+    IdToFlowPlan,               // Anchor(plan_id) -> FlowPlan
+    StewardToFlowPlan,          // Anchor(steward_id) -> FlowPlan
+    PlanToBudget,               // Plan -> FlowBudget (structural)
+    PlanToGoal,                 // Plan -> FlowGoal (structural)
+    PlanToMilestone,            // Plan -> FlowMilestone (structural)
+    PlanToScenario,             // Plan -> FlowScenario (structural)
+    IdToFlowBudget,             // Anchor(budget_id) -> FlowBudget
+    IdToFlowGoal,               // Anchor(goal_id) -> FlowGoal
+    IdToFlowMilestone,          // Anchor(milestone_id) -> FlowMilestone
+    IdToFlowScenario,           // Anchor(scenario_id) -> FlowScenario
+    ScenarioToProjection,       // Scenario -> FlowProjection (structural)
+    IdToRecurringPattern,       // Anchor(pattern_id) -> RecurringPattern
+    StewardToRecurringPattern,  // Anchor(steward_id) -> RecurringPattern
 
     // =========================================================================
     // Lamad: Steward Economy links

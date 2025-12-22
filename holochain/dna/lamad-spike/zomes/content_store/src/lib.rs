@@ -429,12 +429,12 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
         // =====================================================================
         CacheRuleBuilder::new("get_service_request")
             .ttl_5m()
-            .reach_based("request.is_public", true)
+            .reach_based("request.is_public", "true")
             .invalidated_by(vec!["create_service_request"])
             .build(),
         CacheRuleBuilder::new("get_service_offer")
             .ttl_5m()
-            .reach_based("offer.is_public", true)
+            .reach_based("offer.is_public", "true")
             .invalidated_by(vec!["create_service_offer"])
             .build(),
         CacheRuleBuilder::new("get_service_match")
@@ -11619,4 +11619,132 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
     }
 
     Ok(())
+}
+
+// =============================================================================
+// SHEFA: FLOW PLANNING ZOME FUNCTIONS (Phase 1 - CRUD Operations)
+// =============================================================================
+
+/// Create a new FlowPlan
+#[hdk_extern]
+pub fn create_flow_plan(flow_plan: FlowPlan) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::FlowPlan(flow_plan.clone()))?;
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Created entry not found".to_string()
+        )))?;
+
+    // Link from steward to plan
+    create_link(
+        flow_plan.steward_id.clone(),
+        action_hash.clone(),
+        LinkTypes::StewardToFlowPlan,
+        (),
+    )?;
+
+    Ok(record)
+}
+
+/// Retrieve a FlowPlan by action hash
+#[hdk_extern]
+pub fn get_flow_plan(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    get(action_hash, GetOptions::default())
+}
+
+/// Get all flow plans for a steward
+#[hdk_extern]
+pub fn get_plans_for_steward(steward_id: AgentPubKey) -> ExternResult<Vec<Record>> {
+    let query = LinkQuery::try_new(steward_id, LinkTypes::StewardToFlowPlan)?;
+    let links = get_links(query, GetStrategy::default())?;
+    let mut records = Vec::new();
+
+    for link in links {
+        if let Ok(action_hash) = ActionHash::try_from(link.target.clone()) {
+            if let Ok(Some(record)) = get(action_hash, GetOptions::default()) {
+                records.push(record);
+            }
+        }
+    }
+
+    Ok(records)
+}
+
+/// Create a FlowBudget linked to a FlowPlan
+#[hdk_extern]
+pub fn create_flow_budget(flow_budget: FlowBudget) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::FlowBudget(flow_budget.clone()))?;
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Created budget not found".to_string()
+        )))?;
+
+    Ok(record)
+}
+
+/// Create a FlowGoal linked to a FlowPlan
+#[hdk_extern]
+pub fn create_flow_goal(flow_goal: FlowGoal) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::FlowGoal(flow_goal.clone()))?;
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Created goal not found".to_string()
+        )))?;
+
+    Ok(record)
+}
+
+/// Create a FlowMilestone linked to a FlowPlan
+#[hdk_extern]
+pub fn create_flow_milestone(flow_milestone: FlowMilestone) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::FlowMilestone(flow_milestone.clone()))?;
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Created milestone not found".to_string()
+        )))?;
+
+    Ok(record)
+}
+
+/// Create a FlowScenario linked to a FlowPlan
+#[hdk_extern]
+pub fn create_flow_scenario(flow_scenario: FlowScenario) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::FlowScenario(flow_scenario.clone()))?;
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Created scenario not found".to_string()
+        )))?;
+
+    Ok(record)
+}
+
+/// Create a FlowProjection linked to a FlowScenario
+#[hdk_extern]
+pub fn create_flow_projection(flow_projection: FlowProjection) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::FlowProjection(flow_projection.clone()))?;
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Created projection not found".to_string()
+        )))?;
+
+    Ok(record)
+}
+
+/// Create a RecurringPattern for a steward
+#[hdk_extern]
+pub fn create_recurring_pattern(recurring_pattern: RecurringPattern) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::RecurringPattern(recurring_pattern.clone()))?;
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Created pattern not found".to_string()
+        )))?;
+
+    // Link from steward to pattern
+    create_link(
+        recurring_pattern.steward_id.clone(),
+        action_hash.clone(),
+        LinkTypes::StewardToRecurringPattern,
+        (),
+    )?;
+
+    Ok(record)
 }
