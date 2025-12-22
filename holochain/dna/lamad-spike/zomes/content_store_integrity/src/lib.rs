@@ -3933,7 +3933,6 @@ pub enum LinkTypes {
     IdToAccountingBridge,       // Anchor(bridge_id) -> AccountingBridge
     AgentToAccountingBridge,    // Anchor(agent_id) -> AccountingBridge
     BridgeByAssetType,          // Anchor(asset_type) -> AccountingBridge
-    BridgeByCategory,           // Anchor(asset_category) -> AccountingBridge
 
     // =========================================================================
     // Shefa: Constitutional Limits & Transitions links
@@ -3980,7 +3979,6 @@ pub enum LinkTypes {
     StewardToContribution,      // Anchor(steward_id) -> CommonsContribution
     TransitionToContribution,   // Anchor(transition_path_id) -> CommonsContribution
     PoolToContribution,         // Anchor(commons_pool_id) -> CommonsContribution
-    ContributionByRecognition,  // Anchor(public_recognition) -> CommonsContribution
 
     // =========================================================================
     // Shefa: Flow Planning links (Consolidated - essential navigation only)
@@ -4078,8 +4076,6 @@ pub enum LinkTypes {
     // Discussion
     IdToDiscussion,             // Anchor(discussion_id) -> Discussion
     EntityToDiscussion,         // Anchor(entity_type:entity_id) -> Discussion
-    DiscussionByCategory,       // Anchor(category) -> Discussion
-    DiscussionByStatus,         // Anchor(status) -> Discussion
 
     // GovernanceState
     IdToGovernanceState,        // Anchor(entity_type:entity_id) -> GovernanceState
