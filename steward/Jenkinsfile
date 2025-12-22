@@ -255,7 +255,7 @@ spec:
             }
         }
 
-        stage('📦 Fetch UI') {
+        stage('📱 Build UI') {
             when {
                 anyOf {
                     branch 'main'
@@ -267,30 +267,36 @@ spec:
             }
             steps {
                 container('builder') {
-                    dir('steward') {
+                    dir('elohim-app') {
                         script {
                             echo """
                             ═══════════════════════════════════════════════════════════
-                            📱 FETCHING UI
+                            📱 BUILDING ANGULAR UI
                             ═══════════════════════════════════════════════════════════
                             """
 
-                            // Try to find UI from elohim-app build output
-                            def uiFound = sh(script: '''
-                                if [ -d ../elohim-app/dist/elohim-app/browser ]; then
-                                    mkdir -p ui
-                                    cp -r ../elohim-app/dist/elohim-app/browser/* ui/
-                                    echo "✅ UI copied from local elohim-app build"
-                                    exit 0
-                                else
-                                    echo "⚠️  No local UI found - using placeholder"
-                                    mkdir -p ui
-                                    echo "<html><body><h1>Elohim Steward</h1><p>UI not bundled</p></body></html>" > ui/index.html
-                                    exit 0
-                                fi
-                            ''', returnStatus: true)
+                            sh '''#!/usr/bin/env bash
+                                set -euo pipefail
 
-                            sh 'echo "UI directory:"; ls -la ui/'
+                                echo "Installing Angular dependencies..."
+                                npm ci
+
+                                echo ""
+                                echo "Building Angular app for production..."
+                                npm run build
+
+                                echo ""
+                                echo "Build output:"
+                                ls -la dist/elohim-app/browser/
+                            '''
+
+                            // Copy to steward/ui
+                            sh '''
+                                mkdir -p ../steward/ui
+                                cp -r dist/elohim-app/browser/* ../steward/ui/
+                                echo "✅ UI copied to steward/ui/"
+                                ls -la ../steward/ui/
+                            '''
                         }
                     }
                 }
