@@ -364,4 +364,105 @@ describe('BlobStreamingService', () => {
       expect(result1.averageSpeedMbps).toBeCloseTo(result2.averageSpeedMbps, 0);
     });
   });
+
+  describe('Chunk Reassembly Validation', () => {
+    it('should detect missing chunks', () => {
+      const chunks = new Map<number, Uint8Array>();
+      chunks.set(0, new Uint8Array(1024));
+      chunks.set(2, new Uint8Array(1024));
+      // Chunk 1 is missing
+
+      const chunkErrors = new Map<number, string>();
+      chunkErrors.set(1, 'Network timeout');
+
+      const validation = service['validateChunks'](chunks, 3, 3072, chunkErrors);
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.missingChunkIndices).toContain(1);
+      expect(validation.totalChunks).toBe(3);
+      expect(validation.successfulChunks).toBe(2);
+    });
+
+    it('should detect size mismatch', () => {
+      const chunks = new Map<number, Uint8Array>();
+      chunks.set(0, new Uint8Array(1024));
+      chunks.set(1, new Uint8Array(512)); // Only 512 bytes instead of 1024
+
+      const chunkErrors = new Map<number, string>();
+
+      const validation = service['validateChunks'](chunks, 2, 2048, chunkErrors);
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.expectedSizeBytes).toBe(2048);
+      expect(validation.actualSizeBytes).toBe(1536);
+    });
+
+    it('should validate complete and correct chunks', () => {
+      const chunks = new Map<number, Uint8Array>();
+      chunks.set(0, new Uint8Array(1024));
+      chunks.set(1, new Uint8Array(1024));
+      chunks.set(2, new Uint8Array(1024));
+
+      const chunkErrors = new Map<number, string>();
+
+      const validation = service['validateChunks'](chunks, 3, 3072, chunkErrors);
+
+      expect(validation.isValid).toBe(true);
+      expect(validation.successfulChunks).toBe(3);
+      expect(validation.missingChunkIndices.length).toBe(0);
+      expect(validation.failedChunkIndices.length).toBe(0);
+    });
+
+    it('should format validation error message for missing chunks', () => {
+      const validation: any = {
+        isValid: false,
+        totalChunks: 5,
+        successfulChunks: 3,
+        missingChunkIndices: [1, 3],
+        failedChunkIndices: [1],
+        chunkErrors: new Map([[1, 'Connection reset']]),
+        expectedSizeBytes: 5120,
+        actualSizeBytes: 3072,
+      };
+
+      const message = service.formatValidationError(validation);
+
+      expect(message).toContain('Missing chunks: [1, 3]');
+      expect(message).toContain('Failed chunks: 1');
+      expect(message).toContain('Size mismatch');
+    });
+
+    it('should format validation success message', () => {
+      const validation: any = {
+        isValid: true,
+        totalChunks: 5,
+        successfulChunks: 5,
+        missingChunkIndices: [],
+        failedChunkIndices: [],
+        chunkErrors: new Map(),
+        expectedSizeBytes: 5120,
+        actualSizeBytes: 5120,
+      };
+
+      const message = service.formatValidationError(validation);
+
+      expect(message).toBe('All chunks downloaded successfully');
+    });
+
+    it('should track chunk download errors', () => {
+      const chunks = new Map<number, Uint8Array>();
+      chunks.set(0, new Uint8Array(1024));
+      chunks.set(2, new Uint8Array(1024));
+
+      const chunkErrors = new Map<number, string>();
+      chunkErrors.set(1, 'Timeout after 30s');
+      chunkErrors.set(3, 'HTTP 404: Not Found');
+
+      const validation = service['validateChunks'](chunks, 4, 4096, chunkErrors);
+
+      expect(validation.failedChunkIndices).toEqual([1, 3]);
+      expect(validation.chunkErrors.get(1)).toBe('Timeout after 30s');
+      expect(validation.chunkErrors.get(3)).toBe('HTTP 404: Not Found');
+    });
+  });
 });

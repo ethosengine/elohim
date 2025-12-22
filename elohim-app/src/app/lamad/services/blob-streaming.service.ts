@@ -51,6 +51,35 @@ export interface ChunkDownloadResult {
 }
 
 /**
+ * Chunk validation result for detecting missing/corrupted chunks
+ */
+export interface ChunkValidationResult {
+  /** Whether all chunks were successfully downloaded */
+  isValid: boolean;
+
+  /** Total number of expected chunks */
+  totalChunks: number;
+
+  /** Number of chunks successfully downloaded */
+  successfulChunks: number;
+
+  /** Indices of missing chunks (0-based) */
+  missingChunkIndices: number[];
+
+  /** Indices of chunks with errors */
+  failedChunkIndices: number[];
+
+  /** Error messages for failed chunks */
+  chunkErrors: Map<number, string>;
+
+  /** Total expected size in bytes */
+  expectedSizeBytes: number;
+
+  /** Actual size of reassembled data */
+  actualSizeBytes: number;
+}
+
+/**
  * Bandwidth probe result
  */
 export interface BandwidthProbeResult {
@@ -137,6 +166,9 @@ export class BlobStreamingService {
       return this.downloadSingleRequest(url);
     }
 
+    // Track chunk download errors and results
+    const chunkErrors = new Map<number, string>();
+
     // Download chunks in parallel (up to maxParallelChunks at a time)
     const downloadPromises: Promise<void>[] = [];
 
@@ -177,20 +209,38 @@ export class BlobStreamingService {
         }
 
         abortSignal?.throwIfAborted();
+      }).catch((error) => {
+        // Capture chunk download errors instead of failing entire download
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        chunkErrors.set(i, errorMsg);
+        console.warn(`[BlobStreaming] Chunk ${i} download failed: ${errorMsg}`);
       });
 
       downloadPromises.push(chunkPromise);
     }
 
-    // Wait for all chunks to complete
-    await Promise.all(downloadPromises);
+    // Wait for all chunks to complete (even if some fail)
+    await Promise.allSettled(downloadPromises);
 
-    // Assemble chunks in order
+    // Validate chunks before reassembly
+    const validation = this.validateChunks(chunks, chunkCount, totalSize, chunkErrors);
+
+    if (!validation.isValid) {
+      const missingList = validation.missingChunkIndices.join(', ');
+      const failedList = validation.failedChunkIndices.join(', ');
+      throw new Error(
+        `Chunk download validation failed. Missing: [${missingList}], Failed: [${failedList}]. ` +
+        `Got ${validation.successfulChunks}/${validation.totalChunks} chunks.`
+      );
+    }
+
+    // Assemble chunks in order (all chunks are now validated to exist)
     const result = new Uint8Array(totalSize);
     let offset = 0;
 
     for (let i = 0; i < chunkCount; i++) {
       const chunk = chunks.get(i);
+      // Safe to assume chunk exists due to validation above
       if (chunk) {
         result.set(chunk, offset);
         offset += chunk.length;
@@ -238,6 +288,60 @@ export class BlobStreamingService {
           error: (err) => reject(err),
         });
     });
+  }
+
+  /**
+   * Validate that all expected chunks were successfully downloaded.
+   *
+   * Detects missing and failed chunks before reassembly to prevent silent
+   * data corruption. Throws an error if chunks are missing.
+   *
+   * @param chunks Map of chunk index to data
+   * @param totalChunks Total number of expected chunks
+   * @param totalSize Total size in bytes
+   * @param chunkErrors Map of chunk errors that occurred
+   * @returns Validation result with details on missing/failed chunks
+   */
+  private validateChunks(
+    chunks: Map<number, Uint8Array>,
+    totalChunks: number,
+    totalSize: number,
+    chunkErrors: Map<number, string>
+  ): ChunkValidationResult {
+    const missingChunkIndices: number[] = [];
+    const failedChunkIndices: number[] = [];
+
+    // Check for missing chunks
+    for (let i = 0; i < totalChunks; i++) {
+      if (!chunks.has(i)) {
+        missingChunkIndices.push(i);
+
+        // Check if this chunk has a recorded error
+        if (chunkErrors.has(i)) {
+          failedChunkIndices.push(i);
+        }
+      }
+    }
+
+    // Calculate actual reassembled size
+    let actualSize = 0;
+    for (const chunk of chunks.values()) {
+      actualSize += chunk.length;
+    }
+
+    const successfulChunks = chunks.size;
+    const isValid = missingChunkIndices.length === 0 && actualSize === totalSize;
+
+    return {
+      isValid,
+      totalChunks,
+      successfulChunks,
+      missingChunkIndices,
+      failedChunkIndices,
+      chunkErrors,
+      expectedSizeBytes: totalSize,
+      actualSizeBytes: actualSize,
+    };
   }
 
   /**
@@ -294,6 +398,49 @@ export class BlobStreamingService {
         error: (err) => reject(err),
       });
     });
+  }
+
+  /**
+   * Format chunk validation result as human-readable error message.
+   * Useful for logging or reporting chunk download failures.
+   *
+   * @param validation Validation result from chunk download
+   * @returns Human-readable error message
+   */
+  formatValidationError(validation: ChunkValidationResult): string {
+    if (validation.isValid) {
+      return 'All chunks downloaded successfully';
+    }
+
+    const parts: string[] = [];
+
+    if (validation.missingChunkIndices.length > 0) {
+      parts.push(
+        `Missing chunks: [${validation.missingChunkIndices.join(', ')}] ` +
+        `(${validation.missingChunkIndices.length}/${validation.totalChunks})`
+      );
+    }
+
+    if (validation.failedChunkIndices.length > 0) {
+      const errorDetails = validation.failedChunkIndices
+        .slice(0, 3) // Show first 3 errors
+        .map((idx) => `chunk ${idx}: ${validation.chunkErrors.get(idx)}`)
+        .join('; ');
+
+      parts.push(
+        `Failed chunks: ${validation.failedChunkIndices.length} ` +
+        `(${errorDetails}${validation.failedChunkIndices.length > 3 ? '...' : ''})`
+      );
+    }
+
+    if (validation.expectedSizeBytes !== validation.actualSizeBytes) {
+      parts.push(
+        `Size mismatch: expected ${validation.expectedSizeBytes} bytes, ` +
+        `got ${validation.actualSizeBytes} bytes`
+      );
+    }
+
+    return parts.join('; ');
   }
 
   /**

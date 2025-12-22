@@ -11,3 +11,4 @@ name = "content_store_integrity"
 hdi.workspace = true
 holochain_serialized_bytes.workspace = true
 serde.workspace = true
+hc-rna.workspace = true
