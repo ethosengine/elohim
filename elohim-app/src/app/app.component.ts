@@ -5,6 +5,7 @@ import { filter } from 'rxjs/operators';
 import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
 import { HolochainContentService } from './elohim/services/holochain-content.service';
+import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
 import { environment } from '../environments/environment';
 
 /** Connection retry configuration */
@@ -28,6 +29,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private readonly holochainService = inject(HolochainClientService);
   private readonly holochainContent = inject(HolochainContentService);
+  private readonly blobBootstrap = inject(BlobBootstrapService);
 
   /** Retry configuration for connection attempts */
   private readonly retryConfig: RetryConfig = {
@@ -79,11 +81,16 @@ export class AppComponent implements OnInit, OnDestroy {
    *
    * Runs in background without blocking app initialization.
    * On failure, retries with exponential backoff up to maxAttempts.
+   *
+   * Also initializes blob streaming in degraded mode (cached blobs only)
+   * if Holochain config is not available.
    */
   private async initializeHolochainConnection(): Promise<void> {
     // Only attempt connection if holochain config exists
     if (!environment.holochain?.adminUrl) {
-      console.log('[Holochain] Config not found, skipping auto-connect');
+      console.log('[Holochain] Config not found, initializing blob bootstrap in degraded mode');
+      // Start blob bootstrap in degraded mode - can serve cached blobs without Holochain
+      this.blobBootstrap.startBootstrap();
       return;
     }
 
@@ -113,6 +120,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
         if (contentAvailable) {
           console.log('[Holochain] Content service available - Holochain data ready!');
+
+          // Initialize blob streaming now that Holochain is ready
+          this.blobBootstrap.startBootstrap();
         } else {
           console.warn('[Holochain] Connected but content service unavailable');
         }

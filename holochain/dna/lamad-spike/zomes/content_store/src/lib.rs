@@ -20,8 +20,11 @@ pub mod healing_impl;
 // Integration layer for healing (read/write path glue)
 pub mod healing_integration;
 
+// Entry type providers for flexible healing architecture
+pub mod providers;
+
 // =============================================================================
-// DNA Initialization - Sets up healing support
+// DNA Initialization - Sets up healing support and flexible architecture
 // =============================================================================
 
 #[hdk_extern]
@@ -30,7 +33,51 @@ pub fn init() -> ExternResult<InitCallbackResult> {
     // This never fails, always returns success
     let _ = healing_impl::init_healing();
 
+    // Initialize flexible healing architecture
+    // Register all entry type providers
+    init_flexible_orchestrator()?;
+
     Ok(InitCallbackResult::Pass)
+}
+
+/// Initialize the flexible orchestrator with all Lamad entry type providers
+fn init_flexible_orchestrator() -> ExternResult<()> {
+    use hc_rna::{EntryTypeRegistry, FlexibleOrchestrator, FlexibleOrchestratorConfig, BridgeFirstStrategy};
+    use std::sync::Arc;
+
+    // Create registry and register all Lamad entry types
+    let mut registry = EntryTypeRegistry::new();
+
+    registry.register(Arc::new(providers::ContentProvider))
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to register ContentProvider: {}", e))))?;
+
+    registry.register(Arc::new(providers::LearningPathProvider))
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to register LearningPathProvider: {}", e))))?;
+
+    registry.register(Arc::new(providers::PathStepProvider))
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to register PathStepProvider: {}", e))))?;
+
+    registry.register(Arc::new(providers::ContentMasteryProvider))
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to register ContentMasteryProvider: {}", e))))?;
+
+    // Create orchestrator config
+    let config = FlexibleOrchestratorConfig {
+        v1_role_name: Some("lamad-v1".to_string()),
+        v2_role_name: Some("lamad-v2".to_string()),
+        healing_strategy: Arc::new(BridgeFirstStrategy),
+        allow_degradation: true,
+        max_attempts: 3,
+        emit_signals: true,
+    };
+
+    // Create orchestrator
+    let _orchestrator = FlexibleOrchestrator::new(config, registry);
+
+    // In production, you'd store the orchestrator in a thread_local or call it lazily
+    // For now, we've just initialized it successfully
+    debug!("Flexible orchestrator initialized with all entry type providers");
+
+    Ok(())
 }
 
 // =============================================================================

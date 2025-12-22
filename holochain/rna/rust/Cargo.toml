@@ -11,10 +11,18 @@ categories = ["development-tools"]
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[[bin]]
+name = "hc-rna-generate"
+path = "src/bin/generate.rs"
+required-features = ["cli"]
+
 [dependencies]
 hdk = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+regex = "1.10"
+clap = { version = "4.4", features = ["derive"], optional = true }
 
 [features]
 default = []
+cli = ["clap"]

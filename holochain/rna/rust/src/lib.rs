@@ -67,6 +67,11 @@ pub mod traits;
 pub mod healing;
 pub mod self_healing;
 pub mod healing_orchestrator;
+pub mod entry_type_provider;
+pub mod healing_strategy;
+pub mod flexible_orchestrator;
+pub mod analyzer;
+pub mod generator;
 
 // Re-export commonly used items
 pub use bridge::bridge_call;
@@ -75,7 +80,7 @@ pub use report::{
     CountCheck, MigrationCounts, MigrationError, MigrationPhase, MigrationReport,
     MigrationVerification,
 };
-pub use traits::{Exporter, Importer, TransformContext, Transformer, Verifier};
+pub use traits::{Exporter, Importer, TransformContext, Transformer as MigrationTransformer, Verifier};
 
 // Re-export self-healing types
 pub use healing::{
@@ -84,3 +89,18 @@ pub use healing::{
 };
 pub use self_healing::{SelfHealingEntry, HealedEntry, ValidationResult, BatchValidator};
 pub use healing_orchestrator::{HealingOrchestrator, emit_healing_signal};
+
+// Re-export flexible architecture types
+pub use entry_type_provider::{
+    HealableEntry, Validator, Transformer, ReferenceResolver,
+    DegradationHandler, DegradationDecision, EntryTypeProvider, EntryTypeRegistry,
+};
+pub use healing_strategy::{
+    HealingResult as HealingStrategyResult, HealingStrategy, HealingContext,
+    BridgeFirstStrategy, SelfRepairFirstStrategy, LocalRepairOnlyStrategy, NoHealingStrategy,
+};
+pub use flexible_orchestrator::{OrchestratorConfig as FlexibleOrchestratorConfig, FlexibleOrchestrator, HealingOutcome};
+
+// Re-export schema analysis and generation
+pub use analyzer::{DNAAnalyzer, EntryTypeSchema, FieldType, Field};
+pub use generator::ProviderGenerator;

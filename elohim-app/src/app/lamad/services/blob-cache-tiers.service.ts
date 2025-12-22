@@ -178,10 +178,10 @@ export class BlobCacheTiersService {
     const sizeBytes = blob.size;
 
     // Don't cache oversized blobs
-    if (sizeBytes > this.tiers.blob.maxSizeBytes) {
+    if (sizeBytes > this.tiers['blob'].maxSizeBytes) {
       return {
         success: false,
-        reason: `Blob too large (${sizeBytes} > ${this.tiers.blob.maxSizeBytes})`,
+        reason: `Blob too large (${sizeBytes} > ${this.tiers['blob'].maxSizeBytes})`,
       };
     }
 
@@ -211,7 +211,7 @@ export class BlobCacheTiersService {
     if (item) {
       // Check TTL
       const age = (Date.now() - item.createdAt) / 1000;
-      if (age > this.tiers.blob.ttlSeconds) {
+      if (age > this.tiers['blob'].ttlSeconds) {
         // Expired
         this.blobCache.delete(hash);
         this.blobCacheSize -= item.sizeBytes;
@@ -236,10 +236,10 @@ export class BlobCacheTiersService {
     const sizeBytes = chunk.byteLength;
 
     // Don't cache oversized chunks
-    if (sizeBytes > this.tiers.chunk.maxSizeBytes) {
+    if (sizeBytes > this.tiers['chunk'].maxSizeBytes) {
       return {
         success: false,
-        reason: `Chunk too large (${sizeBytes} > ${this.tiers.chunk.maxSizeBytes})`,
+        reason: `Chunk too large (${sizeBytes} > ${this.tiers['chunk'].maxSizeBytes})`,
       };
     }
 
@@ -269,7 +269,7 @@ export class BlobCacheTiersService {
     if (item) {
       // Check TTL
       const age = (Date.now() - item.createdAt) / 1000;
-      if (age > this.tiers.chunk.ttlSeconds) {
+      if (age > this.tiers['chunk'].ttlSeconds) {
         // Expired
         this.chunkCache.delete(hash);
         this.chunkCacheSize -= item.sizeBytes;
@@ -418,7 +418,7 @@ export class BlobCacheTiersService {
   private evictFromBlobCache(requiredBytes: number): number {
     let evicted = 0;
 
-    while (this.blobCacheSize + requiredBytes > this.tiers.blob.maxSizeBytes && this.blobCache.size > 0) {
+    while (this.blobCacheSize + requiredBytes > this.tiers['blob'].maxSizeBytes && this.blobCache.size > 0) {
       // Find least recently used item
       let lruHash = '';
       let lruTime = Infinity;
@@ -450,7 +450,7 @@ export class BlobCacheTiersService {
   private evictFromChunkCache(requiredBytes: number): number {
     let evicted = 0;
     const now = Date.now();
-    const ttl = this.tiers.chunk.ttlSeconds * 1000;
+    const ttl = this.tiers['chunk'].ttlSeconds * 1000;
 
     // First pass: remove expired items
     for (const [hash, item] of this.chunkCache.entries()) {
@@ -463,7 +463,7 @@ export class BlobCacheTiersService {
     }
 
     // Second pass: if still need space, use LRU
-    while (this.chunkCacheSize + requiredBytes > this.tiers.chunk.maxSizeBytes && this.chunkCache.size > 0) {
+    while (this.chunkCacheSize + requiredBytes > this.tiers['chunk'].maxSizeBytes && this.chunkCache.size > 0) {
       let lruHash = '';
       let lruTime = Infinity;
 
@@ -508,7 +508,7 @@ export class BlobCacheTiersService {
     // Cleanup blob cache
     for (const [hash, item] of this.blobCache.entries()) {
       const age = (now - item.createdAt) / 1000;
-      if (age > this.tiers.blob.ttlSeconds) {
+      if (age > this.tiers['blob'].ttlSeconds) {
         this.blobCache.delete(hash);
         this.blobCacheSize -= item.sizeBytes;
         this.blobStats.evictions++;
@@ -518,7 +518,7 @@ export class BlobCacheTiersService {
     // Cleanup chunk cache
     for (const [hash, item] of this.chunkCache.entries()) {
       const age = (now - item.createdAt) / 1000;
-      if (age > this.tiers.chunk.ttlSeconds) {
+      if (age > this.tiers['chunk'].ttlSeconds) {
         this.chunkCache.delete(hash);
         this.chunkCacheSize -= item.sizeBytes;
         this.chunkStats.evictions++;
@@ -547,8 +547,8 @@ export class BlobCacheTiersService {
       blobCacheBytes: this.blobCacheSize,
       chunkCacheBytes: this.chunkCacheSize,
       totalBytes: this.getTotalMemoryUsageBytes(),
-      percentOfBlobMax: (this.blobCacheSize / this.tiers.blob.maxSizeBytes) * 100,
-      percentOfChunkMax: (this.chunkCacheSize / this.tiers.chunk.maxSizeBytes) * 100,
+      percentOfBlobMax: (this.blobCacheSize / this.tiers['blob'].maxSizeBytes) * 100,
+      percentOfChunkMax: (this.chunkCacheSize / this.tiers['chunk'].maxSizeBytes) * 100,
     };
   }
 
@@ -689,7 +689,7 @@ export class BlobCacheTiersService {
    * Uses lazy loading of BlobVerificationService to avoid circular dependencies
    * during service initialization.
    */
-  private startIntegrityVerification(): void {
+  public startIntegrityVerification(): void {
     // Run integrity check every 1 hour
     const checkIntervalMs = 60 * 60 * 1000;
 

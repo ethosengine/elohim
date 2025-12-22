@@ -179,7 +179,7 @@ export class BlobManagerService {
 
     // Fetch blob from fallback URLs
     return this.fallbackService.fetchWithFallback(blobMetadata.fallbackUrls).pipe(
-      tap((fetchResult) => {
+      tap((fetchResult: BlobFetchResult) => {
         if (progressCallback) {
           progressCallback({
             bytesDownloaded: blobMetadata.sizeBytes,
@@ -189,7 +189,7 @@ export class BlobManagerService {
           });
         }
       }),
-      switchMap((fetchResult) =>
+      switchMap((fetchResult: BlobFetchResult) =>
         // Verify blob integrity
         this.verificationService.verifyBlob(fetchResult.blob, blobMetadata.hash).pipe(
           map((verificationResult) => ({

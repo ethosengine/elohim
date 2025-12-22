@@ -12,7 +12,7 @@
 
 import { Injectable } from '@angular/core';
 import { Observable, throwError } from 'rxjs';
-import { retry, timeout, catchError } from 'rxjs/operators';
+import { retry, timeout, catchError, tap, map } from 'rxjs/operators';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 
 /**
@@ -159,32 +159,28 @@ export class BlobFallbackService {
             );
           },
         }),
-        catchError((error: HttpErrorResponse) => {
+        tap((blob: Blob) => {
+          // Record success
+          this.recordUrlSuccess(url);
+          console.log(`Successfully fetched from ${url}`);
+        }),
+        map((blob: Blob): BlobFetchResult => ({
+          blob,
+          urlIndex: currentIndex,
+          successUrl: url,
+          durationMs: performance.now() - context.startTime,
+          retryCount: context.retryCount,
+        })),
+        catchError((error: any) => {
           // Record failure
           this.recordUrlFailure(url, error.message);
 
           console.warn(
-            `URL failed: ${url} (${error.status}). Trying next fallback...`,
+            `URL failed: ${url}. Trying next fallback...`,
             error,
           );
 
-          // Try next URL
-          return this.fetchUrlCascade(
-            urls,
-            currentIndex + 1,
-            timeoutMs,
-            maxRetries,
-            context,
-          );
-        }),
-        // Success - record URL health and return
-        catchError((error) => {
-          // If we get here, all URLs exhausted
-          return throwError(() => error);
-        }),
-      )
-      .pipe(
-        catchError((error) => {
+          // Try next URL in cascade
           return this.fetchUrlCascade(
             urls,
             currentIndex + 1,
@@ -194,43 +190,6 @@ export class BlobFallbackService {
           );
         }),
       );
-
-    // This is the success path
-    return new Observable((subscriber) => {
-      this.fetchUrl(url, timeoutMs, maxRetries)
-        .subscribe(
-          (blob) => {
-            const durationMs = performance.now() - context.startTime;
-
-            // Record success
-            this.recordUrlSuccess(url);
-
-            subscriber.next({
-              blob,
-              urlIndex: currentIndex,
-              successUrl: url,
-              durationMs,
-              retryCount: context.retryCount,
-            });
-            subscriber.complete();
-          },
-          (error) => {
-            // Try next URL on failure
-            this.recordUrlFailure(url, error.message);
-            this.fetchUrlCascade(
-              urls,
-              currentIndex + 1,
-              timeoutMs,
-              maxRetries,
-              context,
-            ).subscribe(
-              (result) => subscriber.next(result),
-              (err) => subscriber.error(err),
-              () => subscriber.complete(),
-            );
-          },
-        );
-    });
   }
 
   /**
