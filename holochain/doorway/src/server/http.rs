@@ -386,7 +386,14 @@ async fn handle_request(
         // REST API routes for public content
         (Method::GET, p) if p.starts_with("/api/v1/") => {
             let query = req.uri().query();
-            to_boxed(routes::handle_api_request(state, p, query).await)
+            // Extract auth header and remote IP for reach-aware serving
+            let auth_header = req
+                .headers()
+                .get("authorization")
+                .and_then(|h| h.to_str().ok())
+                .map(|s| s.to_string());
+            let remote_ip = addr.ip();
+            to_boxed(routes::handle_api_request(state, p, query, Some(remote_ip), auth_header).await)
         }
 
         // Not found

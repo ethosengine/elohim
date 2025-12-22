@@ -375,6 +375,23 @@ pub const BANDWIDTH_CLASSES: [&str; 4] = [
     "ultra",    // >500 Mbps
 ];
 
+/// Category override types (specialists who custody content outside relationship reach)
+pub const CATEGORY_OVERRIDE_TYPES: [&str; 5] = [
+    "medical",           // Healthcare providers (doctors, clinicians)
+    "emergency",         // Emergency services (fire, police, rescue)
+    "disaster_relief",   // Disaster response (FEMA, Red Cross, etc.)
+    "high_bandwidth",    // Content delivery specialists (video, media)
+    "archive",           // Long-term preservation (librarians, archivists)
+];
+
+/// Category override access levels
+pub const CATEGORY_ACCESS_LEVELS: [&str; 4] = [
+    "professional",      // Licensed/credentialed access only
+    "trusted",          // Pre-vetted specialists
+    "verified",         // Verified identity + background check
+    "emergency_only",   // Access granted only during declared emergency
+];
+
 // =============================================================================
 // Content Entry
 // =============================================================================

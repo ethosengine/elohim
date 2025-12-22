@@ -23,6 +23,14 @@ pub struct CacheEntry {
     pub expires_at: Instant,
     /// Content-Type header value
     pub content_type: String,
+    /// Reach level of the cached content (private, local, municipal, commons, etc.)
+    pub reach: Option<String>,
+    /// Cache priority (0-100, higher = serve sooner)
+    pub cache_priority: u32,
+    /// Bandwidth classification (low, medium, high, ultra)
+    pub bandwidth_class: Option<String>,
+    /// Geographic affinity hint for source prioritization
+    pub geographic_affinity: Option<String>,
 }
 
 impl CacheEntry {
@@ -36,6 +44,35 @@ impl CacheEntry {
             created_at: now,
             expires_at: now + ttl,
             content_type: content_type.to_string(),
+            reach: None,
+            cache_priority: 50, // Default priority
+            bandwidth_class: None,
+            geographic_affinity: None,
+        }
+    }
+
+    /// Create a new cache entry with reach and performance hints
+    pub fn with_reach(
+        data: Vec<u8>,
+        ttl: Duration,
+        content_type: &str,
+        reach: &str,
+        cache_priority: u32,
+        bandwidth_class: Option<&str>,
+        geographic_affinity: Option<&str>,
+    ) -> Self {
+        let etag = Self::compute_etag(&data);
+        let now = Instant::now();
+        Self {
+            data,
+            etag,
+            created_at: now,
+            expires_at: now + ttl,
+            content_type: content_type.to_string(),
+            reach: Some(reach.to_string()),
+            cache_priority: cache_priority.clamp(0, 100),
+            bandwidth_class: bandwidth_class.map(|s| s.to_string()),
+            geographic_affinity: geographic_affinity.map(|s| s.to_string()),
         }
     }
 

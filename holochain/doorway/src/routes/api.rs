@@ -35,10 +35,11 @@ use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{Response, StatusCode};
 use serde::Serialize;
+use std::net::IpAddr;
 use std::sync::Arc;
 use tracing::{debug, warn};
 
-use crate::cache::{CacheKey, DefaultRules};
+use crate::cache::{CacheKey, extract_reach_from_response, should_serve_response, extract_requester_context};
 use crate::projection::ProjectionQuery;
 use crate::server::AppState;
 
@@ -125,10 +126,17 @@ fn cached_response(
 /// Query parameters:
 /// - `_conductor=true` - Bypass projection cache, read directly from conductor (DEV_MODE only)
 /// - Other params are passed as zome function arguments
+///
+/// Reach-aware serving gates content access by reach level:
+/// - private: Only the beneficiary (content owner)
+/// - local/neighborhood/municipal/bioregional/regional: Authenticated users
+/// - commons: Everyone (public)
 pub async fn handle_api_request(
     state: Arc<AppState>,
     path: &str,
     query: Option<&str>,
+    remote_addr: Option<IpAddr>,
+    auth_header: Option<String>,
 ) -> Response<Full<Bytes>> {
     // Parse route
     let route = match ApiRoute::parse(path) {
@@ -150,6 +158,13 @@ pub async fn handle_api_request(
     if conductor_bypass && !state.args.dev_mode {
         warn!("Conductor bypass requested but DEV_MODE is disabled");
     }
+
+    // Extract requester context from auth header and IP
+    let requester = extract_requester_context(auth_header.as_deref(), remote_addr);
+
+    // Placeholder for beneficiary_id - would come from content metadata or request context
+    // For now, we'll check reach-based access in the should_serve_response call
+    let beneficiary_id = "unknown";
 
     // Create cache key (without the _conductor param)
     let cache_key = route.cache_key(&args);
@@ -181,16 +196,46 @@ pub async fn handle_api_request(
 
     // Try legacy cache first (for backward compat during transition)
     if let Some(entry) = state.cache.get(&storage_key) {
-        let ttl = entry.remaining_ttl_secs();
-        let etag = entry.etag.clone();
-        return cached_response(entry.data, &etag, ttl, true);
+        // Check if requester can access this reach level
+        if should_serve_response(&entry.data, &requester, beneficiary_id) {
+            let ttl = entry.remaining_ttl_secs();
+            let etag = entry.etag.clone();
+            let reach = entry.reach.clone();
+            return reach_aware_cached_response(entry.data, &etag, ttl, true, reach);
+        } else {
+            debug!("Requester denied access to cached content due to reach level");
+            return error_response(
+                StatusCode::FORBIDDEN,
+                "Content exists but is not accessible to you",
+                "REACH_DENIED",
+            );
+        }
     }
 
     // Try projection store
     if let Some(ref projection) = state.projection {
         // Map zome function to projection query
         if let Some(response) = query_projection(&route, &args, projection.as_ref()).await {
-            return projection_response(response);
+            // Check if requester can access this reach level
+            if !should_serve_response(&response, &requester, beneficiary_id) {
+                debug!("Requester denied access to projection content due to reach level");
+                return error_response(
+                    StatusCode::FORBIDDEN,
+                    "Content exists but is not accessible to you",
+                    "REACH_DENIED",
+                );
+            }
+
+            // Cache the response with reach-aware key if reach is present
+            let reach_aware_key = if let Some(reach) = extract_reach_from_response(&response) {
+                let mut key = cache_key.clone();
+                key.reach = Some(reach.clone());
+                key
+            } else {
+                cache_key.clone()
+            };
+
+            return reach_aware_projection_response(response, reach_aware_key.reach);
         }
     }
 
@@ -310,6 +355,49 @@ async fn query_projection(
     }
 }
 
+/// Build reach-aware cached response with reach level header
+fn reach_aware_cached_response(
+    data: Vec<u8>,
+    etag: &str,
+    ttl_secs: u64,
+    cache_hit: bool,
+    reach: Option<String>,
+) -> Response<Full<Bytes>> {
+    let mut response = Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .header("Cache-Control", format!("public, max-age={}, stale-while-revalidate=60", ttl_secs))
+        .header("ETag", etag)
+        .header("X-Cache", if cache_hit { "HIT" } else { "MISS" });
+
+    if let Some(r) = reach {
+        response = response.header("X-Reach", r);
+    }
+
+    response
+        .header("Access-Control-Allow-Origin", "*")
+        .body(Full::new(Bytes::from(data)))
+        .unwrap()
+}
+
+/// Build response from projection data with reach awareness
+fn reach_aware_projection_response(data: Vec<u8>, reach: Option<String>) -> Response<Full<Bytes>> {
+    let mut response = Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .header("X-Source", "projection")
+        .header("Cache-Control", "public, max-age=60");
+
+    if let Some(r) = reach {
+        response = response.header("X-Reach", r);
+    }
+
+    response
+        .header("Access-Control-Allow-Origin", "*")
+        .body(Full::new(Bytes::from(data)))
+        .unwrap()
+}
+
 /// Build response from projection data
 fn projection_response(data: Vec<u8>) -> Response<Full<Bytes>> {
     Response::builder()
@@ -325,6 +413,7 @@ fn projection_response(data: Vec<u8>) -> Response<Full<Bytes>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::RequesterContext;
 
     #[test]
     fn test_parse_route() {
@@ -356,5 +445,223 @@ mod tests {
     fn test_error_response() {
         let resp = error_response(StatusCode::NOT_FOUND, "Test error", "TEST_ERROR");
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    // ========================================================================
+    // Reach-Aware Serving Tests
+    // ========================================================================
+
+    #[test]
+    fn test_reach_aware_cached_response_with_reach() {
+        let data = b"test content".to_vec();
+        let etag = "\"abc123\"";
+        let ttl_secs = 300;
+        let reach = Some("commons".to_string());
+
+        let resp = reach_aware_cached_response(data.clone(), etag, ttl_secs, true, reach);
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(resp.headers().contains_key("X-Cache"));
+        assert!(resp.headers().contains_key("X-Reach"));
+    }
+
+    #[test]
+    fn test_reach_aware_cached_response_without_reach() {
+        let data = b"test content".to_vec();
+        let etag = "\"abc123\"";
+        let ttl_secs = 300;
+
+        let resp = reach_aware_cached_response(data, etag, ttl_secs, false, None);
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(!resp.headers().contains_key("X-Reach"));
+    }
+
+    #[test]
+    fn test_reach_aware_projection_response_with_reach() {
+        let data = br#"{"id":"test","reach":"local"}"#.to_vec();
+        let reach = Some("local".to_string());
+
+        let resp = reach_aware_projection_response(data, reach);
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers()
+                .get("X-Reach")
+                .and_then(|h| h.to_str().ok()),
+            Some("local")
+        );
+    }
+
+    #[test]
+    fn test_extract_requester_context_authenticated() {
+        let auth_header = "Bearer alice-pubkey-abc123";
+        let requester = extract_requester_context(Some(auth_header), None);
+
+        assert_eq!(requester.agent_id, "alice-pubkey-abc123");
+        assert!(requester.authenticated);
+    }
+
+    #[test]
+    fn test_extract_requester_context_unauthenticated() {
+        let requester = extract_requester_context(None, None);
+
+        assert_eq!(requester.agent_id, "anonymous");
+        assert!(!requester.authenticated);
+    }
+
+    #[test]
+    fn test_should_serve_commons_unauthenticated() {
+        let response = br#"{"id":"content1","reach":"commons","title":"Public"}"#.to_vec();
+        let requester = RequesterContext {
+            agent_id: "stranger".to_string(),
+            location: None,
+            authenticated: false,
+        };
+
+        assert!(should_serve_response(&response, &requester, "alice"));
+    }
+
+    #[test]
+    fn test_should_not_serve_private_unauthenticated() {
+        let response = br#"{"id":"content1","reach":"private","title":"Secret"}"#.to_vec();
+        let requester = RequesterContext {
+            agent_id: "bob".to_string(),
+            location: None,
+            authenticated: false,
+        };
+
+        assert!(!should_serve_response(&response, &requester, "alice"));
+    }
+
+    #[test]
+    fn test_should_serve_private_to_owner() {
+        let response = br#"{"id":"content1","reach":"private","title":"Secret"}"#.to_vec();
+        let requester = RequesterContext {
+            agent_id: "alice".to_string(),
+            location: None,
+            authenticated: true,
+        };
+
+        assert!(should_serve_response(&response, &requester, "alice"));
+    }
+
+    #[test]
+    fn test_should_not_serve_private_to_other_authenticated() {
+        let response = br#"{"id":"content1","reach":"private","title":"Secret"}"#.to_vec();
+        let requester = RequesterContext {
+            agent_id: "bob".to_string(),
+            location: None,
+            authenticated: true,
+        };
+
+        assert!(!should_serve_response(&response, &requester, "alice"));
+    }
+
+    #[test]
+    fn test_should_serve_neighborhood_to_authenticated() {
+        let response =
+            br#"{"id":"content1","reach":"neighborhood","title":"Local"}"#.to_vec();
+        let requester = RequesterContext {
+            agent_id: "bob".to_string(),
+            location: Some("37.7749,-122.4194".to_string()),
+            authenticated: true,
+        };
+
+        assert!(should_serve_response(&response, &requester, "alice"));
+    }
+
+    #[test]
+    fn test_should_not_serve_neighborhood_to_unauthenticated() {
+        let response =
+            br#"{"id":"content1","reach":"neighborhood","title":"Local"}"#.to_vec();
+        let requester = RequesterContext {
+            agent_id: "stranger".to_string(),
+            location: None,
+            authenticated: false,
+        };
+
+        assert!(!should_serve_response(&response, &requester, "alice"));
+    }
+
+    #[test]
+    fn test_extract_reach_from_response_commons() {
+        use serde_json::json;
+
+        let response = json!({
+            "id": "test-content",
+            "title": "Public Content",
+            "reach": "commons"
+        });
+        let bytes = serde_json::to_vec(&response).unwrap();
+
+        let reach = extract_reach_from_response(&bytes);
+        assert_eq!(reach, Some("commons".to_string()));
+    }
+
+    #[test]
+    fn test_extract_reach_from_response_private() {
+        use serde_json::json;
+
+        let response = json!({
+            "id": "test-content",
+            "title": "Private Content",
+            "reach": "private"
+        });
+        let bytes = serde_json::to_vec(&response).unwrap();
+
+        let reach = extract_reach_from_response(&bytes);
+        assert_eq!(reach, Some("private".to_string()));
+    }
+
+    #[test]
+    fn test_extract_reach_from_array_response() {
+        use serde_json::json;
+
+        let response = json!([
+            {"id": "item1", "reach": "commons"},
+            {"id": "item2", "reach": "local"}
+        ]);
+        let bytes = serde_json::to_vec(&response).unwrap();
+
+        let reach = extract_reach_from_response(&bytes);
+        assert_eq!(reach, Some("commons".to_string())); // Should get from first item
+    }
+
+    #[test]
+    fn test_extract_reach_missing() {
+        use serde_json::json;
+
+        let response = json!({
+            "id": "test-content",
+            "title": "No Reach Field"
+        });
+        let bytes = serde_json::to_vec(&response).unwrap();
+
+        let reach = extract_reach_from_response(&bytes);
+        assert_eq!(reach, None);
+    }
+
+    #[test]
+    fn test_parse_query_args_with_conductor_flag() {
+        let (args, conductor) = parse_query_args("id=abc&_conductor=true&name=test");
+        assert!(conductor);
+        assert!(!args.contains("_conductor"));
+        assert!(args.contains("id=abc"));
+        assert!(args.contains("name=test"));
+    }
+
+    #[test]
+    fn test_parse_query_args_without_conductor_flag() {
+        let (args, conductor) = parse_query_args("id=abc&name=test");
+        assert!(!conductor);
+        assert_eq!(args, "id=abc&name=test");
+    }
+
+    #[test]
+    fn test_parse_query_args_empty() {
+        let (args, conductor) = parse_query_args("");
+        assert!(!conductor);
+        assert_eq!(args, "");
     }
 }

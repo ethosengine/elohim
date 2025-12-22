@@ -15,6 +15,9 @@ pub struct CacheKey {
     pub fn_name: String,
     /// Serialized input arguments (for cache key uniqueness)
     pub args_hash: String,
+    /// Reach level of the content (for reach-aware caching)
+    /// None = reach not applicable, Some("commons"|"regional"|"bioregional"|etc) = reach-specific cache
+    pub reach: Option<String>,
 }
 
 impl CacheKey {
@@ -36,6 +39,7 @@ impl CacheKey {
             zome: zome.to_string(),
             fn_name: fn_name.to_string(),
             args_hash,
+            reach: None,
         }
     }
 
@@ -46,15 +50,36 @@ impl CacheKey {
             zome: zome.to_string(),
             fn_name: fn_name.to_string(),
             args_hash: args_hash.to_string(),
+            reach: None,
         }
     }
 
+    /// Create a cache key with reach level (for reach-aware caching)
+    pub fn with_reach(
+        dna_hash: &str,
+        zome: &str,
+        fn_name: &str,
+        args: &str,
+        reach: &str,
+    ) -> Self {
+        let mut key = Self::new(dna_hash, zome, fn_name, args);
+        key.reach = Some(reach.to_string());
+        key
+    }
+
     /// Convert to storage key string
+    /// Format: dna:zome:fn:args_hash or dna:zome:fn:args_hash:reach
     pub fn to_storage_key(&self) -> String {
-        format!(
-            "{}:{}:{}:{}",
-            self.dna_hash, self.zome, self.fn_name, self.args_hash
-        )
+        match &self.reach {
+            Some(reach) => format!(
+                "{}:{}:{}:{}:{}",
+                self.dna_hash, self.zome, self.fn_name, self.args_hash, reach
+            ),
+            None => format!(
+                "{}:{}:{}:{}",
+                self.dna_hash, self.zome, self.fn_name, self.args_hash
+            ),
+        }
     }
 
     /// Create a pattern for invalidating all calls to a function
@@ -126,5 +151,21 @@ mod tests {
         let display = format!("{}", key);
         assert!(display.contains("zome"));
         assert!(display.contains("get_thing"));
+    }
+
+    #[test]
+    fn test_cache_key_with_reach() {
+        let key = CacheKey::with_reach("dna123", "content_store", "get_content", r#"{"id":"abc"}"#, "commons");
+        assert_eq!(key.reach, Some("commons".to_string()));
+        assert!(key.to_storage_key().ends_with(":commons"));
+    }
+
+    #[test]
+    fn test_cache_key_reach_separate_cache() {
+        // Different reach levels should have different cache keys
+        let key1 = CacheKey::with_reach("dna", "zome", "fn", r#"{"id":"x"}"#, "commons");
+        let key2 = CacheKey::with_reach("dna", "zome", "fn", r#"{"id":"x"}"#, "private");
+
+        assert_ne!(key1.to_storage_key(), key2.to_storage_key());
     }
 }
