@@ -11977,3 +11977,210 @@ pub fn get_rules_for_steward(steward_id: String) -> ExternResult<Vec<Transaction
 
     Ok(rules)
 }
+
+// =============================================================================
+// Qahal: Human Relationship Management (Social Graph & Custody)
+// =============================================================================
+
+/// Create a human relationship (social bond between two agents)
+/// Initiates a relationship that requires confirmation from both parties
+#[hdk_extern]
+pub fn create_human_relationship(relationship: HumanRelationship) -> ExternResult<ActionHash> {
+    let action_hash = create_entry(&EntryTypes::HumanRelationship(relationship.clone()))?;
+
+    // Link from relationship ID
+    let id_anchor = StringAnchor {
+        anchor_type: "relationship".to_string(),
+        anchor_value: relationship.id.clone(),
+    };
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToHumanRelationship,
+        (),
+    )?;
+
+    // Link from both parties (so each can query their relationships)
+    let party_a_anchor = StringAnchor {
+        anchor_type: "agent".to_string(),
+        anchor_value: relationship.party_a_id.clone(),
+    };
+    let party_a_hash = hash_entry(&EntryTypes::StringAnchor(party_a_anchor))?;
+    create_link(
+        party_a_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToRelationship,
+        (),
+    )?;
+
+    let party_b_anchor = StringAnchor {
+        anchor_type: "agent".to_string(),
+        anchor_value: relationship.party_b_id.clone(),
+    };
+    let party_b_hash = hash_entry(&EntryTypes::StringAnchor(party_b_anchor))?;
+    create_link(
+        party_b_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToRelationship,
+        (),
+    )?;
+
+    // Link by intimacy level (for custody queries)
+    let intimacy_anchor = StringAnchor {
+        anchor_type: "intimacy".to_string(),
+        anchor_value: relationship.intimacy_level.clone(),
+    };
+    let intimacy_hash = hash_entry(&EntryTypes::StringAnchor(intimacy_anchor))?;
+    create_link(
+        intimacy_hash,
+        action_hash.clone(),
+        LinkTypes::HumanRelationshipByIntimacy,
+        (),
+    )?;
+
+    // If custody enabled, create automatic custodian commitments
+    if relationship.auto_custody_enabled
+        && relationship.consent_given_by_a
+        && relationship.consent_given_by_b
+    {
+        create_auto_custody_commitments(&relationship, &action_hash)?;
+    }
+
+    Ok(action_hash)
+}
+
+/// Get all relationships for an agent
+#[hdk_extern]
+pub fn get_relationships_for_agent(agent_id: String) -> ExternResult<Vec<HumanRelationship>> {
+    let anchor = StringAnchor {
+        anchor_type: "agent".to_string(),
+        anchor_value: agent_id,
+    };
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::AgentToRelationship)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut relationships = Vec::new();
+    for link in links {
+        if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
+            if let Some(EntryTypes::HumanRelationship(rel)) = record.entry().to_app_option().ok().flatten() {
+                relationships.push(rel);
+            }
+        }
+    }
+
+    Ok(relationships)
+}
+
+/// Get intimate relationships for auto-custody (family, spouse, etc.)
+#[hdk_extern]
+pub fn get_intimate_relationships(agent_id: String) -> ExternResult<Vec<HumanRelationship>> {
+    let all_relationships = get_relationships_for_agent(agent_id.clone())?;
+
+    // Filter to intimate level with custody enabled
+    let intimate: Vec<_> = all_relationships
+        .into_iter()
+        .filter(|r| r.intimacy_level == "intimate" && r.auto_custody_enabled)
+        .filter(|r| r.consent_given_by_a && r.consent_given_by_b)
+        .collect();
+
+    Ok(intimate)
+}
+
+/// Helper: Create automatic custodian commitments for family relationships
+fn create_auto_custody_commitments(
+    relationship: &HumanRelationship,
+    relationship_hash: &ActionHash,
+) -> ExternResult<()> {
+    // Only create for intimate relationships with custody enabled
+    if relationship.intimacy_level != "intimate" || !relationship.auto_custody_enabled {
+        return Ok(());
+    }
+
+    // Party A custodies Party B's data (if B allows)
+    if relationship.custody_enabled_by_b {
+        let commitment = CustodianCommitment {
+            id: format!("{}-custody-a-to-b", relationship.id),
+            custodian_agent_id: relationship.party_a_id.clone(),
+            beneficiary_agent_id: relationship.party_b_id.clone(),
+            commitment_type: "relationship".to_string(),
+            basis: "intimate_relationship".to_string(),
+            relationship_id: Some(relationship.id.clone()),
+            category_override_json: "[]".to_string(),
+            content_filters_json: json!({
+                "reach": ["private", "intimate"],
+                "author": relationship.party_b_id.clone(),
+            })
+            .to_string(),
+            estimated_content_count: 0,
+            estimated_size_mb: 0.0,
+            shard_strategy: "full_replica".to_string(),
+            redundancy_factor: 1,
+            shard_assignments_json: "[]".to_string(),
+            state: "accepted".to_string(),
+            shards_stored_count: 0,
+            last_shard_update_at: None,
+            total_restores_performed: 0,
+            emergency_triggers_json: json!({"triggers": ["manual_passphrase", "trusted_party"]})
+                .to_string(),
+            emergency_contacts_json: json!([{"agent_id": relationship.party_a_id.clone()}])
+                .to_string(),
+            recovery_instructions_json: json!({"method": "full_replica"}).to_string(),
+            created_at: sys_time()?.to_string(),
+            updated_at: sys_time()?.to_string(),
+        };
+
+        let commitment_hash = create_entry(&EntryTypes::CustodianCommitment(commitment))?;
+        create_link(
+            relationship_hash.clone(),
+            commitment_hash,
+            LinkTypes::RelationshipToCommitment,
+            (),
+        )?;
+    }
+
+    // Party B custodies Party A's data (if A allows)
+    if relationship.custody_enabled_by_a {
+        let commitment = CustodianCommitment {
+            id: format!("{}-custody-b-to-a", relationship.id),
+            custodian_agent_id: relationship.party_b_id.clone(),
+            beneficiary_agent_id: relationship.party_a_id.clone(),
+            commitment_type: "relationship".to_string(),
+            basis: "intimate_relationship".to_string(),
+            relationship_id: Some(relationship.id.clone()),
+            category_override_json: "[]".to_string(),
+            content_filters_json: json!({
+                "reach": ["private", "intimate"],
+                "author": relationship.party_a_id.clone(),
+            })
+            .to_string(),
+            estimated_content_count: 0,
+            estimated_size_mb: 0.0,
+            shard_strategy: "full_replica".to_string(),
+            redundancy_factor: 1,
+            shard_assignments_json: "[]".to_string(),
+            state: "accepted".to_string(),
+            shards_stored_count: 0,
+            last_shard_update_at: None,
+            total_restores_performed: 0,
+            emergency_triggers_json: json!({"triggers": ["manual_passphrase", "trusted_party"]})
+                .to_string(),
+            emergency_contacts_json: json!([{"agent_id": relationship.party_b_id.clone()}])
+                .to_string(),
+            recovery_instructions_json: json!({"method": "full_replica"}).to_string(),
+            created_at: sys_time()?.to_string(),
+            updated_at: sys_time()?.to_string(),
+        };
+
+        let commitment_hash = create_entry(&EntryTypes::CustodianCommitment(commitment))?;
+        create_link(
+            relationship_hash.clone(),
+            commitment_hash,
+            LinkTypes::RelationshipToCommitment,
+            (),
+        )?;
+    }
+
+    Ok(())
+}

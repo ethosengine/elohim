@@ -674,6 +674,74 @@ pub struct Relationship {
 }
 
 // =============================================================================
+// Human Relationships (Qahal - Social Graph)
+// =============================================================================
+
+/// Intimacy levels for human relationships (determines custody and access rights)
+pub const INTIMACY_LEVELS: [&str; 5] = [
+    "intimate",    // Spouse, immediate family, closest confidants (auto-custody enabled)
+    "trusted",     // Extended family, very close friends (custody by consent)
+    "familiar",    // Friends, colleagues, regular contacts (no auto-custody)
+    "acquainted",  // People you know but don't interact with regularly
+    "public",      // Known publicly but no personal relationship
+];
+
+/// Human relationship types (social bonds between agents)
+pub const HUMAN_RELATIONSHIP_TYPES: [&str; 12] = [
+    "spouse",           // Married/life partner (intimate)
+    "parent",           // Parent-child (intimate)
+    "child",            // Parent-child (intimate)
+    "sibling",          // Brother/sister (intimate or trusted)
+    "grandparent",      // Grandparent-grandchild (trusted)
+    "grandchild",       // Grandparent-grandchild (trusted)
+    "extended-family",  // Aunt, uncle, cousin (trusted or familiar)
+    "trusted-friend",   // Close friend (trusted)
+    "colleague",        // Work colleague (familiar)
+    "neighbor",         // Geographic proximity (familiar)
+    "community-member", // Same community/church/organization (familiar)
+    "acquaintance",     // Known but not close (acquainted)
+];
+
+/// Human-to-human relationship for social graph and custody
+/// Enables multi-tier replication: family network backup + emergency access
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct HumanRelationship {
+    pub id: String,
+
+    // === PARTIES ===
+    pub party_a_id: String,        // Agent ID of first party
+    pub party_b_id: String,        // Agent ID of second party
+
+    // === RELATIONSHIP NATURE ===
+    pub relationship_type: String, // See HUMAN_RELATIONSHIP_TYPES
+    pub intimacy_level: String,    // See INTIMACY_LEVELS
+    pub is_bidirectional: bool,    // Both parties acknowledge (true) or one-sided (false)
+
+    // === CONSENT & PERMISSIONS ===
+    pub consent_given_by_a: bool,  // Party A agrees to relationship
+    pub consent_given_by_b: bool,  // Party B agrees to relationship
+    pub custody_enabled_by_a: bool, // Party A allows B to custody their data
+    pub custody_enabled_by_b: bool, // Party B allows A to custody their data
+
+    // === CUSTODY & BACKUP ===
+    pub auto_custody_enabled: bool,     // Should intimate/private content auto-replicate?
+    pub shared_encryption_key_id: Option<String>, // For family-shared content
+    pub emergency_access_enabled: bool, // Can this relationship trigger emergency recovery?
+
+    // === METADATA ===
+    pub initiated_by: String,      // Which party initiated (party_a_id or party_b_id)
+    pub verified_at: Option<String>, // When both parties confirmed
+    pub created_at: String,
+    pub updated_at: String,
+    pub expires_at: Option<String>, // Optional expiration (e.g., temporary trust)
+
+    // === CONTEXT ===
+    pub context_json: Option<String>, // Additional metadata: how they met, shared interests, etc.
+    pub reach: String,                // Visibility of relationship itself (private, local, public)
+}
+
+// =============================================================================
 // Human/Agent Entry (for Elohim network)
 // =============================================================================
 
@@ -3498,6 +3566,7 @@ pub enum EntryTypes {
 
     // Qahal: Community & Relationships
     Relationship(Relationship),
+    HumanRelationship(HumanRelationship),
 
     // Governance
     Challenge(Challenge),
@@ -3671,7 +3740,17 @@ pub enum LinkTypes {
     ContentToRelated,           // Content -> Relationship entry
     RelationshipBySource,       // Anchor(source_id) -> Relationship
     RelationshipByTarget,       // Anchor(target_id) -> Relationship
-    RelationshipByType,         // Anchor(rel_type) -> Relationship
+    ContentRelationshipByType,  // Anchor(rel_type) -> Relationship
+
+    // =========================================================================
+    // Qahal: Human Relationship links (Social Graph)
+    // =========================================================================
+    IdToHumanRelationship,      // Anchor(relationship_id) -> HumanRelationship
+    AgentToRelationship,        // Anchor(agent_id) -> HumanRelationship (all relationships for agent)
+    HumanRelationshipByIntimacy, // Anchor(intimacy_level) -> HumanRelationship
+    HumanRelationshipByType,    // Anchor(relationship_type) -> HumanRelationship
+    RelationshipPendingConsent, // Anchor(pending) -> HumanRelationship (awaiting confirmation)
+    RelationshipWithCustody,    // Anchor(custody_enabled) -> HumanRelationship (custody relationships)
 
     // =========================================================================
     // Imago Dei: Human/Agent links (Legacy)
