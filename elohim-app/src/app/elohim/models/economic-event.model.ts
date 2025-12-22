@@ -234,7 +234,23 @@ export type LamadEventType =
   // Currency Events (Unyt integration)
   | 'credit-issue'        // Mutual credit issued (produce + currency)
   | 'credit-transfer'     // Credit transferred (transfer + currency)
-  | 'credit-retire';      // Credit retired (consume + currency)
+  | 'credit-retire'       // Credit retired (consume + currency)
+
+  // Insurance Mutual Events (Elohim Mutual)
+  | 'premium-payment'           // Member paid premium (transfer + currency)
+  | 'claim-filed'               // Member filed claim (deliver-service + adjustment)
+  | 'claim-evidence-submitted'  // Supporting docs attached (deliver-service + adjustment)
+  | 'claim-investigated'        // Adjuster gathering evidence (work + adjustment)
+  | 'claim-adjusted'            // Adjuster made determination (deliver-service + adjustment)
+  | 'claim-settled'             // Claim paid (transfer + currency)
+  | 'claim-denied'              // Claim rejected (modify + adjustment)
+  | 'claim-appealed'            // Member appealed decision (work + adjustment)
+  | 'risk-reduction-verified'   // Observer verified risk mitigation (raise + recognition)
+  | 'preventive-care-completed' // Member completed prevention activity (produce + stewardship)
+  | 'prevention-incentive-awarded' // Premium discount/reward for risk mitigation (raise + care-token)
+  | 'coverage-decision'         // Community decided coverage (work + membership)
+  | 'claim-review-initiated'    // Governance review of adjuster decision (work + membership)
+  | 'reserve-adjustment';       // Regulatory reserve change (modify + currency)
 
 /**
  * Event type to action+resource mapping.
@@ -284,6 +300,22 @@ export const LAMAD_EVENT_MAPPINGS: Record<LamadEventType, {
   'credit-issue': { action: 'produce', resourceType: 'currency', defaultUnit: 'unit-token' },
   'credit-transfer': { action: 'transfer', resourceType: 'currency', defaultUnit: 'unit-token' },
   'credit-retire': { action: 'consume', resourceType: 'currency', defaultUnit: 'unit-token' },
+
+  // Insurance Mutual Events
+  'premium-payment': { action: 'transfer', resourceType: 'currency', defaultUnit: 'unit-token' },
+  'claim-filed': { action: 'deliver-service', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'claim-evidence-submitted': { action: 'deliver-service', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'claim-investigated': { action: 'work', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'claim-adjusted': { action: 'deliver-service', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'claim-settled': { action: 'transfer', resourceType: 'currency', defaultUnit: 'unit-token' },
+  'claim-denied': { action: 'modify', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'claim-appealed': { action: 'work', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'risk-reduction-verified': { action: 'raise', resourceType: 'recognition', defaultUnit: 'unit-affinity' },
+  'preventive-care-completed': { action: 'produce', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'prevention-incentive-awarded': { action: 'raise', resourceType: 'care-token', defaultUnit: 'unit-token' },
+  'coverage-decision': { action: 'work', resourceType: 'membership', defaultUnit: 'unit-each' },
+  'claim-review-initiated': { action: 'work', resourceType: 'membership', defaultUnit: 'unit-each' },
+  'reserve-adjustment': { action: 'modify', resourceType: 'currency', defaultUnit: 'unit-token' },
 };
 
 // ============================================================================
