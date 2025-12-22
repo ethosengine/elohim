@@ -1,371 +1,24 @@
 //! Self-Healing DNA Implementation for Lamad
 //!
-//! Implements the self-healing pattern for Lamad's core entry types:
-//! - Content: Atomic knowledge units
-//! - LearningPath: Organized learning sequences
-//! - PathStep: Individual steps in learning paths
-//! - ContentMastery: User mastery tracking
+//! Provides transformation functions and helper utilities for the self-healing pattern.
+//! The actual SelfHealingEntry trait implementations are defined in the integrity crate
+//! to avoid Rust's orphan rule violations.
 //!
-//! This module enables Lamad to survive schema evolution without data loss,
-//! supporting rapid iteration on the learning system.
+//! This module handles:
+//! - V1 → V2 data transformation
+//! - Healing orchestrator setup
+//! - Healing initialization and signals
 
 use hdk::prelude::*;
 use content_store_integrity::*;
-use hc_rna::{SelfHealingEntry, ValidationStatus, HealingOrchestrator, HealingSignal};
-
-// ============================================================================
-// Validation Constants
-// ============================================================================
-
-const CONTENT_TYPES: &[&str] = &[
-    "concept",       // Atomic knowledge concept
-    "lesson",        // Structured learning unit
-    "practice",      // Hands-on practice activity
-    "assessment",    // Knowledge check
-    "reference",     // External reference material
-];
-
-const REACH_LEVELS: &[&str] = &[
-    "public",   // Open to everyone
-    "commons",  // Shared commons (curated)
-    "private",  // Private/restricted
-];
-
-const CONTENT_FORMATS: &[&str] = &[
-    "markdown",   // Markdown format
-    "html",       // HTML format
-    "plaintext",  // Plain text
-    "video",      // Video media
-];
-
-const PATH_VISIBILITIES: &[&str] = &[
-    "public",  // Published path
-    "private", // Private path
-    "draft",   // Draft in progress
-];
-
-const STEP_TYPES: &[&str] = &[
-    "content",   // Reference content
-    "path",      // Reference another path
-    "external",  // External URL
-    "practice",  // Practice activity
-];
-
-const MASTERY_LEVELS: &[&str] = &[
-    "recognize",    // Can identify
-    "recall",       // Can recall
-    "understand",   // Understands concepts
-    "apply",        // Can apply knowledge
-    "synthesize",   // Can combine and create
-];
-
-const COMPLETION_CRITERIA: &[&str] = &[
-    "all-required",     // All steps required
-    "pass-assessment",  // Must pass assessment
-    "view-content",     // Just view content
-];
-
-// ============================================================================
-// Content Self-Healing Implementation
-// ============================================================================
-
-impl SelfHealingEntry for Content {
-    fn schema_version(&self) -> u32 {
-        self.schema_version
-    }
-
-    fn validation_status(&self) -> ValidationStatus {
-        match self.validation_status.as_str() {
-            "Valid" => ValidationStatus::Valid,
-            "Migrated" => ValidationStatus::Migrated,
-            "Degraded" => ValidationStatus::Degraded,
-            "Healing" => ValidationStatus::Healing,
-            _ => ValidationStatus::Valid,
-        }
-    }
-
-    fn set_validation_status(&mut self, status: ValidationStatus) {
-        self.validation_status = format!("{}", status);
-    }
-
-    fn entry_id(&self) -> String {
-        self.id.clone()
-    }
-
-    fn validate(&self) -> Result<(), String> {
-        // Required fields
-        if self.id.is_empty() {
-            return Err("Content id is required".to_string());
-        }
-        if self.title.is_empty() {
-            return Err("Content title is required".to_string());
-        }
-        if self.content_type.is_empty() {
-            return Err("Content type is required".to_string());
-        }
-
-        // Validate against known content types
-        if !CONTENT_TYPES.contains(&self.content_type.as_str()) {
-            return Err(format!(
-                "Invalid content_type '{}'. Must be one of: {:?}",
-                self.content_type, CONTENT_TYPES
-            ));
-        }
-
-        // Validate reach level
-        if !REACH_LEVELS.contains(&self.reach.as_str()) {
-            return Err(format!(
-                "Invalid reach '{}'. Must be one of: {:?}",
-                self.reach, REACH_LEVELS
-            ));
-        }
-
-        // Validate format
-        if !CONTENT_FORMATS.contains(&self.content_format.as_str()) {
-            return Err(format!(
-                "Invalid content_format '{}'. Must be one of: {:?}",
-                self.content_format, CONTENT_FORMATS
-            ));
-        }
-
-        // Reference validation is deferred - will be checked when references are accessed
-        // For now, just validate that IDs are not empty
-        // This allows entries to be created and marked Degraded if references fail later
-        for related_id in &self.related_node_ids {
-            if related_id.is_empty() {
-                return Err("Related content ID cannot be empty".to_string());
-            }
-        }
-
-        Ok(())
-    }
-}
-
-// ============================================================================
-// LearningPath Self-Healing Implementation
-// ============================================================================
-
-impl SelfHealingEntry for LearningPath {
-    fn schema_version(&self) -> u32 {
-        self.schema_version
-    }
-
-    fn validation_status(&self) -> ValidationStatus {
-        match self.validation_status.as_str() {
-            "Valid" => ValidationStatus::Valid,
-            "Migrated" => ValidationStatus::Migrated,
-            "Degraded" => ValidationStatus::Degraded,
-            "Healing" => ValidationStatus::Healing,
-            _ => ValidationStatus::Valid,
-        }
-    }
-
-    fn set_validation_status(&mut self, status: ValidationStatus) {
-        self.validation_status = format!("{}", status);
-    }
-
-    fn entry_id(&self) -> String {
-        self.id.clone()
-    }
-
-    fn validate(&self) -> Result<(), String> {
-        // Required fields
-        if self.id.is_empty() {
-            return Err("LearningPath id is required".to_string());
-        }
-        if self.title.is_empty() {
-            return Err("LearningPath title is required".to_string());
-        }
-        if self.created_by.is_empty() {
-            return Err("LearningPath created_by is required".to_string());
-        }
-
-        // Validate visibility
-        if !PATH_VISIBILITIES.contains(&self.visibility.as_str()) {
-            return Err(format!(
-                "Invalid visibility '{}'. Must be one of: {:?}",
-                self.visibility, PATH_VISIBILITIES
-            ));
-        }
-
-        // Validate creator exists (if we can check)
-        // This would require querying agents/humans
-        // For now, just validate it's not empty (already checked above)
-
-        Ok(())
-    }
-}
-
-// ============================================================================
-// PathStep Self-Healing Implementation
-// ============================================================================
-
-impl SelfHealingEntry for PathStep {
-    fn schema_version(&self) -> u32 {
-        self.schema_version
-    }
-
-    fn validation_status(&self) -> ValidationStatus {
-        match self.validation_status.as_str() {
-            "Valid" => ValidationStatus::Valid,
-            "Migrated" => ValidationStatus::Migrated,
-            "Degraded" => ValidationStatus::Degraded,
-            "Healing" => ValidationStatus::Healing,
-            _ => ValidationStatus::Valid,
-        }
-    }
-
-    fn set_validation_status(&mut self, status: ValidationStatus) {
-        self.validation_status = format!("{}", status);
-    }
-
-    fn entry_id(&self) -> String {
-        self.id.clone()
-    }
-
-    fn validate(&self) -> Result<(), String> {
-        // Required fields
-        if self.id.is_empty() {
-            return Err("PathStep id is required".to_string());
-        }
-        if self.path_id.is_empty() {
-            return Err("PathStep path_id is required".to_string());
-        }
-        if self.resource_id.is_empty() {
-            return Err("PathStep resource_id is required".to_string());
-        }
-
-        // Validate step type
-        if !STEP_TYPES.contains(&self.step_type.as_str()) {
-            return Err(format!(
-                "Invalid step_type '{}'. Must be one of: {:?}",
-                self.step_type, STEP_TYPES
-            ));
-        }
-
-        // Reference validation is deferred - will be checked when references are accessed
-        // Just validate that references are not empty
-        if self.path_id.is_empty() {
-            return Err("Path ID cannot be empty".to_string());
-        }
-
-        if self.resource_id.is_empty() {
-            return Err("Resource ID cannot be empty".to_string());
-        }
-
-        // Validate completion criteria if present
-        if let Some(criteria) = &self.completion_criteria {
-            if !COMPLETION_CRITERIA.contains(&criteria.as_str()) {
-                return Err(format!(
-                    "Invalid completion_criteria '{}'. Must be one of: {:?}",
-                    criteria, COMPLETION_CRITERIA
-                ));
-            }
-        }
-
-        Ok(())
-    }
-}
-
-// ============================================================================
-// ContentMastery Self-Healing Implementation
-// ============================================================================
-
-impl SelfHealingEntry for ContentMastery {
-    fn schema_version(&self) -> u32 {
-        self.schema_version
-    }
-
-    fn validation_status(&self) -> ValidationStatus {
-        match self.validation_status.as_str() {
-            "Valid" => ValidationStatus::Valid,
-            "Migrated" => ValidationStatus::Migrated,
-            "Degraded" => ValidationStatus::Degraded,
-            "Healing" => ValidationStatus::Healing,
-            _ => ValidationStatus::Valid,
-        }
-    }
-
-    fn set_validation_status(&mut self, status: ValidationStatus) {
-        self.validation_status = format!("{}", status);
-    }
-
-    fn entry_id(&self) -> String {
-        self.id.clone()
-    }
-
-    fn validate(&self) -> Result<(), String> {
-        // Required fields
-        if self.id.is_empty() {
-            return Err("ContentMastery id is required".to_string());
-        }
-        if self.human_id.is_empty() {
-            return Err("ContentMastery human_id is required".to_string());
-        }
-        if self.content_id.is_empty() {
-            return Err("ContentMastery content_id is required".to_string());
-        }
-
-        // Validate mastery level
-        if !MASTERY_LEVELS.contains(&self.mastery_level.as_str()) {
-            return Err(format!(
-                "Invalid mastery_level '{}'. Must be one of: {:?}",
-                self.mastery_level, MASTERY_LEVELS
-            ));
-        }
-
-        // Validate mastery_level_index matches mastery_level
-        let expected_index = MASTERY_LEVELS
-            .iter()
-            .position(|&l| l == self.mastery_level.as_str())
-            .unwrap_or(0) as u32;
-        if self.mastery_level_index != expected_index {
-            return Err(format!(
-                "mastery_level_index {} doesn't match mastery_level '{}' (expected {})",
-                self.mastery_level_index, self.mastery_level, expected_index
-            ));
-        }
-
-        // Validate freshness_score is in range
-        if self.freshness_score < 0.0 || self.freshness_score > 1.0 {
-            return Err(format!(
-                "freshness_score {} out of range (0.0-1.0)",
-                self.freshness_score
-            ));
-        }
-
-        // Validate last_engagement_type
-        if !ENGAGEMENT_TYPES.contains(&self.last_engagement_type.as_str()) {
-            return Err(format!(
-                "Invalid last_engagement_type '{}'. Must be one of: {:?}",
-                self.last_engagement_type, ENGAGEMENT_TYPES
-            ));
-        }
-
-        // Check reference integrity
-        match get_content_by_id_internal(&self.content_id) {
-            Ok(Some(_)) => {},
-            Ok(None) => {
-                return Err(format!("Content {} not found", self.content_id))
-            },
-            Err(_) => {
-                return Err(format!(
-                    "Error checking reference to content {}",
-                    self.content_id
-                ))
-            },
-        }
-
-        Ok(())
-    }
-}
+use hc_rna::{HealingOrchestrator, HealingSignal};
 
 // ============================================================================
 // V1 → V2 Transformation Functions
 // ============================================================================
 
 /// V1 Content export format
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ContentV1Export {
     pub id: String,
     pub content_type: String,
@@ -413,7 +66,7 @@ pub fn transform_content_v1_to_v2(v1: ContentV1Export) -> Content {
 }
 
 /// V1 LearningPath export format
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct LearningPathV1Export {
     pub id: String,
     pub version: String,
@@ -453,7 +106,7 @@ pub fn transform_learning_path_v1_to_v2(v1: LearningPathV1Export) -> LearningPat
 }
 
 /// V1 PathStep export format
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PathStepV1Export {
     pub id: String,
     pub path_id: String,
@@ -505,7 +158,7 @@ pub fn transform_path_step_v1_to_v2(v1: PathStepV1Export) -> PathStep {
 }
 
 /// V1 ContentMastery export format
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ContentMasteryV1Export {
     pub id: String,
     pub human_id: String,
@@ -618,34 +271,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_content_validation() {
-        let content = Content {
-            id: "test-1".to_string(),
-            content_type: "concept".to_string(),
-            title: "Valid Content".to_string(),
-            description: "A valid content entry".to_string(),
-            summary: None,
-            content: "Content body".to_string(),
-            content_format: "markdown".to_string(),
-            tags: vec![],
-            source_path: None,
-            related_node_ids: vec![],
-            author_id: None,
-            reach: "public".to_string(),
-            trust_score: 0.8,
-            estimated_minutes: Some(10),
-            thumbnail_url: None,
-            metadata_json: "{}".to_string(),
-            created_at: "2025-01-01".to_string(),
-            updated_at: "2025-01-01".to_string(),
-            schema_version: 2,
-            validation_status: "Valid".to_string(),
-        };
-
-        assert!(content.validate().is_ok());
-    }
-
-    #[test]
     fn test_content_v1_transformation() {
         let v1 = ContentV1Export {
             id: "test".to_string(),
@@ -671,32 +296,5 @@ mod tests {
         let v2 = transform_content_v1_to_v2(v1);
         assert_eq!(v2.schema_version, 2);
         assert_eq!(v2.validation_status, "Migrated");
-    }
-
-    #[test]
-    fn test_mastery_validation() {
-        let mastery = ContentMastery {
-            id: "mastery-1".to_string(),
-            human_id: "human-1".to_string(),
-            content_id: "content-1".to_string(),
-            mastery_level: "understand".to_string(),
-            mastery_level_index: 3,
-            freshness_score: 0.8,
-            needs_refresh: false,
-            engagement_count: 5,
-            last_engagement_type: "practice".to_string(),
-            last_engagement_at: "2025-01-01".to_string(),
-            level_achieved_at: "2024-12-31".to_string(),
-            content_version_at_mastery: None,
-            assessment_evidence_json: "[]".to_string(),
-            privileges_json: "[]".to_string(),
-            created_at: "2025-01-01".to_string(),
-            updated_at: "2025-01-01".to_string(),
-            schema_version: 2,
-            validation_status: "Valid".to_string(),
-        };
-
-        // Will fail because content_id doesn't exist, but validation logic is shown
-        assert!(mastery.validate().is_err());
     }
 }

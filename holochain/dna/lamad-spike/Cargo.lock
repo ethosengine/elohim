@@ -127,6 +127,7 @@ dependencies = [
 name = "content_store_integrity"
 version = "0.1.0"
 dependencies = [
+ "hc-rna",
  "hdi",
  "holochain_serialized_bytes",
  "serde",

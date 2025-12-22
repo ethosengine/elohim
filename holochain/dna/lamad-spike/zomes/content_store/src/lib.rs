@@ -25,12 +25,12 @@ pub mod healing_integration;
 // =============================================================================
 
 #[hdk_extern]
-pub fn init(_: InitPayload) -> InitResult {
+pub fn init(_: InitPayload) -> ExternResult<InitCallbackResult> {
     // Initialize healing support - check if v1 is available
-    // This never fails, always returns InitResult::Pass
+    // This never fails, always returns success
     let _ = healing_impl::init_healing();
 
-    Ok(InitResult::Pass)
+    Ok(InitCallbackResult::Pass)
 }
 
 // =============================================================================

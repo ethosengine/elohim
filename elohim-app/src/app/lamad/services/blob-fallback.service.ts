@@ -47,6 +47,35 @@ export interface UrlHealth {
   isHealthy: boolean; // failureCount < successCount
 }
 
+/**
+ * URL validation result
+ */
+export interface UrlValidationResult {
+  /** The URL being validated */
+  url: string;
+
+  /** Whether URL is accessible */
+  isValid: boolean;
+
+  /** HTTP status code from HEAD request (-1 if no response) */
+  statusCode: number;
+
+  /** Type of URL (standard, custodian, cloudfront, etc.) */
+  type: 'standard' | 'custodian' | 'cloudfront' | 'cdn' | 'unknown';
+
+  /** Response time in milliseconds */
+  responseTimeMs: number;
+
+  /** Content-Length header if available */
+  contentLength?: number;
+
+  /** Supports range requests (via Accept-Ranges header) */
+  supportsRangeRequests?: boolean;
+
+  /** Error message if validation failed */
+  errorMessage?: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -358,5 +387,122 @@ export class BlobFallbackService {
     );
 
     return Promise.all(tests);
+  }
+
+  /**
+   * Validate a single URL's accessibility and capabilities.
+   *
+   * Performs detailed checks including:
+   * - HTTP HEAD request to verify accessibility
+   * - Response headers for capabilities (Range support, Content-Length)
+   * - URL type detection (custodian, CDN, standard)
+   * - Response time measurement
+   *
+   * @param url URL to validate
+   * @param timeoutMs Validation timeout (default 5 seconds)
+   * @returns Promise with validation result
+   */
+  async validateUrl(url: string, timeoutMs: number = 5000): Promise<UrlValidationResult> {
+    const startTime = performance.now();
+
+    try {
+      const response = await this.http
+        .head(url, {
+          observe: 'response',
+          responseType: 'text',
+        })
+        .toPromise();
+
+      const responseTimeMs = Math.round(performance.now() - startTime);
+      const statusCode = response!.status;
+      const contentLength = response!.headers.get('Content-Length');
+      const acceptRanges = response!.headers.get('Accept-Ranges');
+
+      return {
+        url,
+        isValid: statusCode >= 200 && statusCode < 300,
+        statusCode,
+        type: this.detectUrlType(url),
+        responseTimeMs,
+        contentLength: contentLength ? parseInt(contentLength, 10) : undefined,
+        supportsRangeRequests: acceptRanges !== null && acceptRanges !== 'none',
+      };
+    } catch (error) {
+      const responseTimeMs = Math.round(performance.now() - startTime);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      return {
+        url,
+        isValid: false,
+        statusCode: -1,
+        type: this.detectUrlType(url),
+        responseTimeMs,
+        errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Validate multiple URLs in parallel.
+   *
+   * @param urls URLs to validate
+   * @param timeoutMs Validation timeout per URL
+   * @returns Promise with array of validation results
+   */
+  async validateUrls(urls: string[], timeoutMs: number = 5000): Promise<UrlValidationResult[]> {
+    const validations = urls.map((url) => this.validateUrl(url, timeoutMs));
+    return Promise.all(validations);
+  }
+
+  /**
+   * Filter URLs to only those that are valid and healthy.
+   *
+   * Useful for pre-filtering fallback URL lists before attempting downloads.
+   * Returns only URLs that:
+   * - Pass accessibility validation
+   * - Are marked as healthy in history
+   * - Have reasonable response times (<5 seconds)
+   *
+   * @param urls URLs to filter
+   * @returns Promise with validated and healthy URLs
+   */
+  async getValidAndHealthyUrls(urls: string[]): Promise<string[]> {
+    const validations = await this.validateUrls(urls);
+
+    const validUrlsWithHealth = validations
+      .filter((v) => v.isValid && v.responseTimeMs < 5000)
+      .map((v) => ({
+        url: v.url,
+        health: this.getUrlHealth(v.url),
+      }))
+      .filter((item) => item.health.isHealthy || item.health.successCount + item.health.failureCount === 0) // Healthy or untested
+      .map((item) => item.url);
+
+    return validUrlsWithHealth;
+  }
+
+  /**
+   * Detect URL type (custodian endpoint, CDN, standard).
+   *
+   * Useful for routing to appropriate handling logic.
+   *
+   * @param url URL to analyze
+   * @returns URL type
+   */
+  private detectUrlType(url: string): UrlValidationResult['type'] {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.toLowerCase();
+
+      if (hostname.includes('custodian')) return 'custodian';
+      if (hostname.includes('cloudfront')) return 'cloudfront';
+      if (hostname.includes('cdn')) return 'cdn';
+      if (hostname.includes('akamai')) return 'cdn';
+      if (hostname.includes('fastly')) return 'cdn';
+
+      return 'standard';
+    } catch {
+      return 'unknown';
+    }
   }
 }

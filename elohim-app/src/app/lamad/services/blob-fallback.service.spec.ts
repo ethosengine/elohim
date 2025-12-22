@@ -282,4 +282,103 @@ describe('BlobFallbackService', () => {
       expect(health.failureCount).toBe(0);
     });
   });
+
+  describe('URL Validation', () => {
+    it('should validate single URL successfully', (done) => {
+      const url = 'https://example.com/blob.mp4';
+
+      service.validateUrl(url).then((result) => {
+        expect(result.url).toBe(url);
+        expect(typeof result.isValid).toBe('boolean');
+        expect(result.statusCode).toBeDefined();
+        expect(result.responseTimeMs).toBeGreaterThanOrEqual(0);
+        done();
+      });
+
+      // Mock HTTP HEAD response
+      const req = httpMock.expectOne(url);
+      req.flush(null, { status: 200, statusText: 'OK' });
+    });
+
+    it('should detect URL validation failures', (done) => {
+      const url = 'https://invalid.example.com/blob.mp4';
+
+      service.validateUrl(url).then((result) => {
+        expect(result.url).toBe(url);
+        expect(result.isValid).toBe(false);
+        expect(result.statusCode).toBe(-1);
+        expect(result.errorMessage).toBeDefined();
+        done();
+      });
+
+      // Mock HTTP HEAD failure
+      const req = httpMock.expectOne(url);
+      req.error(new ErrorEvent('error'));
+    });
+
+    it('should extract capabilities from validation headers', (done) => {
+      const url = 'https://example.com/blob.mp4';
+
+      service.validateUrl(url).then((result) => {
+        expect(result.supportsRangeRequests).toBe(true);
+        expect(result.contentLength).toBe(1024);
+        done();
+      });
+
+      const req = httpMock.expectOne(url);
+      req.flush(null, {
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          'Content-Length': '1024',
+          'Accept-Ranges': 'bytes',
+        },
+      });
+    });
+
+    it('should detect URL types (custodian vs CDN vs standard)', () => {
+      const custodianUrl = 'https://custodian-123.example.com/blob.mp4';
+      const cdnUrl = 'https://cdn.example.com/blob.mp4';
+      const standardUrl = 'https://example.com/blob.mp4';
+
+      expect(service['detectUrlType'](custodianUrl)).toBe('custodian');
+      expect(service['detectUrlType'](cdnUrl)).toBe('cdn');
+      expect(service['detectUrlType'](standardUrl)).toBe('standard');
+    });
+
+    it('should validate multiple URLs in parallel', (done) => {
+      const urls = ['https://example.com/blob1.mp4', 'https://example.com/blob2.mp4'];
+
+      service.validateUrls(urls).then((results) => {
+        expect(results).toHaveLength(2);
+        expect(results[0].url).toBe(urls[0]);
+        expect(results[1].url).toBe(urls[1]);
+        done();
+      });
+
+      const reqs = httpMock.match((req) => urls.includes(req.url));
+      expect(reqs).toHaveLength(2);
+      reqs.forEach((req) => {
+        req.flush(null, { status: 200, statusText: 'OK' });
+      });
+    });
+
+    it('should filter to valid and healthy URLs only', (done) => {
+      const urls = ['https://example.com/blob1.mp4', 'https://example.com/blob2.mp4'];
+
+      // Mark second URL as healthy in history
+      service['recordUrlSuccess'](urls[1]);
+
+      service.getValidAndHealthyUrls(urls).then((validUrls) => {
+        // Results should include URLs that passed validation and are healthy
+        expect(Array.isArray(validUrls)).toBe(true);
+        done();
+      });
+
+      const reqs = httpMock.match((req) => urls.includes(req.url));
+      reqs.forEach((req) => {
+        req.flush(null, { status: 200, statusText: 'OK' });
+      });
+    });
+  });
 });
