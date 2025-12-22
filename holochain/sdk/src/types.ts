@@ -2228,6 +2228,224 @@ export interface SettlePaymentInput {
 }
 
 // =============================================================================
+// Shefa: Constitutional Limits & Transitions (Donut Economy & Limitarianism)
+// =============================================================================
+
+/** ConstitutionalLimit - Defines floor and ceiling bounds for resources */
+export interface ConstitutionalLimit {
+  id: string;
+  category: string;
+  dimension: string;
+  floor_value: number;
+  floor_rationale: string;
+  ceiling_value: number;
+  ceiling_rationale: string;
+  safe_min_value: number;
+  safe_max_value: number;
+  enforcement_method: string; // "voluntary", "progressive", "hard"
+  transition_deadline: string; // ISO 8601
+  hard_stop_date: string | null;
+  constitutional_basis_key: string;
+  governance_level: string;
+  governed_by: string;
+  schema_version: number;
+  validation_status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** ResourcePosition - Assessment of where a resource stands relative to bounds */
+export interface ResourcePosition {
+  id: string;
+  resource_id: string;
+  limit_id: string;
+  assessment_date: string;
+  position_type: string; // "below-floor", "at-floor", "in-safe-zone", "above-ceiling", "far-above-ceiling"
+  current_value: number;
+  distance_from_floor: number;
+  distance_from_ceiling: number;
+  excess_above_ceiling: number;
+  excess_percentage: number;
+  surplus_available_for_transition: number;
+  compliant: boolean;
+  warning_level: string; // "none", "caution", "warning", "critical"
+  days_to_hard_stop: number | null;
+  has_active_transition: boolean;
+  transition_path_id: string | null;
+  transition_status: string | null;
+  schema_version: number;
+  validation_status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** AssetSplit - How excess asset is divided among destinations */
+export interface AssetSplit {
+  id: string;
+  transition_path_id: string;
+  split_name: string;
+  destination_type: string;
+  destination_id: string;
+  amount: number;
+  percentage: number;
+  legacy_role: string | null;
+  legacy_role_details: string | null;
+  status: string;
+  agreed_at: string | null;
+  completed_at: string | null;
+  rationale: string;
+  terms: string | null;
+  conditions: string | null;
+  schema_version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** TransitionPhase - Sequential phase in the execution of a transition */
+export interface TransitionPhase {
+  id: string;
+  transition_path_id: string;
+  sequence_number: number;
+  name: string;
+  description: string;
+  target_start_date: string;
+  target_end_date: string;
+  actual_start_date: string | null;
+  actual_end_date: string | null;
+  amount_in_phase: number;
+  actions_json: string; // Vec<TransitionAction> as JSON
+  total_actions: number;
+  completed_actions: number;
+  failed_actions: number;
+  status: string;
+  block_reason: string | null;
+  block_date: string | null;
+  schema_version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** TransitionAction - Specific action within a phase */
+export interface TransitionAction {
+  id: string;
+  phase_id: string;
+  action_type: string;
+  action_description: string;
+  responsible_party: string;
+  assigned_to: string | null;
+  target_date: string;
+  actual_date: string | null;
+  deadline_critical: boolean;
+  status: string;
+  completion_notes: string | null;
+  failure_reason: string | null;
+  economic_event_id: string | null;
+  schema_version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** TransitionPath - Structured process for moving excess assets to community stewardship */
+export interface TransitionPath {
+  id: string;
+  steward_id: string;
+  resource_id: string;
+  limit_id: string;
+  current_value: number;
+  constitutional_ceiling: number;
+  excess_amount: number;
+  proposed_splits_json: string; // Vec<AssetSplit> as JSON
+  status: string;
+  initiated_at: string;
+  negotiation_deadline: string;
+  execution_start_date: string | null;
+  target_completion_date: string | null;
+  actual_completion_date: string | null;
+  governance_level: string;
+  governing_body: string;
+  approval_status: string;
+  approval_date: string | null;
+  approved_by: string | null;
+  visibility: string;
+  rationale: string;
+  phases_json: string; // Vec<TransitionPhase> as JSON
+  current_phase: number;
+  transition_event_ids_json: string; // Vec<String> as JSON
+  governance_proposal_event_id: string | null;
+  block_reason: string | null;
+  blocked_at: string | null;
+  disputed: boolean;
+  schema_version: number;
+  validation_status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** CommonsContribution - Recognition when asset transitions to community stewardship */
+export interface CommonsContribution {
+  id: string;
+  steward_id: string;
+  transition_path_id: string;
+  asset_split_id: string;
+  original_holding: number;
+  contributed_amount: number;
+  contribution_date: string;
+  destination_commons_pool: string;
+  commons_pool_id: string;
+  governance_credit_amount: number;
+  governance_credit_category: string;
+  legacy_role: string | null;
+  legacy_role_details: string | null;
+  public_recognition: boolean;
+  recognition_statement: string | null;
+  recognition_date: string | null;
+  economic_event_id: string;
+  governance_proposal_id: string | null;
+  schema_version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Input for creating a constitutional limit */
+export interface CreateConstitutionalLimitInput {
+  category: string;
+  dimension: string;
+  floor_value: number;
+  floor_rationale: string;
+  ceiling_value: number;
+  ceiling_rationale: string;
+  safe_min_value: number;
+  safe_max_value: number;
+  enforcement_method: string;
+  transition_deadline: string;
+  hard_stop_date?: string | null;
+  constitutional_basis_key: string;
+  governance_level: string;
+  governed_by: string;
+}
+
+/** Input for assessing resource position */
+export interface AssessResourcePositionInput {
+  resource_id: string;
+  limit_id: string;
+}
+
+/** Input for initiating a transition path */
+export interface InitiateTransitionPathInput {
+  resource_id: string;
+  limit_id: string;
+  proposed_splits_json: string; // Vec<AssetSplit> as JSON
+  visibility: string;
+  rationale: string;
+}
+
+/** Input for executing a transition phase */
+export interface ExecuteTransitionPhaseInput {
+  transition_path_id: string;
+  phase_number: number;
+}
+
+// =============================================================================
 // Lamad: Learning Economy (uses Shefa hREA primitives)
 // =============================================================================
 //

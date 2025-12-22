@@ -3178,6 +3178,15 @@ pub enum EntryTypes {
     UBAEligibility(UBAEligibility),
     AccountingBridge(AccountingBridge),
 
+    // Shefa: Constitutional Limits & Transitions (Donut Economy & Limitarianism)
+    ConstitutionalLimit(ConstitutionalLimit),
+    ResourcePosition(ResourcePosition),
+    TransitionPath(TransitionPath),
+    AssetSplit(AssetSplit),
+    TransitionPhase(TransitionPhase),
+    TransitionAction(TransitionAction),
+    CommonsContribution(CommonsContribution),
+
     // Lamad: Steward Economy
     StewardCredential(StewardCredential),
     PremiumGate(PremiumGate),
@@ -3460,6 +3469,53 @@ pub enum LinkTypes {
     AgentToAccountingBridge,    // Anchor(agent_id) -> AccountingBridge
     BridgeByAssetType,          // Anchor(asset_type) -> AccountingBridge
     BridgeByCategory,           // Anchor(asset_category) -> AccountingBridge
+
+    // =========================================================================
+    // Shefa: Constitutional Limits & Transitions links
+    // =========================================================================
+    // ConstitutionalLimit
+    IdToConstitutionalLimit,    // Anchor(limit_id) -> ConstitutionalLimit
+    LimitByCategory,            // Anchor(category) -> ConstitutionalLimit
+    LimitByGovernance,          // Anchor(governance_level) -> ConstitutionalLimit
+    LimitByEnforcement,         // Anchor(enforcement_method) -> ConstitutionalLimit
+
+    // ResourcePosition
+    IdToResourcePosition,       // Anchor(position_id) -> ResourcePosition
+    ResourceToPosition,         // Anchor(resource_id) -> ResourcePosition
+    PositionByType,             // Anchor(position_type) -> ResourcePosition
+    PositionByCompliance,       // Anchor(compliant:warning_level) -> ResourcePosition
+
+    // TransitionPath
+    IdToTransitionPath,         // Anchor(path_id) -> TransitionPath
+    StewardToTransitionPath,    // Anchor(steward_id) -> TransitionPath
+    ResourceToTransitionPath,   // Anchor(resource_id) -> TransitionPath
+    TransitionByStatus,         // Anchor(status) -> TransitionPath
+    TransitionByGovernance,     // Anchor(governance_level) -> TransitionPath
+
+    // AssetSplit
+    IdToAssetSplit,             // Anchor(split_id) -> AssetSplit
+    TransitionPathToSplit,      // Anchor(transition_path_id) -> AssetSplit
+    SplitByDestination,         // Anchor(destination_type) -> AssetSplit
+    SplitByStatus,              // Anchor(status) -> AssetSplit
+
+    // TransitionPhase
+    IdToTransitionPhase,        // Anchor(phase_id) -> TransitionPhase
+    TransitionPathToPhase,      // Anchor(transition_path_id) -> TransitionPhase
+    PhaseBySequence,            // Anchor(sequence_number) -> TransitionPhase
+    PhaseByStatus,              // Anchor(status) -> TransitionPhase
+
+    // TransitionAction
+    IdToTransitionAction,       // Anchor(action_id) -> TransitionAction
+    PhaseToAction,              // Anchor(phase_id) -> TransitionAction
+    ActionByType,               // Anchor(action_type) -> TransitionAction
+    ActionByStatus,             // Anchor(status) -> TransitionAction
+
+    // CommonsContribution
+    IdToCommonsContribution,    // Anchor(contribution_id) -> CommonsContribution
+    StewardToContribution,      // Anchor(steward_id) -> CommonsContribution
+    TransitionToContribution,   // Anchor(transition_path_id) -> CommonsContribution
+    PoolToContribution,         // Anchor(commons_pool_id) -> CommonsContribution
+    ContributionByRecognition,  // Anchor(public_recognition) -> CommonsContribution
 
     // =========================================================================
     // Lamad: Steward Economy links
