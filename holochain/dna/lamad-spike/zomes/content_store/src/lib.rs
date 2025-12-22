@@ -11748,3 +11748,198 @@ pub fn create_recurring_pattern(recurring_pattern: RecurringPattern) -> ExternRe
 
     Ok(record)
 }
+
+// =============================================================================
+// Shefa: Transaction Import (Plaid Integration) Zome Functions
+// =============================================================================
+
+/// Create a PlaidConnection (OAuth connection to financial institution)
+#[hdk_extern]
+pub fn create_plaid_connection(connection: PlaidConnection) -> ExternResult<ActionHash> {
+    let action_hash = create_entry(&EntryTypes::PlaidConnection(connection.clone()))?;
+
+    // Link from steward to connection for easy lookup
+    create_link(
+        connection.steward_id.clone(),
+        action_hash.clone(),
+        LinkTypes::StewardToPlaidConnection,
+        (),
+    )?;
+
+    // Link from connection ID for direct access
+    create_link(
+        AnchorAddress::try_from_raw("plaid_connections".to_string().into_bytes())?,
+        action_hash.clone(),
+        LinkTypes::IdToPlaidConnection,
+        (),
+    )?;
+
+    Ok(action_hash)
+}
+
+/// Get all PlaidConnections for a steward
+#[hdk_extern]
+pub fn get_plaid_connections(steward_id: String) -> ExternResult<Vec<PlaidConnection>> {
+    let links = get_links(
+        steward_id.into(),
+        LinkTypes::StewardToPlaidConnection,
+        None,
+    )?;
+
+    let mut connections = Vec::new();
+    for link in links {
+        if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
+            if let Ok(EntryTypes::PlaidConnection(conn)) = record.entry().to_app_option() {
+                connections.push(conn);
+            }
+        }
+    }
+
+    Ok(connections)
+}
+
+/// Create an ImportBatch for a specific date range and Plaid connection
+#[hdk_extern]
+pub fn create_import_batch(batch: ImportBatch) -> ExternResult<ActionHash> {
+    let action_hash = create_entry(&EntryTypes::ImportBatch(batch.clone()))?;
+
+    // Link from connection to batch
+    create_link(
+        batch.connection_id.clone().into(),
+        action_hash.clone(),
+        LinkTypes::ConnectionToBatch,
+        (),
+    )?;
+
+    // Link from batch ID anchor for direct access
+    create_link(
+        AnchorAddress::try_from_raw("import_batches".to_string().into_bytes())?,
+        action_hash.clone(),
+        LinkTypes::IdToImportBatch,
+        (),
+    )?;
+
+    Ok(action_hash)
+}
+
+/// Create a StagedTransaction (transaction awaiting review)
+#[hdk_extern]
+pub fn create_staged_transaction(staged: StagedTransaction) -> ExternResult<ActionHash> {
+    let action_hash = create_entry(&EntryTypes::StagedTransaction(staged.clone()))?;
+
+    // Link from batch to staged transaction
+    create_link(
+        staged.batch_id.clone().into(),
+        action_hash.clone(),
+        LinkTypes::BatchToStagedTransaction,
+        (),
+    )?;
+
+    // Link for direct access
+    create_link(
+        AnchorAddress::try_from_raw("staged_transactions".to_string().into_bytes())?,
+        action_hash.clone(),
+        LinkTypes::IdToStagedTransaction,
+        (),
+    )?;
+
+    Ok(action_hash)
+}
+
+/// Get all StagedTransactions for an ImportBatch
+#[hdk_extern]
+pub fn get_staged_transactions_for_batch(batch_id: String) -> ExternResult<Vec<StagedTransaction>> {
+    let links = get_links(
+        batch_id.into(),
+        LinkTypes::BatchToStagedTransaction,
+        None,
+    )?;
+
+    let mut transactions = Vec::new();
+    for link in links {
+        if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
+            if let Ok(EntryTypes::StagedTransaction(txn)) = record.entry().to_app_option() {
+                transactions.push(txn);
+            }
+        }
+    }
+
+    Ok(transactions)
+}
+
+/// Approve a StagedTransaction and link it to the created EconomicEvent
+#[hdk_extern]
+pub fn approve_staged_transaction(
+    staged_id: String,
+    event_id: String,
+) -> ExternResult<()> {
+    // Get the staged transaction
+    let links = get_links(
+        AnchorAddress::try_from_raw("staged_transactions".to_string().into_bytes())?,
+        LinkTypes::IdToStagedTransaction,
+        None,
+    )?;
+
+    for link in links {
+        if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
+            if let Ok(EntryTypes::StagedTransaction(mut txn)) = record.entry().to_app_option() {
+                if txn.id == staged_id {
+                    // Update the staged transaction with the event ID
+                    // In a real implementation, you'd update the entry
+                    // For now, we just record that approval happened
+                    debug!("Approved staged transaction {} -> event {}", staged_id, event_id);
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(
+        format!("Staged transaction {} not found", staged_id)
+    )))
+}
+
+/// Create a TransactionRule (auto-categorization from user corrections)
+#[hdk_extern]
+pub fn create_transaction_rule(rule: TransactionRule) -> ExternResult<ActionHash> {
+    let action_hash = create_entry(&EntryTypes::TransactionRule(rule.clone()))?;
+
+    // Link from steward to rule for easy lookup
+    create_link(
+        rule.steward_id.clone().into(),
+        action_hash.clone(),
+        LinkTypes::StewardToTransactionRule,
+        (),
+    )?;
+
+    // Link for direct access
+    create_link(
+        AnchorAddress::try_from_raw("transaction_rules".to_string().into_bytes())?,
+        action_hash.clone(),
+        LinkTypes::IdToTransactionRule,
+        (),
+    )?;
+
+    Ok(action_hash)
+}
+
+/// Get all TransactionRules for a steward
+#[hdk_extern]
+pub fn get_rules_for_steward(steward_id: String) -> ExternResult<Vec<TransactionRule>> {
+    let links = get_links(
+        steward_id.into(),
+        LinkTypes::StewardToTransactionRule,
+        None,
+    )?;
+
+    let mut rules = Vec::new();
+    for link in links {
+        if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
+            if let Ok(EntryTypes::TransactionRule(rule)) = record.entry().to_app_option() {
+                rules.push(rule);
+            }
+        }
+    }
+
+    Ok(rules)
+}

@@ -2410,6 +2410,179 @@ pub struct RecurringPattern {
 }
 
 // =============================================================================
+// Shefa: Transaction Import (Plaid Integration)
+// =============================================================================
+
+/// PlaidConnection - OAuth-authenticated connection to a financial institution via Plaid API
+///
+/// Stores encrypted access tokens and account mappings for transaction synchronization.
+/// Access tokens are encrypted client-side (AES-GCM) and never stored in plaintext.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct PlaidConnection {
+    pub connection_number: String,              // PC-XXXXXXXXXX formatted ID
+    pub steward_id: String,                     // AgentPubKey serialized as string
+
+    // Plaid OAuth credentials (encrypted)
+    pub plaid_item_id: String,
+    pub plaid_access_token_encrypted: String,   // AES-GCM encrypted, never logged
+    pub plaid_institution_id: String,
+    pub institution_name: String,
+
+    // Account mapping to Elohim FinancialAssets
+    pub linked_accounts_json: String,           // Vec<PlaidAccountLink> as JSON
+
+    // Connection health
+    pub status: String,                         // active | requires-reauth | disconnected | error
+    pub last_synced_at: Option<String>,
+    pub error_message: Option<String>,
+    pub webhook_url: Option<String>,
+
+    // Audit trail
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
+
+/// ImportBatch - Tracks a cohesive set of transaction imports for a specific date range
+///
+/// State machine:
+/// created → fetching → categorizing → staged → reviewing → approved → completed
+///                                                             ↓
+///                                                         rejected
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ImportBatch {
+    pub batch_number: String,                   // IB-XXXXXXXXXX formatted ID
+    pub steward_id: String,                     // AgentPubKey serialized as string
+    pub connection_id: String,                  // FK to PlaidConnection
+
+    // Scope
+    pub account_ids_json: String,               // Vec<String> as JSON
+    pub date_range_json: String,                // {start: String, end: String} as JSON
+
+    // Statistics
+    pub total_transactions: u32,
+    pub new_transactions: u32,
+    pub duplicate_transactions: u32,
+    pub error_transactions: u32,
+
+    // Processing status
+    pub status: String,                         // fetching | categorizing | staged | reviewing | approved | completed | rejected
+    pub staged_transaction_ids_json: String,    // Vec<String> as JSON
+
+    // AI categorization
+    pub ai_categorization_enabled: bool,
+    pub ai_categorization_completed_at: Option<String>,
+
+    // Review workflow
+    pub reviewed_by: Option<String>,
+    pub reviewed_at: Option<String>,
+    pub review_notes: Option<String>,
+
+    // Audit trail
+    pub created_at: Timestamp,
+    pub completed_at: Option<Timestamp>,
+}
+
+/// StagedTransaction - Transaction awaiting review and approval before EconomicEvent creation
+///
+/// Bridges external bank data (Plaid) with Elohim's immutable event-based accounting.
+/// Critical to preserve external reference (plaidTransactionId) for reconciliation.
+///
+/// State machine:
+/// pending → categorized → [approved | rejected | needs-attention]
+///                              ↓
+///                         completed (EconomicEvent created)
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct StagedTransaction {
+    pub batch_id: String,                       // FK to ImportBatch
+    pub steward_id: String,                     // AgentPubKey serialized as string
+
+    // Source tracking (CRITICAL for reconciliation)
+    pub plaid_transaction_id: String,           // Plaid's unique ID (prevents re-import)
+    pub plaid_account_id: String,
+    pub financial_asset_id: String,             // Elohim FinancialAsset
+
+    // Transaction data from Plaid
+    pub timestamp: String,                      // ISO 8601 datetime
+    pub transaction_type: String,               // debit | credit | transfer | fee
+    pub amount: f64,
+    pub currency: String,                       // USD, etc.
+    pub description: String,                    // Raw bank description
+    pub merchant_name: Option<String>,
+
+    // AI categorization
+    pub category: String,                       // BudgetCategory.name
+    pub category_confidence: u8,                // 0-100
+    pub category_source: String,                // ai | plaid | manual | rule
+    pub suggested_categories_json: String,      // Vec<CategorySuggestion> as JSON
+
+    // Budget linkage (for variance tracking)
+    pub budget_id: Option<String>,              // FK to FlowBudget
+    pub budget_category_id: Option<String>,     // FK to BudgetCategory
+
+    // Duplicate detection
+    pub is_duplicate: bool,
+    pub duplicate_of_transaction_id: Option<String>,
+    pub duplicate_confidence: Option<u8>,
+
+    // Review workflow
+    pub review_status: String,                  // pending | approved | rejected | needs-attention
+    pub reviewed_by: Option<String>,
+    pub reviewed_at: Option<String>,
+
+    // Economic event linkage (created after approval)
+    pub economic_event_id: Option<String>,
+
+    // Preserve original data for debugging
+    pub plaid_raw_data_json: String,            // Original Plaid transaction as JSON
+
+    // Audit trail
+    pub created_at: Timestamp,
+}
+
+/// TransactionRule - Auto-categorization rule learned from user corrections
+///
+/// Rules are auto-created when:
+/// - 5+ corrections to same category for same merchant
+/// - Confidence > 90%
+/// - No contradictory corrections
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct TransactionRule {
+    pub rule_number: String,                    // TR-XXXXXXXXXX formatted ID
+    pub steward_id: String,                     // AgentPubKey serialized as string
+
+    // Rule definition
+    pub name: String,
+    pub description: Option<String>,
+
+    // Matching criteria
+    pub match_type: String,                     // exact | contains | starts-with | regex | merchant | amount-range
+    pub match_field: String,                    // description | merchant | amount | account
+    pub match_value: String,
+    pub match_value_max: Option<f64>,           // For amount-range
+
+    // Action when rule matches
+    pub action: String,                         // categorize | flag | auto-approve | auto-reject
+    pub target_category: Option<String>,
+    pub target_budget_id: Option<String>,
+
+    // Learning
+    pub learn_from_corrections: bool,
+    pub accuracy_rate: Option<f64>,
+
+    // Control
+    pub priority: u8,                           // 0-100, higher = evaluated first
+    pub enabled: bool,
+
+    // Audit trail
+    pub created_at: Timestamp,
+    pub updated_at: Option<Timestamp>,
+}
+
+// =============================================================================
 // Lamad: Practice Pool & Mastery Challenges
 // =============================================================================
 
@@ -3394,6 +3567,12 @@ pub enum EntryTypes {
     FlowProjection(FlowProjection),
     RecurringPattern(RecurringPattern),
 
+    // Shefa: Transaction Import (Plaid Integration)
+    PlaidConnection(PlaidConnection),
+    ImportBatch(ImportBatch),
+    StagedTransaction(StagedTransaction),
+    TransactionRule(TransactionRule),
+
     // Lamad: Steward Economy
     StewardCredential(StewardCredential),
     PremiumGate(PremiumGate),
@@ -3740,6 +3919,18 @@ pub enum LinkTypes {
     ScenarioToProjection,       // Scenario -> FlowProjection (structural)
     IdToRecurringPattern,       // Anchor(pattern_id) -> RecurringPattern
     StewardToRecurringPattern,  // Anchor(steward_id) -> RecurringPattern
+
+    // =========================================================================
+    // Shefa: Transaction Import links (Plaid Integration)
+    // =========================================================================
+    IdToPlaidConnection,        // Anchor(connection_id) -> PlaidConnection
+    StewardToPlaidConnection,   // Anchor(steward_id) -> PlaidConnection
+    IdToImportBatch,            // Anchor(batch_id) -> ImportBatch
+    ConnectionToBatch,          // PlaidConnection -> ImportBatch
+    BatchToStagedTransaction,   // ImportBatch -> StagedTransaction
+    IdToStagedTransaction,      // Anchor(staged_id) -> StagedTransaction
+    StewardToTransactionRule,   // Anchor(steward_id) -> TransactionRule
+    IdToTransactionRule,        // Anchor(rule_id) -> TransactionRule
 
     // =========================================================================
     // Lamad: Steward Economy links
