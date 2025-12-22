@@ -11767,8 +11767,13 @@ pub fn create_plaid_connection(connection: PlaidConnection) -> ExternResult<Acti
     )?;
 
     // Link from connection ID for direct access
+    let anchor = StringAnchor {
+        anchor_type: "plaid".to_string(),
+        anchor_value: "plaid_connections".to_string(),
+    };
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     create_link(
-        AnchorAddress::try_from_raw("plaid_connections".to_string().into_bytes())?,
+        anchor_hash,
         action_hash.clone(),
         LinkTypes::IdToPlaidConnection,
         (),
@@ -11780,16 +11785,18 @@ pub fn create_plaid_connection(connection: PlaidConnection) -> ExternResult<Acti
 /// Get all PlaidConnections for a steward
 #[hdk_extern]
 pub fn get_plaid_connections(steward_id: String) -> ExternResult<Vec<PlaidConnection>> {
-    let links = get_links(
-        steward_id.into(),
-        LinkTypes::StewardToPlaidConnection,
-        None,
-    )?;
+    let anchor = StringAnchor {
+        anchor_type: "agent".to_string(),
+        anchor_value: steward_id,
+    };
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::StewardToPlaidConnection)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut connections = Vec::new();
     for link in links {
         if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
-            if let Ok(EntryTypes::PlaidConnection(conn)) = record.entry().to_app_option() {
+            if let Some(EntryTypes::PlaidConnection(conn)) = record.entry().to_app_option().ok().flatten() {
                 connections.push(conn);
             }
         }
@@ -11812,8 +11819,13 @@ pub fn create_import_batch(batch: ImportBatch) -> ExternResult<ActionHash> {
     )?;
 
     // Link from batch ID anchor for direct access
+    let anchor = StringAnchor {
+        anchor_type: "plaid".to_string(),
+        anchor_value: "import_batches".to_string(),
+    };
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     create_link(
-        AnchorAddress::try_from_raw("import_batches".to_string().into_bytes())?,
+        anchor_hash,
         action_hash.clone(),
         LinkTypes::IdToImportBatch,
         (),
@@ -11836,8 +11848,13 @@ pub fn create_staged_transaction(staged: StagedTransaction) -> ExternResult<Acti
     )?;
 
     // Link for direct access
+    let anchor = StringAnchor {
+        anchor_type: "plaid".to_string(),
+        anchor_value: "staged_transactions".to_string(),
+    };
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     create_link(
-        AnchorAddress::try_from_raw("staged_transactions".to_string().into_bytes())?,
+        anchor_hash,
         action_hash.clone(),
         LinkTypes::IdToStagedTransaction,
         (),
@@ -11849,16 +11866,18 @@ pub fn create_staged_transaction(staged: StagedTransaction) -> ExternResult<Acti
 /// Get all StagedTransactions for an ImportBatch
 #[hdk_extern]
 pub fn get_staged_transactions_for_batch(batch_id: String) -> ExternResult<Vec<StagedTransaction>> {
-    let links = get_links(
-        batch_id.into(),
-        LinkTypes::BatchToStagedTransaction,
-        None,
-    )?;
+    let anchor = StringAnchor {
+        anchor_type: "batch".to_string(),
+        anchor_value: batch_id,
+    };
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::BatchToStagedTransaction)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut transactions = Vec::new();
     for link in links {
         if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
-            if let Ok(EntryTypes::StagedTransaction(txn)) = record.entry().to_app_option() {
+            if let Some(EntryTypes::StagedTransaction(txn)) = record.entry().to_app_option().ok().flatten() {
                 transactions.push(txn);
             }
         }
@@ -11867,22 +11886,30 @@ pub fn get_staged_transactions_for_batch(batch_id: String) -> ExternResult<Vec<S
     Ok(transactions)
 }
 
+/// Input for approving a staged transaction
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ApproveStagedTransactionInput {
+    pub staged_id: String,
+    pub event_id: String,
+}
+
 /// Approve a StagedTransaction and link it to the created EconomicEvent
 #[hdk_extern]
-pub fn approve_staged_transaction(
-    staged_id: String,
-    event_id: String,
-) -> ExternResult<()> {
+pub fn approve_staged_transaction(input: ApproveStagedTransactionInput) -> ExternResult<()> {
+    let staged_id = input.staged_id;
+    let event_id = input.event_id;
     // Get the staged transaction
-    let links = get_links(
-        AnchorAddress::try_from_raw("staged_transactions".to_string().into_bytes())?,
-        LinkTypes::IdToStagedTransaction,
-        None,
-    )?;
+    let anchor = StringAnchor {
+        anchor_type: "plaid".to_string(),
+        anchor_value: "staged_transactions".to_string(),
+    };
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToStagedTransaction)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     for link in links {
         if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
-            if let Ok(EntryTypes::StagedTransaction(mut txn)) = record.entry().to_app_option() {
+            if let Some(EntryTypes::StagedTransaction(mut txn)) = record.entry().to_app_option().ok().flatten() {
                 if txn.id == staged_id {
                     // Update the staged transaction with the event ID
                     // In a real implementation, you'd update the entry
@@ -11913,8 +11940,13 @@ pub fn create_transaction_rule(rule: TransactionRule) -> ExternResult<ActionHash
     )?;
 
     // Link for direct access
+    let anchor = StringAnchor {
+        anchor_type: "plaid".to_string(),
+        anchor_value: "transaction_rules".to_string(),
+    };
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     create_link(
-        AnchorAddress::try_from_raw("transaction_rules".to_string().into_bytes())?,
+        anchor_hash,
         action_hash.clone(),
         LinkTypes::IdToTransactionRule,
         (),
@@ -11926,16 +11958,18 @@ pub fn create_transaction_rule(rule: TransactionRule) -> ExternResult<ActionHash
 /// Get all TransactionRules for a steward
 #[hdk_extern]
 pub fn get_rules_for_steward(steward_id: String) -> ExternResult<Vec<TransactionRule>> {
-    let links = get_links(
-        steward_id.into(),
-        LinkTypes::StewardToTransactionRule,
-        None,
-    )?;
+    let anchor = StringAnchor {
+        anchor_type: "agent".to_string(),
+        anchor_value: steward_id,
+    };
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::StewardToTransactionRule)?;
+    let links = get_links(query, GetStrategy::default())?;
 
     let mut rules = Vec::new();
     for link in links {
         if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
-            if let Ok(EntryTypes::TransactionRule(rule)) = record.entry().to_app_option() {
+            if let Some(EntryTypes::TransactionRule(rule)) = record.entry().to_app_option().ok().flatten() {
                 rules.push(rule);
             }
         }
