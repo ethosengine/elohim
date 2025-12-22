@@ -800,6 +800,69 @@ pub struct ProgressSummary {
     pub completed_at: Option<String>,
 }
 
+// =============================================================================
+// Input/Output Types for CustodianCommitment (Digital Presence Stewardship)
+// =============================================================================
+
+/// Input for creating a custodian commitment
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CreateCustodianCommitmentInput {
+    pub custodian_agent_id: String,
+    pub beneficiary_agent_id: String,
+    pub commitment_type: String,        // relationship|category|community|steward
+    pub basis: String,                  // intimate_relationship|trusted_relationship|etc.
+    pub relationship_id: Option<String>,
+    pub category_override_json: String,
+    pub content_filters_json: String,
+    pub estimated_content_count: u32,
+    pub estimated_size_mb: f64,
+    pub shard_strategy: String,         // full_replica|threshold_split|erasure_coded
+    pub redundancy_factor: u32,
+    pub shard_assignments_json: String, // Empty initially, filled when shards created
+    pub emergency_triggers_json: String,
+    pub emergency_contacts_json: String,
+    pub recovery_instructions_json: String,
+    pub cache_priority: Option<u32>,
+    pub bandwidth_class: Option<String>,
+    pub geographic_affinity: Option<String>,
+    pub note: Option<String>,
+    pub metadata_json: Option<String>,
+}
+
+/// Output when retrieving a custodian commitment
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CustodianCommitmentOutput {
+    pub action_hash: ActionHash,
+    pub entry_hash: EntryHash,
+    pub commitment: CustodianCommitment,
+}
+
+/// Input for querying custodian commitments
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryCommitmentsInput {
+    pub custodian_agent_id: Option<String>,
+    pub beneficiary_agent_id: Option<String>,
+    pub commitment_type: Option<String>,
+    pub state: Option<String>,
+    pub basis: Option<String>,
+    pub limit: Option<u32>,
+}
+
+/// Input for accepting a commitment
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AcceptCommitmentInput {
+    pub commitment_id: String,
+}
+
+/// Input for activating emergency protocol
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ActivateEmergencyInput {
+    pub commitment_id: String,
+    pub trigger_type: String,   // manual_signal|trusted_party|m_of_n_consensus|dead_mans_switch|beneficiary_incapacity
+    pub activation_proof: String, // Passphrase, signature, consensus votes, etc.
+    pub reason: String,
+}
+
 /// Input for granting attestation
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GrantAttestationInput {
@@ -9022,6 +9085,213 @@ pub fn query_governance_states(input: QueryGovernanceStatesInput) -> ExternResul
             if let Some(record) = record {
                 if let Some(governance_state) = record.entry().to_app_option::<GovernanceState>().ok().flatten() {
                     results.push(GovernanceStateOutput { action_hash, governance_state });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
+// CustodianCommitment CRUD Operations (Digital Presence Stewardship)
+// =============================================================================
+
+/// Create a custodian commitment
+#[hdk_extern]
+pub fn create_custodian_commitment(input: CreateCustodianCommitmentInput) -> ExternResult<CustodianCommitmentOutput> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let commitment = CustodianCommitment {
+        id: format!("{}-{}", input.beneficiary_agent_id, input.custodian_agent_id),
+        custodian_agent_id: input.custodian_agent_id.clone(),
+        beneficiary_agent_id: input.beneficiary_agent_id.clone(),
+        commitment_type: input.commitment_type.clone(),
+        basis: input.basis.clone(),
+        relationship_id: input.relationship_id,
+        category_override_json: input.category_override_json,
+        content_filters_json: input.content_filters_json,
+        estimated_content_count: input.estimated_content_count,
+        estimated_size_mb: input.estimated_size_mb,
+        shard_strategy: input.shard_strategy,
+        redundancy_factor: input.redundancy_factor,
+        shard_assignments_json: input.shard_assignments_json,
+        emergency_triggers_json: input.emergency_triggers_json,
+        emergency_contacts_json: input.emergency_contacts_json,
+        recovery_instructions_json: input.recovery_instructions_json,
+        cache_priority: input.cache_priority.unwrap_or(50),
+        bandwidth_class: input.bandwidth_class.unwrap_or_else(|| "medium".to_string()),
+        geographic_affinity: input.geographic_affinity,
+        state: "proposed".to_string(),
+        proposed_at: timestamp.clone(),
+        accepted_at: None,
+        activated_at: None,
+        last_verification_at: None,
+        verification_failures_json: "[]".to_string(),
+        shards_stored_count: 0,
+        last_shard_update_at: None,
+        total_restores_performed: 0,
+        shefa_commitment_id: None,
+        note: input.note,
+        metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+    };
+
+    // Create the entry
+    let action_hash = create_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
+
+    // Create index links
+    let id_anchor = StringAnchor::new("custodian_commitment_id", &commitment.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToCommitmentCustodian,
+        (),
+    )?;
+
+    let custodian_anchor = StringAnchor::new("custodian_id", &commitment.custodian_agent_id);
+    let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
+    create_link(
+        custodian_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::CustodianToCommitment,
+        (),
+    )?;
+
+    let beneficiary_anchor = StringAnchor::new("beneficiary_id", &commitment.beneficiary_agent_id);
+    let beneficiary_anchor_hash = hash_entry(&EntryTypes::StringAnchor(beneficiary_anchor))?;
+    create_link(
+        beneficiary_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::BeneficiaryToCommitment,
+        (),
+    )?;
+
+    Ok(CustodianCommitmentOutput {
+        action_hash,
+        entry_hash,
+        commitment,
+    })
+}
+
+/// Accept a custodian commitment (proposed → accepted)
+#[hdk_extern]
+pub fn accept_custodian_commitment(input: AcceptCommitmentInput) -> ExternResult<CustodianCommitmentOutput> {
+    // Get the commitment by ID
+    let id_anchor = StringAnchor::new("custodian_commitment_id", &input.commitment_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToCommitmentCustodian)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Commitment not found".to_string())));
+    }
+
+    let action_hash = ActionHash::try_from(links[0].target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid commitment hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Commitment record not found".to_string())))?;
+
+    let mut commitment = record
+        .entry()
+        .to_app_option::<CustodianCommitment>()
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid commitment entry type".to_string())))?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid commitment entry".to_string())))?;
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Update the commitment
+    commitment.state = "accepted".to_string();
+    commitment.accepted_at = Some(timestamp.clone());
+    commitment.updated_at = timestamp;
+
+    // Create a new version with update
+    let updated_action_hash = update_entry(action_hash.clone(), &EntryTypes::CustodianCommitment(commitment.clone()))?;
+
+    let entry_hash = hash_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
+
+    Ok(CustodianCommitmentOutput {
+        action_hash: updated_action_hash,
+        entry_hash,
+        commitment,
+    })
+}
+
+/// Query custodian commitments by various criteria
+#[hdk_extern]
+pub fn query_custodian_commitments(input: QueryCommitmentsInput) -> ExternResult<Vec<CustodianCommitmentOutput>> {
+    let mut results = Vec::new();
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    // Query by custodian if specified
+    if let Some(custodian_id) = &input.custodian_agent_id {
+        let custodian_anchor = StringAnchor::new("custodian_id", custodian_id);
+        let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
+
+        let query = LinkQuery::try_new(custodian_anchor_hash, LinkTypes::CustodianToCommitment)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        for link in links.iter().take(limit) {
+            let action_hash = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid commitment hash".to_string())))?;
+
+            let record = get(action_hash.clone(), GetOptions::default())?;
+            if let Some(record) = record {
+                if let Some(commitment) = record.entry().to_app_option::<CustodianCommitment>().ok().flatten() {
+                    // Filter by state if specified
+                    if let Some(ref state) = input.state {
+                        if commitment.state != *state {
+                            continue;
+                        }
+                    }
+                    let entry_hash = hash_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
+                    results.push(CustodianCommitmentOutput {
+                        action_hash,
+                        entry_hash,
+                        commitment,
+                    });
+                }
+            }
+        }
+    }
+
+    // Query by beneficiary if specified (and no custodian specified)
+    if let Some(beneficiary_id) = &input.beneficiary_agent_id {
+        if input.custodian_agent_id.is_none() {
+            let beneficiary_anchor = StringAnchor::new("beneficiary_id", beneficiary_id);
+            let beneficiary_anchor_hash = hash_entry(&EntryTypes::StringAnchor(beneficiary_anchor))?;
+
+            let query = LinkQuery::try_new(beneficiary_anchor_hash, LinkTypes::BeneficiaryToCommitment)?;
+            let links = get_links(query, GetStrategy::default())?;
+
+            for link in links.iter().take(limit) {
+                let action_hash = ActionHash::try_from(link.target.clone())
+                    .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid commitment hash".to_string())))?;
+
+                let record = get(action_hash.clone(), GetOptions::default())?;
+                if let Some(record) = record {
+                    if let Some(commitment) = record.entry().to_app_option::<CustodianCommitment>().ok().flatten() {
+                        // Filter by state if specified
+                        if let Some(ref state) = input.state {
+                            if commitment.state != *state {
+                                continue;
+                            }
+                        }
+                        let entry_hash = hash_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
+                        results.push(CustodianCommitmentOutput {
+                            action_hash,
+                            entry_hash,
+                            commitment,
+                        });
+                    }
                 }
             }
         }

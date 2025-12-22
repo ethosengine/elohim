@@ -330,6 +330,52 @@ pub const VALUE_FLOW_LAYERS: [&str; 4] = [
 ];
 
 // =============================================================================
+// CustodianCommitment Constants (Imago Dei - Digital Presence Stewardship)
+// =============================================================================
+
+/// Commitment types - why this commitment exists
+pub const COMMITMENT_TYPES: [&str; 4] = [
+    "relationship",     // Based on HumanRelationship (primary path)
+    "category",         // Category override (medical, high-bandwidth, etc.)
+    "community",        // M-of-N community custody
+    "steward",          // ContributorPresence steward custody
+];
+
+/// Commitment basis - selection criteria
+pub const COMMITMENT_BASIS: [&str; 6] = [
+    "intimate_relationship",    // IntimacyLevel >= trusted (family, close friends)
+    "trusted_relationship",     // IntimacyLevel == trusted
+    "community_member",         // Same community/neighborhood reach
+    "category_specialist",      // Has credential for content category
+    "bandwidth_capacity",       // High bandwidth for large files
+    "geographic_proximity",     // Close geographic location
+];
+
+/// Shard strategy - how content is split for resilience
+pub const SHARD_STRATEGIES: [&str; 3] = [
+    "full_replica",      // Each custodian holds complete copy (small content)
+    "threshold_split",   // M-of-N Shamir's Secret Sharing
+    "erasure_coded",     // Reed-Solomon erasure coding (efficient for large files)
+];
+
+/// Emergency trigger types - what can activate emergency protocol
+pub const EMERGENCY_TRIGGERS: [&str; 5] = [
+    "manual_signal",           // Beneficiary manually activates via passphrase
+    "trusted_party",           // Designated trusted person activates
+    "m_of_n_consensus",        // M custodians vote to activate
+    "dead_mans_switch",        // Beneficiary hasn't checked in for N days
+    "beneficiary_incapacity",  // Medical/legal declaration of incapacity
+];
+
+/// Bandwidth classes for performance hints
+pub const BANDWIDTH_CLASSES: [&str; 4] = [
+    "low",      // <5 Mbps
+    "medium",   // 5-50 Mbps
+    "high",     // 50-500 Mbps
+    "ultra",    // >500 Mbps
+];
+
+// =============================================================================
 // Content Entry
 // =============================================================================
 
@@ -1779,6 +1825,109 @@ pub struct StewardRevenue {
 }
 
 // =============================================================================
+// CustodianCommitment - Digital Presence Stewardship
+// =============================================================================
+
+/// CustodianCommitment - Promise to custody content for resilience
+///
+/// Enables organic account protection through social relationships:
+/// - Family automatically custodies family-reach content (intimate relationships)
+/// - Communities custody community-reach content
+/// - Specialists custody category-specific content (medical, video, etc.)
+/// - Emergency protocols (manual, trusted party, M-of-N) can reconstruct presence
+///
+/// Lifecycle: PROPOSED → ACCEPTED → ACTIVE → FULFILLED | BREACHED
+///
+/// Example commitments:
+/// 1. Alice (spouse) → Bob's "intimate" reach content (relationship-based, 60-80%)
+/// 2. Carol (nurse) → Medical content (category override, 20-40%)
+/// 3. Dave (fiber ISP) → Video content (bandwidth override)
+/// 4. Community (100 of 100k followers) → Sheila's commons-reach content (democratic resilience)
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CustodianCommitment {
+    pub id: String,
+
+    // =========================================================================
+    // Parties
+    // =========================================================================
+    pub custodian_agent_id: String,       // Who is custodying
+    pub beneficiary_agent_id: String,     // Whose content/presence is being custodied
+    pub commitment_type: String,          // From COMMITMENT_TYPES: relationship|category|community|steward
+
+    // =========================================================================
+    // Basis (WHY this custodian was selected)
+    // =========================================================================
+    pub basis: String,                    // From COMMITMENT_BASIS: intimate_relationship|trusted_relationship|etc.
+    pub relationship_id: Option<String>,  // If relationship-based, link to HumanRelationship
+    pub category_override_json: String,   // CategoryOverride[] if category-based (empty string if not)
+
+    // =========================================================================
+    // Scope (WHAT is being custodied)
+    // =========================================================================
+    /// ContentFilter[] - which content matches this commitment (reach levels, categories, tags, etc.)
+    pub content_filters_json: String,
+    pub estimated_content_count: u32,     // Estimated number of items matching filters
+    pub estimated_size_mb: f64,           // Estimated total size
+
+    // =========================================================================
+    // Shard Topology
+    // =========================================================================
+    pub shard_strategy: String,           // From SHARD_STRATEGIES: full_replica|threshold_split|erasure_coded
+    pub redundancy_factor: u32,           // M (threshold for recovery)
+    /// ShardAssignment[] - which shards this custodian holds (encrypted on DHT)
+    pub shard_assignments_json: String,
+
+    // =========================================================================
+    // Emergency Protocol (all three trigger types can be enabled)
+    // =========================================================================
+    /// EmergencyTrigger[] - what can activate emergency mode
+    pub emergency_triggers_json: String,
+    /// EmergencyContact[] - who to notify when activated
+    pub emergency_contacts_json: String,
+    /// RecoveryPlan - instructions for reconstruction
+    pub recovery_instructions_json: String,
+
+    // =========================================================================
+    // Performance Hints (for cache layer, NOT custody requirements)
+    // =========================================================================
+    pub cache_priority: u32,              // Higher = prefer when serving from cache
+    pub bandwidth_class: String,          // From BANDWIDTH_CLASSES: low|medium|high|ultra
+    pub geographic_affinity: Option<String>, // Hint: prefer serving to this region
+
+    // =========================================================================
+    // State Tracking
+    // =========================================================================
+    pub state: String,                    // From COMMITMENT_STATES: proposed|accepted|in-progress|fulfilled|cancelled|breached
+    pub proposed_at: String,
+    pub accepted_at: Option<String>,
+    pub activated_at: Option<String>,     // When emergency protocol was activated
+    pub last_verification_at: Option<String>, // Last time shards were verified
+    /// VerificationFailure[] - any shard integrity checks that failed
+    pub verification_failures_json: String,
+
+    // =========================================================================
+    // Fulfillment Tracking
+    // =========================================================================
+    pub shards_stored_count: u32,         // How many shards are currently stored
+    pub last_shard_update_at: Option<String>, // When shards were last updated
+    pub total_restores_performed: u32,    // How many times content was reconstructed
+
+    // =========================================================================
+    // Economic Context
+    // =========================================================================
+    pub shefa_commitment_id: Option<String>, // Links to Shefa Commitment if compensation is involved
+
+    // =========================================================================
+    // Metadata
+    // =========================================================================
+    pub note: Option<String>,
+    pub metadata_json: String,            // Extensible metadata
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// =============================================================================
 // Anchor Entries (for link indexing)
 // =============================================================================
 
@@ -1833,6 +1982,7 @@ pub enum EntryTypes {
     Agent(Agent),           // Expanded identity model
     AgentProgress(AgentProgress), // Expanded progress model
     Attestation(Attestation),
+    CustodianCommitment(CustodianCommitment), // Digital presence stewardship
 
     // Shefa: Economy (REA/ValueFlows)
     EconomicEvent(EconomicEvent),
@@ -1971,6 +2121,18 @@ pub enum LinkTypes {
     AgentToAttestation,         // Anchor(agent_id) -> Attestation
     AttestationByCategory,      // Anchor(category) -> Attestation
     AttestationByType,          // Anchor(attestation_type) -> Attestation
+
+    // =========================================================================
+    // Imago Dei: CustodianCommitment links (Digital Presence Stewardship)
+    // =========================================================================
+    IdToCommitmentCustodian,        // Anchor(commitment_id) -> CustodianCommitment
+    CustodianToCommitment,          // Anchor(custodian_agent_id) -> CustodianCommitment
+    BeneficiaryToCommitment,        // Anchor(beneficiary_agent_id) -> CustodianCommitment
+    CustodianCommitmentByType,      // Anchor(commitment_type) -> CustodianCommitment
+    CustodianCommitmentByBasis,     // Anchor(basis) -> CustodianCommitment
+    CustodianCommitmentByState,     // Anchor(state) -> CustodianCommitment
+    RelationshipToCommitment,       // HumanRelationship -> CustodianCommitment (automatic)
+    ContentToCommitmentCustodian,   // Content -> CustodianCommitment (which commitments cover)
 
     // =========================================================================
     // Shefa: Economic Event links
