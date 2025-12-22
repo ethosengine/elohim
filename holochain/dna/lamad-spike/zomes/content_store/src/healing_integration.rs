@@ -5,6 +5,7 @@
 
 use hdk::prelude::*;
 use content_store_integrity::*;
+use hc_rna::SelfHealingEntry;
 use crate::healing_impl;
 
 // ============================================================================
@@ -262,7 +263,7 @@ fn get_step_by_id_v2(id: &str) -> ExternResult<Option<PathStep>> {
     let anchor = StringAnchor::new("step_id", id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
 
-    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToPathStep)?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToStep)?;
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
@@ -338,7 +339,7 @@ fn get_mastery_by_id_v2(id: &str) -> ExternResult<Option<ContentMastery>> {
     let anchor = StringAnchor::new("mastery_id", id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
 
-    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContentMastery)?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToMastery)?;
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {

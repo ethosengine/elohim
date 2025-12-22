@@ -2593,6 +2593,7 @@ pub enum LinkTypes {
     // =========================================================================
     // Lamad: Content Mastery links
     // =========================================================================
+    IdToMastery,                // Anchor(mastery_id) -> ContentMastery (for healing/migration)
     HumanToMastery,             // Anchor(human_id) -> ContentMastery
     ContentToMastery,           // Anchor(content_id) -> ContentMastery
     MasteryByLevel,             // Anchor(mastery_level) -> ContentMastery

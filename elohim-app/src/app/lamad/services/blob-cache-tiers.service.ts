@@ -9,7 +9,7 @@
  * This avoids cache thrashing where one large video evicts 1000 small documents.
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, Injector } from '@angular/core';
 import { ContentBlob } from '../models/content-node.model';
 
 /**
@@ -59,6 +59,29 @@ export interface CacheOperationResult {
   reason?: string;
 }
 
+/**
+ * Cache integrity check result
+ */
+export interface CacheIntegrityCheckResult {
+  /** Whether all checked items are valid */
+  isValid: boolean;
+
+  /** Total items checked */
+  itemsChecked: number;
+
+  /** Items that failed hash verification */
+  corruptedItems: string[];
+
+  /** Items that are missing expected metadata */
+  missingMetadata: string[];
+
+  /** Duration of integrity check in milliseconds */
+  durationMs: number;
+
+  /** Timestamp when check was performed */
+  checkedAt: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -99,9 +122,18 @@ export class BlobCacheTiersService {
     },
   };
 
-  constructor() {
+  /** Last integrity check result */
+  private lastIntegrityCheck: CacheIntegrityCheckResult | null = null;
+
+  /** Integrity check interval ID */
+  private integrityCheckIntervalId: number | null = null;
+
+  constructor(private injector: Injector) {
     // Start background cleanup
     this.startCleanupTimer();
+
+    // Start background integrity verification
+    this.startIntegrityVerification();
   }
 
   /**
@@ -518,5 +550,170 @@ export class BlobCacheTiersService {
       percentOfBlobMax: (this.blobCacheSize / this.tiers.blob.maxSizeBytes) * 100,
       percentOfChunkMax: (this.chunkCacheSize / this.tiers.chunk.maxSizeBytes) * 100,
     };
+  }
+
+  // =========================================================================
+  // Cache Integrity Verification
+  // =========================================================================
+
+  /**
+   * Get the result of the last integrity check.
+   *
+   * @returns Last integrity check result or null if never checked
+   */
+  getLastIntegrityCheck(): CacheIntegrityCheckResult | null {
+    return this.lastIntegrityCheck;
+  }
+
+  /**
+   * Verify integrity of a single cached blob by re-hashing it.
+   *
+   * Useful for detecting corruption in specific blobs without
+   * re-verifying the entire cache.
+   *
+   * @param hash Hash key of blob to verify
+   * @returns Promise with verification result (true if valid, false if corrupted)
+   */
+  async verifyBlobIntegrity(hash: string): Promise<boolean> {
+    const item = this.blobCache.get(hash);
+    if (!item) {
+      return false; // Not cached
+    }
+
+    try {
+      // Lazy-inject BlobVerificationService to avoid circular dependency
+      const { BlobVerificationService } = await import('./blob-verification.service');
+      const verificationService = this.injector.get(BlobVerificationService);
+
+      const result = await verificationService.verifyBlob(item.data, hash).toPromise();
+      return result?.isValid ?? false;
+    } catch (error) {
+      console.warn(`[BlobCacheTiers] Error verifying blob ${hash}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Perform comprehensive integrity check of all cached blobs.
+   *
+   * This method:
+   * - Re-hashes all cached blobs
+   * - Detects corrupted entries
+   * - Removes invalid blobs from cache
+   * - Generates detailed report
+   *
+   * Useful for:
+   * - Periodic health checks (runs every 1 hour by default)
+   * - Diagnostic/debugging
+   * - Ensuring cache validity after system crash
+   *
+   * @returns Promise with integrity check result
+   */
+  async verifyAllBlobIntegrity(): Promise<CacheIntegrityCheckResult> {
+    const startTime = performance.now();
+    const corruptedItems: string[] = [];
+    const missingMetadata: string[] = [];
+    let itemsChecked = 0;
+
+    try {
+      // Lazy-inject BlobVerificationService to avoid circular dependency
+      const { BlobVerificationService } = await import('./blob-verification.service');
+      const verificationService = this.injector.get(BlobVerificationService);
+
+      // Check all blob cache items
+      for (const [hash, item] of this.blobCache.entries()) {
+        itemsChecked++;
+
+        try {
+          // Verify the blob matches its hash
+          const result = await verificationService
+            .verifyBlob(item.data, hash)
+            .toPromise();
+
+          if (!result?.isValid) {
+            corruptedItems.push(hash);
+          }
+        } catch (error) {
+          // Verification failed - treat as corrupted
+          corruptedItems.push(hash);
+          console.warn(`[BlobCacheTiers] Blob ${hash} failed verification:`, error);
+        }
+      }
+
+      // Remove corrupted items from cache
+      for (const hash of corruptedItems) {
+        const item = this.blobCache.get(hash);
+        if (item) {
+          this.blobCache.delete(hash);
+          this.blobCacheSize -= item.sizeBytes;
+          this.blobStats.evictions++;
+          console.warn(`[BlobCacheTiers] Removed corrupted blob from cache: ${hash}`);
+        }
+      }
+
+      const durationMs = Math.round(performance.now() - startTime);
+
+      const result: CacheIntegrityCheckResult = {
+        isValid: corruptedItems.length === 0 && missingMetadata.length === 0,
+        itemsChecked,
+        corruptedItems,
+        missingMetadata,
+        durationMs,
+        checkedAt: Date.now(),
+      };
+
+      this.lastIntegrityCheck = result;
+      return result;
+    } catch (error) {
+      console.error('[BlobCacheTiers] Integrity verification failed:', error);
+
+      const durationMs = Math.round(performance.now() - startTime);
+      const result: CacheIntegrityCheckResult = {
+        isValid: false,
+        itemsChecked,
+        corruptedItems,
+        missingMetadata,
+        durationMs,
+        checkedAt: Date.now(),
+      };
+
+      this.lastIntegrityCheck = result;
+      return result;
+    }
+  }
+
+  /**
+   * Start periodic integrity verification.
+   * Runs every hour by default to detect cache corruption.
+   *
+   * Uses lazy loading of BlobVerificationService to avoid circular dependencies
+   * during service initialization.
+   */
+  private startIntegrityVerification(): void {
+    // Run integrity check every 1 hour
+    const checkIntervalMs = 60 * 60 * 1000;
+
+    this.integrityCheckIntervalId = window.setInterval(() => {
+      this.verifyAllBlobIntegrity().catch((error) => {
+        console.error('[BlobCacheTiers] Background integrity check failed:', error);
+      });
+    }, checkIntervalMs);
+
+    // Perform initial check after 5 minutes to allow service startup
+    setTimeout(() => {
+      this.verifyAllBlobIntegrity().catch((error) => {
+        console.error('[BlobCacheTiers] Initial integrity check failed:', error);
+      });
+    }, 5 * 60 * 1000);
+  }
+
+  /**
+   * Stop periodic integrity verification (for testing/cleanup).
+   */
+  stopIntegrityVerification(): void {
+    if (this.integrityCheckIntervalId !== null) {
+      clearInterval(this.integrityCheckIntervalId);
+      this.integrityCheckIntervalId = null;
+    }
   }
 }

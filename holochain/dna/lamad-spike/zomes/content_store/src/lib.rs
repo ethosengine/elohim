@@ -25,7 +25,7 @@ pub mod healing_integration;
 // =============================================================================
 
 #[hdk_extern]
-pub fn init(_: InitPayload) -> ExternResult<InitCallbackResult> {
+pub fn init() -> ExternResult<InitCallbackResult> {
     // Initialize healing support - check if v1 is available
     // This never fails, always returns success
     let _ = healing_impl::init_healing();
@@ -1901,6 +1901,8 @@ pub fn create_path(input: CreatePathInput) -> ExternResult<ActionHash> {
         metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
         created_at: timestamp.clone(),
         updated_at: timestamp,
+        schema_version: 2,
+        validation_status: "Valid".to_string(),
     };
 
     let action_hash = create_entry(&EntryTypes::LearningPath(path))?;
@@ -1957,6 +1959,8 @@ pub fn add_path_step(input: AddPathStepInput) -> ExternResult<ActionHash> {
         metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
         created_at: timestamp.clone(),
         updated_at: timestamp,
+        schema_version: 2,
+        validation_status: "Valid".to_string(),
     };
 
     let action_hash = create_entry(&EntryTypes::PathStep(step))?;
@@ -2655,6 +2659,8 @@ pub fn update_path(input: UpdatePathInput) -> ExternResult<PathWithSteps> {
         metadata_json: existing.path.metadata_json,
         created_at: existing.path.created_at,
         updated_at: timestamp,
+        schema_version: 2,
+        validation_status: "Valid".to_string(),
     };
 
     let action_hash = create_entry(&EntryTypes::LearningPath(updated_path.clone()))?;
@@ -2761,6 +2767,8 @@ pub fn update_step(input: UpdateStepInput) -> ExternResult<PathStepOutput> {
         metadata_json: existing.metadata_json,
         created_at: existing.created_at,
         updated_at: timestamp,
+        schema_version: 2,
+        validation_status: "Valid".to_string(),
     };
 
     let action_hash = create_entry(&EntryTypes::PathStep(updated_step.clone()))?;
@@ -3588,6 +3596,8 @@ pub fn upsert_mastery(input: UpsertMasteryInput) -> ExternResult<ContentMasteryO
             privileges_json: "[]".to_string(),
             created_at: timestamp.clone(),
             updated_at: timestamp,
+            schema_version: 2,
+            validation_status: "Valid".to_string(),
         }
     };
 
