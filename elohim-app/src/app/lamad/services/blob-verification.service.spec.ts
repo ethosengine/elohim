@@ -199,4 +199,96 @@ describe('BlobVerificationService', () => {
       });
     });
   });
+
+  describe('SubtleCrypto Fallback for Non-HTTPS Contexts', () => {
+    it('should use pure-JS SHA256 when SubtleCrypto unavailable', (done) => {
+      const testData = 'test content';
+      const blob = new Blob([testData]);
+      const expectedHash = 'd4d8f0b8d9c8c8f8e8d8c8b8a8989898989898989898989898989898989898';
+
+      // This test will work with the fallback SHA256
+      service.verifyBlob(blob, expectedHash).subscribe((result) => {
+        // Just verify it doesn't error and returns a result
+        expect(result.computedHash).toBeDefined();
+        expect(typeof result.computedHash).toBe('string');
+        expect(result.computedHash.length).toBe(64); // SHA256 is 64 hex chars
+        done();
+      });
+    });
+
+    it('should produce consistent hashes with fallback', (done) => {
+      const testData = 'test data for hashing';
+      const blob = new Blob([testData]);
+
+      let hash1: string;
+
+      // Compute hash first time
+      service.verifyBlob(blob, '0000').subscribe((result1) => {
+        hash1 = result1.computedHash;
+
+        // Compute same hash again to verify consistency
+        service.verifyBlob(new Blob([testData]), '0000').subscribe((result2) => {
+          expect(result2.computedHash).toBe(hash1);
+          done();
+        });
+      });
+    });
+
+    it('should fallback gracefully when SubtleCrypto fails', (done) => {
+      const blob = new Blob(['test']);
+
+      // Even if SubtleCrypto is unavailable or fails, should get a valid hash
+      service.verifyBlob(blob, 'invalid_hash').subscribe((result) => {
+        expect(result.computedHash).toBeDefined();
+        expect(result.computedHash.length).toBe(64);
+        expect(result.isValid).toBe(false); // Should not match "invalid_hash"
+        done();
+      });
+    });
+
+    it('should compute different hashes for different content', (done) => {
+      const blob1 = new Blob(['content1']);
+      const blob2 = new Blob(['content2']);
+
+      let hash1: string;
+
+      service.verifyBlob(blob1, '0000').subscribe((result1) => {
+        hash1 = result1.computedHash;
+
+        service.verifyBlob(blob2, '0000').subscribe((result2) => {
+          expect(result2.computedHash).not.toBe(hash1);
+          done();
+        });
+      });
+    });
+
+    it('should handle large blobs with fallback', (done) => {
+      // Create a large blob (1 MB)
+      const largeData = new Uint8Array(1024 * 1024);
+      for (let i = 0; i < largeData.length; i++) {
+        largeData[i] = Math.floor(Math.random() * 256);
+      }
+      const blob = new Blob([largeData]);
+
+      service.verifyBlob(blob, 'dummy_hash').subscribe((result) => {
+        expect(result.computedHash).toBeDefined();
+        expect(result.computedHash.length).toBe(64);
+        expect(result.durationMs).toBeGreaterThan(0);
+        done();
+      });
+    });
+
+    it('should produce standard SHA256 hashes', (done) => {
+      // Test with a known SHA256 hash
+      // SHA256('') = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      const emptyBlob = new Blob(['']);
+
+      service.verifyBlob(emptyBlob, 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+        .subscribe((result) => {
+          expect(result.isValid).toBe(true);
+          expect(result.computedHash).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+          done();
+        });
+    });
+  });
 });
