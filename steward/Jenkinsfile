@@ -255,7 +255,7 @@ spec:
             }
         }
 
-        stage('📱 Build UI') {
+        stage('📱 Fetch UI') {
             when {
                 anyOf {
                     branch 'main'
@@ -267,36 +267,54 @@ spec:
             }
             steps {
                 container('builder') {
-                    dir('elohim-app') {
+                    dir('steward') {
                         script {
                             echo """
                             ═══════════════════════════════════════════════════════════
-                            📱 BUILDING ANGULAR UI
+                            📱 FETCHING UI FROM ELOHIM-APP PIPELINE
                             ═══════════════════════════════════════════════════════════
                             """
 
-                            sh '''#!/usr/bin/env bash
-                                set -euo pipefail
+                            def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-app/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/*zip*/archive.zip"
 
-                                echo "Installing Angular dependencies..."
-                                npm ci
+                            sh 'mkdir -p ui'
 
-                                echo ""
-                                echo "Building Angular app for production..."
-                                npm run build
+                            echo "Fetching UI from: ${artifactUrl}"
 
-                                echo ""
-                                echo "Build output:"
-                                ls -la dist/elohim-app/browser/
-                            '''
+                            def fetched = sh(
+                                script: """
+                                    set +e
+                                    wget --timeout=30 --tries=3 -O /tmp/ui-archive.zip '${artifactUrl}' 2>&1
+                                    exit_code=\$?
+                                    set -e
+                                    exit \$exit_code
+                                """,
+                                returnStatus: true
+                            ) == 0
 
-                            // Copy to steward/ui
-                            sh '''
-                                mkdir -p ../steward/ui
-                                cp -r dist/elohim-app/browser/* ../steward/ui/
-                                echo "✅ UI copied to steward/ui/"
-                                ls -la ../steward/ui/
-                            '''
+                            if (fetched) {
+                                sh '''
+                                    cd /tmp
+                                    unzip -o ui-archive.zip
+                                    # Find the browser output and copy to steward/ui
+                                    if [ -d archive/dist/elohim-app/browser ]; then
+                                        cp -r archive/dist/elohim-app/browser/* /home/jenkins/agent/workspace/*/steward/ui/ 2>/dev/null || \
+                                        cp -r archive/dist/elohim-app/browser/* $WORKSPACE/steward/ui/
+                                    fi
+                                    rm -rf archive ui-archive.zip
+                                '''
+                                echo "✅ UI fetched from elohim-app pipeline"
+                            } else {
+                                echo "⚠️ Could not fetch UI from pipeline - building locally"
+                                sh '''
+                                    cd ../elohim-app
+                                    npm ci
+                                    npm run build
+                                    cp -r dist/elohim-app/browser/* ../steward/ui/
+                                '''
+                            }
+
+                            sh 'echo "UI directory:"; ls -la ui/ | head -20'
                         }
                     }
                 }
