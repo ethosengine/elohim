@@ -136,20 +136,35 @@ pub struct CustodianAssignment {
     // === CONTENT ===
     pub content_id: String,           // What content
     pub content_hash: String,         // SHA256 for integrity
+    pub content_size_gb: Option<f64>, // Size of content for capacity planning
 
     // === CUSTODIAN ===
     pub custodian_node_id: String,    // Which node will custody
     pub strategy: String,             // See SHARD_STRATEGIES
     pub shard_index: Option<u32>,     // If using sharding, which shard
+    pub preferred_region: Option<String>, // Preferred geographic region
+    pub required_tier: Option<String>,    // Minimum steward tier required
 
     // === DECISION METADATA ===
     pub decided_by: String,           // Regional coordinator or "quorum"
-    pub decision_round: u32,          // For Byzantine consensus
+    pub decision_round: Option<u32>,  // For Byzantine consensus
     pub votes_json: String,           // JSON: [(node_id, vote)] if quorum
 
     // === LIFECYCLE ===
     pub created_at: String,           // When assignment was made
     pub expires_at: String,           // Assignments have TTL, must renew
+}
+
+// =============================================================================
+// String Anchor (for creating anchor points in DHT)
+// =============================================================================
+
+/// Generic string anchor for creating stable entry points in the DHT
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct StringAnchor {
+    pub anchor_type: String,
+    pub anchor_value: String,
 }
 
 // =============================================================================
@@ -163,6 +178,7 @@ pub enum EntryTypes {
     NodeHeartbeat(NodeHeartbeat),
     HealthAttestation(HealthAttestation),
     CustodianAssignment(CustodianAssignment),
+    StringAnchor(StringAnchor),
 }
 
 // =============================================================================
@@ -175,6 +191,8 @@ pub enum LinkTypes {
     RegionToNode,              // Anchor(region) -> NodeRegistration
     StatusToNode,              // Anchor(status) -> NodeRegistration
     TierToNode,                // Anchor(steward_tier) -> NodeRegistration
+    IdToNodeRegistration,      // Anchor(node_id) -> NodeRegistration (for lookups by ID)
+    CustodianToNode,           // Anchor(custodian="available") -> NodeRegistration (nodes opted-in)
 
     // Health tracking
     NodeToHeartbeat,           // NodeRegistration -> NodeHeartbeat (latest)
@@ -191,70 +209,21 @@ pub enum LinkTypes {
 
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
-    match op {
-        Op::StoreEntry(store_entry) => {
-            match store_entry.entry {
-                Entry::App(app_entry) => {
-                    // Parse entry type
-                    let entry_type = EntryTypes::deserialize_from_type(
-                        store_entry.action.hashed.entry_type().clone(),
-                        &app_entry,
-                    )?;
+    // Simplified validation - accept all entries for now
+    // TODO: Implement proper validation in production:
+    // - Verify signatures match agent keys
+    // - Ensure reasonable capacity values (no overflow attacks)
+    // - Validate timestamps are recent
+    // - Validate status/tier/strategy values against constants
+    // - Prevent self-attestation in HealthAttestation
+    // - Verify quorum votes in CustodianAssignment
 
-                    match entry_type {
-                        Some(EntryTypes::NodeRegistration(node)) => {
-                            validate_node_registration(&node)
-                        }
-                        Some(EntryTypes::NodeHeartbeat(heartbeat)) => {
-                            validate_node_heartbeat(&heartbeat)
-                        }
-                        Some(EntryTypes::HealthAttestation(attestation)) => {
-                            validate_health_attestation(&attestation)
-                        }
-                        Some(EntryTypes::CustodianAssignment(assignment)) => {
-                            validate_custodian_assignment(&assignment)
-                        }
-                        None => Ok(ValidateCallbackResult::Invalid(
-                            "Unknown entry type".to_string()
-                        )),
-                    }
-                }
-                _ => Ok(ValidateCallbackResult::Valid),
-            }
-        }
+    match op {
+        Op::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
+        Op::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
+        Op::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        Op::RegisterCreateLink(_) => Ok(ValidateCallbackResult::Valid),
+        Op::RegisterDeleteLink(_) => Ok(ValidateCallbackResult::Valid),
         _ => Ok(ValidateCallbackResult::Valid),
     }
-}
-
-fn validate_node_registration(node: &NodeRegistration) -> ExternResult<ValidateCallbackResult> {
-    // TODO: Verify signature matches agent_pub_key
-    // TODO: Ensure reasonable capacity values (no overflow attacks)
-    // TODO: Validate region is known region
-
-    // For now, accept all
-    Ok(ValidateCallbackResult::Valid)
-}
-
-fn validate_node_heartbeat(heartbeat: &NodeHeartbeat) -> ExternResult<ValidateCallbackResult> {
-    // TODO: Verify signature
-    // TODO: Ensure timestamp is recent (< 60 seconds old)
-    // TODO: Validate status is one of NODE_STATUS
-
-    Ok(ValidateCallbackResult::Valid)
-}
-
-fn validate_health_attestation(attestation: &HealthAttestation) -> ExternResult<ValidateCallbackResult> {
-    // TODO: Verify attester signature
-    // TODO: Ensure timestamp is recent
-    // TODO: Prevent self-attestation (attester != subject)
-
-    Ok(ValidateCallbackResult::Valid)
-}
-
-fn validate_custodian_assignment(assignment: &CustodianAssignment) -> ExternResult<ValidateCallbackResult> {
-    // TODO: Verify decided_by has authority to make assignments
-    // TODO: If quorum, verify votes_json has valid signatures
-    // TODO: Ensure strategy is one of SHARD_STRATEGIES
-
-    Ok(ValidateCallbackResult::Valid)
 }
