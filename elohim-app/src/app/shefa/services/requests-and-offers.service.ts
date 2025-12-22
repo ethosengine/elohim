@@ -85,17 +85,90 @@ export class RequestsAndOffersService {
     intent: Intent;
     createdEvent: EconomicEvent;
   }> {
-    // TODO: Implementation
-    // 1. Validate requester has user profile
-    // 2. Validate request fields (title, description length, etc)
-    // 3. Validate service type IDs exist
-    // 4. Validate medium of exchange IDs exist
-    // 5. Create ServiceRequest entity
-    // 6. Create Intent (REA) for the request
-    // 7. Create 'service-request-created' EconomicEvent
-    // 8. Set status to 'pending' (awaiting admin review)
-    // 9. Return request, intent, event
-    throw new Error('Not yet implemented');
+    // Step 1: Validate request fields
+    if (!requestDetails.title || requestDetails.title.trim().length === 0) {
+      throw new Error('Request title is required');
+    }
+    if (!requestDetails.description || requestDetails.description.trim().length < 20) {
+      throw new Error('Request description must be at least 20 characters');
+    }
+    if (!requestDetails.serviceTypeIds || requestDetails.serviceTypeIds.length === 0) {
+      throw new Error('Request must specify at least one service type');
+    }
+    if (
+      !requestDetails.mediumOfExchangeIds ||
+      requestDetails.mediumOfExchangeIds.length === 0
+    ) {
+      throw new Error('Request must specify at least one payment method');
+    }
+
+    // Step 2: Create ServiceRequest entity
+    const now = new Date().toISOString();
+    const request: ServiceRequest = {
+      id: generateRequestId(),
+      requestNumber: `REQ-${Date.now().toString().slice(-10)}`,
+      requesterId,
+      title: requestDetails.title,
+      description: requestDetails.description,
+      contactPreference: requestDetails.contactPreference || 'email',
+      contactValue: requestDetails.contactValue || '',
+      timeZone: requestDetails.timeZone || 'UTC',
+      timePreference: requestDetails.timePreference || 'any',
+      interactionType: requestDetails.interactionType || 'virtual',
+      dateRange: requestDetails.dateRange || { startDate: now, endDate: '' },
+      serviceTypeIds: requestDetails.serviceTypeIds,
+      requiredSkills: requestDetails.requiredSkills || [],
+      budget: requestDetails.budget,
+      mediumOfExchangeIds: requestDetails.mediumOfExchangeIds,
+      status: 'pending', // Awaiting admin approval
+      isPublic: false,   // Hidden until approved
+      links: requestDetails.links || [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Step 3: Create REA Intent for the request
+    // ServiceRequest = Intent to take (receive) service
+    const intent: Intent = {
+      id: `intent-${request.id}`,
+      action: 'take',
+      receiver: requesterId,
+      resourceConformsTo: requestDetails.serviceTypeIds.join('|'), // Multi-type
+      resourceQuantity: request.budget,
+      note: `Request for ${request.title}`,
+      metadata: {
+        requestId: request.id,
+        requestNumber: request.requestNumber,
+      },
+    };
+
+    // Step 4: Create 'service-request-created' EconomicEvent
+    const createdEvent = await this.economicService.createEvent({
+      action: 'propose',
+      provider: requesterId,
+      receiver: 'shefa-coordination',
+      resourceConformsTo: 'service-request',
+      hasPointInTime: now,
+      state: 'proposed',
+      note: `Service request created: ${request.title}. Requester: ${requesterId}. Services: ${requestDetails.serviceTypeIds.join(', ')}`,
+      metadata: {
+        lamadEventType: 'service-request-created',
+        requestId: request.id,
+        requestNumber: request.requestNumber,
+        requesterId,
+        serviceTypeIds: requestDetails.serviceTypeIds,
+        status: 'pending',
+      },
+    });
+
+    // Step 5: Persist request (in production, to Holochain DHT)
+    await this.persistRequest(request);
+
+    return {
+      request,
+      intent,
+      createdEvent,
+    };
   }
 
   /**
@@ -112,13 +185,52 @@ export class RequestsAndOffersService {
     request: ServiceRequest;
     updatedEvent: EconomicEvent;
   }> {
-    // TODO: Implementation
-    // 1. Verify requester owns this request
-    // 2. Validate updated fields
-    // 3. Merge updates with existing request
-    // 4. Create 'service-request-updated' event
-    // 5. Return updated request and event
-    throw new Error('Not yet implemented');
+    // Step 1: Get existing request
+    const request = await this.getRequest(requestId);
+    if (!request) {
+      throw new Error(`Request ${requestId} not found`);
+    }
+
+    // Step 2: Verify requester owns this request
+    if (request.requesterId !== requesterId) {
+      throw new Error(`Only requester can update this request`);
+    }
+
+    // Step 3: Merge updates with existing request
+    const updated: ServiceRequest = {
+      ...request,
+      ...updates,
+      id: request.id, // Never update ID
+      requestNumber: request.requestNumber, // Never update number
+      requesterId: request.requesterId, // Never update requester
+      createdAt: request.createdAt, // Never update created date
+      updatedAt: new Date().toISOString(), // Update modification time
+    };
+
+    // Step 4: Create 'service-request-updated' EconomicEvent
+    const updatedEvent = await this.economicService.createEvent({
+      action: 'modify',
+      provider: requesterId,
+      receiver: 'shefa-coordination',
+      hasPointInTime: new Date().toISOString(),
+      state: 'validated',
+      note: `Service request updated: ${updated.title}. Changes: ${Object.keys(updates).join(', ')}`,
+      metadata: {
+        lamadEventType: 'service-request-updated',
+        requestId: request.id,
+        requestNumber: request.requestNumber,
+        requesterId,
+        changedFields: Object.keys(updates),
+      },
+    });
+
+    // Step 5: Persist updated request
+    await this.persistRequest(updated);
+
+    return {
+      request: updated,
+      updatedEvent,
+    };
   }
 
   /**
@@ -127,8 +239,38 @@ export class RequestsAndOffersService {
    * Hides it from search but keeps record.
    */
   async archiveRequest(requestId: string, requesterId: string): Promise<ServiceRequest> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    // Get and verify ownership
+    const request = await this.getRequest(requestId);
+    if (!request) {
+      throw new Error(`Request ${requestId} not found`);
+    }
+    if (request.requesterId !== requesterId) {
+      throw new Error(`Only requester can archive this request`);
+    }
+
+    // Archive by setting status
+    const archived: ServiceRequest = {
+      ...request,
+      status: 'archived',
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Create event
+    await this.economicService.createEvent({
+      action: 'raise',
+      provider: requesterId,
+      receiver: 'shefa-coordination',
+      hasPointInTime: new Date().toISOString(),
+      state: 'validated',
+      note: `Request archived: ${request.title}`,
+      metadata: {
+        lamadEventType: 'service-request-archived',
+        requestId,
+      },
+    });
+
+    await this.persistRequest(archived);
+    return archived;
   }
 
   /**
@@ -137,16 +279,46 @@ export class RequestsAndOffersService {
    * Hard delete if within grace period, soft otherwise.
    */
   async deleteRequest(requestId: string, requesterId: string): Promise<void> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    const request = await this.getRequest(requestId);
+    if (!request) {
+      throw new Error(`Request ${requestId} not found`);
+    }
+
+    if (request.requesterId !== requesterId) {
+      throw new Error(`Only requester can delete this request`);
+    }
+
+    // TODO: Implement hard/soft delete logic based on grace period
+    // For now, just mark as deleted
+    const deleted: ServiceRequest = {
+      ...request,
+      status: 'deleted',
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.economicService.createEvent({
+      action: 'modify',
+      provider: requesterId,
+      receiver: 'shefa-coordination',
+      hasPointInTime: new Date().toISOString(),
+      state: 'validated',
+      note: `Request deleted: ${request.title}`,
+      metadata: {
+        lamadEventType: 'service-request-deleted',
+        requestId,
+      },
+    });
+
+    await this.persistRequest(deleted);
   }
 
   /**
    * Get a specific request.
    */
   async getRequest(requestId: string): Promise<ServiceRequest | null> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    // TODO: In production, fetch from Holochain DHT
+    console.log('Fetching request:', requestId);
+    return null;
   }
 
   /**
@@ -160,8 +332,10 @@ export class RequestsAndOffersService {
       toDate?: string;
     }
   ): Promise<ServiceRequest[]> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    // TODO: In production, query DHT for requests where requesterId matches
+    // Apply filters if provided
+    console.log(`Fetching requests for user ${requesterId}`, filters);
+    return [];
   }
 
   // ============================================================================
@@ -186,17 +360,94 @@ export class RequestsAndOffersService {
     intent: Intent;
     createdEvent: EconomicEvent;
   }> {
-    // TODO: Implementation
-    // 1. Validate offeror has user profile
-    // 2. Validate offer fields
-    // 3. Validate service type IDs
-    // 4. Validate medium of exchange IDs
-    // 5. Create ServiceOffer entity
-    // 6. Create Intent (REA) for the offer
-    // 7. Create 'service-offer-created' event
-    // 8. Set admin status to 'pending'
-    // 9. Return offer, intent, event
-    throw new Error('Not yet implemented');
+    // Step 1: Validate offer fields
+    if (!offerDetails.title || offerDetails.title.trim().length === 0) {
+      throw new Error('Offer title is required');
+    }
+    if (!offerDetails.description || offerDetails.description.trim().length < 20) {
+      throw new Error('Offer description must be at least 20 characters');
+    }
+    if (!offerDetails.serviceTypeIds || offerDetails.serviceTypeIds.length === 0) {
+      throw new Error('Offer must specify at least one service type');
+    }
+    if (
+      !offerDetails.mediumOfExchangeIds ||
+      offerDetails.mediumOfExchangeIds.length === 0
+    ) {
+      throw new Error('Offer must specify at least one payment method');
+    }
+
+    // Step 2: Create ServiceOffer entity
+    const now = new Date().toISOString();
+    const offer: ServiceOffer = {
+      id: generateOfferId(),
+      offerNumber: `OFR-${Date.now().toString().slice(-10)}`,
+      offerorId,
+      title: offerDetails.title,
+      description: offerDetails.description,
+      contactPreference: offerDetails.contactPreference || 'email',
+      contactValue: offerDetails.contactValue || '',
+      timeZone: offerDetails.timeZone || 'UTC',
+      timePreference: offerDetails.timePreference || 'any',
+      interactionType: offerDetails.interactionType || 'virtual',
+      hoursPerWeek: offerDetails.hoursPerWeek || 40,
+      dateRange: offerDetails.dateRange || { startDate: now, endDate: '' },
+      serviceTypeIds: offerDetails.serviceTypeIds,
+      offeredSkills: offerDetails.offeredSkills || [],
+      rate: offerDetails.rate,
+      mediumOfExchangeIds: offerDetails.mediumOfExchangeIds,
+      acceptsAlternativePayment: offerDetails.acceptsAlternativePayment || false,
+      status: 'pending', // Awaiting admin approval
+      isPublic: false,   // Hidden until approved
+      links: offerDetails.links || [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Step 3: Create REA Intent for the offer
+    // ServiceOffer = Intent to give (provide) service
+    const intent: Intent = {
+      id: `intent-${offer.id}`,
+      action: 'give',
+      provider: offerorId,
+      resourceConformsTo: offerDetails.serviceTypeIds.join('|'), // Multi-type
+      resourceQuantity: offer.rate,
+      note: `Offer for ${offer.title}`,
+      metadata: {
+        offerId: offer.id,
+        offerNumber: offer.offerNumber,
+      },
+    };
+
+    // Step 4: Create 'service-offer-created' EconomicEvent
+    const createdEvent = await this.economicService.createEvent({
+      action: 'propose',
+      provider: offerorId,
+      receiver: 'shefa-coordination',
+      resourceConformsTo: 'service-offer',
+      resourceQuantity: offer.rate,
+      hasPointInTime: now,
+      state: 'proposed',
+      note: `Service offer created: ${offer.title}. Offeror: ${offerorId}. Services: ${offerDetails.serviceTypeIds.join(', ')}. Rate: ${offer.rate.amount.value} ${offer.rate.amount.unit}/${offer.rate.per}`,
+      metadata: {
+        lamadEventType: 'service-offer-created',
+        offerId: offer.id,
+        offerNumber: offer.offerNumber,
+        offerorId,
+        serviceTypeIds: offerDetails.serviceTypeIds,
+        rate: offer.rate.amount.value,
+        status: 'pending',
+      },
+    });
+
+    // Step 5: Persist offer (in production, to Holochain DHT)
+    await this.persistOffer(offer);
+
+    return {
+      offer,
+      intent,
+      createdEvent,
+    };
   }
 
   /**
@@ -212,32 +463,131 @@ export class RequestsAndOffersService {
     offer: ServiceOffer;
     updatedEvent: EconomicEvent;
   }> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    // Step 1: Get existing offer
+    const offer = await this.getOffer(offerId);
+    if (!offer) {
+      throw new Error(`Offer ${offerId} not found`);
+    }
+
+    // Step 2: Verify offeror owns this offer
+    if (offer.offerorId !== offerorId) {
+      throw new Error(`Only offeror can update this offer`);
+    }
+
+    // Step 3: Merge updates
+    const updated: ServiceOffer = {
+      ...offer,
+      ...updates,
+      id: offer.id,
+      offerNumber: offer.offerNumber,
+      offerorId: offer.offerorId,
+      createdAt: offer.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Step 4: Create update event
+    const updatedEvent = await this.economicService.createEvent({
+      action: 'modify',
+      provider: offerorId,
+      receiver: 'shefa-coordination',
+      hasPointInTime: new Date().toISOString(),
+      state: 'validated',
+      note: `Service offer updated: ${updated.title}. Changes: ${Object.keys(updates).join(', ')}`,
+      metadata: {
+        lamadEventType: 'service-offer-updated',
+        offerId: offer.id,
+        offerNumber: offer.offerNumber,
+        offerorId,
+        changedFields: Object.keys(updates),
+      },
+    });
+
+    // Step 5: Persist updated offer
+    await this.persistOffer(updated);
+
+    return {
+      offer: updated,
+      updatedEvent,
+    };
   }
 
   /**
    * Archive an offer (soft delete).
    */
   async archiveOffer(offerId: string, offerorId: string): Promise<ServiceOffer> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    const offer = await this.getOffer(offerId);
+    if (!offer) {
+      throw new Error(`Offer ${offerId} not found`);
+    }
+    if (offer.offerorId !== offerorId) {
+      throw new Error(`Only offeror can archive this offer`);
+    }
+
+    const archived: ServiceOffer = {
+      ...offer,
+      status: 'archived',
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.economicService.createEvent({
+      action: 'raise',
+      provider: offerorId,
+      receiver: 'shefa-coordination',
+      hasPointInTime: new Date().toISOString(),
+      state: 'validated',
+      note: `Offer archived: ${offer.title}`,
+      metadata: {
+        lamadEventType: 'service-offer-archived',
+        offerId,
+      },
+    });
+
+    await this.persistOffer(archived);
+    return archived;
   }
 
   /**
    * Delete an offer.
    */
   async deleteOffer(offerId: string, offerorId: string): Promise<void> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    const offer = await this.getOffer(offerId);
+    if (!offer) {
+      throw new Error(`Offer ${offerId} not found`);
+    }
+
+    if (offer.offerorId !== offerorId) {
+      throw new Error(`Only offeror can delete this offer`);
+    }
+
+    const deleted: ServiceOffer = {
+      ...offer,
+      status: 'deleted',
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.economicService.createEvent({
+      action: 'modify',
+      provider: offerorId,
+      receiver: 'shefa-coordination',
+      hasPointInTime: new Date().toISOString(),
+      state: 'validated',
+      note: `Offer deleted: ${offer.title}`,
+      metadata: {
+        lamadEventType: 'service-offer-deleted',
+        offerId,
+      },
+    });
+
+    await this.persistOffer(deleted);
   }
 
   /**
    * Get a specific offer.
    */
   async getOffer(offerId: string): Promise<ServiceOffer | null> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    // TODO: In production, fetch from Holochain DHT
+    console.log('Fetching offer:', offerId);
+    return null;
   }
 
   /**
@@ -251,8 +601,9 @@ export class RequestsAndOffersService {
       toDate?: string;
     }
   ): Promise<ServiceOffer[]> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    // TODO: In production, query DHT for offers where offerorId matches
+    console.log(`Fetching offers for user ${offerorId}`, filters);
+    return [];
   }
 
   // ============================================================================
@@ -283,15 +634,31 @@ export class RequestsAndOffersService {
     page: number;
     pageSize: number;
   }> {
-    // TODO: Implementation
-    // 1. Query requests matching filters
-    // 2. Apply text search across title + description
-    // 3. Filter by accepted admin status
-    // 4. Exclude archived/deleted
-    // 5. Sort by recency or relevance
-    // 6. Paginate results
-    // 7. Return with total count
-    throw new Error('Not yet implemented');
+    // TODO: In production, query Holochain DHT with multiple filters
+    // 1. Filter by service types (any matching serviceTypeIds)
+    // 2. Filter by text search (match title + description)
+    // 3. Filter by timezone if provided
+    // 4. Filter by interaction type if provided
+    // 5. Filter by date range if provided
+    // 6. Filter by budget range if provided
+    // 7. Filter by accepted payment methods (any matching mediumOfExchangeIds)
+    // 8. Only return requests with status='pending' (approved)
+    // 9. Exclude archived/deleted
+    // 10. Sort by recency (newest first)
+    // 11. Apply pagination
+    const page = pagination?.page || 1;
+    const pageSize = pagination?.pageSize || 20;
+
+    console.log('Searching requests with filters:', filters);
+    console.log(`Pagination: page ${page}, size ${pageSize}`);
+
+    // Placeholder return for development
+    return {
+      requests: [],
+      totalCount: 0,
+      page,
+      pageSize,
+    };
   }
 
   /**
@@ -317,8 +684,30 @@ export class RequestsAndOffersService {
     page: number;
     pageSize: number;
   }> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    // TODO: In production, query Holochain DHT with multiple filters
+    // 1. Filter by service types (any matching)
+    // 2. Filter by text search
+    // 3. Filter by timezone if provided
+    // 4. Filter by interaction type if provided
+    // 5. Filter by hourly rate range if provided
+    // 6. Filter by accepted payment methods
+    // 7. Filter by minimum hours per week if provided
+    // 8. Only return offers with status='pending' (approved)
+    // 9. Exclude archived/deleted
+    // 10. Sort by rate (lowest first) or newest
+    // 11. Apply pagination
+    const page = pagination?.page || 1;
+    const pageSize = pagination?.pageSize || 20;
+
+    console.log('Searching offers with filters:', filters);
+    console.log(`Pagination: page ${page}, size ${pageSize}`);
+
+    return {
+      offers: [],
+      totalCount: 0,
+      page,
+      pageSize,
+    };
   }
 
   /**
@@ -327,16 +716,26 @@ export class RequestsAndOffersService {
    * Return requests with high engagement (saves, contacts, etc).
    */
   async getTrendingRequests(limit: number = 10): Promise<ServiceRequest[]> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    // TODO: In production, query DHT for requests with highest:
+    // - Number of matches suggested
+    // - Number of saves
+    // - Number of contacts received
+    // - Recency (if tied)
+    console.log(`Fetching top ${limit} trending requests`);
+    return [];
   }
 
   /**
    * Get trending or featured offers.
    */
   async getTrendingOffers(limit: number = 10): Promise<ServiceOffer[]> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    // TODO: In production, query DHT for offers with highest:
+    // - Number of matches suggested
+    // - Number of saves
+    // - Number of contacts received
+    // - Recency (if tied)
+    console.log(`Fetching top ${limit} trending offers`);
+    return [];
   }
 
   // ============================================================================
@@ -350,34 +749,66 @@ export class RequestsAndOffersService {
    * to suggest matching offers.
    *
    * Returns ranked list of ServiceMatch objects.
+   *
+   * ⚠️ PLACEHOLDER: Matching algorithm requires alignment review with Elohim Protocol
+   *
+   * This is a critical component that should be reviewed for:
+   * - Fairness in matching (avoiding preferential treatment)
+   * - Transparency in scoring (explainable recommendations)
+   * - Economic neutrality (not biasing toward payment methods)
+   * - Privacy preservation (not leaking requester/offeror preferences)
+   * - Accessibility (ensuring matches for lower-visibility listings)
+   *
+   * See: docs/alignment-reviews/service-matching-algorithm.md
    */
   async findMatchesForRequest(
     requestId: string,
     limit: number = 10
   ): Promise<ServiceMatch[]> {
-    // TODO: Implementation
+    // PLACEHOLDER IMPLEMENTATION
+    // TODO: Implement matching algorithm with alignment review
+    //
+    // High-level approach (to be reviewed):
     // 1. Get the request
-    // 2. Get all active offers
-    // 3. For each offer:
-    //    - Check service type overlap
-    //    - Check time preference compatibility
-    //    - Check interaction type compatibility
-    //    - Check medium of exchange overlap
-    //    - Calculate match quality score
-    // 4. Filter to matches with acceptable quality
-    // 5. Sort by quality
+    // 2. Get all active offers (status='pending' = approved by admin)
+    // 3. For each offer, calculate compatibility score:
+    //    a. Service type overlap (exact match scores higher)
+    //    b. Time preference compatibility (can both work together?)
+    //    c. Interaction type compatibility (virtual vs in-person)
+    //    d. Medium of exchange overlap (any payment method both accept)
+    //    e. Budget vs rate alignment (if applicable)
+    // 4. Filter to matches with minimum acceptable quality (e.g., >= 70)
+    // 5. Sort by quality score (highest first)
     // 6. Return top N matches
-    throw new Error('Not yet implemented');
+    //
+    // Must ensure:
+    // - Score calculation is transparent and auditable
+    // - No preferential treatment based on requester/offeror identity
+    // - Privacy: don't leak requester's budget or timing constraints
+    // - Fairness: all offers get equal consideration regardless of creator
+    // - Inclusion: matching algorithm doesn't create systemic exclusions
+
+    console.log(
+      `Finding matches for request ${requestId}. Limit: ${limit}. PLACEHOLDER IMPLEMENTATION.`
+    );
+    return [];
   }
 
   /**
    * Find requests that match an offer.
    *
    * Mirror of findMatchesForRequest for offers.
+   * See ⚠️ notes on findMatchesForRequest about alignment review.
    */
   async findMatchesForOffer(offerId: string, limit: number = 10): Promise<ServiceMatch[]> {
-    // TODO: Implementation
-    throw new Error('Not yet implemented');
+    // PLACEHOLDER IMPLEMENTATION
+    // TODO: Implement matching algorithm with alignment review
+    // See findMatchesForRequest for design notes and governance requirements
+
+    console.log(
+      `Finding matches for offer ${offerId}. Limit: ${limit}. PLACEHOLDER IMPLEMENTATION.`
+    );
+    return [];
   }
 
   /**
@@ -919,4 +1350,42 @@ export class RequestsAndOffersService {
     // TODO: Implementation
     throw new Error('Not yet implemented');
   }
+
+  // ============================================================================
+  // HELPER METHODS
+  // ============================================================================
+
+  private async persistRequest(request: ServiceRequest): Promise<void> {
+    // TODO: Persist to Holochain DHT
+    console.log('Persisting request:', request.requestNumber);
+  }
+
+  private async persistOffer(offer: ServiceOffer): Promise<void> {
+    // TODO: Persist to Holochain DHT
+    console.log('Persisting offer:', offer.offerNumber);
+  }
+}
+
+// ============================================================================
+// STANDALONE HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Generate a unique ID for a service request.
+ * Uses timestamp + random suffix.
+ * In production, would use UUID or Holochain hash.
+ */
+function generateRequestId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 9);
+  return `req-${timestamp}-${random}`;
+}
+
+/**
+ * Generate a unique ID for a service offer.
+ */
+function generateOfferId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 9);
+  return `off-${timestamp}-${random}`;
 }

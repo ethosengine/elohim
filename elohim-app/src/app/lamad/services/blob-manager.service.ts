@@ -7,9 +7,10 @@
  * - Caching decisions based on blob size
  * - Progress tracking for large downloads
  * - Error handling and recovery
+ * - Metadata retrieval from Holochain DHT
  */
 
-import { Injectable } from '@angular/core';
+import { Injectable, Injector } from '@angular/core';
 import { Observable, from, of, throwError } from 'rxjs';
 import { map, catchError, tap, switchMap } from 'rxjs/operators';
 import { ContentBlob } from '../models/content-node.model';
@@ -66,6 +67,47 @@ export interface BlobDownloadProgress {
   phase: 'fetching' | 'verifying';
 }
 
+/**
+ * Blob metadata output from Holochain zome
+ * Matches BlobMetadataOutput in coordinator zome
+ */
+export interface BlobMetadataOutput {
+  /** SHA256 hash of blob */
+  hash: string;
+
+  /** Size in bytes */
+  size_bytes: number;
+
+  /** MIME type (video/mp4, audio/mpeg, etc.) */
+  mime_type: string;
+
+  /** Primary + fallback URLs */
+  fallback_urls: string[];
+
+  /** Bitrate in Mbps (optional) */
+  bitrate_mbps?: number;
+
+  /** Duration in seconds for audio/video */
+  duration_seconds?: number;
+
+  /** Codec (H.264, H.265, VP9, AAC, etc.) */
+  codec?: string;
+
+  /** When this blob was created */
+  created_at?: string;
+
+  /** When this blob was last verified */
+  verified_at?: string;
+}
+
+/**
+ * Response from get_blobs_by_content_id zome call
+ */
+export interface BlobsForContentOutput {
+  /** List of blobs for content */
+  blobs: BlobMetadataOutput[];
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -85,6 +127,7 @@ export class BlobManagerService {
   constructor(
     private verificationService: BlobVerificationService,
     private fallbackService: BlobFallbackService,
+    private injector: Injector,
   ) {}
 
   /**
@@ -386,5 +429,143 @@ export class BlobManagerService {
     });
 
     await this.cacheLock;
+  }
+
+  // =========================================================================
+  // Metadata Retrieval from Holochain DHT
+  // =========================================================================
+
+  /**
+   * Retrieve all blobs for a content node from Holochain DHT.
+   *
+   * This method queries the Holochain DHT for all blobs associated with a content ID,
+   * retrieving their metadata which includes hashes, fallback URLs, and codec info.
+   *
+   * @param contentId Content node ID to retrieve blobs for
+   * @returns Observable with array of ContentBlob objects ready for download
+   */
+  getBlobsForContent(contentId: string): Observable<ContentBlob[]> {
+    return from(this.callGetBlobsForContent(contentId)).pipe(
+      map((output) => {
+        if (!output || !output.blobs || output.blobs.length === 0) {
+          return [];
+        }
+
+        // Transform Holochain BlobMetadataOutput to ContentBlob
+        return output.blobs.map((blob) => this.transformBlobMetadata(blob));
+      }),
+      catchError((error) => {
+        console.error('[BlobManager] Failed to retrieve blobs for content:', error);
+        return of([]);
+      }),
+    );
+  }
+
+  /**
+   * Retrieve a specific blob's metadata from Holochain DHT by hash.
+   *
+   * Useful for getting detailed metadata about a blob before downloading,
+   * or for verifying blob existence in the DHT.
+   *
+   * @param contentId Content node ID that owns the blob
+   * @param blobHash SHA256 hash of blob to retrieve
+   * @returns Observable with ContentBlob metadata or null if not found
+   */
+  getBlobMetadata(contentId: string, blobHash: string): Observable<ContentBlob | null> {
+    return this.getBlobsForContent(contentId).pipe(
+      map((blobs) => {
+        const found = blobs.find((b) => b.hash === blobHash);
+        return found || null;
+      }),
+    );
+  }
+
+  /**
+   * Check if a blob exists in Holochain DHT for a given content.
+   *
+   * @param contentId Content node ID
+   * @param blobHash SHA256 hash of blob
+   * @returns Observable with boolean indicating existence
+   */
+  blobExists(contentId: string, blobHash: string): Observable<boolean> {
+    return this.getBlobMetadata(contentId, blobHash).pipe(
+      map((metadata) => metadata !== null),
+    );
+  }
+
+  /**
+   * Retrieve blobs for multiple content nodes in parallel.
+   *
+   * @param contentIds Array of content node IDs
+   * @returns Observable with map of content ID -> blobs array
+   */
+  getBlobsForMultipleContent(contentIds: string[]): Observable<Map<string, ContentBlob[]>> {
+    const requests = contentIds.map((id) =>
+      this.getBlobsForContent(id).pipe(
+        map((blobs) => ({ contentId: id, blobs })),
+        catchError(() => of({ contentId: id, blobs: [] })),
+      ),
+    );
+
+    return from(Promise.all(requests.map((r) => r.toPromise()))).pipe(
+      map((results) => {
+        const map = new Map<string, ContentBlob[]>();
+        for (const result of results) {
+          if (result) {
+            map.set(result.contentId, result.blobs);
+          }
+        }
+        return map;
+      }),
+    );
+  }
+
+  // =========================================================================
+  // Private Helper Methods
+  // =========================================================================
+
+  /**
+   * Call Holochain zome function to get blobs for content.
+   * Uses lazy Injector to avoid circular dependency issues.
+   */
+  private async callGetBlobsForContent(contentId: string): Promise<BlobsForContentOutput | null> {
+    try {
+      // Lazily inject HolochainClientService to avoid circular dependency
+      const HolochainClientService = (await import('@app/elohim/services/holochain-client.service')).HolochainClientService;
+      const holochainClient = this.injector.get(HolochainClientService);
+
+      const result = await holochainClient.callZome<BlobsForContentOutput>({
+        zomeName: 'content_store',
+        fnName: 'get_blobs_by_content_id',
+        payload: { content_id: contentId },
+      });
+
+      if (!result.success || !result.data) {
+        console.warn('[BlobManager] Holochain zome call failed:', result.error);
+        return null;
+      }
+
+      return result.data;
+    } catch (error) {
+      console.warn('[BlobManager] Error calling Holochain zome:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Transform Holochain BlobMetadataOutput to ContentBlob.
+   */
+  private transformBlobMetadata(metadata: BlobMetadataOutput): ContentBlob {
+    return {
+      hash: metadata.hash,
+      sizeBytes: metadata.size_bytes,
+      mimeType: metadata.mime_type,
+      fallbackUrls: metadata.fallback_urls,
+      bitrateMbps: metadata.bitrate_mbps,
+      durationSeconds: metadata.duration_seconds,
+      codec: metadata.codec,
+      createdAt: metadata.created_at,
+      verifiedAt: metadata.verified_at,
+    };
   }
 }

@@ -354,6 +354,49 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .build(),
 
         // =====================================================================
+        // SHEFA: INSURANCE MUTUAL (member-specific, requires auth)
+        // =====================================================================
+        CacheRuleBuilder::new("get_member_risk_profile")
+            .ttl_5m()
+            .private()
+            .invalidated_by(vec!["create_member_risk_profile"])
+            .build(),
+        CacheRuleBuilder::new("get_coverage_policy")
+            .ttl_5m()
+            .private()
+            .invalidated_by(vec!["create_coverage_policy"])
+            .build(),
+        CacheRuleBuilder::new("get_insurance_claim")
+            .ttl_1m()
+            .private()
+            .invalidated_by(vec!["create_insurance_claim"])
+            .build(),
+        CacheRuleBuilder::new("get_adjustment_reasoning")
+            .ttl_5m()
+            .private()
+            .invalidated_by(vec!["create_adjustment_reasoning"])
+            .build(),
+
+        // =====================================================================
+        // SHEFA: REQUESTS & OFFERS (public discovery, member-specific details)
+        // =====================================================================
+        CacheRuleBuilder::new("get_service_request")
+            .ttl_5m()
+            .reach_based("request.is_public", true)
+            .invalidated_by(vec!["create_service_request"])
+            .build(),
+        CacheRuleBuilder::new("get_service_offer")
+            .ttl_5m()
+            .reach_based("offer.is_public", true)
+            .invalidated_by(vec!["create_service_offer"])
+            .build(),
+        CacheRuleBuilder::new("get_service_match")
+            .ttl_1m()
+            .private()
+            .invalidated_by(vec!["create_service_match"])
+            .build(),
+
+        // =====================================================================
         // USER-SPECIFIC DATA (short TTL, auth required)
         // These use default behavior - 5 min TTL, auth required
         // Not explicitly listed because defaults apply to get_* functions
@@ -5244,6 +5287,8 @@ pub fn initialize_mastery(input: InitializeMasteryInput) -> ExternResult<Content
         privileges_json: serde_json::json!(["view", "practice"]).to_string(),
         created_at: timestamp.clone(),
         updated_at: timestamp,
+        schema_version: 2,
+        validation_status: "Valid".to_string(),
     };
 
     let action_hash = create_entry(&EntryTypes::ContentMastery(mastery.clone()))?;
@@ -5508,6 +5553,8 @@ pub fn record_engagement(input: RecordEngagementInput) -> ExternResult<ContentMa
         privileges_json: existing_mastery.privileges_json,
         created_at: existing_mastery.created_at,
         updated_at: timestamp,
+        schema_version: 2,
+        validation_status: "Valid".to_string(),
     };
 
     let action_hash = create_entry(&EntryTypes::ContentMastery(updated_mastery.clone()))?;
@@ -5642,6 +5689,8 @@ pub fn record_assessment(input: RecordAssessmentInput) -> ExternResult<ContentMa
         privileges_json: new_privileges,
         created_at: existing_mastery.created_at,
         updated_at: timestamp,
+        schema_version: 2,
+        validation_status: "Valid".to_string(),
     };
 
     let action_hash = create_entry(&EntryTypes::ContentMastery(updated_mastery.clone()))?;
@@ -10876,6 +10925,364 @@ pub fn get_shard_metadata_only(
 }
 
 // =============================================================================
+// Shefa: Insurance Mutual Zome Functions
+// =============================================================================
+
+/// Create a member risk profile entry
+#[hdk_extern]
+pub fn create_member_risk_profile(input: MemberRiskProfile) -> ExternResult<(ActionHash, EntryHash)> {
+    let action_hash = create_entry(&EntryTypes::MemberRiskProfile(input.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::MemberRiskProfile(input.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("member_risk_profile", &input.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToMemberRiskProfile, ())?;
+
+    // Create member lookup link
+    let member_anchor = StringAnchor::new("member_profiles", &input.member_id);
+    let member_anchor_hash = hash_entry(&EntryTypes::StringAnchor(member_anchor))?;
+    create_link(member_anchor_hash, action_hash.clone(), LinkTypes::MemberToRiskProfile, ())?;
+
+    // Create tier lookup link
+    let tier_anchor = StringAnchor::new("risk_profiles_by_tier", &input.risk_tier);
+    let tier_anchor_hash = hash_entry(&EntryTypes::StringAnchor(tier_anchor))?;
+    create_link(tier_anchor_hash, action_hash.clone(), LinkTypes::RiskProfileByTier, ())?;
+
+    Ok((action_hash, entry_hash))
+}
+
+/// Get a member risk profile by ID
+#[hdk_extern]
+pub fn get_member_risk_profile(profile_id: String) -> ExternResult<Option<(ActionHash, MemberRiskProfile)>> {
+    let id_anchor = StringAnchor::new("member_risk_profile", &profile_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToMemberRiskProfile)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    let action_hash = ActionHash::try_from(links[0].target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?;
+    if let Some(record) = record {
+        if let Some(profile) = record.entry().to_app_option::<MemberRiskProfile>().ok().flatten() {
+            return Ok(Some((action_hash, profile)));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Create a coverage policy entry
+#[hdk_extern]
+pub fn create_coverage_policy(input: CoveragePolicy) -> ExternResult<(ActionHash, EntryHash)> {
+    let action_hash = create_entry(&EntryTypes::CoveragePolicy(input.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::CoveragePolicy(input.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("coverage_policy", &input.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToCoveragePolicy, ())?;
+
+    // Create member lookup link
+    let member_anchor = StringAnchor::new("member_policies", &input.member_id);
+    let member_anchor_hash = hash_entry(&EntryTypes::StringAnchor(member_anchor))?;
+    create_link(member_anchor_hash, action_hash.clone(), LinkTypes::MemberToCoveragePolicy, ())?;
+
+    // Create level lookup link
+    let level_anchor = StringAnchor::new("policies_by_level", &input.coverage_level);
+    let level_anchor_hash = hash_entry(&EntryTypes::StringAnchor(level_anchor))?;
+    create_link(level_anchor_hash, action_hash.clone(), LinkTypes::CoveragePolicyByLevel, ())?;
+
+    Ok((action_hash, entry_hash))
+}
+
+/// Get a coverage policy by ID
+#[hdk_extern]
+pub fn get_coverage_policy(policy_id: String) -> ExternResult<Option<(ActionHash, CoveragePolicy)>> {
+    let id_anchor = StringAnchor::new("coverage_policy", &policy_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToCoveragePolicy)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    let action_hash = ActionHash::try_from(links[0].target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?;
+    if let Some(record) = record {
+        if let Some(policy) = record.entry().to_app_option::<CoveragePolicy>().ok().flatten() {
+            return Ok(Some((action_hash, policy)));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Create an insurance claim entry
+#[hdk_extern]
+pub fn create_insurance_claim(input: InsuranceClaim) -> ExternResult<(ActionHash, EntryHash)> {
+    let action_hash = create_entry(&EntryTypes::InsuranceClaim(input.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::InsuranceClaim(input.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("insurance_claim", &input.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToInsuranceClaim, ())?;
+
+    // Create member lookup link
+    let member_anchor = StringAnchor::new("member_claims", &input.member_id);
+    let member_anchor_hash = hash_entry(&EntryTypes::StringAnchor(member_anchor))?;
+    create_link(member_anchor_hash, action_hash.clone(), LinkTypes::MemberToClaim, ())?;
+
+    // Create status lookup link
+    let status_anchor = StringAnchor::new("claims_by_status", &input.status);
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::ClaimByStatus, ())?;
+
+    Ok((action_hash, entry_hash))
+}
+
+/// Get an insurance claim by ID
+#[hdk_extern]
+pub fn get_insurance_claim(claim_id: String) -> ExternResult<Option<(ActionHash, InsuranceClaim)>> {
+    let id_anchor = StringAnchor::new("insurance_claim", &claim_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToInsuranceClaim)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    let action_hash = ActionHash::try_from(links[0].target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?;
+    if let Some(record) = record {
+        if let Some(claim) = record.entry().to_app_option::<InsuranceClaim>().ok().flatten() {
+            return Ok(Some((action_hash, claim)));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Create an adjustment reasoning entry
+#[hdk_extern]
+pub fn create_adjustment_reasoning(input: AdjustmentReasoning) -> ExternResult<(ActionHash, EntryHash)> {
+    let action_hash = create_entry(&EntryTypes::AdjustmentReasoning(input.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::AdjustmentReasoning(input.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("adjustment_reasoning", &input.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToAdjustmentReasoning, ())?;
+
+    // Create claim lookup link
+    let claim_anchor = StringAnchor::new("claim_adjustments", &input.claim_id);
+    let claim_anchor_hash = hash_entry(&EntryTypes::StringAnchor(claim_anchor))?;
+    create_link(claim_anchor_hash, action_hash.clone(), LinkTypes::ClaimToAdjustment, ())?;
+
+    Ok((action_hash, entry_hash))
+}
+
+/// Get an adjustment reasoning by ID
+#[hdk_extern]
+pub fn get_adjustment_reasoning(reasoning_id: String) -> ExternResult<Option<(ActionHash, AdjustmentReasoning)>> {
+    let id_anchor = StringAnchor::new("adjustment_reasoning", &reasoning_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToAdjustmentReasoning)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    let action_hash = ActionHash::try_from(links[0].target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?;
+    if let Some(record) = record {
+        if let Some(reasoning) = record.entry().to_app_option::<AdjustmentReasoning>().ok().flatten() {
+            return Ok(Some((action_hash, reasoning)));
+        }
+    }
+
+    Ok(None)
+}
+
+// =============================================================================
+// Shefa: Requests & Offers Zome Functions
+// =============================================================================
+
+/// Create a service request entry
+#[hdk_extern]
+pub fn create_service_request(input: ServiceRequest) -> ExternResult<(ActionHash, EntryHash)> {
+    let action_hash = create_entry(&EntryTypes::ServiceRequest(input.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::ServiceRequest(input.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("service_request", &input.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToServiceRequest, ())?;
+
+    // Create requester lookup link
+    let requester_anchor = StringAnchor::new("user_requests", &input.requester_id);
+    let requester_anchor_hash = hash_entry(&EntryTypes::StringAnchor(requester_anchor))?;
+    create_link(requester_anchor_hash, action_hash.clone(), LinkTypes::RequesterToRequest, ())?;
+
+    // Create status lookup link
+    let status_anchor = StringAnchor::new("requests_by_status", &input.status);
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::RequestByStatus, ())?;
+
+    Ok((action_hash, entry_hash))
+}
+
+/// Get a service request by ID
+#[hdk_extern]
+pub fn get_service_request(request_id: String) -> ExternResult<Option<(ActionHash, ServiceRequest)>> {
+    let id_anchor = StringAnchor::new("service_request", &request_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToServiceRequest)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    let action_hash = ActionHash::try_from(links[0].target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?;
+    if let Some(record) = record {
+        if let Some(request) = record.entry().to_app_option::<ServiceRequest>().ok().flatten() {
+            return Ok(Some((action_hash, request)));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Create a service offer entry
+#[hdk_extern]
+pub fn create_service_offer(input: ServiceOffer) -> ExternResult<(ActionHash, EntryHash)> {
+    let action_hash = create_entry(&EntryTypes::ServiceOffer(input.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::ServiceOffer(input.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("service_offer", &input.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToServiceOffer, ())?;
+
+    // Create offeror lookup link
+    let offeror_anchor = StringAnchor::new("user_offers", &input.offeror_id);
+    let offeror_anchor_hash = hash_entry(&EntryTypes::StringAnchor(offeror_anchor))?;
+    create_link(offeror_anchor_hash, action_hash.clone(), LinkTypes::OfferorToOffer, ())?;
+
+    // Create status lookup link
+    let status_anchor = StringAnchor::new("offers_by_status", &input.status);
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::OfferByStatus, ())?;
+
+    Ok((action_hash, entry_hash))
+}
+
+/// Get a service offer by ID
+#[hdk_extern]
+pub fn get_service_offer(offer_id: String) -> ExternResult<Option<(ActionHash, ServiceOffer)>> {
+    let id_anchor = StringAnchor::new("service_offer", &offer_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToServiceOffer)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    let action_hash = ActionHash::try_from(links[0].target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?;
+    if let Some(record) = record {
+        if let Some(offer) = record.entry().to_app_option::<ServiceOffer>().ok().flatten() {
+            return Ok(Some((action_hash, offer)));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Create a service match entry
+#[hdk_extern]
+pub fn create_service_match(input: ServiceMatch) -> ExternResult<(ActionHash, EntryHash)> {
+    let action_hash = create_entry(&EntryTypes::ServiceMatch(input.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::ServiceMatch(input.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("service_match", &input.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToServiceMatch, ())?;
+
+    // Create request lookup link
+    let request_anchor = StringAnchor::new("request_matches", &input.request_id);
+    let request_anchor_hash = hash_entry(&EntryTypes::StringAnchor(request_anchor))?;
+    create_link(request_anchor_hash, action_hash.clone(), LinkTypes::RequestToMatch, ())?;
+
+    // Create offer lookup link
+    let offer_anchor = StringAnchor::new("offer_matches", &input.offer_id);
+    let offer_anchor_hash = hash_entry(&EntryTypes::StringAnchor(offer_anchor))?;
+    create_link(offer_anchor_hash, action_hash.clone(), LinkTypes::OfferToMatch, ())?;
+
+    // Create status lookup link
+    let status_anchor = StringAnchor::new("matches_by_status", &input.status);
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::MatchByStatus, ())?;
+
+    Ok((action_hash, entry_hash))
+}
+
+/// Get a service match by ID
+#[hdk_extern]
+pub fn get_service_match(match_id: String) -> ExternResult<Option<(ActionHash, ServiceMatch)>> {
+    let id_anchor = StringAnchor::new("service_match", &match_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToServiceMatch)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    let action_hash = ActionHash::try_from(links[0].target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".to_string())))?;
+
+    let record = get(action_hash.clone(), GetOptions::default())?;
+    if let Some(record) = record {
+        if let Some(service_match) = record.entry().to_app_option::<ServiceMatch>().ok().flatten() {
+            return Ok(Some((action_hash, service_match)));
+        }
+    }
+
+    Ok(None)
+}
+
+// =============================================================================
 // Post-Commit Signals for Doorway Projection
 // =============================================================================
 
@@ -10948,6 +11355,55 @@ pub enum ProjectionSignal {
         action_hash: ActionHash,
         entry_hash: EntryHash,
         commitment: CustodianCommitment,
+        author: AgentPubKey,
+    },
+    /// MemberRiskProfile was created or updated
+    MemberRiskProfileCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        profile: MemberRiskProfile,
+        author: AgentPubKey,
+    },
+    /// CoveragePolicy was created or updated
+    CoveragePolicyCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        policy: CoveragePolicy,
+        author: AgentPubKey,
+    },
+    /// InsuranceClaim was created or updated
+    InsuranceClaimCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        claim: InsuranceClaim,
+        author: AgentPubKey,
+    },
+    /// AdjustmentReasoning was created or updated
+    AdjustmentReasoningCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        reasoning: AdjustmentReasoning,
+        author: AgentPubKey,
+    },
+    /// ServiceRequest was created or updated
+    ServiceRequestCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        request: ServiceRequest,
+        author: AgentPubKey,
+    },
+    /// ServiceOffer was created or updated
+    ServiceOfferCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        offer: ServiceOffer,
+        author: AgentPubKey,
+    },
+    /// ServiceMatch was created or updated
+    ServiceMatchCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        service_match: ServiceMatch,
         author: AgentPubKey,
     },
     /// Generic entry committed (for extension)
@@ -11050,6 +11506,55 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 action_hash,
                 entry_hash,
                 commitment,
+                author,
+            })?;
+        } else if let Some(profile) = record.entry().to_app_option::<MemberRiskProfile>().ok().flatten() {
+            emit_signal(ProjectionSignal::MemberRiskProfileCommitted {
+                action_hash,
+                entry_hash,
+                profile,
+                author,
+            })?;
+        } else if let Some(policy) = record.entry().to_app_option::<CoveragePolicy>().ok().flatten() {
+            emit_signal(ProjectionSignal::CoveragePolicyCommitted {
+                action_hash,
+                entry_hash,
+                policy,
+                author,
+            })?;
+        } else if let Some(claim) = record.entry().to_app_option::<InsuranceClaim>().ok().flatten() {
+            emit_signal(ProjectionSignal::InsuranceClaimCommitted {
+                action_hash,
+                entry_hash,
+                claim,
+                author,
+            })?;
+        } else if let Some(reasoning) = record.entry().to_app_option::<AdjustmentReasoning>().ok().flatten() {
+            emit_signal(ProjectionSignal::AdjustmentReasoningCommitted {
+                action_hash,
+                entry_hash,
+                reasoning,
+                author,
+            })?;
+        } else if let Some(request) = record.entry().to_app_option::<ServiceRequest>().ok().flatten() {
+            emit_signal(ProjectionSignal::ServiceRequestCommitted {
+                action_hash,
+                entry_hash,
+                request,
+                author,
+            })?;
+        } else if let Some(offer) = record.entry().to_app_option::<ServiceOffer>().ok().flatten() {
+            emit_signal(ProjectionSignal::ServiceOfferCommitted {
+                action_hash,
+                entry_hash,
+                offer,
+                author,
+            })?;
+        } else if let Some(service_match) = record.entry().to_app_option::<ServiceMatch>().ok().flatten() {
+            emit_signal(ProjectionSignal::ServiceMatchCommitted {
+                action_hash,
+                entry_hash,
+                service_match,
                 author,
             })?;
         }

@@ -1901,6 +1901,333 @@ export interface SettlementOutput {
 }
 
 // =============================================================================
+// Shefa: Insurance Mutual Types
+// =============================================================================
+
+/** MemberRiskProfile - Behavioral risk assessment for insurance member */
+export interface MemberRiskProfile {
+  id: string;
+  member_id: string;
+  risk_type: string;          // health, property, casualty, care
+  care_maintenance_score: number;  // 0-100
+  community_connectedness_score: number;  // 0-100
+  historical_claims_rate: number;  // 0.0-1.0
+  risk_score: number;         // Weighted average 0-100
+  risk_tier: string;          // low, standard, high, uninsurable
+  risk_tier_rationale: string;
+  evidence_event_ids_json: string;  // EconomicEvent[] as JSON
+  evidence_breakdown_json: string;  // Object as JSON
+  risk_trend_direction: string;  // improving, stable, declining
+  last_risk_score: number;
+  assessed_at: string;
+  last_assessment_at: string;
+  next_assessment_due: string;
+  assessment_event_ids_json: string;
+  schema_version: number;
+  validation_status: string;  // Valid, Migrated, Degraded, Healing
+  metadata_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** CoveragePolicy - Coverage definition at graduated governance levels */
+export interface CoveragePolicy {
+  id: string;
+  member_id: string;
+  coverage_level: string;     // individual, household, community, network, constitutional
+  governed_at: string;        // Qahal entity ID
+  covered_risks_json: string; // CoveredRisk[] as JSON
+  deductible_value: number | null;
+  deductible_unit: string | null;
+  coinsurance: number;        // 0-100 percentage
+  out_of_pocket_maximum_value: number | null;
+  out_of_pocket_maximum_unit: string | null;
+  effective_from: string;
+  renewal_terms: string;
+  renewal_due_at: string;
+  constitutional_basis: string;  // Reference to governance document
+  last_premium_event_id: string | null;
+  last_premium_paid_at: string | null;
+  schema_version: number;
+  validation_status: string;
+  modification_event_ids_json: string;
+  metadata_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** CoveredRisk - Individual risk definition with coverage limits */
+export interface CoveredRisk {
+  id: string;
+  risk_name: string;
+  risk_description: string;
+  risk_category: string;
+  is_covered: boolean;
+  coverage_limit_value: number | null;
+  coverage_limit_unit: string | null;
+  deductible_applies: boolean;
+  coinsurance_percent: number;
+  prevention_incentive_applies: boolean;
+  created_at: string;
+}
+
+/** InsuranceClaim - Full claims lifecycle with immutable event trail */
+export interface InsuranceClaim {
+  id: string;
+  claim_number: string;      // CLM-XXXXXXXXXX
+  policy_id: string;
+  member_id: string;
+  filed_date: string;
+  filed_by: string;
+  loss_type: string;
+  loss_date: string;
+  description: string;
+  estimated_amount_value: number | null;
+  estimated_amount_unit: string | null;
+  observer_attestation_ids_json: string;
+  member_document_ids_json: string;
+  status: string;            // filed, adjustment-made, approved, denied, settled, appealed, resolved
+  status_history_json: string;
+  adjustment_event_ids_json: string;
+  appeal_event_ids_json: string;
+  settlement_event_ids_json: string;
+  schema_version: number;
+  validation_status: string;
+  metadata_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** AdjustmentReasoning - Adjuster decisions with Bob Parr Principle (transparency + reasoning) */
+export interface AdjustmentReasoning {
+  id: string;
+  claim_id: string;
+  adjuster_id: string;
+  coverage_decision: string;  // approved, denied, partial
+  approved_amount_value: number | null;
+  approved_amount_unit: string | null;
+  plain_language_explanation: string;  // Required for member understanding
+  interpretation_notes: string | null;
+  applied_generosity_principle: boolean;
+  constitutional_basis_documents_json: string;
+  policy_citations_json: string;
+  flagged_for_governance: boolean;
+  governance_review_reason: string | null;
+  adjustment_date: string;
+  created_at: string;
+}
+
+/** Output for insurance claim */
+export interface InsuranceClaimOutput {
+  action_hash: ActionHash;
+  claim: InsuranceClaim;
+}
+
+/** Input for enrolling member in insurance mutual */
+export interface EnrollMemberInput {
+  member_id: string;
+  risk_type: string;
+  coverage_level: string;
+  metadata_json?: string;
+}
+
+/** Input for filing an insurance claim */
+export interface FileClaimInput {
+  policy_id: string;
+  loss_type: string;
+  loss_date: string;
+  description: string;
+  estimated_amount_value?: number;
+  estimated_amount_unit?: string;
+  document_ids?: string[];
+  metadata_json?: string;
+}
+
+/** Input for adjusting a claim */
+export interface AdjustClaimInput {
+  claim_id: string;
+  coverage_decision: string;
+  approved_amount_value?: number;
+  approved_amount_unit?: string;
+  plain_language_explanation: string;
+  constitutional_basis?: string;
+  flagged_for_governance?: boolean;
+  governance_review_reason?: string;
+}
+
+// =============================================================================
+// Shefa: Requests & Offers Types
+// =============================================================================
+
+/** ServiceRequest - Someone is requesting a service (REA Intent) */
+export interface ServiceRequest {
+  id: string;
+  request_number: string;    // REQ-XXXXXXXXXX
+  requester_id: string;
+  title: string;
+  description: string;
+  contact_preference: string; // email, phone, message, in-person
+  contact_value: string;
+  time_zone: string;
+  time_preference: string;   // morning, afternoon, evening, any
+  interaction_type: string;  // virtual, in-person, hybrid
+  date_range_start: string;
+  date_range_end: string | null;
+  service_type_ids_json: string;  // string[] as JSON
+  required_skills_json: string;   // string[] as JSON
+  budget_value: number | null;
+  budget_unit: string | null;
+  medium_of_exchange_ids_json: string;
+  status: string;            // pending, active, archived, deleted
+  is_public: boolean;
+  links_json: string;
+  schema_version: number;
+  validation_status: string;
+  metadata_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** ServiceOffer - Someone is offering a service (REA Intent) */
+export interface ServiceOffer {
+  id: string;
+  offer_number: string;      // OFR-XXXXXXXXXX
+  offeror_id: string;
+  title: string;
+  description: string;
+  contact_preference: string;
+  contact_value: string;
+  time_zone: string;
+  time_preference: string;
+  interaction_type: string;
+  hours_per_week: number;
+  date_range_start: string;
+  date_range_end: string | null;
+  service_type_ids_json: string;
+  offered_skills_json: string;
+  rate_value: number | null;
+  rate_unit: string | null;
+  rate_per: string;          // hour, day, week, project, etc.
+  medium_of_exchange_ids_json: string;
+  accepts_alternative_payment: boolean;
+  status: string;            // pending, active, archived, deleted
+  is_public: boolean;
+  links_json: string;
+  schema_version: number;
+  validation_status: string;
+  metadata_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** ServiceMatch - Request + Offer pairing with compatibility scoring */
+export interface ServiceMatch {
+  id: string;
+  request_id: string;
+  offer_id: string;
+  match_reason: string;
+  match_quality: number;     // 0-100 score
+  shared_service_types_json: string;
+  time_compatible: boolean;
+  interaction_compatible: boolean;
+  exchange_compatible: boolean;
+  status: string;            // suggested → contacted → negotiating → agreed → completed
+  proposal_id: string | null; // REA Proposal
+  commitment_id: string | null;  // REA Commitment
+  schema_version: number;
+  validation_status: string;
+  metadata_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Output for service request */
+export interface ServiceRequestOutput {
+  action_hash: ActionHash;
+  request: ServiceRequest;
+}
+
+/** Output for service offer */
+export interface ServiceOfferOutput {
+  action_hash: ActionHash;
+  offer: ServiceOffer;
+}
+
+/** Output for service match */
+export interface ServiceMatchOutput {
+  action_hash: ActionHash;
+  match: ServiceMatch;
+}
+
+/** Input for creating a service request */
+export interface CreateServiceRequestInput {
+  title: string;
+  description: string;
+  service_type_ids: string[];
+  contact_preference: string;
+  contact_value: string;
+  time_zone: string;
+  time_preference: string;
+  interaction_type: string;
+  date_range_start: string;
+  date_range_end?: string;
+  required_skills?: string[];
+  budget_value?: number;
+  budget_unit?: string;
+  medium_of_exchange_ids?: string[];
+  links?: string[];
+  metadata_json?: string;
+}
+
+/** Input for creating a service offer */
+export interface CreateServiceOfferInput {
+  title: string;
+  description: string;
+  service_type_ids: string[];
+  contact_preference: string;
+  contact_value: string;
+  time_zone: string;
+  time_preference: string;
+  interaction_type: string;
+  hours_per_week: number;
+  date_range_start: string;
+  date_range_end?: string;
+  offered_skills?: string[];
+  rate_value?: number;
+  rate_unit?: string;
+  rate_per?: string;
+  medium_of_exchange_ids?: string[];
+  accepts_alternative_payment?: boolean;
+  links?: string[];
+  metadata_json?: string;
+}
+
+/** Input for creating a service match */
+export interface CreateServiceMatchInput {
+  request_id: string;
+  offer_id: string;
+  match_quality: number;
+}
+
+/** Input for proposing offer to request */
+export interface ProposeOfferToRequestInput {
+  offer_id: string;
+  request_id: string;
+  proposal_message: string;
+  metadata_json?: string;
+}
+
+/** Input for settling payment */
+export interface SettlePaymentInput {
+  match_id: string;
+  amount_value: number;
+  amount_unit: string;
+  medium_of_exchange_id: string;
+  payment_method?: string;
+  metadata_json?: string;
+}
+
+// =============================================================================
 // Lamad: Learning Economy (uses Shefa hREA primitives)
 // =============================================================================
 //

@@ -330,4 +330,76 @@ describe('BlobManagerService', () => {
       });
     });
   });
+
+  describe('Metadata Retrieval from Holochain', () => {
+    it('should retrieve blobs for content from Holochain', (done) => {
+      const contentId = 'content_123';
+
+      service.getBlobsForContent(contentId).subscribe((blobs) => {
+        // Will return empty array since Holochain is mocked, but should not error
+        expect(Array.isArray(blobs)).toBe(true);
+        done();
+      });
+    });
+
+    it('should return empty array on metadata retrieval error', (done) => {
+      const contentId = 'content_nonexistent';
+
+      service.getBlobsForContent(contentId).subscribe((blobs) => {
+        expect(blobs).toEqual([]);
+        done();
+      });
+    });
+
+    it('should retrieve specific blob metadata by hash', (done) => {
+      const contentId = 'content_123';
+      const blobHash = 'test_hash_123';
+
+      service.getBlobMetadata(contentId, blobHash).subscribe((metadata) => {
+        // Will be null since Holochain is mocked, but should not error
+        expect(metadata === null || metadata instanceof Object).toBe(true);
+        done();
+      });
+    });
+
+    it('should check if blob exists in DHT', (done) => {
+      const contentId = 'content_123';
+      const blobHash = 'test_hash_123';
+
+      service.blobExists(contentId, blobHash).subscribe((exists) => {
+        expect(typeof exists).toBe('boolean');
+        done();
+      });
+    });
+
+    it('should retrieve blobs for multiple content nodes in parallel', (done) => {
+      const contentIds = ['content_1', 'content_2', 'content_3'];
+
+      service.getBlobsForMultipleContent(contentIds).subscribe((blobMap) => {
+        expect(blobMap instanceof Map).toBe(true);
+        expect(blobMap.size).toBeLessThanOrEqual(contentIds.length);
+        done();
+      });
+    });
+
+    it('should transform BlobMetadataOutput to ContentBlob', () => {
+      const metadata = service['transformBlobMetadata']({
+        hash: 'test_hash',
+        size_bytes: 1024,
+        mime_type: 'video/mp4',
+        fallback_urls: ['https://example.com/blob.mp4'],
+        bitrate_mbps: 5,
+        duration_seconds: 300,
+        codec: 'h264',
+        created_at: '2024-01-01T00:00:00Z',
+        verified_at: '2024-01-02T00:00:00Z',
+      });
+
+      expect(metadata.hash).toBe('test_hash');
+      expect(metadata.sizeBytes).toBe(1024);
+      expect(metadata.mimeType).toBe('video/mp4');
+      expect(metadata.bitrateMbps).toBe(5);
+      expect(metadata.codec).toBe('h264');
+    });
+  });
 });

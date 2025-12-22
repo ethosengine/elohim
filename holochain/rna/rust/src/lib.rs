@@ -42,12 +42,31 @@
 //! - [`bridge`] - Cross-DNA communication helpers (tRNA)
 //! - [`report`] - Migration tracking and verification
 //! - [`config`] - Migration configuration options
-//! - [`traits`] - Extension points for custom logic
+//! - [`traits`] - Extension points for custom logic (external orchestration)
+//! - [`healing`] - Core self-healing types: ValidationStatus, HealingSignal, HealingReport
+//! - [`self_healing`] - SelfHealingEntry trait: implement for any entry type
+//! - [`healing_orchestrator`] - Background healing orchestrator: manages healing workflow
+//!
+//! ## Two Patterns Supported
+//!
+//! ### 1. External Orchestration (Original RNA)
+//!
+//! Use [`Exporter`], [`Transformer`], [`Importer`] traits with external tooling.
+//! Good for one-time migrations or controlled deployments.
+//!
+//! ### 2. Self-Healing DNA (New)
+//!
+//! Implement [`SelfHealingEntry`] for your entry types, use [`HealingOrchestrator`]
+//! in init and read paths. The DNA heals itself continuously without external coordination.
+//! Perfect for rapid schema iteration and operational resilience.
 
 pub mod bridge;
 pub mod config;
 pub mod report;
 pub mod traits;
+pub mod healing;
+pub mod self_healing;
+pub mod healing_orchestrator;
 
 // Re-export commonly used items
 pub use bridge::bridge_call;
@@ -57,3 +76,11 @@ pub use report::{
     MigrationVerification,
 };
 pub use traits::{Exporter, Importer, TransformContext, Transformer, Verifier};
+
+// Re-export self-healing types
+pub use healing::{
+    ValidationStatus, ValidationRule, HealingSignal, HealingMetadata, HealingResult,
+    HealingReport, HealingCounts, AcceptAllValidator,
+};
+pub use self_healing::{SelfHealingEntry, HealedEntry, ValidationResult, BatchValidator};
+pub use healing_orchestrator::{HealingOrchestrator, emit_healing_signal};

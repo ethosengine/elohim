@@ -1,0 +1,418 @@
+//! Self-Healing DNA Pattern Template
+//!
+//! Use this template as a starting point for adopting the self-healing pattern.
+//! Replace {{PLACEHOLDERS}} with your app-specific values.
+//!
+//! # What This Does
+//!
+//! 1. Defines {{ENTRY_TYPE}} as a self-healing entry
+//! 2. Implements validation rules
+//! 3. Provides v1 fallback healing
+//! 4. Integrates with healing orchestrator
+//! 5. Emits healing signals for UI awareness
+//!
+//! # Steps to Use
+//!
+//! 1. Copy this file: `cp templates/self-healing.rs.template zomes/{{ZOME_NAME}}/src/self_healing.rs`
+//! 2. Replace all {{PLACEHOLDERS}} with your values
+//! 3. Add `mod self_healing;` to your zome's lib.rs
+//! 4. Implement the hooks in your read/write paths
+//! 5. Update your happ.yaml to include both v1 and v2 DNA roles
+
+use hdk::prelude::*;
+use hc_rna::{
+    SelfHealingEntry, ValidationStatus, HealingOrchestrator, HealingSignal,
+    emit_healing_signal,
+};
+
+/// {{ENTRY_TYPE}} entry that participates in self-healing
+///
+/// Schema version: {{SCHEMA_VERSION}} (increment when schema changes)
+#[hdk_entry(type = "{{ENTRY_TYPE_LOWERCASE}}")]
+#[derive(Clone)]
+pub struct {{ENTRY_TYPE}} {
+    /// Unique stable identifier (survives schema changes)
+    pub id: String,
+
+    /// {{FIELD_DESCRIPTION_1}}
+    pub {{field_name_1}}: {{FieldType1}},
+
+    /// {{FIELD_DESCRIPTION_2}}
+    pub {{field_name_2}}: {{FieldType2}},
+
+    /// Schema version (change when you update this entry structure)
+    pub schema_version: u32,
+
+    /// Health status of this entry
+    pub validation_status: ValidationStatus,
+
+    /// {{OPTIONAL: Field for references}}
+    {{#if HAS_PARENT}}pub parent_id: Option<String>,{{/if}}
+
+    {{#if HAS_REFERENCES}}
+    /// List of related entry IDs (checked during validation)
+    pub related_ids: Vec<String>,
+    {{/if}}
+}
+
+impl Default for {{ENTRY_TYPE}} {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            {{field_name_1}}: Default::default(),
+            {{field_name_2}}: Default::default(),
+            schema_version: {{SCHEMA_VERSION}},
+            validation_status: ValidationStatus::Valid,
+            {{#if HAS_PARENT}}parent_id: None,{{/if}}
+            {{#if HAS_REFERENCES}}related_ids: Vec::new(),{{/if}}
+        }
+    }
+}
+
+// ============================================================================
+// IMPLEMENT SELF-HEALING TRAIT
+// ============================================================================
+
+impl SelfHealingEntry for {{ENTRY_TYPE}} {
+    fn schema_version(&self) -> u32 {
+        self.schema_version
+    }
+
+    fn validation_status(&self) -> ValidationStatus {
+        self.validation_status
+    }
+
+    fn set_validation_status(&mut self, status: ValidationStatus) {
+        self.validation_status = status;
+    }
+
+    fn entry_id(&self) -> String {
+        self.id.clone()
+    }
+
+    /// Validate this entry against current expectations
+    fn validate(&self) -> Result<(), String> {
+        // Check required fields
+        if self.id.is_empty() {
+            return Err("{{ENTRY_TYPE}} id is required".to_string());
+        }
+
+        {{#if HAS_PARENT}}
+        // Check parent reference if present
+        if let Some(parent_id) = &self.parent_id {
+            match get_{{parent_type}}_by_id(parent_id) {
+                Ok(Some(_)) => {}, // Parent exists, good
+                Ok(None) => return Err(format!("Parent {} not found", parent_id)),
+                Err(e) => return Err(format!("Error checking parent: {:?}", e)),
+            }
+        }
+        {{/if}}
+
+        {{#if HAS_REFERENCES}}
+        // Check all referenced entries exist
+        for related_id in &self.related_ids {
+            match get_{{RELATED_TYPE}}_by_id(related_id) {
+                Ok(Some(_)) => {},
+                Ok(None) => return Err(format!("Related entry {} not found", related_id)),
+                Err(_) => return Err(format!("Error checking reference {}", related_id)),
+            }
+        }
+        {{/if}}
+
+        // Add custom validation rules specific to {{ENTRY_TYPE}}
+        // Example: check field lengths, allowed values, etc.
+        if self.{{field_name_1}}.is_empty() {
+            return Err("{{field_name_1}} cannot be empty".to_string());
+        }
+
+        Ok(())
+    }
+
+    /// Called when entry needs to be healed
+    fn try_self_heal(&mut self) -> Result<bool, String> {
+        // Try to auto-correct issues if possible
+        // Return Ok(true) if you made modifications, Ok(false) if already valid
+
+        // Example: trim whitespace, normalize data
+        // self.{{field_name_1}} = self.{{field_name_1}}.trim().to_string();
+
+        // If still broken after self-healing, validation will catch it
+        self.validate()?;
+        Ok(false)
+    }
+}
+
+// ============================================================================
+// EXPORT FOR V1 FALLBACK
+// ============================================================================
+
+/// Export entry format compatible with v1 DNA
+#[derive(Serialize, Deserialize, Clone)]
+pub struct {{ENTRY_TYPE}}V1Export {
+    pub id: String,
+    pub {{field_name_1}}: {{FieldType1}},
+    pub {{field_name_2}}: {{FieldType2}},
+    {{#if HAS_PARENT}}pub parent_id: Option<String>,{{/if}}
+    {{#if HAS_REFERENCES}}pub related_ids: Vec<String>,{{/if}}
+}
+
+/// Transform v1 data to v2
+///
+/// This is called when healing from v1 bridge.
+/// Update the schema_version and adapt field names/types as needed.
+pub fn transform_v1_to_v2(v1: {{ENTRY_TYPE}}V1Export) -> {{ENTRY_TYPE}} {
+    {{ENTRY_TYPE}} {
+        id: v1.id,
+        {{field_name_1}}: v1.{{field_name_1}},
+        {{field_name_2}}: v1.{{field_name_2}},
+        schema_version: {{SCHEMA_VERSION}},
+        validation_status: ValidationStatus::Migrated,
+        {{#if HAS_PARENT}}parent_id: v1.parent_id,{{/if}}
+        {{#if HAS_REFERENCES}}related_ids: v1.related_ids,{{/if}}
+    }
+}
+
+// ============================================================================
+// READ PATH INTEGRATION
+// ============================================================================
+
+/// Get {{ENTRY_TYPE}} by ID with automatic healing
+///
+/// This implements the healing pattern:
+/// 1. Try to get from v2 (current DNA)
+/// 2. If not found or invalid, try v1 via bridge
+/// 3. Return healed entry or error
+pub fn get_{{entry_type_lowercase}}_with_healing(
+    id: String,
+) -> ExternResult<{{ENTRY_TYPE}}> {
+    // Try v2 first
+    match get_{{entry_type_lowercase}}_by_id(&id)? {
+        Some(mut entry) => {
+            // Entry exists in v2, validate it
+            match entry.validate() {
+                Ok(_) => return Ok(entry),
+                Err(_) => {
+                    // Validation failed, try to heal
+                    emit_healing_signal(HealingSignal::DegradedEntryFound {
+                        entry_id: id.clone(),
+                        entry_type: "{{ENTRY_TYPE}}".to_string(),
+                        reason: "Validation failed".to_string(),
+                    })?;
+                }
+            }
+        }
+        None => {
+            // Not in v2, will try v1
+        }
+    }
+
+    // Entry not in v2 or failed validation, try v1 bridge
+    heal_{{entry_type_lowercase}}_from_v1(&id)
+}
+
+/// Attempt to heal {{ENTRY_TYPE}} from v1
+fn heal_{{entry_type_lowercase}}_from_v1(
+    id: &str,
+) -> ExternResult<{{ENTRY_TYPE}}> {
+    let orchestrator = HealingOrchestrator::new(
+        "{{DNA_V1_ROLE}}", // e.g., "lamad-v1"
+        "{{DNA_V2_ROLE}}", // e.g., "lamad-v2"
+    );
+
+    // Call v1 to get this entry
+    let v1_entry: {{ENTRY_TYPE}}V1Export = hc_rna::bridge_call(
+        orchestrator.v1_role_name(),
+        "{{ZOME_NAME}}",
+        "export_{{entry_type_lowercase}}_by_id",
+        serde_json::json!({ "id": id }),
+    )
+    .map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            format!("{{ENTRY_TYPE}} {} not found in v1", id)
+        ))
+    })?;
+
+    // Transform to v2
+    let mut healed = transform_v1_to_v2(v1_entry);
+
+    // Validate
+    healed.validate()?;
+
+    // Store in v2 for next time (optional, depends on your design)
+    // create_entry(&healed)?;
+
+    emit_healing_signal(HealingSignal::HealingSucceeded {
+        entry_id: id.to_string(),
+        entry_type: "{{ENTRY_TYPE}}".to_string(),
+        was_migrated_from_v1: true,
+    })?;
+
+    Ok(healed)
+}
+
+// ============================================================================
+// WRITE PATH INTEGRATION
+// ============================================================================
+
+/// Create or update {{ENTRY_TYPE}} with validation
+pub fn create_{{entry_type_lowercase}}(
+    input: {{ENTRY_TYPE}},
+) -> ExternResult<ActionHash> {
+    let mut entry = input;
+
+    // Always use current schema version
+    entry.schema_version = {{SCHEMA_VERSION}};
+
+    // Validate before creating
+    entry.validate()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
+
+    // If validation passed, it's valid
+    entry.validation_status = ValidationStatus::Valid;
+
+    // Create the entry
+    create_entry(&entry)
+}
+
+// ============================================================================
+// INIT PATTERN
+// ============================================================================
+
+/// Call this from your DNA's init() function
+pub fn init_healing() -> ExternResult<()> {
+    let orchestrator = HealingOrchestrator::new(
+        "{{DNA_V1_ROLE}}",
+        "{{DNA_V2_ROLE}}",
+    );
+
+    // Check if v1 has data
+    match orchestrator.check_v1_on_startup()? {
+        Some(has_data) => {
+            if has_data {
+                // V1 has data, healing will happen on first query
+                debug_log("Init: v1 DNA available with data, will heal on demand")?;
+                // Optionally set a flag to trigger background healing later
+            } else {
+                // V1 exists but is empty
+                debug_log("Init: v1 DNA available but empty, fresh start")?;
+            }
+        }
+        None => {
+            // No v1 bridge, this is a fresh DNA
+            debug_log("Init: no v1 bridge, fresh start")?;
+        }
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// BACKGROUND HEALING
+// ============================================================================
+
+/// Heal all degraded {{ENTRY_TYPE}} entries
+///
+/// Call this periodically or via a scheduled task.
+/// Returns count of entries healed.
+pub fn heal_all_{{entry_type_lowercase}}() -> ExternResult<u32> {
+    // Query for degraded entries
+    // This requires custom query logic based on your DNA structure
+    // Example pseudocode:
+    //
+    // let filter = ChainQueryFilter::new()
+    //     .entry_type(EntryTypes::{{ENTRY_TYPE_LOWERCASE}}.try_into()?);
+    // let records = query(filter)?;
+    //
+    // let mut healed_count = 0;
+    // for record in records {
+    //     if let Ok(entry) = record.entry().clone().into_sb_single::<{{ENTRY_TYPE}}>() {
+    //         if entry.validation_status == ValidationStatus::Degraded {
+    //             match heal_{{entry_type_lowercase}}_from_v1(&entry.id) {
+    //                 Ok(_) => healed_count += 1,
+    //                 Err(_) => {}
+    //             }
+    //         }
+    //     }
+    // }
+    //
+    // Ok(healed_count)
+
+    Ok(0) // Placeholder
+}
+
+// ============================================================================
+// STUB FUNCTIONS - IMPLEMENT THESE
+// ============================================================================
+
+/// Query {{ENTRY_TYPE}} by ID (implement in your coordinator zome)
+fn get_{{entry_type_lowercase}}_by_id(id: &str) -> ExternResult<Option<{{ENTRY_TYPE}}>> {
+    // TODO: Implement actual query
+    // Use your DNA's index/lookup mechanism
+    // Example:
+    // let filter = ChainQueryFilter::new()
+    //     .action_type(ActionType::Create);
+    // let records = query(filter)?;
+    // ...
+    todo!("Implement get_{{entry_type_lowercase}}_by_id")
+}
+
+/// Debug logging helper
+fn debug_log(msg: &str) -> ExternResult<()> {
+    // Optionally implement logging
+    Ok(())
+}
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_{{entry_type_lowercase}}_validation() {
+        let mut entry = {{ENTRY_TYPE}} {
+            id: "test-1".to_string(),
+            {{field_name_1}}: "valid value".to_string(),
+            {{field_name_2}}: "another value".to_string(),
+            ..Default::default()
+        };
+
+        // Should be valid
+        assert!(entry.validate().is_ok());
+
+        // Invalid entry
+        let mut invalid = {{ENTRY_TYPE}} {
+            id: String::new(), // Empty ID
+            ..entry
+        };
+        assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn test_v1_transformation() {
+        let v1 = {{ENTRY_TYPE}}V1Export {
+            id: "test".to_string(),
+            {{field_name_1}}: "value".to_string(),
+            {{field_name_2}}: "another".to_string(),
+            {{#if HAS_PARENT}}parent_id: None,{{/if}}
+            {{#if HAS_REFERENCES}}related_ids: vec![],{{/if}}
+        };
+
+        let v2 = transform_v1_to_v2(v1);
+        assert_eq!(v2.schema_version, {{SCHEMA_VERSION}});
+        assert_eq!(v2.validation_status, ValidationStatus::Migrated);
+    }
+
+    #[test]
+    fn test_{{entry_type_lowercase}}_healing_awareness() {
+        let entry = {{ENTRY_TYPE}} {
+            id: "test".to_string(),
+            validation_status: ValidationStatus::Degraded,
+            ..Default::default()
+        };
+
+        assert!(entry.validation_status().needs_healing());
+    }
+}

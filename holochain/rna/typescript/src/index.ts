@@ -96,3 +96,23 @@ export {
   MigrationOrchestrator,
   createOrchestrator,
 } from './orchestrator.js';
+
+// Self-Healing DNA types and utilities
+export {
+  HealingSignalType,
+  HealingEntryStatus,
+  SystemHealingStatus,
+  HealingMonitor,
+  formatHealingSignal,
+  createHealingMonitor,
+  isHealingSignal,
+  type BaseHealingSignal,
+  type DegradedEntryFoundSignal,
+  type HealingStartedSignal,
+  type HealingSucceededSignal,
+  type HealingRetryingSignal,
+  type HealingFailedSignal,
+  type HealingBatchCompleteSignal,
+  type SystemFullyHealedSignal,
+  type HealingSignal,
+} from './healing.js';
