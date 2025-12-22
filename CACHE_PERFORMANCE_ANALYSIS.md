@@ -209,10 +209,10 @@ item.lastAccessedAt = Date.now();  // Line 280
 
 ## Proposed Rust Module Architecture
 
-### Module: `blob-cache-core` (Rust + WASM)
+### Module: `holochain-cache-core` (Rust + WASM)
 
 ```rust
-// blob_cache_core/src/lib.rs
+// holochain-cache-core/src/lib.rs
 
 use std::collections::{BTreeMap, HashMap};
 use std::time::{SystemTime, UNIX_EPOCH};
