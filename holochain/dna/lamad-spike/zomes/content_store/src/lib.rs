@@ -9301,6 +9301,164 @@ pub fn query_custodian_commitments(input: QueryCommitmentsInput) -> ExternResult
 }
 
 // =============================================================================
+// Relationship Hooks - Auto-Create CustodianCommitments
+// =============================================================================
+
+/// Auto-create custodian commitments when relationship intimacy level reaches trusted/intimate
+///
+/// When a HumanRelationship reaches:
+/// - "intimate": Auto-propose bidirectional custody for private, invited, local reach content
+/// - "trusted": Auto-propose bidirectional custody for neighborhood, municipal reach content
+///
+/// This implements the hybrid model where family and trusted circles automatically become
+/// custodians based on relationship intimacy without manual negotiation.
+fn on_relationship_updated(relationship: Relationship) -> ExternResult<()> {
+    // Extract intimacy level from metadata_json if present
+    let intimacy_level: String = if let Some(metadata) = &relationship.metadata_json {
+        if let Ok(metadata_obj) = serde_json::from_str::<serde_json::Value>(metadata) {
+            metadata_obj
+                .get("intimacy_level")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or_default()
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    // Only auto-create commitments for trusted or intimate relationships
+    let reach_filters = match intimacy_level.as_str() {
+        "intimate" => vec!["private", "invited", "local"],
+        "trusted" => vec!["neighborhood", "municipal"],
+        _ => return Ok(()), // No commitments for recognition or connection levels
+    };
+
+    // Create bidirectional commitments
+    // Both source → target and target → source
+
+    let source_to_target_input = CreateCustodianCommitmentInput {
+        custodian_agent_id: relationship.target_id.clone(), // Target becomes custodian of source's content
+        beneficiary_agent_id: relationship.source_id.clone(),
+        commitment_type: "relationship".to_string(),
+        basis: if intimacy_level == "intimate" {
+            "intimate_relationship".to_string()
+        } else {
+            "trusted_relationship".to_string()
+        },
+        relationship_id: Some(relationship.id.clone()),
+        category_override_json: "[]".to_string(),
+        content_filters_json: serde_json::to_string(&vec![serde_json::json!({
+            "reach_levels": reach_filters.clone(),
+            "content_types": [],
+            "tags": [],
+        })])
+        .unwrap_or_else(|_| "[]".to_string()),
+        estimated_content_count: 0,
+        estimated_size_mb: 0.0,
+        shard_strategy: "full_replica".to_string(),
+        redundancy_factor: 2,
+        shard_assignments_json: "[]".to_string(),
+        emergency_triggers_json: serde_json::to_string(&vec![
+            serde_json::json!({
+                "trigger_type": "manual_signal",
+                "enabled": true,
+            }),
+            serde_json::json!({
+                "trigger_type": "trusted_party",
+                "enabled": true,
+                "trusted_agent_ids": [relationship.target_id.clone()],
+            }),
+        ])
+        .unwrap_or_else(|_| "[]".to_string()),
+        emergency_contacts_json: serde_json::to_string(&vec![serde_json::json!({
+            "agent_id": relationship.target_id.clone(),
+            "contact_method": "agent-to-agent",
+            "contact_value": relationship.target_id.clone(),
+            "priority": 1,
+        })])
+        .unwrap_or_else(|_| "[]".to_string()),
+        recovery_instructions_json: serde_json::to_string(&serde_json::json!({
+            "instructions_markdown": "Reconstruct from relationship-based custodians",
+            "shard_reconstruction_method": "full_replica",
+            "verification_steps": ["verify_watermarks", "verify_shard_hashes"],
+            "fallback_contacts": []
+        }))
+        .unwrap_or_else(|_| "{}".to_string()),
+        cache_priority: Some(80),
+        bandwidth_class: Some("medium".to_string()),
+        geographic_affinity: None,
+        note: Some(format!("{} relationship custody auto-commitment", intimacy_level)),
+        metadata_json: Some(format!(r#"{{"relationship_type":"{}","auto_created":true}}"#, relationship.relationship_type)),
+    };
+
+    // Create source → target commitment
+    let _ = create_custodian_commitment(source_to_target_input);
+
+    // Create bidirectional commitment (target → source)
+    let target_to_source_input = CreateCustodianCommitmentInput {
+        custodian_agent_id: relationship.source_id.clone(),
+        beneficiary_agent_id: relationship.target_id.clone(),
+        commitment_type: "relationship".to_string(),
+        basis: if intimacy_level == "intimate" {
+            "intimate_relationship".to_string()
+        } else {
+            "trusted_relationship".to_string()
+        },
+        relationship_id: Some(relationship.id.clone()),
+        category_override_json: "[]".to_string(),
+        content_filters_json: serde_json::to_string(&vec![serde_json::json!({
+            "reach_levels": reach_filters,
+            "content_types": [],
+            "tags": [],
+        })])
+        .unwrap_or_else(|_| "[]".to_string()),
+        estimated_content_count: 0,
+        estimated_size_mb: 0.0,
+        shard_strategy: "full_replica".to_string(),
+        redundancy_factor: 2,
+        shard_assignments_json: "[]".to_string(),
+        emergency_triggers_json: serde_json::to_string(&vec![
+            serde_json::json!({
+                "trigger_type": "manual_signal",
+                "enabled": true,
+            }),
+            serde_json::json!({
+                "trigger_type": "trusted_party",
+                "enabled": true,
+                "trusted_agent_ids": [relationship.source_id.clone()],
+            }),
+        ])
+        .unwrap_or_else(|_| "[]".to_string()),
+        emergency_contacts_json: serde_json::to_string(&vec![serde_json::json!({
+            "agent_id": relationship.source_id.clone(),
+            "contact_method": "agent-to-agent",
+            "contact_value": relationship.source_id.clone(),
+            "priority": 1,
+        })])
+        .unwrap_or_else(|_| "[]".to_string()),
+        recovery_instructions_json: serde_json::to_string(&serde_json::json!({
+            "instructions_markdown": "Reconstruct from relationship-based custodians",
+            "shard_reconstruction_method": "full_replica",
+            "verification_steps": ["verify_watermarks", "verify_shard_hashes"],
+            "fallback_contacts": []
+        }))
+        .unwrap_or_else(|_| "{}".to_string()),
+        cache_priority: Some(80),
+        bandwidth_class: Some("medium".to_string()),
+        geographic_affinity: None,
+        note: Some(format!("{} relationship custody auto-commitment", intimacy_level)),
+        metadata_json: Some(format!(r#"{{"relationship_type":"{}","auto_created":true}}"#, relationship.relationship_type)),
+    };
+
+    // Create target → source commitment
+    let _ = create_custodian_commitment(target_to_source_input);
+
+    Ok(())
+}
+
+// =============================================================================
 // Post-Commit Signals for Doorway Projection
 // =============================================================================
 
@@ -9432,6 +9590,9 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 author,
             })?;
         } else if let Some(relationship) = record.entry().to_app_option::<Relationship>().ok().flatten() {
+            // Auto-create custodian commitments when relationship reaches trusted/intimate
+            let _ = on_relationship_updated(relationship.clone());
+
             emit_signal(ProjectionSignal::RelationshipCommitted {
                 action_hash,
                 entry_hash,
