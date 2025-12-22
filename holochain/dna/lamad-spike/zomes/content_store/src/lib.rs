@@ -17,6 +17,22 @@ pub mod migration;
 // Self-healing DNA implementation for schema evolution
 pub mod healing_impl;
 
+// Integration layer for healing (read/write path glue)
+pub mod healing_integration;
+
+// =============================================================================
+// DNA Initialization - Sets up healing support
+// =============================================================================
+
+#[hdk_extern]
+pub fn init(_: InitPayload) -> InitResult {
+    // Initialize healing support - check if v1 is available
+    // This never fails, always returns InitResult::Pass
+    let _ = healing_impl::init_healing();
+
+    Ok(InitResult::Pass)
+}
+
 // =============================================================================
 // Doorway Cache Configuration
 // =============================================================================
@@ -1281,7 +1297,7 @@ pub fn create_content(input: CreateContentInput) -> ExternResult<ContentOutput> 
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let content = Content {
+    let mut content = Content {
         id: input.id.clone(),
         content_type: input.content_type.clone(),
         title: input.title,
@@ -1300,7 +1316,12 @@ pub fn create_content(input: CreateContentInput) -> ExternResult<ContentOutput> 
         metadata_json: input.metadata_json,
         created_at: timestamp.clone(),
         updated_at: timestamp,
+        schema_version: 2,  // Always current version
+        validation_status: String::new(),  // Will be set by prepare_
     };
+
+    // Prepare and validate - sets schema_version=2 and validation_status
+    let content = healing_integration::prepare_content_for_storage(content)?;
 
     // Create the entry
     let action_hash = create_entry(&EntryTypes::Content(content.clone()))?;
@@ -1385,18 +1406,37 @@ pub fn get_content(action_hash: ActionHash) -> ExternResult<Option<ContentOutput
 /// Get content by string ID (using IdToContent link)
 #[hdk_extern]
 pub fn get_content_by_id(input: QueryByIdInput) -> ExternResult<Option<ContentOutput>> {
-    let anchor = StringAnchor::new("content_id", &input.id);
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    // Use healing-aware retrieval - will fallback to v1 if not found in v2
+    let content = healing_integration::get_content_by_id_with_healing(&input.id)?;
 
-    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
-    let links = get_links(query, GetStrategy::default())?;
+    match content {
+        Some(content) => {
+            // Get the entry hash for output
+            let entry_hash = hash_entry(&EntryTypes::Content(content.clone()))?;
 
-    if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
-        get_content(action_hash)
-    } else {
-        Ok(None)
+            // Get the action hash - use existing anchor/link method
+            let anchor = StringAnchor::new("content_id", &input.id);
+            let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+            let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
+            let links = get_links(query, GetStrategy::default())?;
+
+            let action_hash = if let Some(link) = links.first() {
+                ActionHash::try_from(link.target.clone())
+                    .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?
+            } else {
+                // Newly healed entry, cache it with a new link
+                let new_hash = create_entry(&EntryTypes::Content(content.clone()))?;
+                let _ = create_id_to_content_link(&content.id, &new_hash);
+                new_hash
+            };
+
+            Ok(Some(ContentOutput {
+                action_hash,
+                entry_hash,
+                content,
+            }))
+        }
+        None => Ok(None),
     }
 }
 
@@ -1683,15 +1723,41 @@ pub fn get_blobs_by_content_id(input: QueryBlobsByContentIdInput) -> ExternResul
         .map_err(|e| wasm_error!(e))?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize content".to_string())))?;
 
-    // Extract blobs from content if it has them
-    // This is a simplified version - in production, blobs would be stored in a separate entry type
-    let mut blobs = Vec::new();
+    let content_hash = links[0].target.clone();
 
-    // Placeholder: iterate over content.blobs if field exists
-    // For now, return empty vec as the model integration is next
-    // TODO: Add actual blob extraction logic when ContentNode is integrated
+    // Query ContentToBlobs links from this content
+    let query = LinkQuery::try_new(content_hash, LinkTypes::ContentToBlobs)?;
+    let blob_links = get_links(query, GetStrategy::default())?;
 
-    Ok(blobs)
+    if blob_links.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Fetch each blob entry
+    let mut results = Vec::new();
+
+    for link in blob_links {
+        let blob_action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in blob link".to_string())))?;
+
+        if let Some(record) = get(blob_action_hash, GetOptions::default())? {
+            if let Ok(Some(blob)) = record.entry().to_app_option::<BlobEntry>() {
+                results.push(BlobMetadataOutput {
+                    hash: blob.hash,
+                    size_bytes: blob.size_bytes,
+                    mime_type: blob.mime_type,
+                    fallback_urls: blob.fallback_urls,
+                    bitrate_mbps: blob.bitrate_mbps.map(|b| b as f64),
+                    duration_seconds: blob.duration_seconds,
+                    codec: blob.codec,
+                    created_at: Some(blob.created_at),
+                    verified_at: blob.verified_at,
+                });
+            }
+        }
+    }
+
+    Ok(results)
 }
 
 /// Verify that a blob hash is valid and matches expected content.
@@ -1717,9 +1783,15 @@ pub fn verify_blob_integrity(input: VerifyBlobIntegrityInput) -> ExternResult<Bl
         )));
     }
 
-    // For Phase 1, we just verify that the blob hash exists in our system
-    // Full verification happens client-side where the actual bytes are
-    let is_valid = true; // TODO: Implement actual hash validation
+    // Check if blob with this hash exists in our system
+    let blob_anchor = StringAnchor::new("blob_hash", &input.blob_hash);
+    let blob_anchor_hash = hash_entry(&EntryTypes::StringAnchor(blob_anchor))?;
+
+    let blob_query = LinkQuery::try_new(blob_anchor_hash, LinkTypes::IdToBlob)?;
+    let blob_links = get_links(blob_query, GetStrategy::default())?;
+
+    // Blob is valid if it exists in DHT and hash matches content
+    let is_valid = !blob_links.is_empty();
 
     let elapsed = start_time
         .elapsed()

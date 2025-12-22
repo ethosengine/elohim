@@ -474,6 +474,61 @@ pub struct Content {
 }
 
 // =============================================================================
+// Blob (Media) Entries - Phase 1: Large Media Support
+// =============================================================================
+
+/// Blob entry - metadata for large media files (video, audio, podcasts)
+///
+/// Blobs are NOT stored in DHT (too large). This entry stores only metadata:
+/// - Cryptographic hash for integrity verification
+/// - Size for cache allocation planning
+/// - MIME type for rendering
+/// - Codec info for adaptive streaming
+/// - Fallback URLs for resilience (CDN, custodians, P2P)
+///
+/// Actual blob data distributed separately via:
+/// - HTTP Range requests (resumable downloads)
+/// - HLS/DASH adaptive streaming
+/// - Custodian P2P replication
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct BlobEntry {
+    /// SHA256 hash of blob content (hex string, 64 chars)
+    pub hash: String,
+
+    /// Total size in bytes
+    pub size_bytes: u64,
+
+    /// MIME type (video/mp4, audio/mpeg, etc.)
+    pub mime_type: String,
+
+    /// Fallback URLs for resilient access (primary, secondary, tertiary, custodian URLs)
+    /// Tried in order until one succeeds
+    pub fallback_urls: Vec<String>,
+
+    /// Bitrate in megabits per second (for quality indication)
+    pub bitrate_mbps: Option<f32>,
+
+    /// Duration in seconds (for audio/video)
+    pub duration_seconds: Option<u32>,
+
+    /// Codec used (h264, h265, vp9, av1, opus, flac, etc.)
+    pub codec: Option<String>,
+
+    /// Visibility level (private, commons, etc.)
+    pub reach: String,
+
+    /// Author/uploader agent ID
+    pub author_id: Option<String>,
+
+    /// When created
+    pub created_at: String,
+
+    /// When last verified/accessed
+    pub verified_at: Option<String>,
+}
+
+// =============================================================================
 // Learning Path Entries
 // =============================================================================
 
@@ -1134,6 +1189,378 @@ pub struct Settlement {
     pub note: Option<String>,
     pub created_at: String,
 }
+
+// =============================================================================
+// Shefa: Insurance Mutual - Member Risk Profile
+// =============================================================================
+
+/// MemberRiskProfile - Behavioral risk assessment for autonomous mutual insurance.
+///
+/// Core of Elohim Mutual: actual behavioral observation instead of proxies like credit scores.
+/// Uses Observer protocol attestations for three factors: care, connectedness, claims history.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct MemberRiskProfile {
+    pub id: String,
+    pub member_id: String,              // Agent ID of member
+    pub risk_type: String,              // health, property, casualty, care
+    // Behavioral scores (0-100)
+    pub care_maintenance_score: f64,    // Preventive care frequency
+    pub community_connectedness_score: f64, // Support network quality
+    pub historical_claims_rate: f64,    // Claims frequency (0.0-1.0)
+    // Calculated risk
+    pub risk_score: f64,                // Weighted average (0-100)
+    pub risk_tier: String,              // low, standard, high, uninsurable (from RISK_TIERS)
+    pub risk_tier_rationale: String,    // Human-readable explanation
+    // Evidence trail
+    pub evidence_event_ids_json: String, // Observer attestation IDs (Vec<String> as JSON)
+    pub evidence_breakdown_json: String, // Count by type: {careEvents, communityEvents, claimsEvents}
+    // Trending
+    pub risk_trend_direction: String,   // improving, stable, declining (from RISK_TRENDS)
+    pub last_risk_score: f64,           // Score from previous assessment
+    // Assessment tracking
+    pub assessed_at: String,
+    pub last_assessment_at: String,
+    pub next_assessment_due: String,
+    pub assessment_event_ids_json: String, // EconomicEvent IDs (Vec<String> as JSON)
+    // Schema & validation
+    pub schema_version: u32,
+    pub validation_status: String,      // Valid, Migrated, Degraded, Healing
+    pub metadata_json: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Risk tiers for insurance mutual
+pub const RISK_TIERS: [&str; 4] = [
+    "low",          // Excellent preventive care, strong support
+    "standard",     // Average care, moderate support
+    "high",         // Poor care or weak support
+    "uninsurable",  // Too risky for coverage
+];
+
+/// Risk trend directions
+pub const RISK_TRENDS: [&str; 3] = [
+    "improving",
+    "stable",
+    "declining",
+];
+
+// =============================================================================
+// Shefa: Insurance Mutual - Coverage Policy
+// =============================================================================
+
+/// CoveragePolicy - What risks are covered and under what terms.
+///
+/// Governs cost-sharing: deductible, coinsurance, out-of-pocket maximum.
+/// Created at governance level (individual, household, community, network, constitutional).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CoveragePolicy {
+    pub id: String,
+    pub member_id: String,
+    // Coverage definition
+    pub coverage_level: String,         // individual, household, community, network
+    pub governed_at: String,            // Which Qahal (or network)
+    pub covered_risks_json: String,     // CoveredRisk[] as JSON
+    // Cost sharing
+    pub deductible_value: Option<f64>,
+    pub deductible_unit: Option<String>,
+    pub coinsurance: f64,               // Percentage (0-100)
+    pub out_of_pocket_maximum_value: Option<f64>,
+    pub out_of_pocket_maximum_unit: Option<String>,
+    // Effective dates
+    pub effective_from: String,
+    pub renewal_terms: String,          // annual, semi-annual, etc.
+    pub renewal_due_at: String,
+    // Constitutional basis
+    pub constitutional_basis: String,   // Reference to governance document
+    // Premium tracking
+    pub last_premium_event_id: Option<String>,
+    pub last_premium_paid_at: Option<String>,
+    // Schema & validation
+    pub schema_version: u32,
+    pub validation_status: String,
+    pub modification_event_ids_json: String, // EconomicEvent IDs (Vec<String> as JSON)
+    pub metadata_json: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// CoveredRisk - A single risk that's covered
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CoveredRisk {
+    pub id: String,
+    pub risk_name: String,              // "Emergency Medical", "Prescription Medications"
+    pub risk_description: String,
+    pub risk_category: String,          // health, property, casualty, care
+    pub is_covered: bool,
+    pub coverage_limit_value: Option<f64>,
+    pub coverage_limit_unit: Option<String>,
+    pub deductible_applies: bool,
+    pub coinsurance_percent: f64,       // 0-100
+    pub prevention_incentive_applies: bool,
+    pub created_at: String,
+}
+
+/// Coverage levels (governance layers for policy decisions)
+pub const COVERAGE_LEVELS: [&str; 5] = [
+    "individual",
+    "household",
+    "community",
+    "network",
+    "constitutional",
+];
+
+// =============================================================================
+// Shefa: Insurance Mutual - Claims
+// =============================================================================
+
+/// InsuranceClaim - A member's claim for coverage.
+///
+/// Full lifecycle: filed → investigated → adjusted → approved/denied → settled/appealed.
+/// Immutable event trail for transparency and governance.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct InsuranceClaim {
+    pub id: String,
+    pub claim_number: String,           // Human-readable: CLM-XXXXXXXXXX
+    pub policy_id: String,
+    pub member_id: String,
+    // Filing
+    pub filed_date: String,
+    pub filed_by: String,
+    // Loss details
+    pub loss_type: String,              // Risk name (e.g., "Emergency Medical")
+    pub loss_date: String,
+    pub description: String,
+    pub estimated_amount_value: Option<f64>,
+    pub estimated_amount_unit: Option<String>,
+    // Evidence
+    pub observer_attestation_ids_json: String, // Vec<String> as JSON
+    pub member_document_ids_json: String,      // Vec<String> as JSON
+    // Status & history
+    pub status: String,                 // filed, adjustment-made, approved, denied, settled, appealed (from CLAIM_STATUSES)
+    pub status_history_json: String,    // ClaimStatusChange[] as JSON
+    // Adjustments
+    pub adjustment_event_ids_json: String, // EconomicEvent IDs (Vec<String> as JSON)
+    pub appeal_event_ids_json: String,
+    pub settlement_event_ids_json: String,
+    // Schema & validation
+    pub schema_version: u32,
+    pub validation_status: String,
+    pub metadata_json: String,          // {coveredRiskId, deductibleApplies, coinsurancePercent, coverageLimit}
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Claim statuses
+pub const CLAIM_STATUSES: [&str; 7] = [
+    "filed",
+    "adjustment-made",
+    "approved",
+    "denied",
+    "settled",
+    "appealed",
+    "resolved",
+];
+
+// =============================================================================
+// Shefa: Insurance Mutual - Adjustment Reasoning (Bob Parr Principle)
+// =============================================================================
+
+/// AdjustmentReasoning - Adjuster's determination with full constitutional reasoning.
+///
+/// Core of the Bob Parr Principle: every decision must be explained in plain language
+/// and cite the constitutional basis. Auditable by governance.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct AdjustmentReasoning {
+    pub id: String,
+    pub claim_id: String,
+    pub adjuster_id: String,
+    // Decision
+    pub coverage_decision: String,      // approved, denied, partial (from COVERAGE_DECISIONS)
+    pub approved_amount_value: Option<f64>,
+    pub approved_amount_unit: Option<String>,
+    // Reasoning
+    pub plain_language_explanation: String, // Member-facing explanation
+    pub interpretation_notes: Option<String>,
+    pub applied_generosity_principle: bool, // Did we interpret ambiguously in member's favor?
+    // Constitutional basis
+    pub constitutional_basis_documents_json: String, // Document references (Vec<String> as JSON)
+    pub policy_citations_json: String,  // Specific policy sections (Vec<String> as JSON)
+    // Governance review
+    pub flagged_for_governance: bool,
+    pub governance_review_reason: Option<String>,
+    // Timestamps
+    pub adjustment_date: String,
+    pub created_at: String,
+}
+
+/// Coverage decision types
+pub const COVERAGE_DECISIONS: [&str; 3] = [
+    "approved",
+    "denied",
+    "partial",
+];
+
+// =============================================================================
+// Shefa: Requests & Offers - Service Request
+// =============================================================================
+
+/// ServiceRequest - Someone requesting a service (REA Intent: take action).
+///
+/// Part of the peer-to-peer marketplace for coordinating work and services.
+/// Initially pending admin approval before becoming visible.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ServiceRequest {
+    pub id: String,
+    pub request_number: String,         // REQ-XXXXXXXXXX
+    pub requester_id: String,
+    // Content
+    pub title: String,
+    pub description: String,
+    // Contact & timing
+    pub contact_preference: String,     // email, phone, message, in-person (from CONTACT_PREFERENCES)
+    pub contact_value: String,
+    pub time_zone: String,
+    pub time_preference: String,        // morning, afternoon, evening, any (from TIME_PREFERENCES)
+    pub interaction_type: String,       // virtual, in-person, hybrid (from INTERACTION_TYPES)
+    pub date_range_start: String,
+    pub date_range_end: Option<String>,
+    // Service details
+    pub service_type_ids_json: String,  // Vec<String> as JSON
+    pub required_skills_json: String,   // Vec<String> as JSON
+    pub budget_value: Option<f64>,
+    pub budget_unit: Option<String>,
+    pub medium_of_exchange_ids_json: String, // Vec<String> as JSON
+    // Visibility
+    pub status: String,                 // pending, active, archived, deleted (from REQUEST_STATUSES)
+    pub is_public: bool,                // Hidden until admin approval
+    pub links_json: String,             // Vec<String> as JSON - portfolio, docs, etc.
+    // Schema & validation
+    pub schema_version: u32,
+    pub validation_status: String,
+    pub metadata_json: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// ServiceOffer - Someone offering a service (REA Intent: give action).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ServiceOffer {
+    pub id: String,
+    pub offer_number: String,           // OFR-XXXXXXXXXX
+    pub offeror_id: String,
+    // Content
+    pub title: String,
+    pub description: String,
+    // Contact & availability
+    pub contact_preference: String,
+    pub contact_value: String,
+    pub time_zone: String,
+    pub time_preference: String,
+    pub interaction_type: String,
+    pub hours_per_week: f64,
+    pub date_range_start: String,
+    pub date_range_end: Option<String>,
+    // Service details
+    pub service_type_ids_json: String,  // Vec<String> as JSON
+    pub offered_skills_json: String,    // Vec<String> as JSON
+    pub rate_value: f64,
+    pub rate_unit: String,              // unit token
+    pub rate_per: String,               // hour, day, week, month, project
+    pub medium_of_exchange_ids_json: String, // Vec<String> as JSON
+    pub accepts_alternative_payment: bool,
+    // Visibility
+    pub status: String,                 // pending, active, archived, deleted
+    pub is_public: bool,
+    pub links_json: String,             // Vec<String> as JSON
+    // Schema & validation
+    pub schema_version: u32,
+    pub validation_status: String,
+    pub metadata_json: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Request/Offer statuses
+pub const REQUEST_STATUSES: [&str; 4] = [
+    "pending",
+    "active",
+    "archived",
+    "deleted",
+];
+
+/// Contact preferences
+pub const CONTACT_PREFERENCES: [&str; 4] = [
+    "email",
+    "phone",
+    "message",
+    "in-person",
+];
+
+/// Time preferences
+pub const TIME_PREFERENCES: [&str; 4] = [
+    "morning",
+    "afternoon",
+    "evening",
+    "any",
+];
+
+/// Interaction types
+pub const INTERACTION_TYPES: [&str; 3] = [
+    "virtual",
+    "in-person",
+    "hybrid",
+];
+
+// =============================================================================
+// Shefa: Requests & Offers - Service Match
+// =============================================================================
+
+/// ServiceMatch - A suggested or confirmed match between request and offer.
+///
+/// Lifecycle: suggested → contacted → negotiating → agreed → completed.
+/// Algorithmic or manual matching based on compatibility.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ServiceMatch {
+    pub id: String,
+    pub request_id: String,
+    pub offer_id: String,
+    // Matching details
+    pub match_reason: String,
+    pub match_quality: u32,             // 0-100 compatibility score
+    pub shared_service_types_json: String, // Vec<String> as JSON
+    pub time_compatible: bool,
+    pub interaction_compatible: bool,
+    pub exchange_compatible: bool,
+    // Status
+    pub status: String,                 // suggested, contacted, negotiating, agreed, completed (from MATCH_STATUSES)
+    // Coordination
+    pub proposal_id: Option<String>,    // REA Proposal ID if exists
+    pub commitment_id: Option<String>,  // REA Commitment ID if agreed
+    // Schema & validation
+    pub schema_version: u32,
+    pub validation_status: String,
+    pub metadata_json: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Match statuses (lifecycle)
+pub const MATCH_STATUSES: [&str; 5] = [
+    "suggested",
+    "contacted",
+    "negotiating",
+    "agreed",
+    "completed",
+];
 
 // =============================================================================
 // Lamad: Practice Pool & Mastery Challenges
@@ -2039,6 +2466,7 @@ impl StringAnchor {
 pub enum EntryTypes {
     // Lamad: Content & Learning
     Content(Content),
+    BlobEntry(BlobEntry),              // NEW: Large media (video, audio, podcasts)
     LearningPath(LearningPath),
     PathChapter(PathChapter),
     PathStep(PathStep),
@@ -2083,6 +2511,18 @@ pub enum EntryTypes {
     Claim(Claim),
     Settlement(Settlement),
 
+    // Shefa: Insurance Mutual (Autonomous Mutual Insurance)
+    MemberRiskProfile(MemberRiskProfile),
+    CoveragePolicy(CoveragePolicy),
+    CoveredRisk(CoveredRisk),
+    InsuranceClaim(InsuranceClaim),
+    AdjustmentReasoning(AdjustmentReasoning),
+
+    // Shefa: Requests & Offers (Peer-to-Peer Service Coordination)
+    ServiceRequest(ServiceRequest),
+    ServiceOffer(ServiceOffer),
+    ServiceMatch(ServiceMatch),
+
     // Lamad: Steward Economy
     StewardCredential(StewardCredential),
     PremiumGate(PremiumGate),
@@ -2107,6 +2547,16 @@ pub enum LinkTypes {
     TagToContent,
     AuthorToContent,
     ImportBatchToContent,
+
+    // =========================================================================
+    // Lamad: Blob (Media) links - Phase 1
+    // =========================================================================
+    ContentToBlobs,                     // Content -> BlobEntry (one-to-many)
+    IdToBlob,                          // Anchor(blob_hash) -> BlobEntry (for lookup)
+    BlobToVariants,                    // BlobEntry -> BlobVariant entries (quality options)
+    BlobToCaptions,                    // BlobEntry -> BlobCaption entries (subtitles)
+    BlobToReplicas,                    // BlobEntry -> CustodianCommitment (replication)
+    AuthorToBlobs,                     // Anchor(author_id) -> BlobEntry (author's blobs)
 
     // =========================================================================
     // Lamad: Learning path links
@@ -2294,6 +2744,40 @@ pub enum LinkTypes {
     IdToSettlement,             // Anchor(settlement_id) -> Settlement
     ClaimToSettlement,          // Claim -> Settlement
     EventSettlesClaim,          // EconomicEvent -> Settlement
+
+    // =========================================================================
+    // Shefa: Insurance Mutual links
+    // =========================================================================
+    IdToMemberRiskProfile,      // Anchor(profile_id) -> MemberRiskProfile
+    MemberToRiskProfile,        // Anchor(member_id) -> MemberRiskProfile
+    RiskProfileByTier,          // Anchor(risk_tier) -> MemberRiskProfile
+    IdToCoveragePolicy,         // Anchor(policy_id) -> CoveragePolicy
+    MemberToCoveragePolicy,     // Anchor(member_id) -> CoveragePolicy
+    CoveragePolicyByLevel,      // Anchor(coverage_level) -> CoveragePolicy
+    PolicyToCoveredRisk,        // CoveragePolicy -> CoveredRisk
+    IdToInsuranceClaim,         // Anchor(claim_id) -> InsuranceClaim
+    MemberToClaim,              // Anchor(member_id) -> InsuranceClaim
+    ClaimByStatus,              // Anchor(status) -> InsuranceClaim
+    PolicyToClaim,              // CoveragePolicy -> InsuranceClaim
+    IdToAdjustmentReasoning,    // Anchor(adjustment_id) -> AdjustmentReasoning
+    ClaimToAdjustment,          // InsuranceClaim -> AdjustmentReasoning
+    AdjustmentToEvent,          // AdjustmentReasoning -> EconomicEvent
+
+    // =========================================================================
+    // Shefa: Requests & Offers links
+    // =========================================================================
+    IdToServiceRequest,         // Anchor(request_id) -> ServiceRequest
+    RequesterToRequest,         // Anchor(requester_id) -> ServiceRequest
+    RequestByStatus,            // Anchor(status) -> ServiceRequest
+    RequestByServiceType,       // Anchor(service_type_id) -> ServiceRequest
+    IdToServiceOffer,           // Anchor(offer_id) -> ServiceOffer
+    OfferorToOffer,             // Anchor(offeror_id) -> ServiceOffer
+    OfferByStatus,              // Anchor(status) -> ServiceOffer
+    OfferByServiceType,         // Anchor(service_type_id) -> ServiceOffer
+    IdToServiceMatch,           // Anchor(match_id) -> ServiceMatch
+    RequestToMatch,             // ServiceRequest -> ServiceMatch
+    OfferToMatch,               // ServiceOffer -> ServiceMatch
+    MatchByStatus,              // Anchor(status) -> ServiceMatch
 
     // =========================================================================
     // Lamad: Steward Economy links

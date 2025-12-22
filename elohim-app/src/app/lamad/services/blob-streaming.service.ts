@@ -242,11 +242,16 @@ export class BlobStreamingService {
 
   /**
    * Check if server supports HTTP Range requests (206 Partial Content).
+   *
+   * HTTP Semantics:
+   * - 206 Partial Content: Server accepted Range header and returned partial content (Range SUPPORTED)
+   * - 200 OK: Server ignored Range header and returned full content (Range NOT supported)
+   * - 4xx/5xx: Error state
    */
   private async checkRangeSupport(url: string): Promise<boolean> {
     return new Promise((resolve) => {
       const headers = new HttpHeaders({
-        'Range': 'bytes=0-0',
+        'Range': 'bytes=0-1', // Request exactly 2 bytes
       });
 
       this.http
@@ -256,9 +261,23 @@ export class BlobStreamingService {
         })
         .subscribe({
           next: (response: HttpResponse<any>) => {
-            // 206 Partial Content means Range is supported
-            // 200 OK means Range is not supported but we can still download
-            resolve(response.status === 206 || response.status === 200);
+            // ONLY 206 indicates Range support
+            // NEVER accept 200 as Range support - that means server ignored the Range header
+            const contentRange = response.headers.get('Content-Range');
+            const isRangeSupported =
+              response.status === 206 &&
+              contentRange &&
+              contentRange.includes('0-1');
+
+            if (response.status === 200 && response.headers.has('Accept-Ranges')) {
+              // Server explicitly advertises range support but test returned 200
+              // This is a server misconfiguration - trust Accept-Ranges header
+              const acceptRanges = response.headers.get('Accept-Ranges');
+              const canDoRanges = acceptRanges && acceptRanges.toLowerCase() !== 'none';
+              resolve(canDoRanges || false);
+            } else {
+              resolve(isRangeSupported);
+            }
           },
           error: () => resolve(false), // Assume no Range support on error
         });

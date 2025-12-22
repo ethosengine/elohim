@@ -79,6 +79,9 @@ export class BlobManagerService {
   /** Maximum cache size (100 MB by default) */
   maxCacheSizeBytes = 100 * 1024 * 1024;
 
+  /** Serialization lock for concurrent cache operations (FIX for race condition) */
+  private cacheLock = Promise.resolve();
+
   constructor(
     private verificationService: BlobVerificationService,
     private fallbackService: BlobFallbackService,
@@ -152,11 +155,14 @@ export class BlobManagerService {
           })),
         ),
       ),
-      tap(({ fetchResult, verificationResult }) => {
+      switchMap(({ fetchResult, verificationResult }) => {
         // Cache if verification successful and cache not full
         if (verificationResult.isValid) {
-          this.cacheBlob(cacheKey, fetchResult.blob, blobMetadata.sizeBytes);
+          return from(this.cacheBlob(cacheKey, fetchResult.blob, blobMetadata.sizeBytes)).pipe(
+            map(() => ({ fetchResult, verificationResult })),
+          );
         }
+        return of({ fetchResult, verificationResult });
       }),
       map(({ fetchResult, verificationResult }) => {
         const totalDurationMs = performance.now() - startTime;
@@ -335,29 +341,50 @@ export class BlobManagerService {
 
   /**
    * Cache a blob (called internally after successful download).
+   * Serialized with lock to prevent race conditions during concurrent downloads.
    *
    * @param hash SHA256 hash key
    * @param blob The Blob to cache
    * @param size Expected size (for cache planning)
    */
-  private cacheBlob(hash: string, blob: Blob, size: number): void {
-    // Don't cache if blob is too large for cache
-    if (size > this.maxCacheSizeBytes) {
-      console.warn(
-        `Blob too large to cache (${size} > ${this.maxCacheSizeBytes}). Keeping in memory temporarily.`,
-      );
-      return;
-    }
+  private async cacheBlob(hash: string, blob: Blob, size: number): Promise<void> {
+    // Serialize cache operations to prevent race conditions
+    this.cacheLock = this.cacheLock.then(() => {
+      return new Promise<void>((resolve) => {
+        // Don't cache if blob is too large for cache
+        if (size > this.maxCacheSizeBytes) {
+          console.warn(
+            `Blob too large to cache (${size} > ${this.maxCacheSizeBytes}). Keeping in memory temporarily.`,
+          );
+          resolve();
+          return;
+        }
 
-    // If cache would exceed max size, remove oldest entries
-    while (this.cacheSize + size > this.maxCacheSizeBytes && this.blobCache.size > 0) {
-      // Remove first (oldest) entry
-      const firstKey = this.blobCache.keys().next().value;
-      this.removeFromCache(firstKey);
-    }
+        // Re-check cache size AFTER acquiring lock (another download may have filled it)
+        while (this.cacheSize + size > this.maxCacheSizeBytes && this.blobCache.size > 0) {
+          // Remove first (oldest) entry (LRU)
+          const firstKey = this.blobCache.keys().next().value;
+          if (firstKey) {
+            const evicted = this.blobCache.get(firstKey);
+            if (evicted) {
+              this.cacheSize -= evicted.size;
+            }
+            this.blobCache.delete(firstKey);
+          }
+        }
 
-    // Cache the blob
-    this.blobCache.set(hash, blob);
-    this.cacheSize += size;
+        // Only cache if it still fits
+        if (this.cacheSize + size <= this.maxCacheSizeBytes) {
+          this.blobCache.set(hash, blob);
+          this.cacheSize += size;
+        } else {
+          console.warn(`Blob still too large to cache after eviction: ${hash}`);
+        }
+
+        resolve();
+      });
+    });
+
+    await this.cacheLock;
   }
 }
