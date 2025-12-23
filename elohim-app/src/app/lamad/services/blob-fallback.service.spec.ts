@@ -264,7 +264,7 @@ describe('BlobFallbackService', () => {
       }, 10);
 
       const results = await testPromise;
-      expect(results).toHaveLength(2);
+      expect(results.length).toBe(2);
     });
   });
 
@@ -350,14 +350,14 @@ describe('BlobFallbackService', () => {
       const urls = ['https://example.com/blob1.mp4', 'https://example.com/blob2.mp4'];
 
       service.validateUrls(urls).then((results) => {
-        expect(results).toHaveLength(2);
+        expect(results.length).toBe(2);
         expect(results[0].url).toBe(urls[0]);
         expect(results[1].url).toBe(urls[1]);
         done();
       });
 
       const reqs = httpMock.match((req) => urls.includes(req.url));
-      expect(reqs).toHaveLength(2);
+      expect(reqs.length).toBe(2);
       reqs.forEach((req) => {
         req.flush(null, { status: 200, statusText: 'OK' });
       });

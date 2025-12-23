@@ -185,7 +185,7 @@ describe('BlobStreamingService', () => {
       const recommendation = service.recommendQuality(blob, 5);
 
       expect(recommendation.variant).toBe('default');
-      expect(recommendation.bitrateMbps).toBe(blob.bitrateMbps);
+      expect(recommendation.bitrateMbps).toBe(blob.bitrateMbps ?? 0);
     });
 
     it('should provide reasoning score for quality choice', () => {

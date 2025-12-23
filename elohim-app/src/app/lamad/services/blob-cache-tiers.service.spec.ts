@@ -158,7 +158,7 @@ describe('BlobCacheTiersService', () => {
       service.setBlob('hash1', blob);
 
       // Manually set expiration time to past
-      service['blobCache'].get('hash1')!.createdAt = Date.now() - 25 * 60 * 60 * 1000;
+      (service['blobCache'] as any).cache.get('hash1')!.createdAt = Date.now() - 25 * 60 * 60 * 1000;
 
       const retrieved = service.getBlob('hash1');
       expect(retrieved).toBeNull();
@@ -200,7 +200,7 @@ describe('BlobCacheTiersService', () => {
       service.setChunk('hash2', chunk2);
 
       // Manually expire hash1
-      service['chunkCache'].get('hash1')!.createdAt = Date.now() - 8 * 24 * 60 * 60 * 1000;
+      (service['chunkCache'] as any).cache.get('hash1')!.createdAt = Date.now() - 8 * 24 * 60 * 60 * 1000;
 
       // Add new chunk - should trigger cleanup that removes expired hash1
       const chunk3 = new Uint8Array(100);
@@ -323,18 +323,18 @@ describe('BlobCacheTiersService', () => {
 
       const allStats = service.getAllStats();
 
-      expect(allStats.metadata).toBeTruthy();
-      expect(allStats.blob).toBeTruthy();
-      expect(allStats.chunk).toBeTruthy();
+      expect(allStats['metadata']).toBeTruthy();
+      expect(allStats['blob']).toBeTruthy();
+      expect(allStats['chunk']).toBeTruthy();
 
-      expect(allStats.metadata.itemCount).toBe(1);
-      expect(allStats.blob.itemCount).toBe(1);
-      expect(allStats.chunk.itemCount).toBe(1);
+      expect(allStats['metadata'].itemCount).toBe(1);
+      expect(allStats['blob'].itemCount).toBe(1);
+      expect(allStats['chunk'].itemCount).toBe(1);
     });
 
     it('should calculate percent full correctly', () => {
       // Set small test limits
-      service['tiers'].blob.maxSizeBytes = 1000;
+      (service['blobCache'] as any).maxSizeBytes = 1000;
 
       const blob = new Blob(['a'.repeat(500)]);
       service.setBlob('hash1', blob);
