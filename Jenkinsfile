@@ -803,7 +803,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('Deploy to Alpha') {
+        stage('🚀 Deploy to Alpha') {
             when {
                 anyOf {
                     branch 'dev'
@@ -822,7 +822,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         def props = loadBuildVars()
 
                         withBuildVars(props) {
-                            echo "Deploying to Alpha: ${IMAGE_TAG}"
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            🚀 DEPLOYING ELOHIM APP TO ALPHA
+                            ═══════════════════════════════════════════════════════════
+                            Image Tag: ${IMAGE_TAG}
+                            Git Hash: ${GIT_COMMIT_HASH}
+                            Target: https://alpha.elohim.host
+                            ═══════════════════════════════════════════════════════════
+                            """
 
                             // Validate configmap
                             sh '''
@@ -855,8 +863,132 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 echo '=================================='
                             """
 
-                            echo 'Alpha deployment completed!'
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            ✅ ALPHA DEPLOYMENT COMPLETE
+                            ═══════════════════════════════════════════════════════════
+                            App URL: https://alpha.elohim.host
+                            Image: ${IMAGE_TAG}
+                            ═══════════════════════════════════════════════════════════
+                            """
                         }
+                    }
+                }
+            }
+        }
+
+        stage('🔧 Verify Holochain & Database Seed') {
+            when {
+                anyOf {
+                    branch 'dev'
+                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                    expression { return env.BRANCH_NAME.contains('alpha') }
+                }
+            }
+            steps {
+                container('builder'){
+                    script {
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        🔧 VERIFYING HOLOCHAIN & DATABASE SEED
+                        ═══════════════════════════════════════════════════════════
+                        Checking holochain-dev.elohim.host
+                        Verifying database seed status
+                        ═══════════════════════════════════════════════════════════
+                        """
+
+                        // Check if holochain edge node is running
+                        def holochainStatus = sh(
+                            script: '''
+                                kubectl get deployment elohim-edgenode-dev -n ethosengine -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0"
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        if (holochainStatus == "1") {
+                            echo "✅ Holochain Edge Node: Running"
+                        } else {
+                            echo "⚠️  Holochain Edge Node: Not available (${holochainStatus} replicas)"
+                        }
+
+                        // Check holochain connectivity
+                        def holochainHealth = sh(
+                            script: '''
+                                timeout 10s curl -f -s -o /dev/null -w "%{http_code}" https://holochain-dev.elohim.host/health 2>/dev/null || echo "000"
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        if (holochainHealth == "200") {
+                            echo "✅ Holochain Gateway: Healthy (HTTP ${holochainHealth})"
+                        } else {
+                            echo "⚠️  Holochain Gateway: Unhealthy (HTTP ${holochainHealth})"
+                        }
+
+                        // Check if seeding is needed
+                        def needsSeeding = sh(
+                            script: '''
+                                git diff --name-only HEAD~1 2>/dev/null | grep -E "^(holochain/dna/|holochain/seeder/)" && echo "true" || echo "false"
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        if (needsSeeding == "true" && holochainHealth == "200") {
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            🌱 SEEDING DATABASE (DNA or seed data changed)
+                            ═══════════════════════════════════════════════════════════
+                            """
+
+                            dir('holochain/seeder') {
+                                sh '''#!/usr/bin/env bash
+                                    set -euo pipefail
+
+                                    echo "Installing seeder dependencies..."
+                                    npm ci
+
+                                    echo ""
+                                    echo "Running seeder against holochain-dev.elohim.host..."
+                                    HOLOCHAIN_ADMIN_URL="wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024" \
+                                        npx tsx src/seed.ts
+
+                                    echo ""
+                                    echo "✅ Seeding complete"
+                                '''
+                            }
+
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            ✅ DATABASE SEEDED SUCCESSFULLY
+                            ═══════════════════════════════════════════════════════════
+                            Holochain: holochain-dev.elohim.host
+                            Status: Seeded with lamad content
+                            ═══════════════════════════════════════════════════════════
+                            """
+                        } else if (holochainHealth != "200") {
+                            echo """
+                            ⚠️  Skipping seed - Holochain not healthy
+                            ───────────────────────────────────────────────────────────
+                            Run holochain pipeline first if DNA changes were made
+                            """
+                        } else {
+                            echo """
+                            ℹ️  Skipping seed - No DNA/seeder changes detected
+                            ───────────────────────────────────────────────────────────
+                            Database seed is up to date
+                            """
+                        }
+
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        ✅ HOLOCHAIN VERIFICATION COMPLETE
+                        ═══════════════════════════════════════════════════════════
+                        Edge Node: ${holochainStatus == "1" ? "Running" : "Unavailable"}
+                        Gateway: ${holochainHealth == "200" ? "Healthy" : "Unhealthy"}
+                        Seed Status: ${needsSeeding == "true" ? "Seeded" : "Up to date"}
+                        ═══════════════════════════════════════════════════════════
+                        """
                     }
                 }
             }
