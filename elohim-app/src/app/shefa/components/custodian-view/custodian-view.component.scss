@@ -1,0 +1,568 @@
+/**
+ * Custodian View Styles
+ *
+ * Bidirectional view showing mutual aid relationships
+ */
+
+// Colors
+$color-primary: #3b82f6;
+$color-success: #10b981;
+$color-warning: #f59e0b;
+$color-danger: #ef4444;
+$color-text: #1f2937;
+$color-text-muted: #6b7280;
+$color-border: #e5e7eb;
+$color-bg: #ffffff;
+$color-bg-subtle: #f9fafb;
+
+$color-helping: #8b5cf6; // Purple for giving
+$color-being-helped: #10b981; // Green for receiving
+$color-balanced: #3b82f6; // Blue for balanced
+
+// =============================================================================
+// CONTAINER
+// =============================================================================
+
+.custodian-view {
+  background: $color-bg;
+  border-radius: 0.5rem;
+  border: 1px solid $color-border;
+  overflow: hidden;
+}
+
+// =============================================================================
+// HEADER
+// =============================================================================
+
+.view-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid $color-border;
+  background: $color-bg-subtle;
+
+  h2 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: $color-text;
+  }
+
+  .subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    color: $color-text-muted;
+  }
+}
+
+// =============================================================================
+// BALANCE SUMMARY
+// =============================================================================
+
+.balance-summary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid $color-border;
+
+  &.balance-giving {
+    background: rgba($color-helping, 0.05);
+    border-left: 4px solid $color-helping;
+  }
+
+  &.balance-receiving {
+    background: rgba($color-being-helped, 0.05);
+    border-left: 4px solid $color-being-helped;
+  }
+
+  &.balance-balanced {
+    background: rgba($color-balanced, 0.05);
+    border-left: 4px solid $color-balanced;
+  }
+}
+
+.balance-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.balance-content {
+  flex: 1;
+  min-width: 0;
+
+  .balance-message {
+    font-weight: 500;
+    color: $color-text;
+    font-size: 0.9rem;
+    margin-bottom: 0.375rem;
+  }
+
+  .balance-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    color: $color-text-muted;
+
+    .stat {
+      .label {
+        margin-right: 0.25rem;
+      }
+
+      .value {
+        font-weight: 500;
+        color: $color-text;
+      }
+    }
+
+    .divider {
+      color: $color-border;
+    }
+  }
+}
+
+.community-strength {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: $color-bg;
+  border-radius: 0.375rem;
+  border: 1px solid $color-border;
+
+  .strength-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: $color-text-muted;
+  }
+
+  .strength-value {
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+
+  &.strength-strong {
+    .strength-value {
+      color: $color-success;
+    }
+  }
+
+  &.strength-moderate {
+    .strength-value {
+      color: $color-warning;
+    }
+  }
+
+  &.strength-weak {
+    .strength-value {
+      color: $color-danger;
+    }
+  }
+}
+
+// =============================================================================
+// SUMMARY MODE
+// =============================================================================
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.summary-card {
+  padding: 1rem;
+  border-radius: 0.5rem;
+  text-align: center;
+
+  h4 {
+    margin: 0 0 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: $color-text-muted;
+  }
+
+  .count {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+  }
+
+  .details {
+    font-size: 0.8rem;
+    color: $color-text-muted;
+  }
+
+  &.helping {
+    background: rgba($color-helping, 0.1);
+    border: 1px solid rgba($color-helping, 0.2);
+
+    .count {
+      color: $color-helping;
+    }
+  }
+
+  &.being-helped {
+    background: rgba($color-being-helped, 0.1);
+    border: 1px solid rgba($color-being-helped, 0.2);
+
+    .count {
+      color: $color-being-helped;
+    }
+  }
+}
+
+// =============================================================================
+// TAB NAVIGATION
+// =============================================================================
+
+.tab-nav {
+  display: flex;
+  border-bottom: 1px solid $color-border;
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: $color-bg-subtle;
+  }
+
+  &.active {
+    border-bottom-color: $color-primary;
+    background: $color-bg;
+
+    .tab-label {
+      color: $color-text;
+      font-weight: 500;
+    }
+  }
+
+  .tab-icon {
+    font-size: 1.125rem;
+  }
+
+  .tab-label {
+    font-size: 0.875rem;
+    color: $color-text-muted;
+  }
+
+  .tab-count {
+    background: $color-bg-subtle;
+    padding: 0.125rem 0.5rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: $color-text-muted;
+  }
+
+  &.active .tab-count {
+    background: $color-primary;
+    color: white;
+  }
+}
+
+// =============================================================================
+// RELATIONSHIP LIST
+// =============================================================================
+
+.relationship-list {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.relationship-card {
+  background: $color-bg;
+  border: 1px solid $color-border;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: $color-primary;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid $color-border;
+  background: $color-bg-subtle;
+
+  .rel-icon {
+    font-size: 1.5rem;
+  }
+
+  .rel-info {
+    flex: 1;
+    min-width: 0;
+
+    .rel-name {
+      display: block;
+      font-weight: 600;
+      color: $color-text;
+      font-size: 0.9rem;
+    }
+
+    .rel-type {
+      display: block;
+      font-size: 0.75rem;
+      color: $color-text-muted;
+    }
+  }
+
+  .rel-status {
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+
+    &.status-active {
+      background: rgba($color-success, 0.1);
+      color: $color-success;
+    }
+
+    &.status-pending {
+      background: rgba($color-warning, 0.1);
+      color: $color-warning;
+    }
+
+    &.status-at-risk {
+      background: rgba($color-danger, 0.1);
+      color: $color-danger;
+    }
+
+    &.status-expired {
+      background: rgba($color-text-muted, 0.1);
+      color: $color-text-muted;
+    }
+  }
+}
+
+.card-body {
+  padding: 0.75rem 1rem;
+}
+
+.direction-indicator {
+  margin-bottom: 0.75rem;
+
+  .direction {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+
+    &.helping {
+      background: rgba($color-helping, 0.1);
+      color: $color-helping;
+    }
+
+    &.being-helped {
+      background: rgba($color-being-helped, 0.1);
+      color: $color-being-helped;
+    }
+  }
+}
+
+.content-summary {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.75rem;
+
+  .summary-stat {
+    text-align: center;
+
+    .stat-value {
+      display: block;
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: $color-text;
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      display: block;
+      font-size: 0.7rem;
+      color: $color-text-muted;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  }
+}
+
+.content-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+
+  .type-tag {
+    font-size: 0.7rem;
+    padding: 0.125rem 0.375rem;
+    background: $color-bg-subtle;
+    border: 1px solid $color-border;
+    border-radius: 0.25rem;
+    color: $color-text-muted;
+  }
+
+  .more-types {
+    font-size: 0.7rem;
+    color: $color-text-muted;
+    font-style: italic;
+  }
+}
+
+.card-footer {
+  padding: 0.5rem 1rem 0.75rem;
+  border-top: 1px solid $color-border;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.reliability {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  .reliability-label {
+    font-size: 0.7rem;
+    color: $color-text-muted;
+  }
+
+  .reliability-bar {
+    width: 60px;
+    height: 4px;
+    background: $color-border;
+    border-radius: 2px;
+    overflow: hidden;
+
+    .reliability-fill {
+      height: 100%;
+      background: $color-success;
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+  }
+
+  .reliability-value {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: $color-text;
+  }
+}
+
+.last-activity {
+  font-size: 0.7rem;
+  color: $color-text-muted;
+}
+
+// =============================================================================
+// EMPTY STATE
+// =============================================================================
+
+.empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+
+  .empty-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 0.75rem;
+    opacity: 0.5;
+  }
+
+  p {
+    margin: 0;
+    color: $color-text-muted;
+    font-size: 0.9rem;
+    max-width: 300px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+}
+
+// =============================================================================
+// LOADING & ERROR STATES
+// =============================================================================
+
+.loading,
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  color: $color-text-muted;
+}
+
+.spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid $color-border;
+  border-top-color: $color-primary;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  color: $color-danger;
+
+  .icon {
+    font-size: 1.25rem;
+  }
+}
+
+// =============================================================================
+// RESPONSIVE
+// =============================================================================
+
+@media (max-width: 640px) {
+  .balance-summary {
+    flex-wrap: wrap;
+
+    .community-strength {
+      width: 100%;
+      margin-top: 0.5rem;
+      flex-direction: row;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+  }
+
+  .balance-stats {
+    flex-wrap: wrap;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .content-summary {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+}

@@ -547,6 +547,355 @@ export interface ConstitutionalAlert {
 }
 
 // =============================================================================
+// NODE TOPOLOGY - Cluster-wide view of all user's nodes
+// =============================================================================
+
+/**
+ * NodeTopologyState - Overview of all nodes owned/managed by user
+ *
+ * This is the "everyday user" view showing:
+ * - All nodes in user's cluster
+ * - Status of each (online/offline/degraded)
+ * - What each node is doing
+ * - Overall cluster health
+ */
+export interface NodeTopologyState {
+  // All nodes the user owns/manages
+  nodes: OwnedNode[];
+
+  // Summary stats
+  totalNodes: number;
+  onlineNodes: number;
+  offlineNodes: number;
+  degradedNodes: number;
+
+  // Primary family node (if designated)
+  primaryNode?: {
+    nodeId: string;
+    status: NodeClusterStatus;
+    isOnline: boolean;
+  };
+
+  // Overall cluster health
+  clusterHealth: 'healthy' | 'degraded' | 'critical' | 'offline';
+
+  // Active alerts
+  alerts: OfflineNodeAlert[];
+
+  // Last topology refresh
+  lastUpdated: string; // ISO 8601
+}
+
+/**
+ * OwnedNode - A single node in user's cluster
+ */
+export interface OwnedNode {
+  // Identity
+  nodeId: string;
+  displayName: string; // User-friendly name, e.g., "Living Room Holoport"
+  nodeType: 'holoport' | 'holoport-plus' | 'holoport-nano' | 'self-hosted' | 'cloud';
+
+  // Status
+  status: NodeClusterStatus;
+  lastHeartbeat: string; // ISO 8601
+  consecutiveUptime: string; // Human-readable, e.g., "14 days"
+
+  // Location
+  location?: {
+    label: string; // "Home Office", "Basement Rack"
+    region: string; // Geographic region
+    country: string;
+  };
+
+  // What this node is doing
+  roles: NodeRole[];
+
+  // Resource summary
+  resources: {
+    cpuPercent: number; // Current usage
+    memoryPercent: number;
+    storageUsedGB: number;
+    storageTotalGB: number;
+    bandwidthMbps: number;
+  };
+
+  // Custodian activity on this node
+  custodianActivity: {
+    contentItemsCustodied: number; // Content I'm storing for others
+    contentItemsBeingCustodied: number; // My content others store on this node's behalf
+    totalCustodiedGB: number;
+  };
+
+  // Is this the primary family node?
+  isPrimary: boolean;
+}
+
+/**
+ * NodeClusterStatus - Health states for nodes in topology
+ */
+export type NodeClusterStatus =
+  | 'online' // Active and healthy
+  | 'offline' // Not responding to heartbeats
+  | 'degraded' // Online but performance issues
+  | 'maintenance' // Planned downtime
+  | 'provisioning' // New node being set up
+  | 'unknown'; // Haven't received status yet
+
+/**
+ * NodeRole - What a node is doing in the cluster
+ */
+export interface NodeRole {
+  role: 'storage' | 'compute' | 'gateway' | 'custodian' | 'archive';
+  description: string;
+  utilizationPercent: number; // How busy this role is
+}
+
+/**
+ * OfflineNodeAlert - Alert when a node goes offline
+ *
+ * This powers the banner/popup in Shefa header
+ */
+export interface OfflineNodeAlert {
+  id: string;
+  severity: 'info' | 'warning' | 'critical';
+  nodeId: string;
+  nodeName: string;
+  isPrimaryNode: boolean;
+
+  // What happened
+  eventType: 'went-offline' | 'degraded' | 'heartbeat-missed' | 'recovery-needed';
+  message: string;
+
+  // When
+  detectedAt: string; // ISO 8601
+  lastSeenOnline: string; // ISO 8601
+  offlineDuration: string; // Human-readable, e.g., "2 hours"
+
+  // Impact assessment
+  impact: {
+    affectedContent: number; // Content items impacted
+    affectedCustodians: number; // Custodian relationships affected
+    computeGapPercent: number; // % of compute lost
+    storageGapPercent: number; // % of storage lost
+  };
+
+  // Recovery actions
+  recommendedActions: string[];
+  helpFlowUrl?: string; // Link to compute needs help-flow
+  dismissedAt?: string; // If user dismissed alert
+}
+
+// =============================================================================
+// BIDIRECTIONAL CUSTODIAN VIEW
+// =============================================================================
+
+/**
+ * BidirectionalCustodianView - Who I'm helping vs who's helping me
+ *
+ * Shows the mutual aid aspect of the custodian network:
+ * - Outbound: Others I'm storing content for
+ * - Inbound: Others storing my content
+ */
+export interface BidirectionalCustodianView {
+  // Who I'm helping (storing their content)
+  helping: CustodianRelationship[];
+  helpingCount: number;
+  helpingTotalGB: number;
+
+  // Who's helping me (storing my content)
+  beingHelpedBy: CustodianRelationship[];
+  beingHelpedByCount: number;
+  beingHelpedByTotalGB: number;
+
+  // Balance indicator
+  mutualAidBalance: {
+    ratio: number; // helping / beingHelped (1.0 = balanced)
+    status: 'giving-more' | 'balanced' | 'receiving-more';
+    message: string; // "You're helping 3 more people than are helping you"
+  };
+
+  // Community health
+  communityStrength: 'strong' | 'moderate' | 'weak';
+}
+
+/**
+ * CustodianRelationship - A single custodian relationship
+ */
+export interface CustodianRelationship {
+  // Who
+  agentId: string;
+  displayName: string;
+  relationshipType: 'family' | 'friend' | 'community' | 'professional';
+  trustScore: number; // 0-100
+
+  // Direction
+  direction: 'i-help-them' | 'they-help-me';
+
+  // What content
+  contentSummary: {
+    totalItems: number;
+    totalGB: number;
+    contentTypes: { type: string; count: number; gb: number }[];
+  };
+
+  // Health
+  status: 'active' | 'pending' | 'at-risk' | 'expired';
+  lastActivity: string; // ISO 8601
+  reliability: number; // 0-100 uptime percentage
+}
+
+// =============================================================================
+// STORAGE CONTENT DISTRIBUTION
+// =============================================================================
+
+/**
+ * StorageContentDistribution - What types of content are stored where
+ *
+ * Shows breakdown by content type, reach level, and storage location
+ */
+export interface StorageContentDistribution {
+  // By content type
+  byContentType: ContentTypeStorage[];
+
+  // By reach level (0-7)
+  byReachLevel: ReachLevelStorage[];
+
+  // By storage location (which nodes)
+  byNode: NodeStorageBreakdown[];
+
+  // Summary
+  totalContent: {
+    items: number;
+    sizeGB: number;
+    replicaCount: number; // Total replicas across all custodians
+  };
+}
+
+/**
+ * ContentTypeStorage - Storage breakdown by content type
+ */
+export interface ContentTypeStorage {
+  contentType: 'video' | 'audio' | 'image' | 'document' | 'application' | 'learning' | 'other';
+  displayLabel: string; // "Videos", "Learning Materials"
+  icon?: string; // Icon class or URL
+
+  // Amounts
+  itemCount: number;
+  sizeGB: number;
+  percentOfTotal: number;
+
+  // Replication status
+  fullyReplicated: number; // Items meeting target replica count
+  underReplicated: number; // Items below target
+  averageReplicas: number;
+}
+
+/**
+ * ReachLevelStorage - Storage breakdown by reach level
+ */
+export interface ReachLevelStorage {
+  reachLevel: number; // 0-7
+  reachLabel: string; // "Private", "Household", ..., "Commons"
+
+  // What's at this reach level
+  itemCount: number;
+  sizeGB: number;
+  targetReplicas: number; // Target replica count for this reach
+  currentReplicas: number; // Average current replicas
+  replicationStatus: 'met' | 'under' | 'over';
+}
+
+/**
+ * NodeStorageBreakdown - What's stored on each node
+ */
+export interface NodeStorageBreakdown {
+  nodeId: string;
+  nodeName: string;
+  nodeStatus: NodeClusterStatus;
+
+  // Storage on this node
+  totalGB: number;
+  usedGB: number;
+  availableGB: number;
+
+  // Content breakdown
+  contentBreakdown: {
+    myContent: number; // GB of my own content
+    custodiedContent: number; // GB of others' content I'm storing
+    cacheContent: number; // GB of cached/ephemeral content
+  };
+
+  // What types
+  contentTypes: { type: string; gb: number }[];
+}
+
+// =============================================================================
+// COMPUTE NEEDS ASSESSMENT (for help-flow)
+// =============================================================================
+
+/**
+ * ComputeNeedsAssessment - Evaluation of compute gaps and recommendations
+ *
+ * Powers the help-flow that guides users to order needed nodes
+ */
+export interface ComputeNeedsAssessment {
+  // Current state
+  currentCapacity: {
+    totalCPUCores: number;
+    totalMemoryGB: number;
+    totalStorageGB: number;
+    totalBandwidthMbps: number;
+  };
+
+  // Gaps
+  gaps: ComputeGap[];
+  hasGaps: boolean;
+  overallGapSeverity: 'none' | 'minor' | 'moderate' | 'critical';
+
+  // Recommendations
+  recommendations: NodeRecommendation[];
+
+  // Help flow link
+  helpFlowUrl: string;
+  helpFlowCTA: string; // "Order a Holoport to restore full protection"
+}
+
+/**
+ * ComputeGap - A specific compute deficiency
+ */
+export interface ComputeGap {
+  resource: 'cpu' | 'memory' | 'storage' | 'bandwidth' | 'redundancy';
+  currentValue: number;
+  targetValue: number;
+  gapPercent: number;
+  severity: 'minor' | 'moderate' | 'critical';
+  description: string;
+  impact: string; // What this gap means for the user
+}
+
+/**
+ * NodeRecommendation - Suggested node to address compute gaps
+ */
+export interface NodeRecommendation {
+  nodeType: 'holoport' | 'holoport-plus' | 'holoport-nano' | 'self-hosted' | 'cloud';
+  displayName: string;
+  description: string;
+
+  // What gaps this would address
+  addressesGaps: string[]; // Gap resource types
+  improvementPercent: number; // How much better things would be
+
+  // Ordering info
+  estimatedCost?: {
+    value: number;
+    currency: string;
+    period?: 'one-time' | 'monthly' | 'yearly';
+  };
+  orderUrl?: string;
+  priority: 'recommended' | 'optional' | 'future';
+}
+
+// =============================================================================
 // DASHBOARD CONFIGURATION
 // =============================================================================
 

@@ -35,6 +35,24 @@ import {
   ConstitutionalAlert,
   UpTimeMetrics,
   MetricHistory,
+  // Node Topology types
+  NodeTopologyState,
+  OwnedNode,
+  NodeClusterStatus,
+  NodeRole,
+  OfflineNodeAlert,
+  // Bidirectional custodian types
+  BidirectionalCustodianView,
+  CustodianRelationship,
+  // Storage distribution types
+  StorageContentDistribution,
+  ContentTypeStorage,
+  ReachLevelStorage,
+  NodeStorageBreakdown,
+  // Compute needs types
+  ComputeNeedsAssessment,
+  ComputeGap,
+  NodeRecommendation,
 } from '../models/shefa-dashboard.model';
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
@@ -690,6 +708,580 @@ export class ShefaComputeService {
     }
 
     return alerts;
+  }
+
+  // =============================================================================
+  // NODE TOPOLOGY - Cluster-wide view
+  // =============================================================================
+
+  /**
+   * Get topology of all nodes owned by the operator
+   * This is the "everyday user" view of what's running
+   */
+  getNodeTopology(operatorId: string): Observable<NodeTopologyState> {
+    return this.holochain
+      .callZome('node_registry_coordinator', 'get_nodes_by_owner', { owner_id: operatorId })
+      .pipe(
+        map((nodes: any[]) => {
+          const ownedNodes: OwnedNode[] = (nodes || []).map(n => ({
+            nodeId: n.node_id,
+            displayName: n.display_name || n.node_id.substring(0, 8),
+            nodeType: n.node_type || 'self-hosted',
+            status: this.mapNodeStatus(n.status),
+            lastHeartbeat: n.last_heartbeat || new Date().toISOString(),
+            consecutiveUptime: n.consecutive_uptime || 'Unknown',
+            location: n.location ? {
+              label: n.location.label || 'Unknown',
+              region: n.location.region || 'unknown',
+              country: n.location.country || 'unknown',
+            } : undefined,
+            roles: (n.roles || []).map((r: any) => ({
+              role: r.role,
+              description: r.description || '',
+              utilizationPercent: r.utilization_percent || 0,
+            })),
+            resources: {
+              cpuPercent: n.resources?.cpu_percent || 0,
+              memoryPercent: n.resources?.memory_percent || 0,
+              storageUsedGB: n.resources?.storage_used_gb || 0,
+              storageTotalGB: n.resources?.storage_total_gb || 0,
+              bandwidthMbps: n.resources?.bandwidth_mbps || 0,
+            },
+            custodianActivity: {
+              contentItemsCustodied: n.custodian_activity?.items_custodied || 0,
+              contentItemsBeingCustodied: n.custodian_activity?.items_being_custodied || 0,
+              totalCustodiedGB: n.custodian_activity?.total_custodied_gb || 0,
+            },
+            isPrimary: n.is_primary || false,
+          }));
+
+          const onlineNodes = ownedNodes.filter(n => n.status === 'online').length;
+          const offlineNodes = ownedNodes.filter(n => n.status === 'offline').length;
+          const degradedNodes = ownedNodes.filter(n => n.status === 'degraded').length;
+          const primaryNode = ownedNodes.find(n => n.isPrimary);
+
+          return {
+            nodes: ownedNodes,
+            totalNodes: ownedNodes.length,
+            onlineNodes,
+            offlineNodes,
+            degradedNodes,
+            primaryNode: primaryNode ? {
+              nodeId: primaryNode.nodeId,
+              status: primaryNode.status,
+              isOnline: primaryNode.status === 'online',
+            } : undefined,
+            clusterHealth: this.calculateClusterHealth(onlineNodes, offlineNodes, degradedNodes, ownedNodes.length),
+            alerts: this.generateOfflineAlerts(ownedNodes),
+            lastUpdated: new Date().toISOString(),
+          };
+        }),
+        catchError(error => {
+          console.error('[ShefaComputeService] Failed to load node topology:', error);
+          return of(this.getEmptyNodeTopology());
+        }),
+        shareReplay(1)
+      );
+  }
+
+  /**
+   * Get active offline node alerts
+   * Used for the banner/popup in Shefa header
+   */
+  getOfflineNodeAlerts(operatorId: string): Observable<OfflineNodeAlert[]> {
+    return this.getNodeTopology(operatorId).pipe(
+      map(topology => topology.alerts.filter(a => !a.dismissedAt))
+    );
+  }
+
+  /**
+   * Check if primary node is offline - for header banner
+   */
+  isPrimaryNodeOffline(operatorId: string): Observable<boolean> {
+    return this.getNodeTopology(operatorId).pipe(
+      map(topology => topology.primaryNode ? !topology.primaryNode.isOnline : false)
+    );
+  }
+
+  // =============================================================================
+  // BIDIRECTIONAL CUSTODIAN VIEW
+  // =============================================================================
+
+  /**
+   * Get bidirectional view of custodian relationships
+   * Shows who I'm helping vs who's helping me
+   */
+  getBidirectionalCustodianView(operatorId: string): Observable<BidirectionalCustodianView> {
+    return combineLatest([
+      // Who I'm helping (content I'm custodying for others)
+      this.holochain.callZome('content_store', 'get_custodian_commitments_as_custodian', { custodian_id: operatorId }),
+      // Who's helping me (content others are custodying for me)
+      this.holochain.callZome('content_store', 'get_custodian_commitments', { steward_id: operatorId }),
+    ]).pipe(
+      map(([helpingRaw, beingHelpedRaw]: [any[], any[]]) => {
+        const helping: CustodianRelationship[] = (helpingRaw || []).map(c => ({
+          agentId: c.steward_id,
+          displayName: c.steward_name || c.steward_id.substring(0, 8),
+          relationshipType: c.relationship_type || 'community',
+          trustScore: c.trust_score || 50,
+          direction: 'i-help-them' as const,
+          contentSummary: {
+            totalItems: c.content_count || 0,
+            totalGB: c.total_gb || 0,
+            contentTypes: (c.content_types || []).map((ct: any) => ({
+              type: ct.type,
+              count: ct.count,
+              gb: ct.gb,
+            })),
+          },
+          status: c.status || 'active',
+          lastActivity: c.last_activity || new Date().toISOString(),
+          reliability: c.my_reliability || 99,
+        }));
+
+        const beingHelpedBy: CustodianRelationship[] = (beingHelpedRaw || []).map(c => ({
+          agentId: c.custodian_id,
+          displayName: c.custodian_name || c.custodian_id.substring(0, 8),
+          relationshipType: c.relationship_type || 'community',
+          trustScore: c.trust_score || 50,
+          direction: 'they-help-me' as const,
+          contentSummary: {
+            totalItems: c.content_count || 0,
+            totalGB: c.total_gb || 0,
+            contentTypes: (c.content_types || []).map((ct: any) => ({
+              type: ct.type,
+              count: ct.count,
+              gb: ct.gb,
+            })),
+          },
+          status: c.status || 'active',
+          lastActivity: c.last_activity || new Date().toISOString(),
+          reliability: c.custodian_reliability || 99,
+        }));
+
+        const helpingTotalGB = helping.reduce((sum, r) => sum + r.contentSummary.totalGB, 0);
+        const beingHelpedTotalGB = beingHelpedBy.reduce((sum, r) => sum + r.contentSummary.totalGB, 0);
+        const ratio = beingHelpedTotalGB > 0 ? helpingTotalGB / beingHelpedTotalGB : helpingTotalGB > 0 ? 2 : 1;
+
+        return {
+          helping,
+          helpingCount: helping.length,
+          helpingTotalGB,
+          beingHelpedBy,
+          beingHelpedByCount: beingHelpedBy.length,
+          beingHelpedByTotalGB: beingHelpedTotalGB,
+          mutualAidBalance: {
+            ratio,
+            status: ratio > 1.2 ? 'giving-more' : ratio < 0.8 ? 'receiving-more' : 'balanced',
+            message: this.generateBalanceMessage(helping.length, beingHelpedBy.length, helpingTotalGB, beingHelpedTotalGB),
+          },
+          communityStrength: this.calculateCommunityStrength(helping.length + beingHelpedBy.length),
+        };
+      }),
+      catchError(error => {
+        console.error('[ShefaComputeService] Failed to load bidirectional custodian view:', error);
+        return of(this.getEmptyBidirectionalView());
+      }),
+      shareReplay(1)
+    );
+  }
+
+  // =============================================================================
+  // STORAGE CONTENT DISTRIBUTION
+  // =============================================================================
+
+  /**
+   * Get breakdown of what types of content are stored where
+   */
+  getStorageContentDistribution(operatorId: string): Observable<StorageContentDistribution> {
+    return combineLatest([
+      this.holochain.callZome('content_store', 'get_content_distribution', { owner_id: operatorId }),
+      this.getNodeTopology(operatorId),
+    ]).pipe(
+      map(([distribution, topology]: [any, NodeTopologyState]) => {
+        // By content type
+        const byContentType: ContentTypeStorage[] = (distribution?.by_content_type || []).map((ct: any) => ({
+          contentType: ct.content_type,
+          displayLabel: this.getContentTypeLabel(ct.content_type),
+          icon: this.getContentTypeIcon(ct.content_type),
+          itemCount: ct.item_count || 0,
+          sizeGB: ct.size_gb || 0,
+          percentOfTotal: ct.percent_of_total || 0,
+          fullyReplicated: ct.fully_replicated || 0,
+          underReplicated: ct.under_replicated || 0,
+          averageReplicas: ct.average_replicas || 0,
+        }));
+
+        // By reach level
+        const byReachLevel: ReachLevelStorage[] = (distribution?.by_reach_level || []).map((rl: any) => ({
+          reachLevel: rl.reach_level,
+          reachLabel: this.getReachLevelLabel(rl.reach_level),
+          itemCount: rl.item_count || 0,
+          sizeGB: rl.size_gb || 0,
+          targetReplicas: this.getTargetReplicasForReach(rl.reach_level),
+          currentReplicas: rl.current_replicas || 0,
+          replicationStatus: rl.current_replicas >= this.getTargetReplicasForReach(rl.reach_level) ? 'met' : 'under',
+        }));
+
+        // By node
+        const byNode: NodeStorageBreakdown[] = topology.nodes.map(node => ({
+          nodeId: node.nodeId,
+          nodeName: node.displayName,
+          nodeStatus: node.status,
+          totalGB: node.resources.storageTotalGB,
+          usedGB: node.resources.storageUsedGB,
+          availableGB: node.resources.storageTotalGB - node.resources.storageUsedGB,
+          contentBreakdown: {
+            myContent: (distribution?.by_node?.[node.nodeId]?.my_content_gb) || 0,
+            custodiedContent: node.custodianActivity.totalCustodiedGB,
+            cacheContent: (distribution?.by_node?.[node.nodeId]?.cache_gb) || 0,
+          },
+          contentTypes: (distribution?.by_node?.[node.nodeId]?.content_types || []),
+        }));
+
+        return {
+          byContentType,
+          byReachLevel,
+          byNode,
+          totalContent: {
+            items: distribution?.total_items || 0,
+            sizeGB: distribution?.total_size_gb || 0,
+            replicaCount: distribution?.total_replicas || 0,
+          },
+        };
+      }),
+      catchError(error => {
+        console.error('[ShefaComputeService] Failed to load storage distribution:', error);
+        return of(this.getEmptyStorageDistribution());
+      }),
+      shareReplay(1)
+    );
+  }
+
+  // =============================================================================
+  // COMPUTE NEEDS ASSESSMENT (Help Flow)
+  // =============================================================================
+
+  /**
+   * Assess compute gaps and generate recommendations
+   * Powers the help-flow that guides users to order needed nodes
+   */
+  getComputeNeedsAssessment(operatorId: string): Observable<ComputeNeedsAssessment> {
+    return combineLatest([
+      this.getNodeTopology(operatorId),
+      this.getComputeMetrics(operatorId),
+    ]).pipe(
+      map(([topology, metrics]) => {
+        // Calculate current capacity across all nodes
+        const currentCapacity = {
+          totalCPUCores: topology.nodes.reduce((sum, n) => sum + (n.resources.cpuPercent / 100) * 8, 0), // Estimate
+          totalMemoryGB: topology.nodes.reduce((sum, n) => sum + (100 - n.resources.memoryPercent) / 100 * 16, 0), // Estimate
+          totalStorageGB: topology.nodes.reduce((sum, n) => sum + (n.resources.storageTotalGB - n.resources.storageUsedGB), 0),
+          totalBandwidthMbps: topology.nodes.reduce((sum, n) => sum + n.resources.bandwidthMbps, 0),
+        };
+
+        // Target capacity (based on family needs)
+        const targetCapacity = {
+          totalCPUCores: 4 * Math.max(topology.totalNodes, 1),
+          totalMemoryGB: 16 * Math.max(topology.totalNodes, 1),
+          totalStorageGB: 500 * Math.max(topology.totalNodes, 1),
+          totalBandwidthMbps: 100 * Math.max(topology.totalNodes, 1),
+        };
+
+        // Calculate gaps
+        const gaps: ComputeGap[] = [];
+
+        if (topology.offlineNodes > 0) {
+          const gapPercent = (topology.offlineNodes / topology.totalNodes) * 100;
+          gaps.push({
+            resource: 'redundancy',
+            currentValue: topology.onlineNodes,
+            targetValue: topology.totalNodes,
+            gapPercent,
+            severity: gapPercent > 50 ? 'critical' : gapPercent > 25 ? 'moderate' : 'minor',
+            description: `${topology.offlineNodes} of ${topology.totalNodes} nodes offline`,
+            impact: 'Reduced redundancy - your data may not be fully protected',
+          });
+        }
+
+        if (currentCapacity.totalStorageGB < targetCapacity.totalStorageGB * 0.2) {
+          const gapPercent = 100 - (currentCapacity.totalStorageGB / targetCapacity.totalStorageGB) * 100;
+          gaps.push({
+            resource: 'storage',
+            currentValue: currentCapacity.totalStorageGB,
+            targetValue: targetCapacity.totalStorageGB,
+            gapPercent,
+            severity: gapPercent > 80 ? 'critical' : gapPercent > 50 ? 'moderate' : 'minor',
+            description: `Only ${currentCapacity.totalStorageGB.toFixed(0)}GB available of ${targetCapacity.totalStorageGB}GB target`,
+            impact: 'You may not be able to store all your content or help others',
+          });
+        }
+
+        // Generate recommendations
+        const recommendations: NodeRecommendation[] = [];
+
+        if (topology.offlineNodes > 0 || topology.totalNodes < 2) {
+          recommendations.push({
+            nodeType: 'holoport',
+            displayName: 'Holoport',
+            description: 'Standard Holoport for family use. 4-core CPU, 16GB RAM, 500GB storage.',
+            addressesGaps: ['redundancy', 'storage', 'cpu'],
+            improvementPercent: 50,
+            estimatedCost: { value: 449, currency: 'USD', period: 'one-time' },
+            orderUrl: 'https://holo.host/holoport',
+            priority: 'recommended',
+          });
+        }
+
+        if (gaps.some(g => g.resource === 'storage' && g.severity === 'critical')) {
+          recommendations.push({
+            nodeType: 'holoport-plus',
+            displayName: 'Holoport+',
+            description: 'High-capacity Holoport for media-heavy families. 8-core CPU, 32GB RAM, 2TB storage.',
+            addressesGaps: ['storage', 'cpu', 'bandwidth'],
+            improvementPercent: 75,
+            estimatedCost: { value: 799, currency: 'USD', period: 'one-time' },
+            orderUrl: 'https://holo.host/holoport-plus',
+            priority: 'recommended',
+          });
+        }
+
+        const hasGaps = gaps.length > 0;
+        const overallSeverity = gaps.some(g => g.severity === 'critical') ? 'critical'
+          : gaps.some(g => g.severity === 'moderate') ? 'moderate'
+          : hasGaps ? 'minor' : 'none';
+
+        return {
+          currentCapacity,
+          gaps,
+          hasGaps,
+          overallGapSeverity: overallSeverity,
+          recommendations,
+          helpFlowUrl: '/shefa/help-flow/compute-needs',
+          helpFlowCTA: hasGaps
+            ? (overallSeverity === 'critical' ? 'Restore protection now' : 'Improve your compute capacity')
+            : 'Your compute is healthy',
+        };
+      }),
+      catchError(error => {
+        console.error('[ShefaComputeService] Failed to assess compute needs:', error);
+        return of(this.getEmptyComputeNeedsAssessment());
+      }),
+      shareReplay(1)
+    );
+  }
+
+  // =============================================================================
+  // HELPER METHODS for Node Topology
+  // =============================================================================
+
+  private mapNodeStatus(status: string): NodeClusterStatus {
+    switch (status?.toLowerCase()) {
+      case 'online': return 'online';
+      case 'offline': return 'offline';
+      case 'degraded': return 'degraded';
+      case 'maintenance': return 'maintenance';
+      case 'provisioning': return 'provisioning';
+      default: return 'unknown';
+    }
+  }
+
+  private calculateClusterHealth(online: number, offline: number, degraded: number, total: number): 'healthy' | 'degraded' | 'critical' | 'offline' {
+    if (total === 0 || offline === total) return 'offline';
+    if (offline > 0 || degraded > total / 2) return 'critical';
+    if (degraded > 0) return 'degraded';
+    return 'healthy';
+  }
+
+  private generateOfflineAlerts(nodes: OwnedNode[]): OfflineNodeAlert[] {
+    return nodes
+      .filter(n => n.status === 'offline' || n.status === 'degraded')
+      .map(n => ({
+        id: `alert-${n.nodeId}-${Date.now()}`,
+        severity: n.isPrimary ? 'critical' : n.status === 'offline' ? 'warning' : 'info',
+        nodeId: n.nodeId,
+        nodeName: n.displayName,
+        isPrimaryNode: n.isPrimary,
+        eventType: n.status === 'offline' ? 'went-offline' : 'degraded',
+        message: n.isPrimary
+          ? `Your primary family node "${n.displayName}" is offline`
+          : `Node "${n.displayName}" is ${n.status}`,
+        detectedAt: new Date().toISOString(),
+        lastSeenOnline: n.lastHeartbeat,
+        offlineDuration: this.calculateOfflineDuration(n.lastHeartbeat),
+        impact: {
+          affectedContent: n.custodianActivity.contentItemsCustodied + n.custodianActivity.contentItemsBeingCustodied,
+          affectedCustodians: 0, // Would need additional data
+          computeGapPercent: n.resources.cpuPercent,
+          storageGapPercent: (n.resources.storageUsedGB / n.resources.storageTotalGB) * 100,
+        },
+        recommendedActions: n.isPrimary
+          ? ['Check power and network connection', 'Visit compute dashboard for details', 'Consider ordering replacement node']
+          : ['Check node status', 'Verify network connectivity'],
+        helpFlowUrl: '/shefa/help-flow/compute-needs',
+      }));
+  }
+
+  private calculateOfflineDuration(lastHeartbeat: string): string {
+    const now = new Date();
+    const last = new Date(lastHeartbeat);
+    const diffMs = now.getTime() - last.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (diffHours >= 24) {
+      return `${Math.floor(diffHours / 24)} days`;
+    } else if (diffHours > 0) {
+      return `${diffHours} hours`;
+    } else {
+      return `${diffMins} minutes`;
+    }
+  }
+
+  // =============================================================================
+  // HELPER METHODS for Bidirectional View
+  // =============================================================================
+
+  private generateBalanceMessage(helpingCount: number, beingHelpedCount: number, helpingGB: number, beingHelpedGB: number): string {
+    const countDiff = helpingCount - beingHelpedCount;
+    const gbDiff = helpingGB - beingHelpedGB;
+
+    if (Math.abs(countDiff) <= 1 && Math.abs(gbDiff) < 10) {
+      return 'Your custodian relationships are well balanced';
+    } else if (countDiff > 0) {
+      return `You're helping ${countDiff} more people than are helping you (${helpingGB.toFixed(0)}GB given, ${beingHelpedGB.toFixed(0)}GB received)`;
+    } else {
+      return `You're receiving help from ${-countDiff} more people than you're helping (${beingHelpedGB.toFixed(0)}GB received, ${helpingGB.toFixed(0)}GB given)`;
+    }
+  }
+
+  private calculateCommunityStrength(totalRelationships: number): 'strong' | 'moderate' | 'weak' {
+    if (totalRelationships >= 10) return 'strong';
+    if (totalRelationships >= 4) return 'moderate';
+    return 'weak';
+  }
+
+  // =============================================================================
+  // HELPER METHODS for Storage Distribution
+  // =============================================================================
+
+  private getContentTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+      video: 'Videos',
+      audio: 'Audio',
+      image: 'Images',
+      document: 'Documents',
+      application: 'Applications',
+      learning: 'Learning Materials',
+      other: 'Other',
+    };
+    return labels[type] || type;
+  }
+
+  private getContentTypeIcon(type: string): string {
+    const icons: Record<string, string> = {
+      video: 'videocam',
+      audio: 'audiotrack',
+      image: 'image',
+      document: 'description',
+      application: 'apps',
+      learning: 'school',
+      other: 'folder',
+    };
+    return icons[type] || 'folder';
+  }
+
+  private getReachLevelLabel(level: number): string {
+    const labels = ['Private', 'Household', 'Extended Family', 'Close Friends', 'Community', 'Region', 'Network', 'Commons'];
+    return labels[level] || `Reach ${level}`;
+  }
+
+  private getTargetReplicasForReach(level: number): number {
+    // Match the values from node_registry_coordinator
+    const targets = [3, 4, 5, 7, 10, 15, 20, 30];
+    return targets[level] || 3;
+  }
+
+  // =============================================================================
+  // EMPTY STATE GENERATORS for new methods
+  // =============================================================================
+
+  private getEmptyNodeTopology(): NodeTopologyState {
+    return {
+      nodes: [],
+      totalNodes: 0,
+      onlineNodes: 0,
+      offlineNodes: 0,
+      degradedNodes: 0,
+      primaryNode: undefined,
+      clusterHealth: 'offline',
+      alerts: [],
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  private getEmptyBidirectionalView(): BidirectionalCustodianView {
+    return {
+      helping: [],
+      helpingCount: 0,
+      helpingTotalGB: 0,
+      beingHelpedBy: [],
+      beingHelpedByCount: 0,
+      beingHelpedByTotalGB: 0,
+      mutualAidBalance: {
+        ratio: 1,
+        status: 'balanced',
+        message: 'No custodian relationships yet',
+      },
+      communityStrength: 'weak',
+    };
+  }
+
+  private getEmptyStorageDistribution(): StorageContentDistribution {
+    return {
+      byContentType: [],
+      byReachLevel: [],
+      byNode: [],
+      totalContent: {
+        items: 0,
+        sizeGB: 0,
+        replicaCount: 0,
+      },
+    };
+  }
+
+  private getEmptyComputeNeedsAssessment(): ComputeNeedsAssessment {
+    return {
+      currentCapacity: {
+        totalCPUCores: 0,
+        totalMemoryGB: 0,
+        totalStorageGB: 0,
+        totalBandwidthMbps: 0,
+      },
+      gaps: [{
+        resource: 'redundancy',
+        currentValue: 0,
+        targetValue: 1,
+        gapPercent: 100,
+        severity: 'critical',
+        description: 'No nodes available',
+        impact: 'Your data is not protected',
+      }],
+      hasGaps: true,
+      overallGapSeverity: 'critical',
+      recommendations: [{
+        nodeType: 'holoport',
+        displayName: 'Holoport',
+        description: 'Start with a Holoport to protect your digital life',
+        addressesGaps: ['redundancy', 'storage', 'cpu'],
+        improvementPercent: 100,
+        estimatedCost: { value: 449, currency: 'USD', period: 'one-time' },
+        orderUrl: 'https://holo.host/holoport',
+        priority: 'recommended',
+      }],
+      helpFlowUrl: '/shefa/help-flow/compute-needs',
+      helpFlowCTA: 'Get started with Holoport',
+    };
   }
 
   /**
