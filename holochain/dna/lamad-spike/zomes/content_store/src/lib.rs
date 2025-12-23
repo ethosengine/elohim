@@ -9,6 +9,7 @@
 use hdk::prelude::*;
 use content_store_integrity::*;
 use doorway_client::{CacheRule, CacheRuleBuilder};
+use serde_json::json;
 use std::collections::HashMap;
 
 // Migration module for DNA version upgrades
@@ -11750,233 +11751,23 @@ pub fn create_recurring_pattern(recurring_pattern: RecurringPattern) -> ExternRe
 }
 
 // =============================================================================
-// Shefa: Transaction Import (Plaid Integration) Zome Functions
+// NOTE: Plaid/Banking Integration REMOVED from Holochain
 // =============================================================================
-
-/// Create a PlaidConnection (OAuth connection to financial institution)
-#[hdk_extern]
-pub fn create_plaid_connection(connection: PlaidConnection) -> ExternResult<ActionHash> {
-    let action_hash = create_entry(&EntryTypes::PlaidConnection(connection.clone()))?;
-
-    // Link from steward to connection for easy lookup
-    create_link(
-        connection.steward_id.clone(),
-        action_hash.clone(),
-        LinkTypes::StewardToPlaidConnection,
-        (),
-    )?;
-
-    // Link from connection ID for direct access
-    let anchor = StringAnchor {
-        anchor_type: "plaid".to_string(),
-        anchor_value: "plaid_connections".to_string(),
-    };
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    create_link(
-        anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToPlaidConnection,
-        (),
-    )?;
-
-    Ok(action_hash)
-}
-
-/// Get all PlaidConnections for a steward
-#[hdk_extern]
-pub fn get_plaid_connections(steward_id: String) -> ExternResult<Vec<PlaidConnection>> {
-    let anchor = StringAnchor {
-        anchor_type: "agent".to_string(),
-        anchor_value: steward_id,
-    };
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let query = LinkQuery::try_new(anchor_hash, LinkTypes::StewardToPlaidConnection)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut connections = Vec::new();
-    for link in links {
-        if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
-            if let Some(EntryTypes::PlaidConnection(conn)) = record.entry().to_app_option().ok().flatten() {
-                connections.push(conn);
-            }
-        }
-    }
-
-    Ok(connections)
-}
-
-/// Create an ImportBatch for a specific date range and Plaid connection
-#[hdk_extern]
-pub fn create_import_batch(batch: ImportBatch) -> ExternResult<ActionHash> {
-    let action_hash = create_entry(&EntryTypes::ImportBatch(batch.clone()))?;
-
-    // Link from connection to batch
-    create_link(
-        batch.connection_id.clone().into(),
-        action_hash.clone(),
-        LinkTypes::ConnectionToBatch,
-        (),
-    )?;
-
-    // Link from batch ID anchor for direct access
-    let anchor = StringAnchor {
-        anchor_type: "plaid".to_string(),
-        anchor_value: "import_batches".to_string(),
-    };
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    create_link(
-        anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToImportBatch,
-        (),
-    )?;
-
-    Ok(action_hash)
-}
-
-/// Create a StagedTransaction (transaction awaiting review)
-#[hdk_extern]
-pub fn create_staged_transaction(staged: StagedTransaction) -> ExternResult<ActionHash> {
-    let action_hash = create_entry(&EntryTypes::StagedTransaction(staged.clone()))?;
-
-    // Link from batch to staged transaction
-    create_link(
-        staged.batch_id.clone().into(),
-        action_hash.clone(),
-        LinkTypes::BatchToStagedTransaction,
-        (),
-    )?;
-
-    // Link for direct access
-    let anchor = StringAnchor {
-        anchor_type: "plaid".to_string(),
-        anchor_value: "staged_transactions".to_string(),
-    };
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    create_link(
-        anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToStagedTransaction,
-        (),
-    )?;
-
-    Ok(action_hash)
-}
-
-/// Get all StagedTransactions for an ImportBatch
-#[hdk_extern]
-pub fn get_staged_transactions_for_batch(batch_id: String) -> ExternResult<Vec<StagedTransaction>> {
-    let anchor = StringAnchor {
-        anchor_type: "batch".to_string(),
-        anchor_value: batch_id,
-    };
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let query = LinkQuery::try_new(anchor_hash, LinkTypes::BatchToStagedTransaction)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut transactions = Vec::new();
-    for link in links {
-        if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
-            if let Some(EntryTypes::StagedTransaction(txn)) = record.entry().to_app_option().ok().flatten() {
-                transactions.push(txn);
-            }
-        }
-    }
-
-    Ok(transactions)
-}
-
-/// Input for approving a staged transaction
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ApproveStagedTransactionInput {
-    pub staged_id: String,
-    pub event_id: String,
-}
-
-/// Approve a StagedTransaction and link it to the created EconomicEvent
-#[hdk_extern]
-pub fn approve_staged_transaction(input: ApproveStagedTransactionInput) -> ExternResult<()> {
-    let staged_id = input.staged_id;
-    let event_id = input.event_id;
-    // Get the staged transaction
-    let anchor = StringAnchor {
-        anchor_type: "plaid".to_string(),
-        anchor_value: "staged_transactions".to_string(),
-    };
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToStagedTransaction)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    for link in links {
-        if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
-            if let Some(EntryTypes::StagedTransaction(mut txn)) = record.entry().to_app_option().ok().flatten() {
-                if txn.id == staged_id {
-                    // Update the staged transaction with the event ID
-                    // In a real implementation, you'd update the entry
-                    // For now, we just record that approval happened
-                    debug!("Approved staged transaction {} -> event {}", staged_id, event_id);
-                    return Ok(());
-                }
-            }
-        }
-    }
-
-    Err(wasm_error!(WasmErrorInner::Guest(
-        format!("Staged transaction {} not found", staged_id)
-    )))
-}
-
-/// Create a TransactionRule (auto-categorization from user corrections)
-#[hdk_extern]
-pub fn create_transaction_rule(rule: TransactionRule) -> ExternResult<ActionHash> {
-    let action_hash = create_entry(&EntryTypes::TransactionRule(rule.clone()))?;
-
-    // Link from steward to rule for easy lookup
-    create_link(
-        rule.steward_id.clone().into(),
-        action_hash.clone(),
-        LinkTypes::StewardToTransactionRule,
-        (),
-    )?;
-
-    // Link for direct access
-    let anchor = StringAnchor {
-        anchor_type: "plaid".to_string(),
-        anchor_value: "transaction_rules".to_string(),
-    };
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    create_link(
-        anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToTransactionRule,
-        (),
-    )?;
-
-    Ok(action_hash)
-}
-
-/// Get all TransactionRules for a steward
-#[hdk_extern]
-pub fn get_rules_for_steward(steward_id: String) -> ExternResult<Vec<TransactionRule>> {
-    let anchor = StringAnchor {
-        anchor_type: "agent".to_string(),
-        anchor_value: steward_id,
-    };
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let query = LinkQuery::try_new(anchor_hash, LinkTypes::StewardToTransactionRule)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut rules = Vec::new();
-    for link in links {
-        if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
-            if let Some(EntryTypes::TransactionRule(rule)) = record.entry().to_app_option().ok().flatten() {
-                rules.push(rule);
-            }
-        }
-    }
-
-    Ok(rules)
-}
+// All Plaid/banking zome functions have been moved to the banking-bridge module
+// in the Angular app (elohim-app/src/app/shefa/banking-bridge).
+//
+// Rationale:
+// 1. Bank credentials are personal convenience, not network signals
+// 2. Staging data is ephemeral - only approved transactions become EconomicEvents
+// 3. Separation prevents cluttering the next-gen economy domain
+//
+// The EconomicEventBridgeService in banking-bridge handles:
+// - Local IndexedDB storage for PlaidConnection, ImportBatch, StagedTransaction, TransactionRule
+// - Approval workflow entirely client-side
+// - Committing approved transactions to Holochain via create_economic_event()
+//
+// The ONLY network signal from banking is the final EconomicEvent.
+// =============================================================================
 
 // =============================================================================
 // Qahal: Human Relationship Management (Social Graph & Custody)
@@ -12053,18 +11844,17 @@ pub fn create_human_relationship(relationship: HumanRelationship) -> ExternResul
 /// Get all relationships for an agent
 #[hdk_extern]
 pub fn get_relationships_for_agent(agent_id: String) -> ExternResult<Vec<HumanRelationship>> {
-    let anchor = StringAnchor {
-        anchor_type: "agent".to_string(),
-        anchor_value: agent_id,
-    };
+    let anchor = StringAnchor::new("agent", &agent_id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
     let query = LinkQuery::try_new(anchor_hash, LinkTypes::AgentToRelationship)?;
     let links = get_links(query, GetStrategy::default())?;
 
     let mut relationships = Vec::new();
     for link in links {
-        if let Ok(Some(record)) = get(link.target.clone(), GetOptions::default()) {
-            if let Some(EntryTypes::HumanRelationship(rel)) = record.entry().to_app_option().ok().flatten() {
+        let action_hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+        if let Ok(Some(record)) = get(action_hash, GetOptions::default()) {
+            if let Some(rel) = record.entry().to_app_option::<HumanRelationship>().ok().flatten() {
                 relationships.push(rel);
             }
         }
@@ -12099,6 +11889,7 @@ fn create_auto_custody_commitments(
     }
 
     // Party A custodies Party B's data (if B allows)
+    let now = sys_time()?.to_string();
     if relationship.custody_enabled_by_b {
         let commitment = CustodianCommitment {
             id: format!("{}-custody-a-to-b", relationship.id),
@@ -12119,6 +11910,11 @@ fn create_auto_custody_commitments(
             redundancy_factor: 1,
             shard_assignments_json: "[]".to_string(),
             state: "accepted".to_string(),
+            proposed_at: now.clone(),
+            accepted_at: Some(now.clone()),
+            activated_at: None,
+            last_verification_at: None,
+            verification_failures_json: "[]".to_string(),
             shards_stored_count: 0,
             last_shard_update_at: None,
             total_restores_performed: 0,
@@ -12127,8 +11923,14 @@ fn create_auto_custody_commitments(
             emergency_contacts_json: json!([{"agent_id": relationship.party_a_id.clone()}])
                 .to_string(),
             recovery_instructions_json: json!({"method": "full_replica"}).to_string(),
-            created_at: sys_time()?.to_string(),
-            updated_at: sys_time()?.to_string(),
+            cache_priority: 10,
+            bandwidth_class: "medium".to_string(),
+            geographic_affinity: None,
+            shefa_commitment_id: None,
+            note: None,
+            metadata_json: "{}".to_string(),
+            created_at: now.clone(),
+            updated_at: now.clone(),
         };
 
         let commitment_hash = create_entry(&EntryTypes::CustodianCommitment(commitment))?;
@@ -12161,6 +11963,11 @@ fn create_auto_custody_commitments(
             redundancy_factor: 1,
             shard_assignments_json: "[]".to_string(),
             state: "accepted".to_string(),
+            proposed_at: now.clone(),
+            accepted_at: Some(now.clone()),
+            activated_at: None,
+            last_verification_at: None,
+            verification_failures_json: "[]".to_string(),
             shards_stored_count: 0,
             last_shard_update_at: None,
             total_restores_performed: 0,
@@ -12169,8 +11976,14 @@ fn create_auto_custody_commitments(
             emergency_contacts_json: json!([{"agent_id": relationship.party_b_id.clone()}])
                 .to_string(),
             recovery_instructions_json: json!({"method": "full_replica"}).to_string(),
-            created_at: sys_time()?.to_string(),
-            updated_at: sys_time()?.to_string(),
+            cache_priority: 10,
+            bandwidth_class: "medium".to_string(),
+            geographic_affinity: None,
+            shefa_commitment_id: None,
+            note: None,
+            metadata_json: "{}".to_string(),
+            created_at: now.clone(),
+            updated_at: now.clone(),
         };
 
         let commitment_hash = create_entry(&EntryTypes::CustodianCommitment(commitment))?;

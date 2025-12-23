@@ -26,6 +26,9 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   private readonly shefa = inject(ShefaService);
   private readonly selection = inject(CustodianSelectionService);
 
+  // Expose Math for template use
+  readonly Math = Math;
+
   // Data signals
   readonly allMetrics = signal<any[]>([]);
   readonly alerts = signal<any[]>([]);

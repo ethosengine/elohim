@@ -147,7 +147,7 @@ export class CustodianCommitmentService {
         return { success: false, error: result.error };
       }
 
-      return { success: true, commitmentId: result.data };
+      return { success: true, commitmentId: result.data as string };
     } catch (err) {
       console.error('[CustodianCommitment] Error creating commitment:', err);
       return { success: false, error: String(err) };

@@ -190,7 +190,7 @@ export class ShefaService {
         return [];
       }
 
-      const metrics = result.data || [];
+      const metrics = Array.isArray(result.data) ? result.data as CustodianMetrics[] : [];
 
       // Cache result
       this.allMetricsCache.set({
@@ -291,7 +291,13 @@ export class ShefaService {
     }>
   > {
     const allMetrics = await this.getAllMetrics();
-    const alerts = [];
+    const alerts: Array<{
+      custodianId: string;
+      severity: 'warning' | 'critical';
+      category: string;
+      message: string;
+      suggestion?: string;
+    }> = [];
 
     for (const metrics of allMetrics) {
       // High memory usage
@@ -396,7 +402,7 @@ export class ShefaService {
         recommendations.push({
           custodianId: metrics.custodianId,
           category: 'capacity',
-          opportunity: `Significant CPU capacity available (${100 - metrics.computation.cpu_usage_percent.toFixed(0)}%) - take on computation work`
+          opportunity: `Significant CPU capacity available (${Math.round(100 - metrics.computation.cpu_usage_percent)}%) - take on computation work`
         });
       }
 
