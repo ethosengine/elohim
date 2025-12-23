@@ -26,7 +26,15 @@ def loadBuildVars() {
     def path = fileExists(rootEnv) ? rootEnv : 'build.env'
 
     if (!fileExists(path)) {
-        error "build.env not found at ${path}"
+        echo "WARNING: build.env not found at ${path}, using defaults"
+        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+        return [
+            BASE_VERSION: 'dev',
+            GIT_COMMIT_HASH: gitHash,
+            IMAGE_TAG: "dev-${sanitizedBranch}-${gitHash}",
+            BRANCH_NAME: env.BRANCH_NAME
+        ]
     }
 
     return readProperties(file: path)

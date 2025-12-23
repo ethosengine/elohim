@@ -268,7 +268,7 @@ impl DNAAnalyzer {
     }
 
     /// Determine if a struct is likely an entry type
-    fn is_likely_entry_type(&self, name: &str, fields: &[Field]) -> bool {
+    fn is_likely_entry_type(&self, _name: &str, fields: &[Field]) -> bool {
         // Heuristics:
         // - Has an 'id' field
         // - Is public
