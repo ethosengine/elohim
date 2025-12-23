@@ -180,7 +180,6 @@ impl Validator for {validator_name} {{
 
     fn generate_transformer(&self, schema: &EntryTypeSchema) -> String {
         let transformer_name = format!("{}Transformer", schema.name);
-        let struct_name = &schema.name;
 
         // Generate field extraction code
         let mut extractions = String::new();
@@ -275,7 +274,6 @@ impl Transformer for {transformer_name} {{
 
     fn generate_resolver(&self, schema: &EntryTypeSchema) -> String {
         let resolver_name = format!("{}ReferenceResolver", schema.name);
-        let struct_name = &schema.name;
         let ref_fields = schema.reference_fields();
 
         let mut resolve_match_arms = String::new();
@@ -384,16 +382,16 @@ impl DegradationHandler for {handler_name} {{
     }
 
     fn generate_provider(&self, schema: &EntryTypeSchema) -> String {
+        let struct_name = &schema.name;
         let provider_name = format!("{}Provider", schema.name);
         let validator_name = format!("{}Validator", schema.name);
         let transformer_name = format!("{}Transformer", schema.name);
         let resolver_name = format!("{}ReferenceResolver", schema.name);
         let handler_name = format!("{}DegradationHandler", schema.name);
-        let struct_name = &schema.name;
         let entry_type_name = schema.to_entry_type_name();
 
         format!(
-            r#"/// Complete provider for {} entry type
+            r#"/// Complete provider for {struct_name} entry type
 pub struct {provider_name};
 
 impl EntryTypeProvider for {provider_name} {{
@@ -426,17 +424,10 @@ impl EntryTypeProvider for {provider_name} {{
 
         // Serialize to bytes
         Ok(serde_json::to_vec(&v2_json)
-            .map_err(|e| format!("Failed to serialize healed {}: {{}}", e))?)
+            .map_err(|e| format!("Failed to serialize healed {{}}: {{}}", e))?)
     }}
 }}
-"#,
-            struct_name = schema.name,
-            provider_name = provider_name,
-            validator_name = validator_name,
-            transformer_name = transformer_name,
-            resolver_name = resolver_name,
-            handler_name = handler_name,
-            entry_type_name = entry_type_name
+"#
         )
     }
 
