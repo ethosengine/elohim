@@ -1,14 +1,28 @@
 //! Cache store implementation
 //!
 //! In-memory LRU cache with TTL support, ETag generation, and pattern-based invalidation.
+//! Uses holochain-cache-core for O(log n) eviction operations.
+//!
+//! ## Streaming Support
+//!
+//! Provides async blob streaming to avoid blocking conductor threads:
+//! - `stream_blob()` - Stream entire blob as async chunks
+//! - `get_range()` - Get byte range for HTTP 206 Partial Content
+//! - `blob_size()` - Get blob size without loading data
 
 use super::CacheConfig;
+use bytes::Bytes;
 use dashmap::DashMap;
+use futures::stream::{self, Stream};
+use holochain_cache_core::BlobCache;
 use sha2::{Digest, Sha256};
+use std::ops::Range;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::RwLock;
 use std::time::{Duration, Instant};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// A cached entry with metadata
 #[derive(Debug, Clone)]
@@ -118,10 +132,15 @@ impl CacheStats {
     }
 }
 
-/// In-memory content cache
+/// In-memory content cache with O(log n) LRU eviction.
+///
+/// Uses holochain-cache-core's BlobCache for efficient eviction decisions
+/// while maintaining DashMap for concurrent access to actual content.
 pub struct ContentCache {
     /// The cache storage: storage_key -> entry
     entries: DashMap<String, CacheEntry>,
+    /// LRU index for O(log n) eviction (tracks keys and sizes only)
+    lru_index: RwLock<BlobCache>,
     /// Configuration
     config: CacheConfig,
     /// Hit counter
@@ -133,10 +152,21 @@ pub struct ContentCache {
 }
 
 impl ContentCache {
-    /// Create a new content cache with configuration
+    /// Create a new content cache with configuration.
+    /// Initializes holochain-cache-core's BlobCache for O(log n) eviction.
     pub fn new(config: CacheConfig) -> Self {
+        // Calculate max size: assume average entry is ~10KB
+        let estimated_max_bytes = (config.max_entries as u64) * 10 * 1024;
+        let lru_index = BlobCache::new(estimated_max_bytes);
+
+        info!(
+            max_entries = config.max_entries,
+            "ContentCache initialized with holochain-cache-core O(log n) eviction"
+        );
+
         Self {
             entries: DashMap::new(),
+            lru_index: RwLock::new(lru_index),
             config,
             hits: AtomicU64::new(0),
             misses: AtomicU64::new(0),
@@ -292,6 +322,237 @@ impl ContentCache {
         }
 
         debug!(evicted = to_evict, "Evicted cache entries");
+    }
+
+    // =========================================================================
+    // Blob Streaming Operations (NEW - for HTTP 206 Range requests)
+    // =========================================================================
+
+    /// Get the size of a cached blob without loading the data.
+    /// Returns None if the entry doesn't exist or is expired.
+    pub fn blob_size(&self, storage_key: &str) -> Option<usize> {
+        self.entries.get(storage_key).and_then(|entry| {
+            if entry.is_expired() {
+                None
+            } else {
+                Some(entry.data.len())
+            }
+        })
+    }
+
+    /// Get a byte range from a cached blob.
+    /// Used for HTTP 206 Partial Content responses.
+    ///
+    /// # Arguments
+    /// * `storage_key` - The cache key
+    /// * `range` - Byte range (start..end, exclusive end)
+    ///
+    /// # Returns
+    /// * `Some((data, total_size, etag))` if found and valid
+    /// * `None` if not found, expired, or range invalid
+    pub fn get_range(
+        &self,
+        storage_key: &str,
+        range: Range<usize>,
+    ) -> Option<(Bytes, usize, String)> {
+        let entry = self.entries.get(storage_key)?;
+
+        if entry.is_expired() {
+            drop(entry);
+            self.entries.remove(storage_key);
+            self.misses.fetch_add(1, Ordering::Relaxed);
+            return None;
+        }
+
+        let total_size = entry.data.len();
+
+        // Validate range
+        if range.start >= total_size || range.end > total_size || range.start >= range.end {
+            warn!(
+                key = storage_key,
+                range_start = range.start,
+                range_end = range.end,
+                total_size = total_size,
+                "Invalid byte range requested"
+            );
+            return None;
+        }
+
+        self.hits.fetch_add(1, Ordering::Relaxed);
+        debug!(
+            key = storage_key,
+            range = format!("{}-{}", range.start, range.end - 1),
+            "Cache range hit"
+        );
+
+        let data = Bytes::copy_from_slice(&entry.data[range]);
+        let etag = entry.etag.clone();
+
+        Some((data, total_size, etag))
+    }
+
+    /// Stream a blob in chunks without blocking.
+    /// Returns an async stream of Bytes chunks.
+    ///
+    /// # Arguments
+    /// * `storage_key` - The cache key
+    /// * `chunk_size` - Size of each chunk (default 64KB if 0)
+    ///
+    /// # Returns
+    /// * `Some(stream)` if blob exists and is valid
+    /// * `None` if not found or expired
+    pub fn stream_blob(
+        &self,
+        storage_key: &str,
+        chunk_size: usize,
+    ) -> Option<(
+        Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
+        usize,
+        String,
+        String,
+    )> {
+        let entry = self.entries.get(storage_key)?;
+
+        if entry.is_expired() {
+            drop(entry);
+            self.entries.remove(storage_key);
+            self.misses.fetch_add(1, Ordering::Relaxed);
+            return None;
+        }
+
+        let data = entry.data.clone();
+        let total_size = data.len();
+        let etag = entry.etag.clone();
+        let content_type = entry.content_type.clone();
+        drop(entry); // Release lock before spawning
+
+        self.hits.fetch_add(1, Ordering::Relaxed);
+        debug!(
+            key = storage_key,
+            size = total_size,
+            chunk_size = chunk_size,
+            "Streaming blob"
+        );
+
+        // Use 64KB chunks if not specified
+        let chunk_size = if chunk_size == 0 { 64 * 1024 } else { chunk_size };
+
+        // Create chunked stream
+        let stream = stream::iter((0..total_size).step_by(chunk_size).map(move |start| {
+            let end = std::cmp::min(start + chunk_size, total_size);
+            Ok(Bytes::copy_from_slice(&data[start..end]))
+        }));
+
+        Some((Box::pin(stream), total_size, etag, content_type))
+    }
+
+    /// Stream a byte range of a blob.
+    /// Used for HTTP 206 with streaming response.
+    ///
+    /// # Arguments
+    /// * `storage_key` - The cache key
+    /// * `range` - Byte range to stream
+    /// * `chunk_size` - Size of each chunk
+    pub fn stream_range(
+        &self,
+        storage_key: &str,
+        range: Range<usize>,
+        chunk_size: usize,
+    ) -> Option<(
+        Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
+        usize,
+        String,
+        String,
+    )> {
+        let entry = self.entries.get(storage_key)?;
+
+        if entry.is_expired() {
+            drop(entry);
+            self.entries.remove(storage_key);
+            self.misses.fetch_add(1, Ordering::Relaxed);
+            return None;
+        }
+
+        let total_size = entry.data.len();
+
+        // Validate range
+        if range.start >= total_size || range.end > total_size || range.start >= range.end {
+            return None;
+        }
+
+        // Extract the range data
+        let range_data = entry.data[range.clone()].to_vec();
+        let range_size = range_data.len();
+        let etag = entry.etag.clone();
+        let content_type = entry.content_type.clone();
+        drop(entry);
+
+        self.hits.fetch_add(1, Ordering::Relaxed);
+        debug!(
+            key = storage_key,
+            range = format!("{}-{}", range.start, range.end - 1),
+            "Streaming range"
+        );
+
+        let chunk_size = if chunk_size == 0 { 64 * 1024 } else { chunk_size };
+
+        let stream = stream::iter((0..range_size).step_by(chunk_size).map(move |start| {
+            let end = std::cmp::min(start + chunk_size, range_size);
+            Ok(Bytes::copy_from_slice(&range_data[start..end]))
+        }));
+
+        Some((Box::pin(stream), total_size, etag, content_type))
+    }
+
+    /// Store a blob with explicit size tracking for large content.
+    /// This method is optimized for media files.
+    pub fn set_blob(
+        &self,
+        storage_key: &str,
+        data: Vec<u8>,
+        content_type: &str,
+        ttl: Duration,
+        reach: Option<&str>,
+        priority: Option<u32>,
+    ) {
+        let size = data.len();
+        let entry = if let Some(r) = reach {
+            CacheEntry::with_reach(
+                data,
+                ttl,
+                content_type,
+                r,
+                priority.unwrap_or(50),
+                None,
+                None,
+            )
+        } else {
+            CacheEntry::new(data, ttl, content_type)
+        };
+
+        debug!(
+            key = storage_key,
+            size = size,
+            content_type = content_type,
+            ttl_secs = ttl.as_secs(),
+            "Blob cached"
+        );
+
+        self.entries.insert(storage_key.to_string(), entry);
+
+        // Update LRU index with size
+        if let Ok(mut lru) = self.lru_index.write() {
+            lru.put(
+                storage_key.to_string(),
+                size as u64,
+                7, // Default to commons reach
+                "blob".to_string(),
+                "media".to_string(),
+                priority.unwrap_or(50) as i32,
+            );
+        }
+
+        self.maybe_evict();
     }
 }
 

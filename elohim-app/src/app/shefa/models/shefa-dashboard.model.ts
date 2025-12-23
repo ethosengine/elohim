@@ -16,7 +16,7 @@
  * - NATS heartbeats for uptime/health
  */
 
-import { ResourceMeasure } from './economic-event.model';
+import { ResourceMeasure } from './stewarded-resources.model';
 
 // =============================================================================
 // CORE DASHBOARD STATE

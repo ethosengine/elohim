@@ -2,9 +2,9 @@
 
 Distributed ledger for Elohim node orchestration, disaster recovery, and Byzantine-fault-tolerant consensus.
 
-## Status: SCAFFOLDING / NOT YET BUILDABLE
+## Status: BUILDABLE
 
-This DNA has been scaffolded with complete architecture and logic, but requires HDI/HDK API updates to build successfully.
+This DNA compiles successfully with HDI 0.5 / HDK 0.4 API patterns.
 
 ## Architecture
 
@@ -47,29 +47,24 @@ This DNA has been scaffolded with complete architecture and logic, but requires 
 - `detect_failed_nodes()` - Find nodes with stale heartbeats (>60s)
 - `trigger_disaster_recovery(failed_node_id)` - Automatically re-replicate content
 
-## Known Build Issues
+## Build Instructions
 
-The coordinator zome requires updates for HDI/HDK API compatibility:
+```bash
+# From the node-registry directory:
+RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
 
-1. **Entry Deserialization**: `to_app_option()` API has changed in HDI 0.5
-   - Need to update pattern: `record.entry().to_app_option()` → use new deserialization pattern
-   - Affects all functions that retrieve entries from DHT
+# Package DNA:
+hc dna pack . -o workdir/node_registry.dna
+```
 
-2. **Type Conversions**: Several i64/u64 mismatches in timestamp handling
-   - `max_age_seconds` needs `.try_into().unwrap()` conversion
-   - Timestamp comparisons need consistent types
+## API Patterns Used
 
-3. **Struct Field Updates**: Some structs need additional fields
-   - NodeHeartbeat missing `active_connections` field
-   - May need to align with latest HDI schema requirements
+This zome uses HDI 0.5 / HDK 0.4 patterns:
 
-## Next Steps to Make Buildable
-
-1. Update coordinator zome entry deserialization to match HDI 0.5 API
-2. Fix type conversions (i64 ↔ u64) in timestamp handling
-3. Ensure all struct fields match integrity zome definitions
-4. Test build: `cargo build --release --target wasm32-unknown-unknown`
-5. Package DNA: `hc dna pack . -o workdir/node_registry.dna`
+- **GetLinksInputBuilder**: `get_links(GetLinksInputBuilder::try_new(...).build())`
+- **Action Hash Conversion**: `link.target.into_action_hash()`
+- **Entry Deserialization**: Custom `deserialize_*()` helper functions with `SerializedBytes`
+- **Timestamp Types**: Consistent `i64` for comparisons with `sys_time().as_seconds_and_nanos().0`
 
 ## Integration with Elohim
 
@@ -81,7 +76,18 @@ Once built, this DNA enables:
 - **Byzantine tolerance**: Peer health attestation prevents false reports
 - **Google Account recovery**: Login from doorway → detect offline → sync from family
 
-See `HOLOCHAIN_ORCHESTRATOR_IMPLEMENTATION_PLAN.md` for full architecture and integration details.
+## Integration
+
+To integrate with other DNAs:
+
+1. **Package the DNA**:
+   ```bash
+   hc dna pack . -o workdir/node_registry.dna
+   ```
+
+2. **Add to hApp manifest** alongside other roles (lamad, etc.)
+
+3. **Bridge calls** from other DNAs to query custodians, register nodes, etc.
 
 ## License
 

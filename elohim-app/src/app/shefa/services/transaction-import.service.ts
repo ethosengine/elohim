@@ -30,7 +30,7 @@ import {
   StagedTransaction,
   PlaidTransaction,
   CategorizationResult,
-} from '@elohim/models/transaction-import.model';
+} from '../models/transaction-import.model';
 
 import { PlaidIntegrationService } from './plaid-integration.service';
 import { DuplicateDetectionService } from './duplicate-detection.service';

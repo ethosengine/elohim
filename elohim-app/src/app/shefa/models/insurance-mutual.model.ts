@@ -916,14 +916,4 @@ export interface AdjustmentReasoning {
   metadata?: Record<string, unknown>;
 }
 
-// ============================================================================
-// Type Exports
-// ============================================================================
-
-export type {
-  MemberRiskProfile,
-  CoveragePolicy,
-  CoveredRisk,
-  InsuranceClaim,
-  AdjustmentReasoning,
-};
+// Note: Types are exported inline with their interface declarations above.

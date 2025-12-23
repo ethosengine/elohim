@@ -19,7 +19,7 @@
  */
 
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, Subject, interval } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, interval, from, of } from 'rxjs';
 import { map, switchMap, tap, catchError, debounceTime, startWith } from 'rxjs/operators';
 
 import {
@@ -27,9 +27,13 @@ import {
   ComputeMetrics,
 } from '../models/shefa-dashboard.model';
 
-import { HolochainClientService } from '@elohim/services/holochain-client.service';
-import { EconomicService } from './economic.service';
-import { ResourceMeasure, EconomicEvent, CreateEventRequest } from '@elohim/models/economic-event.model';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { EconomicService, CreateEconomicEventInput } from './economic.service';
+import { EconomicEvent } from '@app/elohim/models/economic-event.model';
+import { ResourceMeasure } from '../models/stewarded-resources.model';
+
+// CreateEventRequest is an alias for the EconomicEvent creation input
+type CreateEventRequest = CreateEconomicEventInput;
 import { ShefaComputeService } from './shefa-compute.service';
 
 /**
@@ -323,9 +327,7 @@ export class ComputeEventService {
   ): Observable<ComputeEventPayload[]> {
     // Skip if no events or if emission is too frequent
     if (events.length === 0 || Date.now() - this.lastEmissionTime < this.config.eventEmissionInterval * 0.8) {
-      return new Promise(resolve => {
-        setTimeout(() => resolve([]), 0);
-      });
+      return of([]);
     }
 
     this.lastEmissionTime = Date.now();
@@ -336,23 +338,26 @@ export class ComputeEventService {
     );
 
     // Batch create events
-    return this.holochain
-      .callZome('content_store', 'create_economic_events_batch', {
-        events: eventRequests,
+    return from(
+      this.holochain.callZome<any[]>({
+        zomeName: 'content_store',
+        fnName: 'create_economic_events_batch',
+        payload: { events: eventRequests },
       })
-      .pipe(
-        map((results: any[]) => {
-          // Link persisted event IDs back to payloads
-          return events.map((e, i) => ({
-            ...e,
-            economicEventId: results[i]?.id,
-          }));
-        }),
-        catchError(error => {
-          console.error('[ComputeEventService] Failed to persist compute events:', error);
-          return [];
-        })
-      );
+    ).pipe(
+      map((result) => {
+        const results = result.success ? result.data || [] : [];
+        // Link persisted event IDs back to payloads
+        return events.map((e, i) => ({
+          ...e,
+          economicEventId: results[i]?.id,
+        }));
+      }),
+      catchError(error => {
+        console.error('[ComputeEventService] Failed to persist compute events:', error);
+        return of([]);
+      })
+    );
   }
 
   /**
@@ -361,39 +366,31 @@ export class ComputeEventService {
   private convertToEconomicEvent(operatorId: string, payload: ComputeEventPayload): CreateEventRequest {
     const { cpuHours, storageHours, bandwidthHours } = this.getUsageSummary(payload);
 
-    // Determine action type (cpu-hours-provided, storage-provided, bandwidth-provided)
-    let action: string = 'cpu-hours-provided';
+    // Determine action and quantity based on primary resource type
+    let action: 'produce' | 'use' | 'transfer' = 'produce';
     let quantity: number = cpuHours;
     let unit: string = 'cpu-hour';
+    let lamadEventType: string = 'compute-provided';
 
-    if (storageHours > 0) {
-      action = 'storage-provided';
+    if (storageHours > cpuHours && storageHours > bandwidthHours) {
       quantity = storageHours;
       unit = 'gb-hour';
-    } else if (bandwidthHours > 0) {
-      action = 'bandwidth-provided';
+      lamadEventType = 'storage-provided';
+    } else if (bandwidthHours > cpuHours) {
       quantity = bandwidthHours;
       unit = 'mbps-hour';
+      lamadEventType = 'bandwidth-provided';
     }
 
     return {
-      eventType: action as any, // Cast to LamadEventType
+      action,
       providerId: operatorId, // My node is the provider
-      receiverId: payload.usage.governanceLevel || payload.usage.custodianId || 'family-community', // Family-community is receiver
-      quantity: quantity,
-      unit: unit,
+      receiverId: payload.usage.governanceLevel || payload.usage.custodianId || 'family-community',
+      resourceQuantityValue: quantity,
+      resourceQuantityUnit: unit,
+      resourceClassifiedAs: ['compute', 'infrastructure'],
       note: `Compute provided to ${payload.usage.governanceLevel || 'family-community'}: ${cpuHours.toFixed(2)} CPU-hours, ${storageHours.toFixed(2)} GB-hours, ${bandwidthHours.toFixed(2)} Mbps-hours`,
-      metadata: {
-        type: 'compute-event',
-        cpuCoreHours: cpuHours,
-        storageGBHours: storageHours,
-        bandwidthMbpsHours: bandwidthHours,
-        tokensEarned: payload.tokensEarned,
-        governanceLevel: payload.usage.governanceLevel,
-        custodianId: payload.usage.custodianId,
-        computeEventId: payload.eventId,
-        computeEventTimestamp: payload.timestamp,
-      },
+      lamadEventType: lamadEventType as any,
     };
   }
 

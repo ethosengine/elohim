@@ -37,10 +37,11 @@ import {
   MetricHistory,
 } from '../models/shefa-dashboard.model';
 
-import { HolochainClientService } from '@elohim/services/holochain-client.service';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { EconomicService } from './economic.service';
 import { StewaredResourcesService } from './stewared-resources.service';
-import { ResourceMeasure, EconomicEvent, LamadEventType } from '@elohim/models/economic-event.model';
+import { EconomicEvent, LamadEventType } from '@app/elohim/models/economic-event.model';
+import { ResourceMeasure } from '../models/stewarded-resources.model';
 
 /**
  * Configuration for ShefaComputeService

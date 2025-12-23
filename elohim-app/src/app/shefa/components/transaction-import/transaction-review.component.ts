@@ -28,7 +28,7 @@ import {
   StagedTransaction,
   ImportBatch,
   CategorySuggestion,
-} from '@elohim/models/transaction-import.model';
+} from '../../models/transaction-import.model';
 
 import { TransactionImportService } from '../../services/transaction-import.service';
 import { AICategorizationService } from '../../services/ai-categorization.service';

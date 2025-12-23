@@ -12,9 +12,16 @@
 
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, Subject, throwError, of } from 'rxjs';
+import { Observable, Subject, throwError, of, firstValueFrom } from 'rxjs';
 import { catchError, retry, timeout, tap } from 'rxjs/operators';
-import { environment } from '@elohim/environments/environment';
+import { environment } from '../../../environments/environment';
+
+// Plaid configuration (stubbed - environment.plaid not yet configured)
+const PLAID_CONFIG = {
+  products: ['transactions'],
+  countryCodes: ['US', 'CA'],
+  webhookUrl: undefined as string | undefined,
+};
 
 import {
   PlaidConnection,
@@ -22,7 +29,7 @@ import {
   PlaidTransaction,
   PlaidWebhookPayload,
   SyncResult,
-} from '@elohim/models/transaction-import.model';
+} from '../models/transaction-import.model';
 
 /**
  * Configuration for Plaid Link (client-side OAuth UI)
@@ -78,19 +85,10 @@ export class PlaidIntegrationService {
 
   /**
    * Validate required environment configuration
+   * Note: Plaid integration is stubbed - environment.plaid config not yet added
    */
   private validateEnvironmentConfig(): void {
-    if (!environment.plaid?.clientId) {
-      console.error(
-        '[PlaidIntegration] Missing PLAID_CLIENT_ID in environment'
-      );
-    }
-    if (!environment.plaid?.secret) {
-      console.error('[PlaidIntegration] Missing PLAID_SECRET in environment');
-    }
-    if (!environment.ai?.apiKey) {
-      console.error('[PlaidIntegration] Missing ANTHROPIC_API_KEY in environment');
-    }
+    console.warn('[PlaidIntegration] STUB MODE: Plaid integration not configured - will use mock responses');
   }
 
   // ============================================================================
@@ -120,26 +118,23 @@ export class PlaidIntegrationService {
   /**
    * Creates a Plaid link token (required before showing Plaid Link UI)
    */
-  private createLinkToken(stewardId: string): Promise<string> {
+  private async createLinkToken(stewardId: string): Promise<string> {
     const requestBody = {
       user: { client_user_id: stewardId },
       client_name: 'Elohim Protocol',
       language: 'en',
-      products: environment.plaid?.products || ['transactions'],
-      country_codes: environment.plaid?.countryCodes || ['US', 'CA'],
-      webhook: environment.plaid?.webhookUrl,
+      products: PLAID_CONFIG.products,
+      country_codes: PLAID_CONFIG.countryCodes,
+      webhook: PLAID_CONFIG.webhookUrl,
     };
 
-    return this.callPlaidAPI<{ link_token: string }>(
-      '/link/token/create',
-      requestBody
-    ).toPromise()
-      .then(response => {
-        if (!response?.link_token) {
-          throw new Error('No link_token in response');
-        }
-        return response.link_token;
-      });
+    const response = await firstValueFrom(
+      this.callPlaidAPI<{ link_token: string }>('/link/token/create', requestBody)
+    );
+    if (!response?.link_token) {
+      throw new Error('No link_token in response');
+    }
+    return response.link_token;
   }
 
   /**
@@ -149,9 +144,9 @@ export class PlaidIntegrationService {
   async handlePlaidCallback(publicToken: string): Promise<PlaidConnection> {
     try {
       // Exchange public token for access token
-      const accessTokenResponse = await this.exchangePublicToken(
-        publicToken
-      ).toPromise();
+      const accessTokenResponse = await firstValueFrom(
+        this.exchangePublicToken(publicToken)
+      );
 
       if (
         !accessTokenResponse?.access_token ||
@@ -161,9 +156,9 @@ export class PlaidIntegrationService {
       }
 
       // Get institution and account details
-      const itemResponse = await this.getItemDetails(
-        accessTokenResponse.access_token
-      ).toPromise();
+      const itemResponse = await firstValueFrom(
+        this.getItemDetails(accessTokenResponse.access_token)
+      );
 
       // Encrypt the access token before storing
       const encryptedToken = await this.encryptAccessToken(
@@ -173,7 +168,7 @@ export class PlaidIntegrationService {
       // Get account details
       const accountsResponse = await this.getAccounts(
         accessTokenResponse.access_token
-      ).toPromise();
+      );
 
       const linkedAccounts = (accountsResponse?.accounts || []).map(
         (account: any) => ({
@@ -260,13 +255,15 @@ export class PlaidIntegrationService {
 
       // Paginate through results
       do {
-        const response = await this.getTransactions(
-          accessToken,
-          dateRange.start,
-          dateRange.end,
-          cursor,
-          pageSize
-        ).toPromise();
+        const response = await firstValueFrom(
+          this.getTransactions(
+            accessToken,
+            dateRange.start,
+            dateRange.end,
+            cursor,
+            pageSize
+          )
+        );
 
         if (!response?.transactions) {
           break;
@@ -302,10 +299,9 @@ export class PlaidIntegrationService {
         connection.plaidAccessToken
       );
 
-      const response = await this.getTransactionSync(
-        accessToken,
-        cursor
-      ).toPromise();
+      const response = await firstValueFrom(
+        this.getTransactionSync(accessToken, cursor)
+      );
 
       if (!response) {
         throw new Error('No response from transaction sync');
@@ -389,9 +385,9 @@ export class PlaidIntegrationService {
    */
   async getAccounts(accessToken: string): Promise<any> {
     const decryptedToken = await this.decryptAccessToken(accessToken);
-    return this.callPlaidAPI('/accounts/get', {
-      access_token: decryptedToken,
-    }).toPromise();
+    return firstValueFrom(
+      this.callPlaidAPI('/accounts/get', { access_token: decryptedToken })
+    );
   }
 
   /**
@@ -413,9 +409,9 @@ export class PlaidIntegrationService {
       );
 
       // Force refresh of accounts and balances
-      await this.callPlaidAPI('/accounts/get', {
-        access_token: accessToken,
-      }).toPromise();
+      await firstValueFrom(
+        this.callPlaidAPI('/accounts/get', { access_token: accessToken })
+      );
 
       console.log(
         `[PlaidIntegration] Connection ${connection.connectionNumber} refreshed`

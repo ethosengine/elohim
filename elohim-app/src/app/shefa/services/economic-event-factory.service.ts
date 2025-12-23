@@ -15,7 +15,7 @@
  */
 
 import { Injectable } from '@angular/core';
-import { StagedTransaction } from '@elohim/models/transaction-import.model';
+import { StagedTransaction } from '../models/transaction-import.model';
 
 /**
  * EconomicEvent state from the model

@@ -20,7 +20,7 @@ import { Injectable } from '@angular/core';
 import {
   StagedTransaction,
   ReconciliationResult,
-} from '@elohim/models/transaction-import.model';
+} from '../models/transaction-import.model';
 
 /**
  * ResourceMeasure

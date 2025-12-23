@@ -28,7 +28,7 @@
  */
 
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, combineLatest, of, interval } from 'rxjs';
+import { BehaviorSubject, Observable, combineLatest, of, interval, from } from 'rxjs';
 import { map, switchMap, catchError, shareReplay, startWith } from 'rxjs/operators';
 
 import {
@@ -38,7 +38,7 @@ import {
   TrustRelationship,
 } from '../models/shefa-dashboard.model';
 
-import { HolochainClientService } from '@elohim/services/holochain-client.service';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 /**
  * Raw custodian commitment data from Holochain
@@ -133,34 +133,44 @@ export class FamilyCommunityProtectionService {
    * Load complete protection status from DHT
    */
   private loadProtectionStatus(operatorId: string): Observable<FamilyCommunityProtectionStatus> {
-    return this.holochain
-      .callZome('content_store', 'get_custodian_commitments', { steward_id: operatorId })
-      .pipe(
-        switchMap((commitments: RawCustodianCommitment[]) => {
-          if (!commitments || commitments.length === 0) {
-            return of(this.getEmptyProtectionStatus());
-          }
-
-          // Load health status for each custodian
-          const healthObs = commitments.map(c =>
-            this.holochain
-              .callZome('content_store', 'get_agent_status', { agent_id: c.custodian_id })
-              .pipe(
-                map(status => ({ commitment: c, status })),
-                catchError(() =>
-                  of({ commitment: c, status: null })
-                )
-              )
-          );
-
-          return combineLatest(healthObs);
-        }),
-        map((data: any[]) => this.buildProtectionStatus(operatorId, data)),
-        catchError(error => {
-          console.error('[FamilyCommunityProtectionService] Failed to load protection status:', error);
+    return from(
+      this.holochain.callZome<RawCustodianCommitment[]>({
+        zomeName: 'content_store',
+        fnName: 'get_custodian_commitments',
+        payload: { steward_id: operatorId },
+      })
+    ).pipe(
+      switchMap((result) => {
+        const commitments = result.success ? result.data || [] : [];
+        if (commitments.length === 0) {
           return of(this.getEmptyProtectionStatus());
-        })
-      );
+        }
+
+        // Load health status for each custodian
+        const healthObs = commitments.map(c =>
+          from(
+            this.holochain.callZome<AgentStatus>({
+              zomeName: 'content_store',
+              fnName: 'get_agent_status',
+              payload: { agent_id: c.custodian_id },
+            })
+          ).pipe(
+            map(statusResult => ({
+              commitment: c,
+              status: statusResult.success ? statusResult.data : null,
+            })),
+            catchError(() => of({ commitment: c, status: null }))
+          )
+        );
+
+        return combineLatest(healthObs);
+      }),
+      map((data: any[]) => this.buildProtectionStatus(operatorId, data)),
+      catchError(error => {
+        console.error('[FamilyCommunityProtectionService] Failed to load protection status:', error);
+        return of(this.getEmptyProtectionStatus());
+      })
+    );
   }
 
   /**
@@ -218,17 +228,35 @@ export class FamilyCommunityProtectionService {
     // Estimate recovery time
     const estimatedRecoveryTime = this.estimateRecoveryTime(custodians, redundancyMetrics);
 
+    // Calculate risk profile based on regional distribution
+    const riskProfile = this.calculateGeographicRiskProfile(geographicDistribution);
+
     return {
       redundancy: redundancyMetrics,
       custodians,
       totalCustodians: custodians.length,
-      geographicDistribution,
+      geographicDistribution: {
+        regions: geographicDistribution,
+        riskProfile,
+      },
       trustGraph,
       protectionLevel,
       estimatedRecoveryTime,
       lastVerification: new Date().toISOString(),
       verificationStatus: custodians.length > 0 ? 'verified' : 'pending',
     };
+  }
+
+  /**
+   * Calculate geographic risk profile based on distribution
+   */
+  private calculateGeographicRiskProfile(
+    regions: RegionalPresence[]
+  ): 'centralized' | 'distributed' | 'geo-redundant' {
+    if (regions.length === 0) return 'centralized';
+    if (regions.length === 1) return 'centralized';
+    if (regions.length >= 3) return 'geo-redundant';
+    return 'distributed';
   }
 
   /**
@@ -451,7 +479,7 @@ export class FamilyCommunityProtectionService {
     const status = this.protectionStatus$.value;
     if (!status) return [];
 
-    return status.geographicDistribution.filter(region => region.riskFactors.length > 0 || region.custodianCount === 1);
+    return status.geographicDistribution.regions.filter(region => region.riskFactors.length > 0 || region.custodianCount === 1);
   }
 
   /**
@@ -525,7 +553,10 @@ export class FamilyCommunityProtectionService {
       },
       custodians: [],
       totalCustodians: 0,
-      geographicDistribution: [],
+      geographicDistribution: {
+        regions: [],
+        riskProfile: 'centralized',
+      },
       trustGraph: [],
       protectionLevel: 'vulnerable',
       estimatedRecoveryTime: 'unknown',

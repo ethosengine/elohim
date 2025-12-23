@@ -1,4 +1,5 @@
 use hdk::prelude::*;
+use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use node_registry_integrity::*;
 
 // Re-export integrity types for convenience
@@ -156,7 +157,7 @@ pub struct DeregisterInput {
 #[hdk_extern]
 pub fn deregister_node(input: DeregisterInput) -> ExternResult<()> {
     // Get the registration
-    let registration = get_node_registration_by_id(input.node_id.clone())?;
+    let _registration = get_node_registration_by_id(input.node_id.clone())?;
     let registration_hash = get_node_registration_hash(&input.node_id)?;
 
     // Delete all links associated with this node
@@ -306,15 +307,17 @@ pub fn get_nodes_by_region(region: String) -> ExternResult<Vec<NodeRegistration>
     };
     let region_anchor_hash = hash_entry(&EntryTypes::StringAnchor(region_anchor))?;
 
-    let query = LinkQuery::try_new(region_anchor_hash, LinkTypes::RegionToNode)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(
+        GetLinksInputBuilder::try_new(region_anchor_hash, LinkTypes::RegionToNode)?.build()
+    )?;
 
     let mut nodes = Vec::new();
     for link in links {
-        if let Some(record) = get(link.target, GetOptions::default())? {
-            if let Some(EntryTypes::NodeRegistration(registration)) =
-                record.entry().to_app_option().ok().flatten() {
-                nodes.push(registration);
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(registration) = deserialize_node_registration(&record)? {
+                    nodes.push(registration);
+                }
             }
         }
     }
@@ -344,52 +347,54 @@ pub fn get_available_custodians(filters: CustodianFilters) -> ExternResult<Vec<N
     };
     let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
 
-    let query = LinkQuery::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(
+        GetLinksInputBuilder::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?.build()
+    )?;
 
     let mut candidates = Vec::new();
     for link in links {
-        if let Some(record) = get(link.target, GetOptions::default())? {
-            if let Some(EntryTypes::NodeRegistration(registration)) =
-                record.entry().to_app_option().ok().flatten() {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(registration) = deserialize_node_registration(&record)? {
 
-                // Apply filters
-                if let Some(ref region) = filters.region {
-                    if &registration.region != region {
-                        continue;
+                    // Apply filters
+                    if let Some(ref region) = filters.region {
+                        if &registration.region != region {
+                            continue;
+                        }
                     }
-                }
 
-                if let Some(min_storage) = filters.min_storage_gb {
-                    let available_storage = registration.max_custody_gb.unwrap_or(0.0);
-                    if available_storage < min_storage {
-                        continue;
+                    if let Some(min_storage) = filters.min_storage_gb {
+                        let available_storage = registration.max_custody_gb.unwrap_or(0.0);
+                        if available_storage < min_storage {
+                            continue;
+                        }
                     }
-                }
 
-                if let Some(min_bandwidth) = filters.min_bandwidth_mbps {
-                    let available_bandwidth = registration.max_bandwidth_mbps.unwrap_or(0);
-                    if available_bandwidth < min_bandwidth {
-                        continue;
+                    if let Some(min_bandwidth) = filters.min_bandwidth_mbps {
+                        let available_bandwidth = registration.max_bandwidth_mbps.unwrap_or(0);
+                        if available_bandwidth < min_bandwidth {
+                            continue;
+                        }
                     }
-                }
 
-                if let Some(ref min_tier) = filters.min_tier {
-                    // Tier hierarchy: caretaker < guardian < steward < pioneer
-                    if !meets_tier_requirement(&registration.steward_tier, min_tier) {
-                        continue;
+                    if let Some(ref min_tier) = filters.min_tier {
+                        // Tier hierarchy: caretaker < guardian < steward < pioneer
+                        if !meets_tier_requirement(&registration.steward_tier, min_tier) {
+                            continue;
+                        }
                     }
-                }
 
-                if let Some(ref exclude_list) = filters.exclude_nodes {
-                    if exclude_list.contains(&registration.node_id) {
-                        continue;
+                    if let Some(ref exclude_list) = filters.exclude_nodes {
+                        if exclude_list.contains(&registration.node_id) {
+                            continue;
+                        }
                     }
+
+                    // TODO: Check status from recent heartbeats
+
+                    candidates.push(registration);
                 }
-
-                // TODO: Check status from recent heartbeats
-
-                candidates.push(registration);
             }
         }
     }
@@ -406,15 +411,17 @@ pub fn get_nodes_by_tier(tier: String) -> ExternResult<Vec<NodeRegistration>> {
     };
     let tier_anchor_hash = hash_entry(&EntryTypes::StringAnchor(tier_anchor))?;
 
-    let query = LinkQuery::try_new(tier_anchor_hash, LinkTypes::TierToNode)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(
+        GetLinksInputBuilder::try_new(tier_anchor_hash, LinkTypes::TierToNode)?.build()
+    )?;
 
     let mut nodes = Vec::new();
     for link in links {
-        if let Some(record) = get(link.target, GetOptions::default())? {
-            if let Some(EntryTypes::NodeRegistration(registration)) =
-                record.entry().to_app_option().ok().flatten() {
-                nodes.push(registration);
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(registration) = deserialize_node_registration(&record)? {
+                    nodes.push(registration);
+                }
             }
         }
     }
@@ -470,15 +477,17 @@ pub fn get_assignments_for_content(content_id: String) -> ExternResult<Vec<Custo
     };
     let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
 
-    let query = LinkQuery::try_new(content_anchor_hash, LinkTypes::ContentToAssignment)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(
+        GetLinksInputBuilder::try_new(content_anchor_hash, LinkTypes::ContentToAssignment)?.build()
+    )?;
 
     let mut assignments = Vec::new();
     for link in links {
-        if let Some(record) = get(link.target, GetOptions::default())? {
-            if let Some(EntryTypes::CustodianAssignment(assignment)) =
-                record.entry().to_app_option().ok().flatten() {
-                assignments.push(assignment);
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(assignment) = deserialize_custodian_assignment(&record)? {
+                    assignments.push(assignment);
+                }
             }
         }
     }
@@ -495,15 +504,17 @@ pub fn get_assignments_for_node(node_id: String) -> ExternResult<Vec<CustodianAs
     };
     let node_anchor_hash = hash_entry(&EntryTypes::StringAnchor(node_anchor))?;
 
-    let query = LinkQuery::try_new(node_anchor_hash, LinkTypes::NodeToAssignment)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(
+        GetLinksInputBuilder::try_new(node_anchor_hash, LinkTypes::NodeToAssignment)?.build()
+    )?;
 
     let mut assignments = Vec::new();
     for link in links {
-        if let Some(record) = get(link.target, GetOptions::default())? {
-            if let Some(EntryTypes::CustodianAssignment(assignment)) =
-                record.entry().to_app_option().ok().flatten() {
-                assignments.push(assignment);
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(assignment) = deserialize_custodian_assignment(&record)? {
+                    assignments.push(assignment);
+                }
             }
         }
     }
@@ -525,31 +536,33 @@ pub fn detect_failed_nodes(_: ()) -> ExternResult<Vec<String>> {
     };
     let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
 
-    let query = LinkQuery::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(
+        GetLinksInputBuilder::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?.build()
+    )?;
 
     let mut failed_nodes = Vec::new();
     let now = sys_time()?;
 
     for link in links {
-        if let Some(record) = get(link.target, GetOptions::default())? {
-            if let Some(EntryTypes::NodeRegistration(registration)) =
-                record.entry().to_app_option().ok().flatten() {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(registration) = deserialize_node_registration(&record)? {
 
-                // Check latest heartbeat
-                match get_latest_heartbeat(&registration.node_id) {
-                    Ok(heartbeat) => {
-                        let heartbeat_time = parse_timestamp(&heartbeat.timestamp)?;
-                        let elapsed = now.as_seconds_and_nanos().0 - heartbeat_time.as_seconds_and_nanos().0;
+                    // Check latest heartbeat
+                    match get_latest_heartbeat(&registration.node_id) {
+                        Ok(heartbeat) => {
+                            let heartbeat_time = parse_timestamp(&heartbeat.timestamp)?;
+                            let elapsed = now.as_seconds_and_nanos().0 - heartbeat_time.as_seconds_and_nanos().0;
 
-                        // If no heartbeat in 60 seconds, mark as failed
-                        if elapsed > 60 {
+                            // If no heartbeat in 60 seconds, mark as failed
+                            if elapsed > 60 {
+                                failed_nodes.push(registration.node_id);
+                            }
+                        }
+                        Err(_) => {
+                            // No heartbeat found at all - mark as failed
                             failed_nodes.push(registration.node_id);
                         }
-                    }
-                    Err(_) => {
-                        // No heartbeat found at all - mark as failed
-                        failed_nodes.push(registration.node_id);
                     }
                 }
             }
@@ -572,6 +585,7 @@ pub fn trigger_disaster_recovery(failed_node_id: String) -> ExternResult<Vec<Act
         let filters = CustodianFilters {
             region: Some(assignment.preferred_region.clone().unwrap_or_default()),
             min_storage_gb: Some(assignment.content_size_gb.unwrap_or(1.0)),
+            min_bandwidth_mbps: None, // No minimum bandwidth for disaster recovery
             min_tier: Some(assignment.required_tier.clone().unwrap_or("caretaker".to_string())),
             exclude_nodes: Some(vec![failed_node_id.clone()]),
             status: Some("online".to_string()),
@@ -588,6 +602,9 @@ pub fn trigger_disaster_recovery(failed_node_id: String) -> ExternResult<Vec<Act
             })?;
             continue;
         }
+
+        // Store content_id before moving into new assignment
+        let content_id_for_lookup = assignment.content_id.clone();
 
         // Create new assignment with first available custodian
         let new_assignment = CustodianAssignment {
@@ -614,7 +631,7 @@ pub fn trigger_disaster_recovery(failed_node_id: String) -> ExternResult<Vec<Act
         emit_signal(Signal::ReplicateContent {
             content_id: new_assignment.content_id,
             content_hash: new_assignment.content_hash,
-            from_custodians: find_other_custodians(&assignment.content_id, &failed_node_id)?,
+            from_custodians: find_other_custodians(&content_id_for_lookup, &failed_node_id)?,
             to_custodian: new_assignment.custodian_node_id,
             strategy: new_assignment.strategy,
         })?;
@@ -648,6 +665,70 @@ pub enum Signal {
 // HELPER FUNCTIONS
 // ============================================================================
 
+/// Deserialize a NodeRegistration from a Record
+fn deserialize_node_registration(record: &Record) -> ExternResult<Option<NodeRegistration>> {
+    match record.entry().as_option() {
+        Some(entry) => {
+            let sb: SerializedBytes = entry.clone().try_into().map_err(|e: SerializedBytesError| {
+                wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e)))
+            })?;
+            let registration: NodeRegistration = sb.try_into().map_err(|e: SerializedBytesError| {
+                wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
+            })?;
+            Ok(Some(registration))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Deserialize a NodeHeartbeat from a Record
+fn deserialize_node_heartbeat(record: &Record) -> ExternResult<Option<NodeHeartbeat>> {
+    match record.entry().as_option() {
+        Some(entry) => {
+            let sb: SerializedBytes = entry.clone().try_into().map_err(|e: SerializedBytesError| {
+                wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e)))
+            })?;
+            let heartbeat: NodeHeartbeat = sb.try_into().map_err(|e: SerializedBytesError| {
+                wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
+            })?;
+            Ok(Some(heartbeat))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Deserialize a HealthAttestation from a Record
+fn deserialize_health_attestation(record: &Record) -> ExternResult<Option<HealthAttestation>> {
+    match record.entry().as_option() {
+        Some(entry) => {
+            let sb: SerializedBytes = entry.clone().try_into().map_err(|e: SerializedBytesError| {
+                wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e)))
+            })?;
+            let attestation: HealthAttestation = sb.try_into().map_err(|e: SerializedBytesError| {
+                wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
+            })?;
+            Ok(Some(attestation))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Deserialize a CustodianAssignment from a Record
+fn deserialize_custodian_assignment(record: &Record) -> ExternResult<Option<CustodianAssignment>> {
+    match record.entry().as_option() {
+        Some(entry) => {
+            let sb: SerializedBytes = entry.clone().try_into().map_err(|e: SerializedBytesError| {
+                wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e)))
+            })?;
+            let assignment: CustodianAssignment = sb.try_into().map_err(|e: SerializedBytesError| {
+                wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
+            })?;
+            Ok(Some(assignment))
+        }
+        None => Ok(None),
+    }
+}
+
 fn get_node_registration_by_id(node_id: String) -> ExternResult<NodeRegistration> {
     let id_anchor = StringAnchor {
         anchor_type: "node_id".to_string(),
@@ -655,8 +736,9 @@ fn get_node_registration_by_id(node_id: String) -> ExternResult<NodeRegistration
     };
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
 
-    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToNodeRegistration)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(
+        GetLinksInputBuilder::try_new(id_anchor_hash, LinkTypes::IdToNodeRegistration)?.build()
+    )?;
 
     if links.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -664,10 +746,11 @@ fn get_node_registration_by_id(node_id: String) -> ExternResult<NodeRegistration
         )));
     }
 
-    if let Some(record) = get(links[0].target.clone(), GetOptions::default())? {
-        if let Some(EntryTypes::NodeRegistration(registration)) =
-            record.entry().to_app_option().ok().flatten() {
-            return Ok(registration);
+    if let Some(action_hash) = links[0].target.clone().into_action_hash() {
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(registration) = deserialize_node_registration(&record)? {
+                return Ok(registration);
+            }
         }
     }
 
@@ -683,8 +766,9 @@ fn get_node_registration_hash(node_id: &str) -> ExternResult<ActionHash> {
     };
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
 
-    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToNodeRegistration)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(
+        GetLinksInputBuilder::try_new(id_anchor_hash, LinkTypes::IdToNodeRegistration)?.build()
+    )?;
 
     if links.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -692,9 +776,9 @@ fn get_node_registration_hash(node_id: &str) -> ExternResult<ActionHash> {
         )));
     }
 
-    Ok(links[0].target.clone().into_action_hash().ok_or_else(|| {
+    links[0].target.clone().into_action_hash().ok_or_else(|| {
         wasm_error!(WasmErrorInner::Guest("Invalid action hash".to_string()))
-    })?)
+    })
 }
 
 fn get_node_by_agent(agent_key: AgentPubKey) -> ExternResult<NodeRegistration> {
@@ -705,15 +789,17 @@ fn get_node_by_agent(agent_key: AgentPubKey) -> ExternResult<NodeRegistration> {
     };
     let custodian_anchor_hash = hash_entry(&EntryTypes::StringAnchor(custodian_anchor))?;
 
-    let query = LinkQuery::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(
+        GetLinksInputBuilder::try_new(custodian_anchor_hash, LinkTypes::CustodianToNode)?.build()
+    )?;
 
     for link in links {
-        if let Some(record) = get(link.target, GetOptions::default())? {
-            if let Some(EntryTypes::NodeRegistration(registration)) =
-                record.entry().to_app_option().ok().flatten() {
-                if registration.agent_pub_key == agent_key.to_string() {
-                    return Ok(registration);
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(registration) = deserialize_node_registration(&record)? {
+                    if registration.agent_pub_key == agent_key.to_string() {
+                        return Ok(registration);
+                    }
                 }
             }
         }
@@ -731,8 +817,9 @@ fn get_latest_heartbeat(node_id: &str) -> ExternResult<NodeHeartbeat> {
     };
     let node_anchor_hash = hash_entry(&EntryTypes::StringAnchor(node_anchor))?;
 
-    let query = LinkQuery::try_new(node_anchor_hash, LinkTypes::NodeToHeartbeat)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(
+        GetLinksInputBuilder::try_new(node_anchor_hash, LinkTypes::NodeToHeartbeat)?.build()
+    )?;
 
     if links.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -743,10 +830,11 @@ fn get_latest_heartbeat(node_id: &str) -> ExternResult<NodeHeartbeat> {
     // Get the most recent heartbeat (links are ordered by creation time)
     let latest_link = &links[links.len() - 1];
 
-    if let Some(record) = get(latest_link.target.clone(), GetOptions::default())? {
-        if let Some(EntryTypes::NodeHeartbeat(heartbeat)) =
-            record.entry().to_app_option().ok().flatten() {
-            return Ok(heartbeat);
+    if let Some(action_hash) = latest_link.target.clone().into_action_hash() {
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(heartbeat) = deserialize_node_heartbeat(&record)? {
+                return Ok(heartbeat);
+            }
         }
     }
 
@@ -755,29 +843,31 @@ fn get_latest_heartbeat(node_id: &str) -> ExternResult<NodeHeartbeat> {
     )))
 }
 
-fn get_recent_attestations(node_id: &str, max_age_seconds: u64) -> ExternResult<Vec<HealthAttestation>> {
+fn get_recent_attestations(node_id: &str, max_age_seconds: i64) -> ExternResult<Vec<HealthAttestation>> {
     let subject_anchor = StringAnchor {
         anchor_type: "node_id".to_string(),
         anchor_value: node_id.to_string(),
     };
     let subject_anchor_hash = hash_entry(&EntryTypes::StringAnchor(subject_anchor))?;
 
-    let query = LinkQuery::try_new(subject_anchor_hash, LinkTypes::NodeToAttestations)?;
-    let links = get_links(query, GetStrategy::default())?;
+    let links = get_links(
+        GetLinksInputBuilder::try_new(subject_anchor_hash, LinkTypes::NodeToAttestations)?.build()
+    )?;
 
     let now = sys_time()?;
     let mut recent_attestations = Vec::new();
 
     for link in links {
-        if let Some(record) = get(link.target, GetOptions::default())? {
-            if let Some(EntryTypes::HealthAttestation(attestation)) =
-                record.entry().to_app_option().ok().flatten() {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(attestation) = deserialize_health_attestation(&record)? {
 
-                let attestation_time = parse_timestamp(&attestation.timestamp)?;
-                let elapsed = now.as_seconds_and_nanos().0 - attestation_time.as_seconds_and_nanos().0;
+                    let attestation_time = parse_timestamp(&attestation.timestamp)?;
+                    let elapsed = now.as_seconds_and_nanos().0 - attestation_time.as_seconds_and_nanos().0;
 
-                if elapsed <= max_age_seconds {
-                    recent_attestations.push(attestation);
+                    if elapsed <= max_age_seconds {
+                        recent_attestations.push(attestation);
+                    }
                 }
             }
         }

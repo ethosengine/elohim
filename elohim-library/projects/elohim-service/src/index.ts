@@ -41,5 +41,8 @@ export * from './services/import-pipeline.service';
 // Database
 export * from './db';
 
+// Cache (framework-agnostic reach-aware caching)
+export * from './cache';
+
 // Re-export main functions for convenience
 export { runImportPipeline, importContent } from './services/import-pipeline.service';

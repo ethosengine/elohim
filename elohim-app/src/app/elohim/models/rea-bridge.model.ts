@@ -46,6 +46,9 @@ import {
   type GovernanceLayer,
 } from './protocol-core.model';
 
+// Re-export governance types for consumers
+export type { GovernanceLayer } from './protocol-core.model';
+
 // ============================================================================
 // ValueFlows Action Vocabulary
 // ============================================================================

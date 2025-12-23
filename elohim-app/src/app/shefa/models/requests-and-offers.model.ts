@@ -637,22 +637,4 @@ export interface ListingAdminStatus {
   metadata?: Record<string, unknown>;
 }
 
-// ============================================================================
-// TYPE EXPORTS
-// ============================================================================
-
-export type {
-  ContactPreference,
-  TimePreference,
-  InteractionType,
-  DateRange,
-  UserPreferences,
-  ServiceType,
-  MediumOfExchange,
-  ServiceRequest,
-  ServiceOffer,
-  ServiceMatch,
-  SavedRequest,
-  SavedOffer,
-  ListingAdminStatus,
-};
+// Note: Types are exported inline with their type/interface declarations above.

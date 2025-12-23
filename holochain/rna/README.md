@@ -85,6 +85,19 @@ The migration happens in four phases:
 3. **Import** (Ribosome synthesis) - Create entries in target DNA
 4. **Verify** (Quality control) - Check counts and reference integrity
 
+## Two Migration Patterns
+
+### 1. External Orchestration (Original)
+
+Use TypeScript CLI or external tooling to drive migration. Good for one-time migrations or controlled deployments.
+
+### 2. Self-Healing DNA (New)
+
+The DNA heals itself continuously - no external tools needed. Perfect for:
+- Rapid schema iteration during development
+- Zero-downtime deployments
+- Graceful degradation when healing fails
+
 ## Module Structure
 
 ```
@@ -97,7 +110,15 @@ holochain/rna/
 │       ├── bridge.rs             # bridge_call helper (tRNA)
 │       ├── report.rs             # MigrationReport structs
 │       ├── config.rs             # Configuration types
-│       └── traits.rs             # Exporter, Transformer, Importer
+│       ├── traits.rs             # Exporter, Transformer, Importer
+│       │
+│       │   # Self-Healing Extension
+│       ├── healing.rs            # ValidationStatus, HealingSignal, HealingReport
+│       ├── self_healing.rs       # SelfHealingEntry trait
+│       ├── healing_orchestrator.rs  # HealingOrchestrator
+│       ├── entry_type_provider.rs   # Pluggable provider traits
+│       ├── healing_strategy.rs   # BridgeFirst, SelfRepairFirst, etc.
+│       └── flexible_orchestrator.rs # FlexibleOrchestrator
 ├── typescript/                   # TypeScript package
 │   ├── package.json
 │   └── src/
@@ -335,6 +356,72 @@ if (!report.verification.passed) {
   // Decide: retry, manual fix, or rollback
 }
 ```
+
+## Self-Healing DNA Pattern
+
+For DNAs that need continuous healing without external orchestration:
+
+### 1. Implement Entry Type Providers
+
+```rust
+use hc_rna::{EntryTypeProvider, Validator, Transformer, ReferenceResolver, DegradationHandler};
+
+pub struct ContentProvider;
+impl EntryTypeProvider for ContentProvider {
+    fn entry_type(&self) -> &str { "content" }
+    fn validator(&self) -> &dyn Validator { &ContentValidator }
+    fn transformer(&self) -> &dyn Transformer { &ContentTransformer }
+    fn reference_resolver(&self) -> &dyn ReferenceResolver { &ContentReferenceResolver }
+    fn degradation_handler(&self) -> &dyn DegradationHandler { &ContentDegradationHandler }
+}
+```
+
+### 2. Register in DNA init()
+
+```rust
+use hc_rna::{EntryTypeRegistry, FlexibleOrchestrator, BridgeFirstStrategy};
+
+fn init_healing() -> ExternResult<()> {
+    let mut registry = EntryTypeRegistry::new();
+    registry.register(Arc::new(ContentProvider))?;
+    registry.register(Arc::new(LearningPathProvider))?;
+
+    let orchestrator = FlexibleOrchestrator::new(
+        FlexibleOrchestratorConfig {
+            v1_role_name: Some("my-dna-v1".to_string()),
+            healing_strategy: Arc::new(BridgeFirstStrategy),
+            allow_degradation: true,
+            ..Default::default()
+        },
+        registry,
+    );
+    Ok(())
+}
+```
+
+### 3. Use in Read Paths
+
+```rust
+// Try v2 first, fall back to healing
+if let Some(entry) = get_from_v2(id)? {
+    return Ok(Some(entry));
+}
+if let Some(healed) = orchestrator.heal_by_id("content", id, None)? {
+    return Ok(Some(healed.entry));
+}
+Ok(None)
+```
+
+### Healing Strategies
+
+| Strategy | Behavior |
+|----------|----------|
+| `BridgeFirstStrategy` | Try v1 bridge, fall back to local repair |
+| `SelfRepairFirstStrategy` | Try local repair, fall back to v1 bridge |
+| `LocalRepairOnlyStrategy` | Never use v1, only local repair |
+| `NoHealingStrategy` | Accept entries as-is, no healing |
+
+See `holochain/dna/lamad-spike/` for a complete implementation example.
 
 ## Contributing
 

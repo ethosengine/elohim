@@ -16,7 +16,7 @@ import {
   FuzzyMatch,
   PlaidTransaction,
   StagedTransaction,
-} from '@elohim/models/transaction-import.model';
+} from '../models/transaction-import.model';
 
 /**
  * Transaction candidate for fuzzy matching

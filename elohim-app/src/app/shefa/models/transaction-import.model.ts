@@ -8,8 +8,8 @@
  * Plaid Bank API → PlaidTransaction[] → StagedTransaction[] → EconomicEvent[]
  */
 
-import { ResourceMeasure } from '@elohim/models/economic/resource.model';
-import { EventState } from '@elohim/models/economic/event.model';
+import { ResourceMeasure } from './stewarded-resources.model';
+import { EventState } from '@app/elohim/models/economic-event.model';
 
 // ============================================================================
 // PLAID CONNECTION MANAGEMENT
@@ -452,10 +452,10 @@ export interface StagedTransactionEntry {
   batch_id: string;
   plaid_transaction_id: string;
   timestamp: number;
-  amount: f64; // Floating point in Rust
+  amount: number; // f64 in Rust
   description: string;
   category: string;
-  category_confidence: u8;
+  category_confidence: number; // u8 in Rust (0-100)
   review_status: string;
   economic_event_id?: string;
   plaid_raw_data_json: string;
