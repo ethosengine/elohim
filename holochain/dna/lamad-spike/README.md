@@ -1,8 +1,8 @@
 # Lamad Spike DNA
 
-Minimal Holochain DNA for testing browser-to-conductor connectivity.
+Minimal Holochain DNA for testing browser-to-conductor connectivity and learning path coordination.
 
-## Purpose
+## Architecture
 
 This DNA exists to validate the web-first architecture:
 1. Browser connects to Edge Node via WebSocket
@@ -63,8 +63,64 @@ pub struct Content {
 
 ## Next Steps
 
-Once this spike works, expand to full Lamad DNA with:
 - ContentNode with all fields
 - LearningPath entries
-- Progress tracking
-- Cross-references (links)
+- Progress tracking via mastery events (see code comments in integrity zome)
+
+## Self-Healing Schema Evolution
+
+Lamad uses the RNA module's flexible healing architecture to handle schema migrations without external tools or downtime.
+
+### How It Works
+
+When the schema changes (new fields, renamed fields, etc.), the DNA can heal itself:
+
+1. **Dual-role hApp**: Both v1 and v2 DNAs are bundled together
+2. **Lazy healing**: On first read, entries are fetched from v1 via bridge call
+3. **Automatic transformation**: v1 data is transformed to v2 schema
+4. **Graceful degradation**: If healing fails, entries remain accessible but marked "Degraded"
+
+### Architecture
+
+```
+zomes/content_store/src/
+├── lib.rs                    # init() registers providers
+├── providers.rs              # Entry type providers (ContentProvider, etc.)
+├── healing_impl.rs           # V1→V2 transform functions
+└── healing_integration.rs    # Read path healing glue
+```
+
+### Adding New Entry Types
+
+To add a new entry type with healing support:
+
+```rust
+// 1. Create provider (in providers.rs)
+pub struct QuizProvider;
+impl EntryTypeProvider for QuizProvider {
+    fn entry_type(&self) -> &str { "quiz" }
+    fn validator(&self) -> &dyn Validator { &QuizValidator }
+    fn transformer(&self) -> &dyn Transformer { &QuizTransformer }
+    // ...
+}
+
+// 2. Register in init_flexible_orchestrator() (lib.rs)
+registry.register(Arc::new(QuizProvider))?;
+```
+
+No changes needed to RNA framework, orchestrator, or other providers.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `holochain/rna/rust/src/` | Core healing framework |
+| `zomes/content_store/src/providers.rs` | Lamad entry type providers |
+| `zomes/content_store/src/healing_impl.rs` | V1→V2 transformations |
+
+## Vision & Design
+
+For design rationale and governance policy, see:
+- `docs/content/elohim-protocol/` - Elohim Protocol Manifesto
+- `docs/content/lamad/` - Lamad learning system
+- `zomes/content_store_integrity/src/lib.rs` - LinkTypes with inline comments

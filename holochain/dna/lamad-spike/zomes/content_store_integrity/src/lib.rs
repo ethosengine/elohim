@@ -3684,10 +3684,7 @@ pub enum LinkTypes {
     IdToStep,                   // Anchor(step_id) -> PathStep
     PathToStep,
     StepToContent,
-    PathByCreator,              // Anchor(created_by) -> LearningPath
-    PathByDifficulty,           // Anchor(difficulty) -> LearningPath
-    PathByType,                 // Anchor(path_type) -> LearningPath
-    PathByTag,                  // Anchor(tag) -> LearningPath
+    // PathByCreator, PathByDifficulty, PathByType, PathByTag removed - use queries
 
     // =========================================================================
     // Lamad: Chapter links

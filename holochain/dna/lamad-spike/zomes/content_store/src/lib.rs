@@ -2924,7 +2924,7 @@ pub fn create_relationship(input: CreateRelationshipInput) -> ExternResult<Relat
     // By type
     let type_anchor = StringAnchor::new("rel_type", &input.relationship_type);
     let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
-    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::RelationshipByType, ())?;
+    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::ContentRelationshipByType, ())?;
 
     Ok(RelationshipOutput {
         action_hash,
