@@ -30,6 +30,202 @@ def withBuildVars(props, Closure body) {
     }
 }
 
+// ============================================================================
+// STAGE HELPER METHODS (to reduce bytecode size)
+// ============================================================================
+
+def orchestrateMonoRepo() {
+    echo """
+    ═══════════════════════════════════════════════════════════
+    📋 ELOHIM MONO-REPO BUILD ORCHESTRATION
+    ═══════════════════════════════════════════════════════════
+    Branch: ${env.BRANCH_NAME}
+    Commit: ${env.GIT_COMMIT ?: 'unknown'}
+    Build: ${env.BUILD_NUMBER}
+    ═══════════════════════════════════════════════════════════
+    """
+
+    // Detect changesets
+    def changesetElohimApp = sh(
+        script: '''
+            git diff --name-only HEAD~1 2>/dev/null | \
+            grep -E "^(elohim-app/|elohim-library/|Jenkinsfile|VERSION)" || echo ""
+        ''',
+        returnStdout: true
+    ).trim()
+
+    def changesetHolochain = sh(
+        script: '''
+            git diff --name-only HEAD~1 2>/dev/null | \
+            grep -E "^holochain/" || echo ""
+        ''',
+        returnStdout: true
+    ).trim()
+
+    def changesetSteward = sh(
+        script: '''
+            git diff --name-only HEAD~1 2>/dev/null | \
+            grep -E "^(steward/|holochain/dna/|elohim-app/src/|VERSION)" || echo ""
+        ''',
+        returnStdout: true
+    ).trim()
+
+    // Build matrix
+    def buildMatrix = [
+        'elohim-app': !changesetElohimApp.isEmpty() ||
+            env.BRANCH_NAME == 'main' ||
+            env.BRANCH_NAME == 'staging' ||
+            env.BRANCH_NAME == 'dev',
+        'holochain': !changesetHolochain.isEmpty(),
+        'steward': !changesetSteward.isEmpty()
+    ]
+
+    echo """
+    📊 CHANGESET ANALYSIS
+    ─────────────────────────────────────────────────────────────
+    """
+
+    if (!changesetElohimApp.isEmpty()) {
+        echo "  elohim-app changes detected:"
+        changesetElohimApp.split('\n').each { echo "    - \$it" }
+    }
+
+    if (!changesetHolochain.isEmpty()) {
+        echo "  holochain changes detected:"
+        changesetHolochain.split('\n').each { echo "    - \$it" }
+    }
+
+    if (!changesetSteward.isEmpty()) {
+        echo "  steward changes detected:"
+        changesetSteward.split('\n').each { echo "    - \$it" }
+    }
+
+    echo """
+    🎯 BUILD MATRIX
+    ─────────────────────────────────────────────────────────────
+    ${buildMatrix.collect { k, v ->
+        "  ${v ? '✅ BUILD' : '⏭️  SKIP'} ${k}"
+    }.join('\n')}
+    ═══════════════════════════════════════════════════════════
+    """
+
+    currentBuild.description = buildMatrix.collect { k, v ->
+        "${v ? '✅' : '⏭️'} ${k}"
+    }.join(' | ')
+
+    echo """
+    📡 ORCHESTRATION PLAN
+    ─────────────────────────────────────────────────────────────
+    Webhook will trigger these pipelines based on changesets:
+    ${buildMatrix.collect { k, v ->
+        "  ${v ? '✅ WILL RUN' : '⏭️  SKIP'} ${k} pipeline"
+    }.join('\n')}
+
+    Each pipeline respects its own when{} conditions and
+    changeset filters. This orchestrator provides visibility
+    into what's expected to run and why.
+    ═══════════════════════════════════════════════════════════
+    """
+}
+
+def runE2ETests(String environment, String baseUrl, String gitCommitHash) {
+    echo "Running E2E tests against ${environment}"
+    env.E2E_TESTS_RAN = 'true'
+
+    // Install Cypress if needed
+    sh '''
+        if [ ! -d "node_modules/cypress" ]; then
+            npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
+        fi
+    '''
+
+    // Verify environment is up
+    sh """
+        timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" ${baseUrl} | grep -q "200\\|302\\|301"; do
+            sleep 5
+        done'
+        echo "✅ ${environment} site is responding"
+    """
+
+    // Run tests
+    sh """#!/bin/bash
+        export CYPRESS_baseUrl=${baseUrl}
+        export CYPRESS_ENV=${environment}
+        export CYPRESS_EXPECTED_GIT_HASH=${gitCommitHash}
+        export NO_COLOR=1
+        export DISPLAY=:99
+
+        Xvfb :99 -screen 0 1024x768x24 -ac > /dev/null 2>&1 &
+        XVFB_PID=\\\$!
+        sleep 2
+
+        npx cypress verify > /dev/null
+        mkdir -p cypress/reports
+
+        npx cypress run \\
+            --headless \\
+            --browser chromium \\
+            --spec "cypress/e2e/staging-validation.feature"
+
+        kill \\\$XVFB_PID 2>/dev/null || true
+    """
+
+    echo "✅ ${environment} validation passed!"
+}
+
+def publishE2EReports(String environment) {
+    if (env.E2E_TESTS_RAN == 'true') {
+        echo '📊 Publishing cucumber reports...'
+
+        if (environment == 'staging') {
+            sh 'echo "DEBUG: Contents of cypress directory:"'
+            sh 'find cypress -type f -name "*" 2>/dev/null || echo "cypress directory not found"'
+            sh 'echo "DEBUG: Contents of cypress/reports directory:"'
+            sh 'ls -la cypress/reports/ 2>/dev/null || echo "cypress/reports directory not found"'
+            sh 'echo "DEBUG: Current working directory: $(pwd)"'
+            sh 'echo "DEBUG: Absolute path to cucumber report: $(pwd)/cypress/reports/cucumber-report.json"'
+            sh 'test -f cypress/reports/cucumber-report.json && echo "DEBUG: File exists and is readable" || echo "DEBUG: File does not exist or is not readable"'
+        }
+
+        if (fileExists('cypress/reports/cucumber-report.json')) {
+            cucumber([
+                reportTitle: "E2E Test Results (${environment})",
+                fileIncludePattern: 'cucumber-report.json',
+                jsonReportDirectory: 'cypress/reports',
+                buildStatus: 'FAILURE',
+                failedFeaturesNumber: -1,
+                failedScenariosNumber: -1,
+                failedStepsNumber: -1,
+                skippedStepsNumber: -1,
+                pendingStepsNumber: -1,
+                undefinedStepsNumber: -1
+            ])
+            echo 'Cucumber reports published successfully'
+        } else {
+            echo 'No cucumber reports found to publish'
+        }
+    } else {
+        echo 'E2E tests did not run - skipping cucumber report publishing'
+    }
+
+    // Archive test artifacts
+    if (env.E2E_TESTS_RAN == 'true') {
+        if (fileExists('cypress/screenshots')) {
+            archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
+        }
+        if (fileExists('cypress/videos')) {
+            archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', allowEmptyArchive: true
+        }
+        if (fileExists('cypress/reports/cucumber-report.json')) {
+            archiveArtifacts artifacts: 'cypress/reports/cucumber-report.json', allowEmptyArchive: true
+        }
+    }
+}
+
+// ============================================================================
+// END HELPER METHODS
+// ============================================================================
+
 pipeline {
     agent {
         kubernetes {
@@ -131,100 +327,7 @@ spec:
             steps {
                 container('builder') {
                     script {
-                        echo """
-                        ═══════════════════════════════════════════════════════════
-                        📋 ELOHIM MONO-REPO BUILD ORCHESTRATION
-                        ═══════════════════════════════════════════════════════════
-                        Branch: ${env.BRANCH_NAME}
-                        Commit: ${env.GIT_COMMIT ?: 'unknown'}
-                        Build: ${env.BUILD_NUMBER}
-                        ═══════════════════════════════════════════════════════════
-                        """
-
-                        // Detect changesets
-                        def changesetElohimApp = sh(
-                            script: '''
-                                git diff --name-only HEAD~1 2>/dev/null | \
-                                grep -E "^(elohim-app/|elohim-library/|Jenkinsfile|VERSION)" || echo ""
-                            ''',
-                            returnStdout: true
-                        ).trim()
-
-                        def changesetHolochain = sh(
-                            script: '''
-                                git diff --name-only HEAD~1 2>/dev/null | \
-                                grep -E "^holochain/" || echo ""
-                            ''',
-                            returnStdout: true
-                        ).trim()
-
-                        def changesetSteward = sh(
-                            script: '''
-                                git diff --name-only HEAD~1 2>/dev/null | \
-                                grep -E "^(steward/|holochain/dna/|elohim-app/src/|VERSION)" || echo ""
-                            ''',
-                            returnStdout: true
-                        ).trim()
-
-                        // Build matrix - determine which pipelines to trigger
-                        def buildMatrix = [
-                            'elohim-app': !changesetElohimApp.isEmpty() ||
-                                env.BRANCH_NAME == 'main' ||
-                                env.BRANCH_NAME == 'staging' ||
-                                env.BRANCH_NAME == 'dev',
-                            'holochain': !changesetHolochain.isEmpty(),
-                            'steward': !changesetSteward.isEmpty()
-                        ]
-
-                        echo """
-                        📊 CHANGESET ANALYSIS
-                        ─────────────────────────────────────────────────────────────
-                        """
-
-                        if (!changesetElohimApp.isEmpty()) {
-                            echo "  elohim-app changes detected:"
-                            changesetElohimApp.split('\n').each { echo "    - \$it" }
-                        }
-
-                        if (!changesetHolochain.isEmpty()) {
-                            echo "  holochain changes detected:"
-                            changesetHolochain.split('\n').each { echo "    - \$it" }
-                        }
-
-                        if (!changesetSteward.isEmpty()) {
-                            echo "  steward changes detected:"
-                            changesetSteward.split('\n').each { echo "    - \$it" }
-                        }
-
-                        echo """
-                        🎯 BUILD MATRIX
-                        ─────────────────────────────────────────────────────────────
-                        ${buildMatrix.collect { k, v ->
-                            "  ${v ? '✅ BUILD' : '⏭️  SKIP'} ${k}"
-                        }.join('\n')}
-                        ═══════════════════════════════════════════════════════════
-                        """
-
-                        // Update build description with matrix
-                        currentBuild.description = buildMatrix.collect { k, v ->
-                            "${v ? '✅' : '⏭️'} ${k}"
-                        }.join(' | ')
-
-                        // Pipeline triggering is handled by GitHub webhooks
-                        // This orchestrator provides visibility and planning
-                        echo """
-                        📡 ORCHESTRATION PLAN
-                        ─────────────────────────────────────────────────────────────
-                        Webhook will trigger these pipelines based on changesets:
-                        ${buildMatrix.collect { k, v ->
-                            "  ${v ? '✅ WILL RUN' : '⏭️  SKIP'} ${k} pipeline"
-                        }.join('\n')}
-
-                        Each pipeline respects its own when{} conditions and
-                        changeset filters. This orchestrator provides visibility
-                        into what's expected to run and why.
-                        ═══════════════════════════════════════════════════════════
-                        """
+                        orchestrateMonoRepo()
                     }
                 }
             }
@@ -927,50 +1030,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     dir('elohim-app') {
                         script {
                             def props = loadBuildVars()
-
                             withBuildVars(props) {
-                                echo 'Running E2E tests against alpha'
-                                env.E2E_TESTS_RAN = 'true'
-
-                                // Install Cypress if needed
-                                sh '''
-                                    if [ ! -d "node_modules/cypress" ]; then
-                                        npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
-                                    fi
-                                '''
-
-                                // Verify alpha is up
-                                sh '''
-                                    timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://alpha.elohim.host | grep -q "200\\|302\\|301"; do
-                                        sleep 5
-                                    done'
-                                    echo "✅ Alpha site is responding"
-                                '''
-
-                                // Run tests
-                                sh """#!/bin/bash
-                                    export CYPRESS_baseUrl=https://alpha.elohim.host
-                                    export CYPRESS_ENV=alpha
-                                    export CYPRESS_EXPECTED_GIT_HASH=${GIT_COMMIT_HASH}
-                                    export NO_COLOR=1
-                                    export DISPLAY=:99
-
-                                    Xvfb :99 -screen 0 1024x768x24 -ac > /dev/null 2>&1 &
-                                    XVFB_PID=\$!
-                                    sleep 2
-
-                                    npx cypress verify > /dev/null
-                                    mkdir -p cypress/reports
-
-                                    npx cypress run \\
-                                        --headless \\
-                                        --browser chromium \\
-                                        --spec "cypress/e2e/staging-validation.feature"
-
-                                    kill \$XVFB_PID 2>/dev/null || true
-                                """
-
-                                echo '✅ Alpha validation passed!'
+                                runE2ETests('alpha', 'https://alpha.elohim.host', env.GIT_COMMIT_HASH)
                             }
                         }
                     }
@@ -983,41 +1044,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 always {
                     dir('elohim-app') {
                         script {
-                            if (env.E2E_TESTS_RAN == 'true') {
-                                echo '📊 Publishing cucumber reports...'
-
-                                // Publish cucumber reports
-                                if (fileExists('cypress/reports/cucumber-report.json')) {
-                                    cucumber([
-                                        reportTitle: 'E2E Test Results (Alpha)',
-                                        fileIncludePattern: 'cucumber-report.json',
-                                        jsonReportDirectory: 'cypress/reports',
-                                        buildStatus: 'FAILURE',
-                                        failedFeaturesNumber: -1,
-                                        failedScenariosNumber: -1,
-                                        failedStepsNumber: -1,
-                                        skippedStepsNumber: -1,
-                                        pendingStepsNumber: -1,
-                                        undefinedStepsNumber: -1
-                                    ])
-                                    echo 'Cucumber reports published successfully'
-                                } else {
-                                    echo 'No cucumber reports found to publish'
-                                }
-                            }
-
-                            // Archive test artifacts
-                            if (env.E2E_TESTS_RAN == 'true') {
-                                if (fileExists('cypress/screenshots')) {
-                                    archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
-                                }
-                                if (fileExists('cypress/videos')) {
-                                    archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', allowEmptyArchive: true
-                                }
-                                if (fileExists('cypress/reports/cucumber-report.json')) {
-                                    archiveArtifacts artifacts: 'cypress/reports/cucumber-report.json', allowEmptyArchive: true
-                                }
-                            }
+                            publishE2EReports('alpha')
                         }
                     }
                 }
@@ -1041,50 +1068,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     dir('elohim-app') {
                         script {
                             def props = loadBuildVars()
-
                             withBuildVars(props) {
-                                echo 'Running E2E tests against staging'
-                                env.E2E_TESTS_RAN = 'true'
-
-                                // Install Cypress if needed
-                                sh '''
-                                    if [ ! -d "node_modules/cypress" ]; then
-                                        npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
-                                    fi
-                                '''
-
-                                // Verify staging is up
-                                sh '''
-                                    timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://staging.elohim.host | grep -q "200\\|302\\|301"; do
-                                        sleep 5
-                                    done'
-                                    echo "✅ Staging site is responding"
-                                '''
-
-                                // Run tests
-                                sh """#!/bin/bash
-                                    export CYPRESS_baseUrl=https://staging.elohim.host
-                                    export CYPRESS_ENV=staging
-                                    export CYPRESS_EXPECTED_GIT_HASH=${GIT_COMMIT_HASH}
-                                    export NO_COLOR=1
-                                    export DISPLAY=:99
-
-                                    Xvfb :99 -screen 0 1024x768x24 -ac > /dev/null 2>&1 &
-                                    XVFB_PID=\$!
-                                    sleep 2
-
-                                    npx cypress verify > /dev/null
-                                    mkdir -p cypress/reports
-
-                                    npx cypress run \\
-                                        --headless \\
-                                        --browser chromium \\
-                                        --spec "cypress/e2e/staging-validation.feature"
-
-                                    kill \$XVFB_PID 2>/dev/null || true
-                                """
-
-                                echo '✅ Staging validation passed!'
+                                runE2ETests('staging', 'https://staging.elohim.host', env.GIT_COMMIT_HASH)
                             }
                         }
                     }
@@ -1097,56 +1082,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 always {
                     dir('elohim-app') {
                         script {
-                            if (env.E2E_TESTS_RAN == 'true') {
-                                echo '📊 Publishing cucumber reports...'
-                                
-                                // Debug: Show what files exist in cypress directory
-                                sh 'echo "DEBUG: Contents of cypress directory:"'
-                                sh 'find cypress -type f -name "*" 2>/dev/null || echo "cypress directory not found"'
-                                
-                                // Debug: Show specifically what's in reports directory
-                                sh 'echo "DEBUG: Contents of cypress/reports directory:"'
-                                sh 'ls -la cypress/reports/ 2>/dev/null || echo "cypress/reports directory not found"'
-                                
-                                // Debug: Show absolute paths for cucumber plugin
-                                sh 'echo "DEBUG: Current working directory: $(pwd)"'
-                                sh 'echo "DEBUG: Absolute path to cucumber report: $(pwd)/cypress/reports/cucumber-report.json"'
-                                sh 'test -f cypress/reports/cucumber-report.json && echo "DEBUG: File exists and is readable" || echo "DEBUG: File does not exist or is not readable"'
-                                
-                                // Publish cucumber reports using cucumber plugin
-                                if (fileExists('cypress/reports/cucumber-report.json')) {
-                                cucumber([
-                                    reportTitle: 'E2E Test Results',
-                                    fileIncludePattern: 'cucumber-report.json',
-                                    jsonReportDirectory: 'cypress/reports',
-                                    buildStatus: 'FAILURE',
-                                    failedFeaturesNumber: -1,
-                                    failedScenariosNumber: -1,
-                                    failedStepsNumber: -1,
-                                    skippedStepsNumber: -1,
-                                    pendingStepsNumber: -1,
-                                    undefinedStepsNumber: -1
-                                ])
-                                    echo 'Cucumber reports published successfully with cucumber plugin'
-                                } else {
-                                    echo 'No cucumber reports found to publish'
-                                }
-                            } else {
-                                echo 'E2E tests did not run - skipping cucumber report publishing'
-                            }
-                            
-                            // Archive test artifacts if E2E tests ran
-                            if (env.E2E_TESTS_RAN == 'true') {
-                                if (fileExists('cypress/screenshots')) {
-                                    archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
-                                }
-                                if (fileExists('cypress/videos')) {
-                                    archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', allowEmptyArchive: true
-                                }
-                                if (fileExists('cypress/reports/cucumber-report.json')) {
-                                    archiveArtifacts artifacts: 'cypress/reports/cucumber-report.json', allowEmptyArchive: true
-                                }
-                            }
+                            publishE2EReports('staging')
                         }
                     }
                 }
