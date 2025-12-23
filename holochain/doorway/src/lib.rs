@@ -12,6 +12,7 @@
 //! - **Signal**: WebRTC signaling relay (SBD protocol)
 //! - **Cache**: In-memory content caching for REST API
 //! - **Projection**: DHT → MongoDB projection engine for fast reads
+//! - **Orchestrator**: Plug-n-play node management with mDNS discovery
 
 pub mod auth;
 pub mod bootstrap;
@@ -21,6 +22,7 @@ pub mod db;
 pub mod hosts;
 pub mod logging;
 pub mod nats;
+pub mod orchestrator;
 pub mod projection;
 pub mod proxy;
 pub mod routes;

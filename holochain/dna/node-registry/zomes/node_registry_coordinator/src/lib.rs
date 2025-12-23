@@ -522,6 +522,174 @@ pub fn get_assignments_for_node(node_id: String) -> ExternResult<Vec<CustodianAs
     Ok(assignments)
 }
 
+/// Input for auto-assigning custodians to a newly registered node
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoAssignInput {
+    /// Node ID to assign custodian responsibilities to
+    pub node_id: String,
+    /// Maximum total GB to assign
+    pub max_total_gb: Option<f64>,
+    /// Preferred content reach levels (0-7, where 0=private, 7=commons)
+    pub preferred_reach_levels: Option<Vec<u8>>,
+    /// Maximum number of assignments to create
+    pub max_assignments: Option<u32>,
+}
+
+/// Result of auto-assignment operation
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoAssignResult {
+    pub node_id: String,
+    pub assignments_created: u32,
+    pub total_gb_assigned: f64,
+    pub assignment_hashes: Vec<ActionHash>,
+    pub skipped_content: Vec<String>,
+}
+
+/// Auto-assign custodian responsibilities to a newly registered node
+///
+/// This function:
+/// 1. Finds content needing additional custodians in the node's region
+/// 2. Prioritizes content by reach level (commons first) and under-replicated items
+/// 3. Creates assignments up to the node's capacity limits
+/// 4. Emits signals for orchestrator to coordinate blob transfer
+#[hdk_extern]
+pub fn auto_assign_custodians(input: AutoAssignInput) -> ExternResult<AutoAssignResult> {
+    // Get the node registration to know capacity and region
+    let registration = get_node_registration_by_id(input.node_id.clone())?;
+
+    // Determine maximum capacity
+    let max_gb = input.max_total_gb
+        .or(registration.max_custody_gb)
+        .unwrap_or(100.0); // Default 100GB
+
+    let max_assignments = input.max_assignments.unwrap_or(50);
+
+    // Get content needing custodians in this region
+    let content_needing_custodians = find_content_needing_custodians(
+        &registration.region,
+        input.preferred_reach_levels.clone(),
+    )?;
+
+    let mut result = AutoAssignResult {
+        node_id: input.node_id.clone(),
+        assignments_created: 0,
+        total_gb_assigned: 0.0,
+        assignment_hashes: Vec::new(),
+        skipped_content: Vec::new(),
+    };
+
+    // Create assignments until we hit limits
+    for content in content_needing_custodians {
+        // Check if we've hit limits
+        if result.assignments_created >= max_assignments {
+            result.skipped_content.push(content.content_id.clone());
+            continue;
+        }
+
+        let content_gb = content.size_gb.unwrap_or(0.1);
+        if result.total_gb_assigned + content_gb > max_gb {
+            result.skipped_content.push(content.content_id.clone());
+            continue;
+        }
+
+        // Create the assignment
+        let assignment = CustodianAssignment {
+            assignment_id: format!("auto-{}-{}", input.node_id, sys_time()?.as_micros()),
+            content_id: content.content_id.clone(),
+            content_hash: content.content_hash.clone(),
+            custodian_node_id: input.node_id.clone(),
+            strategy: content.strategy.clone().unwrap_or("full_replica".to_string()),
+            shard_index: None,
+            preferred_region: Some(registration.region.clone()),
+            required_tier: Some(registration.steward_tier.clone()),
+            content_size_gb: Some(content_gb),
+            decided_by: "auto_assign_custodians".to_string(),
+            decision_round: Some(1),
+            votes_json: "".to_string(),
+            created_at: timestamp_now()?,
+            expires_at: calculate_expiration(365)?, // 1 year
+        };
+
+        match assign_custodian(assignment) {
+            Ok(hash) => {
+                result.assignments_created += 1;
+                result.total_gb_assigned += content_gb;
+                result.assignment_hashes.push(hash);
+
+                // Emit signal for orchestrator to transfer content
+                emit_signal(Signal::ReplicateContent {
+                    content_id: content.content_id.clone(),
+                    content_hash: content.content_hash,
+                    from_custodians: content.existing_custodians,
+                    to_custodian: input.node_id.clone(),
+                    strategy: content.strategy.unwrap_or("full_replica".to_string()),
+                })?;
+            }
+            Err(_) => {
+                // Log error but continue with other assignments
+                result.skipped_content.push(content.content_id);
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+/// Content that needs additional custodians
+#[derive(Debug, Clone)]
+struct ContentNeedingCustodian {
+    content_id: String,
+    content_hash: String,
+    size_gb: Option<f64>,
+    reach_level: u8,
+    current_replicas: u32,
+    target_replicas: u32,
+    existing_custodians: Vec<String>,
+    strategy: Option<String>,
+}
+
+/// Find content that needs additional custodians in a region
+fn find_content_needing_custodians(
+    _region: &str,
+    _preferred_reach_levels: Option<Vec<u8>>,
+) -> ExternResult<Vec<ContentNeedingCustodian>> {
+    // In a full implementation, this would:
+    // 1. Query a content index anchor by region
+    // 2. Check each content's current replica count vs target
+    // 3. Filter by reach level if specified
+    // 4. Sort by priority (under-replicated first, then by reach level)
+
+    // For now, return empty - orchestrator handles actual content discovery
+    // This would be populated by content DNA or projection
+
+    // Placeholder: In production, query content needing replication
+    // let content_anchor = StringAnchor {
+    //     anchor_type: "content_region".to_string(),
+    //     anchor_value: region.to_string(),
+    // };
+    // ... query and filter content ...
+
+    Ok(Vec::new())
+}
+
+/// Get target replica count based on reach level
+fn target_replicas_for_reach(reach_level: u8) -> u32 {
+    // Higher reach = more replicas needed
+    match reach_level {
+        0 => 3,      // Private: 3 replicas (family cluster)
+        1 => 3,      // Invited: 3 replicas
+        2 => 5,      // Local: 5 replicas
+        3 => 7,      // Neighborhood: 7 replicas
+        4 => 10,     // Municipal: 10 replicas
+        5 => 15,     // Bioregional: 15 replicas
+        6 => 20,     // Regional: 20 replicas
+        7 => 30,     // Commons: 30 replicas (widely available)
+        _ => 5,      // Default
+    }
+}
+
 // ============================================================================
 // DISASTER RECOVERY FUNCTIONS
 // ============================================================================
