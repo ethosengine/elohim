@@ -5,6 +5,8 @@
  * This is a deterministic script that loads JSON files created by Claude + MCP tools.
  *
  * Pipeline: docs/ → Claude + MCP → data/lamad/ → seeder → Holochain DHT
+ *
+ * @version 2024-12-24 - Trigger seeder after seed data migration
  */
 
 import { AdminWebsocket, AppWebsocket, encodeHashToBase64, CellId } from '@holochain/client';
