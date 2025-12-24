@@ -351,31 +351,48 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             echo "Building Edge Node image: ${IMAGE_TAG}"
 
-                            // Unstash hApp if it was built
+                            // Get hApp bundle - try stash first, then fetch from artifacts
+                            def haveHapp = false
                             try {
                                 dir('holochain/edgenode') {
                                     unstash 'happ-bundle'
                                 }
-                                echo "hApp bundle included in image"
+                                echo "hApp bundle from current build"
+                                haveHapp = true
                             } catch (Exception e) {
-                                echo "No hApp bundle stashed - Edge Node will need runtime installation"
+                                echo "No hApp stashed in this build - fetching from last successful build..."
+                                def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ"
+                                def fetchResult = sh(
+                                    script: "wget --timeout=30 --tries=3 -O holochain/edgenode/lamad-spike.happ '${artifactUrl}' 2>&1",
+                                    returnStatus: true
+                                )
+                                if (fetchResult == 0) {
+                                    echo "hApp bundle fetched from artifacts"
+                                    haveHapp = true
+                                } else {
+                                    echo "WARNING: Could not fetch hApp - skipping Edge Node build"
+                                }
                             }
 
-                            sh """#!/bin/bash
-                                set -euo pipefail
+                            if (haveHapp) {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
 
-                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+                                    buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                cd holochain/edgenode
+                                    cd holochain/edgenode
 
-                                # Build custom Edge Node with config baked in
-                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
-                                    nerdctl -n k8s.io build \\
-                                    -t elohim-edgenode:${IMAGE_TAG} \\
-                                    -f Dockerfile .
+                                    # Build custom Edge Node with config baked in
+                                    BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                        nerdctl -n k8s.io build \\
+                                        -t elohim-edgenode:${IMAGE_TAG} \\
+                                        -f Dockerfile .
 
-                                nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} elohim-edgenode:${GIT_COMMIT_HASH}
-                            """
+                                    nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} elohim-edgenode:${GIT_COMMIT_HASH}
+                                """
+                            } else {
+                                echo "Skipping Edge Node image build - no hApp available"
+                            }
                         }
                     }
                 }
@@ -394,31 +411,48 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             echo "Building hApp Installer image: ${IMAGE_TAG}"
 
-                            // Unstash hApp if it was built
+                            // Get hApp bundle - try stash first, then fetch from artifacts
+                            def haveHapp = false
                             try {
                                 dir('holochain/edgenode/scripts') {
                                     unstash 'happ-bundle'
                                 }
-                                echo "hApp bundle available for installer image"
+                                echo "hApp bundle from current build"
+                                haveHapp = true
                             } catch (Exception e) {
-                                error "hApp bundle not found - cannot build installer image"
+                                echo "No hApp stashed - fetching from last successful build..."
+                                def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ"
+                                def fetchResult = sh(
+                                    script: "wget --timeout=30 --tries=3 -O holochain/edgenode/scripts/lamad-spike.happ '${artifactUrl}' 2>&1",
+                                    returnStatus: true
+                                )
+                                if (fetchResult == 0) {
+                                    echo "hApp bundle fetched from artifacts"
+                                    haveHapp = true
+                                } else {
+                                    echo "WARNING: Could not fetch hApp - skipping hApp Installer build"
+                                }
                             }
 
-                            sh """#!/bin/bash
-                                set -euo pipefail
+                            if (haveHapp) {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
 
-                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+                                    buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                cd holochain/edgenode/scripts
+                                    cd holochain/edgenode/scripts
 
-                                # Build hApp installer sidecar
-                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
-                                    nerdctl -n k8s.io build \\
-                                    -t elohim-happ-installer:${IMAGE_TAG} \\
-                                    -f Dockerfile .
+                                    # Build hApp installer sidecar
+                                    BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                        nerdctl -n k8s.io build \\
+                                        -t elohim-happ-installer:${IMAGE_TAG} \\
+                                        -f Dockerfile .
 
-                                nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} elohim-happ-installer:${GIT_COMMIT_HASH}
-                            """
+                                    nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} elohim-happ-installer:${GIT_COMMIT_HASH}
+                                """
+                            } else {
+                                echo "Skipping hApp Installer build - no hApp available"
+                            }
                         }
                     }
                 }
