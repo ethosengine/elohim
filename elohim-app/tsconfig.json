@@ -15,7 +15,9 @@
       "@app/qahal": ["src/app/qahal/index.ts"],
       "@app/qahal/*": ["src/app/qahal/*"],
       "@app/shefa": ["src/app/shefa/index.ts"],
-      "@app/shefa/*": ["src/app/shefa/*"]
+      "@app/shefa/*": ["src/app/shefa/*"],
+      "@app/doorway": ["src/app/doorway/index.ts"],
+      "@app/doorway/*": ["src/app/doorway/*"]
     },
     "outDir": "./dist/out-tsc",
     "strict": true,

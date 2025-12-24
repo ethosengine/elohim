@@ -26,6 +26,11 @@ export const routes: Routes = [
     loadChildren: () =>
       import('./imagodei/imagodei.routes').then(m => m.IMAGODEI_ROUTES)
   },
+  {
+    path: 'doorway',
+    loadChildren: () =>
+      import('./doorway/doorway.routes').then(m => m.DOORWAY_ROUTES)
+  },
   // 404 catch-all - must be last
   {
     path: '**',

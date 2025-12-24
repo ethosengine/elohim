@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Input, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router, NavigationEnd } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -11,11 +11,12 @@ import { HolochainClientService } from '../../services/holochain-client.service'
 import { EdgeNodeDisplayInfo } from '../../models/holochain-connection.model';
 import { SovereigntyBadgeComponent } from '../../../lamad/components/sovereignty-badge/sovereignty-badge.component';
 import { IdentityService } from '../../../imagodei/services/identity.service';
+import { RunningContextService } from '@app/doorway/services/running-context.service';
 
 /**
  * Context app identifiers for the Elohim Protocol
  */
-export type ContextApp = 'lamad' | 'community' | 'shefa';
+export type ContextApp = 'lamad' | 'community' | 'shefa' | 'doorway';
 
 /**
  * Context app configuration
@@ -70,8 +71,8 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   /** Copy feedback state */
   copiedField: string | null = null;
 
-  /** Available context apps */
-  readonly contextApps: ContextAppConfig[] = [
+  /** Base context apps (always available) */
+  private readonly baseContextApps: ContextAppConfig[] = [
     {
       id: 'lamad',
       name: 'Lamad',
@@ -97,6 +98,30 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       available: true
     }
   ];
+
+  /** Doorway context app (only for always-on nodes with web hosting) */
+  private readonly doorwayApp: ContextAppConfig = {
+    id: 'doorway',
+    name: 'Doorway',
+    icon: '🌐',
+    route: '/doorway',
+    tagline: 'Web Hosting Configuration',
+    available: true
+  };
+
+  /** Running context service - determines if operator mode is available */
+  private readonly runningContext = inject(RunningContextService);
+
+  /**
+   * Available context apps - includes Doorway when user has web-hosting capable nodes
+   */
+  readonly contextApps = computed(() => {
+    const apps = [...this.baseContextApps];
+    if (this.runningContext.hasDoorwayCapableNode()) {
+      apps.push(this.doorwayApp);
+    }
+    return apps;
+  });
 
   private readonly destroy$ = new Subject<void>();
 
@@ -132,6 +157,9 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   readonly identityMode = computed(() => this.identityService.mode());
 
   ngOnInit(): void {
+    // Start context detection to determine if operator mode is available
+    this.runningContext.startPeriodicDetection();
+
     // Subscribe to session human state
     this.sessionHumanService.session$.pipe(takeUntil(this.destroy$)).subscribe(session => {
       this.session = session;
@@ -157,6 +185,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.runningContext.stopPeriodicDetection();
     document.removeEventListener('click', this.handleOutsideClick.bind(this));
   }
 
@@ -168,14 +197,15 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    * Get the current context app config
    */
   get currentApp(): ContextAppConfig {
-    return this.contextApps.find(app => app.id === this.context) || this.contextApps[0];
+    const apps = this.contextApps();
+    return apps.find(app => app.id === this.context) || apps[0];
   }
 
   /**
    * Get other available context apps
    */
   get otherApps(): ContextAppConfig[] {
-    return this.contextApps.filter(app => app.id !== this.context);
+    return this.contextApps().filter(app => app.id !== this.context);
   }
 
   /**
