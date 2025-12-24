@@ -1,0 +1,6 @@
+# Seed Trigger File
+# Updated: 2024-12-24
+# Purpose: Force Jenkins seeder to run when seed data is updated
+#
+# This file is tracked in git and any change to it will trigger the seeder.
+# Last migration: contentFormat schema alignment (287 files)
