@@ -116,11 +116,93 @@ impl HeartbeatLoop {
 pub struct HeartbeatMessage {
     pub node_id: String,
     pub timestamp: String,
+    // Resource metrics
     pub cpu_usage_percent: f64,
     pub memory_usage_percent: f64,
     pub storage_usage_tb: f64,
     pub active_connections: u32,
     pub custodied_content_gb: f64,
+    // Human-scale metrics (optional for backward compat)
+    #[serde(default)]
+    pub social_metrics: Option<SocialMetrics>,
+}
+
+/// Human-scale metrics for nodes
+///
+/// These metrics connect technical infrastructure to social relationships:
+/// - Steward tier reflects commitment level to the network
+/// - Reach levels indicate what content this node can serve
+/// - Trust score reflects reliability based on peer attestations
+/// - Humans served shows impact in the network
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SocialMetrics {
+    /// Steward tier: caretaker (0) → guardian (1) → steward (2) → pioneer (3)
+    pub steward_tier: String,
+    /// Maximum reach level this node serves (0=private, 7=commons)
+    pub max_reach_level: u8,
+    /// Reach levels actively being served
+    pub active_reach_levels: Vec<u8>,
+    /// Trust score from peer attestations (0.0 - 1.0)
+    pub trust_score: f64,
+    /// Number of unique humans served in last period
+    pub humans_served: u32,
+    /// Content pieces actively custodied
+    pub content_custodied: u32,
+    /// Successful content deliveries in last period
+    pub successful_deliveries: u32,
+    /// Failed content deliveries in last period
+    pub failed_deliveries: u32,
+}
+
+impl Default for SocialMetrics {
+    fn default() -> Self {
+        Self {
+            steward_tier: "caretaker".to_string(),
+            max_reach_level: 7, // commons by default
+            active_reach_levels: vec![7],
+            trust_score: 0.5, // neutral starting point
+            humans_served: 0,
+            content_custodied: 0,
+            successful_deliveries: 0,
+            failed_deliveries: 0,
+        }
+    }
+}
+
+impl SocialMetrics {
+    /// Calculate delivery success rate
+    pub fn delivery_success_rate(&self) -> f64 {
+        let total = self.successful_deliveries + self.failed_deliveries;
+        if total == 0 {
+            return 1.0; // No deliveries = no failures
+        }
+        self.successful_deliveries as f64 / total as f64
+    }
+
+    /// Calculate human-scale impact score (0.0 - 1.0)
+    ///
+    /// Weighs multiple factors:
+    /// - 30% steward tier (commitment)
+    /// - 25% trust score (reliability)
+    /// - 25% delivery success rate (performance)
+    /// - 20% reach breadth (accessibility)
+    pub fn impact_score(&self) -> f64 {
+        let tier_score = match self.steward_tier.as_str() {
+            "pioneer" => 1.0,
+            "steward" => 0.75,
+            "guardian" => 0.5,
+            _ => 0.25, // caretaker
+        };
+
+        let reach_score = self.active_reach_levels.len() as f64 / 8.0;
+        let delivery_score = self.delivery_success_rate();
+
+        (tier_score * 0.30)
+            + (self.trust_score * 0.25)
+            + (delivery_score * 0.25)
+            + (reach_score * 0.20)
+    }
 }
 
 /// Run the heartbeat monitoring loop
@@ -190,6 +272,9 @@ async fn trigger_disaster_recovery_for_node(
 }
 
 /// Health status aggregation from multiple sources
+///
+/// Combines technical metrics with human-scale impact metrics
+/// to create a holistic view of node health and contribution.
 #[derive(Debug, Clone)]
 pub struct NodeHealthAggregation {
     pub node_id: String,
@@ -203,6 +288,8 @@ pub struct NodeHealthAggregation {
     pub failed_pings: u32,
     /// Calculated health score (0.0 - 1.0)
     pub health_score: f64,
+    /// Human-scale impact score (0.0 - 1.0)
+    pub impact_score: f64,
     /// Final status determination
     pub status: NodeHealthStatus,
 }
@@ -217,7 +304,7 @@ pub enum NodeHealthStatus {
 }
 
 impl NodeHealthAggregation {
-    /// Calculate health score from metrics
+    /// Calculate technical health score from metrics (0.0 - 1.0)
     pub fn calculate_health_score(&self) -> f64 {
         let total_pings = self.successful_pings + self.failed_pings;
         if total_pings == 0 {
@@ -230,6 +317,29 @@ impl NodeHealthAggregation {
         let heartbeat_factor = if self.self_reported.is_some() { 0.3 } else { 0.0 };
 
         (ping_ratio * 0.7) + heartbeat_factor
+    }
+
+    /// Calculate human-scale impact score (0.0 - 1.0)
+    pub fn calculate_impact_score(&self) -> f64 {
+        match &self.self_reported {
+            Some(hb) => match &hb.social_metrics {
+                Some(social) => social.impact_score(),
+                None => 0.5, // No social metrics = neutral
+            },
+            None => 0.0,
+        }
+    }
+
+    /// Calculate combined score (health + impact)
+    ///
+    /// The combined score weighs both technical reliability
+    /// and human-scale contribution:
+    /// - 60% technical health (uptime, ping success)
+    /// - 40% human-scale impact (trust, reach, stewardship)
+    pub fn combined_score(&self) -> f64 {
+        let health = self.calculate_health_score();
+        let impact = self.calculate_impact_score();
+        (health * 0.60) + (impact * 0.40)
     }
 
     /// Determine status from health score
@@ -264,16 +374,33 @@ mod tests {
                 storage_usage_tb: 0.5,
                 active_connections: 10,
                 custodied_content_gb: 100.0,
+                social_metrics: Some(SocialMetrics {
+                    steward_tier: "guardian".to_string(),
+                    max_reach_level: 7,
+                    active_reach_levels: vec![5, 6, 7],
+                    trust_score: 0.9,
+                    humans_served: 50,
+                    content_custodied: 100,
+                    successful_deliveries: 950,
+                    failed_deliveries: 50,
+                }),
             }),
             peer_attestations: 5,
             successful_pings: 9,
             failed_pings: 1,
             health_score: 0.0,
+            impact_score: 0.0,
             status: NodeHealthStatus::Unknown,
         };
 
         let score = aggregation.calculate_health_score();
         assert!(score > 0.9); // 90% success + heartbeat bonus
+
+        let impact = aggregation.calculate_impact_score();
+        assert!(impact > 0.5); // Guardian tier with good metrics
+
+        let combined = aggregation.combined_score();
+        assert!(combined > 0.7); // Combined health + impact
 
         let status = aggregation.determine_status();
         assert_eq!(status, NodeHealthStatus::Healthy);
@@ -288,11 +415,32 @@ mod tests {
             successful_pings: 7,
             failed_pings: 3,
             health_score: 0.0,
+            impact_score: 0.0,
             status: NodeHealthStatus::Unknown,
         };
 
         let status = aggregation.determine_status();
         assert_eq!(status, NodeHealthStatus::Degraded);
+    }
+
+    #[test]
+    fn test_social_metrics_impact_score() {
+        // Pioneer with perfect metrics
+        let pioneer = SocialMetrics {
+            steward_tier: "pioneer".to_string(),
+            max_reach_level: 7,
+            active_reach_levels: vec![0, 1, 2, 3, 4, 5, 6, 7], // All reach levels
+            trust_score: 1.0,
+            humans_served: 1000,
+            content_custodied: 500,
+            successful_deliveries: 10000,
+            failed_deliveries: 0,
+        };
+        assert!(pioneer.impact_score() > 0.9);
+
+        // Caretaker with minimal metrics
+        let caretaker = SocialMetrics::default();
+        assert!(caretaker.impact_score() < 0.5);
     }
 
     #[tokio::test]

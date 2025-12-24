@@ -32,7 +32,7 @@ pub mod nats_provisioning;
 pub mod node_bootstrap;
 
 pub use disaster_recovery::DisasterRecoveryCoordinator;
-pub use heartbeat::{HeartbeatConfig, HeartbeatLoop};
+pub use heartbeat::{HeartbeatConfig, HeartbeatLoop, SocialMetrics, HeartbeatMessage};
 pub use inventory::{NodeCapacity, NodeInventory};
 pub use nats_provisioning::{NatsCredentials, NatsProvisioner};
 pub use node_bootstrap::{NodeBootstrap, NodeBootstrapConfig};
@@ -43,7 +43,7 @@ pub use node_bootstrap::{NodeBootstrap, NodeBootstrapConfig};
 use crate::Result;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{debug, info};
 
 /// Central orchestrator state shared across components
 pub struct OrchestratorState {
@@ -56,6 +56,9 @@ pub struct OrchestratorState {
 }
 
 /// Node status tracked by orchestrator
+///
+/// Combines technical health with human-scale contribution metrics
+/// to create a holistic view of each node in the network.
 #[derive(Debug, Clone)]
 pub struct NodeStatus {
     pub node_id: String,
@@ -63,6 +66,10 @@ pub struct NodeStatus {
     pub last_heartbeat: Option<std::time::Instant>,
     pub inventory: Option<NodeInventory>,
     pub nats_provisioned: bool,
+    /// Latest social metrics from heartbeat
+    pub social_metrics: Option<SocialMetrics>,
+    /// Combined health + impact score (0.0 - 1.0)
+    pub combined_score: f64,
 }
 
 /// Health status of a node
@@ -134,13 +141,51 @@ impl OrchestratorState {
             last_heartbeat: None,
             inventory: Some(inventory),
             nats_provisioned: false,
+            social_metrics: None,
+            combined_score: 0.5, // neutral starting score
         };
         nodes.insert(node_id.clone(), status);
         info!(node_id = %node_id, "Node discovered and registered");
         Ok(())
     }
 
-    /// Update node heartbeat
+    /// Update node heartbeat with optional social metrics
+    pub async fn update_heartbeat_with_metrics(
+        &self,
+        node_id: &str,
+        social_metrics: Option<SocialMetrics>,
+    ) -> Result<()> {
+        let mut nodes = self.nodes.write().await;
+        if let Some(node) = nodes.get_mut(node_id) {
+            node.last_heartbeat = Some(std::time::Instant::now());
+
+            // Update social metrics if provided
+            if let Some(metrics) = social_metrics {
+                let impact_score = metrics.impact_score();
+                node.social_metrics = Some(metrics);
+
+                // Recalculate combined score (60% health, 40% impact)
+                // Health is 1.0 if we're receiving heartbeats
+                let health_score = 1.0;
+                node.combined_score = (health_score * 0.60) + (impact_score * 0.40);
+
+                debug!(
+                    node_id = %node_id,
+                    impact_score = %impact_score,
+                    combined_score = %node.combined_score,
+                    "Updated social metrics"
+                );
+            }
+
+            if node.status == NodeHealthStatus::Offline {
+                node.status = NodeHealthStatus::Online;
+                info!(node_id = %node_id, "Node came back online");
+            }
+        }
+        Ok(())
+    }
+
+    /// Update node heartbeat (simple version without metrics)
     pub async fn update_heartbeat(&self, node_id: &str) -> Result<()> {
         let mut nodes = self.nodes.write().await;
         if let Some(node) = nodes.get_mut(node_id) {
@@ -210,6 +255,58 @@ impl OrchestratorState {
     pub async fn all_nodes(&self) -> Vec<NodeStatus> {
         let nodes = self.nodes.read().await;
         nodes.values().cloned().collect()
+    }
+
+    /// Get online nodes ranked by combined score (health + impact)
+    ///
+    /// Returns nodes sorted from highest to lowest combined score,
+    /// which factors in both technical health (60%) and human-scale
+    /// impact (40%) including steward tier, reach, and trust.
+    pub async fn get_ranked_nodes(&self) -> Vec<NodeStatus> {
+        let nodes = self.nodes.read().await;
+        let mut ranked: Vec<_> = nodes
+            .values()
+            .filter(|s| s.status == NodeHealthStatus::Online)
+            .cloned()
+            .collect();
+
+        // Sort by combined_score descending
+        ranked.sort_by(|a, b| {
+            b.combined_score
+                .partial_cmp(&a.combined_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        ranked
+    }
+
+    /// Get nodes that can serve a specific reach level
+    ///
+    /// Filters online nodes to those with social metrics indicating
+    /// they serve the requested reach level, ranked by combined score.
+    pub async fn get_nodes_for_reach(&self, reach_level: u8) -> Vec<NodeStatus> {
+        let nodes = self.nodes.read().await;
+        let mut matching: Vec<_> = nodes
+            .values()
+            .filter(|s| {
+                if s.status != NodeHealthStatus::Online {
+                    return false;
+                }
+                match &s.social_metrics {
+                    Some(metrics) => metrics.active_reach_levels.contains(&reach_level),
+                    None => reach_level == 7, // Assume commons if no metrics
+                }
+            })
+            .cloned()
+            .collect();
+
+        matching.sort_by(|a, b| {
+            b.combined_score
+                .partial_cmp(&a.combined_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        matching
     }
 }
 

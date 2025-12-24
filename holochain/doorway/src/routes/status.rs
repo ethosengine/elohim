@@ -62,6 +62,14 @@ pub struct NodeSummary {
     pub status: String,
     pub nats_provisioned: bool,
     pub last_heartbeat_secs_ago: Option<u64>,
+    /// Combined health + impact score (0.0 - 1.0)
+    pub combined_score: f64,
+    /// Steward tier (caretaker, guardian, steward, pioneer)
+    pub steward_tier: Option<String>,
+    /// Trust score from peer attestations (0.0 - 1.0)
+    pub trust_score: Option<f64>,
+    /// Human-scale impact score (0.0 - 1.0)
+    pub impact_score: Option<f64>,
 }
 
 /// Status response payload
@@ -142,11 +150,25 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 
                 let last_heartbeat_secs_ago = node_status.last_heartbeat.map(|t| t.elapsed().as_secs());
 
+                // Extract social metrics if available
+                let (steward_tier, trust_score, impact_score) = match &node_status.social_metrics {
+                    Some(metrics) => (
+                        Some(metrics.steward_tier.clone()),
+                        Some(metrics.trust_score),
+                        Some(metrics.impact_score()),
+                    ),
+                    None => (None, None, None),
+                };
+
                 node_summaries.push(NodeSummary {
                     node_id: node_status.node_id.clone(),
                     status: status_str.to_string(),
                     nats_provisioned: node_status.nats_provisioned,
                     last_heartbeat_secs_ago,
+                    combined_score: node_status.combined_score,
+                    steward_tier,
+                    trust_score,
+                    impact_score,
                 });
             }
 
@@ -240,6 +262,10 @@ mod tests {
                         status: "online".to_string(),
                         nats_provisioned: true,
                         last_heartbeat_secs_ago: Some(5),
+                        combined_score: 0.85,
+                        steward_tier: Some("guardian".to_string()),
+                        trust_score: Some(0.9),
+                        impact_score: Some(0.75),
                     },
                 ],
             },
