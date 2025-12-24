@@ -472,13 +472,18 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                                 sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
 
-                                // Push Edge Node image
+                                // Push Edge Node image (if it was built)
                                 sh """
-                                    nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
-                                    nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
+                                    if nerdctl -n k8s.io images | grep -q "elohim-edgenode.*${IMAGE_TAG}"; then
+                                        echo "Pushing Edge Node image..."
+                                        nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
+                                        nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
 
-                                    nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
-                                    nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
+                                    else
+                                        echo "Edge Node image not found, skipping push"
+                                    fi
                                 """
 
                                 // Push Doorway image (if it was built)
@@ -511,8 +516,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 if (env.BRANCH_NAME == 'dev') {
                                     sh """
-                                        nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
+                                        if nerdctl -n k8s.io images | grep -q "elohim-edgenode.*${IMAGE_TAG}"; then
+                                            nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
+                                        fi
 
                                         if nerdctl -n k8s.io images | grep -q "elohim-doorway.*${IMAGE_TAG}"; then
                                             nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:dev-latest
