@@ -42,8 +42,8 @@ data:
     network:
       # Bootstrap served by Doorway gateway
       bootstrap_url: "https://doorway-dev.elohim.host/bootstrap"
-      # Signal served by Doorway (unified subdomain for all DHT services)
-      signal_url: "wss://doorway-dev.elohim.host/signal"
+      # Signal served on dedicated subdomain (tx5/SBD protocol requires path = pubkey)
+      signal_url: "wss://signal.doorway-dev.elohim.host"
       enable_mdns: false
       enable_relaying: true
       webrtc_config:
@@ -248,14 +248,15 @@ spec:
     environment: dev
 ---
 # Public Ingress - routes all traffic through authenticated Doorway Gateway
-# Supports: /admin, /app/*, /bootstrap/*, /signal/*, /api/v1/*
+# Supports: /admin, /app/*, /bootstrap/*, /api/v1/*
+# Signal subdomain: signal.doorway-dev.elohim.host (tx5/SBD protocol)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: elohim-edgenode-dev
   namespace: ethosengine
   annotations:
-    # WebSocket support for /admin, /app/*, /signal/*
+    # WebSocket support for /admin, /app/*, signal subdomain
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
@@ -271,9 +272,20 @@ spec:
   tls:
     - hosts:
         - doorway-dev.elohim.host
+        - signal.doorway-dev.elohim.host
       secretName: doorway-dev-tls
   rules:
     - host: doorway-dev.elohim.host
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: elohim-edgenode-dev
+                port:
+                  number: 8080
+    - host: signal.doorway-dev.elohim.host
       http:
         paths:
           - path: /
