@@ -448,6 +448,15 @@ async fn handle_request(
             to_boxed(routes::handle_custodians(Arc::clone(&state)).await)
         }
 
+        // Real-time WebSocket feed for dashboard
+        (Method::GET, "/admin/ws") => {
+            if hyper_tungstenite::is_upgrade_request(&req) {
+                to_boxed(routes::handle_dashboard_ws(Arc::clone(&state), req).await)
+            } else {
+                to_boxed(bad_request_response("WebSocket upgrade required for /admin/ws"))
+            }
+        }
+
         // Bootstrap service routes (X-Op header protocol)
         // POST /bootstrap with X-Op header, or legacy path-based routing
         (Method::POST, p) if p == "/bootstrap" || p.starts_with("/bootstrap/") => {
