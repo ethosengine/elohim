@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
 # Copy manifests and local crates first for dependency caching
 COPY doorway/Cargo.toml doorway/Cargo.lock ./
 COPY crates ./crates
+COPY holochain-cache-core ./holochain-cache-core
 
 # Create dummy src to build dependencies
 RUN mkdir -p src/bin && \
@@ -21,8 +22,9 @@ RUN mkdir -p src/bin && \
     echo 'pub fn placeholder() {}' > src/lib.rs && \
     echo 'fn main() { println!("worker placeholder"); }' > src/bin/worker.rs
 
-# Fix the path to doorway-client (now relative to /app)
-RUN sed -i 's|path = "../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml
+# Fix the paths to local crates (now relative to /app)
+RUN sed -i 's|path = "../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
+    sed -i 's|path = "../holochain-cache-core"|path = "holochain-cache-core"|' Cargo.toml
 
 # Build dependencies (this layer gets cached)
 RUN cargo build --release
