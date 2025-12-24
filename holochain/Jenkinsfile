@@ -138,6 +138,8 @@ spec:
         HAPP_NAME = "lamad-spike"
         // Nix PATH not inherited from Dockerfile in Jenkins shell steps
         PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
+        // Track if images were pushed (set by Push stage, checked by Deploy stages)
+        IMAGES_PUSHED = 'false'
     }
 
     options {
@@ -473,18 +475,27 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
 
                                 // Push Edge Node image (if it was built)
-                                sh """
-                                    if nerdctl -n k8s.io images | grep -q "elohim-edgenode.*${IMAGE_TAG}"; then
-                                        echo "Pushing Edge Node image..."
-                                        nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
-                                        nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
+                                def edgeNodePushed = sh(
+                                    script: """
+                                        if nerdctl -n k8s.io images | grep -q "elohim-edgenode.*${IMAGE_TAG}"; then
+                                            echo "Pushing Edge Node image..."
+                                            nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
+                                            nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
 
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
-                                    else
-                                        echo "Edge Node image not found, skipping push"
-                                    fi
-                                """
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
+                                            exit 0
+                                        else
+                                            echo "Edge Node image not found, skipping push"
+                                            exit 1
+                                        fi
+                                    """,
+                                    returnStatus: true
+                                ) == 0
+
+                                if (edgeNodePushed) {
+                                    env.IMAGES_PUSHED = 'true'
+                                }
 
                                 // Push Doorway image (if it was built)
                                 sh """
@@ -553,6 +564,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             steps {
                 container('builder') {
                     script {
+                        // Skip deployment if no images were pushed
+                        if (env.IMAGES_PUSHED != 'true') {
+                            echo "No new images were pushed - skipping deployment"
+                            return
+                        }
+
                         def props = loadBuildVars()
 
                         withBuildVars(props) {
@@ -649,6 +666,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             steps {
                 container('builder') {
                     script {
+                        // Skip deployment if no images were pushed
+                        if (env.IMAGES_PUSHED != 'true') {
+                            echo "No new images were pushed - skipping deployment"
+                            return
+                        }
+
                         def props = loadBuildVars()
 
                         withBuildVars(props) {
