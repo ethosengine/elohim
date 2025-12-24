@@ -361,19 +361,10 @@ spec:
                                     npm install
 
                                     echo ""
-                                    echo "=== Generating app icons ==="
-                                    # Use Elohim app logo (solid background, pops better as icon)
-                                    ICON_SOURCE="../elohim-app/public/images/elohim_protocol_app_logo.png"
-                                    if [ -f "$ICON_SOURCE" ]; then
-                                        # Make square by padding to largest dimension (732x625 -> 732x732)
-                                        mkdir -p src-tauri/icons
-                                        convert "$ICON_SOURCE" -gravity center -background white -extent 732x732 src-tauri/icons/icon-square.png
-                                        npx tauri icon src-tauri/icons/icon-square.png
-                                        echo "Icons generated from elohim_protocol_app_logo.png (padded to square)"
-                                    else
-                                        echo "Warning: Source icon not found at $ICON_SOURCE"
-                                        echo "Build may fail without icons"
-                                    fi
+                                    echo "=== Using committed app icons ==="
+                                    # Icons are pre-generated and committed in src-tauri/icons/
+                                    # Generated from elohim_protocol_app_logo.png with black background
+                                    ls -la src-tauri/icons/*.png | head -5 || echo "Warning: icons not found"
 
                                     echo ""
                                     echo "=== Debug: Testing linuxdeploy & plugin ==="
