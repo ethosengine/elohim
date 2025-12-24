@@ -37,6 +37,9 @@ pub use inventory::{NodeCapacity, NodeInventory};
 pub use nats_provisioning::{NatsCredentials, NatsProvisioner};
 pub use node_bootstrap::{NodeBootstrap, NodeBootstrapConfig};
 
+// Note: NodeHealthStatus, NodeStatus, OrchestratorConfig, OrchestratorState, Orchestrator
+// are defined below and are public by default in this module
+
 use crate::Result;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -201,6 +204,12 @@ impl OrchestratorState {
     /// Get orchestrator config
     pub fn config(&self) -> &OrchestratorConfig {
         &self.config
+    }
+
+    /// Get all nodes (for status reporting)
+    pub async fn all_nodes(&self) -> Vec<NodeStatus> {
+        let nodes = self.nodes.read().await;
+        nodes.values().cloned().collect()
     }
 }
 

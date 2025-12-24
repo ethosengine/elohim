@@ -1,6 +1,7 @@
 //! Status endpoint for Doorway
 //!
-//! Provides runtime status information including active connections.
+//! Provides runtime status information including active connections,
+//! cluster health, and orchestration metrics.
 
 use http_body_util::Full;
 use hyper::body::Bytes;
@@ -8,6 +9,7 @@ use hyper::{Response, StatusCode};
 use serde::Serialize;
 use std::sync::Arc;
 
+use crate::orchestrator::NodeHealthStatus;
 use crate::server::AppState;
 
 /// Bootstrap service stats
@@ -34,6 +36,34 @@ pub struct CacheStats {
     pub hit_rate: f64,
 }
 
+/// Orchestrator cluster stats
+#[derive(Debug, Serialize)]
+pub struct OrchestratorStats {
+    /// Whether orchestrator is enabled
+    pub enabled: bool,
+    /// Region for this doorway
+    pub region: String,
+    /// Total nodes known to orchestrator
+    pub total_nodes: usize,
+    /// Online nodes
+    pub online_nodes: usize,
+    /// Degraded nodes (heartbeat issues)
+    pub degraded_nodes: usize,
+    /// Failed/offline nodes
+    pub failed_nodes: usize,
+    /// Nodes with health breakdown
+    pub nodes: Vec<NodeSummary>,
+}
+
+/// Summary of a single node
+#[derive(Debug, Serialize)]
+pub struct NodeSummary {
+    pub node_id: String,
+    pub status: String,
+    pub nats_provisioned: bool,
+    pub last_heartbeat_secs_ago: Option<u64>,
+}
+
 /// Status response payload
 #[derive(Debug, Serialize)]
 pub struct StatusResponse {
@@ -55,6 +85,8 @@ pub struct StatusResponse {
     pub bootstrap: BootstrapStats,
     /// Cache service stats
     pub cache: CacheStats,
+    /// Orchestrator cluster stats
+    pub orchestrator: OrchestratorStats,
 }
 
 /// Handle status request
@@ -87,6 +119,58 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         hit_rate: cache_stats.hit_rate(),
     };
 
+    // Get orchestrator stats
+    let orchestrator = match &state.orchestrator {
+        Some(orch_state) => {
+            let config = orch_state.config();
+            let all_nodes = orch_state.all_nodes().await;
+
+            let mut online = 0;
+            let mut degraded = 0;
+            let mut failed = 0;
+            let mut node_summaries = Vec::new();
+
+            for node_status in &all_nodes {
+                let status_str = match &node_status.status {
+                    NodeHealthStatus::Discovered => "discovered",
+                    NodeHealthStatus::Registering => "registering",
+                    NodeHealthStatus::Online => { online += 1; "online" },
+                    NodeHealthStatus::Degraded => { degraded += 1; "degraded" },
+                    NodeHealthStatus::Offline => { failed += 1; "offline" },
+                    NodeHealthStatus::Failed => { failed += 1; "failed" },
+                };
+
+                let last_heartbeat_secs_ago = node_status.last_heartbeat.map(|t| t.elapsed().as_secs());
+
+                node_summaries.push(NodeSummary {
+                    node_id: node_status.node_id.clone(),
+                    status: status_str.to_string(),
+                    nats_provisioned: node_status.nats_provisioned,
+                    last_heartbeat_secs_ago,
+                });
+            }
+
+            OrchestratorStats {
+                enabled: true,
+                region: config.region.clone(),
+                total_nodes: all_nodes.len(),
+                online_nodes: online,
+                degraded_nodes: degraded,
+                failed_nodes: failed,
+                nodes: node_summaries,
+            }
+        }
+        None => OrchestratorStats {
+            enabled: false,
+            region: state.args.region.clone().unwrap_or_else(|| "default".to_string()),
+            total_nodes: 0,
+            online_nodes: 0,
+            degraded_nodes: 0,
+            failed_nodes: 0,
+            nodes: vec![],
+        },
+    };
+
     let status = StatusResponse {
         service: "doorway",
         version: env!("CARGO_PKG_VERSION"),
@@ -97,6 +181,7 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         nats_connected: state.nats.is_some(),
         bootstrap,
         cache,
+        orchestrator,
     };
 
     match serde_json::to_string_pretty(&status) {
@@ -142,11 +227,29 @@ mod tests {
                 misses: 10,
                 hit_rate: 83.33,
             },
+            orchestrator: OrchestratorStats {
+                enabled: true,
+                region: "us-west".to_string(),
+                total_nodes: 5,
+                online_nodes: 4,
+                degraded_nodes: 1,
+                failed_nodes: 0,
+                nodes: vec![
+                    NodeSummary {
+                        node_id: "node-1".to_string(),
+                        status: "online".to_string(),
+                        nats_provisioned: true,
+                        last_heartbeat_secs_ago: Some(5),
+                    },
+                ],
+            },
         };
 
         let json = serde_json::to_string(&status).unwrap();
         assert!(json.contains("doorway"));
         assert!(json.contains("test-node"));
+        assert!(json.contains("orchestrator"));
+        assert!(json.contains("us-west"));
         assert!(json.contains("bootstrap"));
         assert!(json.contains("cache"));
     }
