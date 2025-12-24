@@ -1,7 +1,7 @@
-//! Blob streaming routes with HTTP 206 Range request support
+//! Content store streaming routes with HTTP 206 Range request support
 //!
 //! Provides efficient media delivery without blocking conductor threads:
-//! - `GET /blob/{hash}` - Stream entire blob or byte range
+//! - `GET /store/{hash}` - Stream entire content or byte range
 //! - Supports `Range: bytes=start-end` header for partial content
 //! - Returns `206 Partial Content` for range requests
 //! - Returns `200 OK` for full content requests
@@ -10,10 +10,10 @@
 //!
 //! ```bash
 //! # Full content
-//! curl https://doorway.example.com/blob/sha256-abc123
+//! curl https://doorway.example.com/store/sha256-abc123
 //!
 //! # Partial content (video seeking)
-//! curl -H "Range: bytes=1000000-2000000" https://doorway.example.com/blob/sha256-abc123
+//! curl -H "Range: bytes=1000000-2000000" https://doorway.example.com/store/sha256-abc123
 //! ```
 
 use crate::cache::ContentCache;
@@ -82,11 +82,11 @@ fn parse_range_header(range_header: &str, total_size: usize) -> Option<(usize, u
     Some((start, end))
 }
 
-/// Handle blob requests with Range support.
+/// Handle content store requests with Range support.
 ///
 /// # Routes
-/// - `GET /blob/{hash}` - Get blob (full or partial)
-/// - `HEAD /blob/{hash}` - Get blob metadata only
+/// - `GET /store/{hash}` - Get content (full or partial)
+/// - `HEAD /store/{hash}` - Get content metadata only
 ///
 /// # Headers
 /// - `Range: bytes=start-end` - Request partial content
@@ -96,16 +96,16 @@ fn parse_range_header(range_header: &str, total_size: usize) -> Option<(usize, u
 /// - `200 OK` - Full content
 /// - `206 Partial Content` - Range request fulfilled
 /// - `304 Not Modified` - ETag matched
-/// - `404 Not Found` - Blob not in cache
+/// - `404 Not Found` - Content not in cache
 /// - `416 Range Not Satisfiable` - Invalid range
 pub async fn handle_blob_request(
     req: Request<hyper::body::Incoming>,
     cache: Arc<ContentCache>,
 ) -> Result<Response<Full<Bytes>>, BlobError> {
-    // Extract hash from path: /blob/{hash}
+    // Extract hash from path: /store/{hash}
     let path = req.uri().path();
     let hash = path
-        .strip_prefix("/blob/")
+        .strip_prefix("/store/")
         .ok_or(BlobError::NotFound)?
         .to_string();
 
@@ -122,7 +122,7 @@ pub async fn handle_blob_request(
     }
 }
 
-/// Handle GET /blob/{hash}
+/// Handle GET /store/{hash}
 async fn handle_get_blob(
     req: Request<hyper::body::Incoming>,
     cache: Arc<ContentCache>,
@@ -218,7 +218,7 @@ async fn handle_range_request(
         .unwrap())
 }
 
-/// Handle HEAD /blob/{hash}
+/// Handle HEAD /store/{hash}
 async fn handle_head_blob(
     _req: Request<hyper::body::Incoming>,
     cache: Arc<ContentCache>,

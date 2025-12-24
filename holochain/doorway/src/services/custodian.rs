@@ -178,15 +178,15 @@ impl CustodianCapability {
         self.health_check_successes as f32 / total as f32
     }
 
-    /// Generate fallback URL for a blob hash
+    /// Generate fallback URL for a content hash
     pub fn blob_url(&self, blob_hash: &str) -> String {
-        format!("{}/blob/{}", self.base_url.trim_end_matches('/'), blob_hash)
+        format!("{}/store/{}", self.base_url.trim_end_matches('/'), blob_hash)
     }
 
-    /// Generate chunk URL for a blob hash and chunk index
+    /// Generate chunk URL for a content hash and chunk index
     pub fn chunk_url(&self, blob_hash: &str, chunk_index: usize) -> String {
         format!(
-            "{}/blob/{}/chunk/{}",
+            "{}/store/{}/chunk/{}",
             self.base_url.trim_end_matches('/'),
             blob_hash,
             chunk_index
