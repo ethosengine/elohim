@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { of, throwError, BehaviorSubject, NEVER } from 'rxjs';
 import { PathNavigatorComponent } from './path-navigator.component';
@@ -99,6 +101,8 @@ describe('PathNavigatorComponent', () => {
     await TestBed.configureTestingModule({
       imports: [PathNavigatorComponent],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         provideRouter([]),
         { provide: PathService, useValue: pathServiceSpy },
         { provide: AgentService, useValue: agentServiceSpy },
