@@ -24,9 +24,9 @@ admin_interfaces:
 # Network configuration
 network:
   # Bootstrap served by Doorway gateway
-  bootstrap_url: "https://elohim.host/bootstrap"
-  # Signal served by Doorway on dedicated subdomain (tx5 protocol)
-  signal_url: "wss://signal.elohim.host"
+  bootstrap_url: "https://doorway.elohim.host/bootstrap"
+  # Signal served by Doorway (unified subdomain for all DHT services)
+  signal_url: "wss://doorway.elohim.host/signal"
   enable_mdns: false
   enable_relaying: true
   webrtc_config:

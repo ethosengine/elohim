@@ -8,8 +8,8 @@ export const environment: Environment = {
   // Holochain Edge Node configuration (production)
   // Single proxy URL handles admin operations with authentication
   holochain: {
-    adminUrl: 'wss://holochain.elohim.host',
-    appUrl: 'wss://holochain.elohim.host',
+    adminUrl: 'wss://doorway.elohim.host',
+    appUrl: 'wss://doorway.elohim.host',
     // IMPORTANT: This key must match the secret in edgenode-prod.yaml
     // Update both when changing production credentials
     proxyApiKey: 'CHANGE-ME-prod-elohim-auth-2024',

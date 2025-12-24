@@ -21,8 +21,8 @@ fn network_config() -> NetworkConfig {
         network_config.signal_url = url2::Url2::parse("ws://localhost:8888/signal");
     } else {
         // Production: use Elohim's doorway infrastructure
-        network_config.bootstrap_url = url2::Url2::parse("https://holochain.elohim.host/bootstrap");
-        network_config.signal_url = url2::Url2::parse("wss://signal.elohim.host");
+        network_config.bootstrap_url = url2::Url2::parse("https://doorway.elohim.host/bootstrap");
+        network_config.signal_url = url2::Url2::parse("wss://doorway.elohim.host/signal");
     }
 
     // Mobile devices don't hold DHT data (reduces battery/bandwidth)
