@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-municipality-municipal emergency response includes teen care contributions",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:municipality-municipal emergency response includes teen care contributions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Municipal emergency response includes teen care contributions",
+  "description": "Municipal emergency response includes teen care contributions",
+  "content": "Scenario: Municipal emergency response includes teen care contributions\n    Given the municipality experiences emergency situation (natural disaster, pandemic)\n    And community resilience depends on care economy networks\n    When emergency response is coordinated through municipal_elohim\n    Then teen care contributions should be recognized and mobilized\n    And Jasmine's capability should be matched to community needs\n    And youth mutual aid networks should be integrated into response\n    And teen volunteers should be valued as essential emergency workers\n    And care economy should demonstrate that communities survive crises through mutual care\n    And her generation should learn that civic responsibility includes crisis response\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:municipality",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:community,neighborhood,ecological_bioregional",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Municipal emergency response includes teen care contributions",
+    "ogDescription": "Municipal emergency response includes teen care contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-municipality-municipal emergency response includes teen care contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal emergency response includes teen care contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-municipality-municipal emergency response includes teen care contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:municipality-municipal emergency response includes teen care contributions",
+    "name": "Municipal emergency response includes teen care contributions",
+    "description": "Municipal emergency response includes teen care contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-community-citizen accesses community resources without attending meetings",
+  "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:community-citizen accesses community resources without attending meetings",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Citizen accesses community resources without attending meetings",
+  "description": "Citizen accesses community resources without attending meetings",
+  "content": "Scenario: Citizen accesses community resources without attending meetings\n    Given the citizen works evening shifts\n    And cannot attend 7 PM community meetings in person\n    When community decisions are being made\n    Then they can review asynchronous meeting summaries\n    And submit positions via the app during lunch break\n    And join key decision moments virtually\n    And participate meaningfully in 15 minutes vs 3 hours\n    And working-class participation barriers are reduced\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:community",
+    "related_users:parent,activist,community_organizer,journalist",
+    "related_layers:municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-community",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Citizen accesses community resources without attending meetings",
+    "ogDescription": "Citizen accesses community resources without attending meetings",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-community-citizen accesses community resources without attending meetings",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Citizen accesses community resources without attending meetings - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-community-citizen accesses community resources without attending meetings",
+    "identifier": "did:web:elohim.host:content:public-observer:citizen:scenarios:community-citizen accesses community resources without attending meetings",
+    "name": "Citizen accesses community resources without attending meetings",
+    "description": "Citizen accesses community resources without attending meetings",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

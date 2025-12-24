@@ -1,0 +1,71 @@
+{
+  "id": "human-janice-janitor",
+  "did": "did:web:elohim.host:human:janice-janitor",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Janice",
+  "description": "Working hard, keeping things clean. Don't have much time for this stuff but trying to stay connected.",
+  "content": "# Janice\n\nWorking hard, keeping things clean. Don't have much time for this stuff but trying to stay connected.\n\n**Profile Reach:** network\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Primary Location:** {\n  \"layer\": \"municipality\",\n  \"displayName\": \"Valley Town\",\n  \"reach\": \"community\"\n}\n\n**Organizations:** [object Object]\n\n**Communities:** community-local-church\n\n**Public Affinities:** practical-skills, community-service, family\n\n**Accessibility Needs:** limited-screen-time, simple-interface\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/janice-janitor/profile.json",
+  "tags": [
+    "role-custodian",
+    "human",
+    "community-service",
+    "reach-network",
+    "edge-case",
+    "practical-skills",
+    "family",
+    "human-graph",
+    "layer-municipality"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "edge-case",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "workplace",
+      "community",
+      "municipality"
+    ],
+    "organizationCount": 1,
+    "communityCount": 1,
+    "designNotes": "Low-tech-engagement user. Important for demonstrating reach/trust works for casual users."
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Janice",
+    "ogDescription": "Working hard, keeping things clean. Don't have much time for this stuff but trying to stay connected.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-janice-janitor",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-janice-janitor.jpg",
+    "ogImageAlt": "Janice's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-janice-janitor",
+    "identifier": "did:web:elohim.host:human:janice-janitor",
+    "name": "Janice",
+    "description": "Working hard, keeping things clean. Don't have much time for this stuff but trying to stay connected.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Valley Town",
+      "description": "municipality"
+    },
+    "affiliation": [
+      {
+        "@type": "Organization",
+        "name": "Valley School District",
+        "@id": "org-valley-school-district"
+      }
+    ]
+  },
+  "createdAt": "2025-12-01T20:08:11.328432",
+  "updatedAt": "2025-12-24T03:05:26.333Z"
+}

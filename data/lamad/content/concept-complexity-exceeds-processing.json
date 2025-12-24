@@ -1,0 +1,28 @@
+{
+  "id": "concept-complexity-exceeds-processing",
+  "contentType": "concept",
+  "title": "Complexity exceeds human processing",
+  "description": "Bills thousands of pages long that no single person understands",
+  "content": "Bills thousands of pages long that no single person understands",
+  "contentFormat": "plaintext",
+  "sourcePath": "generated/landing-page/crisis-political/concept-complexity-exceeds-processing.json",
+  "tags": [
+    "crisis",
+    "governance",
+    "complexity",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "crisis-political",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.000858",
+  "updatedAt": "2025-12-24T03:05:25.849Z"
+}

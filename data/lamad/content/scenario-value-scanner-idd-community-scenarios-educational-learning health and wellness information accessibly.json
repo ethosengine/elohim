@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-learning health and wellness information accessibly",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational-learning health and wellness information accessibly",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Learning health and wellness information accessibly",
+  "description": "Learning health and wellness information accessibly",
+  "content": "Scenario: Learning health and wellness information accessibly\n    Given Jordan wants to understand their own health better\n    And health literacy supports self-advocacy\n    When Jordan uses health education resources\n    Then the personal_agent provides health information in simple language\n    And medical concepts are explained with pictures and examples\n    And Jordan can ask questions and explore topics at their pace\n    And Jordan's health knowledge increases over time\n    And Jordan becomes better able to participate in health decisions\n    And Jordan's informed health participation is supported through accessible education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Learning health and wellness information accessibly",
+    "ogDescription": "Learning health and wellness information accessibly",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-educational-learning health and wellness information accessibly",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning health and wellness information accessibly - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-educational-learning health and wellness information accessibly",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational-learning health and wellness information accessibly",
+    "name": "Learning health and wellness information accessibly",
+    "description": "Learning health and wellness information accessibly",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

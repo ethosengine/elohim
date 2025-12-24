@@ -1,0 +1,482 @@
+{
+  "lastUpdated": "2025-11-28T21:09:48.357670",
+  "zoomLevel": 1,
+  "parentId": "autonomous-entity-epic",
+  "epicKey": "autonomous_entity",
+  "nodes": [
+    {
+      "id": "autonomous-entity-epic",
+      "title": "Autonomous Entity",
+      "contentType": "epic",
+      "description": "Transforming workplace ownership and governance",
+      "hasChildren": true,
+      "childCount": 24,
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "level": 1,
+      "isParent": true
+    },
+    {
+      "id": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+      "title": "Workplace Transformation from Franchise Control to Democratic Governance",
+      "contentType": "feature",
+      "description": "As a franchise_operator in the autonomous_entity system Operating at the workplace_organizational governance layer I want to facilitate conversion from corporate franchise to democratic workplace So t",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 150.0,
+        "y": 0.0
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-franchise-operator-scenarios-individual",
+      "title": "Liberation from Franchise Debt and Dual Extraction for Franchise Operator",
+      "contentType": "feature",
+      "description": "As a franchise_operator in the autonomous_entity system Operating at the individual governance layer I want liberation from corporate extraction and debt burden with dignified exit So that I escape fi",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 144.88887394336024,
+        "y": 38.82285676537811
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+      "title": "Food Service Industry Transformation Through Franchise Conversions",
+      "contentType": "feature",
+      "description": "As a franchise_operator in the autonomous_entity system Operating at the industry_sector governance layer I want to participate in democratizing food service industry So that franchise extraction mode",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 129.9038105676658,
+        "y": 74.99999999999999
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-franchise-operator-scenarios-community",
+      "title": "Community Wealth Reclamation Through Franchise Conversion",
+      "contentType": "feature",
+      "description": "As a franchise_operator in the autonomous_entity system Operating at the community governance layer I want franchise locations to transform from extraction sites to community institutions So that neig",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 106.06601717798213,
+        "y": 106.06601717798212
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+      "title": "Democratic Coordination in Workplace for Manager",
+      "contentType": "feature",
+      "description": "As a manager in the autonomous_entity system Operating at the workplace_organizational governance layer I want to facilitate effective coordination without domination So that operations function smoot",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": 75.00000000000001,
+        "y": 129.9038105676658
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-manager-scenarios-individual",
+      "title": "Individual Liberation and Purpose for Manager",
+      "contentType": "feature",
+      "description": "As a manager in the autonomous_entity system Operating at the individual governance layer I want liberation from extraction role and meaningful purpose So that I serve rather than dominate, coordinate",
+      "hasChildren": true,
+      "childCount": 8,
+      "position": {
+        "x": 38.82285676537811,
+        "y": 144.88887394336024
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-manager-scenarios-community",
+      "title": "Community Service and Accountability for Manager",
+      "contentType": "feature",
+      "description": "As a manager in the autonomous_entity system Operating at the community governance layer I want to serve community needs through workplace coordination So that ChickenMax functions as community instit",
+      "hasChildren": true,
+      "childCount": 10,
+      "position": {
+        "x": 9.184850993605149e-15,
+        "y": 150.0
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-customer-scenarios-individual",
+      "title": "Ethical Consumption and Dignified Service for Customer",
+      "contentType": "feature",
+      "description": "As a customer in the autonomous_entity system Operating at the individual governance layer I want consumption aligned with values and genuine human connection So that I support dignity and community r",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -38.82285676537809,
+        "y": 144.88887394336024
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-customer-scenarios-community",
+      "title": "Community Institution Participation and Wealth Circulation for Customer",
+      "contentType": "feature",
+      "description": "As a customer in the autonomous_entity system Operating at the community governance layer I want to participate in democratic community institutions So that consumption builds neighborhood wealth and ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -74.99999999999997,
+        "y": 129.9038105676658
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-community-investor-scenarios-municipality",
+      "title": "Municipal Economic Development Through Democratic Investment",
+      "contentType": "feature",
+      "description": "As a community_investor in the autonomous_entity system Operating at the municipality governance layer I want to support citywide democratic economy development So that municipal policy enables commun",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -106.06601717798212,
+        "y": 106.06601717798213
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+      "title": "Bioregional Sustainable Economy Investment and Stewardship",
+      "contentType": "feature",
+      "description": "As a community_investor in the autonomous_entity system Operating at the ecological_bioregional governance layer I want to invest in bioregional ecological sustainability and resilience So that capita",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -129.9038105676658,
+        "y": 74.99999999999999
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-community-investor-scenarios-community",
+      "title": "Community Wealth Building Through Democratic Investment",
+      "contentType": "feature",
+      "description": "As a community_investor in the autonomous_entity system Operating at the community governance layer I want to build community wealth through values-aligned investment So that capital supports democrat",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -144.88887394336024,
+        "y": 38.822856765378155
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+      "title": "Democratic Farm Governance and Farmworker Empowerment",
+      "contentType": "feature",
+      "description": "As a supplier in the autonomous_entity system Operating at the workplace_organizational governance layer I want farmworkers to gain ownership and democratic voice So that farm transforms from hierarch",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -150.0,
+        "y": 1.8369701987210297e-14
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
+      "title": "Regenerative Agriculture and Bioregional Food System Stewardship",
+      "contentType": "feature",
+      "description": "As a supplier in the autonomous_entity system Operating at the ecological_bioregional governance layer I want to practice regenerative agriculture coordinated bioregionally So that food system serves ",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -144.88887394336024,
+        "y": -38.82285676537812
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-supplier-scenarios-industry-sector",
+      "title": "Democratic Food System Supply Chain Transformation",
+      "contentType": "feature",
+      "description": "As a supplier in the autonomous_entity system Operating at the industry_sector governance layer I want to participate in democratizing entire food supply chain So that extraction is replaced by fair v",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -129.90381056766583,
+        "y": -74.99999999999996
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-supplier-scenarios-community",
+      "title": "Local Food Security and Community Agricultural Stewardship",
+      "contentType": "feature",
+      "description": "As a supplier in the autonomous_entity system Operating at the community governance layer I want farm to serve community food security and democratic participation So that agriculture becomes communit",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -106.06601717798219,
+        "y": -106.06601717798208
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
+      "title": "Democratic Workplace Governance for Worker",
+      "contentType": "feature",
+      "description": "As a worker in the autonomous_entity system Operating at the workplace_organizational governance layer I want democratic control over my workplace operations So that we collectively shape our working ",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": -75.00000000000007,
+        "y": -129.90381056766574
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-worker-scenarios-individual",
+      "title": "Individual Dignity and Data Sovereignty for Worker",
+      "contentType": "feature",
+      "description": "As a worker in the autonomous_entity system Operating at the individual governance layer I want my personal dignity protected and my data sovereign So that I am valued as a person, not exploited as a ",
+      "hasChildren": true,
+      "childCount": 8,
+      "position": {
+        "x": -38.82285676537809,
+        "y": -144.88887394336024
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-worker-scenarios-industry-sector",
+      "title": "Industry Sector Coordination and Solidarity for Worker",
+      "contentType": "feature",
+      "description": "As a worker in the autonomous_entity system Operating at the industry_sector governance layer I want to coordinate with workers across businesses for collective power So that we build sector-wide soli",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": -2.7554552980815446e-14,
+        "y": -150.0
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-worker-scenarios-community",
+      "title": "Community Stakeholder Relationships for Worker",
+      "contentType": "feature",
+      "description": "As a worker in the autonomous_entity system Operating at the community governance layer I want meaningful relationships with our community stakeholders So that we serve community needs while protectin",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 38.82285676537804,
+        "y": -144.88887394336027
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+      "title": "Municipal Economic Development Through Democratic Business Conversion",
+      "contentType": "feature",
+      "description": "As a small_business_owner in the autonomous_entity system Operating at the municipality governance layer I want my business conversion to contribute to citywide economic democracy So that municipal po",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 75.00000000000001,
+        "y": -129.9038105676658
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+      "title": "Democratic Transition and Knowledge Transfer for Small Business Owner",
+      "contentType": "feature",
+      "description": "As a small_business_owner in the autonomous_entity system Operating at the workplace_organizational governance layer I want to facilitate workers' transition to democratic ownership with dignity So th",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 106.0660171779821,
+        "y": -106.06601717798215
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-small-business-owner-scenarios-individual",
+      "title": "Liberation from Ownership Burden for Small Business Owner",
+      "contentType": "feature",
+      "description": "As a small_business_owner in the autonomous_entity system Operating at the individual governance layer I want liberation from crushing ownership burden with dignified exit So that I achieve security w",
+      "hasChildren": true,
+      "childCount": 8,
+      "position": {
+        "x": 129.90381056766574,
+        "y": -75.00000000000007
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-autonomous-entity-small-business-owner-scenarios-community",
+      "title": "Community Institution Building for Small Business Owner",
+      "contentType": "feature",
+      "description": "As a small_business_owner in the autonomous_entity system Operating at the community governance layer I want my business to become genuine community institution So that neighborhood embeddedness is pr",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 144.8888739433602,
+        "y": -38.82285676537823
+      },
+      "level": 1,
+      "isParent": false
+    }
+  ],
+  "edges": [
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-franchise-operator-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-franchise-operator-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-manager-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-manager-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-customer-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-customer-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-community-investor-scenarios-municipality",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-community-investor-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-supplier-scenarios-industry-sector",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-supplier-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-worker-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-worker-scenarios-industry-sector",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-worker-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-small-business-owner-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "autonomous-entity-epic",
+      "target": "feature-autonomous-entity-small-business-owner-scenarios-community",
+      "type": "CONTAINS"
+    }
+  ],
+  "totalNodes": 25,
+  "totalEdges": 24
+}

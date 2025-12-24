@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-individual-preteen exercises genuine autonomy in real economic decisions",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual-preteen exercises genuine autonomy in real economic decisions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Preteen exercises genuine autonomy in real economic decisions",
+  "description": "Preteen exercises genuine autonomy in real economic decisions",
+  "content": "Scenario: Preteen exercises genuine autonomy in real economic decisions\n    Given Marcus has $75 budget for weekly groceries\n    And the budget is not hypothetical but actual family resource constraint\n    When Marcus uses the Value Scanner to plan weekly shopping\n    Then he should have full autonomy within budget boundaries\n    And his personal_agent should provide adult-level decision support\n    And the interface should treat him as capable, not as a child\n    And his choices should have real consequences for family survival\n    And the system should recognize he's not practicing but performing\n    And autonomy should be genuine, not simulated learning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:individual",
+    "related_users:child,teen,parent,student",
+    "related_layers:family,neighborhood,community,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Preteen exercises genuine autonomy in real economic decisions",
+    "ogDescription": "Preteen exercises genuine autonomy in real economic decisions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-individual-preteen exercises genuine autonomy in real economic decisions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Preteen exercises genuine autonomy in real economic decisions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-individual-preteen exercises genuine autonomy in real economic decisions",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual-preteen exercises genuine autonomy in real economic decisions",
+    "name": "Preteen exercises genuine autonomy in real economic decisions",
+    "description": "Preteen exercises genuine autonomy in real economic decisions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

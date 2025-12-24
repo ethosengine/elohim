@@ -1,0 +1,62 @@
+{
+  "id": "feature-value-scanner-idd-community-scenarios-community",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Community Engagement and IDD Peer Support",
+  "description": "As an IDD community member I want to connect with IDD peers and participate in broader community life So that I experience belonging, mutual support, and valued community participation",
+  "content": "Feature: Community Engagement and IDD Peer Support\n  As an IDD community member\n  I want to connect with IDD peers and participate in broader community life\n  So that I experience belonging, mutual support, and valued community participation\n\n  Background:\n    Given Jordan is part of the IDD community\n    And Jordan deserves connection with peers who share similar experiences\n    And Jordan participates in broader community as both contributor and recipient\n    And the community_elohim coordinates support while making contributions visible\n\n  Scenario: Connecting with IDD peers for mutual support\n    Given Jordan wants to meet other IDD community members\n    And peer connection is essential for Jordan's wellbeing\n    When Jordan uses the peer connection feature\n    Then the interface shows nearby IDD peers with similar interests\n    And profiles use accessible format (pictures, simple descriptions)\n    And Jordan can express interest in connecting\n    And the community_elohim facilitates introductions with support\n    And Jordan builds friendships with people who truly understand\n    And Jordan experiences IDD community belonging and pride\n\n  Scenario: Participating in IDD self-advocacy group\n    Given there's a local IDD self-advocacy organization\n    And Jordan wants to participate in advocacy work\n    When Jordan attends a self-advocacy meeting\n    Then the personal_agent provides accessible meeting information\n    And the meeting uses IDD-accessible facilitation practices\n    And Jordan can share experiences and voice concerns\n    And Jordan's advocacy contribution is valued by peers\n    And the group works on issues Jordan cares about\n    And Jordan accumulates care tokens for community advocacy work\n    And Jordan experiences political agency and community power\n\n  Scenario: Accessing community recreational programs inclusively\n    Given the community rec center offers adaptive sports programs\n    And Jordan loves playing basketball\n    When Jordan joins the adaptive basketball league\n    Then registration uses accessible language and processes\n    And Jordan participates in the sport at their capability level\n    And coaches treat Jordan as an athlete, not a charity case\n    And Jordan's teammates are peers with various abilities\n    And Jordan's athletic participation contributes to team success\n    And Jordan experiences joy, competition, and physical activity\n    And Jordan's community participation is normalized, not special\n\n  Scenario: Contributing to community through volunteer work\n    Given the local food bank needs volunteers\n    And Jordan wants to help community members in need\n    When Jordan volunteers at the food bank\n    Then tasks are adapted to Jordan's capabilities (sorting, carrying)\n    And volunteer coordinators provide clear, accessible instructions\n    And Jordan's work genuinely contributes to food bank operations\n    And Jordan accumulates care tokens for volunteer service\n    And Jordan is recognized as a valued volunteer, not as someone being helped\n    And Jordan experiences being a community care provider\n    And Jordan's contributions are celebrated authentically\n\n  Scenario: Participating in IDD cultural events and celebrations\n    Given the IDD community is hosting a pride celebration\n    And the event celebrates IDD culture, identity, and accomplishments\n    When Jordan attends the celebration\n    Then the personal_agent provides event details accessibly\n    And the entire event is designed for cognitive accessibility\n    And Jordan sees IDD peers being celebrated for their contributions\n    And Jordan participates in activities, performances, and community\n    And Jordan experiences IDD pride and cultural affirmation\n    And Jordan rejects ableist narratives of tragedy and burden\n    And Jordan celebrates disability as difference and community strength\n\n  Scenario: Accessing community services with dignity\n    Given Jordan needs to use public transportation\n    And the bus system has accessibility features\n    When Jordan rides the bus to community destinations\n    Then the personal_agent provides route navigation support\n    And the interface shows visual bus schedules and stops\n    And bus drivers treat Jordan with respect as a regular passenger\n    And Jordan can travel increasingly independently with support\n    And Jordan's community mobility contributes to social participation\n    And Jordan experiences freedom and autonomy through accessible transit\n    And Jordan's right to community access is honored\n\n  Scenario: Teaching others in community about IDD experience\n    Given a local school wants to teach students about inclusion\n    And Jordan is willing to share their experience\n    When Jordan participates in educational presentation\n    Then the personal_agent helps Jordan prepare accessible talking points\n    And Jordan shares their story in their own words with support\n    And students learn from Jordan directly, not just about IDD in abstract\n    And Jordan accumulates care tokens for educational contribution\n    And Jordan's teaching shapes community understanding\n    And Jordan experiences being an educator and advocate\n    And the community learns to see IDD people as full humans\n\n  Scenario: Supporting other IDD community members as peer\n    Given Jordan has learned strategies for various daily challenges\n    And a newer group home resident is struggling with similar issues\n    When Jordan offers peer support\n    Then Jordan shares what has helped them\n    And the new resident benefits from Jordan's lived experience wisdom\n    And Jordan's peer support is recognized as valuable care work\n    And Jordan accumulates care tokens for peer support contribution\n    And Jordan experiences being a care provider and mentor\n    And IDD peer support is recognized as essential care infrastructure\n\n  Scenario: Participating in community decision-making processes\n    Given the city is planning a new accessible park\n    And community input is being gathered\n    When Jordan participates in the planning process\n    Then the personal_agent helps Jordan access the input process\n    And Jordan's preferences about park features are gathered accessibly\n    And Jordan's input is valued equally with other community members\n    And the community_elohim ensures Jordan's voice is heard\n    And park design reflects input from diverse community members including IDD\n    And Jordan experiences being an active citizen shaping community\n    And Jordan's participation strengthens democratic processes\n\n  Scenario: Building diverse friendships across community\n    Given Jordan's social circle includes both IDD and non-IDD people\n    And diverse friendships enrich Jordan's life\n    When Jordan participates in mixed-ability social activities\n    Then the personal_agent supports social coordination\n    And friends engage with Jordan as a peer, not a project\n    And Jordan contributes to friendships through presence, joy, and care\n    And relationships are genuine and reciprocal\n    And Jordan experiences belonging in diverse community\n    And Jordan's social connections are honored and supported\n\n  Scenario: Accessing community cultural opportunities\n    Given the local theater offers sensory-friendly performances\n    And Jordan loves musicals\n    When Jordan attends a sensory-friendly show\n    Then the personal_agent helps Jordan select and prepare for the show\n    And the theater environment is adapted for accessibility (lights, volume)\n    And Jordan can enjoy cultural experience without barriers\n    And Jordan's cultural participation contributes to diverse audiences\n    And the theater benefits from inclusive programming\n    And Jordan experiences full community cultural citizenship\n    And accessibility allows Jordan's flourishing and joy\n\n  Scenario: Responding to community emergency with supported capability\n    Given there's a community crisis (natural disaster, emergency)\n    And everyone is mobilizing to help\n    When Jordan wants to contribute to emergency response\n    Then the personal_agent helps Jordan identify safe ways to help\n    And Jordan contributes at their capability (preparing supplies, making calls)\n    And Jordan's crisis contribution is recognized and valued\n    And the community includes Jordan in collective response\n    And Jordan accumulates care tokens for emergency care work\n    And Jordan experiences being part of community resilience\n    And Jordan's citizenship includes both receiving and providing care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-idd-community-scenarios-community-connecting with idd peers for mutual support",
+    "scenario-value-scanner-idd-community-scenarios-community-participating in idd self-advocacy group",
+    "scenario-value-scanner-idd-community-scenarios-community-accessing community recreational programs inclusively",
+    "scenario-value-scanner-idd-community-scenarios-community-contributing to community through volunteer work",
+    "scenario-value-scanner-idd-community-scenarios-community-participating in idd cultural events and celebrations",
+    "scenario-value-scanner-idd-community-scenarios-community-accessing community services with dignity",
+    "scenario-value-scanner-idd-community-scenarios-community-teaching others in community about idd experience",
+    "scenario-value-scanner-idd-community-scenarios-community-supporting other idd community members as peer",
+    "scenario-value-scanner-idd-community-scenarios-community-participating in community decision-making processes",
+    "scenario-value-scanner-idd-community-scenarios-community-building diverse friendships across community",
+    "scenario-value-scanner-idd-community-scenarios-community-accessing community cultural opportunities",
+    "scenario-value-scanner-idd-community-scenarios-community-responding to community emergency with supported capability"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": null,
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community Engagement and IDD Peer Support",
+    "ogDescription": "As an IDD community member I want to connect with IDD peers and participate in broader community life So that I experience belonging, mutual support, and valued community participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-idd-community-scenarios-community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Community Engagement and IDD Peer Support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-idd-community-scenarios-community",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community",
+    "name": "Community Engagement and IDD Peer Support",
+    "description": "As an IDD community member I want to connect with IDD peers and participate in broader community life So that I experience belonging, mutual support, and valued community participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

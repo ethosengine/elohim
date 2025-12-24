@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-individual-privacy and autonomy as emerging independent adult",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:individual-privacy and autonomy as emerging independent adult",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Privacy and autonomy as emerging independent adult",
+  "description": "Privacy and autonomy as emerging independent adult",
+  "content": "Scenario: Privacy and autonomy as emerging independent adult\n    Given Kenji is establishing adult independence\n    And he has full rights to privacy in his personal life\n    When care economy data is collected about Kenji\n    Then he must have complete control over all personal information\n    And no data should be shared with family or school without his consent\n    And his adult autonomy should be respected completely\n    And privacy should be default, not something he must request\n    And the system should support his development of adult boundaries\n    And Kenji's data sovereignty should be absolute\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:individual",
+    "related_users:young_adult,teen,worker,adult",
+    "related_layers:household,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Privacy and autonomy as emerging independent adult",
+    "ogDescription": "Privacy and autonomy as emerging independent adult",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-individual-privacy and autonomy as emerging independent adult",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Privacy and autonomy as emerging independent adult - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-individual-privacy and autonomy as emerging independent adult",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:individual-privacy and autonomy as emerging independent adult",
+    "name": "Privacy and autonomy as emerging independent adult",
+    "description": "Privacy and autonomy as emerging independent adult",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

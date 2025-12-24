@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-educational-citizen tracks school resource distribution equity",
+  "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:educational-citizen tracks school resource distribution equity",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Citizen tracks school resource distribution equity",
+  "description": "Citizen tracks school resource distribution equity",
+  "content": "Scenario: Citizen tracks school resource distribution equity\n    Given the citizen is concerned about educational equity\n    And lives in a diverse municipality\n    When the Observer analyzes district resource patterns\n    Then the citizen sees which schools get experienced teachers\n    And views facility quality across neighborhoods\n    And identifies program access disparities (gifted, AP, arts)\n    And understands systematic resource distribution patterns\n    And educational justice concerns become evidence-based\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:educational",
+    "related_users:parent,teacher,board_member,student",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,district_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Citizen tracks school resource distribution equity",
+    "ogDescription": "Citizen tracks school resource distribution equity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-educational-citizen tracks school resource distribution equity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Citizen tracks school resource distribution equity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-educational-citizen tracks school resource distribution equity",
+    "identifier": "did:web:elohim.host:content:public-observer:citizen:scenarios:educational-citizen tracks school resource distribution equity",
+    "name": "Citizen tracks school resource distribution equity",
+    "description": "Citizen tracks school resource distribution equity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

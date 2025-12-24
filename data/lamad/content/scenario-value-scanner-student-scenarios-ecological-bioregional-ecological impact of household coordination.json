@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-ecological impact of household coordination",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-ecological impact of household coordination",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Ecological impact of household coordination",
+  "description": "Ecological impact of household coordination",
+  "content": "Scenario: Ecological impact of household coordination\n    Given Kenji lives with three roommates\n    And household coordination can reduce ecological impact\n    When the bioregional_elohim tracks household ecological practices\n    Then it should recognize shared living as ecologically efficient\n    And it should show how cooking for four is more efficient than four cooking separately\n    And it should value household bulk buying as reducing packaging waste\n    And it should accumulate care tokens for ecological household practices\n    And the system should recognize household coordination as ecological care\n    And shared living should be valued as sustainability practice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:ecological_bioregional",
+    "related_users:environmental_scientist,activist,community_member,resident",
+    "related_layers:community,neighborhood,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Ecological impact of household coordination",
+    "ogDescription": "Ecological impact of household coordination",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-ecological impact of household coordination",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Ecological impact of household coordination - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-ecological impact of household coordination",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-ecological impact of household coordination",
+    "name": "Ecological impact of household coordination",
+    "description": "Ecological impact of household coordination",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

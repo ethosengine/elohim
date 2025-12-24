@@ -1,0 +1,65 @@
+{
+  "id": "feature-public-observer-journalist-scenarios-educational",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:educational",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Education Accountability Journalism for Journalist",
+  "description": "As a journalist in the public_observer system Operating at the educational governance layer I want comprehensive education governance surveillance So that education journalism holds systems accountable for equity",
+  "content": "@epic:public_observer\n@user_type:journalist\n@governance_layer:educational\n@related_users:teacher,parent,student,board_member,activist\n@related_layers:district,municipality,provincial_state\n@elohim_agents:public_observer,education_elohim,district_elohim,pattern_elohim\n\nFeature: Education Accountability Journalism for Journalist\n  As a journalist in the public_observer system\n  Operating at the educational governance layer\n  I want comprehensive education governance surveillance\n  So that education journalism holds systems accountable for equity\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the journalist user is registered in the system\n    And the educational governance context is active\n\n  Scenario: Journalist monitors multiple school districts despite limited capacity\n    Given the journalist covers regional education\n    And must track 8 school districts plus state education department\n    When the Observer monitors all district school boards simultaneously\n    Then the journalist reviews all board meetings across districts\n    And receives alerts for newsworthy decisions and patterns\n    And identifies stories affecting multiple districts\n    And comprehensive regional education coverage becomes sustainable\n    And no consequential education decision escapes scrutiny\n\n  Scenario: Journalist exposes systematic school resource inequities\n    Given the journalist investigates education equity\n    And suspects under-resourcing of schools serving students of color\n    When the Observer analyzes district resource distribution\n    Then the journalist sees experienced teachers concentrate in white affluent schools\n    And documents gifted programs and AP courses cluster by race and class\n    And finds per-student spending disparities of thousands of dollars\n    And shows facility quality varies dramatically by neighborhood\n    And publishes investigation exposing structural educational racism\n\n  Scenario: Journalist tracks school board member voting patterns\n    Given a board member campaigns on equity platform\n    And the journalist investigates whether actions match rhetoric\n    When the Observer analyzes 3 years of board voting records\n    Then the journalist sees board member voted against equity funding 7 times\n    And approved budget cutting programs serving disadvantaged students\n    And voted for charter expansion draining district resources\n    And identifies pattern of rhetoric contradicting voting record\n    And publishes accountability profile exposing hypocrisy\n\n  Scenario: Journalist fact-checks superintendent claims on achievement\n    Given the superintendent presents glowing achievement data\n    And the journalist provides accountability coverage\n    When the Observer analyzes district outcome data\n    Then the journalist verifies overall test score increase (true)\n    And finds achievement gap between white and Black students widened\n    And shows gains concentrated in already-high-performing schools\n    And identifies selective data presentation masking inequity\n    And publishes fact-check revealing hidden disparities\n\n  Scenario: Journalist investigates school discipline disparities\n    Given parents report Black students face harsher discipline\n    And the journalist investigates discipline practices\n    When the Observer analyzes discipline data by race\n    Then the journalist sees Black students suspended at 3.5x rate\n    And documents same behaviors leading to suspension for Black students, warnings for white\n    And tracks individual administrators with extreme disparity patterns\n    And compares to districts using restorative justice successfully\n    And publishes investigation exposing discriminatory discipline\n    And pattern recognition reveals school-to-prison pipeline\n\n  Scenario: Journalist tracks district promises on equity initiatives\n    Given district announced equity plan with specific commitments\n    And the journalist covered initial announcement 18 months ago\n    When the Observer monitors equity plan implementation\n    Then the journalist finds only 2 of 12 commitments implemented\n    And sees budget that was supposed to fund initiatives redirected\n    And identifies resistance from administrators in board meeting discussions\n    And documents continued inequities despite equity rhetoric\n    And publishes accountability story on broken equity promises\n\n  Scenario: Journalist develops teacher sources on unsafe conditions\n    Given teachers report unsafe building conditions\n    And fear retaliation for speaking publicly\n    When the Observer provides secure anonymous channel\n    Then teachers share evidence of mold, failing HVAC, and structural issues\n    And journalist investigates without exposing individual sources\n    And verifies claims through building inspection records\n    And documents district knowledge and inaction\n    And publishes investigation forcing accountability\n    And source protection enables teachers to speak truth\n\n  Scenario: Journalist investigates charter school performance claims\n    Given charter schools claim superior outcomes for disadvantaged students\n    And receive public funding based on performance claims\n    When the Observer analyzes charter outcomes versus district schools\n    Then the journalist sees charters are more racially segregated\n    And finds test gains disappear when controlling for selective enrollment\n    And documents higher suspension rates for students of color\n    And shows charter expansion drains resources from district\n    And publishes investigation questioning charter expansion policy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:educational",
+    "related_users:teacher,parent,student,board_member,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,education_elohim,district_elohim,pattern_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-journalist-scenarios-educational-journalist monitors multiple school districts despite limited capacity",
+    "scenario-public-observer-journalist-scenarios-educational-journalist exposes systematic school resource inequities",
+    "scenario-public-observer-journalist-scenarios-educational-journalist tracks school board member voting patterns",
+    "scenario-public-observer-journalist-scenarios-educational-journalist fact-checks superintendent claims on achievement",
+    "scenario-public-observer-journalist-scenarios-educational-journalist investigates school discipline disparities",
+    "scenario-public-observer-journalist-scenarios-educational-journalist tracks district promises on equity initiatives",
+    "scenario-public-observer-journalist-scenarios-educational-journalist develops teacher sources on unsafe conditions",
+    "scenario-public-observer-journalist-scenarios-educational-journalist investigates charter school performance claims",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 8
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Education Accountability Journalism for Journalist",
+    "ogDescription": "As a journalist in the public_observer system Operating at the educational governance layer I want comprehensive education governance surveillance So that education journalism holds systems accountabl",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-journalist-scenarios-educational",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Education Accountability Journalism for Journalist - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-journalist-scenarios-educational",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:educational",
+    "name": "Education Accountability Journalism for Journalist",
+    "description": "As a journalist in the public_observer system Operating at the educational governance layer I want comprehensive education governance surveillance So that education journalism holds systems accountable for equity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

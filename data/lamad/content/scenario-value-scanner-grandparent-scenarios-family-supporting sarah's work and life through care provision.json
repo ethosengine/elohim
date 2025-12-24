@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-family-supporting sarah's work and life through care provision",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:family-supporting sarah's work and life through care provision",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Supporting Sarah's work and life through care provision",
+  "description": "Supporting Sarah's work and life through care provision",
+  "content": "Scenario: Supporting Sarah's work and life through care provision\n    Given Margaret's childcare enables Sarah to work and thrive\n    And this support is essential to Sarah's economic security\n    When the family_elohim tracks how care enables flourishing\n    Then it should show that Margaret's care supports Sarah's career\n    And it should recognize care as infrastructure for Sarah's life\n    And it should make visible that Margaret enables Sarah's economic participation\n    And multigenerational care should enable all generations to thrive\n    And Margaret's contribution to Sarah's flourishing should be recognized\n    And care economy should show how generations support each other\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:family",
+    "related_users:parent,child,elderly,adult,middle_aged",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Supporting Sarah's work and life through care provision",
+    "ogDescription": "Supporting Sarah's work and life through care provision",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-family-supporting sarah's work and life through care provision",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Supporting Sarah's work and life through care provision - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-family-supporting sarah's work and life through care provision",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:family-supporting sarah's work and life through care provision",
+    "name": "Supporting Sarah's work and life through care provision",
+    "description": "Supporting Sarah's work and life through care provision",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

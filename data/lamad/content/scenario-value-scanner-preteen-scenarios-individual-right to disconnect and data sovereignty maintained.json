@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-individual-right to disconnect and data sovereignty maintained",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual-right to disconnect and data sovereignty maintained",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Right to disconnect and data sovereignty maintained",
+  "description": "Right to disconnect and data sovereignty maintained",
+  "content": "Scenario: Right to disconnect and data sovereignty maintained\n    Given Marcus uses the system for critical household functions\n    And constitutional constraints apply at all governance layers\n    When Marcus or his family choose to disconnect\n    Then the system must honor disconnection immediately\n    And alternative methods for household management must remain viable\n    And no dependency should be created that makes disconnection harmful\n    And data sovereignty must be preserved\n    And Marcus's right to not participate must be absolute\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:individual",
+    "related_users:child,teen,parent,student",
+    "related_layers:family,neighborhood,community,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Right to disconnect and data sovereignty maintained",
+    "ogDescription": "Right to disconnect and data sovereignty maintained",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-individual-right to disconnect and data sovereignty maintained",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Right to disconnect and data sovereignty maintained - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-individual-right to disconnect and data sovereignty maintained",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual-right to disconnect and data sovereignty maintained",
+    "name": "Right to disconnect and data sovereignty maintained",
+    "description": "Right to disconnect and data sovereignty maintained",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

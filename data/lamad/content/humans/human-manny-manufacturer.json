@@ -1,0 +1,66 @@
+{
+  "id": "human-manny-manufacturer",
+  "displayName": "Manny",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "Third-generation manufacturer. Running our family's machine shop, adapting to the new economy.",
+  "avatarUrl": "assets/avatars/human-manny-manufacturer.jpg",
+  "primaryLocation": {
+    "layer": "county_regional",
+    "displayName": "Valley County",
+    "reach": "community",
+    "type": "county_regional"
+  },
+  "organizationIds": [
+    "org-valley-machine-works"
+  ],
+  "communityIds": [
+    "community-manufacturers-guild",
+    "community-local-business"
+  ],
+  "affinityGroupIds": [
+    "affinity-manufacturing",
+    "affinity-supply-chain",
+    "affinity-worker-ownership",
+    "affinity-local-economy",
+    "affinity-skilled-trades"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-manufacturing",
+    "concept-supply-chain",
+    "concept-worker-ownership",
+    "concept-local-economy",
+    "concept-skilled-trades"
+  ],
+  "publicAttestationIds": [
+    "attestation-master-machinist",
+    "attestation-iso-certified"
+  ],
+  "relationshipIds": [
+    "rel-0011"
+  ],
+  "trustedConnectionCount": 1,
+  "_metadata": {
+    "category": "local-economy",
+    "governanceLayers": [
+      "community",
+      "workplace",
+      "county_regional"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": null
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

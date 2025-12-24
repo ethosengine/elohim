@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-nation-state-balancing national security claims with individual rights",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:nation-state-balancing national security claims with individual rights",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Balancing national security claims with individual rights",
+  "description": "Balancing national security claims with individual rights",
+  "content": "Scenario: Balancing national security claims with individual rights\n    Given an appeal challenges agent decision justified by security concerns\n    And I must weigh existential threats against individual dignity\n    When we review the security-rights balance\n    Then we evaluate: if security claim was legitimate or pretext\n    And we examine: if less rights-violating alternatives existed\n    And we consider: transparency appropriate to security context\n    And we establish: constitutional limits on authority even under threat\n    And we prevent: security from becoming excuse for unchecked power\n    And we create: precedent for how democracy functions under danger\n    And we protect: both security and rights through wise judgment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:nation_state",
+    "related_users:appellant,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Balancing national security claims with individual rights",
+    "ogDescription": "Balancing national security claims with individual rights",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-nation-state-balancing national security claims with individual rights",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Balancing national security claims with individual rights - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-nation-state-balancing national security claims with individual rights",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:nation-state-balancing national security claims with individual rights",
+    "name": "Balancing national security claims with individual rights",
+    "description": "Balancing national security claims with individual rights",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

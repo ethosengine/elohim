@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-household-shared grocery shopping with roommates",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-shared grocery shopping with roommates",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Shared grocery shopping with roommates",
+  "description": "Shared grocery shopping with roommates",
+  "content": "Scenario: Shared grocery shopping with roommates\n    Given Aisha and her roommates share food costs\n    And they have different dietary preferences\n    When they use the Value Scanner for shared shopping\n    Then the household_elohim should track individual contributions\n    And it should manage the shared household budget\n    And it should accommodate different preferences within budget\n    And care tokens should reflect each person's shopping labor\n    And the system should prevent household conflicts over resources\n    And equitable cost-sharing should be transparent\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:household",
+    "related_users:adult,roommate,partner",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Shared grocery shopping with roommates",
+    "ogDescription": "Shared grocery shopping with roommates",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-shared grocery shopping with roommates",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Shared grocery shopping with roommates - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-shared grocery shopping with roommates",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-shared grocery shopping with roommates",
+    "name": "Shared grocery shopping with roommates",
+    "description": "Shared grocery shopping with roommates",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

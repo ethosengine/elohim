@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-global-advocating for protocol sovereignty in international forums",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:global-advocating for protocol sovereignty in international forums",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Advocating for protocol sovereignty in international forums",
+  "description": "Advocating for protocol sovereignty in international forums",
+  "content": "Scenario: Advocating for protocol sovereignty in international forums\n    Given international organizations discuss AI regulation\n    And some proposals would mandate centralization\n    When I advocate for democratic governance principles\n    Then I argue: governments shouldn't mandate protocol architecture\n    And I promote: community sovereignty as democratic principle\n    And I defend: right of communities to adopt or reject protocol\n    And I present: evidence that protocol sovereignty works\n    And I resist: international regulation enabling authoritarian capture\n    And I build: coalition of democratic nations supporting autonomy\n    And I protect: space for democratic AI governance globally\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,technical_expert,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-global",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Advocating for protocol sovereignty in international forums",
+    "ogDescription": "Advocating for protocol sovereignty in international forums",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-global-advocating for protocol sovereignty in international forums",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advocating for protocol sovereignty in international forums - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-global-advocating for protocol sovereignty in international forums",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:global-advocating for protocol sovereignty in international forums",
+    "name": "Advocating for protocol sovereignty in international forums",
+    "description": "Advocating for protocol sovereignty in international forums",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

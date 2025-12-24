@@ -1,0 +1,29 @@
+{
+  "id": "concept-path-forward-policymakers",
+  "contentType": "concept",
+  "title": "For Policymakers",
+  "description": "Mandate interoperability. Protect data sovereignty. Fund public digital infrastructure. Create space for pro-social experiments.",
+  "content": "Mandate interoperability. Protect data sovereignty. Fund public digital infrastructure. Create space for pro-social experiments.",
+  "contentFormat": "plaintext",
+  "sourcePath": "generated/landing-page/path-forward/concept-path-forward-policymakers.json",
+  "tags": [
+    "path-forward",
+    "policy",
+    "governance",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "governance-epic",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "path-forward",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.002549",
+  "updatedAt": "2025-12-24T03:05:25.880Z"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "hrea-agent-model",
+  "title": "Agents: The Humans in the Network",
+  "content": "# Agents: Economic Actors in hREA\n\n## What is an Agent?\n\nIn hREA (Holochain REA), an Agent is any economic actor who can:\n- **Provide** resources to others\n- **Receive** resources from others\n- **Commit** to future economic activity\n- **Observe** and witness events\n\nAgents can be individuals, organizations, or communities.\n\n## Agent Relationships\n\nAgents don't exist in isolation. They have relationships:\n\n```\nAgent: Adaeze (Nurse)\n├── Relationships as Provider:\n│   ├── Care provider → Hospital patients\n│   ├── Mentor → Junior nurses\n│   └── Family supporter → Okonkwo household\n├── Relationships as Receiver:\n│   ├── Employee ← Hospital\n│   ├── Network member ← Lagos Health Collective\n│   └── Learner ← Continuing education\n└── Scope Memberships:\n    ├── Lagos Health Collective\n    ├── Ikeja Community Network\n    └── Okonkwo Family\n```\n\n## Agent Capabilities in hREA\n\nFrom the hREA GraphQL API, agents can:\n\n| Capability | Description |\n|------------|-------------|\n| `commitments` | Promises to provide or receive resources |\n| `intents` | Desired economic activity (offers/requests) |\n| `economicEvents` | Observed value flows |\n| `inventoriedResources` | Resources the agent stewards |\n| `proposals` | Offers to exchange value |\n\n## Agents and Care Recognition\n\nIn a care economy, agent identity includes:\n- **Care tokens accumulated**: Recognition of care work\n- **Skill attestations**: Witnessed competencies\n- **Creator presence**: Contributions to shared knowledge\n- **Reputation**: Trust built through consistent contribution\n\nThe network sees what you create, who you help, and how you contribute.",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/economic_coordination/epic.md",
+  "tags": [
+    "hrea",
+    "agent",
+    "identity",
+    "relationships",
+    "care-economy"
+  ],
+  "relationships": [
+    {
+      "target": "hrea-intent-commitment",
+      "type": "prereq"
+    }
+  ],
+  "createdAt": "2025-12-16T03:28:53.993Z",
+  "updatedAt": "2025-12-16T03:29:39.970Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "fct-media-05-video-love-your-neighbor-a",
+  "contentType": "video",
+  "title": "love your neighbor as yourself",
+  "description": "love your neighbor as yourself",
+  "content": {
+    "title": "love your neighbor as yourself",
+    "year": null,
+    "platform": null,
+    "duration": null,
+    "format": "video"
+  },
+  "contentFormat": "video-embed",
+  "sourcePath": "fct/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "tags": [
+    "video",
+    "fct",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-06-harmful-consequences"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-06-harmful-consequences",
+    "mediaType": "video",
+    "year": null
+  },
+  "_organization": null,
+  "createdAt": "2025-11-28T21:10:19.204913",
+  "updatedAt": "2025-12-24T03:05:26.108Z",
+  "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+  "activityPubType": "Video",
+  "openGraphMetadata": {
+    "ogTitle": "love your neighbor as yourself",
+    "ogDescription": "love your neighbor as yourself",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-05-video-love-your-neighbor-a",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/video.jpg",
+    "ogImageAlt": "love your neighbor as yourself - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "VideoObject",
+    "@id": "https://elohim-protocol.org/content/fct-media-05-video-love-your-neighbor-a",
+    "identifier": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+    "name": "love your neighbor as yourself",
+    "description": "love your neighbor as yourself",
+    "dateCreated": "2025-11-28T21:10:19.204913",
+    "dateModified": "2025-11-28T21:10:19.204915",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

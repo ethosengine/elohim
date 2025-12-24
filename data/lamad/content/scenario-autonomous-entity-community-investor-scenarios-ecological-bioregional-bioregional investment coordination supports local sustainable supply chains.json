@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-bioregional investment coordination supports local sustainable supply chains",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:ecological-bioregional-bioregional investment coordination supports local sustainable supply chains",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Bioregional investment coordination supports local sustainable supply chains",
+  "description": "Bioregional investment coordination supports local sustainable supply chains",
+  "content": "Scenario: Bioregional investment coordination supports local sustainable supply chains\n    Given sustainable supply chains require coordination across bioregion\n    And Patricia's investment in Maria's Kitchen connects to Johnson Farm investment\n    When investment pool coordinates bioregional supply chain development\n    Then farm-to-restaurant supply chains are financed as integrated systems\n    And bioregional food miles decrease through local sourcing infrastructure\n    And investment supports entire sustainable supply chain, not isolated enterprises\n    And ecological benefits compound through bioregional coordination\n    And bioregional_elohim coordinates supply chain investment across bioregion\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:ecological_bioregional",
+    "related_users:[supplier,worker,community_investor]",
+    "related_layers:[community,municipality]",
+    "elohim_agents:[bioregional_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Bioregional investment coordination supports local sustainable supply chains",
+    "ogDescription": "Bioregional investment coordination supports local sustainable supply chains",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-bioregional investment coordination supports local sustainable supply chains",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Bioregional investment coordination supports local sustainable supply chains - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-bioregional investment coordination supports local sustainable supply chains",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:ecological-bioregional-bioregional investment coordination supports local sustainable supply chains",
+    "name": "Bioregional investment coordination supports local sustainable supply chains",
+    "description": "Bioregional investment coordination supports local sustainable supply chains",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

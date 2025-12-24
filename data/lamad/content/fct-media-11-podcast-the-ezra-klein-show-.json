@@ -1,0 +1,54 @@
+{
+  "id": "fct-media-11-podcast-the-ezra-klein-show-",
+  "contentType": "podcast",
+  "title": "\"The Ezra Klein Show\" episode with Tressie McMillan Cottom",
+  "description": "Podcast recommended in FCT Module 12",
+  "content": {
+    "format": "podcast",
+    "title": "\"The Ezra Klein Show\" episode with Tressie McMillan Cottom"
+  },
+  "contentFormat": "audio-file",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "podcast",
+    "fct",
+    "audio",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice"
+  ],
+  "metadata": {
+    "category": "algorithmic-bias",
+    "sourceModule": "fct-module-12-fairness-justice",
+    "mediaType": "podcast"
+  },
+  "createdAt": "2025-11-28T21:10:19.220395",
+  "updatedAt": "2025-12-24T03:05:26.167Z",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "AudioObject",
+  "openGraphMetadata": {
+    "ogTitle": "\"The Ezra Klein Show\" episode with Tressie McMillan Cottom",
+    "ogDescription": "Podcast recommended in FCT Module 12",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-11-podcast-the-ezra-klein-show-",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/podcast.jpg",
+    "ogImageAlt": "\"The Ezra Klein Show\" episode with Tressie McMillan Cottom - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "PodcastEpisode",
+    "@id": "https://elohim-protocol.org/content/fct-media-11-podcast-the-ezra-klein-show-",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "\"The Ezra Klein Show\" episode with Tressie McMillan Cottom",
+    "description": "Podcast recommended in FCT Module 12",
+    "dateCreated": "2025-11-28T21:10:19.220395",
+    "dateModified": "2025-11-28T21:10:19.220396",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

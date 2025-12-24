@@ -1,0 +1,27 @@
+{
+  "id": "unit-governance-crisis",
+  "title": "The AI Governance Crisis: Why Current Approaches Fail",
+  "content": "# The AI Governance Crisis: Why Current Approaches Fail\n\n## The Regulatory Gap\n\nAI systems are making decisions about your credit, your healthcare, your job applications, your social media feed. Who governs them?\n\n**Current answer**: Mostly the companies that built them.\n\n**The problem**: Corporate self-regulation has consistently failed to protect public interests. From social media algorithms that amplify misinformation to hiring algorithms that perpetuate bias, the track record is clear.\n\n## Why Traditional Regulation Struggles\n\n### Speed Mismatch\n- **Legislation**: Takes years to draft, debate, pass\n- **AI development**: Moves in weeks and months\n- By the time a law is passed, the technology has evolved three generations\n\n### Expertise Gap\n- **Regulators**: Generalists, often rotating between agencies\n- **AI developers**: Deep specialists with proprietary knowledge\n- Regulatory capture is almost inevitable\n\n### Jurisdiction Chaos\n- **AI systems**: Global, borderless, instantly deployed\n- **Regulations**: National, fragmented, inconsistently enforced\n- Companies can forum-shop for favorable jurisdictions\n\n### Black Box Problem\n- **Traditional regulation**: Assumes you can inspect what you're regulating\n- **Modern AI**: Often opaque even to its creators\n- You can't regulate what you can't understand\n\n## What \"AI Governance\" Usually Means\n\nMost AI governance proposals fall into one of three inadequate categories:\n\n### 1. Ethics Washing\n\"We've formed an AI ethics board!\"\n- Boards with no enforcement power\n- Principles that sound good but bind no one\n- PR cover for business as usual\n\n### 2. Technical Solutionism\n\"We'll make AI explain itself!\"\n- Explainability is helpful but insufficient\n- Understanding why a system made a decision doesn't mean the decision was right\n- Technical fixes can't substitute for democratic accountability\n\n### 3. Regulatory Theater\n\"We'll require impact assessments!\"\n- Assessments done by the companies themselves\n- No meaningful public oversight\n- Compliance checklists that miss systemic harms\n\n## The Constitutional Insight\n\nThe Elohim Protocol proposes something different: **constitutional governance for AI**.\n\nWhat made constitutional government work for nation-states?\n- **Separation of powers** - No single entity controls everything\n- **Checks and balances** - Power centers constrain each other\n- **Rights and appeals** - Individuals have recourse against institutions\n- **Amendment processes** - Rules can evolve with changing circumstances\n\nThese principles don't require nation-state scale. They can be applied to AI systems—if we design them in from the start.\n\n## The Path Forward\n\nThe following units show how:\n1. **Constitutional Councils** - Multi-stakeholder oversight bodies\n2. **Appeals Processes** - Individual recourse against AI decisions\n3. **Stakeholder Roles** - Who participates and how\n\nThis isn't about making AI slower or less capable. It's about making AI accountable—to the people it affects.",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/governance/epic.md",
+  "tags": [
+    "governance",
+    "ai-governance",
+    "regulation",
+    "unit",
+    "crisis",
+    "constitutional"
+  ],
+  "relationships": [
+    {
+      "target": "governance-epic",
+      "type": "DERIVED_FROM"
+    },
+    {
+      "target": "unit-five-epics",
+      "type": "DEPENDS_ON"
+    }
+  ],
+  "createdAt": "2025-12-17T01:32:22.272Z",
+  "updatedAt": "2025-12-17T01:32:45.006Z"
+}

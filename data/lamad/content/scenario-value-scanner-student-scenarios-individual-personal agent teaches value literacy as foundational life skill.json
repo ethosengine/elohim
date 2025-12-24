@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-individual-personal agent teaches value literacy as foundational life skill",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:individual-personal agent teaches value literacy as foundational life skill",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Personal agent teaches value literacy as foundational life skill",
+  "description": "Personal agent teaches value literacy as foundational life skill",
+  "content": "Scenario: Personal agent teaches value literacy as foundational life skill\n    Given Kenji is shopping for groceries on his $50/week budget\n    And he struggles to identify best nutritional value per dollar\n    When Kenji's personal_agent analyzes his shopping choices\n    Then the agent should teach him to compare nutrition per cost\n    And it should explain \"Brown rice gives you 8 servings for $3, while instant rice gives 4 for $4\"\n    And it should help him identify efficient protein sources\n    And the agent should build Kenji's capability to make informed choices\n    And value literacy should be taught through practice, not lectures\n    And Kenji should develop skills that serve him throughout adult life\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:individual",
+    "related_users:young_adult,teen,worker,adult",
+    "related_layers:household,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Personal agent teaches value literacy as foundational life skill",
+    "ogDescription": "Personal agent teaches value literacy as foundational life skill",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-individual-personal agent teaches value literacy as foundational life skill",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal agent teaches value literacy as foundational life skill - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-individual-personal agent teaches value literacy as foundational life skill",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:individual-personal agent teaches value literacy as foundational life skill",
+    "name": "Personal agent teaches value literacy as foundational life skill",
+    "description": "Personal agent teaches value literacy as foundational life skill",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

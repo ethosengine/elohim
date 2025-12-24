@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-regenerative consumption replaces extractive consumption patterns",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-regenerative consumption replaces extractive consumption patterns",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Regenerative consumption replaces extractive consumption patterns",
+  "description": "Regenerative consumption replaces extractive consumption patterns",
+  "content": "Scenario: Regenerative consumption replaces extractive consumption patterns\n    Given traditional consumption extracts from ecological systems\n    And Sarah wants to shift to regenerative practices\n    When Sarah makes consumption choices over time\n    Then the bioregional_elohim should guide toward regenerative options\n    And it should educate about regenerative agriculture principles\n    And Sarah's consumption should support ecological health\n    And care economy should enable shift from extraction to regeneration\n    And household consumption should contribute to ecosystem restoration\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,caregiver,consumer,community_member,young_child",
+    "related_layers:household,family,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Regenerative consumption replaces extractive consumption patterns",
+    "ogDescription": "Regenerative consumption replaces extractive consumption patterns",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-regenerative consumption replaces extractive consumption patterns",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Regenerative consumption replaces extractive consumption patterns - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-regenerative consumption replaces extractive consumption patterns",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-regenerative consumption replaces extractive consumption patterns",
+    "name": "Regenerative consumption replaces extractive consumption patterns",
+    "description": "Regenerative consumption replaces extractive consumption patterns",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-industry-sector-farmer cooperation replaces competition through democratic coordination",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:industry-sector-farmer cooperation replaces competition through democratic coordination",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Farmer cooperation replaces competition through democratic coordination",
+  "description": "Farmer cooperation replaces competition through democratic coordination",
+  "content": "Scenario: Farmer cooperation replaces competition through democratic coordination\n    Given farmers traditionally compete for corporate contracts driving prices down\n    And competition prevented coordination benefiting all farmers\n    When democratic network enables farmer cooperation\n    Then Tom and neighboring farms coordinate complementary production\n    And crop specialization (one farm tomatoes, another greens, another roots) provides diversity\n    And revenue is shared fairly based on contribution\n    And farmers share equipment, labor, and expertise\n    And industry_sector_elohim facilitates farmer network coordination and fair value distribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:industry_sector",
+    "related_users:[worker,franchise_operator,small_business_owner,supplier]",
+    "related_layers:[workplace_organizational,community,ecological_bioregional]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Farmer cooperation replaces competition through democratic coordination",
+    "ogDescription": "Farmer cooperation replaces competition through democratic coordination",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-industry-sector-farmer cooperation replaces competition through democratic coordination",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Farmer cooperation replaces competition through democratic coordination - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-industry-sector-farmer cooperation replaces competition through democratic coordination",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:industry-sector-farmer cooperation replaces competition through democratic coordination",
+    "name": "Farmer cooperation replaces competition through democratic coordination",
+    "description": "Farmer cooperation replaces competition through democratic coordination",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

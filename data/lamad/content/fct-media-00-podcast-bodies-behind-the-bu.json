@@ -1,0 +1,54 @@
+{
+  "id": "fct-media-00-podcast-bodies-behind-the-bu",
+  "contentType": "podcast",
+  "title": "Bodies Behind the Bus",
+  "description": "Podcast recommended in FCT Module 1",
+  "content": {
+    "format": "podcast",
+    "title": "Bodies Behind the Bus"
+  },
+  "contentFormat": "audio-file",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "podcast",
+    "fct",
+    "audio",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "church-crisis",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "podcast"
+  },
+  "createdAt": "2025-11-28T21:10:19.182113",
+  "updatedAt": "2025-12-24T03:05:26.095Z",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "AudioObject",
+  "openGraphMetadata": {
+    "ogTitle": "Bodies Behind the Bus",
+    "ogDescription": "Podcast recommended in FCT Module 1",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-podcast-bodies-behind-the-bu",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/podcast.jpg",
+    "ogImageAlt": "Bodies Behind the Bus - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "PodcastEpisode",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-podcast-bodies-behind-the-bu",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Bodies Behind the Bus",
+    "description": "Podcast recommended in FCT Module 1",
+    "dateCreated": "2025-11-28T21:10:19.182113",
+    "dateModified": "2025-11-28T21:10:19.182115",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

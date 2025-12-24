@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-educational-citizen connects municipal decisions to school impacts",
+  "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:educational-citizen connects municipal decisions to school impacts",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Citizen connects municipal decisions to school impacts",
+  "description": "Citizen connects municipal decisions to school impacts",
+  "content": "Scenario: Citizen connects municipal decisions to school impacts\n    Given a developer proposes 200-unit residential complex\n    And claims it will benefit the tax base\n    When the Observer calculates educational impacts\n    Then the citizen sees 180 new students projected\n    And understands infrastructure capacity constraints\n    And learns no new school facilities are planned\n    And connects municipal development to education quality\n    And cross-domain impacts become visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:educational",
+    "related_users:parent,teacher,board_member,student",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,district_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Citizen connects municipal decisions to school impacts",
+    "ogDescription": "Citizen connects municipal decisions to school impacts",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-educational-citizen connects municipal decisions to school impacts",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Citizen connects municipal decisions to school impacts - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-educational-citizen connects municipal decisions to school impacts",
+    "identifier": "did:web:elohim.host:content:public-observer:citizen:scenarios:educational-citizen connects municipal decisions to school impacts",
+    "name": "Citizen connects municipal decisions to school impacts",
+    "description": "Citizen connects municipal decisions to school impacts",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

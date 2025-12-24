@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-provincial-state-teacher challenges state teacher evaluation mandate",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state-teacher challenges state teacher evaluation mandate",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teacher challenges state teacher evaluation mandate",
+  "description": "Teacher challenges state teacher evaluation mandate",
+  "content": "Scenario: Teacher challenges state teacher evaluation mandate\n    Given state law requires evaluation system based on student test scores\n    And teachers know this creates perverse incentives and doesn't improve teaching\n    When teachers organize statewide campaign through Observer\n    Then teachers provide evidence on evaluation system failures\n    And show how it drives teaching to test not student learning\n    And present research on effective teacher evaluation approaches\n    And build parent coalition around learning-centered not test-centered education\n    And state evaluation policy becomes political accountability issue\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:provincial_state",
+    "related_users:parent,politician,community_organizer,union_representative",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,education_elohim,union_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teacher challenges state teacher evaluation mandate",
+    "ogDescription": "Teacher challenges state teacher evaluation mandate",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-provincial-state-teacher challenges state teacher evaluation mandate",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher challenges state teacher evaluation mandate - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-provincial-state-teacher challenges state teacher evaluation mandate",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state-teacher challenges state teacher evaluation mandate",
+    "name": "Teacher challenges state teacher evaluation mandate",
+    "description": "Teacher challenges state teacher evaluation mandate",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

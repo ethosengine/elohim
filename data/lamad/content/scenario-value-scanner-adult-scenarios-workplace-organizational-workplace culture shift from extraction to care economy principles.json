@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-workplace culture shift from extraction to care economy principles",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:workplace-organizational-workplace culture shift from extraction to care economy principles",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Workplace culture shift from extraction to care economy principles",
+  "description": "Workplace culture shift from extraction to care economy principles",
+  "content": "Scenario: Workplace culture shift from extraction to care economy principles\n    Given Sarah's workplace could adopt care economy principles\n    And organizational culture shapes employee well-being\n    When Sarah advocates for cultural change\n    Then the workplace_elohim should support care economy adoption\n    And workplace culture should value employee well-being\n    And success should be measured by care, not just extraction\n    And organizational culture should recognize care creates value\n    And Sarah's workplace should demonstrate care economy in employment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,caregiver,employer,colleague",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Workplace culture shift from extraction to care economy principles",
+    "ogDescription": "Workplace culture shift from extraction to care economy principles",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-workplace-organizational-workplace culture shift from extraction to care economy principles",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace culture shift from extraction to care economy principles - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-workplace-organizational-workplace culture shift from extraction to care economy principles",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:workplace-organizational-workplace culture shift from extraction to care economy principles",
+    "name": "Workplace culture shift from extraction to care economy principles",
+    "description": "Workplace culture shift from extraction to care economy principles",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

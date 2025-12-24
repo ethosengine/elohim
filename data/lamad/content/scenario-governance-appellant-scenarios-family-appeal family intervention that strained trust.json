@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-appellant-scenarios-family-appeal family intervention that strained trust",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:family-appeal family intervention that strained trust",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Appeal family intervention that strained trust",
+  "description": "Appeal family intervention that strained trust",
+  "content": "Scenario: Appeal family intervention that strained trust\n    Given Family Elohim alerted my partner about my behavioral changes\n    And this intervention strained trust in our relationship\n    And my partner now worries I'm being monitored\n    When I file an appeal about the family impact of the intervention\n    And I explain how \"care\" felt like \"control\" in our relationship\n    Then the appeal is reviewed with family dynamics in mind\n    And The Constitutional Council considers relationship impacts\n    And They evaluate whether the intervention balanced individual autonomy with family care\n    And They examine if less invasive options were considered\n    And The family is offered mediation support to rebuild trust\n    And Protocol recommendations address relationship preservation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:individual,community",
+    "elohim_agents:family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-family",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Appeal family intervention that strained trust",
+    "ogDescription": "Appeal family intervention that strained trust",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-family-appeal family intervention that strained trust",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appeal family intervention that strained trust - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-family-appeal family intervention that strained trust",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:family-appeal family intervention that strained trust",
+    "name": "Appeal family intervention that strained trust",
+    "description": "Appeal family intervention that strained trust",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

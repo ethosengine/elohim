@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-neighborhood-knowing and watching out for neighborhood children",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:neighborhood-knowing and watching out for neighborhood children",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Knowing and watching out for neighborhood children",
+  "description": "Knowing and watching out for neighborhood children",
+  "content": "Scenario: Knowing and watching out for neighborhood children\n    Given Margaret is present when children are coming home from school\n    And she has time to notice and care about local kids\n    When the neighborhood_elohim facilitates informal child watching\n    Then Margaret's presence should contribute to neighborhood safety\n    And parents should understand seniors provide informal oversight\n    And Margaret's care about local children should be recognized\n    And village-scale child protection should be facilitated\n    And intergenerational neighborhood care should be normalized\n    And working parents should benefit from retiree presence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:neighborhood",
+    "related_users:middle_aged,elderly,retired,neighbor,community_member",
+    "related_layers:individual,household,family,community,ecological_bioregional",
+    "elohim_agents:personal_agent,household_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Knowing and watching out for neighborhood children",
+    "ogDescription": "Knowing and watching out for neighborhood children",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-neighborhood-knowing and watching out for neighborhood children",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Knowing and watching out for neighborhood children - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-neighborhood-knowing and watching out for neighborhood children",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:neighborhood-knowing and watching out for neighborhood children",
+    "name": "Knowing and watching out for neighborhood children",
+    "description": "Knowing and watching out for neighborhood children",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

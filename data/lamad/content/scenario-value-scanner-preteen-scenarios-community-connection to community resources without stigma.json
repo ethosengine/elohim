@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-community-connection to community resources without stigma",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community-connection to community resources without stigma",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Connection to community resources without stigma",
+  "description": "Connection to community resources without stigma",
+  "content": "Scenario: Connection to community resources without stigma\n    Given Marcus's family needs support\n    And traditional social services often involve stigma\n    When Marcus accesses community resources\n    Then the protocol should preserve his dignity completely\n    And he should not feel like he's receiving charity\n    And the framing should always be reciprocal care exchange\n    And his contributions should be valued genuinely\n    And community support should strengthen rather than shame\n    And care economy should eliminate stigma from receiving help\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:community",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Connection to community resources without stigma",
+    "ogDescription": "Connection to community resources without stigma",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-community-connection to community resources without stigma",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connection to community resources without stigma - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-community-connection to community resources without stigma",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community-connection to community resources without stigma",
+    "name": "Connection to community resources without stigma",
+    "description": "Connection to community resources without stigma",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

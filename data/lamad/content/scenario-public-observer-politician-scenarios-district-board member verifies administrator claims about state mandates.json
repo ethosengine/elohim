@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-district-board member verifies administrator claims about state mandates",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:district-board member verifies administrator claims about state mandates",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Board member verifies administrator claims about state mandates",
+  "description": "Board member verifies administrator claims about state mandates",
+  "content": "Scenario: Board member verifies administrator claims about state mandates\n    Given district administration claims state mandates prevent local changes\n    And politicians suspect bureaucratic resistance masked as legal constraint\n    When the Observer researches actual state requirements\n    Then they see what's legally required versus administrative preference\n    And identify how other districts handle same mandates differently\n    And distinguish genuine constraints from bureaucratic inertia\n    And push for changes within actual legal bounds\n    And hold administration accountable for implementation choices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:district",
+    "related_users:parent,teacher,student,administrator,community_organizer,citizen",
+    "related_layers:municipality,provincial_state,educational,school",
+    "elohim_agents:public_observer,district_elohim,education_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-district",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Board member verifies administrator claims about state mandates",
+    "ogDescription": "Board member verifies administrator claims about state mandates",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-district-board member verifies administrator claims about state mandates",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Board member verifies administrator claims about state mandates - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-district-board member verifies administrator claims about state mandates",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:district-board member verifies administrator claims about state mandates",
+    "name": "Board member verifies administrator claims about state mandates",
+    "description": "Board member verifies administrator claims about state mandates",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

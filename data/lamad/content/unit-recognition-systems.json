@@ -1,0 +1,31 @@
+{
+  "id": "unit-recognition-systems",
+  "title": "Recognition Systems: From Invisible to Acknowledged",
+  "content": "# Recognition Systems: From Invisible to Acknowledged\n\n## The Recognition Gap\n\nTracking value isn't enough. Value must be recognized—acknowledged by others as meaningful and worthy.\n\n**The gap today:**\n- Caregivers are praised but not supported\n- Volunteers are thanked but not empowered\n- Community builders are admired but not resourced\n- Ecological stewards are ignored until crisis\n\nRecognition bridges the gap between visibility and value.\n\n## What Recognition Does\n\n### Validation\n\"What you did matters.\"\n- Psychological: you feel seen\n- Social: others acknowledge your contribution\n- Practical: contribution enters the record\n\n### Reputation\n\"You're someone who does this.\"\n- Track record builds over time\n- Portable across contexts\n- Enables trust with strangers\n\n### Reciprocity\n\"You can draw on what you've given.\"\n- Access to care when you need it\n- Priority in allocation decisions\n- Voice in community governance\n\n### Recruitment\n\"Others like you can contribute.\"\n- Model what contribution looks like\n- Demonstrate that contribution is valued\n- Build culture of participation\n\n## Recognition Without Commodification\n\nThe trap: turning recognition into points that become money that distorts relationships.\n\n**Gamification problems:**\n- Gaming the metrics\n- Extrinsic motivation crowding out intrinsic\n- Competition instead of cooperation\n- Reducing complex contribution to numbers\n\n**The Elohim approach:**\n- Recognition is contextual, not universal currency\n- Multiple forms of acknowledgment\n- Community-defined values\n- Qualitative alongside quantitative\n\n## How Recognition Works\n\n### Peer Recognition\nDirect acknowledgment from those you helped:\n- \"You supported me during X\"\n- Contextual detail, not just points\n- Reciprocal visibility\n\n### Community Recognition\nAggregated patterns visible to community:\n- \"Maria consistently shows up for neighbors\"\n- Roles emerge from contribution patterns\n- Community celebrates contribution\n\n### Institutional Recognition\nFormal acknowledgment from organizations:\n- Credentials, certifications, honors\n- Access to opportunities\n- Voice in governance\n\n### AI-Assisted Recognition\nYour Elohim helps with:\n- Noticing patterns in your contributions\n- Suggesting recognition you might give others\n- Making your contributions visible appropriately\n- Protecting against surveillance and gaming\n\n## For Policy Makers: Recognition Infrastructure\n\nPublic systems can support recognition:\n- **Care credits**: Recognize unpaid care for social security purposes\n- **Service recognition**: Community service counts toward civic standing\n- **Contribution-based access**: Public resources prioritize contributors\n- **Democratic integration**: Recognition informs governance participation\n\n### Implementation Challenges\n- Avoiding surveillance and control\n- Ensuring equity (not everyone can contribute equally)\n- Preventing gaming and fraud\n- Respecting privacy and autonomy\n\n## For Developers: Building Recognition Systems\n\nTechnical requirements:\n- **Contribution logging**: What was given, to whom, in what context\n- **Acknowledgment flows**: How recognition is expressed\n- **Reputation aggregation**: Patterns that emerge over time\n- **Privacy controls**: Who sees what about your contributions\n- **Anti-gaming**: Detect and prevent manipulation\n\n### Design Principles\n- Recognition should enhance relationship, not replace it\n- Quantitative metrics should complement qualitative acknowledgment\n- Systems should be transparent about how recognition works\n- Users should control their own recognition visibility\n\n## For Influencers: Recognition Arbiters\n\nYou already provide recognition:\n- Amplifying others' work\n- Endorsing products and people\n- Building reputation through association\n\nDo it consciously:\n- Recognize the invisible contributors\n- Distribute attention beyond the already-famous\n- Build recognition infrastructure in your community\n- Model generous acknowledgment\n\n## For Everyone: Practicing Recognition\n\nRecognition starts with you:\n- Notice who contributes to your wellbeing\n- Acknowledge them directly\n- Make your acknowledgment visible (where appropriate)\n- Build cultures of recognition in your communities\n\n## The Full Circle\n\nWe started with invisible value. We end with recognition—the completion of the loop that makes invisible value visible and valued.\n\nThe Elohim Protocol is, at its core, a recognition system:\n- **AI Governance**: Recognizing who's affected by AI decisions\n- **Value Scanner**: Recognizing care and contribution\n- **Public Observer**: Recognizing civic participation\n- **Autonomous Entity**: Recognizing worker contribution\n- **Social Medium**: Recognizing relationship and dignity\n- **Economic Coordination**: Recognizing all value flows\n\nWhen recognition works, coordination works. When coordination works, humans flourish.\n\nThat's the promise of the Elohim Protocol.",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/economic_coordination/epic.md",
+  "tags": [
+    "economic-coordination",
+    "recognition",
+    "reputation",
+    "unit",
+    "contribution",
+    "reciprocity"
+  ],
+  "relationships": [
+    {
+      "target": "economic-coordination-epic",
+      "type": "DERIVED_FROM"
+    },
+    {
+      "target": "unit-value-flows",
+      "type": "DEPENDS_ON"
+    },
+    {
+      "target": "unit-value-recognition",
+      "type": "RELATES_TO"
+    }
+  ],
+  "createdAt": "2025-12-17T01:42:36.650Z",
+  "updatedAt": "2025-12-17T01:42:56.833Z"
+}

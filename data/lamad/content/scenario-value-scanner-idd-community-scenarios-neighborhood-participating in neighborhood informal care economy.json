@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-participating in neighborhood informal care economy",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:neighborhood-participating in neighborhood informal care economy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Participating in neighborhood informal care economy",
+  "description": "Participating in neighborhood informal care economy",
+  "content": "Scenario: Participating in neighborhood informal care economy\n    Given Jordan's elderly neighbor sometimes needs help bringing in groceries\n    And Jordan is capable of carrying light bags\n    When the neighbor needs assistance\n    Then Jordan can offer help at their capability level\n    And the neighbor accepts Jordan's help graciously\n    And Jordan's care contribution is real and meaningful\n    And the Value Scanner records Jordan's caregiving\n    And Jordan accumulates care tokens for helping neighbor\n    And Jordan experiences being a care provider, not just recipient\n    And the neighborhood care economy includes Jordan as contributor\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Participating in neighborhood informal care economy",
+    "ogDescription": "Participating in neighborhood informal care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-neighborhood-participating in neighborhood informal care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in neighborhood informal care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-neighborhood-participating in neighborhood informal care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:neighborhood-participating in neighborhood informal care economy",
+    "name": "Participating in neighborhood informal care economy",
+    "description": "Participating in neighborhood informal care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

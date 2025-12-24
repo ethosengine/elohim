@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-individual-tracking self-care achievements despite exhaustion",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual-tracking self-care achievements despite exhaustion",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Tracking self-care achievements despite exhaustion",
+  "description": "Tracking self-care achievements despite exhaustion",
+  "content": "Scenario: Tracking self-care achievements despite exhaustion\n    Given I am exhausted after double shifts\n    And self-care feels impossible\n    When I manage to cook a nutritious meal for myself\n    Or maintain my living space\n    Or get adequate sleep\n    Then the protocol should recognize these achievements\n    And validate that caring for myself is valuable work\n    And celebrate small victories in maintaining well-being\n    And build evidence that I deserve conditions that make self-care possible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-individual",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Tracking self-care achievements despite exhaustion",
+    "ogDescription": "Tracking self-care achievements despite exhaustion",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-individual-tracking self-care achievements despite exhaustion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Tracking self-care achievements despite exhaustion - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-individual-tracking self-care achievements despite exhaustion",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual-tracking self-care achievements despite exhaustion",
+    "name": "Tracking self-care achievements despite exhaustion",
+    "description": "Tracking self-care achievements despite exhaustion",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

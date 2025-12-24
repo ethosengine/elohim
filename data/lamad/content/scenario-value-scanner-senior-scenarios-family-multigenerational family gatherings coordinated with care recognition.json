@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-family-multigenerational family gatherings coordinated with care recognition",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:family-multigenerational family gatherings coordinated with care recognition",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Multigenerational family gatherings coordinated with care recognition",
+  "description": "Multigenerational family gatherings coordinated with care recognition",
+  "content": "Scenario: Multigenerational family gatherings coordinated with care recognition\n    Given Margaret often hosts or coordinates family gatherings\n    And these gatherings require significant labor\n    When Margaret organizes family events\n    Then the planning, preparation, and hosting labor should be tracked\n    And other family members should see the work involved\n    And equitable distribution of hosting burden should be encouraged\n    And Margaret's contributions should be recognized and appreciated\n    And family gatherings should not depend on her invisible labor\n    And care work that makes family connection possible should be valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:family",
+    "related_users:middle_aged,elderly,grandparent,adult_child,grandchild,elderly_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Multigenerational family gatherings coordinated with care recognition",
+    "ogDescription": "Multigenerational family gatherings coordinated with care recognition",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-family-multigenerational family gatherings coordinated with care recognition",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Multigenerational family gatherings coordinated with care recognition - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-family-multigenerational family gatherings coordinated with care recognition",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:family-multigenerational family gatherings coordinated with care recognition",
+    "name": "Multigenerational family gatherings coordinated with care recognition",
+    "description": "Multigenerational family gatherings coordinated with care recognition",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-family-coordinating care work with younger sibling",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:family-coordinating care work with younger sibling",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Coordinating care work with younger sibling",
+  "description": "Coordinating care work with younger sibling",
+  "content": "Scenario: Coordinating care work with younger sibling\n    Given Emma's brother Tommy is 5 years old\n    And Emma sometimes helps Tommy make choices\n    When Emma assists Tommy in the Value Scanner\n    Then her teaching and support should be recognized as care work\n    And the family_elohim should track sibling care patterns\n    And Emma should learn that helping others is valuable contribution\n    And Tommy should benefit from Emma's greater capability\n    And cross-generational care should be made visible\n    And Emma should build identity as both care receiver and care provider\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,neighborhood,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating care work with younger sibling",
+    "ogDescription": "Coordinating care work with younger sibling",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-family-coordinating care work with younger sibling",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating care work with younger sibling - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-family-coordinating care work with younger sibling",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:family-coordinating care work with younger sibling",
+    "name": "Coordinating care work with younger sibling",
+    "description": "Coordinating care work with younger sibling",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-family-appeal mental health intervention that violated privacy",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family-appeal mental health intervention that violated privacy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Appeal mental health intervention that violated privacy",
+  "description": "Appeal mental health intervention that violated privacy",
+  "content": "Scenario: Appeal mental health intervention that violated privacy\n    Given Marcus is experiencing behavioral changes\n    And his Family Elohim detects patterns indicating suicide risk\n    And the agent alerts his partner following graduated intervention protocol\n    When Marcus feels his privacy was violated despite life-saving intent\n    And Marcus triggers an appeal through his interface\n    Then the appeal is immediately logged with timestamp\n    And the Family Elohim provides full constitutional reasoning\n    And the reasoning includes pattern detection details with 85% confidence\n    And the reasoning explains care vs. privacy weighting\n    And Marcus receives plain language explanation within minutes\n    And the appeal is routed to Community Elohim for first-layer review\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual_family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:community,provincial_state",
+    "elohim_agents:family_elohim,individual_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual_family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual-family",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Appeal mental health intervention that violated privacy",
+    "ogDescription": "Appeal mental health intervention that violated privacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-family-appeal mental health intervention that violated privacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appeal mental health intervention that violated privacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-family-appeal mental health intervention that violated privacy",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family-appeal mental health intervention that violated privacy",
+    "name": "Appeal mental health intervention that violated privacy",
+    "description": "Appeal mental health intervention that violated privacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

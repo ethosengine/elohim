@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-appellant-scenarios-nation-state-national precedent reconciles conflicting regional interpretations",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:nation-state-national precedent reconciles conflicting regional interpretations",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "National precedent reconciles conflicting regional interpretations",
+  "description": "National precedent reconciles conflicting regional interpretations",
+  "content": "Scenario: National precedent reconciles conflicting regional interpretations\n    Given different regions have interpreted constitutional principles differently\n    And I appealed a decision that was legal in some regions but not others\n    When National Constitutional Council provides definitive interpretation\n    Then they honor legitimate regional diversity where constitutional\n    And They establish national minimums that all regions must respect\n    And They explain which variation is permitted and which violates constitution\n    And They create coherence without imposing uniformity\n    And Regional councils reference national precedent for guidance\n    And My appeal contributes to coherent constitutional governance at scale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "National precedent reconciles conflicting regional interpretations",
+    "ogDescription": "National precedent reconciles conflicting regional interpretations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-nation-state-national precedent reconciles conflicting regional interpretations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "National precedent reconciles conflicting regional interpretations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-nation-state-national precedent reconciles conflicting regional interpretations",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:nation-state-national precedent reconciles conflicting regional interpretations",
+    "name": "National precedent reconciles conflicting regional interpretations",
+    "description": "National precedent reconciles conflicting regional interpretations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

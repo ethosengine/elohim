@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-educational-politician surfaces teacher and parent priorities at scale",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:educational-politician surfaces teacher and parent priorities at scale",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Politician surfaces teacher and parent priorities at scale",
+  "description": "Politician surfaces teacher and parent priorities at scale",
+  "content": "Scenario: Politician surfaces teacher and parent priorities at scale\n    Given the politician hears from organized advocacy groups\n    But suspects classroom realities differ from political narratives\n    When the Observer aggregates teacher and parent input\n    Then they see teachers prioritize classroom resources and planning time\n    And learn parents want smaller class sizes and mental health support\n    And identify disconnect between political fights and family priorities\n    And understand professional educator perspectives on policy proposals\n    And align education policy with teaching and learning needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,board_member,administrator,activist",
+    "related_layers:district,municipality,provincial_state,school",
+    "elohim_agents:public_observer,education_elohim,district_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Politician surfaces teacher and parent priorities at scale",
+    "ogDescription": "Politician surfaces teacher and parent priorities at scale",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-educational-politician surfaces teacher and parent priorities at scale",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician surfaces teacher and parent priorities at scale - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-educational-politician surfaces teacher and parent priorities at scale",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:educational-politician surfaces teacher and parent priorities at scale",
+    "name": "Politician surfaces teacher and parent priorities at scale",
+    "description": "Politician surfaces teacher and parent priorities at scale",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

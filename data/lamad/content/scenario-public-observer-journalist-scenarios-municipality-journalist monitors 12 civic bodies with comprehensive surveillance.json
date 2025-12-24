@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-municipality-journalist monitors 12 civic bodies with comprehensive surveillance",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:municipality-journalist monitors 12 civic bodies with comprehensive surveillance",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Journalist monitors 12 civic bodies with comprehensive surveillance",
+  "description": "Journalist monitors 12 civic bodies with comprehensive surveillance",
+  "content": "Scenario: Journalist monitors 12 civic bodies with comprehensive surveillance\n    Given the journalist is sole reporter covering city hall\n    And must cover city council, planning, housing, transit, and 8 other bodies\n    When the Observer monitors all municipal meetings simultaneously\n    Then the journalist reviews every meeting that happened this week\n    And receives alerts prioritizing newsworthy decisions\n    And searches across all bodies for patterns and connections\n    And comprehensive municipal coverage replaces selective attention\n    And one reporter with Observer infrastructure outperforms pre-crisis newsroom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:municipality",
+    "related_users:politician,activist,board_member,citizen,journalist",
+    "related_layers:community,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Journalist monitors 12 civic bodies with comprehensive surveillance",
+    "ogDescription": "Journalist monitors 12 civic bodies with comprehensive surveillance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-municipality-journalist monitors 12 civic bodies with comprehensive surveillance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist monitors 12 civic bodies with comprehensive surveillance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-municipality-journalist monitors 12 civic bodies with comprehensive surveillance",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:municipality-journalist monitors 12 civic bodies with comprehensive surveillance",
+    "name": "Journalist monitors 12 civic bodies with comprehensive surveillance",
+    "description": "Journalist monitors 12 civic bodies with comprehensive surveillance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

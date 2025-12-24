@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-01-church-dilemma-discussion",
+  "contentType": "activity",
+  "title": "Discussion: The Church Dilemma",
+  "description": "Group discussion and reflection activity",
+  "content": "**Instructions:** What are some ways that we \"the church\" is reacting to this change?\n\nWhat are some examples of \"god-like\" technology?\n\nWhat are the things churches do which make sense if we look for race for attention?\n\n**Activity Type:** discussion\n\n**Group Size:** small-group\n\n**Estimated Time:** 15-20 minutes\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "activity",
+    "discussion",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "fct-activity",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "activityType": "discussion"
+  },
+  "createdAt": "2025-11-28T21:10:19.190689",
+  "updatedAt": "2025-12-24T03:05:26.169Z",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Discussion: The Church Dilemma",
+    "ogDescription": "Group discussion and reflection activity",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-01-church-dilemma-discussion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
+    "ogImageAlt": "Discussion: The Church Dilemma - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-01-church-dilemma-discussion",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Discussion: The Church Dilemma",
+    "description": "Group discussion and reflection activity",
+    "dateCreated": "2025-11-28T21:10:19.190689",
+    "dateModified": "2025-11-28T21:10:19.190690",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

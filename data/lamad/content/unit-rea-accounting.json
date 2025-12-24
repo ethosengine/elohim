@@ -1,0 +1,27 @@
+{
+  "id": "unit-rea-accounting",
+  "title": "REA Accounting: Tracking Value Without Markets",
+  "content": "# REA Accounting: Tracking Value Without Markets\n\n## Beyond Double-Entry Bookkeeping\n\nTraditional accounting was designed for businesses: track assets, liabilities, and equity. Double-entry bookkeeping, invented in 15th-century Italy, revolutionized commerce.\n\nBut it can't see:\n- Value that doesn't have a price\n- Flows that don't involve ownership transfer\n- Contributions that benefit communities, not individuals\n\n## What is REA?\n\nREA stands for **Resources, Events, and Agents**. It's an accounting ontology developed for enterprise systems, now extended for the care economy.\n\n### Resources\nThings of value—not just money, but:\n- Skills, knowledge, expertise\n- Attention, presence, care\n- Physical goods and spaces\n- Ecological assets\n- Reputation and trust\n\n### Events\nThings that happen to resources:\n- Creation, consumption, transformation\n- Transfer, commitment, sharing\n- Degradation, restoration\n\n### Agents\nWho or what participates:\n- Individuals, families, communities\n- Organizations, networks, ecosystems\n- AI systems (including Elohim)\n\n## How It Works\n\n### Traditional Accounting\n```\nTransaction: Alice pays Bob $50 for babysitting\nRecord: \n  - Alice: -$50 cash\n  - Bob: +$50 cash\n```\nThis misses: the care provided, the trust built, the child's development, the relationship strengthened.\n\n### REA Accounting\n```\nEvent: Bob provides 4 hours of childcare to Alice's family\nRecords:\n  - Bob: -4 hours attention/care (resource flow)\n  - Alice's family: +4 hours childcare received\n  - Alice's child: developmental benefit (resource increment)\n  - Bob-Alice relationship: trust increment\n  - Bob: +$50 (if paid) OR +recognition (if unpaid)\n  - Community: +social capital (spillover)\n```\n\n## Why This Matters\n\n### For Policy Makers\nREA makes the care economy visible to policy analysis:\n- What would happen if we invested in childcare infrastructure?\n- How do caregiver support programs affect health outcomes?\n- Where are the gaps in community resilience?\n\n### For Developers\nREA provides a data model for care-aware platforms:\n- Recognition systems that track non-monetary contribution\n- Reciprocity networks that enable mutual aid\n- Analytics that measure wellbeing, not just engagement\n\n### For Everyone\nREA helps you see your own invisible contributions:\n- That mentoring you do? It has value.\n- The community you build? It's real economic activity.\n- The care you provide? It deserves recognition.\n\n## The ValueFlows Vocabulary\n\nThe Elohim Protocol uses [ValueFlows](https://valueflo.ws/), an open vocabulary for economic networks based on REA:\n\n### Core Concepts\n- **EconomicResource**: Anything of value (skills, goods, care, attention)\n- **EconomicEvent**: Something that happened (transfer, use, production)\n- **Process**: A transformation (teaching session, caregiving episode)\n- **Agent**: A participant (person, organization, AI)\n- **Intent**: A planned action (offer, request, commitment)\n\n### Why Open Standards Matter\n- **Interoperability**: Different systems can share value data\n- **Portability**: Your contribution history travels with you\n- **Transparency**: No proprietary black boxes\n- **Collaboration**: Community-developed, not corporate-controlled\n\n## Practical Applications\n\n### Mutual Aid Networks\nTrack who helped whom, enable reciprocity without money:\n- Time banking that works across communities\n- Skill sharing with visible contribution histories\n- Care coordination that respects relationship\n\n### Community Currencies\nREA-based tokens that represent real value:\n- Local currencies backed by community capacity\n- Care credits that recognize invisible work\n- Reputation systems with verifiable history\n\n### Impact Measurement\nMove beyond vanity metrics:\n- Track wellbeing outcomes, not just activities\n- Measure relationship quality, not just engagement\n- Value ecological regeneration, not just extraction\n\n## The Connection to Holochain\n\nThe Elohim Protocol implements REA accounting on Holochain—a distributed system where:\n- Each community controls its own value data\n- No central authority defines what counts\n- Privacy and transparency are balanced by design\n\nThe next unit explores how value recognition works in practice.",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/value_scanner/epic.md",
+  "tags": [
+    "value-scanner",
+    "rea",
+    "accounting",
+    "unit",
+    "valueflows",
+    "holochain"
+  ],
+  "relationships": [
+    {
+      "target": "value-scanner-epic",
+      "type": "DERIVED_FROM"
+    },
+    {
+      "target": "unit-invisible-economy",
+      "type": "DEPENDS_ON"
+    }
+  ],
+  "createdAt": "2025-12-17T01:36:16.008Z",
+  "updatedAt": "2025-12-17T01:36:28.696Z"
+}

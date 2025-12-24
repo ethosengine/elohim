@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-community-teen recognized as full community participant, not future member",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:community-teen recognized as full community participant, not future member",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teen recognized as full community participant, not future member",
+  "description": "Teen recognized as full community participant, not future member",
+  "content": "Scenario: Teen recognized as full community participant, not future member\n    Given Jasmine has substantial care contributions across multiple contexts\n    And she volunteers 4 hours per week at community center\n    When the community_elohim processes her participation\n    Then she should be recognized as a current contributor, not a youth in training\n    And her care work should be valued at the same care economy rate as adults\n    And community resources should be accessible based on her demonstrated contribution\n    And she should have standing in community care economy discussions\n    And the system should reflect that she is already a productive member of society\n    And her generation's contributions should be made visible at community scale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:community",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:neighborhood,municipality,educational,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teen recognized as full community participant, not future member",
+    "ogDescription": "Teen recognized as full community participant, not future member",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-community-teen recognized as full community participant, not future member",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teen recognized as full community participant, not future member - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-community-teen recognized as full community participant, not future member",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:community-teen recognized as full community participant, not future member",
+    "name": "Teen recognized as full community participant, not future member",
+    "description": "Teen recognized as full community participant, not future member",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

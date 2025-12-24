@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-individual-learning value beyond price through multi-dimensional comparison",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-learning value beyond price through multi-dimensional comparison",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Learning value beyond price through multi-dimensional comparison",
+  "description": "Learning value beyond price through multi-dimensional comparison",
+  "content": "Scenario: Learning value beyond price through multi-dimensional comparison\n    Given Emma is evaluating fair-trade chocolate\n    And she has capacity for understanding multiple value dimensions\n    When Emma scans the chocolate product\n    Then her personal_agent should show nutritional value\n    And the agent should show environmental impact\n    And the agent should explain care labor: \"The farmers who grew this were paid fairly for their care work\"\n    And the agent should show community benefit\n    And price should be one factor among many\n    And Emma should learn to read the world's complexity, not just price tags\n    And value literacy should extend beyond simple cost comparison\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:individual",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:family,neighborhood,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Learning value beyond price through multi-dimensional comparison",
+    "ogDescription": "Learning value beyond price through multi-dimensional comparison",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-learning value beyond price through multi-dimensional comparison",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning value beyond price through multi-dimensional comparison - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-learning value beyond price through multi-dimensional comparison",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-learning value beyond price through multi-dimensional comparison",
+    "name": "Learning value beyond price through multi-dimensional comparison",
+    "description": "Learning value beyond price through multi-dimensional comparison",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

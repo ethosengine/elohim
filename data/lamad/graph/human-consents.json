@@ -1,0 +1,494 @@
+{
+  "lastUpdated": "2025-12-01T20:29:49.320609Z",
+  "count": 23,
+  "consents": [
+    {
+      "id": "consent-0000",
+      "initiatorId": "human-matthew-manager",
+      "participantId": "human-susan-spouse",
+      "intimacyLevel": "intimate",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "intimate",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ],
+      "requiredAttestationType": "relationship:marriage"
+    },
+    {
+      "id": "consent-0001",
+      "initiatorId": "human-matthew-manager",
+      "participantId": "human-sammy-son",
+      "intimacyLevel": "intimate",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "intimate",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ],
+      "requiredAttestationType": "relationship:parent_child"
+    },
+    {
+      "id": "consent-0002",
+      "initiatorId": "human-susan-spouse",
+      "participantId": "human-sammy-son",
+      "intimacyLevel": "intimate",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "intimate",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ],
+      "requiredAttestationType": "relationship:parent_child"
+    },
+    {
+      "id": "consent-0003",
+      "initiatorId": "human-gertrude-grandma",
+      "participantId": "human-matthew-manager",
+      "intimacyLevel": "trusted",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "trusted",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0004",
+      "initiatorId": "human-gertrude-grandma",
+      "participantId": "human-sammy-son",
+      "intimacyLevel": "trusted",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "trusted",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0005",
+      "initiatorId": "human-matthew-manager",
+      "participantId": "human-dan-developer",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0006",
+      "initiatorId": "human-matthew-manager",
+      "participantId": "human-nancy-neighbor",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0007",
+      "initiatorId": "human-matthew-manager",
+      "participantId": "human-pete-pastor",
+      "intimacyLevel": "trusted",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "trusted",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0008",
+      "initiatorId": "human-susan-spouse",
+      "participantId": "human-timothy-tutor",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0009",
+      "initiatorId": "human-sammy-son",
+      "participantId": "human-timothy-tutor",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0010",
+      "initiatorId": "human-frank-farmer",
+      "participantId": "human-georgina-grocer",
+      "intimacyLevel": "trusted",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "trusted",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0011",
+      "initiatorId": "human-bub-builder",
+      "participantId": "human-manny-manufacturer",
+      "intimacyLevel": "trusted",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "trusted",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0012",
+      "initiatorId": "human-bub-builder",
+      "participantId": "human-frank-farmer",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0013",
+      "initiatorId": "human-lenny-lineworker",
+      "participantId": "human-bub-builder",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0014",
+      "initiatorId": "human-mary-miner",
+      "participantId": "human-ginny-gigworker",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0015",
+      "initiatorId": "human-bub-builder",
+      "participantId": "human-pete-pastor",
+      "intimacyLevel": "trusted",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "trusted",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0016",
+      "initiatorId": "human-lenny-lineworker",
+      "participantId": "human-pete-pastor",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0017",
+      "initiatorId": "human-pam-polarized",
+      "participantId": "human-pete-pastor",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0018",
+      "initiatorId": "human-pam-polarized",
+      "participantId": "human-nancy-neighbor",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0019",
+      "initiatorId": "human-meriadoc-moneybags",
+      "participantId": "human-matthew-manager",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0020",
+      "initiatorId": "human-meriadoc-moneybags",
+      "participantId": "human-pete-pastor",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0021",
+      "initiatorId": "human-georgina-grocer",
+      "participantId": "human-susan-spouse",
+      "intimacyLevel": "recognition",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "recognition",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    },
+    {
+      "id": "consent-0022",
+      "initiatorId": "human-tommy-teacher",
+      "participantId": "human-janice-janitor",
+      "intimacyLevel": "connection",
+      "consentState": "accepted",
+      "createdAt": "2025-12-01T20:29:49.320609Z",
+      "updatedAt": "2025-12-01T20:29:49.320609Z",
+      "consentedAt": "2025-12-01T20:29:49.320609Z",
+      "stateHistory": [
+        {
+          "fromState": "pending",
+          "toState": "accepted",
+          "fromLevel": null,
+          "toLevel": "connection",
+          "timestamp": "2025-12-01T20:29:49.320609Z",
+          "initiatedBy": "participant",
+          "reason": "Demo data - auto-accepted"
+        }
+      ]
+    }
+  ],
+  "_schemaVersion": "1.0.0",
+  "_interface": "HumanConsent"
+}

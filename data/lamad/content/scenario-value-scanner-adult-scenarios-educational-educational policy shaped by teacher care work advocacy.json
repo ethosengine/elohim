@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-educational policy shaped by teacher care work advocacy",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-educational policy shaped by teacher care work advocacy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Educational policy shaped by teacher care work advocacy",
+  "description": "Educational policy shaped by teacher care work advocacy",
+  "content": "Scenario: Educational policy shaped by teacher care work advocacy\n    Given Sarah has deep knowledge of educational needs from professional experience\n    And education policy affects her capacity to care for students\n    When educational policy decisions are made\n    Then Sarah's care contributions should give her voice\n    And teacher advocacy should be strengthened by care economy data\n    And policy should reflect actual educator experiences\n    And care economy should empower teacher voice in education governance\n    And those who do care work should shape care work policy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Educational policy shaped by teacher care work advocacy",
+    "ogDescription": "Educational policy shaped by teacher care work advocacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-educational policy shaped by teacher care work advocacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Educational policy shaped by teacher care work advocacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-educational policy shaped by teacher care work advocacy",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-educational policy shaped by teacher care work advocacy",
+    "name": "Educational policy shaped by teacher care work advocacy",
+    "description": "Educational policy shaped by teacher care work advocacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

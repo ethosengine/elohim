@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-displaced-person-scenarios-community-displaced person builds connection in new community",
+  "did": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:community-displaced person builds connection in new community",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Displaced person builds connection in new community",
+  "description": "Displaced person builds connection in new community",
+  "content": "Scenario: Displaced person builds connection in new community\n    Given Maria has relocated to a new city where she knows no one\n    When she joins her new neighborhood community space\n    And she participates in local mutual aid and support networks\n    Then she can gradually build trust in her new community\n    And neighbors help her find resources and employment\n    And she establishes new relationships while processing loss\n    And the new community welcomes her without requiring full disclosure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:displaced_person",
+    "governance_layer:community",
+    "related_users:refugee,activist,community_moderator,elder",
+    "related_layers:family,district,affinity_network",
+    "elohim_agents:protection_agent,sanctuary_agent,connection_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/displaced_person/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-displaced-person-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-displaced-person-scenarios-community",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Displaced person builds connection in new community",
+    "ogDescription": "Displaced person builds connection in new community",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-displaced-person-scenarios-community-displaced person builds connection in new community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Displaced person builds connection in new community - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-displaced-person-scenarios-community-displaced person builds connection in new community",
+    "identifier": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:community-displaced person builds connection in new community",
+    "name": "Displaced person builds connection in new community",
+    "description": "Displaced person builds connection in new community",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

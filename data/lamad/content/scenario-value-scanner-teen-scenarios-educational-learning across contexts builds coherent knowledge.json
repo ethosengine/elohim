@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-educational-learning across contexts builds coherent knowledge",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:educational-learning across contexts builds coherent knowledge",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Learning across contexts builds coherent knowledge",
+  "description": "Learning across contexts builds coherent knowledge",
+  "content": "Scenario: Learning across contexts builds coherent knowledge\n    Given Jasmine learns in school, at work, in family, and in community\n    And knowledge fragments across contexts\n    When her personal_agent integrates learning from all contexts\n    Then she should see connections: \"Your work customer service builds communication skills valuable in all contexts\"\n    And understand how different learning experiences reinforce each other\n    And develop coherent knowledge rather than fragmented skills\n    And learn to translate capabilities across contexts\n    And build sophisticated understanding through integrated experience\n    And maintain coherent identity while navigating multiple learning environments\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:educational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Learning across contexts builds coherent knowledge",
+    "ogDescription": "Learning across contexts builds coherent knowledge",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-educational-learning across contexts builds coherent knowledge",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning across contexts builds coherent knowledge - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-educational-learning across contexts builds coherent knowledge",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:educational-learning across contexts builds coherent knowledge",
+    "name": "Learning across contexts builds coherent knowledge",
+    "description": "Learning across contexts builds coherent knowledge",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

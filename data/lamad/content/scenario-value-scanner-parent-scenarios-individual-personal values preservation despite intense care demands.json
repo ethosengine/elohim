@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-individual-personal values preservation despite intense care demands",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:individual-personal values preservation despite intense care demands",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Personal values preservation despite intense care demands",
+  "description": "Personal values preservation despite intense care demands",
+  "content": "Scenario: Personal values preservation despite intense care demands\n    Given Sarah has core values beyond efficient caregiving\n    And she wants to raise children aligned with those values\n    When Sarah makes care decisions under pressure\n    Then the personal_agent should help her honor her values\n    And it should flag when expedience conflicts with principles\n    And it should support value-aligned decision making even when harder\n    And Sarah's integrity should be preserved despite overwhelming demands\n    And the system should help her be the parent she wants to be\n    And values should not be sacrificed to mere survival\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:individual",
+    "related_users:adult,worker,child,partner",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Personal values preservation despite intense care demands",
+    "ogDescription": "Personal values preservation despite intense care demands",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-individual-personal values preservation despite intense care demands",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal values preservation despite intense care demands - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-individual-personal values preservation despite intense care demands",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:individual-personal values preservation despite intense care demands",
+    "name": "Personal values preservation despite intense care demands",
+    "description": "Personal values preservation despite intense care demands",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

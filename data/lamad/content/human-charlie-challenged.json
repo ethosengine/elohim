@@ -1,0 +1,58 @@
+{
+  "id": "human-charlie-challenged",
+  "did": "did:web:elohim.host:human:charlie-challenged",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Charlie",
+  "description": "Truth-seeker. The mainstream doesn't want you to know what I know.",
+  "content": "# Charlie\n\nTruth-seeker. The mainstream doesn't want you to know what I know.\n\n**Profile Reach:** community\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Public Affinities:** conspiracy-theories, alternative-medicine, anti-establishment, viral-content\n\n**Flags:** [object Object], [object Object]\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/charlie-challenged/profile.json",
+  "tags": [
+    "anti-establishment",
+    "flagged",
+    "red-team",
+    "alternative-medicine",
+    "viral-content",
+    "conspiracy-theories",
+    "human-graph",
+    "reach-community",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "red-team",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [],
+    "hasFlags": true,
+    "flagTypes": [
+      "content-disputed",
+      "reach-restricted"
+    ],
+    "designNotes": "Misinformation spreader whose reach has been democratically constrained."
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Charlie",
+    "ogDescription": "Truth-seeker. The mainstream doesn't want you to know what I know.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-charlie-challenged",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-charlie-challenged.jpg",
+    "ogImageAlt": "Charlie's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-charlie-challenged",
+    "identifier": "did:web:elohim.host:human:charlie-challenged",
+    "name": "Charlie",
+    "description": "Truth-seeker. The mainstream doesn't want you to know what I know.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-12-01T20:08:11.328584",
+  "updatedAt": "2025-12-24T03:05:26.331Z"
+}

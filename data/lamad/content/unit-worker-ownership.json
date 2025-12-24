@@ -1,0 +1,27 @@
+{
+  "id": "unit-worker-ownership",
+  "title": "Worker Ownership: Beyond Employment and Gigs",
+  "content": "# Worker Ownership: Beyond Employment and Gigs\n\n## The Ownership Gap\n\nThe modern economy offers two main ways to work:\n- **Employment**: Trade your time for wages; someone else owns the value you create\n- **Gig work**: Trade your time for fees; even less security, same lack of ownership\n\nIn both cases, the people doing the work rarely own the systems they work within.\n\n## Why This Matters\n\n### The Wealth Gap\nWealth accumulates through ownership, not wages:\n- Wages buy expenses\n- Ownership builds equity\n- The gap widens generation after generation\n\n### The Motivation Gap\nWhen you don't own what you build:\n- You optimize for what you're measured on, not what matters\n- Innovation that threatens owners gets suppressed\n- Knowledge walks out the door when people leave\n\n### The Power Gap\nNon-owners have limited voice:\n- \"At-will employment\" means no real security\n- Workplace decisions happen to you, not with you\n- Your interests conflict with owner interests by design\n\n## What Ownership Can Look Like\n\n### Traditional Cooperatives\nWorker-owned businesses where:\n- Workers are members with voting rights\n- Profits are distributed to workers\n- Major decisions require member approval\n- Examples: Mondragon (Spain), REI (consumer co-op), credit unions\n\n**Limitations**: Hard to scale, difficult to raise capital, governance can be slow\n\n### Employee Stock Ownership (ESOPs)\nPartial ownership through stock:\n- Workers accumulate ownership over time\n- Alignment of interests (in theory)\n- Tax advantages for companies\n\n**Limitations**: Often limited voting rights, ownership concentrated in few hands, subject to market volatility\n\n### Platform Cooperatives\nDigital platforms owned by users and workers:\n- Driver-owned ride services\n- Creator-owned content platforms\n- Worker-owned freelance marketplaces\n\n**Limitations**: Competing against well-funded corporate platforms, coordination challenges\n\n### The Elohim Approach: Distributed Ownership\n\nThe Elohim Protocol enables ownership models that go beyond these limitations:\n\n#### Fractional Ownership\nOwn pieces of multiple entities:\n- Reduce risk through diversification\n- Align incentives across ecosystem\n- Participate where you contribute\n\n#### Graduated Ownership\nOwnership that grows with contribution:\n- New workers begin with limited stake\n- Ownership increases with tenure and contribution\n- Departing workers retain earned equity\n\n#### Contextual Ownership\nDifferent ownership for different decisions:\n- Operational decisions: those doing the work\n- Strategic decisions: broader stakeholder input\n- Community impact: affected community voice\n\n## For Policy Makers: Supporting Ownership\n\nPolicy can enable or obstruct worker ownership:\n\n### Enabling\n- Tax incentives for worker-owned transitions\n- Procurement preferences for cooperative bidders\n- Technical assistance programs\n- Legal frameworks that recognize new ownership forms\n\n### Obstructing\n- Securities regulations that assume investor ownership\n- Bankruptcy laws that privilege creditors over workers\n- Tax structures that favor debt over equity\n- Antitrust enforcement that misses cooperative power\n\n## For Developers: Building Ownership Infrastructure\n\nWorker ownership requires:\n- **Equity tracking**: Who owns what, how does it change\n- **Governance tools**: How do owners make decisions together\n- **Contribution measurement**: What counts as ownership-earning work\n- **Exit mechanisms**: How do people leave while preserving value\n\nThe Elohim Protocol builds these as first-class features, not afterthoughts.\n\n## For Content Creators: You Are Workers\n\nThe creator economy is a labor market:\n- Platforms own the distribution\n- Algorithms determine your reach\n- Terms change without your consent\n- Your audience is their asset\n\nWhat if creators owned the platforms? The Elohim approach to Social Medium explores this.\n\n## Connection to Worker Agency\n\nOwnership alone isn't enough. The next unit explores how workers exercise agency within ownership structures—the difference between owning a vote you never use and genuine participation in workplace governance.",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/autonomous_entity/epic.md",
+  "tags": [
+    "autonomous-entity",
+    "ownership",
+    "cooperatives",
+    "unit",
+    "worker",
+    "equity"
+  ],
+  "relationships": [
+    {
+      "target": "autonomous-entity-epic",
+      "type": "DERIVED_FROM"
+    },
+    {
+      "target": "unit-five-epics",
+      "type": "DEPENDS_ON"
+    }
+  ],
+  "createdAt": "2025-12-17T01:39:28.584Z",
+  "updatedAt": "2025-12-17T01:39:46.215Z"
+}

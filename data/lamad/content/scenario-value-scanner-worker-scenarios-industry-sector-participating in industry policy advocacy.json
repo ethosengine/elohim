@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-industry-sector-participating in industry policy advocacy",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-participating in industry policy advocacy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Participating in industry policy advocacy",
+  "description": "Participating in industry policy advocacy",
+  "content": "Scenario: Participating in industry policy advocacy\n    Given policy changes can transform industry conditions\n    When legislation affecting food service workers is under consideration\n    Then the protocol should alert workers to policy opportunities\n    And facilitate participation in legislative advocacy\n    And coordinate worker testimony and organizing for policy change\n    And build political power for worker-supportive policy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-industry-sector"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Participating in industry policy advocacy",
+    "ogDescription": "Participating in industry policy advocacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-participating in industry policy advocacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in industry policy advocacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-participating in industry policy advocacy",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-participating in industry policy advocacy",
+    "name": "Participating in industry policy advocacy",
+    "description": "Participating in industry policy advocacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

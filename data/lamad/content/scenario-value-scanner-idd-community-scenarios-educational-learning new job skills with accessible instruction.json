@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-learning new job skills with accessible instruction",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational-learning new job skills with accessible instruction",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Learning new job skills with accessible instruction",
+  "description": "Learning new job skills with accessible instruction",
+  "content": "Scenario: Learning new job skills with accessible instruction\n    Given Jordan wants to learn library cataloging skills\n    And the library offers training for this task\n    When Jordan participates in the training\n    Then instruction is provided in cognitively accessible format\n    And the trainer uses simple language, visual aids, and step-by-step guidance\n    And Jordan can practice skills with patient repetition\n    And mistakes are treated as learning opportunities, not failures\n    And Jordan's progress is celebrated at each milestone\n    And Jordan accumulates care tokens for skill development contribution\n    And Jordan experiences growth and increasing capability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Learning new job skills with accessible instruction",
+    "ogDescription": "Learning new job skills with accessible instruction",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-educational-learning new job skills with accessible instruction",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning new job skills with accessible instruction - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-educational-learning new job skills with accessible instruction",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational-learning new job skills with accessible instruction",
+    "name": "Learning new job skills with accessible instruction",
+    "description": "Learning new job skills with accessible instruction",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-workplace-organizational-performing job duties with accessible support",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-performing job duties with accessible support",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Performing job duties with accessible support",
+  "description": "Performing job duties with accessible support",
+  "content": "Scenario: Performing job duties with accessible support\n    Given Jordan is responsible for shelving returned books\n    And the library has organized the system for accessibility\n    When Jordan completes their shelving tasks\n    Then the personal_agent provides visual sorting guidance if needed\n    And the shelving system uses color-coding and clear labels\n    And Jordan can complete most tasks independently\n    And supervisors provide support for complex situations\n    And Jordan's work directly helps library patrons find books\n    And Jordan accumulates care tokens for library care contribution\n    And Jordan experiences competence and work satisfaction\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Performing job duties with accessible support",
+    "ogDescription": "Performing job duties with accessible support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-performing job duties with accessible support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Performing job duties with accessible support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-performing job duties with accessible support",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-performing job duties with accessible support",
+    "name": "Performing job duties with accessible support",
+    "description": "Performing job duties with accessible support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

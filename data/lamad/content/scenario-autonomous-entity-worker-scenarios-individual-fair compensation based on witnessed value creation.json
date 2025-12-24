@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-individual-fair compensation based on witnessed value creation",
+  "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:individual-fair compensation based on witnessed value creation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Fair compensation based on witnessed value creation",
+  "description": "Fair compensation based on witnessed value creation",
+  "content": "Scenario: Fair compensation based on witnessed value creation\n    Given Maria's 8 years of invisible contributions are now documented\n    And her REA profile shows training, conflict prevention, and optimization work\n    When the democratic workplace calculates compensation\n    Then Maria receives $28/hour instead of previous $11/hour\n    And her training contributions (47 hours) are compensated\n    And her conflict resolution (12 incidents prevented) generates recognized value\n    And her efficiency gains (2.3 hours daily saved) benefit her, not just corporate\n    And transparent algorithms show exactly how her compensation is calculated\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:individual",
+    "related_users:[manager,customer,supplier,community_investor]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Fair compensation based on witnessed value creation",
+    "ogDescription": "Fair compensation based on witnessed value creation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-individual-fair compensation based on witnessed value creation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Fair compensation based on witnessed value creation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-individual-fair compensation based on witnessed value creation",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:individual-fair compensation based on witnessed value creation",
+    "name": "Fair compensation based on witnessed value creation",
+    "description": "Fair compensation based on witnessed value creation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

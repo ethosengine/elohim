@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-family-multigenerational care coordination across three generations",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-multigenerational care coordination across three generations",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Multigenerational care coordination across three generations",
+  "description": "Multigenerational care coordination across three generations",
+  "content": "Scenario: Multigenerational care coordination across three generations\n    Given Frank provides occasional grandchild care\n    And he helps maintain his mother-in-law's home\n    And he supports his adult children with wisdom and occasional financial help\n    When family_elohim coordinates care across generations\n    Then it should track care flowing from Frank to grandchildren\n    And care flowing from Frank to his mother-in-law\n    And support flowing from Frank to adult children\n    And emerging care flowing from adult children to Frank\n    And all flows should be visible and valued\n    And multigenerational reciprocity should be recognized\n    And Frank should see himself in ongoing care web\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Multigenerational care coordination across three generations",
+    "ogDescription": "Multigenerational care coordination across three generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-multigenerational care coordination across three generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Multigenerational care coordination across three generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-multigenerational care coordination across three generations",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-multigenerational care coordination across three generations",
+    "name": "Multigenerational care coordination across three generations",
+    "description": "Multigenerational care coordination across three generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

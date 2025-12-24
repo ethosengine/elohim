@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-household-managing household independently as single senior",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:household-managing household independently as single senior",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Managing household independently as single senior",
+  "description": "Managing household independently as single senior",
+  "content": "Scenario: Managing household independently as single senior\n    Given Margaret lives alone in her household\n    And she manages all household responsibilities independently\n    When Margaret coordinates household tasks\n    Then her personal_agent should support her independence\n    And all household labor should be visible and valued\n    And the system should help her maintain self-sufficiency\n    And she should feel capable, not isolated\n    And household management should feel manageable\n    And her autonomy should be preserved and celebrated\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:household",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver,spouse",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Managing household independently as single senior",
+    "ogDescription": "Managing household independently as single senior",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-household-managing household independently as single senior",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing household independently as single senior - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-household-managing household independently as single senior",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:household-managing household independently as single senior",
+    "name": "Managing household independently as single senior",
+    "description": "Managing household independently as single senior",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

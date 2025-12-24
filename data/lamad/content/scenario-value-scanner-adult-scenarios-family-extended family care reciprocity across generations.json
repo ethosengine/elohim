@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-family-extended family care reciprocity across generations",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:family-extended family care reciprocity across generations",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Extended family care reciprocity across generations",
+  "description": "Extended family care reciprocity across generations",
+  "content": "Scenario: Extended family care reciprocity across generations\n    Given Sarah's parents provided care for her as a child\n    And she's now providing care to them as they age\n    When multi-generational care patterns are tracked\n    Then the family_elohim should recognize reciprocal care flows\n    And care should be seen as flowing both ways across time\n    And Sarah's care for parents should be valued\n    And parents' previous care for Sarah should be acknowledged\n    And multi-generational reciprocity should be visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:family",
+    "related_users:young_child,child,parent,grandparent,partner",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Extended family care reciprocity across generations",
+    "ogDescription": "Extended family care reciprocity across generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-family-extended family care reciprocity across generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Extended family care reciprocity across generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-family-extended family care reciprocity across generations",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:family-extended family care reciprocity across generations",
+    "name": "Extended family care reciprocity across generations",
+    "description": "Extended family care reciprocity across generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

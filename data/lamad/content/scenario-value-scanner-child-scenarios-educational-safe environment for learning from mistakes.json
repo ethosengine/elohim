@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-educational-safe environment for learning from mistakes",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-safe environment for learning from mistakes",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Safe environment for learning from mistakes",
+  "description": "Safe environment for learning from mistakes",
+  "content": "Scenario: Safe environment for learning from mistakes\n    Given Emma is practicing value literacy\n    And mistakes are essential to learning\n    When Emma makes a choice that doesn't work out well\n    Then the experience should be treated as learning opportunity\n    And her personal_agent should guide reflection: \"How did that work out?\"\n    And no shame or punishment should be attached to mistakes\n    And consequences should be educational, not harmful\n    And judgment should be built through safe practice\n    And error should be normalized as part of learning process\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Safe environment for learning from mistakes",
+    "ogDescription": "Safe environment for learning from mistakes",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-safe environment for learning from mistakes",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Safe environment for learning from mistakes - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-safe environment for learning from mistakes",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-safe environment for learning from mistakes",
+    "name": "Safe environment for learning from mistakes",
+    "description": "Safe environment for learning from mistakes",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,33 @@
+{
+  "id": "org-bub-construction",
+  "did": "did:web:elohim.host:org:bub-construction",
+  "contentType": "organization",
+  "activityPubType": "Organization",
+  "title": "Bub's Construction",
+  "description": "Organization with 1 members",
+  "content": {
+    "name": "Bub's Construction",
+    "memberCount": 1,
+    "members": [
+      {
+        "humanId": "human-bub-builder",
+        "role": "owner"
+      }
+    ]
+  },
+  "contentFormat": "html",
+  "tags": [
+    "organization",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-bub-builder"
+  ],
+  "metadata": {
+    "category": "organization",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z"
+}

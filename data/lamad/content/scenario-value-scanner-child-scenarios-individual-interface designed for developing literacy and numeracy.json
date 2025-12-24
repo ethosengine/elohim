@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-individual-interface designed for developing literacy and numeracy",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-interface designed for developing literacy and numeracy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Interface designed for developing literacy and numeracy",
+  "description": "Interface designed for developing literacy and numeracy",
+  "content": "Scenario: Interface designed for developing literacy and numeracy\n    Given Emma is building reading and math skills\n    And she can handle more complexity than younger children\n    When Emma uses the Value Scanner interface\n    Then text should be at appropriate reading level for ages 8-10\n    And comparison tools should support decision-making\n    And basic math support should help with calculating savings\n    And visual aids should supplement text\n    And the interface should feel helpful, not game-like\n    And design should support skill development without frustration\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:individual",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:family,neighborhood,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Interface designed for developing literacy and numeracy",
+    "ogDescription": "Interface designed for developing literacy and numeracy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-interface designed for developing literacy and numeracy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Interface designed for developing literacy and numeracy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-interface designed for developing literacy and numeracy",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-interface designed for developing literacy and numeracy",
+    "name": "Interface designed for developing literacy and numeracy",
+    "description": "Interface designed for developing literacy and numeracy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

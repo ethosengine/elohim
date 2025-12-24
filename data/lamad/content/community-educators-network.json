@@ -1,0 +1,30 @@
+{
+  "id": "community-educators-network",
+  "did": "did:web:elohim.host:community:educators-network",
+  "contentType": "organization",
+  "activityPubType": "Group",
+  "title": "Educators Network",
+  "description": "Community with 1 members",
+  "content": {
+    "name": "Educators Network",
+    "memberCount": 1,
+    "memberIds": [
+      "human-tommy-teacher"
+    ]
+  },
+  "contentFormat": "html",
+  "tags": [
+    "community",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-tommy-teacher"
+  ],
+  "metadata": {
+    "category": "community",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z"
+}

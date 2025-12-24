@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-educational-developer school partnership creates genuine community benefit",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:educational-developer school partnership creates genuine community benefit",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Developer school partnership creates genuine community benefit",
+  "description": "Developer school partnership creates genuine community benefit",
+  "content": "Scenario: Developer school partnership creates genuine community benefit\n    Given a responsible developer wants to genuinely support education\n    And recognizes development affects school community\n    When the Observer facilitates school-developer partnership\n    Then the developer commits: after-school program space in community building\n    And provides scholarship fund for district students\n    And employs district graduates in construction and property management\n    And partnership creates lasting educational community benefit\n    And genuine engagement distinguishes from token gestures\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:educational",
+    "related_users:parent,teacher,board_member,citizen",
+    "related_layers:municipality,county_regional,community",
+    "elohim_agents:public_observer,educational_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Developer school partnership creates genuine community benefit",
+    "ogDescription": "Developer school partnership creates genuine community benefit",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-educational-developer school partnership creates genuine community benefit",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer school partnership creates genuine community benefit - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-educational-developer school partnership creates genuine community benefit",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:educational-developer school partnership creates genuine community benefit",
+    "name": "Developer school partnership creates genuine community benefit",
+    "description": "Developer school partnership creates genuine community benefit",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

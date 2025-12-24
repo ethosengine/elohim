@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-connecting grocery shopping to ecological care economy",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-connecting grocery shopping to ecological care economy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Connecting grocery shopping to ecological care economy",
+  "description": "Connecting grocery shopping to ecological care economy",
+  "content": "Scenario: Connecting grocery shopping to ecological care economy\n    Given Kenji shops for food on $50/week budget\n    And food choices have ecological impact\n    When the bioregional_elohim helps Kenji make food decisions\n    Then it should show ecological impact of different food choices\n    And it should help him identify low-impact foods within budget\n    And it should recognize \"Choosing dried beans over beef reduces ecological impact\"\n    And it should show how budget constraint can align with ecological care\n    And the system should connect personal shopping to planetary stewardship\n    And Kenji should see grocery choices as ecological care work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:ecological_bioregional",
+    "related_users:environmental_scientist,activist,community_member,resident",
+    "related_layers:community,neighborhood,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Connecting grocery shopping to ecological care economy",
+    "ogDescription": "Connecting grocery shopping to ecological care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-connecting grocery shopping to ecological care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connecting grocery shopping to ecological care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-connecting grocery shopping to ecological care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-connecting grocery shopping to ecological care economy",
+    "name": "Connecting grocery shopping to ecological care economy",
+    "description": "Connecting grocery shopping to ecological care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

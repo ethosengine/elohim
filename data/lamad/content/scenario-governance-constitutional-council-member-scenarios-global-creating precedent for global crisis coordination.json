@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-creating precedent for global crisis coordination",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-creating precedent for global crisis coordination",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Creating precedent for global crisis coordination",
+  "description": "Creating precedent for global crisis coordination",
+  "content": "Scenario: Creating precedent for global crisis coordination\n    Given convention addresses how protocol handles planetary emergencies\n    And we must balance speed with democratic legitimacy\n    When we deliberate crisis governance framework\n    Then we establish: emergency protocols maintaining accountability\n    And we specify: what constitutes legitimate crisis triggering special powers\n    And we create: rapid review processes for crisis decisions\n    And we ensure: democratic oversight even under urgency\n    And we prevent: crisis from becoming excuse for authoritarian drift\n    And we establish: how humanity governs together under existential threat\n    And we demonstrate: democracy can be both deliberative and responsive\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Creating precedent for global crisis coordination",
+    "ogDescription": "Creating precedent for global crisis coordination",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-creating precedent for global crisis coordination",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Creating precedent for global crisis coordination - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-creating precedent for global crisis coordination",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-creating precedent for global crisis coordination",
+    "name": "Creating precedent for global crisis coordination",
+    "description": "Creating precedent for global crisis coordination",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-fair compensation accounting for care work burden",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:workplace-organizational-fair compensation accounting for care work burden",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Fair compensation accounting for care work burden",
+  "description": "Fair compensation accounting for care work burden",
+  "content": "Scenario: Fair compensation accounting for care work burden\n    Given Sarah performs enormous unpaid care labor\n    And this work subsidizes employer by enabling her professional work\n    When Sarah negotiates compensation\n    Then the workplace_elohim should help her articulate fair pay\n    And it should recognize that low wages force families into poverty\n    And it should support advocacy for family-sustaining compensation\n    And the system should help Sarah argue that fair pay enables family care\n    And workplace should pay wages that support household flourishing\n    And compensation should reflect total value of human labor\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employer,colleague,child",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Fair compensation accounting for care work burden",
+    "ogDescription": "Fair compensation accounting for care work burden",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-workplace-organizational-fair compensation accounting for care work burden",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Fair compensation accounting for care work burden - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-workplace-organizational-fair compensation accounting for care work burden",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:workplace-organizational-fair compensation accounting for care work burden",
+    "name": "Fair compensation accounting for care work burden",
+    "description": "Fair compensation accounting for care work burden",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,62 @@
+{
+  "id": "governance-organizations-global-carbon-reward-climate-initiative-readme",
+  "did": "did:web:elohim.host:content:governance:organizations:global-carbon-reward-climate-initiative:readme",
+  "contentType": "organization",
+  "activityPubType": "Organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "The Global Carbon Reward is a system-changing policy for funding climate mitigation together with healthy ecosystems, vibrant communities, and reliable clean energy.",
+  "content": "---\nnode_type: organization\norg_id: global_carbon_reward_climate_initiative\nname: \"Global Carbon Reward - Climate Initiative\"\nurl: \"https://globalcarbonreward.org/\"\ngem_id: \"wHbU60Xdtszw4VnKknLU\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How Global Carbon Reward - Climate Initiative inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Global Carbon Reward - Climate Initiative\n\n## Description\n\nThe Global Carbon Reward is a system-changing policy for funding climate mitigation together with healthy ecosystems, vibrant communities, and reliable clean energy.\n\n**Publisher:** Global Carbon Reward\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how Global Carbon Reward - Climate Initiative relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://globalcarbonreward.org/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "governance"
+  ],
+  "sourcePath": "governance/organizations/global_carbon_reward_climate_initiative/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "governance",
+    "related_epics": [],
+    "primary_epic": "governance",
+    "url": "https://globalcarbonreward.org/",
+    "name": "Global Carbon Reward - Climate Initiative",
+    "org_id": "global_carbon_reward_climate_initiative",
+    "gem_id": "wHbU60Xdtszw4VnKknLU",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Global Carbon Reward",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How Global Carbon Reward - Climate Initiative inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "The Global Carbon Reward is a system-changing policy for funding climate mitigation together with healthy ecosystems, vibrant communities, and reliable clean energy.",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/governance-organizations-global-carbon-reward-climate-initiative-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/governance-organizations-global-carbon-reward-climate-initiative-readme",
+    "identifier": "did:web:elohim.host:content:governance:organizations:global-carbon-reward-climate-initiative:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "The Global Carbon Reward is a system-changing policy for funding climate mitigation together with healthy ecosystems, vibrant communities, and reliable clean energy.",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

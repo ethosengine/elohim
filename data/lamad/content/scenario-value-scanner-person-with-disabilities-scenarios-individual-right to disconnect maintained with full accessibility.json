@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-right to disconnect maintained with full accessibility",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-right to disconnect maintained with full accessibility",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Right to disconnect maintained with full accessibility",
+  "description": "Right to disconnect maintained with full accessibility",
+  "content": "Scenario: Right to disconnect maintained with full accessibility\n    Given Alex has been using the Value Scanner\n    And constitutional constraints apply to all users equally\n    When Alex chooses to disconnect from the system\n    Then disconnection process must be fully accessible\n    And Alex should receive complete data export in accessible formats\n    And no manipulative retention patterns should be employed\n    And Alex's right to not participate must be absolute\n    And data portability should work with assistive technologies\n    And exit should be as accessible as entry\n    And Alex's autonomy includes the right to leave\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:individual",
+    "related_users:adult,young_adult,elderly,idd_community,vulnerable_temporary,caregiver",
+    "related_layers:household,family,community,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Right to disconnect maintained with full accessibility",
+    "ogDescription": "Right to disconnect maintained with full accessibility",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-right to disconnect maintained with full accessibility",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Right to disconnect maintained with full accessibility - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-right to disconnect maintained with full accessibility",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-right to disconnect maintained with full accessibility",
+    "name": "Right to disconnect maintained with full accessibility",
+    "description": "Right to disconnect maintained with full accessibility",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

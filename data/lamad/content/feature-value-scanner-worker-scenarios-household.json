@@ -1,0 +1,62 @@
+{
+  "id": "feature-value-scanner-worker-scenarios-household",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:household",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Household Care Coordination for Workers",
+  "description": "As a worker living in a shared household I need to coordinate care work fairly with roommates So that household responsibilities don't overwhelm me on top of employment demands",
+  "content": "Feature: Household Care Coordination for Workers\n  As a worker living in a shared household\n  I need to coordinate care work fairly with roommates\n  So that household responsibilities don't overwhelm me on top of employment demands\n\n  Background:\n    Given I am a worker sharing an apartment with roommates\n    And my irregular work schedule complicates household coordination\n    And household care work is distributed among members\n    And the protocol tracks care contributions\n\n  Scenario: Making household contributions visible\n    Given I contribute to household care when my schedule allows\n    Including shopping, cooking, cleaning, and bills management\n    When household members want to understand contribution distribution\n    Then the protocol should make all care work visible\n    And show my contributions relative to available time\n    And recognize that my irregular schedule affects participation\n    And facilitate fair distribution accounting for work constraints\n\n  Scenario: Coordinating shared meals around work schedules\n    Given my roommates and I want to share meal costs and preparation\n    And my work schedule is unpredictable and changes weekly\n    When we plan shared meals\n    Then the protocol should coordinate across different schedules\n    And identify opportunities when I can participate\n    And help distribute cooking responsibilities fairly\n    And allow flexible contribution when my schedule permits\n\n  Scenario: Managing shared grocery shopping efficiently\n    Given household members pool resources for shared groceries\n    And I have limited time for shopping due to work\n    When the household needs groceries\n    Then the protocol should optimize shared shopping lists\n    And coordinate who shops when based on availability\n    And track shared expenses fairly\n    And minimize my individual shopping burden through cooperation\n\n  Scenario: Distributing household tasks based on capacity\n    Given different household members have different time and energy\n    And my work leaves me with minimal capacity\n    When we allocate household responsibilities\n    Then the protocol should suggest distribution based on actual capacity\n    And recognize that my 50+ hour work week limits my availability\n    And propose fair alternatives when I can't do time-intensive tasks\n    And help us find equitable arrangements\n\n  Scenario: Sharing meal prep to reduce individual burden\n    Given cooking for one is inefficient and exhausting\n    When household members batch cook or share meals\n    Then the protocol should coordinate shared meal preparation\n    And track who cooks, who cleans, and who benefits\n    And help us establish sustainable shared cooking rhythms\n    And recognize this cooperation as care economy practice\n\n  Scenario: Accessing household support during crisis periods\n    Given work demands sometimes become overwhelming\n    When I am working double shifts or experiencing crisis\n    Then the protocol should facilitate household mutual aid\n    And help roommates understand my temporary extra needs\n    And suggest how others can support me during difficult periods\n    And enable reciprocity when my situation improves\n\n  Scenario: Managing shared household budget\n    Given household members share rent and utilities\n    And my income is limited and variable\n    When we manage shared expenses\n    Then the protocol should track contributions transparently\n    And accommodate my tight budget constraints\n    And facilitate fair cost distribution\n    And help us optimize shared household economics\n\n  Scenario: Coordinating household care during schedule conflicts\n    Given my work schedule conflicts with household needs\n    When household tasks need completion and I am working\n    Then the protocol should help coordinate coverage\n    And enable roommates to handle urgent needs\n    And track that I contribute when available\n    And maintain fairness over time despite schedule conflicts\n\n  Scenario: Creating household care agreements\n    Given household members need clear expectations\n    When we establish how we'll manage shared living\n    Then the protocol should help us create care agreements\n    And document who does what and when\n    And include flexibility for my irregular schedule\n    And provide framework for fair and sustainable cooperation\n\n  Scenario: Recognizing household labor in care economy\n    Given all household work is care contribution\n    When household members clean, cook, maintain, and organize\n    Then the protocol should recognize this as valuable care work\n    And accumulate care tokens for household contributions\n    And make visible that domestic labor supports everyone's flourishing\n    And validate that this work deserves recognition even though unpaid\n\n  Scenario: Resolving household care conflicts\n    Given household care distribution may become imbalanced\n    When conflicts arise about who is contributing fairly\n    Then the protocol should provide objective contribution data\n    And facilitate conversations about fairness and capacity\n    And help us identify solutions that work for everyone\n    And support negotiation toward sustainable arrangements\n\n  Scenario: Building household resilience through cooperation\n    Given shared households can pool resources and reduce individual burden\n    When we practice care economy cooperation\n    Then the protocol should help us maximize mutual benefit\n    And identify opportunities for efficiency through sharing\n    And support us in building household community\n    And demonstrate that cooperative care reduces costs and increases well-being\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-worker-scenarios-household-making household contributions visible",
+    "scenario-value-scanner-worker-scenarios-household-coordinating shared meals around work schedules",
+    "scenario-value-scanner-worker-scenarios-household-managing shared grocery shopping efficiently",
+    "scenario-value-scanner-worker-scenarios-household-distributing household tasks based on capacity",
+    "scenario-value-scanner-worker-scenarios-household-sharing meal prep to reduce individual burden",
+    "scenario-value-scanner-worker-scenarios-household-accessing household support during crisis periods",
+    "scenario-value-scanner-worker-scenarios-household-managing shared household budget",
+    "scenario-value-scanner-worker-scenarios-household-coordinating household care during schedule conflicts",
+    "scenario-value-scanner-worker-scenarios-household-creating household care agreements",
+    "scenario-value-scanner-worker-scenarios-household-recognizing household labor in care economy",
+    "scenario-value-scanner-worker-scenarios-household-resolving household care conflicts",
+    "scenario-value-scanner-worker-scenarios-household-building household resilience through cooperation"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": null,
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Household Care Coordination for Workers",
+    "ogDescription": "As a worker living in a shared household I need to coordinate care work fairly with roommates So that household responsibilities don't overwhelm me on top of employment demands",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-worker-scenarios-household",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Household Care Coordination for Workers - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-worker-scenarios-household",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:household",
+    "name": "Household Care Coordination for Workers",
+    "description": "As a worker living in a shared household I need to coordinate care work fairly with roommates So that household responsibilities don't overwhelm me on top of employment demands",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

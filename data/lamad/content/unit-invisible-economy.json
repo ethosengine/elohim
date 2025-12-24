@@ -1,0 +1,27 @@
+{
+  "id": "unit-invisible-economy",
+  "title": "The Invisible Economy: What GDP Doesn't Count",
+  "content": "# The Invisible Economy: What GDP Doesn't Count\n\n## The $10 Trillion Blindspot\n\nWhen economists measure the economy, they count market transactions. What they don't count:\n\n- **Unpaid caregiving**: Parents raising children, families caring for elders\n- **Community building**: Volunteers, mentors, neighborhood organizers\n- **Ecological services**: Clean air, pollination, watershed protection\n- **Knowledge sharing**: Teaching, mentoring, open-source contribution\n- **Emotional labor**: Counseling, support, conflict mediation\n\nConservative estimates value unpaid care work alone at $10-13 trillion annually in the US—roughly half of measured GDP.\n\n## Why This Matters\n\n### For Policy Makers\nWhen invisible value is invisible to policy, policy makes bad decisions:\n- Welfare reform that \"gets people working\" often just shifts care from unpaid to uncompensated\n- Infrastructure investment that ignores care infrastructure\n- Tax policy that subsidizes capital while ignoring care\n\n### For Developers\nWhen invisible value is invisible to platforms, platforms optimize against it:\n- Social media that measures engagement, not relationship quality\n- Gig economy platforms that extract from care without compensating it\n- Recommendation systems that maximize transactions, not wellbeing\n\n### For Influencers and Creators\nWhen invisible value is invisible to audiences, you're trapped in metrics that don't measure what matters:\n- Reach without relationship\n- Views without value\n- Engagement without enrichment\n\n## The Care Economy: A Framework\n\nThe Elohim Protocol uses \"care economy\" to describe value creation that markets systematically undercount:\n\n### Direct Care\n- Childcare, eldercare, disability support\n- Health maintenance, illness recovery\n- Education, skill development, mentorship\n\n### Community Infrastructure\n- Neighborhood organizing, civic participation\n- Trust-building, conflict resolution\n- Cultural preservation, knowledge transmission\n\n### Ecological Stewardship\n- Land and water management\n- Biodiversity protection\n- Regenerative practices\n\n### Relational Labor\n- Emotional support, presence, attention\n- Friendship maintenance, community belonging\n- Intergenerational connection\n\n## Why Markets Fail Here\n\nMarkets are powerful tools for allocating certain kinds of value. But they fail systematically when:\n\n### The Value is Relational\nCaregiving isn't a commodity. The value of a parent's attention to a child can't be captured by hourly wages.\n\n### The Beneficiaries Can't Pay\nWho pays for ecological services? Future generations? Non-human species? The atmosphere?\n\n### The Returns are Diffuse\nCommunity trust benefits everyone but belongs to no one. No individual has incentive to invest.\n\n### The Metrics are Wrong\nGDP counts activity, not outcome. A car crash increases GDP (repairs, medical care, legal fees). A healthy family doesn't.\n\n## The Elohim Approach\n\nThe Value Scanner doesn't try to marketize care. Instead, it:\n\n1. **Makes value visible** - Tracks contributions that current systems miss\n2. **Recognizes contribution** - Creates feedback loops so contributors know they're valued\n3. **Enables reciprocity** - Helps care-givers access care when they need it\n4. **Informs allocation** - Gives policy and platform designers better information\n\nThe following units explain how:\n- **REA Accounting** - The technical framework for tracking value flows\n- **Value Recognition** - How contributions become visible without commodification",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/value_scanner/epic.md",
+  "tags": [
+    "value-scanner",
+    "care-economy",
+    "economics",
+    "unit",
+    "invisible-value",
+    "gdp"
+  ],
+  "relationships": [
+    {
+      "target": "value-scanner-epic",
+      "type": "DERIVED_FROM"
+    },
+    {
+      "target": "unit-five-epics",
+      "type": "DEPENDS_ON"
+    }
+  ],
+  "createdAt": "2025-12-17T01:36:13.401Z",
+  "updatedAt": "2025-12-17T01:36:28.873Z"
+}

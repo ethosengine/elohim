@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-municipality-organizer generates accessible materials for citywide campaign",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:municipality-organizer generates accessible materials for citywide campaign",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Organizer generates accessible materials for citywide campaign",
+  "description": "Organizer generates accessible materials for citywide campaign",
+  "content": "Scenario: Organizer generates accessible materials for citywide campaign\n    Given the coalition is campaigning against developer tax breaks\n    And needs to explain complex tax increment financing to residents\n    When the organizer requests education materials from Observer\n    Then they receive plain-language explanation of TIF mechanics\n    And see actual dollar flows (who benefits, who pays)\n    And get talking points for testimony and media\n    And access fact-checking data to counter developer claims\n    And technical policy becomes accessible community education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,politician,journalist",
+    "related_layers:community,district,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Organizer generates accessible materials for citywide campaign",
+    "ogDescription": "Organizer generates accessible materials for citywide campaign",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-municipality-organizer generates accessible materials for citywide campaign",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer generates accessible materials for citywide campaign - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-municipality-organizer generates accessible materials for citywide campaign",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:municipality-organizer generates accessible materials for citywide campaign",
+    "name": "Organizer generates accessible materials for citywide campaign",
+    "description": "Organizer generates accessible materials for citywide campaign",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-franchise brand transition occurs with community communication",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:workplace-organizational-franchise brand transition occurs with community communication",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Franchise brand transition occurs with community communication",
+  "description": "Franchise brand transition occurs with community communication",
+  "content": "Scenario: Franchise brand transition occurs with community communication\n    Given locations were known as ChickenMax #247, #248, #249\n    And brand change could confuse or alienate customers\n    When democratic governance decides on rebranding strategy\n    Then some locations may de-brand (ChickenMax \u2192 Maria's Kitchen)\n    And others may maintain brand temporarily during transition\n    And customers are informed: same workers, democratic ownership, community commitment\n    And brand transition communicates values shift from corporate to community\n    And workplace_elohim manages customer communication during rebranding\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,supplier,customer]",
+    "related_layers:[individual,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Franchise brand transition occurs with community communication",
+    "ogDescription": "Franchise brand transition occurs with community communication",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-franchise brand transition occurs with community communication",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Franchise brand transition occurs with community communication - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-franchise brand transition occurs with community communication",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:workplace-organizational-franchise brand transition occurs with community communication",
+    "name": "Franchise brand transition occurs with community communication",
+    "description": "Franchise brand transition occurs with community communication",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

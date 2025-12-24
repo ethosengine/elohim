@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-individual-maintaining capacity boundaries for sustainable care provision",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual-maintaining capacity boundaries for sustainable care provision",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Maintaining capacity boundaries for sustainable care provision",
+  "description": "Maintaining capacity boundaries for sustainable care provision",
+  "content": "Scenario: Maintaining capacity boundaries for sustainable care provision\n    Given Margaret is 68 and has her own health considerations\n    And excessive care burden could compromise her well-being\n    When the personal_agent monitors Margaret's care load\n    Then it should track whether care labor exceeds healthy capacity\n    And it should alert if Margaret is sacrificing her own health\n    And it should suggest when to renegotiate care arrangements\n    And it should help her maintain sustainable care levels\n    And Margaret should be able to provide care without burning out\n    And the system should protect her well-being while valuing her contributions\n    And capacity monitoring should enable long-term care sustainability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:individual",
+    "related_users:senior,middle_aged,parent,child,elderly",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Maintaining capacity boundaries for sustainable care provision",
+    "ogDescription": "Maintaining capacity boundaries for sustainable care provision",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-individual-maintaining capacity boundaries for sustainable care provision",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Maintaining capacity boundaries for sustainable care provision - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-individual-maintaining capacity boundaries for sustainable care provision",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual-maintaining capacity boundaries for sustainable care provision",
+    "name": "Maintaining capacity boundaries for sustainable care provision",
+    "description": "Maintaining capacity boundaries for sustainable care provision",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

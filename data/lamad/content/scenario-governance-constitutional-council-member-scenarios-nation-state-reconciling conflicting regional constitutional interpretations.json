@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-nation-state-reconciling conflicting regional constitutional interpretations",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:nation-state-reconciling conflicting regional constitutional interpretations",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Reconciling conflicting regional constitutional interpretations",
+  "description": "Reconciling conflicting regional constitutional interpretations",
+  "content": "Scenario: Reconciling conflicting regional constitutional interpretations\n    Given different regions interpreted same principle differently\n    And inconsistency creates confusion and injustice\n    When we provide definitive national interpretation\n    Then we honor: legitimate regional diversity where appropriate\n    And we establish: national minimums all regions must respect\n    And we explain: which variation is constitutional and which violates\n    And we create: coherence without imposing uniformity\n    And we guide: regional councils with clear framework\n    And we enable: coordinated governance across diverse communities\n    And we demonstrate: how subsidiarity and consistency coexist\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:nation_state",
+    "related_users:appellant,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Reconciling conflicting regional constitutional interpretations",
+    "ogDescription": "Reconciling conflicting regional constitutional interpretations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-nation-state-reconciling conflicting regional constitutional interpretations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Reconciling conflicting regional constitutional interpretations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-nation-state-reconciling conflicting regional constitutional interpretations",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:nation-state-reconciling conflicting regional constitutional interpretations",
+    "name": "Reconciling conflicting regional constitutional interpretations",
+    "description": "Reconciling conflicting regional constitutional interpretations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

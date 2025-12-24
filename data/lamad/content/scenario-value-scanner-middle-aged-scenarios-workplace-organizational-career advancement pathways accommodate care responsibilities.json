@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-career advancement pathways accommodate care responsibilities",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-career advancement pathways accommodate care responsibilities",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Career advancement pathways accommodate care responsibilities",
+  "description": "Career advancement pathways accommodate care responsibilities",
+  "content": "Scenario: Career advancement pathways accommodate care responsibilities\n    Given Robert has capacity for career advancement\n    And traditional advancement often requires sacrificing care\n    And career paths should accommodate caregiving\n    When workplace_elohim supports career planning\n    Then it should help Robert explore advancement that works with care responsibilities\n    And surface opportunities that provide advancement without unsustainable burden\n    And advocate for flexible advancement pathways\n    And support him in negotiating advancement terms that honor his full life\n    And build career structures that don't force choice between advancement and care\n    And demonstrate that talented employees shouldn't have to choose\n    And create advancement pathways compatible with care economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:workplace_organizational",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:individual,household,family,industry_sector",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Career advancement pathways accommodate care responsibilities",
+    "ogDescription": "Career advancement pathways accommodate care responsibilities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-career advancement pathways accommodate care responsibilities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Career advancement pathways accommodate care responsibilities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-career advancement pathways accommodate care responsibilities",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-career advancement pathways accommodate care responsibilities",
+    "name": "Career advancement pathways accommodate care responsibilities",
+    "description": "Career advancement pathways accommodate care responsibilities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

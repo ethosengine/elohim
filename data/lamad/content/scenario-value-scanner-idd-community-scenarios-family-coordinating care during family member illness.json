@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-coordinating care during family member illness",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-coordinating care during family member illness",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Coordinating care during family member illness",
+  "description": "Coordinating care during family member illness",
+  "content": "Scenario: Coordinating care during family member illness\n    Given Jordan's mother becomes seriously ill\n    And the family is coordinating care support\n    When the family discusses how to help\n    Then Jordan is included in family care planning\n    And the personal_agent helps Jordan understand the situation\n    And Jordan can offer contributions at their capability (visits, calls)\n    And Jordan's care offerings are recognized and valued\n    And the family doesn't automatically exclude Jordan from caregiving\n    And Jordan experiences being a contributing family member in crisis\n    And Jordan's capacity to give care is honored\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating care during family member illness",
+    "ogDescription": "Coordinating care during family member illness",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-coordinating care during family member illness",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating care during family member illness - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-coordinating care during family member illness",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-coordinating care during family member illness",
+    "name": "Coordinating care during family member illness",
+    "description": "Coordinating care during family member illness",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

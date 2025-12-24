@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-workplace-organizational-advancing skills and taking on new responsibilities",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-advancing skills and taking on new responsibilities",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Advancing skills and taking on new responsibilities",
+  "description": "Advancing skills and taking on new responsibilities",
+  "content": "Scenario: Advancing skills and taking on new responsibilities\n    Given Jordan has mastered the shelving duties\n    And Jordan wants to learn more advanced library tasks\n    When Jordan expresses interest in additional responsibilities\n    Then supervisors take Jordan's career growth seriously\n    And the library provides training for new tasks\n    And Jordan's capacity for growth is assumed, not denied\n    And Jordan can take on cataloging support with proper training\n    And Jordan's career advancement is supported like any employee\n    And Jordan experiences professional development and growth\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Advancing skills and taking on new responsibilities",
+    "ogDescription": "Advancing skills and taking on new responsibilities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-advancing skills and taking on new responsibilities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advancing skills and taking on new responsibilities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-advancing skills and taking on new responsibilities",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-advancing skills and taking on new responsibilities",
+    "name": "Advancing skills and taking on new responsibilities",
+    "description": "Advancing skills and taking on new responsibilities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,28 @@
+{
+  "id": "concept-currency-no-natural-limits",
+  "contentType": "concept",
+  "title": "Have no natural limits",
+  "description": "Creating systemic growth imperatives that destroy ecosystems",
+  "content": "Creating systemic growth imperatives that destroy ecosystems",
+  "contentFormat": "plaintext",
+  "sourcePath": "generated/landing-page/crisis-economic/concept-currency-no-natural-limits.json",
+  "tags": [
+    "crisis",
+    "economics",
+    "limits",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "economic-coordination-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "crisis-economic",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.000329",
+  "updatedAt": "2025-12-24T03:05:25.851Z"
+}

@@ -1,0 +1,29 @@
+{
+  "id": "concept-feedback-loops-broken",
+  "contentType": "concept",
+  "title": "Feedback loops are broken",
+  "description": "Politicians can safely ignore public preferences between elections",
+  "content": "Politicians can safely ignore public preferences between elections",
+  "contentFormat": "plaintext",
+  "sourcePath": "generated/landing-page/crisis-political/concept-feedback-loops-broken.json",
+  "tags": [
+    "crisis",
+    "governance",
+    "accountability",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "governance-epic",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "crisis-political",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.000783",
+  "updatedAt": "2025-12-24T03:05:25.852Z"
+}

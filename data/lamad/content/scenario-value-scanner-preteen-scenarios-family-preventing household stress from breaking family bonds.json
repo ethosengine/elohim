@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-family-preventing household stress from breaking family bonds",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-preventing household stress from breaking family bonds",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Preventing household stress from breaking family bonds",
+  "description": "Preventing household stress from breaking family bonds",
+  "content": "Scenario: Preventing household stress from breaking family bonds\n    Given Sarah is stretched thin across two jobs\n    And Marcus carries substantial household responsibility\n    When family stress levels are high\n    Then the family_elohim should monitor for relationship strain\n    And it should facilitate communication between Marcus and Sarah\n    And it should prompt Sarah to recognize Marcus's work\n    And it should connect family to support resources before crisis\n    And the protocol should prevent stress from damaging their bond\n    And care visibility should make burden manageable\n    And support should flow to prevent family breakdown\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:family",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,neighborhood,community,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Preventing household stress from breaking family bonds",
+    "ogDescription": "Preventing household stress from breaking family bonds",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-preventing household stress from breaking family bonds",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Preventing household stress from breaking family bonds - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-preventing household stress from breaking family bonds",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-preventing household stress from breaking family bonds",
+    "name": "Preventing household stress from breaking family bonds",
+    "description": "Preventing household stress from breaking family bonds",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

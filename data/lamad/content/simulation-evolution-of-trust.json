@@ -1,0 +1,84 @@
+{
+  "id": "simulation-evolution-of-trust",
+  "contentType": "simulation",
+  "title": "The Evolution of Trust",
+  "name": "Evolution of Trust",
+  "description": "An interactive guide to the game theory of trust. Through playable simulations, explore why and how trust evolves - or breaks down - between individuals and in societies. A masterpiece of explorable explanation by Nicky Case.",
+  "url": "https://ncase.me/trust/",
+  "content": "https://ncase.me/trust/",
+  "contentFormat": "html5-app",
+  "sourcePath": "external/ncase/trust",
+  "tags": [
+    "game-theory",
+    "trust",
+    "simulation",
+    "interactive",
+    "explorable-explanation",
+    "cooperation",
+    "prisoners-dilemma",
+    "social-dynamics"
+  ],
+  "relatedNodeIds": [
+    "concept-bidirectional-trust",
+    "governance-epic",
+    "concept-trust-attestations"
+  ],
+  "metadata": {
+    "category": "interactive-simulation",
+    "author": "Nicky Case",
+    "sourceUrl": "https://github.com/ncase/trust",
+    "license": "CC0 Public Domain",
+    "estimatedTime": "30 minutes",
+    "embedStrategy": "iframe",
+    "requiredCapabilities": [
+      "javascript"
+    ],
+    "securityPolicy": {
+      "sandbox": [
+        "allow-scripts",
+        "allow-same-origin"
+      ],
+      "csp": "default-src 'self'; script-src 'unsafe-inline'"
+    },
+    "thumbnailUrl": "https://ncase.me/trust/social/thumbnail.png",
+    "canonicalUrl": "https://ncase.me/trust/",
+    "keywords": [
+      "game theory",
+      "trust",
+      "cooperation",
+      "simulation",
+      "interactive"
+    ]
+  },
+  "reach": "commons",
+  "trustScore": 1,
+  "did": "did:web:elohim.host:content:simulation-evolution-of-trust",
+  "activityPubType": "Application",
+  "openGraphMetadata": {
+    "ogTitle": "The Evolution of Trust",
+    "ogDescription": "An interactive guide to the game theory of trust. Explore why and how trust evolves through playable simulations.",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/simulation-evolution-of-trust",
+    "ogImage": "https://ncase.me/trust/social/thumbnail.png",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articleAuthor": "Nicky Case"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "WebApplication",
+    "@id": "https://elohim-protocol.org/content/simulation-evolution-of-trust",
+    "identifier": "did:web:elohim.host:content:simulation-evolution-of-trust",
+    "name": "The Evolution of Trust",
+    "description": "An interactive guide to the game theory of trust through playable simulations",
+    "applicationCategory": "Educational",
+    "operatingSystem": "Web Browser",
+    "author": {
+      "@type": "Person",
+      "name": "Nicky Case",
+      "url": "https://ncase.me"
+    },
+    "license": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "createdAt": "2025-12-24T00:00:00.000000",
+  "updatedAt": "2025-12-24T00:00:00.000000"
+}

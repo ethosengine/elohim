@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-environmental accessibility enables disabled people's participation",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:ecological-bioregional-environmental accessibility enables disabled people's participation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Environmental accessibility enables disabled people's participation",
+  "description": "Environmental accessibility enables disabled people's participation",
+  "content": "Scenario: Environmental accessibility enables disabled people's participation\n    Given natural spaces are often inaccessible to disabled people\n    And inaccessibility excludes disabled people from environmental connection\n    When ecological spaces and programs are designed\n    Then the bioregional_elohim should advocate for environmental accessibility\n    And trails, parks, gardens should be wheelchair accessible\n    And sensory accommodations should be considered\n    And Alex should be able to participate in environmental care work\n    And exclusion from nature compounds disability injustice\n    And the protocol should recognize that accessibility is environmental justice\n    And disabled people's right to nature should be protected\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,activist,indigenous,elder,youth",
+    "related_layers:community,neighborhood,municipality,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Environmental accessibility enables disabled people's participation",
+    "ogDescription": "Environmental accessibility enables disabled people's participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-environmental accessibility enables disabled people's participation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Environmental accessibility enables disabled people's participation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-environmental accessibility enables disabled people's participation",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:ecological-bioregional-environmental accessibility enables disabled people's participation",
+    "name": "Environmental accessibility enables disabled people's participation",
+    "description": "Environmental accessibility enables disabled people's participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

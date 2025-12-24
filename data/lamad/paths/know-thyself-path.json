@@ -1,0 +1,94 @@
+{
+  "id": "know-thyself-path",
+  "version": "1.0.0",
+  "title": "Know Thyself: Self-Discovery Journey",
+  "description": "A guided journey of self-discovery using validated assessments",
+  "purpose": "Build self-knowledge through scientifically-grounded reflection",
+  "createdBy": "elohim-curriculum",
+  "contributors": [],
+  "createdAt": "2025-11-23T00:09:03.478464",
+  "updatedAt": "2025-11-28T00:09:03.478468",
+  "steps": [
+    {
+      "order": 0,
+      "resourceId": "content-self-knowledge-intro",
+      "stepTitle": "The Value of Self-Knowledge",
+      "stepNarrative": "Understand why 'know thyself' remains timeless wisdom",
+      "learningObjectives": [
+        "Appreciate the value of self-knowledge",
+        "Learn about validated assessment instruments"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Read introduction"
+      ],
+      "estimatedTime": "10-15 minutes"
+    },
+    {
+      "order": 1,
+      "resourceId": "assessment-values-hierarchy",
+      "stepTitle": "Values Hierarchy Assessment",
+      "stepNarrative": "Discover what you truly value most",
+      "learningObjectives": [
+        "Identify your core values",
+        "Understand how values guide decisions"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Complete values assessment"
+      ],
+      "attestationGranted": "values-examined",
+      "estimatedTime": "20-30 minutes"
+    },
+    {
+      "order": 2,
+      "resourceId": "assessment-attachment-style",
+      "stepTitle": "Attachment Style Exploration",
+      "stepNarrative": "Understand your relationship patterns",
+      "learningObjectives": [
+        "Identify attachment patterns",
+        "Understand impact on relationships"
+      ],
+      "optional": true,
+      "completionCriteria": [
+        "Complete attachment assessment"
+      ],
+      "attestationGranted": "attachment-aware",
+      "contentAccess": "gated",
+      "estimatedTime": "25-35 minutes"
+    },
+    {
+      "order": 3,
+      "resourceId": "assessment-strengths-finder",
+      "stepTitle": "Character Strengths",
+      "stepNarrative": "Discover your signature strengths",
+      "learningObjectives": [
+        "Identify top character strengths",
+        "Learn to apply strengths intentionally"
+      ],
+      "optional": true,
+      "completionCriteria": [
+        "Complete strengths assessment"
+      ],
+      "attestationGranted": "strengths-aware",
+      "estimatedTime": "20-30 minutes"
+    }
+  ],
+  "tags": [
+    "self-knowledge",
+    "assessment",
+    "imago-dei",
+    "growth"
+  ],
+  "difficulty": "intermediate",
+  "estimatedDuration": "2-3 hours",
+  "visibility": "public",
+  "prerequisitePaths": [
+    "elohim-protocol"
+  ],
+  "attestationsGranted": [
+    "values-examined",
+    "attachment-aware",
+    "strengths-aware"
+  ]
+}

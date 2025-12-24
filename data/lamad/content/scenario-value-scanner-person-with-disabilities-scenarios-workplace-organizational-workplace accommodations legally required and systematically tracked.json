@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-workplace accommodations legally required and systematically tracked",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:workplace-organizational-workplace accommodations legally required and systematically tracked",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Workplace accommodations legally required and systematically tracked",
+  "description": "Workplace accommodations legally required and systematically tracked",
+  "content": "Scenario: Workplace accommodations legally required and systematically tracked\n    Given Alex requires specific workplace accommodations\n    And accommodations are legally mandated under ADA\n    When Alex requests workplace accommodations\n    Then the workplace_elohim should help Alex document accommodation requests\n    And it should track whether employer provides required accommodations\n    And it should maintain records of all accommodation-related communications\n    And Alex should have documentation to support legal action if necessary\n    And the protocol should recognize that accommodation is right, not favor\n    And Alex should be supported in asserting legal rights\n    And workplace obligations should be clearly documented\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,adult,young_adult,caregiver",
+    "related_layers:individual,household,community,healthcare_medical",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Workplace accommodations legally required and systematically tracked",
+    "ogDescription": "Workplace accommodations legally required and systematically tracked",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-workplace accommodations legally required and systematically tracked",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace accommodations legally required and systematically tracked - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-workplace accommodations legally required and systematically tracked",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:workplace-organizational-workplace accommodations legally required and systematically tracked",
+    "name": "Workplace accommodations legally required and systematically tracked",
+    "description": "Workplace accommodations legally required and systematically tracked",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,52 @@
+{
+  "id": "fct-bible-hebrews-3-1",
+  "contentType": "bible-verse",
+  "title": "Hebrews 3:1",
+  "description": "Scripture reference used in FCT Module 5",
+  "content": "## Hebrews 3:1\n\n> \"Consider Jesus, focus your attention,\". Hebrews 3:1 ESV\n\\[1\\] Therefore, holy brothers, you who share in a heavenly calling, consider Jesus, the apostle and high priest of our confession.\n\n*ESV Translation*\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 5 - Respecting Human Nature - Our Attention is Sacred.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "hebrews",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-05-respecting-human-nature"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-05-respecting-human-nature",
+    "thematicContext": "Respecting Human Nature"
+  },
+  "createdAt": "2025-11-28T21:10:19.197062",
+  "updatedAt": "2025-12-24T03:05:25.966Z",
+  "did": "did:web:elohim.host:content:fct:module 5 - respecting human nature - our attention is sacred",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Hebrews 3:1",
+    "ogDescription": "Scripture reference used in FCT Module 5",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-hebrews-3-1",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Hebrews 3:1 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-hebrews-3-1",
+    "identifier": "did:web:elohim.host:content:fct:module 5 - respecting human nature - our attention is sacred",
+    "name": "Hebrews 3:1",
+    "description": "Scripture reference used in FCT Module 5",
+    "dateCreated": "2025-11-28T21:10:19.197062",
+    "dateModified": "2025-11-28T21:10:19.197063",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

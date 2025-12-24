@@ -1,0 +1,65 @@
+{
+  "id": "human-timothy-tutor",
+  "displayName": "Timothy",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "Educator and learning facilitator. Helping kids and adults discover the joy of learning.",
+  "avatarUrl": "assets/avatars/human-timothy-tutor.jpg",
+  "primaryLocation": {
+    "layer": "community",
+    "displayName": "Valley Community",
+    "reach": "community",
+    "type": "community"
+  },
+  "organizationIds": [
+    "org-learning-collective"
+  ],
+  "communityIds": [
+    "community-homeschool-coop",
+    "community-local-church"
+  ],
+  "affinityGroupIds": [
+    "affinity-education",
+    "affinity-learning-science",
+    "affinity-youth-development",
+    "affinity-faith-formation",
+    "affinity-mastery-learning"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-education",
+    "concept-learning-science",
+    "concept-youth-development",
+    "concept-faith-formation",
+    "concept-mastery-learning"
+  ],
+  "publicAttestationIds": [
+    "attestation-teaching-certification"
+  ],
+  "relationshipIds": [
+    "rel-0008",
+    "rel-0009"
+  ],
+  "trustedConnectionCount": 0,
+  "_metadata": {
+    "category": "affinity",
+    "governanceLayers": [
+      "community",
+      "workplace"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": null
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

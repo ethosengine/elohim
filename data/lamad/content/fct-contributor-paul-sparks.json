@@ -1,0 +1,50 @@
+{
+  "id": "fct-contributor-paul-sparks",
+  "contentType": "contributor",
+  "title": "Paul Sparks",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": "# Paul Sparks\n\n**Role:** author\n\n**Works:** The New Parish\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive",
+    "fct-media-12-book-the-new-parish"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-13-helping-thrive"
+  },
+  "createdAt": "2025-11-28T21:10:19.224346",
+  "updatedAt": "2025-12-24T03:05:26.078Z",
+  "did": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Paul Sparks",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-paul-sparks",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Paul Sparks - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-paul-sparks",
+    "identifier": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+    "name": "Paul Sparks",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.224346",
+    "dateModified": "2025-11-28T21:10:19.224347",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

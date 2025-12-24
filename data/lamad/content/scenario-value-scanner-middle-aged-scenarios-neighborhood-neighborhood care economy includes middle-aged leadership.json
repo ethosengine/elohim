@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood care economy includes middle-aged leadership",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood care economy includes middle-aged leadership",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood care economy includes middle-aged leadership",
+  "description": "Neighborhood care economy includes middle-aged leadership",
+  "content": "Scenario: Neighborhood care economy includes middle-aged leadership\n    Given Robert has decades of life experience\n    And he has accumulated professional and personal capabilities\n    And he's positioned to contribute neighborhood leadership\n    When neighborhood_elohim recognizes his leadership potential\n    Then it should surface leadership opportunities appropriate to his capacity\n    And connect him to neighborhood governance roles\n    And recognize his care contributions as qualifying him for leadership\n    And help him balance leadership with his existing demands\n    And prevent overcommitment that would overwhelm him\n    And channel his capabilities toward neighborhood improvement\n    And build neighborhood leadership from accumulated care experience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:neighborhood",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,community,family,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood care economy includes middle-aged leadership",
+    "ogDescription": "Neighborhood care economy includes middle-aged leadership",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood care economy includes middle-aged leadership",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood care economy includes middle-aged leadership - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood care economy includes middle-aged leadership",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood care economy includes middle-aged leadership",
+    "name": "Neighborhood care economy includes middle-aged leadership",
+    "description": "Neighborhood care economy includes middle-aged leadership",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-household-coordinating shared meals around work schedules",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-coordinating shared meals around work schedules",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Coordinating shared meals around work schedules",
+  "description": "Coordinating shared meals around work schedules",
+  "content": "Scenario: Coordinating shared meals around work schedules\n    Given my roommates and I want to share meal costs and preparation\n    And my work schedule is unpredictable and changes weekly\n    When we plan shared meals\n    Then the protocol should coordinate across different schedules\n    And identify opportunities when I can participate\n    And help distribute cooking responsibilities fairly\n    And allow flexible contribution when my schedule permits\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-household",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating shared meals around work schedules",
+    "ogDescription": "Coordinating shared meals around work schedules",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-coordinating shared meals around work schedules",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating shared meals around work schedules - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-coordinating shared meals around work schedules",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-coordinating shared meals around work schedules",
+    "name": "Coordinating shared meals around work schedules",
+    "description": "Coordinating shared meals around work schedules",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-family-family cultural and value transmission across generations",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:family-family cultural and value transmission across generations",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family cultural and value transmission across generations",
+  "description": "Family cultural and value transmission across generations",
+  "content": "Scenario: Family cultural and value transmission across generations\n    Given Kenji learned family values and culture growing up\n    And he is now interpreting these in young adult context\n    When Kenji participates in family cultural practices\n    Then the family_elohim should recognize his work maintaining culture\n    And it should value his adaptation of family traditions to college life\n    And it should support intergenerational transmission of family values\n    And cultural work should be recognized as family care labor\n    And the system should value students as culture carriers\n    And family identity should persist across geographic separation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:family",
+    "related_users:parent,adult,young_adult,sibling",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family cultural and value transmission across generations",
+    "ogDescription": "Family cultural and value transmission across generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-family cultural and value transmission across generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family cultural and value transmission across generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-family cultural and value transmission across generations",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:family-family cultural and value transmission across generations",
+    "name": "Family cultural and value transmission across generations",
+    "description": "Family cultural and value transmission across generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

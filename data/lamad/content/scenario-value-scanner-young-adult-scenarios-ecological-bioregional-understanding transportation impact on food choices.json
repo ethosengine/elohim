@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-understanding transportation impact on food choices",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-understanding transportation impact on food choices",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Understanding transportation impact on food choices",
+  "description": "Understanding transportation impact on food choices",
+  "content": "Scenario: Understanding transportation impact on food choices\n    Given transportation contributes to food's environmental footprint\n    And Aisha lives in an urban area\n    When the bioregional_elohim analyzes her shopping patterns\n    Then it should consider transportation in environmental impact\n    And it should suggest efficient shopping routes\n    And it should help her minimize transportation emissions\n    And the full ecological cost including transport should be visible\n    And bioregional analysis should inform sustainable choices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Understanding transportation impact on food choices",
+    "ogDescription": "Understanding transportation impact on food choices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-understanding transportation impact on food choices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Understanding transportation impact on food choices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-understanding transportation impact on food choices",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-understanding transportation impact on food choices",
+    "name": "Understanding transportation impact on food choices",
+    "description": "Understanding transportation impact on food choices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

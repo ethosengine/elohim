@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-educational-intergenerational teaching builds community connections",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational-intergenerational teaching builds community connections",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Intergenerational teaching builds community connections",
+  "description": "Intergenerational teaching builds community connections",
+  "content": "Scenario: Intergenerational teaching builds community connections\n    Given Margaret has knowledge valuable to all ages\n    And intergenerational programs benefit whole community\n    When the educational_elohim facilitates cross-age teaching\n    Then Margaret should teach in intergenerational settings\n    And her contributions should bridge age segregation\n    And younger people should benefit from her wisdom\n    And Margaret should learn from younger teachers too\n    And intergenerational education should build community bonds\n    And age-diverse learning should be normalized and valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:educational",
+    "related_users:middle_aged,elderly,retired,teacher,mentor,student,learner",
+    "related_layers:individual,family,community,neighborhood",
+    "elohim_agents:personal_agent,community_elohim,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Intergenerational teaching builds community connections",
+    "ogDescription": "Intergenerational teaching builds community connections",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-educational-intergenerational teaching builds community connections",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Intergenerational teaching builds community connections - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-educational-intergenerational teaching builds community connections",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational-intergenerational teaching builds community connections",
+    "name": "Intergenerational teaching builds community connections",
+    "description": "Intergenerational teaching builds community connections",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

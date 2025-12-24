@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-community-connecting community care with family care responsibilities",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-connecting community care with family care responsibilities",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Connecting community care with family care responsibilities",
+  "description": "Connecting community care with family care responsibilities",
+  "content": "Scenario: Connecting community care with family care responsibilities\n    Given Margaret provides both family care and community service\n    And these responsibilities must be balanced\n    When the community_elohim tracks Margaret's total contributions\n    Then it should recognize both family and community care\n    And it should help Margaret balance multiple care obligations\n    And it should ensure community service is sustainable alongside family care\n    And total care burden should be visible and manageable\n    And Margaret should be able to contribute without burnout\n    And community should respect her family care commitments\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:community",
+    "related_users:senior,retired,volunteer,elderly,middle_aged",
+    "related_layers:neighborhood,family,municipality,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Connecting community care with family care responsibilities",
+    "ogDescription": "Connecting community care with family care responsibilities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-connecting community care with family care responsibilities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connecting community care with family care responsibilities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-connecting community care with family care responsibilities",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-connecting community care with family care responsibilities",
+    "name": "Connecting community care with family care responsibilities",
+    "description": "Connecting community care with family care responsibilities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

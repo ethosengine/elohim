@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-child-scenarios-family-child creates first contribution within family circle",
+  "did": "did:web:elohim.host:content:social-medium:child:scenarios:family-child creates first contribution within family circle",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Child creates first contribution within family circle",
+  "description": "Child creates first contribution within family circle",
+  "content": "Scenario: Child creates first contribution within family circle\n    Given Emma wants to share her art project with her family\n    When she creates a contribution with a photo of her drawing\n    And she writes \"I made this at school today!\"\n    Then the contribution is immediately visible to all family members\n    And it stays within the family circle by default\n    And family members can respond with encouragement\n    And the guardian agent tracks this as positive creative expression\n    And Emma learns that sharing creates connection\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:elder,content_creator",
+    "related_layers:individual,neighborhood",
+    "elohim_agents:guardian_agent,parental_guidance_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-child-scenarios-family",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-child-scenarios-family",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Child creates first contribution within family circle",
+    "ogDescription": "Child creates first contribution within family circle",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-family-child creates first contribution within family circle",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Child creates first contribution within family circle - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-family-child creates first contribution within family circle",
+    "identifier": "did:web:elohim.host:content:social-medium:child:scenarios:family-child creates first contribution within family circle",
+    "name": "Child creates first contribution within family circle",
+    "description": "Child creates first contribution within family circle",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

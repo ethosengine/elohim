@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-family-parent's care work visible across extended family",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-parent's care work visible across extended family",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parent's care work visible across extended family",
+  "description": "Parent's care work visible across extended family",
+  "content": "Scenario: Parent's care work visible across extended family\n    Given Sarah provides care to her children and aging parents\n    And she coordinates between generations\n    When the family_elohim tracks Sarah's care contributions\n    Then her work should be visible to entire extended family\n    And grandparents should see Sarah's parenting labor\n    And siblings should see her coordination work\n    And the full family should recognize her care contributions\n    And visibility should enable family-wide appreciation\n    And Sarah's labor should be valued across all family relationships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:family",
+    "related_users:child,grandparent,partner,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parent's care work visible across extended family",
+    "ogDescription": "Parent's care work visible across extended family",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-parent's care work visible across extended family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent's care work visible across extended family - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-parent's care work visible across extended family",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-parent's care work visible across extended family",
+    "name": "Parent's care work visible across extended family",
+    "description": "Parent's care work visible across extended family",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

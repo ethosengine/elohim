@@ -1,0 +1,62 @@
+{
+  "id": "feature-value-scanner-worker-scenarios-community",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:community",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Community Care Economy Participation for Workers",
+  "description": "As a worker serving community through my labor I need to participate in community care economy as both contributor and recipient So that I receive recognition and support proportional to my care contributions",
+  "content": "Feature: Community Care Economy Participation for Workers\n  As a worker serving community through my labor\n  I need to participate in community care economy as both contributor and recipient\n  So that I receive recognition and support proportional to my care contributions\n\n  Background:\n    Given I am a worker providing care labor to community\n    And my restaurant work feeds hundreds of people\n    And the community operates a care economy system\n    And my labor accumulates care tokens reflecting contribution\n\n  Scenario: Recognizing paid work as community care contribution\n    Given I work 50+ hours per week preparing food for people\n    And my labor serves community nourishment and flourishing\n    When the community assesses care contributions\n    Then the protocol should recognize my work as care labor\n    And accumulate care tokens reflecting my service to community\n    And make visible that all work serving others is care economy participation\n    And reframe employment from pure extraction to community contribution\n\n  Scenario: Accessing community resources based on care contributions\n    Given I contribute significantly to community through my labor\n    And community has food banks, meal programs, and mutual aid resources\n    When I need support due to low wages or difficult circumstances\n    Then the protocol should connect me to community resources\n    And help me access support with dignity (not charity but reciprocity)\n    And recognize that I have standing based on my care contributions\n    And facilitate care economy where workers are supported by the community they serve\n\n  Scenario: Participating in community food systems\n    Given I work in food preparation and understand food systems\n    And community has food co-ops, gardens, or alternative food access\n    When I participate in community food initiatives\n    Then the protocol should recognize my expertise and contribution\n    And help me access affordable, quality food through community systems\n    And accumulate care tokens for food systems participation\n    And support building community food sovereignty\n\n  Scenario: Connecting with community mutual aid networks\n    Given workers need mutual aid during economic precarity\n    And community has mutual aid organizing\n    When I participate in mutual aid networks\n    Then the protocol should connect me to appropriate networks\n    And facilitate giving and receiving support\n    And recognize that mutual aid is care economy practice\n    And support building community resilience beyond market systems\n\n  Scenario: Advocating for community support of workers\n    Given workers are systematically underpaid and overworked\n    When I want to advocate for community support of workers\n    Then the protocol should help me organize advocacy\n    And connect me with other workers for collective action\n    And support pushing for living wage campaigns and worker protections\n    And build community culture that values worker dignity\n\n  Scenario: Contributing to community education about care work\n    Given many people don't recognize labor as care contribution\n    When I want to help community understand care economy\n    Then the protocol should help me share my perspective as a worker\n    And support education about care work embedded in all labor\n    And facilitate community consciousness-raising\n    And build movement toward care-economy-aligned economics\n\n  Scenario: Accessing community healthcare and support services\n    Given my low wages make healthcare and services unaffordable\n    And community provides sliding-scale or care-economy-based services\n    When I need healthcare, mental health support, or other services\n    Then the protocol should connect me to accessible community resources\n    And facilitate payment based on my care economy participation\n    And recognize that workers deserve healthcare regardless of income\n    And support building community care infrastructure\n\n  Scenario: Participating in community governance despite time constraints\n    Given community makes decisions affecting workers' lives\n    And my work schedule limits participation in governance\n    When the community needs worker perspectives in decision-making\n    Then the protocol should help me participate when possible\n    And amplify worker voices in community governance\n    And advocate for accessible participation structures for workers\n    And ensure community decisions account for workers' needs\n\n  Scenario: Building community solidarity with other workers\n    Given workers across community face similar exploitation\n    When we want to organize collective support and advocacy\n    Then the protocol should connect workers across industries\n    And facilitate worker mutual aid and solidarity networks\n    And support collective action for better conditions\n    And build worker power through community organization\n\n  Scenario: Accessing community crisis support during emergencies\n    Given workers often lack economic buffers for emergencies\n    When I experience health crisis, job loss, or other emergency\n    Then the protocol should rapidly connect me to community crisis support\n    And facilitate emergency mutual aid based on my care contributions\n    And provide immediate practical support during crisis\n    And ensure community safety net catches workers in need\n\n  Scenario: Contributing care tokens to community initiatives\n    Given I accumulate care tokens through my work and participation\n    And community initiatives need resource pooling\n    When I want to support community projects or people in need\n    Then the protocol should enable me to contribute care tokens\n    And facilitate care economy resource distribution\n    And recognize that even workers with limited money can contribute meaningfully\n    And build community care economy beyond cash transactions\n\n  Scenario: Making visible that workers enable community flourishing\n    Given community depends on workers' labor for functioning\n    And workers are often invisible or undervalued\n    When the community assesses what makes life possible\n    Then the protocol should make visible workers' essential contributions\n    And demonstrate that workers deserve dignity and fair compensation\n    And build community consciousness about care labor embedded in all work\n    And catalyze community support for worker justice and care economy principles\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-worker-scenarios-community-recognizing paid work as community care contribution",
+    "scenario-value-scanner-worker-scenarios-community-accessing community resources based on care contributions",
+    "scenario-value-scanner-worker-scenarios-community-participating in community food systems",
+    "scenario-value-scanner-worker-scenarios-community-connecting with community mutual aid networks",
+    "scenario-value-scanner-worker-scenarios-community-advocating for community support of workers",
+    "scenario-value-scanner-worker-scenarios-community-contributing to community education about care work",
+    "scenario-value-scanner-worker-scenarios-community-accessing community healthcare and support services",
+    "scenario-value-scanner-worker-scenarios-community-participating in community governance despite time constraints",
+    "scenario-value-scanner-worker-scenarios-community-building community solidarity with other workers",
+    "scenario-value-scanner-worker-scenarios-community-accessing community crisis support during emergencies",
+    "scenario-value-scanner-worker-scenarios-community-contributing care tokens to community initiatives",
+    "scenario-value-scanner-worker-scenarios-community-making visible that workers enable community flourishing"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": null,
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community Care Economy Participation for Workers",
+    "ogDescription": "As a worker serving community through my labor I need to participate in community care economy as both contributor and recipient So that I receive recognition and support proportional to my care contr",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-worker-scenarios-community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Community Care Economy Participation for Workers - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-worker-scenarios-community",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:community",
+    "name": "Community Care Economy Participation for Workers",
+    "description": "As a worker serving community through my labor I need to participate in community care economy as both contributor and recipient So that I receive recognition and support proportional to my care contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

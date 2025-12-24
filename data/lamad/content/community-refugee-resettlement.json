@@ -1,0 +1,30 @@
+{
+  "id": "community-refugee-resettlement",
+  "did": "did:web:elohim.host:community:refugee-resettlement",
+  "contentType": "organization",
+  "activityPubType": "Group",
+  "title": "Refugee Resettlement",
+  "description": "Community with 1 members",
+  "content": {
+    "name": "Refugee Resettlement",
+    "memberCount": 1,
+    "memberIds": [
+      "human-ronald-refugee"
+    ]
+  },
+  "contentFormat": "html",
+  "tags": [
+    "community",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-ronald-refugee"
+  ],
+  "metadata": {
+    "category": "community",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z"
+}

@@ -1,0 +1,54 @@
+{
+  "id": "fct-module-08-centering-love-story",
+  "contentType": "narrative",
+  "title": "Story: Centering Values: Love",
+  "description": "Biblical story or example illustrating module concepts",
+  "content": {
+    "narrative": "There are such things as bad victories if you are a Christian, there's a way of seeming to win in exchange for giving up your soul.  \nThere's a way of gaining power, there's a way of gaining material security that will ruin you.  That's not because political power is bad, it's not that material security is bad, it's because the MEANS you use to aquire these things is not neutral. \n\nIf you have a choice between behaving viciously and gaining security and power, and behaving righteously and having a chance at losing, for Christians it is better to lose. \n\nJesus meant it when he said, \u201cIf anyone would come after me, let him deny himself and take up his cross and follow me. 25 For whoever would save his life\\[g\\] will lose it, but whoever loses his life for my sake will find it. 26 For what will it profit a man if he gains the whole world and forfeits his soul? Or what shall a man give in return for his soul? 27 For the Son of Man is going to come with his angels in the glory of his Father, and then he will repay each person according to what he has done.\u201cIf anyone would come after me, let him deny himself and take up his cross and follow me. 25 For whoever would save his life\\[g\\] will lose it, but whoever loses his life for my sake will find it. 26 For what will it profit a man if he gains the whole world and forfeits his soul? Or what shall a man give in return for his soul? 27 For the Son of Man is going to come with his angels in the glory of his Father, and then he will repay each person according to what he has done. Matthew 16: 25-27",
+    "narrativeType": "biblical-example"
+  },
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "story",
+    "narrative",
+    "fct",
+    "biblical-example",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "fct-narrative",
+    "sourceModule": "fct-module-08-centering-love"
+  },
+  "createdAt": "2025-11-28T21:10:19.209912",
+  "updatedAt": "2025-11-28T21:10:19.209913",
+  "did": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Story: Centering Values: Love",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-08-centering-love-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "Story: Centering Values: Love - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-08-centering-love-story",
+    "identifier": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
+    "name": "Story: Centering Values: Love",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.209912",
+    "dateModified": "2025-11-28T21:10:19.209913",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

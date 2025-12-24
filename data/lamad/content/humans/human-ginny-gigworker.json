@@ -1,0 +1,58 @@
+{
+  "id": "human-ginny-gigworker",
+  "displayName": "Ginny",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "Freelancer juggling multiple gigs. Rideshare, delivery, odd jobs. Looking for stability and fair pay.",
+  "avatarUrl": "assets/avatars/human-ginny-gigworker.jpg",
+  "primaryLocation": {
+    "layer": "municipality",
+    "displayName": "Metro City",
+    "reach": "community",
+    "type": "municipality"
+  },
+  "communityIds": [
+    "community-gig-workers-alliance",
+    "community-rideshare-drivers"
+  ],
+  "affinityGroupIds": [
+    "affinity-gig-economy",
+    "affinity-worker-rights",
+    "affinity-portable-benefits",
+    "affinity-fair-wages",
+    "affinity-platform-cooperatives"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-gig-economy",
+    "concept-worker-rights",
+    "concept-portable-benefits",
+    "concept-fair-wages",
+    "concept-platform-cooperatives"
+  ],
+  "relationshipIds": [
+    "rel-0014"
+  ],
+  "trustedConnectionCount": 0,
+  "_metadata": {
+    "category": "local-economy",
+    "governanceLayers": [
+      "community",
+      "municipality"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": "Key for demonstrating value scanner (recognizing invisible work)."
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

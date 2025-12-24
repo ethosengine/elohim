@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-industry-sector-food system workforce development includes democratic governance training",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:industry-sector-food system workforce development includes democratic governance training",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Food system workforce development includes democratic governance training",
+  "description": "Food system workforce development includes democratic governance training",
+  "content": "Scenario: Food system workforce development includes democratic governance training\n    Given food service and agriculture training focuses on technical skills only\n    And democratic enterprises need workers skilled in collaboration and governance\n    When industry sector develops democratic food system training programs\n    Then workers learn technical skills (cooking, cultivation) plus democratic governance\n    And training includes cooperative business, facilitation, and consensus decision-making\n    And educational institutions incorporate democratic food system curriculum\n    And workforce is prepared for democratic enterprise participation\n    And industry_sector_elohim develops training curriculum and coordinates educational partnerships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:industry_sector",
+    "related_users:[worker,franchise_operator,small_business_owner,supplier]",
+    "related_layers:[workplace_organizational,community,ecological_bioregional]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Food system workforce development includes democratic governance training",
+    "ogDescription": "Food system workforce development includes democratic governance training",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-industry-sector-food system workforce development includes democratic governance training",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Food system workforce development includes democratic governance training - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-industry-sector-food system workforce development includes democratic governance training",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:industry-sector-food system workforce development includes democratic governance training",
+    "name": "Food system workforce development includes democratic governance training",
+    "description": "Food system workforce development includes democratic governance training",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

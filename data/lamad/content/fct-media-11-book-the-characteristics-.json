@@ -1,0 +1,60 @@
+{
+  "id": "fct-media-11-book-the-characteristics-",
+  "contentType": "book",
+  "title": "The Characteristics of White Supremacy Culture",
+  "description": "Book by Tema Okun",
+  "content": {
+    "title": "The Characteristics of White Supremacy Culture",
+    "author": "Tema Okun",
+    "format": "book"
+  },
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice"
+  ],
+  "metadata": {
+    "category": "algorithmic-bias",
+    "sourceModule": "fct-module-12-fairness-justice",
+    "mediaType": "book",
+    "author": "Tema Okun"
+  },
+  "_contributor": "Tema Okun",
+  "createdAt": "2025-11-28T21:10:19.220445",
+  "updatedAt": "2025-12-24T03:05:26.131Z",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "The Characteristics of White Supremacy Culture",
+    "ogDescription": "Book by Tema Okun",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-11-book-the-characteristics-",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "The Characteristics of White Supremacy Culture - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-11-book-the-characteristics-",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "The Characteristics of White Supremacy Culture",
+    "description": "Book by Tema Okun",
+    "dateCreated": "2025-11-28T21:10:19.220445",
+    "dateModified": "2025-11-28T21:10:19.220446",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Tema Okun"
+    }
+  }
+}

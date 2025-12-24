@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-understanding food systems complexity through shopping",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-understanding food systems complexity through shopping",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Understanding food systems complexity through shopping",
+  "description": "Understanding food systems complexity through shopping",
+  "content": "Scenario: Understanding food systems complexity through shopping\n    Given Marcus shops regularly and makes food choices\n    And food connects to complex agricultural and distribution systems\n    When Marcus scans food items\n    Then the personal_agent should surface information about food origins\n    And it should show where food comes from and who grows it\n    And it should explain care labor embedded in food production\n    And Marcus should learn that his choices connect to larger systems\n    And food system awareness should develop through practice\n    And ecological consciousness should build on care economy foundation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community,educational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Understanding food systems complexity through shopping",
+    "ogDescription": "Understanding food systems complexity through shopping",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-understanding food systems complexity through shopping",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Understanding food systems complexity through shopping - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-understanding food systems complexity through shopping",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-understanding food systems complexity through shopping",
+    "name": "Understanding food systems complexity through shopping",
+    "description": "Understanding food systems complexity through shopping",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

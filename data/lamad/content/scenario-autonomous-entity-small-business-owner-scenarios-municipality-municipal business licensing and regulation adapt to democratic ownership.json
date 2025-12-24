@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal business licensing and regulation adapt to democratic ownership",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:municipality-municipal business licensing and regulation adapt to democratic ownership",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Municipal business licensing and regulation adapt to democratic ownership",
+  "description": "Municipal business licensing and regulation adapt to democratic ownership",
+  "content": "Scenario: Municipal business licensing and regulation adapt to democratic ownership\n    Given regulations were designed for traditional hierarchical businesses\n    And democratic governance may not fit standard regulatory categories\n    When Rosa's Auto navigates municipal licensing as democratic enterprise\n    Then business license accurately reflects worker-owned cooperative structure\n    And regulatory compliance is streamlined for democratic businesses\n    And municipal officials learn how to support rather than obstruct conversions\n    And regulatory framework evolves to accommodate democratic governance\n    And municipality_elohim coordinates with officials to develop supportive policies\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:municipality",
+    "related_users:[worker,franchise_operator,community_investor,manager]",
+    "related_layers:[community,workplace_organizational]",
+    "elohim_agents:[municipality_elohim,community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Municipal business licensing and regulation adapt to democratic ownership",
+    "ogDescription": "Municipal business licensing and regulation adapt to democratic ownership",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal business licensing and regulation adapt to democratic ownership",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal business licensing and regulation adapt to democratic ownership - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal business licensing and regulation adapt to democratic ownership",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:municipality-municipal business licensing and regulation adapt to democratic ownership",
+    "name": "Municipal business licensing and regulation adapt to democratic ownership",
+    "description": "Municipal business licensing and regulation adapt to democratic ownership",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-ecological-bioregional-teaching food sovereignty through kitchen skills",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:ecological-bioregional-teaching food sovereignty through kitchen skills",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teaching food sovereignty through kitchen skills",
+  "description": "Teaching food sovereignty through kitchen skills",
+  "content": "Scenario: Teaching food sovereignty through kitchen skills\n    Given Margaret knows how to cook from scratch and make nutritious meals\n    And kitchen skills support food sovereignty and health\n    When Margaret teaches grandchildren cooking and food preparation\n    Then the bioregional_elohim should recognize cooking as care work\n    And it should value food sovereignty education\n    And it should track kitchen skills transmission\n    And cooking should accumulate care tokens\n    And Margaret's teaching should support family and community food security\n    And traditional food knowledge should be preserved and valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,child,parent,community_member,environmental_steward",
+    "related_layers:community,family,educational,neighborhood",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teaching food sovereignty through kitchen skills",
+    "ogDescription": "Teaching food sovereignty through kitchen skills",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-ecological-bioregional-teaching food sovereignty through kitchen skills",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching food sovereignty through kitchen skills - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-ecological-bioregional-teaching food sovereignty through kitchen skills",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:ecological-bioregional-teaching food sovereignty through kitchen skills",
+    "name": "Teaching food sovereignty through kitchen skills",
+    "description": "Teaching food sovereignty through kitchen skills",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

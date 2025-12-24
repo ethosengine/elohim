@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-national-study whether children growing up with protocol develop different capacities",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:national-study whether children growing up with protocol develop different capacities",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Study whether children growing up with protocol develop different capacities",
+  "description": "Study whether children growing up with protocol develop different capacities",
+  "content": "Scenario: Study whether children growing up with protocol develop different capacities\n    Given Tommy was 12 when Riverside adopted protocol\n    And James tracks cohort of adolescents through development\n    When James compares protocol-exposed youth to control group\n    Then he measures civic engagement, constitutional literacy, and deliberative skills\n    And he finds protocol-exposed youth have stronger democratic capacities\n    And he documents different relationship to AI than parents' generation\n    And he examines whether effects persist into young adulthood\n    And generational analysis reveals transformative potential\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:national",
+    "related_users:constitutional_council_member,policy_maker,technical_expert",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/national.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-national",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-national",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Study whether children growing up with protocol develop different capacities",
+    "ogDescription": "Study whether children growing up with protocol develop different capacities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-study whether children growing up with protocol develop different capacities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Study whether children growing up with protocol develop different capacities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-study whether children growing up with protocol develop different capacities",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:national-study whether children growing up with protocol develop different capacities",
+    "name": "Study whether children growing up with protocol develop different capacities",
+    "description": "Study whether children growing up with protocol develop different capacities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

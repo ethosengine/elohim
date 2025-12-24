@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-household-household budget management on fixed retirement income",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:household-household budget management on fixed retirement income",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Household budget management on fixed retirement income",
+  "description": "Household budget management on fixed retirement income",
+  "content": "Scenario: Household budget management on fixed retirement income\n    Given Margaret's household has fixed income of $32k/year\n    And income cannot be increased through additional employment\n    When the household_elohim manages resource allocation\n    Then it should track all household expenses and patterns\n    And it should optimize spending across categories\n    And it should identify opportunities for cost reduction\n    And it should help Margaret maintain quality of life within constraints\n    And the $150/week grocery budget should be managed carefully\n    And household financial dignity should be preserved\n    And the framing should be resource optimization, not poverty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:household",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver,spouse",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Household budget management on fixed retirement income",
+    "ogDescription": "Household budget management on fixed retirement income",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-household-household budget management on fixed retirement income",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household budget management on fixed retirement income - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-household-household budget management on fixed retirement income",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:household-household budget management on fixed retirement income",
+    "name": "Household budget management on fixed retirement income",
+    "description": "Household budget management on fixed retirement income",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

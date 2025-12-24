@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-county-regional-journalist detects environmental racism at regional scale",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:county-regional-journalist detects environmental racism at regional scale",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Journalist detects environmental racism at regional scale",
+  "description": "Journalist detects environmental racism at regional scale",
+  "content": "Scenario: Journalist detects environmental racism at regional scale\n    Given pollution facilities cluster in certain neighborhoods\n    And the journalist investigates environmental justice\n    When the Observer analyzes regional environmental patterns\n    Then the journalist sees industrial permits concentrate in communities of color\n    And maps proximity of pollution sources to schools and residences\n    And documents health outcome disparities by neighborhood and race\n    And shows pattern across county regardless of municipal boundaries\n    And publishes investigation exposing regional environmental racism\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:county_regional",
+    "related_users:journalist,activist,politician,citizen",
+    "related_layers:municipality,provincial_state,community",
+    "elohim_agents:public_observer,regional_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Journalist detects environmental racism at regional scale",
+    "ogDescription": "Journalist detects environmental racism at regional scale",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-county-regional-journalist detects environmental racism at regional scale",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist detects environmental racism at regional scale - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-county-regional-journalist detects environmental racism at regional scale",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:county-regional-journalist detects environmental racism at regional scale",
+    "name": "Journalist detects environmental racism at regional scale",
+    "description": "Journalist detects environmental racism at regional scale",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

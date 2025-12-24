@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-family-sarah's support for aging parents made visible",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-sarah's support for aging parents made visible",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Sarah's support for aging parents made visible",
+  "description": "Sarah's support for aging parents made visible",
+  "content": "Scenario: Sarah's support for aging parents made visible\n    Given Sarah's parents are aging and need increasing support\n    And Sarah helps with medical appointments, financial planning, household tasks\n    When the family_elohim tracks Sarah's elder care\n    Then it should recognize this as substantial care labor\n    And it should show Sarah is simultaneously caring up and down generations\n    And elder care should accumulate care tokens\n    And the family should see Sarah's sandwich generation burden\n    And her care for aging parents should be valued alongside childcare\n    And multigenerational care should be comprehensive and visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:family",
+    "related_users:child,grandparent,partner,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Sarah's support for aging parents made visible",
+    "ogDescription": "Sarah's support for aging parents made visible",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-sarah's support for aging parents made visible",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Sarah's support for aging parents made visible - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-sarah's support for aging parents made visible",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-sarah's support for aging parents made visible",
+    "name": "Sarah's support for aging parents made visible",
+    "description": "Sarah's support for aging parents made visible",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

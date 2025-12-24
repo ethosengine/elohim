@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-shopping at local stores as recognized customer",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:neighborhood-shopping at local stores as recognized customer",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Shopping at local stores as recognized customer",
+  "description": "Shopping at local stores as recognized customer",
+  "content": "Scenario: Shopping at local stores as recognized customer\n    Given Jordan regularly shops at the neighborhood grocery store\n    And Jordan knows several store employees by name\n    When Jordan visits the store to buy items\n    Then the personal_agent provides shopping support (list, budget, navigation)\n    And store employees greet Jordan warmly as a regular customer\n    And Jordan can complete simple purchases independently\n    And Jordan's patronage contributes to local business economy\n    And the Value Scanner records Jordan's economic contribution\n    And Jordan experiences being a valued community member\n    And Jordan's presence enriches the store's community atmosphere\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Shopping at local stores as recognized customer",
+    "ogDescription": "Shopping at local stores as recognized customer",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-neighborhood-shopping at local stores as recognized customer",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Shopping at local stores as recognized customer - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-neighborhood-shopping at local stores as recognized customer",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:neighborhood-shopping at local stores as recognized customer",
+    "name": "Shopping at local stores as recognized customer",
+    "description": "Shopping at local stores as recognized customer",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

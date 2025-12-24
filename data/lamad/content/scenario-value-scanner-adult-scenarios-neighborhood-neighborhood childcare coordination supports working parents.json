@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood childcare coordination supports working parents",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood-neighborhood childcare coordination supports working parents",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood childcare coordination supports working parents",
+  "description": "Neighborhood childcare coordination supports working parents",
+  "content": "Scenario: Neighborhood childcare coordination supports working parents\n    Given Sarah works full-time as a teacher\n    And childcare is expensive and inflexible\n    When neighborhood coordinates childcare sharing\n    Then the neighborhood_elohim should match schedules and needs\n    And it should track reciprocal childcare exchanges\n    And it should help parents like Sarah support each other\n    And childcare costs should be reduced through cooperation\n    And quality care should be accessible to working families\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,worker,caregiver,young_child",
+    "related_layers:household,community,family",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood childcare coordination supports working parents",
+    "ogDescription": "Neighborhood childcare coordination supports working parents",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-neighborhood-neighborhood childcare coordination supports working parents",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood childcare coordination supports working parents - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-neighborhood-neighborhood childcare coordination supports working parents",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood-neighborhood childcare coordination supports working parents",
+    "name": "Neighborhood childcare coordination supports working parents",
+    "description": "Neighborhood childcare coordination supports working parents",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

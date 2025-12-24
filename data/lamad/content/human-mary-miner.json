@@ -1,0 +1,78 @@
+{
+  "id": "human-mary-miner",
+  "did": "did:web:elohim.host:human:mary-miner",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Mary",
+  "description": "Working the mines like my father and grandfather. Hard work, fair pay. Concerned about automation.",
+  "content": "# Mary\n\nWorking the mines like my father and grandfather. Hard work, fair pay. Concerned about automation.\n\n**Profile Reach:** community\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Primary Location:** {\n  \"layer\": \"county_regional\",\n  \"displayName\": \"Mining County\",\n  \"reach\": \"community\"\n}\n\n**Organizations:** [object Object], [object Object]\n\n**Communities:** community-mining-town\n\n**Public Affinities:** labor-rights, union-organizing, just-transition, community-resilience, automation-impacts\n\n**Public Attestations:** attestation-mine-safety-certified, attestation-union-steward\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/mary-miner/profile.json",
+  "tags": [
+    "role-steward",
+    "layer-county_regional",
+    "just-transition",
+    "community-resilience",
+    "automation-impacts",
+    "local-economy",
+    "labor-rights",
+    "role-worker",
+    "human-graph",
+    "union-organizing",
+    "reach-community",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "local-economy",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "workplace",
+      "community",
+      "county_regional"
+    ],
+    "organizationCount": 2,
+    "communityCount": 1
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Mary",
+    "ogDescription": "Working the mines like my father and grandfather. Hard work, fair pay. Concerned about automation.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-mary-miner",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-mary-miner.jpg",
+    "ogImageAlt": "Mary's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-mary-miner",
+    "identifier": "did:web:elohim.host:human:mary-miner",
+    "name": "Mary",
+    "description": "Working the mines like my father and grandfather. Hard work, fair pay. Concerned about automation.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Mining County",
+      "description": "county_regional"
+    },
+    "affiliation": [
+      {
+        "@type": "Organization",
+        "name": "Consolidated Mining Corp",
+        "@id": "org-consolidated-mining"
+      },
+      {
+        "@type": "Organization",
+        "name": "Miners Union Local 347",
+        "@id": "org-miners-union-local-347"
+      }
+    ]
+  },
+  "createdAt": "2025-12-01T20:08:11.328541",
+  "updatedAt": "2025-12-24T03:05:26.334Z"
+}

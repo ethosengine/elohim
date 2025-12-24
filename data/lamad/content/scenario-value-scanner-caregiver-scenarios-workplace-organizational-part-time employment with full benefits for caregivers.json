@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-workplace-organizational-part-time employment with full benefits for caregivers",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:workplace-organizational-part-time employment with full benefits for caregivers",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Part-time employment with full benefits for caregivers",
+  "description": "Part-time employment with full benefits for caregivers",
+  "content": "Scenario: Part-time employment with full benefits for caregivers\n    Given James can only work part-time due to caregiving\n    And loss of benefits creates devastating vulnerability\n    When the workplace_elohim advocates for benefits policy\n    Then part-time caregiver employees should access benefits\n    And healthcare coverage should not require full-time employment\n    And benefits should recognize caregiving as legitimate constraint\n    And workplace should not force caregivers to choose between care and benefits\n    And employment protection should include part-time caregivers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:workplace_organizational",
+    "related_users:adult,middle_aged,employee,contractor",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Part-time employment with full benefits for caregivers",
+    "ogDescription": "Part-time employment with full benefits for caregivers",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-workplace-organizational-part-time employment with full benefits for caregivers",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Part-time employment with full benefits for caregivers - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-workplace-organizational-part-time employment with full benefits for caregivers",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:workplace-organizational-part-time employment with full benefits for caregivers",
+    "name": "Part-time employment with full benefits for caregivers",
+    "description": "Part-time employment with full benefits for caregivers",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}
