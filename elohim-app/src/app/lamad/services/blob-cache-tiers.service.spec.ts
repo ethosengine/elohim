@@ -118,7 +118,7 @@ describe('BlobCacheTiersService', () => {
 
       const result = service.setBlob('hash_large', largeBlob);
       expect(result.success).toBe(false);
-      expect(result.reason).toContain('too large');
+      expect(result.reason).toContain('exceeds 1 GB limit');
     });
 
     it('should track blob cache size', () => {
@@ -134,7 +134,9 @@ describe('BlobCacheTiersService', () => {
     });
 
     it('should evict LRU blob on overflow', () => {
-      // Set small cache limit via testing
+      // Set a small cache limit to force eviction
+      (service['blobCache'] as any).maxSizeBytes = 250; // Only fit ~2 blobs of 100 bytes each
+
       const blob1 = new Blob(['a'.repeat(100)]);
       const blob2 = new Blob(['b'.repeat(100)]);
       const blob3 = new Blob(['c'.repeat(100)]);
