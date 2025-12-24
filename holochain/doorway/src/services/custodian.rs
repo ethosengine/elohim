@@ -29,6 +29,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tracing::{debug, info, warn};
 
+use crate::orchestrator::OrchestratorState;
 use crate::projection::ProjectionStore;
 
 // ============================================================================
@@ -120,7 +121,8 @@ impl ReachLevel {
         self.numeric_value() >= requester_reach.numeric_value()
     }
 
-    fn numeric_value(&self) -> u8 {
+    /// Get numeric value (0=private, 7=commons)
+    pub fn numeric_value(&self) -> u8 {
         match self {
             ReachLevel::Private => 0,
             ReachLevel::Invited => 1,
@@ -311,6 +313,8 @@ pub struct CustodianService {
     stats: CustodianServiceStats,
     /// Optional projection store for querying commitments
     projection: Option<Arc<ProjectionStore>>,
+    /// Optional orchestrator state for human-scale metrics
+    orchestrator: Option<Arc<OrchestratorState>>,
 }
 
 /// Service statistics
@@ -336,6 +340,7 @@ impl CustodianService {
                 total_selections: AtomicU64::new(0),
             },
             projection: None,
+            orchestrator: None,
         }
     }
 
@@ -344,6 +349,18 @@ impl CustodianService {
         let mut service = Self::new(config);
         service.projection = Some(projection);
         service
+    }
+
+    /// Create with orchestrator state for human-scale metrics integration
+    pub fn with_orchestrator(config: CustodianServiceConfig, orchestrator: Arc<OrchestratorState>) -> Self {
+        let mut service = Self::new(config);
+        service.orchestrator = Some(orchestrator);
+        service
+    }
+
+    /// Set orchestrator state (for adding after construction)
+    pub fn set_orchestrator(&mut self, orchestrator: Arc<OrchestratorState>) {
+        self.orchestrator = Some(orchestrator);
     }
 
     /// Register a custodian's capabilities
@@ -530,6 +547,133 @@ impl CustodianService {
         score += custodian.health_score() * 5.0;
 
         score
+    }
+
+    // ========================================================================
+    // Human-Scale Selection (async, integrates with orchestrator)
+    // ========================================================================
+
+    /// Select custodians with human-scale metrics from orchestrator
+    ///
+    /// This async method integrates with the orchestrator to factor in:
+    /// - Trust score from peer attestations
+    /// - Steward tier commitment level
+    /// - Impact score combining multiple human-scale factors
+    ///
+    /// When orchestrator isn't available, falls back to standard selection.
+    pub async fn select_custodians_with_metrics(
+        &self,
+        blob_hash: &str,
+        criteria: &CustodianSelectionCriteria,
+    ) -> Vec<CustodianCapability> {
+        // If no orchestrator, use standard selection
+        let Some(ref orchestrator) = self.orchestrator else {
+            return self.select_custodians(blob_hash, criteria);
+        };
+
+        self.stats.total_selections.fetch_add(1, Ordering::Relaxed);
+
+        // Get reach level as u8 for orchestrator query
+        let reach_level = criteria.min_reach.numeric_value();
+
+        // Get nodes from orchestrator that serve this reach level
+        let ranked_nodes = orchestrator.get_nodes_for_reach(reach_level).await;
+
+        // Build a map of node_id -> social metrics
+        let social_scores: std::collections::HashMap<String, f64> = ranked_nodes
+            .iter()
+            .map(|n| (n.node_id.clone(), n.combined_score))
+            .collect();
+
+        // First, check if we have specific custodians for this blob
+        let known_custodians = self.blob_custodians.get(blob_hash);
+
+        // Score candidates including human-scale metrics
+        let mut candidates: Vec<(CustodianCapability, f32)> = self
+            .capabilities
+            .iter()
+            .filter(|entry| {
+                let c = entry.value();
+                self.matches_criteria(c, criteria, known_custodians.as_ref())
+            })
+            .map(|entry| {
+                let c = entry.value().clone();
+                let base_score = self.score_custodian(&c, criteria);
+
+                // Add human-scale bonus (up to 20 extra points)
+                // This effectively reweights: tech (80%) + human (20%)
+                let social_bonus = social_scores
+                    .get(&c.agent_id)
+                    .map(|&s| (s * 20.0) as f32)
+                    .unwrap_or(0.0);
+
+                let total_score = base_score + social_bonus;
+                (c, total_score)
+            })
+            .collect();
+
+        // Sort by total score (highest first)
+        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Take top N
+        let max = criteria
+            .max_custodians
+            .unwrap_or(self.config.default_max_custodians);
+
+        let selected: Vec<CustodianCapability> =
+            candidates.into_iter().take(max).map(|(c, _)| c).collect();
+
+        debug!(
+            blob_hash = %blob_hash,
+            count = selected.len(),
+            reach_level = reach_level,
+            "Selected custodians with human-scale metrics"
+        );
+
+        selected
+    }
+
+    /// Select single best URL with human-scale metrics
+    pub async fn select_best_url_with_metrics(
+        &self,
+        blob_hash: &str,
+        criteria: &CustodianSelectionCriteria,
+    ) -> Option<String> {
+        let custodians = self.select_custodians_with_metrics(blob_hash, criteria).await;
+        custodians.first().map(|c| c.blob_url(blob_hash))
+    }
+
+    /// Get ranked custodians from orchestrator for a specific reach level
+    ///
+    /// This is useful when you want to find new custodians to commit
+    /// content to based on their trustworthiness and capability.
+    pub async fn get_trusted_custodians_for_reach(
+        &self,
+        reach_level: u8,
+        max_count: usize,
+    ) -> Vec<CustodianCapability> {
+        let Some(ref orchestrator) = self.orchestrator else {
+            // No orchestrator, return capabilities filtered by reach
+            return self
+                .capabilities
+                .iter()
+                .filter(|e| e.reach_level.numeric_value() >= reach_level)
+                .take(max_count)
+                .map(|e| e.value().clone())
+                .collect();
+        };
+
+        // Get ranked nodes from orchestrator
+        let ranked_nodes = orchestrator.get_nodes_for_reach(reach_level).await;
+
+        // Match to registered capabilities
+        ranked_nodes
+            .iter()
+            .filter_map(|node| {
+                self.capabilities.get(&node.node_id).map(|c| c.clone())
+            })
+            .take(max_count)
+            .collect()
     }
 
     // ========================================================================
@@ -944,5 +1088,75 @@ mod tests {
         let urls = service.get_fallback_urls("content1", "hash123");
         assert_eq!(urls.len(), 1); // Only active commitment
         assert!(urls[0].contains("a.example.com"));
+    }
+
+    #[tokio::test]
+    async fn test_select_custodians_with_metrics_fallback() {
+        // Without orchestrator, should fall back to standard selection
+        let service = CustodianService::new(CustodianServiceConfig::default());
+
+        let mut c1 = test_custodian("agent1");
+        c1.bandwidth_mbps = 100.0;
+        c1.latency_ms = 20;
+
+        let mut c2 = test_custodian("agent2");
+        c2.bandwidth_mbps = 50.0;
+        c2.latency_ms = 100;
+
+        service.register_custodian(c1);
+        service.register_custodian(c2);
+
+        let criteria = CustodianSelectionCriteria {
+            max_custodians: Some(2),
+            ..Default::default()
+        };
+
+        let selected = service
+            .select_custodians_with_metrics("test_hash", &criteria)
+            .await;
+
+        assert_eq!(selected.len(), 2);
+        // Agent1 should be first (higher bandwidth, lower latency)
+        assert_eq!(selected[0].agent_id, "agent1");
+    }
+
+    #[test]
+    fn test_reach_level_numeric_values() {
+        assert_eq!(ReachLevel::Private.numeric_value(), 0);
+        assert_eq!(ReachLevel::Invited.numeric_value(), 1);
+        assert_eq!(ReachLevel::Local.numeric_value(), 2);
+        assert_eq!(ReachLevel::Neighborhood.numeric_value(), 3);
+        assert_eq!(ReachLevel::Municipal.numeric_value(), 4);
+        assert_eq!(ReachLevel::Bioregional.numeric_value(), 5);
+        assert_eq!(ReachLevel::Regional.numeric_value(), 6);
+        assert_eq!(ReachLevel::Commons.numeric_value(), 7);
+    }
+
+    #[tokio::test]
+    async fn test_get_trusted_custodians_for_reach() {
+        // Without orchestrator, should return filtered capabilities
+        let service = CustodianService::new(CustodianServiceConfig::default());
+
+        let mut c1 = test_custodian("agent1");
+        c1.reach_level = ReachLevel::Commons;
+
+        let mut c2 = test_custodian("agent2");
+        c2.reach_level = ReachLevel::Regional;
+
+        let mut c3 = test_custodian("agent3");
+        c3.reach_level = ReachLevel::Neighborhood;
+
+        service.register_custodian(c1);
+        service.register_custodian(c2);
+        service.register_custodian(c3);
+
+        // Request Regional level (6) - should get Commons (7) and Regional (6)
+        let custodians = service.get_trusted_custodians_for_reach(6, 10).await;
+        assert!(custodians.len() >= 2);
+
+        // All returned should have reach >= 6
+        for c in &custodians {
+            assert!(c.reach_level.numeric_value() >= 6);
+        }
     }
 }
