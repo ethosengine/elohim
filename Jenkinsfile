@@ -1030,9 +1030,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         }
 
                         // Check if seeding is needed (DNA, seeder code, or seed data changes)
+                        // Use grep -q to suppress output - only return true/false
                         def needsSeeding = sh(
                             script: '''
-                                git diff --name-only HEAD~1 2>/dev/null | grep -E "^(holochain/dna/|holochain/seeder/|data/lamad/)" && echo "true" || echo "false"
+                                git diff --name-only HEAD~1 2>/dev/null | grep -qE "^(holochain/dna/|holochain/seeder/|data/lamad/)" && echo "true" || echo "false"
                             ''',
                             returnStdout: true
                         ).trim()
