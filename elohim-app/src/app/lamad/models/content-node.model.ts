@@ -491,12 +491,35 @@ export interface RoleMetadata {
 /**
  * ContentFormat - How the content payload should be interpreted and rendered.
  * Maps to specific renderer components via RendererRegistryService.
+ *
+ * Multimedia formats:
+ * - 'markdown': Rich text with embedded media (default for most content)
+ * - 'html': Raw HTML content
+ * - 'plaintext': Unformatted text
+ * - 'gherkin': Behavior-driven development scenarios
+ *
+ * Interactive formats:
+ * - 'html5-app': Interactive web applications (e.g., https://github.com/ncase/trust)
+ *   Rendered via iframe with sandbox. Ideal for simulations, games, explorable explanations.
+ *   Can have attestation quizzes built to verify understanding.
+ * - 'quiz-json': Structured quiz/assessment data
+ * - 'assessment-json': Formal assessment instruments
+ *
+ * Media formats:
+ * - 'video-embed': Embedded video (YouTube, Vimeo, etc.)
+ * - 'video-file': Direct video file (blob-based streaming)
+ * - 'audio-file': Direct audio file (podcasts, lectures, music)
+ * - 'epub': E-book format
+ *
+ * Navigation:
+ * - 'external-link': Link to external resource
  */
 export type ContentFormat =
   | 'markdown'
   | 'html5-app'
   | 'video-embed'
   | 'video-file'
+  | 'audio-file'
   | 'quiz-json'
   | 'external-link'
   | 'epub'

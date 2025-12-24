@@ -459,12 +459,56 @@ Aligned with Holochain DNA `Content` struct:
 }
 ```
 
+#### ContentFormat Values
+
+All content should have a `contentFormat` that maps to a renderer. Valid values:
+
+| Format | Description | Renderer |
+|--------|-------------|----------|
+| `markdown` | Rich text with embedded media (default for most content) | MarkdownRenderer |
+| `html` | Raw HTML content | MarkdownRenderer |
+| `plaintext` | Unformatted text | MarkdownRenderer |
+| `gherkin` | Behavior-driven development scenarios | GherkinRenderer |
+| `html5-app` | Interactive web apps (e.g., [Evolution of Trust](https://github.com/ncase/trust)). Rendered via sandboxed iframe. Can have attestation quizzes built to verify understanding. | IframeRenderer |
+| `video-embed` | Embedded video (YouTube, Vimeo, etc.) | IframeRenderer |
+| `video-file` | Direct video file (blob-based streaming) | VideoRenderer |
+| `audio-file` | Direct audio file (podcasts, lectures, music) | AudioRenderer |
+| `quiz-json` | Structured quiz/assessment data | QuizRenderer |
+| `assessment-json` | Formal assessment instruments | AssessmentRenderer |
+| `epub` | E-book format | EpubRenderer |
+| `external-link` | Link to external resource | ExternalLinkRenderer |
+
+**Content Principle:** Content should translate into consumable multimedia experiences. Raw data formats (like `bible-json`, `contributor-json`) are not valid - transform them into `markdown` or appropriate media format during import.
+
+**Example html5-app content:**
+```json
+{
+  "id": "simulation-evolution-of-trust",
+  "contentType": "simulation",
+  "title": "The Evolution of Trust",
+  "description": "An interactive guide to the game theory of trust",
+  "url": "https://ncase.me/trust/",
+  "content": "https://ncase.me/trust/",
+  "contentFormat": "html5-app",
+  "metadata": {
+    "author": "Nicky Case",
+    "sourceUrl": "https://github.com/ncase/trust",
+    "embedStrategy": "iframe",
+    "requiredCapabilities": ["javascript"],
+    "securityPolicy": {
+      "sandbox": ["allow-scripts", "allow-same-origin"]
+    }
+  }
+}
+```
+
 #### Content Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `estimatedMinutes` | number | Reading/viewing time in minutes |
-| `contentType` | `"article"` \| `"video"` \| `"interactive"` \| `"assessment"` | Media format |
+| `contentType` | `"article"` \| `"video"` \| `"simulation"` \| `"assessment"` | Semantic type |
+| `contentFormat` | ContentFormat | How content is rendered (see table above) |
 | `metadata` | object | Extensible JSON for additional data |
 
 **Note:** Complexity is NOT stored on content. It's relative to the learner - a beginner finds content "deep" that an expert finds "light".
