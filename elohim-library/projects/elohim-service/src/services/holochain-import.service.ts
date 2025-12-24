@@ -8,8 +8,8 @@
  * Usage:
  * ```typescript
  * const service = new HolochainImportService({
- *   adminUrl: 'wss://holochain-dev.elohim.host',
- *   appId: 'lamad-spike',
+ *   adminUrl: 'wss://doorway-dev.elohim.host',
+ *   appId: 'elohim',
  *   batchSize: 50,
  * });
  *
@@ -248,20 +248,20 @@ export class HolochainImportService {
 }
 
 /**
- * Create a pre-configured import service for the lamad-spike app
+ * Create a pre-configured import service for the elohim app
  *
- * @param adminUrl - Admin WebSocket URL (default: wss://holochain-dev.elohim.host)
+ * @param adminUrl - Admin WebSocket URL (default: wss://doorway-dev.elohim.host)
  * @param batchSize - Number of entries per bulk call (default: 50)
  * @param happPath - Optional path to .happ file for installation
  */
-export function createLamadImportService(
-  adminUrl = 'wss://holochain-dev.elohim.host',
+export function createElohimImportService(
+  adminUrl = 'wss://doorway-dev.elohim.host',
   batchSize = 50,
   happPath?: string
 ): HolochainImportService {
   return new HolochainImportService({
     adminUrl,
-    appId: 'lamad-spike',
+    appId: 'elohim',
     batchSize,
     happPath,
   });

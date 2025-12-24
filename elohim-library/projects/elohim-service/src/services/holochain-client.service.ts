@@ -279,18 +279,18 @@ export class HolochainClientService {
 }
 
 /**
- * Create a pre-configured client for the lamad-spike app
+ * Create a pre-configured client for the elohim app
  *
- * @param adminUrl - Admin WebSocket URL (default: wss://holochain-dev.elohim.host)
+ * @param adminUrl - Admin WebSocket URL (default: wss://doorway-dev.elohim.host)
  * @param happPath - Optional path to .happ file for installation
  */
-export function createLamadClient(
-  adminUrl = 'wss://holochain-dev.elohim.host',
+export function createElohimClient(
+  adminUrl = 'wss://doorway-dev.elohim.host',
   happPath?: string
 ): HolochainClientService {
   return new HolochainClientService({
     adminUrl,
-    appId: 'lamad-spike',
+    appId: 'elohim',
     happPath,
   });
 }

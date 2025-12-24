@@ -1018,7 +1018,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         // Check holochain connectivity
                         def holochainHealth = sh(
                             script: '''
-                                timeout 10s curl -f -s -o /dev/null -w "%{http_code}" https://holochain-dev.elohim.host/health 2>/dev/null || echo "000"
+                                timeout 10s curl -f -s -o /dev/null -w "%{http_code}" https://doorway-dev.elohim.host/health 2>/dev/null || echo "000"
                             ''',
                             returnStdout: true
                         ).trim()
@@ -1053,8 +1053,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     npm ci
 
                                     echo ""
-                                    echo "Running seeder against holochain-dev.elohim.host..."
-                                    HOLOCHAIN_ADMIN_URL="wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024" \
+                                    echo "Running seeder against doorway-dev.elohim.host..."
+                                    HOLOCHAIN_ADMIN_URL="wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024" \
                                         npx tsx src/seed.ts
 
                                     echo ""
@@ -1066,8 +1066,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             ═══════════════════════════════════════════════════════════
                             ✅ DATABASE SEEDED SUCCESSFULLY
                             ═══════════════════════════════════════════════════════════
-                            Holochain: holochain-dev.elohim.host
-                            Status: Seeded with lamad content
+                            Holochain: doorway-dev.elohim.host
+                            Status: Seeded with elohim content
                             ═══════════════════════════════════════════════════════════
                             """
                         } else if (holochainHealth != "200") {

@@ -532,7 +532,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             sh "kubectl rollout restart deployment/elohim-edgenode-dev -n ethosengine"
                             sh "kubectl rollout status deployment/elohim-edgenode-dev -n ethosengine --timeout=300s"
 
-                            echo "Edge Node Dev deployed: https://holochain-dev.elohim.host"
+                            echo "Edge Node Dev deployed: https://doorway-dev.elohim.host"
                         }
                     }
                 }
@@ -584,8 +584,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 npm ci
 
                                 echo ""
-                                echo "Running seeder against holochain-dev.elohim.host..."
-                                HOLOCHAIN_ADMIN_URL="wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024" \
+                                echo "Running seeder against doorway-dev.elohim.host..."
+                                HOLOCHAIN_ADMIN_URL="wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024" \
                                     npx tsx src/seed.ts
 
                                 echo ""
@@ -595,7 +595,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                         echo """
                         ═══════════════════════════════════════════════════════════
-                        ✅ Dev database seeded with lamad content
+                        ✅ Dev database seeded with elohim content
                         Ready for prototyping!
                         ═══════════════════════════════════════════════════════════
                         """

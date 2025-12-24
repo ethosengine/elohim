@@ -41,9 +41,9 @@ data:
           allowed_origins: "*"
     network:
       # Bootstrap served by Doorway gateway
-      bootstrap_url: "https://holochain-dev.elohim.host/bootstrap"
-      # Signal served by Doorway on dedicated subdomain (tx5 protocol)
-      signal_url: "wss://signal-dev.elohim.host"
+      bootstrap_url: "https://doorway-dev.elohim.host/bootstrap"
+      # Signal served by Doorway (unified subdomain for all DHT services)
+      signal_url: "wss://doorway-dev.elohim.host/signal"
       enable_mdns: false
       enable_relaying: true
       webrtc_config:
@@ -270,44 +270,10 @@ spec:
   ingressClassName: public
   tls:
     - hosts:
-        - holochain-dev.elohim.host
-      secretName: holochain-dev-tls
+        - doorway-dev.elohim.host
+      secretName: doorway-dev-tls
   rules:
-    - host: holochain-dev.elohim.host
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: elohim-edgenode-dev
-                port:
-                  number: 8080
----
-# Signal subdomain Ingress - for tx5 WebRTC signaling (dedicated host)
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: elohim-signal-dev
-  namespace: ethosengine
-  annotations:
-    # WebSocket support for signal connections
-    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    nginx.ingress.kubernetes.io/websocket-services: "elohim-edgenode-dev"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header Upgrade $http_upgrade;
-      proxy_set_header Connection "upgrade";
-    cert-manager.io/cluster-issuer: letsencrypt-production
-spec:
-  ingressClassName: public
-  tls:
-    - hosts:
-        - signal-dev.elohim.host
-      secretName: signal-dev-tls
-  rules:
-    - host: signal-dev.elohim.host
+    - host: doorway-dev.elohim.host
       http:
         paths:
           - path: /

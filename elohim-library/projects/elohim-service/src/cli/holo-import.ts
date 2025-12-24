@@ -25,8 +25,8 @@ const program = new Command();
 
 // Default configuration
 const DEFAULT_CONFIG: HolochainImportConfig = {
-  adminUrl: 'wss://holochain-dev.elohim.host',
-  appId: 'lamad-spike',
+  adminUrl: 'wss://doorway-dev.elohim.host',
+  appId: 'elohim',
   batchSize: 50,
 };
 
