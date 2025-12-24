@@ -247,7 +247,6 @@ export class BlobVerificationService {
     chunkSize: number = 1024 * 1024,
     onProgress?: (processed: number, total: number) => void,
   ): Promise<string> {
-    const hashAlgo = new SubtleCrypto();
     let processed = 0;
 
     // For streaming hash, we use chunked processing
