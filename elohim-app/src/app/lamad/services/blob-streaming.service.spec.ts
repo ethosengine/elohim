@@ -144,13 +144,25 @@ describe('BlobStreamingService', () => {
 
     it('should return conservative/optimistic speed estimates', async () => {
       const url = 'https://example.com/probe.bin';
-      const probeData = new Uint8Array(1024 * 1024);
+      const probeData = new Uint8Array(1024 * 1024); // 1 MB
+
+      // Mock performance.now() to simulate 1 second elapsed (1 MB / 1s = 8 Mbps)
+      let callCount = 0;
+      const originalPerformanceNow = performance.now;
+      spyOn(performance, 'now').and.callFake(() => {
+        callCount++;
+        // First call: startTime=0, second call: latencyStartTime=0, third call: endTime=1000ms
+        return callCount <= 2 ? 0 : 1000;
+      });
 
       const probePromise = service.probeBandwidth(url);
       const req = httpMock.expectOne(url);
       req.flush(probeData.buffer);
 
       const result = await probePromise;
+
+      // 1 MB in 1 second = 1 MB/s (service names it Mbps but uses bytes)
+      expect(result.averageSpeedMbps).toBeCloseTo(1, 0);
       expect(result.minSpeedMbps).toBeLessThan(result.averageSpeedMbps);
       expect(result.maxSpeedMbps).toBeGreaterThan(result.averageSpeedMbps);
     });

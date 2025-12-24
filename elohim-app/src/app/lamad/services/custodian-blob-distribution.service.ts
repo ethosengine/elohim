@@ -177,6 +177,26 @@ export class CustodianBlobDistributionService {
     progress: number,
     bandwidth: number
   ): Observable<CustodianBlobCommitment> {
+    // Find the commitment in storage and update it
+    const key = `${commitment.contentId}_${commitment.blobHash}`;
+    const commitments = this.blobCommitments.get(key) || [];
+    const index = commitments.findIndex(
+      (c) => c.custodianId === commitment.custodianId
+    );
+
+    if (index >= 0) {
+      commitments[index].replicationProgress = Math.min(progress, 100);
+      commitments[index].bandwidth = bandwidth;
+      commitments[index].lastVerifiedAt = Date.now();
+
+      if (progress === 100) {
+        commitments[index].commitmentStatus = 'active';
+      }
+
+      return of(commitments[index]);
+    }
+
+    // If not found in storage, return updated copy
     const updated = { ...commitment };
     updated.replicationProgress = Math.min(progress, 100);
     updated.bandwidth = bandwidth;
