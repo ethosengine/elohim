@@ -90,13 +90,19 @@ describe('BlobStreamingService', () => {
         done();
       });
 
-      // Range check returns 200 (Range not supported)
-      const rangeReq = httpMock.expectOne(url);
-      rangeReq.flush(null, { status: 200, statusText: 'OK' });
+      // Give time for async performChunkedDownload to start
+      setTimeout(() => {
+        // Range check (HEAD request) returns 200 (Range not supported)
+        const rangeReq = httpMock.expectOne((req) => req.method === 'HEAD' && req.url === url);
+        rangeReq.flush(null, { status: 200, statusText: 'OK' });
 
-      // Single request
-      const downloadReq = httpMock.expectOne(url);
-      downloadReq.flush(testData);
+        // Give time for fallback to trigger
+        setTimeout(() => {
+          // Single GET request for full download
+          const downloadReq = httpMock.expectOne((req) => req.method === 'GET' && req.url === url);
+          downloadReq.flush(testData.buffer);
+        }, 10);
+      }, 10);
     });
   });
 
@@ -108,7 +114,7 @@ describe('BlobStreamingService', () => {
       const probePromise = service.probeBandwidth(url, 1024 * 1024);
 
       const req = httpMock.expectOne(url);
-      req.flush(probeData);
+      req.flush(probeData.buffer);
 
       const result = await probePromise;
       expect(result.averageSpeedMbps).toBeGreaterThan(0);
@@ -122,7 +128,7 @@ describe('BlobStreamingService', () => {
       // First probe
       let probePromise = service.probeBandwidth(url);
       let req = httpMock.expectOne(url);
-      req.flush(probeData);
+      req.flush(probeData.buffer);
       const result1 = await probePromise;
 
       // Second probe should be cached (no HTTP call)
@@ -142,7 +148,7 @@ describe('BlobStreamingService', () => {
 
       const probePromise = service.probeBandwidth(url);
       const req = httpMock.expectOne(url);
-      req.flush(probeData);
+      req.flush(probeData.buffer);
 
       const result = await probePromise;
       expect(result.minSpeedMbps).toBeLessThan(result.averageSpeedMbps);
@@ -238,8 +244,8 @@ describe('BlobStreamingService', () => {
 
       const playlist = service.generateHlsPlaylist(blob, 'https://cdn.example.com/blob');
 
-      // Count segment lines
-      const segmentLines = playlist.split('\n').filter((line) => line.startsWith('segment-'));
+      // Count segment lines - in simple playlist, segments include full URL
+      const segmentLines = playlist.split('\n').filter((line) => line.includes('segment-') && line.endsWith('.ts'));
       expect(segmentLines.length).toBe(10);
     });
   });
@@ -335,7 +341,7 @@ describe('BlobStreamingService', () => {
       // Populate cache
       let probePromise = service.probeBandwidth(url);
       let req = httpMock.expectOne(url);
-      req.flush(probeData);
+      req.flush(probeData.buffer);  // Flush ArrayBuffer, not Uint8Array
       await probePromise;
 
       // Clear cache
@@ -344,7 +350,7 @@ describe('BlobStreamingService', () => {
       // Next probe should hit network again
       probePromise = service.probeBandwidth(url);
       req = httpMock.expectOne(url);
-      req.flush(probeData);
+      req.flush(probeData.buffer);  // Flush ArrayBuffer, not Uint8Array
       await probePromise;
     });
 
@@ -355,18 +361,19 @@ describe('BlobStreamingService', () => {
       // Populate cache
       let probePromise = service.probeBandwidth(url);
       let req = httpMock.expectOne(url);
-      req.flush(probeData);
+      req.flush(probeData.buffer);
       const result1 = await probePromise;
 
       // Manually expire cache by manipulating timestamp
+      // Use performance.now() not Date.now() since that's what probeBandwidth uses
       service['bandwidthCache'].forEach((value) => {
-        value.timestamp = Date.now() - 11 * 60 * 1000; // 11 minutes ago
+        value.timestamp = performance.now() - 11 * 60 * 1000; // 11 minutes ago
       });
 
       // Next probe should hit network again (cache expired)
       probePromise = service.probeBandwidth(url);
       req = httpMock.expectOne(url);
-      req.flush(probeData);
+      req.flush(probeData.buffer);
       const result2 = await probePromise;
 
       // Results should be similar but from different probes
