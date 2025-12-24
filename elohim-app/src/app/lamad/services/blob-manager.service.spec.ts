@@ -87,25 +87,25 @@ describe('BlobManagerService', () => {
       expect(service['cacheSize']).toBe(0);
     });
 
-    it('should track cache size', () => {
+    it('should track cache size', async () => {
       const hash1 = 'hash1';
       const hash2 = 'hash2';
       const blob1 = new Blob(['a'.repeat(1000)]);
       const blob2 = new Blob(['b'.repeat(500)]);
 
-      service['cacheBlob'](hash1, blob1, blob1.size);
-      service['cacheBlob'](hash2, blob2, blob2.size);
+      await service['cacheBlob'](hash1, blob1, blob1.size);
+      await service['cacheBlob'](hash2, blob2, blob2.size);
 
       const stats = service.getCacheStats();
       expect(stats.sizeBytes).toBe(blob1.size + blob2.size);
       expect(stats.entriesCount).toBe(2);
     });
 
-    it('should report cache statistics', () => {
+    it('should report cache statistics', async () => {
       const blob = new Blob(['test']);
       const size = 1000;
 
-      service['cacheBlob']('hash1', blob, size);
+      await service['cacheBlob']('hash1', blob, size);
 
       const stats = service.getCacheStats();
       expect(stats.entriesCount).toBe(1);
@@ -145,7 +145,7 @@ describe('BlobManagerService', () => {
   });
 
   describe('Cache Eviction', () => {
-    it('should evict oldest entries when cache is full', () => {
+    it('should evict oldest entries when cache is full', async () => {
       // Set small cache size for testing
       service.maxCacheSizeBytes = 3000;
 
@@ -154,10 +154,10 @@ describe('BlobManagerService', () => {
       const blob3 = new Blob(['c'.repeat(1000)]);
       const blob4 = new Blob(['d'.repeat(1000)]); // This should evict blob1
 
-      service['cacheBlob']('hash1', blob1, blob1.size);
-      service['cacheBlob']('hash2', blob2, blob2.size);
-      service['cacheBlob']('hash3', blob3, blob3.size);
-      service['cacheBlob']('hash4', blob4, blob4.size);
+      await service['cacheBlob']('hash1', blob1, blob1.size);
+      await service['cacheBlob']('hash2', blob2, blob2.size);
+      await service['cacheBlob']('hash3', blob3, blob3.size);
+      await service['cacheBlob']('hash4', blob4, blob4.size);
 
       // blob1 should have been evicted
       expect(service.isCached('hash1')).toBe(false);
@@ -166,12 +166,12 @@ describe('BlobManagerService', () => {
       expect(service.isCached('hash4')).toBe(true);
     });
 
-    it('should not cache oversized blobs', () => {
+    it('should not cache oversized blobs', async () => {
       service.maxCacheSizeBytes = 1000;
       const largeBlob = new Blob(['x'.repeat(2000)]);
 
       spyOn(console, 'warn');
-      service['cacheBlob']('large_hash', largeBlob, largeBlob.size);
+      await service['cacheBlob']('large_hash', largeBlob, largeBlob.size);
 
       expect(console.warn).toHaveBeenCalledWith(
         jasmine.stringMatching(/Blob too large to cache/)

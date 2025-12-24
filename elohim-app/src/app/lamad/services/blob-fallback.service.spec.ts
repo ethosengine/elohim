@@ -47,7 +47,7 @@ describe('BlobFallbackService', () => {
       const secondaryUrl = 'https://secondary.example.com/blob.mp4';
       const testBlob = new Blob(['fallback data']);
 
-      service.fetchWithFallback([primaryUrl, secondaryUrl]).subscribe((result) => {
+      service.fetchWithFallback([primaryUrl, secondaryUrl], 30000, 0).subscribe((result) => {
         expect(result.urlIndex).toBe(1);
         expect(result.successUrl).toBe(secondaryUrl);
         done();
@@ -70,7 +70,7 @@ describe('BlobFallbackService', () => {
       ];
       const testBlob = new Blob(['final data']);
 
-      service.fetchWithFallback(urls).subscribe((result) => {
+      service.fetchWithFallback(urls, 30000, 0).subscribe((result) => {
         expect(result.urlIndex).toBe(2);
         expect(result.successUrl).toBe(urls[2]);
         done();
@@ -95,7 +95,7 @@ describe('BlobFallbackService', () => {
         'https://cdn2.example.com/blob.mp4',
       ];
 
-      service.fetchWithFallback(urls).subscribe(
+      service.fetchWithFallback(urls, 30000, 0).subscribe(
         () => fail('should have errored'),
         (error) => {
           expect(error.message).toContain('All fallback URLs exhausted');
@@ -176,7 +176,7 @@ describe('BlobFallbackService', () => {
       const fallbackUrl = 'https://fallback.example.com/blob.mp4';
       const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url, fallbackUrl]).subscribe(() => {
+      service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
         const failedHealth = service.getUrlHealth(url);
         expect(failedHealth.successCount).toBe(0);
         expect(failedHealth.failureCount).toBeGreaterThan(0);
@@ -195,16 +195,15 @@ describe('BlobFallbackService', () => {
       const url = 'https://example.com/blob.mp4';
       const fallbackUrl = 'https://fallback.example.com/blob.mp4';
       const testBlob = new Blob(['data']);
-      const errorMsg = '404 Not Found';
 
-      service.fetchWithFallback([url, fallbackUrl]).subscribe(() => {
+      service.fetchWithFallback([url, fallbackUrl], 30000, 0).subscribe(() => {
         const health = service.getUrlHealth(url);
-        expect(health.lastErrorMessage).toContain('404');
+        expect(health.lastErrorMessage).toContain(url);
         done();
       });
 
       const req1 = httpMock.expectOne(url);
-      req1.error(new ErrorEvent(errorMsg));
+      req1.error(new ErrorEvent('Network error'));
 
       const req2 = httpMock.expectOne(fallbackUrl);
       req2.flush(testBlob);
