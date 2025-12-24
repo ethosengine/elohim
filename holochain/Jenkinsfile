@@ -149,11 +149,7 @@ spec:
 
     stages {
         stage('Checkout') {
-            when {
-                // Only build when holochain files actually changed
-                // This prevents duplicate builds when webhook fires for non-holochain commits
-                changeset "holochain/**"
-            }
+            // Always checkout - required for all subsequent stages
             steps {
                 container('builder') {
                     script {
@@ -169,9 +165,7 @@ spec:
         }
 
         stage('Setup Version') {
-            when {
-                changeset "holochain/**"
-            }
+            // Always setup version - required for image tagging
             steps {
                 container('builder') {
                     script {
@@ -198,9 +192,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Setup Nix Cache') {
-            when {
-                changeset "holochain/**"
-            }
+            // Always setup nix - required for DNA builds
             steps {
                 container('builder') {
                     script {
@@ -223,10 +215,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Build DNA') {
             when {
-                anyOf {
-                    changeset "holochain/dna/**"
-                    expression { return !fileExists('/tmp/lamad-spike.happ') }
-                }
+                // Only rebuild DNA when DNA source files change
+                changeset "holochain/dna/**"
             }
             steps {
                 container('builder') {
