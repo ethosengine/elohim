@@ -11,7 +11,7 @@ async function getHumanInfo() {
   });
 
   const apps = await adminWs.listApps({});
-  const app = apps.find(a => a.installed_app_id === 'lamad-spike');
+  const app = apps.find(a => a.installed_app_id === 'elohim');
   if (app === undefined) throw new Error('App not found');
 
   const cellInfo = Object.values(app.cell_info)[0];
@@ -27,7 +27,7 @@ async function getHumanInfo() {
   // Authorize and connect
   await adminWs.authorizeSigningCredentials(cellId);
   const token = await adminWs.issueAppAuthenticationToken({
-    installed_app_id: 'lamad-spike',
+    installed_app_id: 'elohim',
     single_use: false,
     expiry_seconds: 60,
   });

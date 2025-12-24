@@ -20,8 +20,8 @@ const LOCAL_DEV_DIR = process.env.LOCAL_DEV_DIR || '/projects/elohim/holochain/l
 const CONDUCTOR_DATA_DIR = path.join(LOCAL_DEV_DIR, 'conductor-data');
 const SNAPSHOTS_DIR = path.join(LOCAL_DEV_DIR, 'snapshots');
 const SEED_REPORT_PATH = path.join(LOCAL_DEV_DIR, 'last-seed-report.json');
-const HAPP_PATH = '/projects/elohim/holochain/dna/lamad-spike/workdir/lamad-spike.happ';
-const APP_ID = 'lamad-spike';
+const HAPP_PATH = '/projects/elohim/holochain/dna/lamad-spike/workdir/elohim.happ';
+const APP_ID = 'elohim';
 
 interface SeedReport {
   timestamp: string;

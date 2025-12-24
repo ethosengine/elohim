@@ -14,7 +14,7 @@
  *   - Android: .apk (future, requires Android SDK)
  *
  * Dependencies (fetched from other pipelines in mono-repo):
- *   - lamad.happ from elohim/holochain pipeline artifacts
+ *   - elohim.happ from elohim/holochain pipeline artifacts
  *   - Angular dist from elohim/elohim-app pipeline artifacts
  */
 
@@ -188,7 +188,7 @@ spec:
                             def fetched = sh(
                                 script: """
                                     set +e
-                                    wget --timeout=30 --tries=3 -O workdir/lamad.happ '${artifactUrl}' 2>&1
+                                    wget --timeout=30 --tries=3 -O workdir/elohim.happ '${artifactUrl}' 2>&1
                                     exit_code=\$?
                                     set -e
                                     exit \$exit_code
@@ -196,8 +196,8 @@ spec:
                                 returnStatus: true
                             ) == 0
 
-                            if (fetched && fileExists('workdir/lamad.happ')) {
-                                def fileSize = sh(script: 'ls -lh workdir/lamad.happ | awk \'{print \$5}\'', returnStdout: true).trim()
+                            if (fetched && fileExists('workdir/elohim.happ')) {
+                                def fileSize = sh(script: 'ls -lh workdir/elohim.happ | awk \'{print \$5}\'', returnStdout: true).trim()
                                 echo """
                                 ✅ hApp fetched from Jenkins artifacts (${fileSize})
 
@@ -238,17 +238,17 @@ spec:
                                         hc app pack workdir -o lamad-spike.happ
                                     '
 
-                                    cp lamad-spike.happ ../../../steward/workdir/lamad.happ
+                                    cp lamad-spike.happ ../../../steward/workdir/elohim.happ
                                     echo "✅ Local hApp build completed"
                                 '''
                             }
 
                             // Strategy 3: Verify artifact exists (error if missing)
-                            if (!fileExists('workdir/lamad.happ')) {
+                            if (!fileExists('workdir/elohim.happ')) {
                                 error "hApp artifact not found after fetch/build attempt"
                             }
 
-                            sh 'echo "Final artifact:"; ls -lh workdir/lamad.happ'
+                            sh 'echo "Final artifact:"; ls -lh workdir/elohim.happ'
                         }
                     }
                 }

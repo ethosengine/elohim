@@ -5,10 +5,10 @@
  * Uses bridge calls between two DNA roles installed in the same conductor.
  *
  * Usage:
- *   npx tsx src/migrate.ts                    # Migrate from lamad-previous to lamad
+ *   npx tsx src/migrate.ts                    # Migrate from elohim-previous to elohim
  *   npx tsx src/migrate.ts --dry-run          # Show what would be migrated
  *   npx tsx src/migrate.ts --verify-only      # Just verify existing migration
- *   npx tsx src/migrate.ts --source lamad-v1  # Specify source role name
+ *   npx tsx src/migrate.ts --source elohim-v1  # Specify source role name
  *
  * Prerequisites:
  *   1. Both DNAs bundled in happ.yaml with role names
@@ -22,9 +22,9 @@ import * as fs from 'fs';
 
 // Configuration
 const HC_PORTS_FILE = process.env.HC_PORTS_FILE || '/projects/elohim/holochain/local-dev/.hc_ports';
-const APP_ID = process.env.HOLOCHAIN_APP_ID || 'lamad-spike';
-const SOURCE_ROLE = process.env.SOURCE_ROLE || 'lamad-previous';
-const TARGET_ROLE = process.env.TARGET_ROLE || 'lamad';
+const APP_ID = process.env.HOLOCHAIN_APP_ID || 'elohim';
+const SOURCE_ROLE = process.env.SOURCE_ROLE || 'elohim-previous';
+const TARGET_ROLE = process.env.TARGET_ROLE || 'elohim';
 const ZOME_NAME = 'content_store';
 
 // Types matching the Holochain zome migration module
@@ -212,12 +212,12 @@ async function main() {
     console.log('  3. Run this tool again');
     console.log('\nExample happ.yaml:');
     console.log('  roles:');
-    console.log('    - name: lamad           # Current version');
+    console.log('    - name: elohim           # Current version');
     console.log('      dna:');
-    console.log('        bundled: ./lamad.dna');
-    console.log('    - name: lamad-previous  # Previous version');
+    console.log('        bundled: ./elohim.dna');
+    console.log('    - name: elohim-previous  # Previous version');
     console.log('      dna:');
-    console.log('        bundled: ./archive/lamad-v1.dna');
+    console.log('        bundled: ./archive/elohim-v1.dna');
     process.exit(1);
   }
 

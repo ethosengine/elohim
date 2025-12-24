@@ -3,12 +3,12 @@ use std::path::PathBuf;
 use tauri_plugin_holochain::{HolochainExt, HolochainPluginConfig, NetworkConfig, vec_to_locked, AppBundle};
 use tauri::{AppHandle, Listener};
 
-const APP_ID: &str = "lamad";
+const APP_ID: &str = "elohim";
 
-/// Load the Lamad hApp bundle from embedded bytes
-pub fn lamad_happ() -> AppBundle {
-    let bytes = include_bytes!("../../workdir/lamad.happ");
-    AppBundle::unpack(Cursor::new(bytes)).expect("Failed to unpack lamad happ")
+/// Load the Elohim hApp bundle from embedded bytes
+pub fn elohim_happ() -> AppBundle {
+    let bytes = include_bytes!("../../workdir/elohim.happ");
+    AppBundle::unpack(Cursor::new(bytes)).expect("Failed to unpack elohim happ")
 }
 
 /// Configure the Holochain network for Elohim
@@ -16,12 +16,13 @@ fn network_config() -> NetworkConfig {
     let mut network_config = NetworkConfig::default();
 
     if tauri::is_dev() {
-        // Development: use local bootstrap
-        network_config.bootstrap_url = url2::Url2::parse("http://localhost:8888");
+        // Development: use local doorway
+        network_config.bootstrap_url = url2::Url2::parse("http://localhost:8888/bootstrap");
+        network_config.signal_url = url2::Url2::parse("ws://localhost:8888/signal");
     } else {
-        // Production: use Elohim's holostrap infrastructure
-        network_config.bootstrap_url = url2::Url2::parse("https://holostrap.elohim.host");
-        network_config.signal_url = url2::Url2::parse("wss://holostrap.elohim.host");
+        // Production: use Elohim's doorway infrastructure
+        network_config.bootstrap_url = url2::Url2::parse("https://holochain.elohim.host/bootstrap");
+        network_config.signal_url = url2::Url2::parse("wss://signal.elohim.host");
     }
 
     // Mobile devices don't hold DHT data (reduces battery/bandwidth)
@@ -102,12 +103,12 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
     // Check if app is already installed
     if installed_apps.iter().find(|app| app.installed_app_id.as_str().eq(APP_ID)).is_none() {
         // First run: install the app
-        log::info!("Installing Lamad hApp for the first time...");
+        log::info!("Installing Elohim hApp for the first time...");
         handle
             .holochain()?
             .install_app(
                 String::from(APP_ID),
-                lamad_happ(),
+                elohim_happ(),
                 None,
                 None,
                 None,
@@ -120,7 +121,7 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
         log::info!("Checking for coordinator updates...");
         handle.holochain()?.update_app_if_necessary(
             String::from(APP_ID),
-            lamad_happ()
+            elohim_happ()
         ).await?;
 
         Ok(())

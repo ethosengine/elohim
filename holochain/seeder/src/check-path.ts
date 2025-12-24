@@ -31,16 +31,16 @@ async function main() {
     wsClientOptions: { origin: 'http://localhost' },
   });
   const apps = await adminWs.listApps({});
-  const app = apps.find(a => a.installed_app_id === 'lamad-spike');
+  const app = apps.find(a => a.installed_app_id === 'elohim');
 
   if (!app) {
     console.error('❌ App not found');
     process.exit(1);
   }
 
-  const cellInfo = (app.cell_info as any).lamad?.[0];
+  const cellInfo = (app.cell_info as any).elohim?.[0];
   if (!cellInfo) {
-    console.error('❌ No lamad cell found');
+    console.error('❌ No elohim cell found');
     process.exit(1);
   }
   const cellId = cellInfo.value?.cell_id;
@@ -50,7 +50,7 @@ async function main() {
   }
 
   // Get app auth token
-  const token = await adminWs.issueAppAuthenticationToken({ installed_app_id: 'lamad-spike' });
+  const token = await adminWs.issueAppAuthenticationToken({ installed_app_id: 'elohim' });
 
   // Authorize signing credentials
   await adminWs.authorizeSigningCredentials(cellId);

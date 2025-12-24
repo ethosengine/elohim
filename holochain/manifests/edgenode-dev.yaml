@@ -202,7 +202,7 @@ spec:
             - name: CONDUCTOR_URL
               value: "ws://localhost:4444"
             - name: APP_ID
-              value: "lamad-spike"
+              value: "elohim"
             - name: MAX_RETRIES
               value: "60"
             - name: RETRY_DELAY_MS

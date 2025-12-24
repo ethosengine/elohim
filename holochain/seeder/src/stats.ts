@@ -6,8 +6,8 @@ import { AdminWebsocket, AppWebsocket, encodeHashToBase64, CellId } from '@holoc
 import * as fs from 'fs';
 
 const HC_PORTS_FILE = process.env.HC_PORTS_FILE || '/projects/elohim/holochain/local-dev/.hc_ports';
-const APP_ID = 'lamad-spike';
-const ROLE_NAME = 'lamad';
+const APP_ID = 'elohim';
+const ROLE_NAME = 'elohim';
 const ZOME_NAME = 'content_store';
 
 function readHcPorts(): { adminPort: number; appPort: number } {

@@ -290,8 +290,8 @@ const LOCAL_DATA_DIR = path.join(SEEDER_DIR, 'data', 'lamad');
 const DATA_DIR = process.env.DATA_DIR || (fs.existsSync(LOCAL_DATA_DIR) ? LOCAL_DATA_DIR : '/projects/elohim/data/lamad');
 const LOCAL_DEV_DIR = process.env.LOCAL_DEV_DIR || '/projects/elohim/holochain/local-dev';
 const HC_PORTS_FILE = process.env.HC_PORTS_FILE || path.join(LOCAL_DEV_DIR, '.hc_ports');
-const APP_ID = 'lamad-spike';
-const ROLE_NAME = 'lamad';
+const APP_ID = 'elohim';
+const ROLE_NAME = 'elohim';
 const ZOME_NAME = 'content_store';
 
 /**

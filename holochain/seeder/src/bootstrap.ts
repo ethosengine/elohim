@@ -203,10 +203,10 @@ async function connectToHolochain(appUrl: string): Promise<{
       wsClientOptions: { origin: 'http://localhost' },
     });
     const apps = await adminWs.listApps({});
-    const lamadApp = apps.find(a => a.installed_app_id === 'lamad-spike');
+    const elohimApp = apps.find(a => a.installed_app_id === 'elohim');
 
-    if (lamadApp) {
-      console.log('Found lamad-spike app');
+    if (elohimApp) {
+      console.log('Found elohim app');
 
       // Get app interfaces to find the right port
       const interfaces = await adminWs.listAppInterfaces();
@@ -216,7 +216,7 @@ async function connectToHolochain(appUrl: string): Promise<{
       }
 
       // Get cell ID and agent pubkey from app info
-      const cellInfo = Object.values(lamadApp.cell_info)[0];
+      const cellInfo = Object.values(elohimApp.cell_info)[0];
       if (cellInfo && cellInfo[0]?.type === 'provisioned') {
         const cellId = cellInfo[0].value.cell_id as [Uint8Array, Uint8Array];
         const agentPubKey = uint8ArrayToBase64(cellId[1]);
@@ -227,7 +227,7 @@ async function connectToHolochain(appUrl: string): Promise<{
 
         // Issue app auth token
         const token = await adminWs.issueAppAuthenticationToken({
-          installed_app_id: 'lamad-spike',
+          installed_app_id: 'elohim',
           single_use: false,
           expiry_seconds: 3600,
         });
@@ -254,7 +254,7 @@ async function connectToHolochain(appUrl: string): Promise<{
     }
 
     await adminWs.client.close();
-    throw new Error('lamad-spike app not found or not properly installed');
+    throw new Error('elohim app not found or not properly installed');
   } catch (err) {
     throw new Error(`Failed to connect to Holochain: ${err instanceof Error ? err.message : err}`);
   }
