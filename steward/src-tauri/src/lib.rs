@@ -18,11 +18,13 @@ fn network_config() -> NetworkConfig {
     if tauri::is_dev() {
         // Development: use local doorway
         network_config.bootstrap_url = url2::Url2::parse("http://localhost:8888/bootstrap");
-        network_config.signal_url = url2::Url2::parse("ws://localhost:8888/signal");
+        // Signal URL must not have path - tx5/SBD protocol appends pubkey as path
+        network_config.signal_url = url2::Url2::parse("ws://localhost:8888");
     } else {
         // Production: use Elohim's doorway infrastructure
         network_config.bootstrap_url = url2::Url2::parse("https://doorway.elohim.host/bootstrap");
-        network_config.signal_url = url2::Url2::parse("wss://doorway.elohim.host/signal");
+        // Signal uses dedicated subdomain - tx5/SBD protocol requires path = pubkey
+        network_config.signal_url = url2::Url2::parse("wss://signal.doorway.elohim.host");
     }
 
     // Mobile devices don't hold DHT data (reduces battery/bandwidth)
