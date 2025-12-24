@@ -703,8 +703,11 @@ export class BlobStreamingService {
       );
       if (!hasVariant) continue;
 
+      // Only consider variants that fit within bandwidth (bitrate <= maxBitrate)
+      if (tier.minBitrate > maxBitrate) continue;
+
       // Score: how much of available bandwidth we use (higher is better, up to 100%)
-      const score = Math.min(tier.minBitrate / maxBitrate, 1.0);
+      const score = tier.minBitrate / maxBitrate;
       if (score > bestScore) {
         bestScore = score;
         bestVariant = tier;
