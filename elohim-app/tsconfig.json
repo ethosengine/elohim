@@ -4,6 +4,7 @@
   "compileOnSave": false,
   "compilerOptions": {
     "baseUrl": ".",
+    "typeRoots": ["node_modules/@types", "src/types"],
     "paths": {
       "@app/elohim": ["src/app/elohim/index.ts"],
       "@app/elohim/*": ["src/app/elohim/*"],
