@@ -59,27 +59,8 @@ pipeline {
 
     stages {
         stage('Wait for Holochain Pipeline') {
-            // Use lightweight agent - just needs to trigger another job
-            // This runs first before allocating heavy resources
-            agent {
-                kubernetes {
-                    cloud 'kubernetes'
-                    yaml '''
-apiVersion: v1
-kind: Pod
-spec:
-  containers:
-    - name: jnlp
-      resources:
-        requests:
-          memory: "256Mi"
-          cpu: "100m"
-        limits:
-          memory: "512Mi"
-          cpu: "200m"
-'''
-                }
-            }
+            // No agent needed - build step runs on Jenkins controller
+            agent none
             when {
                 anyOf {
                     branch 'main'
@@ -88,20 +69,11 @@ spec:
                 }
             }
             steps {
+                echo "⏳ Waiting for Holochain pipeline to complete first..."
+                // Trigger holochain pipeline and wait for it to complete
+                // This ensures holochain artifacts are fresh and avoids
+                // resource contention on the operations node
                 script {
-                    echo """
-                    ═══════════════════════════════════════════════════════════
-                    ⏳ WAITING FOR HOLOCHAIN PIPELINE
-                    ═══════════════════════════════════════════════════════════
-                    Steward depends on holochain artifacts. Ensuring holochain
-                    pipeline completes first to avoid resource contention and
-                    guarantee fresh artifacts.
-                    ═══════════════════════════════════════════════════════════
-                    """
-
-                    // Trigger holochain pipeline and wait for it to complete
-                    // This ensures holochain artifacts are fresh and avoids
-                    // resource contention on the operations node
                     def holochainJob = build(
                         job: "elohim-holochain/${env.BRANCH_NAME}",
                         wait: true,
