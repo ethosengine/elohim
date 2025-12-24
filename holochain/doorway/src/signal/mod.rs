@@ -21,10 +21,23 @@
 //! Message forwarding:
 //! - Client sends: [32-byte dest pubkey][payload]
 //! - Server replaces header with sender's pubkey and forwards to dest
+//!
+//! ## Media Sessions (Extended)
+//!
+//! The `media` module provides structured WebRTC session management:
+//! - `MediaOffer` / `MediaAnswer` for SDP exchange
+//! - `IceCandidate` / `IceCandidateBatch` for ICE negotiation
+//! - `MediaEnd` for graceful termination
+//! - Session state tracking
 
 mod cmd;
+pub mod media;
 mod store;
 
+pub use media::{
+    IceCandidate, MediaCmd, MediaEndReason, MediaQuality, MediaSession, MediaSessionState,
+    MediaType,
+};
 pub use store::SignalStore;
 
 use bytes::Bytes;

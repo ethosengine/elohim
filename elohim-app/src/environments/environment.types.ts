@@ -50,4 +50,6 @@ export interface Environment {
   holochain?: HolochainEnvironmentConfig;
   /** Projection API configuration (fast read path) */
   projectionApi?: ProjectionApiConfig;
+  /** Doorway API base URL (defaults to same origin if not set) */
+  doorwayUrl?: string;
 }

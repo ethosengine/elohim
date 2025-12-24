@@ -17,12 +17,17 @@ pub mod keys;
 pub mod reach_aware_serving;
 pub mod rules;
 pub mod store;
+pub mod tiered;
 
 pub use access_control::{can_serve_at_reach, geographic_distance, prioritize_sources, CustodianSource, RequesterContext};
 pub use keys::CacheKey;
 pub use reach_aware_serving::{create_reach_aware_cache_key, extract_reach_from_response, should_serve_response, extract_requester_context};
 pub use rules::{CacheRule, CacheRuleStore, DefaultRules, DnaRules, CACHE_RULES_FN};
 pub use store::{CacheEntry, ContentCache};
+pub use tiered::{
+    BlobMetadata, CaptionMetadata, TieredBlobCache, TieredCacheConfig, TieredCacheStats,
+    TierStats, VariantMetadata, spawn_tiered_cleanup_task,
+};
 
 use std::time::Duration;
 

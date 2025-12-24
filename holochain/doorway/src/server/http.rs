@@ -16,7 +16,14 @@ use tokio::net::TcpListener;
 use tracing::{debug, error, info, warn};
 
 use crate::bootstrap::{self, BootstrapStore};
-use crate::cache::{self, CacheConfig, CacheRuleStore, ContentCache};
+use crate::cache::{
+    self, CacheConfig, CacheRuleStore, ContentCache, TieredBlobCache, TieredCacheConfig,
+    spawn_tiered_cleanup_task,
+};
+use crate::services::{
+    CustodianService, CustodianServiceConfig, VerificationService, VerifyBlobRequest,
+    spawn_health_probe_task,
+};
 use crate::config::Args;
 use crate::db::MongoClient;
 use crate::nats::{HostRouter, NatsClient};
@@ -50,6 +57,12 @@ pub struct AppState {
     pub projection: Option<Arc<ProjectionStore>>,
     /// Signing service for gateway-assisted human signing
     pub signing: Arc<SigningService>,
+    /// Tiered blob cache for media streaming (metadata/blobs/chunks)
+    pub tiered_cache: Arc<TieredBlobCache>,
+    /// Custodian service for P2P blob distribution
+    pub custodian: Arc<CustodianService>,
+    /// Verification service for blob integrity
+    pub verification: Arc<VerificationService>,
 }
 
 impl AppState {
@@ -71,6 +84,9 @@ impl AppState {
         // Projection store in memory-only mode (no MongoDB)
         let projection = Some(Arc::new(ProjectionStore::memory_only(ProjectionConfig::default())));
         let signing = Arc::new(SigningService::new(SigningConfig::default()));
+        let tiered_cache = Arc::new(TieredBlobCache::new(TieredCacheConfig::from_env()));
+        let custodian = Arc::new(CustodianService::new(CustodianServiceConfig::default()));
+        let verification = Arc::new(VerificationService::default());
         Self {
             args,
             mongo: None,
@@ -83,6 +99,9 @@ impl AppState {
             cache_rules,
             projection,
             signing,
+            tiered_cache,
+            custodian,
+            verification,
         }
     }
 
@@ -112,6 +131,9 @@ impl AppState {
         // Start with memory-only projection; upgrade to MongoDB via init_projection()
         let projection = Some(Arc::new(ProjectionStore::memory_only(ProjectionConfig::default())));
         let signing = Arc::new(SigningService::new(SigningConfig::default()));
+        let tiered_cache = Arc::new(TieredBlobCache::new(TieredCacheConfig::from_env()));
+        let custodian = Arc::new(CustodianService::new(CustodianServiceConfig::default()));
+        let verification = Arc::new(VerificationService::default());
         Self {
             args,
             mongo,
@@ -124,6 +146,9 @@ impl AppState {
             cache_rules,
             projection,
             signing,
+            tiered_cache,
+            custodian,
+            verification,
         }
     }
 
@@ -154,6 +179,9 @@ impl AppState {
         // Start with memory-only projection; upgrade to MongoDB via init_projection()
         let projection = Some(Arc::new(ProjectionStore::memory_only(ProjectionConfig::default())));
         let signing = Arc::new(SigningService::new(SigningConfig::default()));
+        let tiered_cache = Arc::new(TieredBlobCache::new(TieredCacheConfig::from_env()));
+        let custodian = Arc::new(CustodianService::new(CustodianServiceConfig::default()));
+        let verification = Arc::new(VerificationService::default());
         Self {
             args,
             mongo,
@@ -166,6 +194,9 @@ impl AppState {
             cache_rules,
             projection,
             signing,
+            tiered_cache,
+            custodian,
+            verification,
         }
     }
 
@@ -201,6 +232,9 @@ impl AppState {
         ).await?;
 
         let signing = Arc::new(SigningService::new(SigningConfig::default()));
+        let tiered_cache = Arc::new(TieredBlobCache::new(TieredCacheConfig::from_env()));
+        let custodian = Arc::new(CustodianService::new(CustodianServiceConfig::default()));
+        let verification = Arc::new(VerificationService::default());
 
         Ok(Self {
             args,
@@ -214,6 +248,9 @@ impl AppState {
             cache_rules,
             projection: Some(Arc::new(projection_store)),
             signing,
+            tiered_cache,
+            custodian,
+            verification,
         })
     }
 }
@@ -247,6 +284,18 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
     // Start cache cleanup task
     cache::store::spawn_cleanup_task(Arc::clone(&state.cache));
     info!("Cache service enabled (max {} entries)", state.cache.config().max_entries);
+
+    // Start tiered blob cache cleanup task (every 60 seconds)
+    spawn_tiered_cleanup_task(Arc::clone(&state.tiered_cache), std::time::Duration::from_secs(60));
+    info!(
+        "Tiered blob cache enabled (blob max: {} MB, chunk max: {} GB)",
+        state.tiered_cache.config().blob_max_bytes / (1024 * 1024),
+        state.tiered_cache.config().chunk_max_bytes / (1024 * 1024 * 1024)
+    );
+
+    // Start custodian health probe task (every 60 seconds)
+    spawn_health_probe_task(Arc::clone(&state.custodian), std::time::Duration::from_secs(60));
+    info!("Custodian service enabled for P2P blob distribution");
 
     loop {
         match listener.accept().await {
@@ -381,6 +430,28 @@ async fn handle_request(
             } else {
                 to_boxed(bad_request_response("Signal endpoint requires WebSocket upgrade"))
             }
+        }
+
+        // Streaming API routes (HLS/DASH)
+        (Method::GET, p) if p.starts_with("/api/stream/") => {
+            // Construct base URL from host header
+            let host = req
+                .headers()
+                .get("host")
+                .and_then(|h| h.to_str().ok())
+                .unwrap_or("localhost");
+            let scheme = if host.contains("localhost") || host.starts_with("127.") {
+                "http"
+            } else {
+                "https"
+            };
+            let base_url = format!("{}://{}", scheme, host);
+            to_boxed(routes::handle_stream_request(state, p, &base_url).await)
+        }
+
+        // Blob verification endpoint
+        (Method::POST, "/api/blob/verify") => {
+            handle_blob_verify(state, req).await
         }
 
         // REST API routes for public content
@@ -533,6 +604,92 @@ async fn handle_signal_request(
 
     // Handle the WebSocket upgrade
     to_boxed(signal::handle_signal_upgrade(store, req, pub_key_str, addr, &state.args).await)
+}
+
+/// Handle blob verification request (POST /api/blob/verify)
+///
+/// This endpoint provides server-side SHA256 verification as part of defense-in-depth:
+/// - Primary: Client uses WASM or SubtleCrypto for local verification
+/// - Fallback: Client sends blob to server for authoritative verification
+async fn handle_blob_verify(
+    state: Arc<AppState>,
+    req: Request<Incoming>,
+) -> Response<BoxBody> {
+    // Read request body
+    let body = match req.collect().await {
+        Ok(collected) => collected.to_bytes(),
+        Err(e) => {
+            warn!("Blob verify request body error: {}", e);
+            return to_boxed(
+                Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .header("Content-Type", "application/json")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .body(Full::new(Bytes::from(
+                        r#"{"error": "Failed to read request body"}"#,
+                    )))
+                    .unwrap(),
+            );
+        }
+    };
+
+    // Parse JSON request
+    let request: VerifyBlobRequest = match serde_json::from_slice(&body) {
+        Ok(r) => r,
+        Err(e) => {
+            warn!("Blob verify JSON parse error: {}", e);
+            return to_boxed(
+                Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .header("Content-Type", "application/json")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error": "Invalid JSON: {}"}}"#,
+                        e
+                    ))))
+                    .unwrap(),
+            );
+        }
+    };
+
+    debug!(
+        expected_hash = %request.expected_hash,
+        has_data = request.data_base64.is_some(),
+        has_url = request.fetch_url.is_some(),
+        content_id = ?request.content_id,
+        "Processing blob verification request"
+    );
+
+    // Process verification
+    let response = state.verification.handle_request(request).await;
+
+    // Serialize response
+    let json_body = match serde_json::to_string(&response) {
+        Ok(j) => j,
+        Err(e) => {
+            error!("Failed to serialize verification response: {}", e);
+            return to_boxed(
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header("Content-Type", "application/json")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .body(Full::new(Bytes::from(
+                        r#"{"error": "Internal serialization error"}"#,
+                    )))
+                    .unwrap(),
+            );
+        }
+    };
+
+    to_boxed(
+        Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .header("Access-Control-Allow-Origin", "*")
+            .header("Cache-Control", "no-store")
+            .body(Full::new(Bytes::from(json_body)))
+            .unwrap(),
+    )
 }
 
 /// Convert a Full<Bytes> body to BoxBody

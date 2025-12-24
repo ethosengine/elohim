@@ -1,0 +1,42 @@
+[package]
+name = "elohim-wasm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Elohim Protocol Team"]
+description = "Client-side WASM verification for Elohim Protocol"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+# WASM bindings
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+
+# Cryptographic hashing
+sha2 = "0.10"
+hex = "0.4"
+
+# Error handling
+thiserror = "1.0"
+
+# Optional: Better panic messages in browser console
+console_error_panic_hook = { version = "0.1", optional = true }
+
+# JS interop types
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "console",
+] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+# Optimize for size
+opt-level = "s"
+lto = true
