@@ -1029,10 +1029,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             echo "⚠️  Holochain Gateway: Unhealthy (HTTP ${holochainHealth})"
                         }
 
-                        // Check if seeding is needed
+                        // Check if seeding is needed (DNA, seeder code, or seed data changes)
                         def needsSeeding = sh(
                             script: '''
-                                git diff --name-only HEAD~1 2>/dev/null | grep -E "^(holochain/dna/|holochain/seeder/)" && echo "true" || echo "false"
+                                git diff --name-only HEAD~1 2>/dev/null | grep -E "^(holochain/dna/|holochain/seeder/|data/lamad/)" && echo "true" || echo "false"
                             ''',
                             returnStdout: true
                         ).trim()
@@ -1077,7 +1077,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             """
                         } else {
                             echo """
-                            ℹ️  Skipping seed - No DNA/seeder changes detected
+                            ℹ️  Skipping seed - No DNA/seeder/seed-data changes detected
                             ───────────────────────────────────────────────────────────
                             Database seed is up to date
                             """
