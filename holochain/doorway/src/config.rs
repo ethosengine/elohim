@@ -97,6 +97,14 @@ pub struct Args {
     /// Signal idle timeout in milliseconds
     #[arg(long, env = "SIGNAL_IDLE_TIMEOUT_MS")]
     pub signal_idle_timeout_ms: Option<i32>,
+
+    /// Enable orchestrator for cluster management (mDNS discovery, node provisioning)
+    #[arg(long, env = "ORCHESTRATOR_ENABLED", default_value = "false")]
+    pub orchestrator_enabled: bool,
+
+    /// Region identifier for this doorway instance (for locality-aware routing)
+    #[arg(long, env = "REGION")]
+    pub region: Option<String>,
 }
 
 /// NATS connection configuration

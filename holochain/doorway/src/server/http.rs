@@ -20,6 +20,7 @@ use crate::cache::{
     self, CacheConfig, CacheRuleStore, ContentCache, TieredBlobCache, TieredCacheConfig,
     spawn_tiered_cleanup_task,
 };
+use crate::orchestrator::OrchestratorState;
 use crate::services::{
     CustodianService, CustodianServiceConfig, VerificationService, VerifyBlobRequest,
     spawn_health_probe_task,
@@ -63,6 +64,8 @@ pub struct AppState {
     pub custodian: Arc<CustodianService>,
     /// Verification service for blob integrity
     pub verification: Arc<VerificationService>,
+    /// Orchestrator state for cluster management (node health, provisioning)
+    pub orchestrator: Option<Arc<OrchestratorState>>,
 }
 
 impl AppState {
@@ -102,6 +105,7 @@ impl AppState {
             tiered_cache,
             custodian,
             verification,
+            orchestrator: None,
         }
     }
 
@@ -149,6 +153,7 @@ impl AppState {
             tiered_cache,
             custodian,
             verification,
+            orchestrator: None,
         }
     }
 
@@ -197,6 +202,7 @@ impl AppState {
             tiered_cache,
             custodian,
             verification,
+            orchestrator: None,
         }
     }
 
@@ -251,7 +257,13 @@ impl AppState {
             tiered_cache,
             custodian,
             verification,
+            orchestrator: None,
         })
+    }
+
+    /// Set orchestrator state (called from main after orchestrator is started)
+    pub fn set_orchestrator(&mut self, state: Arc<OrchestratorState>) {
+        self.orchestrator = Some(state);
     }
 }
 

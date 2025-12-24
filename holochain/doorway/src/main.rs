@@ -11,6 +11,7 @@ use doorway::{
     config::Args,
     db::MongoClient,
     nats::NatsClient,
+    orchestrator::{Orchestrator, OrchestratorConfig, OrchestratorState},
     projection::{EngineConfig, ProjectionEngine, SubscriberConfig, spawn_engine_task, spawn_subscriber},
     server,
     worker::{PoolConfig, WorkerPool},
@@ -117,12 +118,30 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    // Create application state
-    let state = if let Some(p) = pool {
-        Arc::new(server::AppState::with_pool(args.clone(), mongo, nats, p))
+    // Create orchestrator state (before AppState so it can be shared)
+    let orchestrator_state = if args.orchestrator_enabled {
+        let config = OrchestratorConfig {
+            mdns_service_type: "elohim-node".to_string(),
+            admin_port: 8888, // TODO: derive from args
+            nats_url: args.nats.nats_url.clone(),
+            heartbeat_interval_secs: 30,
+            failure_threshold: 3,
+            auto_assign_custodians: true,
+            region: args.region.clone().unwrap_or_else(|| "default".to_string()),
+        };
+        Some(Arc::new(OrchestratorState::new(config)))
     } else {
-        Arc::new(server::AppState::with_services(args.clone(), mongo, nats))
+        None
     };
+
+    // Create application state
+    let mut state = if let Some(p) = pool {
+        server::AppState::with_pool(args.clone(), mongo, nats, p)
+    } else {
+        server::AppState::with_services(args.clone(), mongo, nats)
+    };
+    state.orchestrator = orchestrator_state.clone();
+    let state = Arc::new(state);
 
     // Start Projection Engine (if projection store is available)
     let _projection_handle = if let Some(ref projection_store) = state.projection {
@@ -150,6 +169,32 @@ async fn main() -> anyhow::Result<()> {
         Some((subscriber_handle, engine_handle))
     } else {
         warn!("Projection engine not started (no projection store)");
+        None
+    };
+
+    // Start Orchestrator background tasks (if enabled)
+    // The state is already created and wired to AppState above
+    let _orchestrator = if let Some(ref orch_state) = orchestrator_state {
+        info!("Starting orchestrator background tasks...");
+
+        let mut orch = Orchestrator::with_state(Arc::clone(orch_state));
+
+        match orch.start().await {
+            Ok(()) => {
+                info!("Orchestrator started (mDNS discovery, heartbeat, disaster recovery)");
+                Some(orch)
+            }
+            Err(e) => {
+                if args.dev_mode {
+                    warn!("Orchestrator failed to start (dev mode, continuing): {}", e);
+                    None
+                } else {
+                    error!("Orchestrator failed to start: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+    } else {
         None
     };
 

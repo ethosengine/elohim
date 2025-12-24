@@ -213,10 +213,20 @@ pub struct Orchestrator {
 }
 
 impl Orchestrator {
-    /// Create new orchestrator
+    /// Create new orchestrator with fresh state
     pub fn new(config: OrchestratorConfig) -> Self {
         Self {
             state: Arc::new(OrchestratorState::new(config)),
+            bootstrap: None,
+            heartbeat: None,
+            disaster_recovery: None,
+        }
+    }
+
+    /// Create orchestrator with existing state (for sharing state with AppState)
+    pub fn with_state(state: Arc<OrchestratorState>) -> Self {
+        Self {
+            state,
             bootstrap: None,
             heartbeat: None,
             disaster_recovery: None,
