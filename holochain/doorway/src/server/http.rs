@@ -454,6 +454,22 @@ async fn handle_request(
             handle_blob_verify(state, req).await
         }
 
+        // Blob streaming with Range support (HTTP 206)
+        // GET /blob/{hash} - Stream entire blob or byte range
+        // HEAD /blob/{hash} - Get blob metadata
+        (Method::GET, p) if p.starts_with("/blob/") => {
+            match routes::blob::handle_blob_request(req, Arc::clone(&state.cache)).await {
+                Ok(resp) => to_boxed(resp),
+                Err(err) => to_boxed(routes::blob::error_response(err)),
+            }
+        }
+        (Method::HEAD, p) if p.starts_with("/blob/") => {
+            match routes::blob::handle_blob_request(req, Arc::clone(&state.cache)).await {
+                Ok(resp) => to_boxed(resp),
+                Err(err) => to_boxed(routes::blob::error_response(err)),
+            }
+        }
+
         // REST API routes for public content
         (Method::GET, p) if p.starts_with("/api/v1/") => {
             let query = req.uri().query();
