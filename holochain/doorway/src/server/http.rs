@@ -418,6 +418,36 @@ async fn handle_request(
         // Status endpoint with runtime info
         (Method::GET, "/status") => to_boxed(routes::status_check(Arc::clone(&state)).await),
 
+        // ====================================================================
+        // Admin API endpoints for Shefa compute resources dashboard
+        // ====================================================================
+
+        // List all nodes with detailed resource and social metrics
+        (Method::GET, "/admin/nodes") => {
+            to_boxed(routes::handle_nodes(Arc::clone(&state)).await)
+        }
+
+        // Get specific node details
+        (Method::GET, p) if p.starts_with("/admin/nodes/") => {
+            let node_id = p.strip_prefix("/admin/nodes/").unwrap_or("");
+            to_boxed(routes::handle_node_by_id(Arc::clone(&state), node_id).await)
+        }
+
+        // Cluster-wide aggregated metrics
+        (Method::GET, "/admin/cluster") => {
+            to_boxed(routes::handle_cluster_metrics(Arc::clone(&state)).await)
+        }
+
+        // Resource utilization summary
+        (Method::GET, "/admin/resources") => {
+            to_boxed(routes::handle_resources(Arc::clone(&state)).await)
+        }
+
+        // Custodian network overview
+        (Method::GET, "/admin/custodians") => {
+            to_boxed(routes::handle_custodians(Arc::clone(&state)).await)
+        }
+
         // Bootstrap service routes (X-Op header protocol)
         // POST /bootstrap with X-Op header, or legacy path-based routing
         (Method::POST, p) if p == "/bootstrap" || p.starts_with("/bootstrap/") => {
