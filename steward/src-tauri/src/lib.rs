@@ -5,6 +5,16 @@ use tauri::{AppHandle, Listener};
 
 const APP_ID: &str = "elohim";
 
+// Build-time environment configuration via environment variables
+// Set ELOHIM_BOOTSTRAP_URL and ELOHIM_SIGNAL_URL during build for custom endpoints
+// Defaults to production if not specified
+const DEFAULT_BOOTSTRAP_URL: &str = "https://doorway.elohim.host/bootstrap";
+const DEFAULT_SIGNAL_URL: &str = "wss://signal.doorway.elohim.host";
+
+// Dev environment endpoints (for builds targeting dev/alpha)
+const DEV_BOOTSTRAP_URL: &str = "https://doorway-dev.elohim.host/bootstrap";
+const DEV_SIGNAL_URL: &str = "wss://signal.doorway-dev.elohim.host";
+
 /// Load the Elohim hApp bundle from embedded bytes
 pub fn elohim_happ() -> AppBundle {
     let bytes = include_bytes!("../../workdir/elohim.happ");
@@ -12,19 +22,42 @@ pub fn elohim_happ() -> AppBundle {
 }
 
 /// Configure the Holochain network for Elohim
+///
+/// Network endpoints are determined at compile time:
+/// 1. ELOHIM_BOOTSTRAP_URL / ELOHIM_SIGNAL_URL env vars (highest priority)
+/// 2. ELOHIM_ENV=dev uses dev endpoints
+/// 3. Default to production endpoints
 fn network_config() -> NetworkConfig {
     let mut network_config = NetworkConfig::default();
 
     if tauri::is_dev() {
-        // Development: use local doorway
+        // Local development mode (cargo tauri dev): use localhost
         network_config.bootstrap_url = url2::Url2::parse("http://localhost:8888/bootstrap");
-        // Signal URL must not have path - tx5/SBD protocol appends pubkey as path
         network_config.signal_url = url2::Url2::parse("ws://localhost:8888");
     } else {
-        // Production: use Elohim's doorway infrastructure
-        network_config.bootstrap_url = url2::Url2::parse("https://doorway.elohim.host/bootstrap");
-        // Signal uses dedicated subdomain - tx5/SBD protocol requires path = pubkey
-        network_config.signal_url = url2::Url2::parse("wss://signal.doorway.elohim.host");
+        // Built app: use compile-time configured endpoints
+        let bootstrap_url = option_env!("ELOHIM_BOOTSTRAP_URL")
+            .or_else(|| {
+                if option_env!("ELOHIM_ENV") == Some("dev") {
+                    Some(DEV_BOOTSTRAP_URL)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(DEFAULT_BOOTSTRAP_URL);
+
+        let signal_url = option_env!("ELOHIM_SIGNAL_URL")
+            .or_else(|| {
+                if option_env!("ELOHIM_ENV") == Some("dev") {
+                    Some(DEV_SIGNAL_URL)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(DEFAULT_SIGNAL_URL);
+
+        network_config.bootstrap_url = url2::Url2::parse(bootstrap_url);
+        network_config.signal_url = url2::Url2::parse(signal_url);
     }
 
     // Mobile devices don't hold DHT data (reduces battery/bandwidth)

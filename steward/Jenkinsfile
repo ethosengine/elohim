@@ -396,9 +396,24 @@ spec:
                                         echo "=== Git config set ==="
                                         cat "$GIT_CONFIG_GLOBAL"
 
+                                        # Set build environment based on branch
+                                        # dev/feature branches -> dev endpoints
+                                        # main -> production endpoints (default)
+                                        if [ "$BRANCH_NAME" = "main" ]; then
+                                            echo "=== Building for PRODUCTION environment ==="
+                                            ELOHIM_ENV="prod"
+                                        else
+                                            echo "=== Building for DEV environment ==="
+                                            ELOHIM_ENV="dev"
+                                        fi
+                                        echo "ELOHIM_ENV=$ELOHIM_ENV"
+
                                         echo "=== Entering Nix development shell ==="
-                                        nix develop --accept-flake-config --command bash -c '
+                                        # Pass ELOHIM_ENV to nix shell for Rust compile-time config
+                                        ELOHIM_ENV="$ELOHIM_ENV" nix develop --accept-flake-config --command bash -c '
                                             set -euo pipefail
+
+                                            echo "Build environment: ELOHIM_ENV=$ELOHIM_ENV"
 
                                             echo "=== Installing npm dependencies ==="
                                             npm install
