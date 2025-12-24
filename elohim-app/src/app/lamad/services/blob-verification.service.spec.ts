@@ -1,12 +1,36 @@
 import { TestBed } from '@angular/core/testing';
+import { of, throwError } from 'rxjs';
 import { BlobVerificationService, BlobVerificationResult } from './blob-verification.service';
+import { DoorwayClientService } from '../../elohim/services/doorway-client.service';
+
+/**
+ * Mock DoorwayClientService that simulates server verification failure
+ * so that tests exercise the SubtleCrypto/fallback path.
+ */
+const mockDoorwayClientService = {
+  verifyBlob: jasmine.createSpy('verifyBlob').and.returnValue(
+    throwError(() => new Error('Mock: Server unavailable'))
+  ),
+  verifyBlobData: jasmine.createSpy('verifyBlobData').and.returnValue(
+    throwError(() => new Error('Mock: Server unavailable'))
+  ),
+};
 
 describe('BlobVerificationService', () => {
   let service: BlobVerificationService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [
+        BlobVerificationService,
+        { provide: DoorwayClientService, useValue: mockDoorwayClientService },
+      ],
+    });
     service = TestBed.inject(BlobVerificationService);
+
+    // Reset spies between tests
+    mockDoorwayClientService.verifyBlob.calls.reset();
+    mockDoorwayClientService.verifyBlobData.calls.reset();
   });
 
   it('should be created', () => {
