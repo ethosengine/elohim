@@ -291,7 +291,7 @@ const DATA_DIR = process.env.DATA_DIR || (fs.existsSync(LOCAL_DATA_DIR) ? LOCAL_
 const LOCAL_DEV_DIR = process.env.LOCAL_DEV_DIR || '/projects/elohim/holochain/local-dev';
 const HC_PORTS_FILE = process.env.HC_PORTS_FILE || path.join(LOCAL_DEV_DIR, '.hc_ports');
 const APP_ID = 'elohim';
-const ROLE_NAME = 'elohim';
+// Role name is auto-detected from app's cell_info to support both 'elohim' and legacy 'lamad'
 const ZOME_NAME = 'content_store';
 
 /**
@@ -644,9 +644,20 @@ async function seed() {
     process.exit(1);
   }
 
-  const cellInfo = app.cell_info[ROLE_NAME];
+  // Auto-detect role name from app's cell_info (supports both 'elohim' and legacy 'lamad')
+  const availableRoles = Object.keys(app.cell_info);
+  const roleName = availableRoles.find(r => r === 'elohim') || availableRoles.find(r => r === 'lamad') || availableRoles[0];
+
+  if (!roleName) {
+    console.error(`❌ No roles found in app. cell_info keys:`, availableRoles);
+    process.exit(1);
+  }
+
+  console.log(`✅ Using role: ${roleName} (available: ${availableRoles.join(', ')})`);
+
+  const cellInfo = app.cell_info[roleName];
   if (!cellInfo || cellInfo.length === 0) {
-    console.error(`❌ Role "${ROLE_NAME}" not found in app`);
+    console.error(`❌ Role "${roleName}" has no cells`);
     process.exit(1);
   }
 
