@@ -980,7 +980,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('🔧 Verify Holochain & Database Seed') {
+        stage('Verify Holochain Health') {
             when {
                 anyOf {
                     branch 'dev'
@@ -994,10 +994,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     script {
                         echo """
                         ═══════════════════════════════════════════════════════════
-                        🔧 VERIFYING HOLOCHAIN & DATABASE SEED
+                        VERIFYING HOLOCHAIN INFRASTRUCTURE
                         ═══════════════════════════════════════════════════════════
-                        Checking holochain-dev.elohim.host
-                        Verifying database seed status
+                        Alpha and Staging apps use: doorway-dev.elohim.host
+                        Seeding is managed by: elohim-holochain pipeline
                         ═══════════════════════════════════════════════════════════
                         """
 
@@ -1010,87 +1010,46 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         ).trim()
 
                         if (holochainStatus == "1") {
-                            echo "✅ Holochain Edge Node: Running"
+                            echo "Holochain Edge Node: Running"
                         } else {
-                            echo "⚠️  Holochain Edge Node: Not available (${holochainStatus} replicas)"
+                            echo "Holochain Edge Node: Not available (${holochainStatus} replicas)"
+                            echo "Run elohim-holochain pipeline with FORCE_DEPLOY=true"
                         }
 
-                        // Check holochain connectivity
-                        def holochainHealth = sh(
-                            script: '''
-                                timeout 10s curl -f -s -o /dev/null -w "%{http_code}" https://doorway-dev.elohim.host/health 2>/dev/null || echo "000"
-                            ''',
-                            returnStdout: true
-                        ).trim()
+                        // Check holochain connectivity with retry
+                        def holochainHealth = "000"
+                        for (int i = 0; i < 3; i++) {
+                            holochainHealth = sh(
+                                script: '''
+                                    timeout 10s curl -sf -o /dev/null -w "%{http_code}" https://doorway-dev.elohim.host/health 2>/dev/null || echo "000"
+                                ''',
+                                returnStdout: true
+                            ).trim()
+
+                            if (holochainHealth == "200") break
+                            if (i < 2) {
+                                echo "Health check attempt ${i+1} failed, retrying..."
+                                sleep 5
+                            }
+                        }
 
                         if (holochainHealth == "200") {
-                            echo "✅ Holochain Gateway: Healthy (HTTP ${holochainHealth})"
+                            echo "Holochain Gateway: Healthy"
                         } else {
-                            echo "⚠️  Holochain Gateway: Unhealthy (HTTP ${holochainHealth})"
-                        }
-
-                        // Check if seeding is needed (DNA, seeder code, or seed data changes)
-                        // Use grep -q to suppress output - only return true/false
-                        def needsSeeding = sh(
-                            script: '''
-                                git diff --name-only HEAD~1 2>/dev/null | grep -qE "^(holochain/dna/|holochain/seeder/|data/lamad/)" && echo "true" || echo "false"
-                            ''',
-                            returnStdout: true
-                        ).trim()
-
-                        if (needsSeeding == "true" && holochainHealth == "200") {
-                            echo """
-                            ═══════════════════════════════════════════════════════════
-                            🌱 SEEDING DATABASE (DNA or seed data changed)
-                            ═══════════════════════════════════════════════════════════
-                            """
-
-                            dir('holochain/seeder') {
-                                sh '''#!/usr/bin/env bash
-                                    set -euo pipefail
-
-                                    echo "Installing seeder dependencies..."
-                                    npm ci
-
-                                    echo ""
-                                    echo "Running seeder against doorway-dev.elohim.host..."
-                                    HOLOCHAIN_ADMIN_URL="wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024" \
-                                        npx tsx src/seed.ts
-
-                                    echo ""
-                                    echo "✅ Seeding complete"
-                                '''
-                            }
-
-                            echo """
-                            ═══════════════════════════════════════════════════════════
-                            ✅ DATABASE SEEDED SUCCESSFULLY
-                            ═══════════════════════════════════════════════════════════
-                            Holochain: doorway-dev.elohim.host
-                            Status: Seeded with elohim content
-                            ═══════════════════════════════════════════════════════════
-                            """
-                        } else if (holochainHealth != "200") {
-                            echo """
-                            ⚠️  Skipping seed - Holochain not healthy
-                            ───────────────────────────────────────────────────────────
-                            Run holochain pipeline first if DNA changes were made
-                            """
-                        } else {
-                            echo """
-                            ℹ️  Skipping seed - No DNA/seeder/seed-data changes detected
-                            ───────────────────────────────────────────────────────────
-                            Database seed is up to date
-                            """
+                            echo "Holochain Gateway: Unhealthy (HTTP ${holochainHealth})"
+                            echo "App will work but holochain features may be unavailable"
+                            echo "Run elohim-holochain pipeline with FORCE_DEPLOY=true to fix"
                         }
 
                         echo """
                         ═══════════════════════════════════════════════════════════
-                        ✅ HOLOCHAIN VERIFICATION COMPLETE
+                        HOLOCHAIN STATUS
                         ═══════════════════════════════════════════════════════════
                         Edge Node: ${holochainStatus == "1" ? "Running" : "Unavailable"}
                         Gateway: ${holochainHealth == "200" ? "Healthy" : "Unhealthy"}
-                        Seed Status: ${needsSeeding == "true" ? "Seeded" : "Up to date"}
+
+                        Note: Database seeding is managed by elohim-holochain pipeline.
+                        To force seed, run that pipeline with FORCE_SEED=true.
                         ═══════════════════════════════════════════════════════════
                         """
                     }
