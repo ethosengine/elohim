@@ -610,20 +610,49 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         def props = loadBuildVars()
 
                         withBuildVars(props) {
+                            // Check if we have a reason to deploy
                             def shouldDeploy = (env.IMAGES_PUSHED == 'true') ||
                                                (params.FORCE_DEPLOY == true) ||
                                                (params.FORCE_BUILD == true)
 
                             if (!shouldDeploy) {
-                                echo "No new images pushed and no force flags - checking if restart needed..."
+                                echo "No new images pushed and no force flags - checking edge node health..."
                                 if (checkEdgeNodeHealth('https://doorway-dev.elohim.host')) {
                                     echo "Edge node is healthy - skipping deployment"
                                     env.EDGE_NODE_HEALTHY = 'true'
                                     return
-                                } else {
-                                    echo "Edge node unhealthy - forcing restart with existing images"
-                                    shouldDeploy = true
                                 }
+
+                                // Edge node unhealthy - check if we have images to deploy
+                                echo "Edge node unhealthy - checking if dev-latest images exist in Harbor..."
+                                def imageExists = sh(
+                                    script: '''
+                                        curl -sf -o /dev/null \
+                                            "https://harbor.ethosengine.com/v2/ethosengine/elohim-edgenode/manifests/dev-latest" \
+                                            2>/dev/null
+                                    ''',
+                                    returnStatus: true
+                                ) == 0
+
+                                if (!imageExists) {
+                                    echo """
+                                    ═══════════════════════════════════════════════════════════
+                                    CANNOT AUTO-HEAL: No images available in Harbor
+                                    ═══════════════════════════════════════════════════════════
+                                    Edge node is unhealthy but no dev-latest images exist.
+
+                                    To fix this, run the pipeline with FORCE_BUILD=true after
+                                    ensuring the DNA has been successfully built and archived.
+
+                                    Current hApp availability: ${env.HAPP_AVAILABLE}
+                                    ═══════════════════════════════════════════════════════════
+                                    """
+                                    // Don't fail the pipeline - just skip deployment
+                                    return
+                                }
+
+                                echo "Found dev-latest images - attempting auto-heal restart"
+                                shouldDeploy = true
                             }
 
                             echo """
@@ -772,10 +801,34 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 if (checkEdgeNodeHealth('https://doorway.elohim.host')) {
                                     echo "Prod edge node is healthy - skipping deployment"
                                     return
-                                } else {
-                                    echo "Prod edge node unhealthy - forcing restart"
-                                    shouldDeploy = true
                                 }
+
+                                // Edge node unhealthy - check if we have images to deploy
+                                echo "Prod edge node unhealthy - checking if latest images exist in Harbor..."
+                                def imageExists = sh(
+                                    script: '''
+                                        curl -sf -o /dev/null \
+                                            "https://harbor.ethosengine.com/v2/ethosengine/elohim-edgenode/manifests/latest" \
+                                            2>/dev/null
+                                    ''',
+                                    returnStatus: true
+                                ) == 0
+
+                                if (!imageExists) {
+                                    echo """
+                                    ═══════════════════════════════════════════════════════════
+                                    CANNOT AUTO-HEAL PROD: No images available in Harbor
+                                    ═══════════════════════════════════════════════════════════
+                                    Production edge node is unhealthy but no latest images exist.
+
+                                    To fix: Run pipeline on main branch with FORCE_BUILD=true
+                                    ═══════════════════════════════════════════════════════════
+                                    """
+                                    return
+                                }
+
+                                echo "Found latest images - attempting auto-heal restart"
+                                shouldDeploy = true
                             }
 
                             echo """
