@@ -7,11 +7,23 @@
  *   - dev: doorway-dev.elohim.host (serves alpha + staging apps)
  *   - prod: doorway.elohim.host (serves production app only)
  *
- * Key Behaviors:
- *   - On dev/main branches: Always ensures edge node is running and healthy
- *   - DNA rebuild: Only when holochain/dna/** changes (expensive: 20-40 min)
- *   - Seeding: Runs when DNA/seeder changes OR when forced via parameter
- *   - Artifact fallback: Tries current branch, then dev branch for hApp
+ * IMPORTANT: This pipeline triggers from the same webhook as elohim and elohim-steward.
+ * To avoid wasteful builds, stages are gated appropriately:
+ *
+ *   BUILD stages (DNA, Edge Node, hApp Installer, Push):
+ *     - Only run when holochain/** files change OR FORCE_BUILD=true
+ *     - This prevents rebuilding on every app-only commit
+ *
+ *   DEPLOY stages:
+ *     - Run on dev/main branches to auto-heal unhealthy edge nodes
+ *     - Skip deployment if edge node is already healthy AND no new images
+ *     - Use FORCE_DEPLOY to restart even when healthy
+ *
+ *   SEED stage:
+ *     - Runs when DNA/seeder/data changes OR FORCE_SEED=true
+ *     - Only on dev branch and feature branches
+ *
+ * Artifact fallback: Tries current branch, then dev, then main for hApp
  *
  * @see https://github.com/holochain/holonix
  */
@@ -385,8 +397,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Edge Node Image') {
             when {
                 anyOf {
-                    branch 'dev'
-                    branch 'main'
                     changeset "holochain/**"
                     expression { return params.FORCE_BUILD == true }
                 }
@@ -441,8 +451,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build hApp Installer') {
             when {
                 anyOf {
-                    branch 'dev'
-                    branch 'main'
                     changeset "holochain/**"
                     expression { return params.FORCE_BUILD == true }
                 }
@@ -495,8 +503,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Push to Harbor') {
             when {
                 anyOf {
-                    branch 'dev'
-                    branch 'main'
                     changeset "holochain/**"
                     expression { return params.FORCE_BUILD == true }
                 }
@@ -801,8 +807,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Cleanup') {
             when {
                 anyOf {
-                    branch 'dev'
-                    branch 'main'
                     changeset "holochain/**"
                     expression { return params.FORCE_BUILD == true }
                 }
