@@ -287,7 +287,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Build DNA') {
             when {
-                changeset "holochain/dna/**"
+                anyOf {
+                    changeset "holochain/dna/**"
+                    expression { return params.FORCE_BUILD == true }
+                }
             }
             steps {
                 container('builder') {
@@ -364,6 +367,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 anyOf {
                     changeset "holochain/doorway/**"
                     changeset "holochain/manifests/edgenode-*.yaml"
+                    expression { return params.FORCE_BUILD == true }
                 }
             }
             steps {
