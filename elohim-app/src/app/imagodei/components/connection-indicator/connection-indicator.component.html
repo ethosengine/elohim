@@ -1,0 +1,51 @@
+@if (isVisible()) {
+  <div
+    class="connection-indicator"
+    [class]="status().cssClass"
+    [title]="status().label"
+    (click)="toggleExpanded()"
+  >
+    <!-- Status Dot -->
+    <span class="status-dot" [style.backgroundColor]="status().color"></span>
+
+    <!-- Icon -->
+    <span class="material-icons status-icon" [class.spinning]="status().mode === 'connecting'">
+      {{ status().icon }}
+    </span>
+
+    <!-- Label (shown when not compact) -->
+    <span class="status-label">{{ status().label }}</span>
+
+    <!-- Tooltip/Dropdown on hover -->
+    @if (expanded) {
+      <div class="status-tooltip">
+        <div class="tooltip-header">
+          <span class="material-icons">{{ status().icon }}</span>
+          <span>{{ status().label }}</span>
+        </div>
+        <p class="tooltip-description">
+          @switch (status().mode) {
+            @case ('self-sovereign') {
+              Running on your local Holochain node. Full sovereignty.
+            }
+            @case ('hosted') {
+              Connected via {{ status().doorwayName ?? 'doorway' }}. Hosted identity.
+            }
+            @case ('connecting') {
+              Establishing connection to the network...
+            }
+            @case ('session') {
+              You're exploring as a human in session. Your journey is saved locally.
+            }
+            @case ('offline') {
+              Not connected. Some features may be limited.
+            }
+            @default {
+              Checking connection status...
+            }
+          }
+        </p>
+      </div>
+    }
+  </div>
+}

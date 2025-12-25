@@ -51,6 +51,17 @@
     --lamad-success: #10b981;
     --lamad-warning: #f59e0b;
     --lamad-info: #3b82f6;
+
+    /* ============================================================================
+       Responsive Breakpoints
+       ============================================================================
+       Standard breakpoints for consistent responsive design across components.
+       Usage: @media (max-width: 768px) or use these values as reference.
+       ============================================================================ */
+    --bp-sm: 480px;   /* Small mobile */
+    --bp-md: 768px;   /* Tablet / Large mobile */
+    --bp-lg: 1024px;  /* Desktop */
+    --bp-xl: 1280px;  /* Large desktop */
 }
 
 /* Light Theme - Activates based on device preference */
@@ -167,6 +178,54 @@ body::before {
 /* Smooth scrolling */
 html {
     scroll-behavior: smooth;
+}
+
+/* ============================================================================
+   Accessibility: Focus Visibility
+   ============================================================================
+   Provides visible focus indicators for keyboard navigation while hiding
+   them for mouse users. This is critical for WCAG 2.1 compliance.
+   ============================================================================ */
+
+:focus-visible {
+    outline: 2px solid var(--lamad-accent-primary, #6366f1);
+    outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* ============================================================================
+   Accessibility: Skip Navigation Link
+   ============================================================================
+   Allows keyboard users to skip repetitive navigation and jump directly
+   to main content. Hidden until focused.
+   ============================================================================ */
+
+.skip-link {
+    position: absolute;
+    left: -10000px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    z-index: 10000;
+}
+
+.skip-link:focus {
+    position: fixed;
+    left: 1rem;
+    top: 1rem;
+    width: auto;
+    height: auto;
+    padding: 0.75rem 1.5rem;
+    background: var(--lamad-accent-primary, #6366f1);
+    color: white;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* Custom scrollbar */
@@ -608,4 +667,23 @@ body[data-theme="dark"] .cta-button {
 
 body[data-theme="dark"] .cta-button:hover {
     box-shadow: 0 15px 40px rgba(107, 70, 193, 0.4);
+}
+
+/* ============================================================================
+   Accessibility: Reduced Motion
+   ============================================================================
+   Respects user preference for reduced motion. Users who have enabled
+   "reduce motion" in their OS settings will see minimal or no animations.
+   This is critical for users with vestibular disorders or motion sensitivity.
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }

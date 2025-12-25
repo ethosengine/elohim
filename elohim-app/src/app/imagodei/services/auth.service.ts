@@ -9,6 +9,12 @@
  * - Supports multiple auth providers through the AuthProvider interface
  * - Persists auth state in localStorage for session recovery
  * - Integrates with IdentityService for Holochain identity coordination
+ * - Doorway-aware: Exposes selected doorway info for UI components
+ *
+ * Doorway Integration:
+ * - Users select a doorway (fediverse-style gateway) at registration
+ * - Selected doorway is used for all auth operations
+ * - Providers access doorway URL through DoorwayRegistryService
  *
  * Usage:
  * 1. Register providers on app initialization
@@ -32,6 +38,7 @@ import {
   parseExpiryDate,
   isTokenExpiringSoon,
 } from '../models/auth.model';
+import { DoorwayRegistryService } from './doorway-registry.service';
 
 // =============================================================================
 // Service
@@ -39,6 +46,12 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  // ==========================================================================
+  // Dependencies
+  // ==========================================================================
+
+  private readonly doorwayRegistry = inject(DoorwayRegistryService);
+
   // ==========================================================================
   // State
   // ==========================================================================
@@ -85,6 +98,19 @@ export class AuthService {
 
   /** Token expiration time */
   readonly expiresAt = computed(() => this.authSignal().expiresAt);
+
+  // ==========================================================================
+  // Doorway Signals (delegated to registry)
+  // ==========================================================================
+
+  /** Selected doorway for authentication */
+  readonly selectedDoorway = this.doorwayRegistry.selected;
+
+  /** Selected doorway URL */
+  readonly doorwayUrl = this.doorwayRegistry.selectedUrl;
+
+  /** Whether a doorway has been selected */
+  readonly hasDoorway = this.doorwayRegistry.hasSelection;
 
   // ==========================================================================
   // Constructor

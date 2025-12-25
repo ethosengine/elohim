@@ -35,6 +35,59 @@
   font-size: 0.95rem;
 }
 
+/* Step Indicator */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface-ground, #f8f9fa);
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.step-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: transparent;
+  color: var(--text-color-secondary, #6c757d);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.step-back:hover {
+  background: var(--surface-hover, #e9ecef);
+  color: var(--text-color, #1a1a2e);
+}
+
+.step-back .material-icons {
+  font-size: 1.25rem;
+}
+
+.step-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.step-label {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary, #6c757d);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.step-doorway {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--primary-500, #3b82f6);
+}
+
 /* Error Banner */
 .error-banner {
   display: flex;
@@ -95,7 +148,6 @@
 }
 
 .form-group input:focus {
-  outline: none;
   border-color: var(--primary-400, #60a5fa);
   box-shadow: 0 0 0 3px var(--primary-100, #dbeafe);
   background: var(--surface-card, #ffffff);
@@ -227,9 +279,14 @@
 }
 
 .register-link {
+  background: none;
+  border: none;
   color: var(--primary-500, #3b82f6);
   cursor: pointer;
   text-decoration: none;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
 }
 
 .register-link:hover {

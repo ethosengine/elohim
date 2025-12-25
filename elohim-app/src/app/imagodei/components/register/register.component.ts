@@ -2,8 +2,8 @@
  * RegisterComponent - Network identity registration.
  *
  * Features:
- * - Display name, bio, affinities input
- * - Profile reach selection
+ * - Step 1: Doorway selection (fediverse-style gateway choice)
+ * - Step 2: Profile info + credentials
  * - Migration from session (if session exists)
  * - Post-registration redirect to return URL
  */
@@ -18,6 +18,8 @@ import { SessionMigrationService } from '../../services/session-migration.servic
 import { HolochainClientService } from '../../../elohim/services/holochain-client.service';
 import { AuthService } from '../../services/auth.service';
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
+import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { DoorwayPickerComponent } from '../doorway-picker/doorway-picker.component';
 import {
   type RegisterHumanRequest,
   type ProfileReach,
@@ -26,11 +28,15 @@ import {
   getReachDescription,
 } from '../../models/identity.model';
 import { type RegisterCredentials } from '../../models/auth.model';
+import { type DoorwayInfo } from '../../models/doorway.model';
+
+/** Registration step type */
+type RegistrationStep = 'doorway' | 'credentials';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, DoorwayPickerComponent],
   templateUrl: './register.component.html',
   styleUrls: ['./register.component.css'],
 })
@@ -41,6 +47,7 @@ export class RegisterComponent implements OnInit {
   private readonly holochainClient = inject(HolochainClientService);
   private readonly authService = inject(AuthService);
   private readonly passwordProvider = inject(PasswordAuthProvider);
+  private readonly doorwayRegistry = inject(DoorwayRegistryService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -69,8 +76,21 @@ export class RegisterComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly showPassword = signal(false);
 
+  /** Current registration step */
+  readonly currentStep = signal<RegistrationStep>('doorway');
+
   /** Return URL after successful registration */
   private returnUrl = '/';
+
+  // ==========================================================================
+  // Doorway State
+  // ==========================================================================
+
+  /** Selected doorway */
+  readonly selectedDoorway = this.doorwayRegistry.selected;
+
+  /** Whether a doorway has been selected */
+  readonly hasDoorwaySelected = this.doorwayRegistry.hasSelection;
 
   // ==========================================================================
   // Computed State
@@ -122,6 +142,11 @@ export class RegisterComponent implements OnInit {
     this.route.queryParams.subscribe(params => {
       this.returnUrl = params['returnUrl'] ?? '/';
     });
+
+    // Skip doorway selection if already chosen
+    if (this.hasDoorwaySelected()) {
+      this.currentStep.set('credentials');
+    }
 
     // Pre-fill from session if available
     if (this.hasSession()) {
@@ -352,6 +377,32 @@ export class RegisterComponent implements OnInit {
     this.router.navigate(['/identity/login'], {
       queryParams: { returnUrl: this.returnUrl },
     });
+  }
+
+  // ==========================================================================
+  // Step Navigation
+  // ==========================================================================
+
+  /**
+   * Handle doorway selection from picker.
+   */
+  onDoorwaySelected(doorway: DoorwayInfo): void {
+    console.log('[Register] Doorway selected:', doorway.name);
+    this.currentStep.set('credentials');
+  }
+
+  /**
+   * Handle doorway picker cancellation.
+   */
+  onDoorwayPickerCancelled(): void {
+    this.router.navigate(['/']);
+  }
+
+  /**
+   * Go back to doorway selection.
+   */
+  goBackToDoorway(): void {
+    this.currentStep.set('doorway');
   }
 
   // ==========================================================================

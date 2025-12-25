@@ -2,26 +2,34 @@
  * LoginComponent - Hosted human authentication.
  *
  * Features:
+ * - Doorway-aware: Shows selected doorway, allows changing
  * - Email/username + password login
  * - Remember me (stores identifier)
  * - Error display with clear messaging
  * - Link to register for new users
  * - Post-login redirect to return URL
+ * - Connection status indicator
  */
 
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
 import { IdentityService } from '../../services/identity.service';
+import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { DoorwayPickerComponent } from '../doorway-picker/doorway-picker.component';
 import { type PasswordCredentials, AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
+import { type DoorwayInfo } from '../../models/doorway.model';
+
+/** Login step type */
+type LoginStep = 'doorway' | 'credentials';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, DoorwayPickerComponent],
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css'],
 })
@@ -29,6 +37,7 @@ export class LoginComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly passwordProvider = inject(PasswordAuthProvider);
   private readonly identityService = inject(IdentityService);
+  private readonly doorwayRegistry = inject(DoorwayRegistryService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -50,8 +59,21 @@ export class LoginComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly showPassword = signal(false);
 
+  /** Current login step */
+  readonly currentStep = signal<LoginStep>('doorway');
+
   /** Return URL after successful login */
   private returnUrl = '/';
+
+  // ==========================================================================
+  // Doorway State
+  // ==========================================================================
+
+  /** Selected doorway */
+  readonly selectedDoorway = this.doorwayRegistry.selected;
+
+  /** Whether a doorway has been selected */
+  readonly hasDoorwaySelected = this.doorwayRegistry.hasSelection;
 
   // ==========================================================================
   // Lifecycle
@@ -72,6 +94,11 @@ export class LoginComponent implements OnInit {
     const storedIdentifier = localStorage.getItem(AUTH_IDENTIFIER_KEY);
     if (storedIdentifier) {
       this.form.identifier = storedIdentifier;
+    }
+
+    // Skip doorway selection if already chosen
+    if (this.hasDoorwaySelected()) {
+      this.currentStep.set('credentials');
     }
 
     // Check if already authenticated - redirect if so
@@ -156,5 +183,31 @@ export class LoginComponent implements OnInit {
     this.router.navigate(['/register'], {
       queryParams: { returnUrl: this.returnUrl },
     });
+  }
+
+  // ==========================================================================
+  // Step Navigation
+  // ==========================================================================
+
+  /**
+   * Handle doorway selection from picker.
+   */
+  onDoorwaySelected(doorway: DoorwayInfo): void {
+    console.log('[Login] Doorway selected:', doorway.name);
+    this.currentStep.set('credentials');
+  }
+
+  /**
+   * Handle doorway picker cancellation.
+   */
+  onDoorwayPickerCancelled(): void {
+    this.router.navigate(['/']);
+  }
+
+  /**
+   * Go back to doorway selection.
+   */
+  goBackToDoorway(): void {
+    this.currentStep.set('doorway');
   }
 }

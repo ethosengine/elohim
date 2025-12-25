@@ -2,14 +2,16 @@ import { Component, OnInit, OnDestroy, inject, computed, signal, effect } from '
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute } from '@angular/router';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { Subject, Observable, of } from 'rxjs';
+import { takeUntil, catchError } from 'rxjs/operators';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { SovereigntyService } from '@app/imagodei/services/sovereignty.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
+import { ProfileService } from '@app/elohim/services/profile.service';
 import { SessionHuman, SessionActivity, SessionPathProgress, MasteryStats, MasteryLevel } from '../../models';
+import { ResumePoint, PathsOverview, TimelineEvent } from '@app/imagodei/models/profile.model';
 
 /**
  * ProfilePageComponent - Session Human profile management.
@@ -139,6 +141,11 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   pathProgressList: SessionPathProgress[] = [];
   activityHistory: SessionActivity[] = [];
 
+  // ProfileService data
+  resumePoint: ResumePoint | null = null;
+  pathsOverview: PathsOverview | null = null;
+  timelineEvents: TimelineEvent[] = [];
+
   // Mastery breakdown
   masteryByLevel: { level: MasteryLevel; count: number; label: string }[] = [];
 
@@ -175,7 +182,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly sessionHumanService: SessionHumanService,
-    private readonly contentMasteryService: ContentMasteryService
+    private readonly contentMasteryService: ContentMasteryService,
+    private readonly profileService: ProfileService
   ) {}
 
   ngOnInit(): void {
@@ -223,6 +231,36 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
         this.masteryStats = stats;
         this.computeMasteryBreakdown(stats);
         this.isLoading = false;
+      });
+
+    // Load resume point from ProfileService
+    this.profileService.getResumePoint()
+      .pipe(
+        takeUntil(this.destroy$),
+        catchError(() => of(null))
+      )
+      .subscribe(resumePoint => {
+        this.resumePoint = resumePoint;
+      });
+
+    // Load paths overview from ProfileService
+    this.profileService.getPathsOverview()
+      .pipe(
+        takeUntil(this.destroy$),
+        catchError(() => of({ inProgress: [], completed: [], suggested: [] }))
+      )
+      .subscribe(overview => {
+        this.pathsOverview = overview;
+      });
+
+    // Load timeline from ProfileService
+    this.profileService.getTimeline(50)
+      .pipe(
+        takeUntil(this.destroy$),
+        catchError(() => of([]))
+      )
+      .subscribe(events => {
+        this.timelineEvents = events;
       });
   }
 
@@ -404,6 +442,45 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
       this.sessionHumanService.resetSession();
       this.loadData();
     }
+  }
+
+  // =========================================================================
+  // TIMELINE HELPERS
+  // =========================================================================
+
+  getTimelineEventIcon(type: string): string {
+    const icons: Record<string, string> = {
+      'journey_started': 'play_circle',
+      'journey_completed': 'emoji_events',
+      'step_completed': 'check_circle',
+      'capability_earned': 'workspace_premium',
+      'meaningful_encounter': 'favorite',
+      'note_created': 'edit_note',
+      'return_visit': 'replay',
+      'first_exploration': 'explore',
+    };
+    return icons[type] ?? 'lens';
+  }
+
+  getTimelineEventColor(significance: string): string {
+    const colors: Record<string, string> = {
+      'milestone': '#667eea',
+      'progress': '#4caf50',
+      'activity': '#9e9e9e',
+    };
+    return colors[significance] ?? '#9e9e9e';
+  }
+
+  formatTimelineDate(timestamp: string): string {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString();
   }
 
   // =========================================================================

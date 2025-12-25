@@ -287,10 +287,88 @@
       </section>
       
       <!-- Governance Tab -->
-      <section *ngSwitchCase="'governance'">
-        <div class="placeholder-tab">
-          <h3>Governance History</h3>
-          <p>Change logs and discussions coming soon.</p>
+      <section *ngSwitchCase="'governance'" class="governance-tab">
+        <div *ngIf="isLoadingGovernance" class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading governance data...</p>
+        </div>
+
+        <div *ngIf="!isLoadingGovernance" class="governance-content">
+          <!-- Status Card -->
+          <div class="governance-status-card" [class]="'status-' + (governanceState?.status || 'unreviewed')">
+            <div class="status-header">
+              <span class="status-icon">{{ getGovernanceStatusIcon() }}</span>
+              <h3>{{ getGovernanceStatusLabel() }}</h3>
+            </div>
+            <div class="status-meta" *ngIf="governanceState">
+              <span>Last updated: {{ formatGovernanceDate(governanceState.lastUpdated) }}</span>
+            </div>
+
+            <!-- Active Labels -->
+            <div class="labels-section" *ngIf="governanceState?.labels?.length">
+              <h4>Active Labels</h4>
+              <div class="labels-list">
+                <ng-container *ngIf="governanceState">
+                  <span *ngFor="let label of governanceState.labels"
+                        class="label-badge"
+                        [class]="'severity-' + label.severity">
+                    {{ label.labelType }}
+                  </span>
+                </ng-container>
+              </div>
+            </div>
+          </div>
+
+          <!-- Challenges Section -->
+          <div class="challenges-section">
+            <h3>⚖️ Challenges</h3>
+
+            <div *ngIf="challenges.length === 0" class="empty-state">
+              <p>No challenges filed against this content.</p>
+              <button class="btn-secondary">File a Challenge</button>
+            </div>
+
+            <div *ngIf="challenges.length > 0" class="challenges-list">
+              <div *ngFor="let challenge of challenges"
+                   class="challenge-card"
+                   [class]="'status-' + challenge.status">
+                <div class="challenge-header">
+                  <span class="challenge-grounds">{{ challenge.grounds }}</span>
+                  <span class="challenge-status">{{ challenge.status }}</span>
+                </div>
+                <p class="challenge-description">{{ challenge.description }}</p>
+                <div class="challenge-meta">
+                  <span>Filed: {{ formatGovernanceDate(challenge.filedAt) }}</span>
+                  <span class="sla-indicator" [class]="getSlaStatus(challenge)">
+                    SLA: {{ getDaysRemaining(challenge.slaDeadline) }} days remaining
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Discussions Section (Talk Page) -->
+          <div class="discussions-section">
+            <h3>💬 Discussions</h3>
+
+            <div *ngIf="discussions.length === 0" class="empty-state">
+              <p>No discussions about this content yet.</p>
+              <button class="btn-secondary">Start Discussion</button>
+            </div>
+
+            <div *ngIf="discussions.length > 0" class="discussions-list">
+              <div *ngFor="let discussion of discussions" class="discussion-card">
+                <div class="discussion-header">
+                  <span class="discussion-category">{{ discussion.category }}</span>
+                  <span class="discussion-status">{{ discussion.status }}</span>
+                </div>
+                <h4 class="discussion-topic">{{ discussion.title }}</h4>
+                <div class="discussion-meta">
+                  <span>{{ discussion.messageCount }} messages</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

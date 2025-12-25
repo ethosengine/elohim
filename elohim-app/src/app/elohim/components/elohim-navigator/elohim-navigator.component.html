@@ -77,6 +77,9 @@
 
     <!-- Right: Auth Section -->
     @if (isAuthenticated()) {
+      <!-- Connection Status Indicator -->
+      <app-connection-indicator></app-connection-indicator>
+
       <!-- Authenticated: Show Profile Bubble -->
       <div class="profile-bubble-container">
         <button
@@ -185,7 +188,7 @@
 </div>
 
 <!-- Main Content Area -->
-<main class="elohim-main">
+<main class="elohim-main" id="main-content">
   <ng-content></ng-content>
 </main>
 

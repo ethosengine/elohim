@@ -2,7 +2,10 @@
  * Password Authentication Provider.
  *
  * Implements the AuthProvider interface for email/username + password authentication.
- * Communicates with the admin-proxy's /auth/* HTTP endpoints.
+ * Communicates with the doorway's /auth/* HTTP endpoints.
+ *
+ * Doorway-aware: Uses the selected doorway URL when available, falling back to
+ * environment configuration for backwards compatibility.
  *
  * Usage:
  * 1. Inject and register with AuthService on app init
@@ -25,6 +28,7 @@ import {
   type RegisterAuthRequest,
   type LoginRequest,
 } from '../../models/auth.model';
+import { DoorwayRegistryService } from '../doorway-registry.service';
 
 // =============================================================================
 // Provider Implementation
@@ -35,6 +39,7 @@ export class PasswordAuthProvider implements AuthProvider {
   readonly type = 'password' as const;
 
   private readonly http = inject(HttpClient);
+  private readonly doorwayRegistry = inject(DoorwayRegistryService);
 
   /**
    * Detect if running in Eclipse Che environment.
@@ -63,12 +68,20 @@ export class PasswordAuthProvider implements AuthProvider {
    * Get the base URL for auth endpoints.
    *
    * Priority:
-   * 1. Eclipse Che: Use hc-dev endpoint (admin-proxy exposed via Che)
-   * 2. Explicit authUrl from environment
-   * 3. Derive from adminUrl by converting WS to HTTP
+   * 1. Selected doorway URL (user's chosen identity provider)
+   * 2. Eclipse Che: Use hc-dev endpoint (admin-proxy exposed via Che)
+   * 3. Explicit authUrl from environment
+   * 4. Derive from adminUrl by converting WS to HTTP
    */
   private getAuthBaseUrl(): string {
-    // Check for Eclipse Che environment first
+    // Check for selected doorway first (fediverse-style gateway)
+    const doorwayUrl = this.doorwayRegistry.selectedUrl();
+    if (doorwayUrl) {
+      console.log('[PasswordAuth] Using selected doorway:', doorwayUrl);
+      return doorwayUrl;
+    }
+
+    // Check for Eclipse Che environment
     const cheAuthUrl = this.getCheAuthUrl();
     if (cheAuthUrl) {
       console.log('[PasswordAuth] Using Che hc-dev endpoint:', cheAuthUrl);

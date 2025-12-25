@@ -1,5 +1,32 @@
 <div class="login-container">
+  <!-- Step 1: Doorway Selection -->
+  @if (currentStep() === 'doorway') {
+    <app-doorway-picker
+      [mode]="'login'"
+      (doorwaySelected)="onDoorwaySelected($event)"
+      (cancelled)="onDoorwayPickerCancelled()"
+    />
+  }
+
+  <!-- Step 2: Credentials -->
+  @if (currentStep() === 'credentials') {
   <div class="login-card">
+    <!-- Step Indicator -->
+    <div class="step-indicator">
+      <button
+        type="button"
+        class="step-back"
+        (click)="goBackToDoorway()"
+        aria-label="Change doorway"
+      >
+        <span class="material-icons">arrow_back</span>
+      </button>
+      <div class="step-info">
+        <span class="step-label">Signing in via</span>
+        <span class="step-doorway">{{ selectedDoorway()?.doorway?.name ?? 'Unknown Doorway' }}</span>
+      </div>
+    </div>
+
     <!-- Header -->
     <div class="login-header">
       <h1>Welcome Back</h1>
@@ -8,10 +35,15 @@
 
     <!-- Error Display -->
     @if (error()) {
-      <div class="error-banner" (click)="clearError()">
-        <span class="error-icon">✕</span>
+      <div class="error-banner"
+           role="alert"
+           tabindex="0"
+           (click)="clearError()"
+           (keydown.enter)="clearError()"
+           (keydown.space)="clearError()">
+        <span class="error-icon" aria-hidden="true">✕</span>
         <span>{{ error() }}</span>
-        <button type="button" class="error-dismiss">Dismiss</button>
+        <button type="button" class="error-dismiss" aria-label="Dismiss error">Dismiss</button>
       </div>
     }
 
@@ -91,9 +123,10 @@
     <div class="login-footer">
       <p class="register-prompt">
         Don't have an account?
-        <a (click)="goToRegister()" class="register-link">Create one</a>
+        <button type="button" (click)="goToRegister()" class="register-link">Create one</button>
       </p>
       <a routerLink="/" class="back-link">← Back to Home</a>
     </div>
   </div>
+  }
 </div>

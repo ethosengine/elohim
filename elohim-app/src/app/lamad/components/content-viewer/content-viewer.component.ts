@@ -15,7 +15,13 @@ import { takeUntil, catchError } from 'rxjs/operators';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { ContentService } from '../../services/content.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import {
+  DataLoaderService,
+  ChallengeRecord,
+  DiscussionRecord,
+  GovernanceStateRecord
+} from '@app/elohim/services/data-loader.service';
+import { GovernanceService } from '@app/elohim/services/governance.service';
 import { SeoService } from '../../../services/seo.service';
 import { ContentNode } from '../../models/content-node.model';
 import {
@@ -57,6 +63,12 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   trustBadge: TrustBadge | null = null;
   isLoadingTrust = false;
 
+  // Governance data
+  governanceState: GovernanceStateRecord | null = null;
+  challenges: ChallengeRecord[] = [];
+  discussions: DiscussionRecord[] = [];
+  isLoadingGovernance = false;
+
   // "Appears in paths" back-links (Wikipedia-style)
   containingPaths: Array<{ pathId: string; pathTitle: string; stepIndex: number }> = [];
   loadingPaths = false;
@@ -94,7 +106,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     private readonly dataLoader: DataLoaderService,
     private readonly trustBadgeService: TrustBadgeService,
     private readonly editorService: ContentEditorService,
-    private readonly pathContextService: PathContextService
+    private readonly pathContextService: PathContextService,
+    private readonly governanceService: GovernanceService
   ) {}
 
   ngOnInit(): void {
@@ -258,6 +271,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
         // Load trust badge data for Attestations tab
         this.loadTrustBadge(nodeId);
 
+        // Load governance data for Governance tab
+        this.loadGovernanceData(nodeId);
+
         this.isLoading = false;
 
         // Schedule renderer loading for next change detection cycle
@@ -309,6 +325,143 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
           this.isLoadingTrust = false;
         }
       });
+  }
+
+  /**
+   * Load Governance data for the Governance tab
+   */
+  private loadGovernanceData(nodeId: string): void {
+    this.isLoadingGovernance = true;
+    this.governanceState = null;
+    this.challenges = [];
+    this.discussions = [];
+
+    // Load governance state
+    this.governanceService.getGovernanceState('content', nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (state) => {
+          this.governanceState = state;
+        },
+        error: () => {
+          // Governance state is optional - content may not have explicit state
+        }
+      });
+
+    // Load challenges for this content
+    this.governanceService.getChallengesForEntity('content', nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (challenges) => {
+          this.challenges = challenges;
+          this.isLoadingGovernance = false;
+        },
+        error: () => {
+          this.isLoadingGovernance = false;
+        }
+      });
+
+    // Load discussions for this content
+    this.governanceService.getDiscussionsForEntity('content', nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (discussions) => {
+          this.discussions = discussions;
+        },
+        error: () => {
+          // Discussions are optional
+        }
+      });
+  }
+
+  // =========================================================================
+  // Governance Helper Methods
+  // =========================================================================
+
+  /**
+   * Get human-readable governance status label
+   */
+  getGovernanceStatusLabel(): string {
+    const status = this.governanceState?.status || 'unreviewed';
+    const labels: Record<string, string> = {
+      'unreviewed': 'Unreviewed',
+      'auto-approved': 'Auto-Approved',
+      'community-reviewed': 'Community Reviewed',
+      'elohim-reviewed': 'Elohim Reviewed',
+      'challenged': 'Under Challenge',
+      'restricted': 'Restricted',
+      'suspended': 'Suspended',
+      'removed': 'Removed',
+      'appealing': 'Under Appeal',
+      'restored': 'Restored',
+      'constitutional': 'Constitutional'
+    };
+    return labels[status] || status;
+  }
+
+  /**
+   * Get icon for governance status
+   */
+  getGovernanceStatusIcon(): string {
+    const status = this.governanceState?.status || 'unreviewed';
+    const icons: Record<string, string> = {
+      'unreviewed': '❓',
+      'auto-approved': '🤖',
+      'community-reviewed': '👥',
+      'elohim-reviewed': '✓',
+      'challenged': '⚠️',
+      'restricted': '🔒',
+      'suspended': '⏸️',
+      'removed': '🚫',
+      'appealing': '⚖️',
+      'restored': '↩️',
+      'constitutional': '📜'
+    };
+    return icons[status] || '❓';
+  }
+
+  /**
+   * Get SLA status for a challenge
+   */
+  getSlaStatus(challenge: ChallengeRecord): string {
+    if (!challenge.slaDeadline) return 'unknown';
+
+    const deadline = new Date(challenge.slaDeadline);
+    const now = new Date();
+    const daysRemaining = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysRemaining < 0) return 'sla-breached';
+    if (daysRemaining <= 3) return 'sla-warning';
+    return 'sla-on-track';
+  }
+
+  /**
+   * Get days remaining until SLA deadline
+   */
+  getDaysRemaining(deadline: string | undefined): number {
+    if (!deadline) return -1;
+
+    const deadlineDate = new Date(deadline);
+    const now = new Date();
+    return Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  /**
+   * Format ISO date for display
+   */
+  formatGovernanceDate(isoDate: string | undefined): string {
+    if (!isoDate) return 'Unknown';
+
+    try {
+      const date = new Date(isoDate);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      return 'Invalid date';
+    }
   }
 
   /**

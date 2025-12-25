@@ -12,6 +12,7 @@ import { EdgeNodeDisplayInfo } from '../../models/holochain-connection.model';
 import { SovereigntyBadgeComponent } from '../../../lamad/components/sovereignty-badge/sovereignty-badge.component';
 import { IdentityService } from '../../../imagodei/services/identity.service';
 import { RunningContextService } from '@app/doorway/services/running-context.service';
+import { ConnectionIndicatorComponent } from '../../../imagodei/components/connection-indicator/connection-indicator.component';
 
 /**
  * Context app identifiers for the Elohim Protocol
@@ -42,7 +43,7 @@ export interface ContextAppConfig {
 @Component({
   selector: 'app-elohim-navigator',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, ThemeToggleComponent, SovereigntyBadgeComponent],
+  imports: [CommonModule, RouterLink, FormsModule, ThemeToggleComponent, SovereigntyBadgeComponent, ConnectionIndicatorComponent],
   templateUrl: './elohim-navigator.component.html',
   styleUrls: ['./elohim-navigator.component.css']
 })

@@ -1239,3 +1239,316 @@
     min-height: 280px;
   }
 }
+
+/* =========================================================================
+   Governance Tab Styles
+   ========================================================================= */
+
+.governance-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.governance-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Governance Status Card */
+.governance-status-card {
+  background: var(--lamad-surface);
+  border: 1px solid var(--lamad-border);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-left: 4px solid transparent;
+}
+
+/* Status colors */
+.governance-status-card.status-unreviewed { border-left-color: #9ca3af; }
+.governance-status-card.status-auto-approved { border-left-color: #6366f1; }
+.governance-status-card.status-community-reviewed { border-left-color: #3b82f6; }
+.governance-status-card.status-elohim-reviewed { border-left-color: #10b981; }
+.governance-status-card.status-challenged { border-left-color: #f97316; }
+.governance-status-card.status-restricted { border-left-color: #ef4444; }
+.governance-status-card.status-suspended { border-left-color: #dc2626; }
+.governance-status-card.status-removed { border-left-color: #7f1d1d; }
+.governance-status-card.status-appealing { border-left-color: #a855f7; }
+.governance-status-card.status-restored { border-left-color: #22c55e; }
+.governance-status-card.status-constitutional { border-left-color: #fbbf24; }
+
+.governance-status-card .status-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.governance-status-card .status-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.governance-status-card .status-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--lamad-text-primary);
+}
+
+.governance-status-card .status-meta {
+  font-size: 0.9rem;
+  color: var(--lamad-text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+/* Labels Section */
+.governance-status-card .labels-section {
+  border-top: 1px solid var(--lamad-border);
+  padding-top: 1.5rem;
+}
+
+.governance-status-card .labels-section h4 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  color: var(--lamad-text-primary);
+}
+
+.labels-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.label-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+/* Label severity colors */
+.label-badge.severity-informational {
+  background: rgba(156, 163, 175, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(156, 163, 175, 0.3);
+}
+
+.label-badge.severity-advisory {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.label-badge.severity-warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.label-badge.severity-critical {
+  background: rgba(249, 115, 22, 0.1);
+  color: #ea580c;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.label-badge.severity-emergency {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Challenges Section */
+.challenges-section,
+.discussions-section {
+  background: var(--lamad-surface);
+  border: 1px solid var(--lamad-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.challenges-section h3,
+.discussions-section h3 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.25rem;
+  color: var(--lamad-text-primary);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--lamad-text-secondary);
+}
+
+.empty-state p {
+  margin: 0 0 1rem 0;
+}
+
+.challenges-list,
+.discussions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Challenge Card */
+.challenge-card {
+  background: var(--lamad-bg-secondary);
+  border: 1px solid var(--lamad-border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  border-left: 4px solid transparent;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.challenge-card:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Challenge status colors */
+.challenge-card.status-pending { border-left-color: #9ca3af; }
+.challenge-card.status-acknowledged { border-left-color: #3b82f6; }
+.challenge-card.status-under-review { border-left-color: #f59e0b; }
+.challenge-card.status-resolved { border-left-color: #10b981; }
+.challenge-card.status-rejected { border-left-color: #ef4444; }
+
+.challenge-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.challenge-grounds {
+  font-weight: 600;
+  color: var(--lamad-text-primary);
+  text-transform: capitalize;
+}
+
+.challenge-status {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  background: var(--lamad-bg-tertiary);
+  color: var(--lamad-text-secondary);
+}
+
+.challenge-description {
+  margin: 0 0 1rem 0;
+  color: var(--lamad-text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.challenge-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--lamad-text-muted);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* SLA Indicators */
+.sla-indicator {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.sla-indicator.sla-on-track {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.sla-indicator.sla-warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+.sla-indicator.sla-breached {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+/* Discussion Card */
+.discussion-card {
+  background: var(--lamad-bg-secondary);
+  border: 1px solid var(--lamad-border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.discussion-card:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: var(--lamad-accent-primary);
+}
+
+.discussion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.discussion-category {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--lamad-accent-primary);
+  font-weight: 600;
+}
+
+.discussion-status {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  padding: 0.2rem 0.6rem;
+  border-radius: 10px;
+  background: var(--lamad-bg-tertiary);
+  color: var(--lamad-text-secondary);
+}
+
+.discussion-topic {
+  margin: 0 0 0.75rem 0;
+  font-size: 1.1rem;
+  color: var(--lamad-text-primary);
+}
+
+.discussion-meta {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.85rem;
+  color: var(--lamad-text-muted);
+}
+
+/* Responsive adjustments for governance tab */
+@media (max-width: 768px) {
+  .governance-status-card {
+    padding: 1.25rem;
+  }
+
+  .governance-status-card .status-header h3 {
+    font-size: 1.25rem;
+  }
+
+  .challenge-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .discussion-meta {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

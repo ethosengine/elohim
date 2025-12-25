@@ -107,6 +107,32 @@
             </div>
           }
 
+          <!-- Contextual Settings Links -->
+          <div class="context-links-section">
+            <span class="section-title">Manage in Context</span>
+            <p class="section-description">
+              Your identity extends across different contexts. Manage specific aspects in each.
+            </p>
+            <div class="context-links">
+              <a routerLink="/shefa" class="context-link">
+                <span class="context-icon material-icons">memory</span>
+                <div class="context-info">
+                  <strong>Compute & Nodes</strong>
+                  <span>Manage your stewarded compute resources, node topology, and infrastructure tokens</span>
+                </div>
+                <span class="material-icons">chevron_right</span>
+              </a>
+              <a routerLink="/lamad/profile" class="context-link">
+                <span class="context-icon material-icons">school</span>
+                <div class="context-info">
+                  <strong>Learning Profile</strong>
+                  <span>View your learning paths, progress, and achievements</span>
+                </div>
+                <span class="material-icons">chevron_right</span>
+              </a>
+            </div>
+          </div>
+
           <!-- Edit Button -->
           @if (canEdit()) {
             <div class="profile-actions">

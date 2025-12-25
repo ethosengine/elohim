@@ -1,0 +1,222 @@
+/**
+ * DoorwayPickerComponent - Gateway Selection UI
+ *
+ * Allows users to discover and select an Elohim doorway (network gateway).
+ * Similar to selecting a Mastodon instance in the Fediverse, users choose
+ * which doorway will serve as their identity provider and Holochain gateway.
+ *
+ * Features:
+ * - Grid of doorway cards with status, region, features
+ * - Search/filter by region
+ * - Custom doorway URL input
+ * - Health status indicators
+ * - Selection persistence
+ */
+
+import { Component, OnInit, inject, signal, computed, output, input } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import {
+  type DoorwayInfo,
+  type DoorwayRegion,
+  type DoorwayWithHealth,
+  getRegionDisplayName,
+  getStatusDisplay,
+  getFeatureDisplay,
+} from '../../models/doorway.model';
+
+/** Mode for the doorway picker */
+export type DoorwayPickerMode = 'register' | 'login';
+
+@Component({
+  selector: 'app-doorway-picker',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './doorway-picker.component.html',
+  styleUrls: ['./doorway-picker.component.css'],
+})
+export class DoorwayPickerComponent implements OnInit {
+  // ===========================================================================
+  // Dependencies
+  // ===========================================================================
+
+  private readonly registryService = inject(DoorwayRegistryService);
+
+  // ===========================================================================
+  // Inputs
+  // ===========================================================================
+
+  /** Mode: 'register' shows "Create identity", 'login' shows "Sign in" */
+  readonly mode = input<DoorwayPickerMode>('register');
+
+  // ===========================================================================
+  // Outputs
+  // ===========================================================================
+
+  /** Emitted when a doorway is selected */
+  readonly doorwaySelected = output<DoorwayInfo>();
+
+  /** Emitted when selection is cancelled */
+  readonly cancelled = output<void>();
+
+  // ===========================================================================
+  // Component State
+  // ===========================================================================
+
+  readonly searchQuery = signal('');
+  readonly selectedRegion = signal<DoorwayRegion | 'all'>('all');
+  readonly showCustomInput = signal(false);
+  readonly customUrl = signal('');
+  readonly customValidating = signal(false);
+  readonly customError = signal<string | null>(null);
+
+  // ===========================================================================
+  // Delegated State
+  // ===========================================================================
+
+  readonly doorways = this.registryService.doorwaysWithHealth;
+  readonly isLoading = this.registryService.isLoading;
+  readonly error = this.registryService.error;
+  readonly selected = this.registryService.selected;
+
+  // ===========================================================================
+  // Computed State
+  // ===========================================================================
+
+  /** Filtered doorways based on search and region */
+  readonly filteredDoorways = computed(() => {
+    let result = this.doorways();
+
+    // Filter by region
+    const region = this.selectedRegion();
+    if (region !== 'all') {
+      result = result.filter(d => d.region === region);
+    }
+
+    // Filter by search query
+    const query = this.searchQuery().toLowerCase().trim();
+    if (query) {
+      result = result.filter(d =>
+        d.name.toLowerCase().includes(query) ||
+        d.description.toLowerCase().includes(query) ||
+        d.operator.toLowerCase().includes(query)
+      );
+    }
+
+    return result;
+  });
+
+  /** Available regions from doorways */
+  readonly availableRegions = computed(() => {
+    const regions = new Set(this.doorways().map(d => d.region));
+    return Array.from(regions).sort();
+  });
+
+  /** Currently selected doorway ID (for highlighting) */
+  readonly selectedId = computed(() => this.selected()?.doorway.id ?? null);
+
+  /** Title text based on mode */
+  readonly titleText = computed(() =>
+    this.mode() === 'login' ? 'Choose Your Gateway' : 'Choose Your Gateway'
+  );
+
+  /** Subtitle text based on mode */
+  readonly subtitleText = computed(() =>
+    this.mode() === 'login'
+      ? 'Select the doorway where you registered'
+      : 'Select a doorway to create your identity'
+  );
+
+  /** Action button text based on mode */
+  readonly actionText = computed(() =>
+    this.mode() === 'login' ? 'Sign In Here' : 'Join This Doorway'
+  );
+
+  // ===========================================================================
+  // Template Helpers
+  // ===========================================================================
+
+  readonly getRegionDisplayName = getRegionDisplayName;
+  readonly getStatusDisplay = getStatusDisplay;
+  readonly getFeatureDisplay = getFeatureDisplay;
+
+  // ===========================================================================
+  // Lifecycle
+  // ===========================================================================
+
+  ngOnInit(): void {
+    this.loadDoorways();
+  }
+
+  // ===========================================================================
+  // Public Methods
+  // ===========================================================================
+
+  async loadDoorways(): Promise<void> {
+    await this.registryService.loadDoorways();
+    // Refresh health after loading
+    await this.registryService.refreshHealth();
+  }
+
+  selectDoorway(doorway: DoorwayInfo): void {
+    this.registryService.selectDoorway(doorway, true);
+    this.doorwaySelected.emit(doorway);
+  }
+
+  toggleCustomInput(): void {
+    this.showCustomInput.update(v => !v);
+    this.customError.set(null);
+    this.customUrl.set('');
+  }
+
+  async validateAndSelectCustom(): Promise<void> {
+    const url = this.customUrl().trim();
+    if (!url) {
+      this.customError.set('Please enter a doorway URL');
+      return;
+    }
+
+    this.customValidating.set(true);
+    this.customError.set(null);
+
+    try {
+      const result = await this.registryService.validateDoorway(url);
+
+      if (result.isValid && result.doorway) {
+        this.registryService.selectDoorway(result.doorway, true);
+        this.doorwaySelected.emit(result.doorway);
+      } else {
+        this.customError.set(result.error ?? 'Invalid doorway');
+      }
+    } catch (err) {
+      this.customError.set(err instanceof Error ? err.message : 'Validation failed');
+    } finally {
+      this.customValidating.set(false);
+    }
+  }
+
+  cancel(): void {
+    this.cancelled.emit();
+  }
+
+  // ===========================================================================
+  // Template Helpers
+  // ===========================================================================
+
+  getLatencyClass(latencyMs: number | null): string {
+    if (latencyMs === null) return 'latency-unknown';
+    if (latencyMs < 100) return 'latency-fast';
+    if (latencyMs < 300) return 'latency-medium';
+    return 'latency-slow';
+  }
+
+  formatLatency(latencyMs: number | null): string {
+    if (latencyMs === null) return '--';
+    return `${latencyMs}ms`;
+  }
+
+  trackByDoorway(_index: number, doorway: DoorwayWithHealth): string {
+    return doorway.id;
+  }
+}
