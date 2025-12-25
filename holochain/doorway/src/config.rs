@@ -105,6 +105,24 @@ pub struct Args {
     /// Region identifier for this doorway instance (for locality-aware routing)
     #[arg(long, env = "REGION")]
     pub region: Option<String>,
+
+    /// Doorway identifier for federation (e.g., "alpha-elohim-host")
+    /// Used in JWT claims to identify token issuer
+    #[arg(long, env = "DOORWAY_ID")]
+    pub doorway_id: Option<String>,
+
+    /// Public URL of this doorway for cross-doorway validation
+    /// (e.g., "https://alpha.elohim.host")
+    #[arg(long, env = "DOORWAY_URL")]
+    pub doorway_url: Option<String>,
+
+    /// Holochain installed app ID for projections and signal subscriptions
+    #[arg(long, env = "INSTALLED_APP_ID", default_value = "elohim")]
+    pub installed_app_id: String,
+
+    /// Admin port for orchestrator mDNS advertisement (defaults to conductor admin port)
+    #[arg(long, env = "ORCHESTRATOR_ADMIN_PORT", default_value = "8888")]
+    pub orchestrator_admin_port: u16,
 }
 
 /// NATS connection configuration

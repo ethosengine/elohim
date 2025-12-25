@@ -17,7 +17,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONDUCTOR_DATA_DIR="$SCRIPT_DIR/conductor-data"
 HAPP_PATH="/projects/elohim/holochain/dna/lamad-spike/workdir/lamad-spike.happ"
-APP_ID="lamad-spike"
+APP_ID="elohim"
 APP_PORT=4445
 
 MODE="${1:-auto}"

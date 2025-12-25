@@ -2,6 +2,14 @@
 //!
 //! Subscribes to the conductor's app WebSocket interface and receives
 //! post_commit signals from the DNA, feeding them to the Projection Engine.
+//!
+//! ## Authentication Flow (Holochain 0.3+)
+//!
+//! 1. Connect to admin interface
+//! 2. Request AppAuthenticationToken for the installed app
+//! 3. Connect to app interface
+//! 4. Send AppAuthenticationRequest with token
+//! 5. Receive signals
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -11,9 +19,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use tokio::sync::broadcast;
 use tokio::time::sleep;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{
+    connect_async_with_config,
+    tungstenite::{http::Request, Message},
+};
 use tracing::{debug, error, info, warn};
 
+use super::app_auth::{issue_app_token, AppAuthToken};
 use super::engine::ProjectionSignal;
 
 /// Holochain WebSocket message types
@@ -45,8 +57,14 @@ pub struct AppSignal {
 /// Subscriber configuration
 #[derive(Debug, Clone)]
 pub struct SubscriberConfig {
-    /// Conductor app WebSocket URL
+    /// Conductor admin WebSocket URL (for requesting auth tokens)
+    pub admin_url: String,
+    /// Conductor app WebSocket URL (for receiving signals)
     pub app_url: String,
+    /// Installed app ID to authenticate as
+    pub installed_app_id: String,
+    /// Token expiry in seconds (0 = no expiry)
+    pub token_expiry_seconds: u64,
     /// Reconnection delay on disconnect
     pub reconnect_delay: Duration,
     /// Maximum reconnection attempts (0 = infinite)
@@ -58,7 +76,10 @@ pub struct SubscriberConfig {
 impl Default for SubscriberConfig {
     fn default() -> Self {
         Self {
+            admin_url: "ws://localhost:4444".to_string(),
             app_url: "ws://localhost:4445".to_string(),
+            installed_app_id: "elohim".to_string(),
+            token_expiry_seconds: 0, // No expiry - we'll refresh on reconnect
             reconnect_delay: Duration::from_secs(5),
             max_reconnect_attempts: 0, // Infinite
             ping_interval: Duration::from_secs(30),
@@ -70,8 +91,16 @@ impl SubscriberConfig {
     /// Create config from environment
     pub fn from_env() -> Self {
         Self {
+            admin_url: std::env::var("HOLOCHAIN_ADMIN_URL")
+                .unwrap_or_else(|_| "ws://localhost:4444".to_string()),
             app_url: std::env::var("HOLOCHAIN_APP_URL")
                 .unwrap_or_else(|_| "ws://localhost:4445".to_string()),
+            installed_app_id: std::env::var("HOLOCHAIN_APP_ID")
+                .unwrap_or_else(|_| "elohim".to_string()),
+            token_expiry_seconds: std::env::var("HOLOCHAIN_TOKEN_EXPIRY")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
             reconnect_delay: Duration::from_secs(
                 std::env::var("PROJECTION_RECONNECT_DELAY")
                     .ok()
@@ -136,15 +165,53 @@ impl SignalSubscriber {
                 break;
             }
 
-            info!("Connecting to conductor at {}", self.config.app_url);
+            // Step 1: Get auth token from admin interface
+            info!(
+                "Requesting app auth token for '{}' from {}",
+                self.config.installed_app_id, self.config.admin_url
+            );
 
-            match self.connect_and_listen().await {
+            let token = match issue_app_token(
+                &self.config.admin_url,
+                &self.config.installed_app_id,
+                self.config.token_expiry_seconds,
+            )
+            .await
+            {
+                Ok(t) => {
+                    info!("Obtained app authentication token");
+                    t
+                }
+                Err(e) => {
+                    error!("Failed to get app auth token: {}", e);
+                    reconnect_attempts += 1;
+
+                    if self.config.max_reconnect_attempts > 0
+                        && reconnect_attempts >= self.config.max_reconnect_attempts
+                    {
+                        error!("Max reconnection attempts reached, stopping subscriber");
+                        break;
+                    }
+
+                    info!(
+                        "Retrying in {:?} (attempt {})",
+                        self.config.reconnect_delay, reconnect_attempts
+                    );
+                    sleep(self.config.reconnect_delay).await;
+                    continue;
+                }
+            };
+
+            // Step 2: Connect to app interface and authenticate
+            info!("Connecting to app interface at {}", self.config.app_url);
+
+            match self.connect_and_listen(&token).await {
                 Ok(()) => {
                     // Clean disconnect, reset counter
                     reconnect_attempts = 0;
                 }
                 Err(e) => {
-                    error!("Conductor connection error: {}", e);
+                    error!("App interface error: {}", e);
                     reconnect_attempts += 1;
 
                     if self.config.max_reconnect_attempts > 0
@@ -178,14 +245,47 @@ impl SignalSubscriber {
     }
 
     /// Connect to conductor and listen for signals
-    async fn connect_and_listen(&self) -> Result<(), String> {
-        let (ws_stream, _) = connect_async(&self.config.app_url)
+    async fn connect_and_listen(&self, token: &AppAuthToken) -> Result<(), String> {
+        // Build request with proper headers (like conductor.rs)
+        // This ensures the app interface accepts the connection
+        let host = self
+            .config
+            .app_url
+            .split("//")
+            .last()
+            .unwrap_or("localhost:4445");
+
+        let request = Request::builder()
+            .uri(&self.config.app_url)
+            .header("Host", host)
+            .header("Origin", "http://localhost")
+            .header("Connection", "Upgrade")
+            .header("Upgrade", "websocket")
+            .header("Sec-WebSocket-Version", "13")
+            .header(
+                "Sec-WebSocket-Key",
+                tokio_tungstenite::tungstenite::handshake::client::generate_key(),
+            )
+            .body(())
+            .map_err(|e| format!("Failed to build request: {}", e))?;
+
+        let (ws_stream, _) = connect_async_with_config(request, None, false)
             .await
             .map_err(|e| format!("WebSocket connect failed: {}", e))?;
 
-        info!("Connected to conductor app interface");
+        debug!("WebSocket connected, sending authentication...");
 
         let (mut write, mut read) = ws_stream.split();
+
+        // Step 3: Send AppAuthenticationRequest
+        self.send_auth_request(&mut write, token).await?;
+
+        // Step 4: Wait for auth response
+        self.wait_for_auth_response(&mut read).await?;
+
+        info!("Connected and authenticated to app interface");
+
+        // Continue with the same split streams
         let mut shutdown_rx = self.shutdown_receiver();
         let mut ping_interval = tokio::time::interval(self.config.ping_interval);
 
@@ -233,6 +333,107 @@ impl SignalSubscriber {
                 }
             }
         }
+    }
+
+    /// Send AppAuthenticationRequest to the app interface
+    async fn send_auth_request<S>(
+        &self,
+        write: &mut futures_util::stream::SplitSink<S, Message>,
+        token: &AppAuthToken,
+    ) -> Result<(), String>
+    where
+        S: futures_util::Sink<Message> + Unpin,
+        <S as futures_util::Sink<Message>>::Error: std::fmt::Display,
+    {
+        // Build AppAuthenticationRequest message
+        // Format: { token: <bytes> } wrapped in request envelope
+        let inner = rmpv::Value::Map(vec![(
+            rmpv::Value::String("token".into()),
+            rmpv::Value::Binary(token.token.clone()),
+        )]);
+
+        let mut inner_buf = Vec::new();
+        rmpv::encode::write_value(&mut inner_buf, &inner)
+            .map_err(|e| format!("Failed to encode auth request: {}", e))?;
+
+        // Wrap in request envelope with id=0
+        let envelope = rmpv::Value::Map(vec![
+            (
+                rmpv::Value::String("id".into()),
+                rmpv::Value::Integer(0.into()),
+            ),
+            (
+                rmpv::Value::String("type".into()),
+                rmpv::Value::String("request".into()),
+            ),
+            (
+                rmpv::Value::String("data".into()),
+                rmpv::Value::Binary(inner_buf),
+            ),
+        ]);
+
+        let mut buf = Vec::new();
+        rmpv::encode::write_value(&mut buf, &envelope)
+            .map_err(|e| format!("Failed to encode envelope: {}", e))?;
+
+        write
+            .send(Message::Binary(buf))
+            .await
+            .map_err(|e| format!("Failed to send auth request: {}", e))?;
+
+        debug!("Sent AppAuthenticationRequest");
+        Ok(())
+    }
+
+    /// Wait for authentication response
+    async fn wait_for_auth_response<S>(
+        &self,
+        read: &mut futures_util::stream::SplitStream<S>,
+    ) -> Result<(), String>
+    where
+        S: futures_util::Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>>
+            + Unpin,
+    {
+        let response = tokio::time::timeout(Duration::from_secs(5), async {
+            while let Some(msg) = read.next().await {
+                match msg {
+                    Ok(Message::Binary(data)) => {
+                        // Parse response to check for errors
+                        if let Ok(value) = rmpv::decode::read_value(&mut std::io::Cursor::new(&data))
+                        {
+                            if let rmpv::Value::Map(ref map) = value {
+                                // Check for error response
+                                for (k, v) in map {
+                                    if let rmpv::Value::String(key) = k {
+                                        if key.as_str() == Some("type") {
+                                            if let rmpv::Value::String(val) = v {
+                                                if val.as_str() == Some("error") {
+                                                    return Err("Authentication rejected".to_string());
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // Any non-error response means success
+                        return Ok(());
+                    }
+                    Ok(Message::Close(_)) => {
+                        return Err("Connection closed during auth".to_string());
+                    }
+                    Err(e) => {
+                        return Err(format!("WebSocket error: {}", e));
+                    }
+                    _ => continue,
+                }
+            }
+            Err("No auth response received".to_string())
+        })
+        .await
+        .map_err(|_| "Timeout waiting for auth response".to_string())??;
+
+        Ok(response)
     }
 
     /// Handle a text message from conductor
@@ -359,7 +560,9 @@ mod tests {
     #[test]
     fn test_config_default() {
         let config = SubscriberConfig::default();
+        assert_eq!(config.admin_url, "ws://localhost:4444");
         assert_eq!(config.app_url, "ws://localhost:4445");
+        assert_eq!(config.installed_app_id, "elohim");
         assert_eq!(config.reconnect_delay, Duration::from_secs(5));
     }
 

@@ -58,7 +58,7 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
     # --in-process-lair uses embedded lair keystore
     cat > "$HC_WRAPPER" << EOF
 #!/bin/bash
-exec hc sandbox generate --app-id lamad-spike --in-process-lair -r=4445 "$HAPP_PATH"
+exec hc sandbox generate --app-id elohim --in-process-lair -r=4445 "$HAPP_PATH"
 EOF
     chmod +x "$HC_WRAPPER"
 
@@ -152,10 +152,10 @@ fi
 
 # Check if hApp is installed
 APPS=$(hc sandbox call --running "$ADMIN_PORT" list-apps 2>/dev/null || echo "")
-if echo "$APPS" | grep -q "lamad-spike"; then
-    echo "✅ lamad-spike hApp installed"
+if echo "$APPS" | grep -q "elohim"; then
+    echo "✅ elohim hApp installed"
 else
-    echo "⚠️  lamad-spike not found - sandbox may have started without hApp"
+    echo "⚠️  elohim hApp not found - sandbox may have started without hApp"
     echo "   Ensure $HAPP_PATH exists and restart with: npm run hc:stop && npm run start:hc"
 fi
 

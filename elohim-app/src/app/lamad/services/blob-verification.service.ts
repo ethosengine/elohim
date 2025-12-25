@@ -221,7 +221,9 @@ export class BlobVerificationService {
     try {
       // Dynamic import of WASM module
       // The elohim-wasm package should be built with wasm-pack and available
-      const wasm = await import('@elohim/wasm');
+      // Use variable to prevent Vite from statically resolving (optional dependency)
+      const wasmModulePath = '@elohim/wasm';
+      const wasm = await import(/* @vite-ignore */ wasmModulePath);
       await wasm.default(); // Initialize WASM
       this.wasmModule = wasm as unknown as ElohimWasmModule;
       this.wasmAvailable = true;

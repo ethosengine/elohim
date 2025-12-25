@@ -122,7 +122,7 @@ async fn main() -> anyhow::Result<()> {
     let orchestrator_state = if args.orchestrator_enabled {
         let config = OrchestratorConfig {
             mdns_service_type: "elohim-node".to_string(),
-            admin_port: 8888, // TODO: derive from args
+            admin_port: args.orchestrator_admin_port,
             nats_url: args.nats.nats_url.clone(),
             heartbeat_interval_secs: 30,
             failure_threshold: 3,
@@ -144,29 +144,58 @@ async fn main() -> anyhow::Result<()> {
     let state = Arc::new(state);
 
     // Start Projection Engine (if projection store is available)
+    // Note: In dev mode, the signal subscriber is disabled because:
+    // 1. Holochain 0.3+ requires app interface authentication (IssueAppAuthenticationToken)
+    // 2. The projection store is memory-only without MongoDB anyway
+    // Production mode uses app_auth module for proper IssueAppAuthenticationToken flow
     let _projection_handle = if let Some(ref projection_store) = state.projection {
-        // Derive app URL from conductor URL (replace admin port with app port)
-        let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
+        if args.dev_mode {
+            // In dev mode, create engine without signal subscriber
+            // The projection store can still be queried, just won't receive real-time signals
+            info!("Projection engine started (dev mode: signal subscriber disabled, app interface requires auth)");
 
-        info!("Starting projection engine (app interface: {})", app_url);
+            // Create engine without signals (it will still work for manual queries)
+            let engine = Arc::new(ProjectionEngine::new(
+                projection_store.clone(),
+                EngineConfig::default(),
+            ));
 
-        // Start signal subscriber
-        let subscriber_config = SubscriberConfig {
-            app_url,
-            ..SubscriberConfig::default()
-        };
-        let (subscriber, subscriber_handle) = spawn_subscriber(subscriber_config);
+            // Start engine without signal subscription
+            let (signal_tx, _) = tokio::sync::broadcast::channel(1);
+            let signal_rx = signal_tx.subscribe();
+            let engine_handle = spawn_engine_task(engine, signal_rx);
 
-        // Create and start projection engine
-        let engine = Arc::new(ProjectionEngine::new(
-            projection_store.clone(),
-            EngineConfig::default(),
-        ));
-        let signal_rx = subscriber.subscribe();
-        let engine_handle = spawn_engine_task(engine, signal_rx);
+            Some((tokio::spawn(async {}), engine_handle))
+        } else {
+            // Production mode: require proper app interface authentication
+            // Use conductor URL for admin interface, derive app URL from port
+            let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
 
-        info!("Projection engine started");
-        Some((subscriber_handle, engine_handle))
+            info!(
+                "Starting projection engine (admin: {}, app: {})",
+                args.conductor_url, app_url
+            );
+
+            // Start signal subscriber with proper authentication
+            let subscriber_config = SubscriberConfig {
+                admin_url: args.conductor_url.clone(),
+                app_url,
+                installed_app_id: args.installed_app_id.clone(),
+                ..SubscriberConfig::default()
+            };
+            let (subscriber, subscriber_handle) = spawn_subscriber(subscriber_config);
+
+            // Create and start projection engine
+            let engine = Arc::new(ProjectionEngine::new(
+                projection_store.clone(),
+                EngineConfig::default(),
+            ));
+            let signal_rx = subscriber.subscribe();
+            let engine_handle = spawn_engine_task(engine, signal_rx);
+
+            info!("Projection engine started");
+            Some((subscriber_handle, engine_handle))
+        }
     } else {
         warn!("Projection engine not started (no projection store)");
         None

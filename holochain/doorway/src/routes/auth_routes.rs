@@ -60,6 +60,12 @@ pub struct AuthResponse {
     pub agent_pub_key: String,
     pub identifier: String,
     pub expires_at: u64,
+    /// Doorway that issued this token (for federation)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doorway_id: Option<String>,
+    /// Doorway URL for cross-doorway validation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doorway_url: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -69,6 +75,12 @@ pub struct MeResponse {
     pub agent_pub_key: String,
     pub identifier: String,
     pub permission_level: String,
+    /// Doorway that issued this token (for federation)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doorway_id: Option<String>,
+    /// Doorway URL for cross-doorway validation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doorway_url: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -219,6 +231,7 @@ async fn handle_register(
         );
         return generate_auth_response(
             &jwt,
+            &state,
             &body.human_id,
             &body.agent_pub_key,
             &body.identifier,
@@ -329,6 +342,7 @@ async fn handle_register(
 
     generate_auth_response(
         &jwt,
+        &state,
         &body.human_id,
         &body.agent_pub_key,
         &body.identifier,
@@ -381,6 +395,7 @@ async fn handle_login(
         info!("Dev mode login (no MongoDB): {}", body.identifier);
         return generate_auth_response(
             &jwt,
+            &state,
             &format!("human-{}", &body.identifier),
             "uhCAk-dev-mode-agent-key",
             &body.identifier,
@@ -474,6 +489,7 @@ async fn handle_login(
 
     generate_auth_response(
         &jwt,
+        &state,
         &user.human_id,
         &user.agent_pub_key,
         &user.identifier,
@@ -541,6 +557,7 @@ async fn handle_refresh(
 
     generate_auth_response(
         &jwt,
+        &state,
         &old_claims.human_id,
         &old_claims.agent_pub_key,
         &old_claims.identifier,
@@ -595,6 +612,8 @@ async fn handle_me(
             agent_pub_key: claims.agent_pub_key,
             identifier: claims.identifier,
             permission_level: claims.permission_level.to_string(),
+            doorway_id: claims.doorway_id,
+            doorway_url: claims.doorway_url,
         },
     )
 }
@@ -633,16 +652,23 @@ fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<BoxBody>
 /// Generate a successful auth response with JWT token
 fn generate_auth_response(
     jwt: &JwtValidator,
+    state: &AppState,
     human_id: &str,
     agent_pub_key: &str,
     identifier: &str,
     status: StatusCode,
 ) -> Response<BoxBody> {
+    // Get doorway identity from config
+    let doorway_id = state.args.doorway_id.clone();
+    let doorway_url = state.args.doorway_url.clone();
+
     let input = TokenInput {
         human_id: human_id.to_string(),
         agent_pub_key: agent_pub_key.to_string(),
         identifier: identifier.to_string(),
         permission_level: PermissionLevel::Authenticated,
+        doorway_id: doorway_id.clone(),
+        doorway_url: doorway_url.clone(),
     };
 
     match jwt.generate_token(input) {
@@ -658,6 +684,8 @@ fn generate_auth_response(
                     agent_pub_key: agent_pub_key.to_string(),
                     identifier: identifier.to_string(),
                     expires_at,
+                    doorway_id,
+                    doorway_url,
                 },
             )
         }

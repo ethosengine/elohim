@@ -315,6 +315,8 @@ pub struct CustodianService {
     projection: Option<Arc<ProjectionStore>>,
     /// Optional orchestrator state for human-scale metrics
     orchestrator: Option<Arc<OrchestratorState>>,
+    /// HTTP client for health probing
+    http_client: reqwest::Client,
 }
 
 /// Service statistics
@@ -328,6 +330,12 @@ struct CustodianServiceStats {
 impl CustodianService {
     /// Create a new custodian service
     pub fn new(config: CustodianServiceConfig) -> Self {
+        // Build HTTP client with timeout matching probe timeout
+        let http_client = reqwest::Client::builder()
+            .timeout(config.probe_timeout)
+            .build()
+            .expect("Failed to create HTTP client");
+
         Self {
             capabilities: DashMap::new(),
             blob_custodians: DashMap::new(),
@@ -341,6 +349,7 @@ impl CustodianService {
             },
             projection: None,
             orchestrator: None,
+            http_client,
         }
     }
 
@@ -773,59 +782,113 @@ impl CustodianService {
     // Health Probing
     // ========================================================================
 
-    /// Probe a custodian's health
+    /// Probe a custodian's health by making an HTTP request to their health endpoint
     ///
-    /// TODO: Implement actual HTTP health probing when reqwest is added.
-    /// For now, returns cached health based on success/failure counts.
+    /// Performs actual HTTP GET to `{base_url}/health` and measures latency.
+    /// Updates custodian capability with probe results.
     pub async fn probe_custodian_health(&self, agent_id: &str) -> Option<HealthProbeResult> {
         let capability = self.capabilities.get(agent_id)?;
+        let base_url = capability.base_url.clone();
+        let bandwidth_mbps = capability.bandwidth_mbps;
+        drop(capability); // Release the read lock before async work
 
         self.stats.total_probes.fetch_add(1, Ordering::Relaxed);
         let start = Instant::now();
 
-        // Stub: simulate successful probe based on existing health score
-        let is_healthy = capability.health_score() >= 0.5;
+        // Construct health endpoint URL
+        let health_url = format!("{}/health", base_url.trim_end_matches('/'));
 
-        if is_healthy {
-            self.stats.successful_probes.fetch_add(1, Ordering::Relaxed);
+        // Make actual HTTP request
+        let probe_result = match self.http_client.get(&health_url).send().await {
+            Ok(response) => {
+                let latency = start.elapsed();
+                let latency_ms = latency.as_millis() as u32;
 
-            // Update capability with probe time
-            if let Some(mut cap) = self.capabilities.get_mut(agent_id) {
-                cap.last_health_check_ms = Some(current_time_ms());
-                cap.health_check_successes += 1;
+                if response.status().is_success() {
+                    // Try to parse health response for additional info
+                    let accepting_blobs = response
+                        .json::<serde_json::Value>()
+                        .await
+                        .ok()
+                        .and_then(|v| v.get("accepting_blobs")?.as_bool())
+                        .unwrap_or(true);
+
+                    self.stats.successful_probes.fetch_add(1, Ordering::Relaxed);
+
+                    // Update capability with probe results
+                    if let Some(mut cap) = self.capabilities.get_mut(agent_id) {
+                        cap.last_health_check_ms = Some(current_time_ms());
+                        cap.health_check_successes += 1;
+                        cap.latency_ms = latency_ms; // Update with actual measured latency
+                    }
+
+                    HealthProbeResult {
+                        online: true,
+                        accepting_blobs,
+                        bandwidth_mbps,
+                        latency_ms,
+                        probe_duration: latency,
+                    }
+                } else {
+                    debug!(
+                        "Health probe to {} returned status {}",
+                        health_url,
+                        response.status()
+                    );
+                    self.stats.failed_probes.fetch_add(1, Ordering::Relaxed);
+
+                    if let Some(mut cap) = self.capabilities.get_mut(agent_id) {
+                        cap.health_check_failures += 1;
+                    }
+
+                    HealthProbeResult {
+                        online: false,
+                        accepting_blobs: false,
+                        bandwidth_mbps: 0.0,
+                        latency_ms,
+                        probe_duration: latency,
+                    }
+                }
             }
+            Err(e) => {
+                debug!("Health probe to {} failed: {}", health_url, e);
+                self.stats.failed_probes.fetch_add(1, Ordering::Relaxed);
 
-            Some(HealthProbeResult {
-                online: true,
-                accepting_blobs: true,
-                bandwidth_mbps: capability.bandwidth_mbps,
-                latency_ms: capability.latency_ms,
-                probe_duration: start.elapsed(),
-            })
-        } else {
-            self.stats.failed_probes.fetch_add(1, Ordering::Relaxed);
+                if let Some(mut cap) = self.capabilities.get_mut(agent_id) {
+                    cap.health_check_failures += 1;
+                }
 
-            if let Some(mut cap) = self.capabilities.get_mut(agent_id) {
-                cap.health_check_failures += 1;
+                HealthProbeResult {
+                    online: false,
+                    accepting_blobs: false,
+                    bandwidth_mbps: 0.0,
+                    latency_ms: 0,
+                    probe_duration: start.elapsed(),
+                }
             }
+        };
 
-            Some(HealthProbeResult {
-                online: false,
-                accepting_blobs: false,
-                bandwidth_mbps: 0.0,
-                latency_ms: capability.latency_ms,
-                probe_duration: start.elapsed(),
-            })
-        }
+        Some(probe_result)
     }
 
-    /// Probe health of a specific URL
+    /// Probe health of a specific URL and return the latency
     ///
-    /// TODO: Implement actual HTTP health probing when reqwest is added.
-    /// For now, returns a simulated latency.
-    pub async fn probe_url_health(&self, _url: &str) -> Option<Duration> {
-        // Stub: return simulated latency
-        Some(Duration::from_millis(50))
+    /// Makes an HTTP HEAD request to measure round-trip time.
+    /// Returns None if the request fails or times out.
+    pub async fn probe_url_health(&self, url: &str) -> Option<Duration> {
+        let start = Instant::now();
+
+        match self.http_client.head(url).send().await {
+            Ok(response) if response.status().is_success() => Some(start.elapsed()),
+            Ok(response) => {
+                debug!("URL probe to {} returned status {}", url, response.status());
+                None
+            }
+            Err(e) => {
+                debug!("URL probe to {} failed: {}", url, e);
+                None
+            }
+        }
     }
 
     /// Probe all registered custodians

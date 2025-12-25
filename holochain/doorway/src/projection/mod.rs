@@ -34,6 +34,7 @@
 //! let results = store.query("content", ContentQuery::by_type("concept")).await;
 //! ```
 
+pub mod app_auth;
 pub mod collections;
 pub mod document;
 pub mod engine;

@@ -28,6 +28,12 @@ pub struct Claims {
     pub identifier: String,
     /// Permission level granted
     pub permission_level: PermissionLevel,
+    /// Doorway ID that issued this token (for federation)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doorway_id: Option<String>,
+    /// Doorway URL for cross-doorway validation
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doorway_url: Option<String>,
     /// Token version (for future invalidation)
     pub version: u32,
     /// Issued at (Unix timestamp)
@@ -43,6 +49,10 @@ pub struct TokenInput {
     pub agent_pub_key: String,
     pub identifier: String,
     pub permission_level: PermissionLevel,
+    /// Doorway ID that issues this token (for federation)
+    pub doorway_id: Option<String>,
+    /// Doorway URL for cross-doorway validation
+    pub doorway_url: Option<String>,
 }
 
 /// Result of token validation
@@ -121,6 +131,8 @@ impl JwtValidator {
             agent_pub_key: input.agent_pub_key,
             identifier: input.identifier,
             permission_level: input.permission_level,
+            doorway_id: input.doorway_id,
+            doorway_url: input.doorway_url,
             version: 1,
             iat: now,
             exp: now + self.expiry_seconds,
@@ -151,6 +163,8 @@ impl JwtValidator {
             agent_pub_key: input.agent_pub_key,
             identifier: input.identifier,
             permission_level: input.permission_level,
+            doorway_id: input.doorway_id,
+            doorway_url: input.doorway_url,
             version: 1,
             iat: now,
             exp: now + refresh_expiry,
@@ -272,6 +286,8 @@ mod tests {
             agent_pub_key: "uhCAk...".into(),
             identifier: "test@example.com".into(),
             permission_level: PermissionLevel::Authenticated,
+            doorway_id: Some("alpha-elohim-host".into()),
+            doorway_url: Some("https://alpha.elohim.host".into()),
         };
 
         let token = validator.generate_token(input).unwrap();
@@ -284,6 +300,8 @@ mod tests {
         assert_eq!(claims.human_id, "human-123");
         assert_eq!(claims.identifier, "test@example.com");
         assert_eq!(claims.permission_level, PermissionLevel::Authenticated);
+        assert_eq!(claims.doorway_id, Some("alpha-elohim-host".into()));
+        assert_eq!(claims.doorway_url, Some("https://alpha.elohim.host".into()));
     }
 
     #[test]
@@ -309,6 +327,8 @@ mod tests {
             agent_pub_key: "uhCAk...".into(),
             identifier: "test@example.com".into(),
             permission_level: PermissionLevel::Authenticated,
+            doorway_id: None,
+            doorway_url: None,
         };
 
         let token = validator1.generate_token(input).unwrap();
@@ -379,10 +399,35 @@ mod tests {
             agent_pub_key: "uhCAk...".into(),
             identifier: "test@example.com".into(),
             permission_level: PermissionLevel::Admin,
+            doorway_id: None,
+            doorway_url: None,
         };
 
         let token = validator.generate_token(input).unwrap();
         let result = validator.verify_token(&token);
         assert!(result.valid);
+    }
+
+    #[test]
+    fn test_token_without_doorway_fields() {
+        // Test backward compatibility - tokens should work without doorway fields
+        let validator = test_validator();
+
+        let input = TokenInput {
+            human_id: "human-123".into(),
+            agent_pub_key: "uhCAk...".into(),
+            identifier: "test@example.com".into(),
+            permission_level: PermissionLevel::Authenticated,
+            doorway_id: None,
+            doorway_url: None,
+        };
+
+        let token = validator.generate_token(input).unwrap();
+        let result = validator.verify_token(&token);
+        assert!(result.valid);
+
+        let claims = result.claims.unwrap();
+        assert!(claims.doorway_id.is_none());
+        assert!(claims.doorway_url.is_none());
     }
 }

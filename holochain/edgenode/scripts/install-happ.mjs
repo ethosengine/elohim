@@ -7,8 +7,8 @@
  *
  * Environment variables:
  *   CONDUCTOR_URL - WebSocket URL for admin interface (default: ws://localhost:4444)
- *   HAPP_PATH - Path to .happ file (default: /opt/holochain/lamad-spike.happ)
- *   APP_ID - Installed app ID (default: lamad-spike)
+ *   HAPP_PATH - Path to .happ file (default: /opt/holochain/elohim.happ)
+ *   APP_ID - Installed app ID (default: elohim)
  *   MAX_RETRIES - Maximum connection retries (default: 30)
  *   RETRY_DELAY_MS - Delay between retries in ms (default: 2000)
  */
@@ -16,8 +16,8 @@
 import { AdminWebsocket } from '@holochain/client';
 
 const CONDUCTOR_URL = process.env.CONDUCTOR_URL || 'ws://localhost:4444';
-const HAPP_PATH = process.env.HAPP_PATH || '/opt/holochain/lamad-spike.happ';
-const APP_ID = process.env.APP_ID || 'lamad-spike';
+const HAPP_PATH = process.env.HAPP_PATH || '/opt/holochain/elohim.happ';
+const APP_ID = process.env.APP_ID || 'elohim';
 const MAX_RETRIES = parseInt(process.env.MAX_RETRIES || '30', 10);
 const RETRY_DELAY_MS = parseInt(process.env.RETRY_DELAY_MS || '2000', 10);
 

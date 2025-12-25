@@ -16,6 +16,9 @@ hyper = { version = "1.6", features = ["http1", "http2", "server"] }
 hyper-util = { version = "0.1", features = ["http1", "http2", "server", "tokio"] }
 hyper-tungstenite = "0.15"
 http-body-util = "0.1"
+
+# HTTP client for health probing
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 bytes = "1.10"
 tokio-tungstenite = "0.24"
 futures-util = "0.3"

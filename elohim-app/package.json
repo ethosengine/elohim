@@ -27,7 +27,7 @@
     "doorway:build": "cd ../holochain/doorway && RUSTFLAGS='' cargo build --release",
     "doorway:restart": "npm run doorway:stop && npm run doorway:start",
     "hc:start:doorway": "./scripts/hc-start-doorway.sh",
-    "hc:install": "hc sandbox call --running 4444 install-app ../holochain/dna/lamad-spike/workdir/lamad-spike.happ --app-id lamad-spike && hc sandbox call --running 4444 enable-app lamad-spike",
+    "hc:install": "hc sandbox call --running 4444 install-app ../holochain/dna/lamad-spike/workdir/lamad-spike.happ --app-id elohim && hc sandbox call --running 4444 enable-app elohim",
     "hc:bootstrap": "cd ../holochain/seeder && npm run bootstrap --",
     "hc:seed": "cd ../holochain/seeder && npm run seed",
     "hc:seed:sample": "cd ../holochain/seeder && npm run seed:sample",

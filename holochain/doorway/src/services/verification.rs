@@ -104,6 +104,8 @@ impl VerifyBlobResponse {
 pub struct VerificationConfig {
     /// Maximum inline data size (default: 50 MB)
     pub max_inline_bytes: u64,
+    /// Maximum blob size to fetch from URL (default: 500 MB)
+    pub max_fetch_bytes: u64,
     /// Timeout for URL fetching (seconds)
     pub fetch_timeout_secs: u64,
 }
@@ -112,6 +114,7 @@ impl Default for VerificationConfig {
     fn default() -> Self {
         Self {
             max_inline_bytes: 50 * 1024 * 1024, // 50 MB
+            max_fetch_bytes: 500 * 1024 * 1024, // 500 MB
             fetch_timeout_secs: 30,
         }
     }
@@ -120,12 +123,19 @@ impl Default for VerificationConfig {
 /// Blob verification service
 pub struct VerificationService {
     config: VerificationConfig,
+    /// HTTP client for fetching blobs from URLs
+    http_client: reqwest::Client,
 }
 
 impl VerificationService {
     /// Create a new verification service
     pub fn new(config: VerificationConfig) -> Self {
-        Self { config }
+        let http_client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .expect("Failed to create HTTP client");
+
+        Self { config, http_client }
     }
 
     /// Create with default configuration
@@ -208,6 +218,91 @@ impl VerificationService {
         self.verify_bytes(&data, expected_hash)
     }
 
+    /// Verify a blob by fetching it from a URL
+    ///
+    /// Fetches the blob via HTTP GET, computes SHA256, and compares to expected hash.
+    /// Respects max_blob_size_bytes configuration to prevent memory exhaustion.
+    pub async fn verify_from_url(&self, url: &str, expected_hash: &str) -> VerifyBlobResponse {
+        let start = Instant::now();
+
+        // Fetch the blob
+        let response = match self.http_client.get(url).send().await {
+            Ok(resp) => resp,
+            Err(e) => {
+                warn!("Failed to fetch blob from {}: {}", url, e);
+                return VerifyBlobResponse::error(
+                    expected_hash.to_string(),
+                    format!("Failed to fetch blob: {}", e),
+                );
+            }
+        };
+
+        // Check response status
+        if !response.status().is_success() {
+            return VerifyBlobResponse::error(
+                expected_hash.to_string(),
+                format!("HTTP {} fetching blob", response.status()),
+            );
+        }
+
+        // Check content length if available
+        if let Some(content_length) = response.content_length() {
+            if content_length > self.config.max_fetch_bytes {
+                return VerifyBlobResponse::error(
+                    expected_hash.to_string(),
+                    format!(
+                        "Blob too large: {} bytes (max: {})",
+                        content_length, self.config.max_fetch_bytes
+                    ),
+                );
+            }
+        }
+
+        // Read the body
+        let data = match response.bytes().await {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                warn!("Failed to read blob body from {}: {}", url, e);
+                return VerifyBlobResponse::error(
+                    expected_hash.to_string(),
+                    format!("Failed to read blob body: {}", e),
+                );
+            }
+        };
+
+        // Check size after reading (in case content-length was missing)
+        if data.len() as u64 > self.config.max_fetch_bytes {
+            return VerifyBlobResponse::error(
+                expected_hash.to_string(),
+                format!(
+                    "Blob too large: {} bytes (max: {})",
+                    data.len(),
+                    self.config.max_fetch_bytes
+                ),
+            );
+        }
+
+        // Compute hash
+        let computed_hash = compute_sha256(&data);
+        let duration_ms = start.elapsed().as_millis() as u64;
+
+        debug!(
+            url = %url,
+            expected = %expected_hash,
+            computed = %computed_hash,
+            size = data.len(),
+            duration_ms = duration_ms,
+            "URL blob verification completed"
+        );
+
+        VerifyBlobResponse::success(
+            computed_hash,
+            expected_hash.to_string(),
+            data.len() as u64,
+            duration_ms,
+        )
+    }
+
     /// Handle a verification request
     pub async fn handle_request(&self, request: VerifyBlobRequest) -> VerifyBlobResponse {
         // Check if we have inline data
@@ -216,12 +311,8 @@ impl VerificationService {
         }
 
         // Check if we should fetch from URL
-        if let Some(ref _fetch_url) = request.fetch_url {
-            // TODO: Implement URL fetching when reqwest is added
-            return VerifyBlobResponse::error(
-                request.expected_hash,
-                "URL fetching not yet implemented".to_string(),
-            );
+        if let Some(ref fetch_url) = request.fetch_url {
+            return self.verify_from_url(fetch_url, &request.expected_hash).await;
         }
 
         VerifyBlobResponse::error(
