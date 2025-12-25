@@ -1,25 +1,24 @@
 /**
  * Holochain Infrastructure Pipeline
  *
- * Builds DNA/hApp and deploys Edge Node to dev/alpha environments.
- * Triggered on changes to holochain/** directory.
+ * Builds DNA/hApp and deploys Edge Node to dev/prod environments.
  *
- * Resource Requirements (Nix + Rust/WASM compilation):
- *   - Memory: 8-16GB (Rust compiler is memory-hungry)
- *   - Disk: 30-50GB for /nix store (with Cachix, much less needed)
- *   - CPU: 4+ cores recommended for parallel compilation
+ * Environment Architecture:
+ *   - dev: doorway-dev.elohim.host (serves alpha + staging apps)
+ *   - prod: doorway.elohim.host (serves production app only)
  *
- * Caching Strategy:
- *   - Cachix (holochain-ci): Pre-built Holochain binaries
- *   - PVC for /nix: Persistent store across builds (avoids re-download)
- *
- * Environments:
- *   - dev: holochain-dev.elohim.host (for Che workspace development)
- *   - alpha: holochain-alpha.elohim.host (for integration testing)
+ * Key Behaviors:
+ *   - On dev/main branches: Always ensures edge node is running and healthy
+ *   - DNA rebuild: Only when holochain/dna/** changes (expensive: 20-40 min)
+ *   - Seeding: Runs when DNA/seeder changes OR when forced via parameter
+ *   - Artifact fallback: Tries current branch, then dev branch for hApp
  *
  * @see https://github.com/holochain/holonix
- * @see https://app.cachix.org/cache/holochain-ci
  */
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
 def loadBuildVars() {
     def rootEnv = "${env.WORKSPACE}/build.env"
@@ -51,6 +50,58 @@ def withBuildVars(props, Closure body) {
     }
 }
 
+/**
+ * Fetch hApp artifact with fallback to dev branch
+ * Returns true if hApp was successfully fetched, false otherwise
+ */
+def fetchHappArtifact(String destPath) {
+    // Try 1: Current branch
+    def branchUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ"
+    echo "Attempting to fetch hApp from current branch: ${env.BRANCH_NAME}"
+
+    def result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${branchUrl}' 2>&1", returnStatus: true)
+    if (result == 0 && fileExists(destPath)) {
+        echo "hApp fetched from ${env.BRANCH_NAME} branch artifacts"
+        return true
+    }
+
+    // Try 2: Dev branch (fallback)
+    if (env.BRANCH_NAME != 'dev') {
+        echo "Branch artifact not found, trying dev branch..."
+        def devUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ"
+        result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${devUrl}' 2>&1", returnStatus: true)
+        if (result == 0 && fileExists(destPath)) {
+            echo "hApp fetched from dev branch artifacts (fallback)"
+            return true
+        }
+    }
+
+    // Try 3: Main branch (last resort)
+    if (env.BRANCH_NAME != 'main') {
+        echo "Dev artifact not found, trying main branch..."
+        def mainUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ"
+        result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${mainUrl}' 2>&1", returnStatus: true)
+        if (result == 0 && fileExists(destPath)) {
+            echo "hApp fetched from main branch artifacts (fallback)"
+            return true
+        }
+    }
+
+    echo "Could not fetch hApp from any branch"
+    return false
+}
+
+/**
+ * Check if edge node is healthy
+ */
+def checkEdgeNodeHealth(String url) {
+    def result = sh(
+        script: "curl -sf -o /dev/null -w '%{http_code}' '${url}/health' 2>/dev/null || echo '000'",
+        returnStdout: true
+    ).trim()
+    return result == '200'
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -60,8 +111,6 @@ apiVersion: v1
 kind: Pod
 spec:
   serviceAccount: jenkins-deployer
-  # Holochain/Nix builds need 8+ cores and 16GB RAM
-  # operations node (Intel NUC i5) is best fit
   nodeSelector:
     node-type: operations
   tolerations:
@@ -76,12 +125,9 @@ spec:
         type: Socket
     - name: buildkit-run
       emptyDir: {}
-    # Persistent Nix store - survives across builds
-    # PVC created by holochain/manifests/nix-cache-pvc.yaml
     - name: nix-store
       persistentVolumeClaim:
         claimName: nix-cache-holochain
-    # Cargo cache for Rust builds
     - name: cargo-cache
       persistentVolumeClaim:
         claimName: cargo-cache-holochain
@@ -104,8 +150,6 @@ spec:
           mountPath: /run/containerd/containerd.sock
         - name: buildkit-run
           mountPath: /run/buildkit
-        # Note: /nix PVC mount removed - it was hiding the Nix installation from the image
-        # The image has Nix pre-installed; PVC caching can be added later with proper setup
         - name: cargo-cache
           mountPath: /root/.cargo
     - name: buildkitd
@@ -136,22 +180,39 @@ spec:
     environment {
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
         HAPP_NAME = "lamad-spike"
-        // Nix PATH not inherited from Dockerfile in Jenkins shell steps
         PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
-        // Track if images were pushed (set by Push stage, checked by Deploy stages)
+        // Pipeline state tracking
         IMAGES_PUSHED = 'false'
+        HAPP_AVAILABLE = 'false'
+        EDGE_NODE_HEALTHY = 'false'
+    }
+
+    parameters {
+        booleanParam(
+            name: 'FORCE_BUILD',
+            defaultValue: false,
+            description: 'Force rebuild of all images even without code changes'
+        )
+        booleanParam(
+            name: 'FORCE_SEED',
+            defaultValue: false,
+            description: 'Force database seeding after deployment'
+        )
+        booleanParam(
+            name: 'FORCE_DEPLOY',
+            defaultValue: false,
+            description: 'Force deployment even if no new images (restarts pods with existing images)'
+        )
     }
 
     options {
-        // Nix builds can take a while, especially first time
         timeout(time: 60, unit: 'MINUTES')
-        // Don't run multiple Holochain builds simultaneously (resource contention)
         disableConcurrentBuilds()
+        preserveStashes(buildCount: 5)
     }
 
     stages {
         stage('Checkout') {
-            // Always checkout - required for all subsequent stages
             steps {
                 container('builder') {
                     script {
@@ -167,7 +228,6 @@ spec:
         }
 
         stage('Setup Version') {
-            // Always setup version - required for image tagging
             steps {
                 container('builder') {
                     script {
@@ -194,13 +254,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Setup Nix Cache') {
-            // Always setup nix - required for DNA builds
             steps {
                 container('builder') {
                     script {
                         echo 'Configuring Nix with Holochain Cachix...'
 
-                        // Verify Nix is working and cache is configured
                         sh '''
                             nix --version
                             echo "Nix config:"
@@ -217,7 +275,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Build DNA') {
             when {
-                // Only rebuild DNA when DNA source files change
                 changeset "holochain/dna/**"
             }
             steps {
@@ -227,11 +284,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             echo 'Building Holochain DNA with Nix...'
                             echo 'First build may take 20-40 minutes. Subsequent builds use cache.'
 
-                            // Enter nix shell and build
                             sh '''#!/usr/bin/env bash
                                 set -euo pipefail
 
-                                # Fix git safe.directory for containerized builds
                                 export HOME="${HOME:-/root}"
                                 mkdir -p "$HOME"
                                 echo "[safe]" > "$HOME/.gitconfig"
@@ -241,7 +296,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 echo "=== Entering Nix development shell ==="
                                 echo "This will download/build Holochain toolchain from Cachix..."
 
-                                # Use nix develop to enter the flake environment and build
                                 nix develop --accept-flake-config --command bash -c '
                                     set -euo pipefail
 
@@ -268,7 +322,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 '
                             '''
 
-                            // Archive the hApp
                             archiveArtifacts artifacts: 'lamad-spike.happ,workdir/lamad_spike.dna', allowEmptyArchive: false
                             stash name: 'happ-bundle', includes: 'lamad-spike.happ'
 
@@ -276,20 +329,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             echo """
                             ═══════════════════════════════════════════════════════════
-                            ✅ hApp ARTIFACT ARCHIVED
+                            hApp ARTIFACT ARCHIVED
                             ═══════════════════════════════════════════════════════════
 
                             Artifact URL (for downstream consumers):
                             ${env.BUILD_URL}artifact/holochain/dna/lamad-spike/lamad-spike.happ
-
-                            Direct wget command:
-                            wget -O lamad.happ '${env.BUILD_URL}artifact/holochain/dna/lamad-spike/lamad-spike.happ'
-
-                            Steward Pipeline:
-                            The steward pipeline will automatically fetch this artifact
-                            when building for branch: ${env.BRANCH_NAME}
-
-                            This artifact sharing saves ~35 minutes per steward build!
 
                             Build Details:
                             - Image Tag: ${props.IMAGE_TAG ?: 'unknown'}
@@ -305,7 +349,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Build Doorway') {
             when {
-                // Build when doorway code or manifests change
                 anyOf {
                     changeset "holochain/doorway/**"
                     changeset "holochain/manifests/edgenode-*.yaml"
@@ -326,8 +369,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 cd holochain
 
-                                # Build Doorway using multi-stage Dockerfile (Rust build)
-                                # Context is holochain/ to include crates/doorway-client
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                     nerdctl -n k8s.io build \\
                                     -t elohim-doorway:${IMAGE_TAG} \\
@@ -343,7 +384,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Build Edge Node Image') {
             when {
-                changeset "holochain/**"
+                anyOf {
+                    branch 'dev'
+                    branch 'main'
+                    changeset "holochain/**"
+                    expression { return params.FORCE_BUILD == true }
+                }
             }
             steps {
                 container('builder') {
@@ -353,30 +399,20 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             echo "Building Edge Node image: ${IMAGE_TAG}"
 
-                            // Get hApp bundle - try stash first, then fetch from artifacts
                             def haveHapp = false
                             try {
                                 dir('holochain/edgenode') {
                                     unstash 'happ-bundle'
                                 }
-                                echo "hApp bundle from current build"
+                                echo "hApp bundle from current build (DNA was rebuilt)"
                                 haveHapp = true
                             } catch (Exception e) {
-                                echo "No hApp stashed in this build - fetching from last successful build..."
-                                def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ"
-                                def fetchResult = sh(
-                                    script: "wget --timeout=30 --tries=3 -O holochain/edgenode/lamad-spike.happ '${artifactUrl}' 2>&1",
-                                    returnStatus: true
-                                )
-                                if (fetchResult == 0) {
-                                    echo "hApp bundle fetched from artifacts"
-                                    haveHapp = true
-                                } else {
-                                    echo "WARNING: Could not fetch hApp - skipping Edge Node build"
-                                }
+                                echo "No hApp stashed - fetching from artifacts with fallback..."
+                                haveHapp = fetchHappArtifact('holochain/edgenode/lamad-spike.happ')
                             }
 
                             if (haveHapp) {
+                                env.HAPP_AVAILABLE = 'true'
                                 sh """#!/bin/bash
                                     set -euo pipefail
 
@@ -384,7 +420,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                     cd holochain/edgenode
 
-                                    # Build custom Edge Node with config baked in
                                     BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                         nerdctl -n k8s.io build \\
                                         -t elohim-edgenode:${IMAGE_TAG} \\
@@ -392,8 +427,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                     nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} elohim-edgenode:${GIT_COMMIT_HASH}
                                 """
+                                echo "Edge Node image built successfully"
                             } else {
                                 echo "Skipping Edge Node image build - no hApp available"
+                                echo "Run the pipeline with FORCE_BUILD after ensuring DNA artifacts exist"
                             }
                         }
                     }
@@ -403,7 +440,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Build hApp Installer') {
             when {
-                changeset "holochain/**"
+                anyOf {
+                    branch 'dev'
+                    branch 'main'
+                    changeset "holochain/**"
+                    expression { return params.FORCE_BUILD == true }
+                }
             }
             steps {
                 container('builder') {
@@ -413,7 +455,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             echo "Building hApp Installer image: ${IMAGE_TAG}"
 
-                            // Get hApp bundle - try stash first, then fetch from artifacts
                             def haveHapp = false
                             try {
                                 dir('holochain/edgenode/scripts') {
@@ -422,18 +463,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 echo "hApp bundle from current build"
                                 haveHapp = true
                             } catch (Exception e) {
-                                echo "No hApp stashed - fetching from last successful build..."
-                                def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ"
-                                def fetchResult = sh(
-                                    script: "wget --timeout=30 --tries=3 -O holochain/edgenode/scripts/lamad-spike.happ '${artifactUrl}' 2>&1",
-                                    returnStatus: true
-                                )
-                                if (fetchResult == 0) {
-                                    echo "hApp bundle fetched from artifacts"
-                                    haveHapp = true
-                                } else {
-                                    echo "WARNING: Could not fetch hApp - skipping hApp Installer build"
-                                }
+                                echo "No hApp stashed - fetching from artifacts with fallback..."
+                                haveHapp = fetchHappArtifact('holochain/edgenode/scripts/lamad-spike.happ')
                             }
 
                             if (haveHapp) {
@@ -444,7 +475,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                     cd holochain/edgenode/scripts
 
-                                    # Build hApp installer sidecar
                                     BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                         nerdctl -n k8s.io build \\
                                         -t elohim-happ-installer:${IMAGE_TAG} \\
@@ -452,6 +482,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                     nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} elohim-happ-installer:${GIT_COMMIT_HASH}
                                 """
+                                echo "hApp Installer image built successfully"
                             } else {
                                 echo "Skipping hApp Installer build - no hApp available"
                             }
@@ -463,7 +494,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Push to Harbor') {
             when {
-                changeset "holochain/**"
+                anyOf {
+                    branch 'dev'
+                    branch 'main'
+                    changeset "holochain/**"
+                    expression { return params.FORCE_BUILD == true }
+                }
             }
             steps {
                 container('builder') {
@@ -474,7 +510,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                                 sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
 
-                                // Push Edge Node image (if it was built)
                                 def edgeNodePushed = sh(
                                     script: """
                                         if nerdctl -n k8s.io images | grep -q "elohim-edgenode.*${IMAGE_TAG}"; then
@@ -497,7 +532,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     env.IMAGES_PUSHED = 'true'
                                 }
 
-                                // Push Doorway image (if it was built)
                                 sh """
                                     if nerdctl -n k8s.io images | grep -q "elohim-doorway.*${IMAGE_TAG}"; then
                                         echo "Pushing Doorway image..."
@@ -511,7 +545,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     fi
                                 """
 
-                                // Push hApp Installer image
                                 sh """
                                     if nerdctl -n k8s.io images | grep -q "elohim-happ-installer.*${IMAGE_TAG}"; then
                                         echo "Pushing hApp Installer image..."
@@ -552,58 +585,93 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Deploy Edge Node - Dev') {
             when {
-                allOf {
-                    changeset "holochain/**"
-                    anyOf {
-                        branch 'dev'
-                        expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                        expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                anyOf {
+                    branch 'dev'
+                    allOf {
+                        changeset "holochain/**"
+                        anyOf {
+                            expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                            expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                        }
                     }
+                    expression { return params.FORCE_DEPLOY == true }
+                    expression { return params.FORCE_BUILD == true }
                 }
             }
             steps {
                 container('builder') {
                     script {
-                        // Skip deployment if no images were pushed
-                        if (env.IMAGES_PUSHED != 'true') {
-                            echo "No new images were pushed - skipping deployment"
-                            return
-                        }
-
                         def props = loadBuildVars()
 
                         withBuildVars(props) {
-                            echo "Deploying Edge Node to Dev: ${IMAGE_TAG}"
+                            def shouldDeploy = (env.IMAGES_PUSHED == 'true') ||
+                                               (params.FORCE_DEPLOY == true) ||
+                                               (params.FORCE_BUILD == true)
+
+                            if (!shouldDeploy) {
+                                echo "No new images pushed and no force flags - checking if restart needed..."
+                                if (checkEdgeNodeHealth('https://doorway-dev.elohim.host')) {
+                                    echo "Edge node is healthy - skipping deployment"
+                                    env.EDGE_NODE_HEALTHY = 'true'
+                                    return
+                                } else {
+                                    echo "Edge node unhealthy - forcing restart with existing images"
+                                    shouldDeploy = true
+                                }
+                            }
+
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            DEPLOYING EDGE NODE TO DEV
+                            ═══════════════════════════════════════════════════════════
+                            Image Tag: ${IMAGE_TAG}
+                            Images Pushed: ${env.IMAGES_PUSHED}
+                            Force Deploy: ${params.FORCE_DEPLOY}
+                            ═══════════════════════════════════════════════════════════
+                            """
 
                             sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-dev.yaml > holochain/manifests/edgenode-dev-${IMAGE_TAG}.yaml"
                             sh "kubectl apply -f holochain/manifests/edgenode-dev-${IMAGE_TAG}.yaml"
                             sh "kubectl rollout restart deployment/elohim-edgenode-dev -n ethosengine"
                             sh "kubectl rollout status deployment/elohim-edgenode-dev -n ethosengine --timeout=300s"
 
-                            echo "Edge Node Dev deployed: https://doorway-dev.elohim.host"
+                            sh 'sleep 15'
+
+                            def healthy = checkEdgeNodeHealth('https://doorway-dev.elohim.host')
+                            if (healthy) {
+                                env.EDGE_NODE_HEALTHY = 'true'
+                                echo "Edge Node Dev deployed and healthy: https://doorway-dev.elohim.host"
+                            } else {
+                                echo "Edge Node deployed but health check failed - may need more time"
+                            }
                         }
                     }
                 }
             }
         }
 
-        stage('🔧 Seed Dev Database') {
-            // PROTOTYPING/DEV ONLY - Not part of production pipeline
-            // Automatically resets and populates the dev holochain database AFTER deployment
-            // Only runs when DNA is rebuilt (not for other holochain changes)
-            // Useful for rapid prototyping iteration during development
+        stage('Seed Dev Database') {
             when {
-                allOf {
-                    // Only seed when DNA or seed data changes (not for other holochain modifications)
-                    anyOf {
-                        changeset "holochain/dna/**"
-                        changeset "holochain/seeder/**"
+                anyOf {
+                    allOf {
+                        anyOf {
+                            changeset "holochain/dna/**"
+                            changeset "holochain/seeder/**"
+                            changeset "data/lamad/**"
+                        }
+                        anyOf {
+                            branch 'dev'
+                            expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                            expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                        }
                     }
-                    // Only for dev branches (never on production)
-                    anyOf {
-                        branch 'dev'
-                        expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                        expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                    allOf {
+                        expression { return params.FORCE_SEED == true }
+                        anyOf {
+                            branch 'dev'
+                            expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                            expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                        }
                     }
                 }
             }
@@ -612,17 +680,37 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     script {
                         echo """
                         ═══════════════════════════════════════════════════════════
-                        🔧 SEEDING DEV DATABASE (after deployment)
+                        SEEDING DEV DATABASE
                         ═══════════════════════════════════════════════════════════
-                        Purpose: Populate dev holochain with test/prototype data
-                        Scope: Development/prototyping only
-                        Trigger: DNA was rebuilt in this pipeline run
+                        Purpose: Populate dev holochain with lamad content
+                        Target: doorway-dev.elohim.host
+                        Force Seed: ${params.FORCE_SEED}
                         Branch: ${env.BRANCH_NAME}
                         ═══════════════════════════════════════════════════════════
                         """
 
-                        // Wait for deployment to be fully ready
-                        sh 'sleep 10'
+                        echo "Waiting for edge node to be ready..."
+                        sh '''#!/usr/bin/env bash
+                            set -euo pipefail
+
+                            MAX_ATTEMPTS=30
+                            ATTEMPT=1
+
+                            while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+                                if curl -sf -o /dev/null https://doorway-dev.elohim.host/health 2>/dev/null; then
+                                    echo "Edge node is ready"
+                                    break
+                                fi
+                                echo "Waiting for edge node... (attempt $ATTEMPT/$MAX_ATTEMPTS)"
+                                sleep 5
+                                ATTEMPT=$((ATTEMPT + 1))
+                            done
+
+                            if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
+                                echo "Edge node not responding after ${MAX_ATTEMPTS} attempts"
+                                echo "Proceeding with seeding anyway..."
+                            fi
+                        '''
 
                         dir('holochain/seeder') {
                             sh '''#!/usr/bin/env bash
@@ -637,14 +725,16 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     npx tsx src/seed.ts
 
                                 echo ""
-                                echo "✅ Seeding complete"
+                                echo "Seeding complete"
                             '''
                         }
 
                         echo """
                         ═══════════════════════════════════════════════════════════
-                        ✅ Dev database seeded with elohim content
-                        Ready for prototyping!
+                        DEV DATABASE SEEDED SUCCESSFULLY
+                        ═══════════════════════════════════════════════════════════
+                        Target: doorway-dev.elohim.host
+                        Status: Ready for alpha.elohim.host and staging.elohim.host
                         ═══════════════════════════════════════════════════════════
                         """
                     }
@@ -652,37 +742,56 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        // NOTE: Alpha edge node deployment removed.
-        // Consolidated architecture: holochain-dev.elohim.host serves both alpha and staging apps.
-        // holochain.elohim.host (production) deployed from main branch.
-
         stage('Deploy Edge Node - Prod') {
             when {
-                allOf {
-                    changeset "holochain/**"
+                anyOf {
                     branch 'main'
+                    allOf {
+                        expression { return params.FORCE_DEPLOY == true }
+                        branch 'main'
+                    }
                 }
             }
             steps {
                 container('builder') {
                     script {
-                        // Skip deployment if no images were pushed
-                        if (env.IMAGES_PUSHED != 'true') {
-                            echo "No new images were pushed - skipping deployment"
-                            return
-                        }
-
                         def props = loadBuildVars()
 
                         withBuildVars(props) {
-                            echo "Deploying Edge Node to Production: ${IMAGE_TAG}"
+                            def shouldDeploy = (env.IMAGES_PUSHED == 'true') ||
+                                               (params.FORCE_DEPLOY == true) ||
+                                               (params.FORCE_BUILD == true)
+
+                            if (!shouldDeploy) {
+                                if (checkEdgeNodeHealth('https://doorway.elohim.host')) {
+                                    echo "Prod edge node is healthy - skipping deployment"
+                                    return
+                                } else {
+                                    echo "Prod edge node unhealthy - forcing restart"
+                                    shouldDeploy = true
+                                }
+                            }
+
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            DEPLOYING EDGE NODE TO PRODUCTION
+                            ═══════════════════════════════════════════════════════════
+                            Image Tag: ${IMAGE_TAG}
+                            ═══════════════════════════════════════════════════════════
+                            """
 
                             sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-prod.yaml > holochain/manifests/edgenode-prod-${IMAGE_TAG}.yaml"
                             sh "kubectl apply -f holochain/manifests/edgenode-prod-${IMAGE_TAG}.yaml"
                             sh "kubectl rollout restart deployment/elohim-edgenode-prod -n ethosengine"
                             sh "kubectl rollout status deployment/elohim-edgenode-prod -n ethosengine --timeout=300s"
 
-                            echo "Edge Node Prod deployed: https://holochain.elohim.host"
+                            sh 'sleep 15'
+
+                            if (checkEdgeNodeHealth('https://doorway.elohim.host')) {
+                                echo "Edge Node Prod deployed and healthy: https://doorway.elohim.host"
+                            } else {
+                                echo "Edge Node deployed but health check failed"
+                            }
                         }
                     }
                 }
@@ -691,7 +800,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Cleanup') {
             when {
-                changeset "holochain/**"
+                anyOf {
+                    branch 'dev'
+                    branch 'main'
+                    changeset "holochain/**"
+                    expression { return params.FORCE_BUILD == true }
+                }
             }
             steps {
                 container('builder') {
@@ -716,12 +830,47 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
     }
 
     post {
+        always {
+            script {
+                def props = loadBuildVars()
+
+                def summary = """
+                ═══════════════════════════════════════════════════════════
+                HOLOCHAIN PIPELINE SUMMARY
+                ═══════════════════════════════════════════════════════════
+                Branch: ${env.BRANCH_NAME}
+                Image Tag: ${props.IMAGE_TAG ?: 'N/A'}
+
+                Pipeline State:
+                  - hApp Available: ${env.HAPP_AVAILABLE == 'true' ? 'Yes' : 'No'}
+                  - Images Pushed: ${env.IMAGES_PUSHED == 'true' ? 'Yes' : 'Skipped'}
+                  - Edge Node Healthy: ${env.EDGE_NODE_HEALTHY == 'true' ? 'Yes' : 'Unknown'}
+
+                Parameters Used:
+                  - Force Build: ${params.FORCE_BUILD}
+                  - Force Deploy: ${params.FORCE_DEPLOY}
+                  - Force Seed: ${params.FORCE_SEED}
+                ═══════════════════════════════════════════════════════════
+                """
+
+                echo summary
+
+                currentBuild.description = [
+                    env.HAPP_AVAILABLE == 'true' ? 'hApp:OK' : 'hApp:NO',
+                    env.IMAGES_PUSHED == 'true' ? 'Push:OK' : 'Push:Skip',
+                    env.EDGE_NODE_HEALTHY == 'true' ? 'Deploy:OK' : 'Deploy:?'
+                ].join(' | ')
+            }
+        }
         success {
             echo "Holochain infrastructure pipeline completed successfully"
         }
         failure {
             echo "Holochain infrastructure pipeline failed"
-            echo "If this is a first-time build, it may need more time/resources for Nix cache population"
+            echo "Check the logs above for details. Common issues:"
+            echo "  - hApp artifact not found: Run with FORCE_BUILD after DNA build succeeds"
+            echo "  - Nix build timeout: First build needs more time for cache population"
+            echo "  - Edge node unhealthy: Check Kubernetes pod logs"
         }
     }
 }
