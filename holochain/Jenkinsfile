@@ -728,51 +728,57 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         ═══════════════════════════════════════════════════════════
                         """
 
+                        // Use internal Kubernetes DNS from within the cluster
+                        // External DNS (doorway-dev.elohim.host) may not resolve from Jenkins agent
+                        def INTERNAL_DOORWAY_URL = "elohim-edgenode-dev.ethosengine.svc.cluster.local:8080"
+
                         echo "Waiting for edge node to be ready..."
-                        sh '''#!/usr/bin/env bash
+                        sh """#!/usr/bin/env bash
                             set -euo pipefail
 
                             MAX_ATTEMPTS=30
                             ATTEMPT=1
 
-                            while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-                                if curl -sf -o /dev/null https://doorway-dev.elohim.host/health 2>/dev/null; then
-                                    echo "Edge node is ready"
+                            while [ \$ATTEMPT -le \$MAX_ATTEMPTS ]; do
+                                if curl -sf -o /dev/null http://${INTERNAL_DOORWAY_URL}/health 2>/dev/null; then
+                                    echo "Edge node is ready (via internal DNS)"
                                     break
                                 fi
-                                echo "Waiting for edge node... (attempt $ATTEMPT/$MAX_ATTEMPTS)"
+                                echo "Waiting for edge node... (attempt \$ATTEMPT/\$MAX_ATTEMPTS)"
                                 sleep 5
-                                ATTEMPT=$((ATTEMPT + 1))
+                                ATTEMPT=\$((ATTEMPT + 1))
                             done
 
-                            if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
-                                echo "Edge node not responding after ${MAX_ATTEMPTS} attempts"
+                            if [ \$ATTEMPT -gt \$MAX_ATTEMPTS ]; then
+                                echo "Edge node not responding after \${MAX_ATTEMPTS} attempts"
                                 echo "Proceeding with seeding anyway..."
                             fi
-                        '''
+                        """
 
                         dir('holochain/seeder') {
-                            sh '''#!/usr/bin/env bash
+                            sh """#!/usr/bin/env bash
                                 set -euo pipefail
 
                                 echo "Installing seeder dependencies..."
                                 npm ci
 
                                 echo ""
-                                echo "Running seeder against doorway-dev.elohim.host..."
-                                HOLOCHAIN_ADMIN_URL="wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024" \
+                                echo "Running seeder against internal Kubernetes service..."
+                                echo "Target: ws://${INTERNAL_DOORWAY_URL}"
+                                HOLOCHAIN_ADMIN_URL="ws://${INTERNAL_DOORWAY_URL}?apiKey=dev-elohim-auth-2024" \\
                                     npx tsx src/seed.ts
 
                                 echo ""
                                 echo "Seeding complete"
-                            '''
+                            """
                         }
 
                         echo """
                         ═══════════════════════════════════════════════════════════
                         DEV DATABASE SEEDED SUCCESSFULLY
                         ═══════════════════════════════════════════════════════════
-                        Target: doorway-dev.elohim.host
+                        Target: ${INTERNAL_DOORWAY_URL} (internal K8s DNS)
+                        External: doorway-dev.elohim.host
                         Status: Ready for alpha.elohim.host and staging.elohim.host
                         ═══════════════════════════════════════════════════════════
                         """
