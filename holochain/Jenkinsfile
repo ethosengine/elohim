@@ -19,9 +19,7 @@
  *     - Skip deployment if edge node is already healthy AND no new images
  *     - Use FORCE_DEPLOY to restart even when healthy
  *
- *   SEED stage:
- *     - Runs when DNA/seeder/data changes OR FORCE_SEED=true
- *     - Only on dev branch and feature branches
+ *   NOTE: Seeding is now handled by genesis/Jenkinsfile (separate pipeline)
  *
  * Artifact fallback: Tries current branch, then dev, then main for hApp
  *
@@ -204,11 +202,6 @@ spec:
             name: 'FORCE_BUILD',
             defaultValue: false,
             description: 'Force rebuild of all images even without code changes'
-        )
-        booleanParam(
-            name: 'FORCE_SEED',
-            defaultValue: false,
-            description: 'Force database seeding after deployment'
         )
         booleanParam(
             name: 'FORCE_DEPLOY',
@@ -702,103 +695,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('Seed Dev Database') {
-            when {
-                anyOf {
-                    allOf {
-                        anyOf {
-                            changeset "holochain/dna/**"
-                            changeset "holochain/seeder/**"
-                            changeset "data/lamad/**"
-                        }
-                        anyOf {
-                            branch 'dev'
-                            expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                            expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                        }
-                    }
-                    allOf {
-                        expression { return params.FORCE_SEED == true }
-                        anyOf {
-                            branch 'dev'
-                            expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                            expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                        }
-                    }
-                }
-            }
-            steps {
-                container('builder') {
-                    script {
-                        echo """
-                        ═══════════════════════════════════════════════════════════
-                        SEEDING DEV DATABASE
-                        ═══════════════════════════════════════════════════════════
-                        Purpose: Populate dev holochain with lamad content
-                        Target: doorway-dev.elohim.host
-                        Force Seed: ${params.FORCE_SEED}
-                        Branch: ${env.BRANCH_NAME}
-                        ═══════════════════════════════════════════════════════════
-                        """
-
-                        // Use internal Kubernetes DNS from within the cluster
-                        // External DNS (doorway-dev.elohim.host) may not resolve from Jenkins agent
-                        def INTERNAL_DOORWAY_URL = "elohim-edgenode-dev.ethosengine.svc.cluster.local:8080"
-
-                        echo "Waiting for edge node to be ready..."
-                        sh """#!/usr/bin/env bash
-                            set -euo pipefail
-
-                            MAX_ATTEMPTS=30
-                            ATTEMPT=1
-
-                            while [ \$ATTEMPT -le \$MAX_ATTEMPTS ]; do
-                                if curl -sf -o /dev/null http://${INTERNAL_DOORWAY_URL}/health 2>/dev/null; then
-                                    echo "Edge node is ready (via internal DNS)"
-                                    break
-                                fi
-                                echo "Waiting for edge node... (attempt \$ATTEMPT/\$MAX_ATTEMPTS)"
-                                sleep 5
-                                ATTEMPT=\$((ATTEMPT + 1))
-                            done
-
-                            if [ \$ATTEMPT -gt \$MAX_ATTEMPTS ]; then
-                                echo "Edge node not responding after \${MAX_ATTEMPTS} attempts"
-                                echo "Proceeding with seeding anyway..."
-                            fi
-                        """
-
-                        dir('holochain/seeder') {
-                            sh """#!/usr/bin/env bash
-                                set -euo pipefail
-
-                                echo "Installing seeder dependencies..."
-                                npm ci
-
-                                echo ""
-                                echo "Running seeder against internal Kubernetes service..."
-                                echo "Target: ws://${INTERNAL_DOORWAY_URL}"
-                                HOLOCHAIN_ADMIN_URL="ws://${INTERNAL_DOORWAY_URL}?apiKey=dev-elohim-auth-2024" \\
-                                    npx tsx src/seed.ts
-
-                                echo ""
-                                echo "Seeding complete"
-                            """
-                        }
-
-                        echo """
-                        ═══════════════════════════════════════════════════════════
-                        DEV DATABASE SEEDED SUCCESSFULLY
-                        ═══════════════════════════════════════════════════════════
-                        Target: ${INTERNAL_DOORWAY_URL} (internal K8s DNS)
-                        External: doorway-dev.elohim.host
-                        Status: Ready for alpha.elohim.host and staging.elohim.host
-                        ═══════════════════════════════════════════════════════════
-                        """
-                    }
-                }
-            }
-        }
+        // NOTE: Seeding is now handled by genesis/Jenkinsfile (separate pipeline)
+        // Run genesis pipeline manually after deployment or on schedule
 
         stage('Deploy Edge Node - Prod') {
             when {
@@ -929,7 +827,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 Parameters Used:
                   - Force Build: ${params.FORCE_BUILD}
                   - Force Deploy: ${params.FORCE_DEPLOY}
-                  - Force Seed: ${params.FORCE_SEED}
+
+                Note: Seeding handled by genesis/Jenkinsfile
                 ═══════════════════════════════════════════════════════════
                 """
 

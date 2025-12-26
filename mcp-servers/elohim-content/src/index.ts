@@ -22,9 +22,9 @@ import { createConcept, createRelationship, queryGraph, getRelated, updateConcep
 import { createPath, createChapter, createModule, createSection, addToPath, removeFromPath, reorderPath, generatePath } from './tools/path-tools.js';
 import { createQuiz, createAssessment, updateAssessment } from './tools/assessment-tools.js';
 
-// Configuration
-const DOCS_DIR = process.env.DOCS_DIR || '/projects/elohim/docs/content';
-const DATA_DIR = process.env.DATA_DIR || '/projects/elohim/data/lamad';
+// Configuration - all genesis project content is in /genesis
+const DOCS_DIR = process.env.DOCS_DIR || '/projects/elohim/genesis/docs/content';
+const DATA_DIR = process.env.DATA_DIR || '/projects/elohim/genesis/data/lamad';
 
 const server = new Server(
   {

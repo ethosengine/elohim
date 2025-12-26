@@ -193,7 +193,7 @@ commands:
   - id: seed-holochain
     exec:
       component: tools
-      workingDir: /projects/elohim/holochain/seeder
+      workingDir: /projects/elohim/genesis/seeder
       commandLine: |
         npm install && npm run seed
 

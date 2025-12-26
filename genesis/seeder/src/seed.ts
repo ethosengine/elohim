@@ -282,13 +282,13 @@ class PerformanceTimer {
 const timer = new PerformanceTimer();
 
 // Configuration
-// Data directory is at the git root: elohim/data/lamad
-// Seeder is at: elohim/holochain/seeder/src/seed.ts
+// Data directory is sibling to seeder: elohim/genesis/data/lamad
+// Seeder is at: elohim/genesis/seeder/src/seed.ts
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const SEEDER_DIR = path.dirname(path.dirname(__filename)); // Go up from src/ to seeder/
-const GIT_ROOT = path.resolve(SEEDER_DIR, '..', '..'); // Go up from holochain/seeder to elohim/
-const DATA_DIR = process.env.DATA_DIR || path.join(GIT_ROOT, 'data', 'lamad');
+const GENESIS_DIR = path.resolve(SEEDER_DIR, '..'); // Go up from seeder/ to genesis/
+const DATA_DIR = process.env.DATA_DIR || path.join(GENESIS_DIR, 'data', 'lamad');
 
 // Parse command-line arguments
 const args = process.argv.slice(2);

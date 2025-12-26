@@ -1,11 +1,13 @@
-# Holochain Content Seeder
+# Genesis Seeder
 
-Seeds pre-structured JSON content from `/data/lamad` into Holochain.
+Seeds pre-structured JSON content from `/genesis/data/lamad` into Holochain.
+
+Part of the **Genesis project** - the meta-infrastructure layer for source → seed → validate → feedback.
 
 ## Pipeline
 
 ```
-docs/ → Claude + MCP → data/lamad/ → seeder → Holochain DHT
+genesis/docs/ → Claude + MCP → genesis/data/lamad/ → genesis/seeder → Holochain DHT
 ```
 
 ## Quick Start
@@ -20,7 +22,7 @@ npm run hc:seed              # Full seed
 npm run hc:seed:sample       # Sample (10 items)
 
 # Or from seeder directory
-cd holochain/seeder
+cd genesis/seeder
 npm run seed                 # Full seed
 npm run seed:sample          # Sample (10 items)
 ```
@@ -59,7 +61,7 @@ HOLOCHAIN_ADMIN_URL="wss://holochain-dev.elohim.host?apiKey=dev-elohim-auth-2024
 |----------|-------------|---------|
 | `HOLOCHAIN_ADMIN_URL` | Admin WebSocket URL | `ws://localhost:4444` (from .hc_ports) |
 | `HOLOCHAIN_APP_URL` | App WebSocket URL (optional) | Auto-resolved from admin URL |
-| `DATA_DIR` | Path to lamad data | `/projects/elohim/data/lamad` |
+| `DATA_DIR` | Path to lamad data | `/projects/elohim/genesis/data/lamad` |
 | `LOCAL_DEV_DIR` | Local dev directory | `/projects/elohim/holochain/local-dev` |
 | `HC_PORTS_FILE` | Ports file for local dev | `$LOCAL_DEV_DIR/.hc_ports` |
 
@@ -118,7 +120,7 @@ port returned by the conductor.
 The seeder expects JSON files in:
 
 ```
-data/lamad/
+genesis/data/lamad/
 ├── content/           # Concepts and content nodes
 │   ├── *.json
 │   └── epic/

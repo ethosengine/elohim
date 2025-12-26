@@ -17,19 +17,19 @@ This skill provides domain expertise for transforming raw Elohim Protocol conten
 ## Content Pipeline Architecture
 
 ```
-Holochain DNA (Rust)    [Source of truth - entry types, relationships]
+Holochain DNA (Rust)       [Source of truth - entry types, relationships]
       ↓
-MCP Schemas (TypeScript) [Aligned with DNA structs]
+MCP Schemas (TypeScript)   [Aligned with DNA structs]
       ↓
-docs/content/           [Raw markdown, Gherkin - human authored]
+genesis/docs/content/      [Raw markdown, Gherkin - human authored]
       ↓
-   Claude + MCP tools   [Non-deterministic, creative transformation]
+   Claude + MCP tools      [Non-deterministic, creative transformation]
       ↓
-data/lamad/             [Structured JSON - schema-aligned seed data]
+genesis/data/lamad/        [Structured JSON - schema-aligned seed data]
       ↓
-   holochain/seeder     [Deterministic script - loads JSON to DHT]
+   genesis/seeder          [Deterministic script - loads JSON to DHT]
       ↓
-Holochain DHT           [Production data]
+Holochain DHT              [Production data]
 ```
 
 ---

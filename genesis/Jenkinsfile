@@ -1,0 +1,609 @@
+// ============================================================================
+// GENESIS PIPELINE
+// ============================================================================
+// Standalone pipeline for the Genesis project: source → seed → validate → feedback
+// Handles the full cycle of seeding content and validating it works.  
+// ============================================================================
+
+def resolveDoorwayHost(String targetHost, String explicitDoorway) {
+    if (explicitDoorway) {
+        return explicitDoorway
+    }
+    // Auto-detect doorway host from target host
+    if (targetHost.contains('alpha.elohim.host')) {
+        return 'https://doorway-dev.elohim.host'
+    } else if (targetHost.contains('staging.elohim.host')) {
+        return 'https://doorway-staging.elohim.host'
+    } else if (targetHost.contains('elohim.host') && !targetHost.contains('doorway')) {
+        return 'https://doorway.elohim.host'
+    } else {
+        // For custom hosts, try doorway subdomain
+        return targetHost.replaceFirst('://', '://doorway.')
+    }
+}
+
+def resolveInternalDoorwayUrl(String doorwayHost) {
+    // Map external DNS to internal Kubernetes DNS
+    if (doorwayHost.contains('doorway-dev.elohim.host')) {
+        return 'elohim-edgenode-dev.ethosengine.svc.cluster.local:8080'
+    } else if (doorwayHost.contains('doorway-staging.elohim.host')) {
+        return 'elohim-edgenode-staging.ethosengine.svc.cluster.local:8080'
+    } else if (doorwayHost.contains('doorway.elohim.host')) {
+        return 'elohim-edgenode.ethosengine.svc.cluster.local:8080'
+    }
+    // For custom hosts, try using external URL
+    return doorwayHost.replace('https://', '').replace('http://', '')
+}
+
+def runBDDTests(String targetHost, String doorwayHost, String testTags) {
+    echo "Running BDD tests against ${targetHost}"
+
+    def specPattern = 'cypress/e2e/features/**/*.feature'
+    def tagFilter = testTags ? "--env tags='${testTags}'" : ''
+
+    sh """#!/bin/bash
+        set -e
+        export CYPRESS_baseUrl=${targetHost}
+        export CYPRESS_DOORWAY_HOST=${doorwayHost}
+        export CYPRESS_ENV=bdd-pipeline
+        export NO_COLOR=1
+        export DISPLAY=:99
+
+        # Start Xvfb for headless browser
+        Xvfb :99 -screen 0 1280x720x24 -ac > /dev/null 2>&1 &
+        XVFB_PID=\$!
+        sleep 2
+
+        # Verify Cypress installation
+        npx cypress verify > /dev/null
+        mkdir -p cypress/reports
+
+        # Run BDD tests
+        npx cypress run \\
+            --headless \\
+            --browser chromium \\
+            --spec "${specPattern}" \\
+            ${tagFilter} \\
+            || TEST_EXIT_CODE=\$?
+
+        # Cleanup
+        kill \$XVFB_PID 2>/dev/null || true
+
+        # Exit with test result
+        exit \${TEST_EXIT_CODE:-0}
+    """
+}
+
+def publishBDDReports(String targetHost) {
+    echo '📊 Publishing BDD test reports...'
+
+    sh 'ls -la cypress/reports/ 2>/dev/null || echo "No reports directory"'
+
+    if (fileExists('cypress/reports/cucumber-report.json')) {
+        cucumber([
+            reportTitle: "Genesis BDD Tests - ${targetHost}",
+            fileIncludePattern: 'cucumber-report.json',
+            jsonReportDirectory: 'cypress/reports',
+            buildStatus: 'UNSTABLE',
+            failedFeaturesNumber: 0,
+            failedScenariosNumber: 0,
+            failedStepsNumber: 0,
+            skippedStepsNumber: -1,
+            pendingStepsNumber: -1
+        ])
+        echo '✅ Cucumber reports published'
+    } else {
+        echo '⚠️ No cucumber-report.json found'
+    }
+
+    // Archive test artifacts
+    archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
+    archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', allowEmptyArchive: true
+    archiveArtifacts artifacts: 'cypress/reports/**/*', allowEmptyArchive: true
+    archiveArtifacts artifacts: 'cypress/e2e/features/dynamic/**/*.feature', allowEmptyArchive: true
+}
+
+pipeline {
+    agent {
+        kubernetes {
+            cloud 'kubernetes'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccount: jenkins-deployer
+  nodeSelector:
+    node-type: edge
+  containers:
+  - name: builder
+    image: harbor.ethosengine.com/ethosengine/ci-builder:latest
+    command:
+    - cat
+    tty: true
+    resources:
+      requests:
+        ephemeral-storage: "2Gi"
+        memory: "2Gi"
+      limits:
+        ephemeral-storage: "5Gi"
+        memory: "4Gi"
+'''
+        }
+    }
+
+    parameters {
+        string(
+            name: 'TARGET_HOST',
+            defaultValue: 'https://staging.elohim.host',
+            description: 'Target host URL to test against (e.g., https://alpha.elohim.host, https://staging.elohim.host)'
+        )
+        string(
+            name: 'DOORWAY_HOST',
+            defaultValue: '',
+            description: 'Doorway API host (auto-detected from TARGET_HOST if not specified)'
+        )
+        booleanParam(
+            name: 'SEED_DATA',
+            defaultValue: true,
+            description: 'Seed the target database before running tests'
+        )
+        string(
+            name: 'SEED_IDS',
+            defaultValue: '',
+            description: 'Specific content IDs to seed (comma-separated). Empty = all content'
+        )
+        string(
+            name: 'TEST_PATH_ID',
+            defaultValue: 'bdd-smoke-tests',
+            description: 'ID of the test path to fetch from the content graph'
+        )
+        string(
+            name: 'TEST_TAGS',
+            defaultValue: '',
+            description: 'Cucumber tags to filter tests (e.g., @smoke, @lamad, @critical)'
+        )
+        booleanParam(
+            name: 'FETCH_DYNAMIC_FEATURES',
+            defaultValue: true,
+            description: 'Fetch feature files from the running app (dogfooding mode)'
+        )
+        booleanParam(
+            name: 'SKIP_TESTS',
+            defaultValue: false,
+            description: 'Skip BDD tests (useful for seed-only runs)'
+        )
+        extendedChoice(
+            name: 'FEATURE_AREAS',
+            type: 'PT_CHECKBOX',
+            value: 'all,doorway,imagodei,lamad,shefa,qahal',
+            description: 'Feature areas to include. Select none to skip tests. Select "all" for everything.',
+            multiSelectDelimiter: ',',
+            visibleItemCount: 6
+        )
+        booleanParam(
+            name: 'ANALYZE_DRIFT',
+            defaultValue: true,
+            description: 'Analyze schema drift between DNA and seed data'
+        )
+    }
+
+    environment {
+        NO_COLOR = '1'
+    }
+
+    options {
+        skipDefaultCheckout(true)
+        timeout(time: 45, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                container('builder') {
+                    script {
+                        sh 'git config --global --add safe.directory "*"'
+
+                        checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: "*/${env.BRANCH_NAME ?: 'dev'}"]],
+                            extensions: [
+                                [$class: 'CloneOption', shallow: true, noTags: true, depth: 1],
+                                [$class: 'CleanBeforeCheckout']
+                            ],
+                            userRemoteConfigs: [[
+                                url: 'https://github.com/ethosengine/elohim.git',
+                                credentialsId: 'ee-bot-pat'
+                            ]]
+                        ])
+
+                        echo """
+═══════════════════════════════════════════════════════════
+🌱 GENESIS PIPELINE
+═══════════════════════════════════════════════════════════
+Target Host: ${params.TARGET_HOST}
+Seed Data: ${params.SEED_DATA}
+Seed IDs: ${params.SEED_IDS ?: '(all)'}
+Feature Areas: ${params.FEATURE_AREAS ?: '(all)'}
+Test Path: ${params.TEST_PATH_ID}
+Tags: ${params.TEST_TAGS ?: '(all)'}
+Skip Tests: ${params.SKIP_TESTS}
+═══════════════════════════════════════════════════════════
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Resolve Hosts') {
+            steps {
+                container('builder') {
+                    script {
+                        def doorwayHost = resolveDoorwayHost(params.TARGET_HOST, params.DOORWAY_HOST)
+                        def internalDoorway = resolveInternalDoorwayUrl(doorwayHost)
+
+                        env.RESOLVED_DOORWAY_HOST = doorwayHost
+                        env.INTERNAL_DOORWAY_URL = internalDoorway
+
+                        echo "✅ Doorway API (external): ${doorwayHost}"
+                        echo "✅ Doorway API (internal): ${internalDoorway}"
+                    }
+                }
+            }
+        }
+
+        stage('Install Seeder') {
+            when {
+                expression { params.SEED_DATA }
+            }
+            steps {
+                container('builder') {
+                    dir('genesis/seeder') {
+                        sh '''
+                            echo "Installing seeder dependencies..."
+                            npm ci --prefer-offline
+                            echo "✅ Seeder ready"
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Install Test Dependencies') {
+            when {
+                expression { !params.SKIP_TESTS && params.FEATURE_AREAS }
+            }
+            steps {
+                container('builder') {
+                    dir('elohim-app') {
+                        sh '''
+                            echo "Installing test dependencies..."
+                            npm ci --prefer-offline
+                            npx cypress verify
+                            echo "✅ Test dependencies ready"
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Verify Target Health') {
+            steps {
+                container('builder') {
+                    script {
+                        def targetHost = params.TARGET_HOST
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        def internalDoorway = env.INTERNAL_DOORWAY_URL
+
+                        echo "Verifying target site: ${targetHost}"
+                        sh """
+                            timeout 120s bash -c 'until curl -sf -o /dev/null "${targetHost}"; do
+                                echo "Waiting for target site..."
+                                sleep 5
+                            done'
+                            echo "✅ Target site responding: ${targetHost}"
+                        """
+
+                        echo "Verifying Doorway API (internal): ${internalDoorway}"
+                        sh """#!/bin/bash
+                            set -euo pipefail
+
+                            MAX_ATTEMPTS=30
+                            ATTEMPT=1
+
+                            while [ \$ATTEMPT -le \$MAX_ATTEMPTS ]; do
+                                if curl -sf -o /dev/null "http://${internalDoorway}/health" 2>/dev/null; then
+                                    echo "✅ Doorway API responding (via internal DNS)"
+                                    break
+                                fi
+                                echo "Waiting for Doorway API... (attempt \$ATTEMPT/\$MAX_ATTEMPTS)"
+                                sleep 5
+                                ATTEMPT=\$((ATTEMPT + 1))
+                            done
+
+                            if [ \$ATTEMPT -gt \$MAX_ATTEMPTS ]; then
+                                echo "⚠️ Internal DNS failed, trying external..."
+                                if curl -sf -o /dev/null "${doorwayHost}/health" 2>/dev/null; then
+                                    echo "✅ Doorway API responding (via external DNS)"
+                                else
+                                    echo "❌ Doorway API not responding"
+                                    exit 1
+                                fi
+                            fi
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Seed Database') {
+            when {
+                expression { params.SEED_DATA }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def internalDoorway = env.INTERNAL_DOORWAY_URL
+                        def seedIds = params.SEED_IDS
+
+                        echo """
+═══════════════════════════════════════════════════════════
+🌱 SEEDING DATABASE
+═══════════════════════════════════════════════════════════
+Target: ${internalDoorway}
+IDs: ${seedIds ?: '(all content)'}
+═══════════════════════════════════════════════════════════
+                        """
+
+                        dir('genesis/seeder') {
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                echo "Running seeder..."
+
+                                SEED_CMD="npx tsx src/seed.ts"
+                                if [ -n "${seedIds}" ]; then
+                                    SEED_CMD="\$SEED_CMD --ids ${seedIds}"
+                                fi
+
+                                HOLOCHAIN_ADMIN_URL="ws://${internalDoorway}?apiKey=dev-elohim-auth-2024" \
+                                    \$SEED_CMD
+
+                                echo ""
+                                echo "✅ Seeding complete"
+                            """
+                        }
+
+                        echo """
+═══════════════════════════════════════════════════════════
+✅ DATABASE SEEDED SUCCESSFULLY
+═══════════════════════════════════════════════════════════
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Fetch Dynamic Features') {
+            when {
+                allOf {
+                    expression { params.FETCH_DYNAMIC_FEATURES }
+                    expression { !params.SKIP_TESTS && params.FEATURE_AREAS }
+                }
+            }
+            steps {
+                container('builder') {
+                    dir('elohim-app') {
+                        script {
+                            def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                            def testPathId = params.TEST_PATH_ID
+                            def testTags = params.TEST_TAGS
+
+                            echo "Fetching features from: ${doorwayHost}"
+                            echo "Test path: ${testPathId}"
+
+                            sh """
+                                node scripts/fetch-bdd-features.js \\
+                                    --doorway-url "${doorwayHost}" \\
+                                    --test-path-id "${testPathId}" \\
+                                    --output-dir "cypress/e2e/features/dynamic" \\
+                                    ${testTags ? "--tags '${testTags}'" : ''}
+                            """
+
+                            def featureCount = sh(
+                                script: 'find cypress/e2e/features/dynamic -name "*.feature" 2>/dev/null | wc -l || echo "0"',
+                                returnStdout: true
+                            ).trim()
+
+                            echo "📁 Fetched ${featureCount} dynamic feature files"
+
+                            if (featureCount == '0') {
+                                echo '⚠️ No dynamic features fetched - continuing with static features only'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Execute BDD Tests') {
+            when {
+                expression { !params.SKIP_TESTS && params.FEATURE_AREAS }
+            }
+            steps {
+                container('builder') {
+                    dir('elohim-app') {
+                        script {
+                            // Compute effective tags from feature areas
+                            def featureAreas = params.FEATURE_AREAS ?: ''
+                            def effectiveTags = params.TEST_TAGS ?: ''
+
+                            // If specific areas selected (not "all"), add area tags
+                            if (featureAreas && !featureAreas.contains('all')) {
+                                def areaTags = featureAreas.split(',')
+                                    .collect { "@${it.trim()}" }
+                                    .join(' or ')
+                                if (effectiveTags) {
+                                    effectiveTags = "(${areaTags}) and (${effectiveTags})"
+                                } else {
+                                    effectiveTags = areaTags
+                                }
+                            }
+
+                            runBDDTests(
+                                params.TARGET_HOST,
+                                env.RESOLVED_DOORWAY_HOST,
+                                effectiveTags
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Publish Reports') {
+            when {
+                expression { !params.SKIP_TESTS && params.FEATURE_AREAS }
+            }
+            steps {
+                container('builder') {
+                    dir('elohim-app') {
+                        script {
+                            publishBDDReports(params.TARGET_HOST)
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Analyze Schema Drift') {
+            when {
+                expression { params.ANALYZE_DRIFT }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        echo """
+═══════════════════════════════════════════════════════════
+🔍 SCHEMA DRIFT ANALYSIS
+═══════════════════════════════════════════════════════════
+Comparing DNA schema with seed data structure...
+═══════════════════════════════════════════════════════════
+                        """
+
+                        // Analyze drift between DNA Rust structs and seed JSON
+                        sh """#!/bin/bash
+                            set -euo pipefail
+
+                            echo "📊 Extracting DNA schema fields..."
+
+                            # Extract ContentNode fields from Rust DNA
+                            echo "=== ContentNode (DNA) ==="
+                            grep -A 50 'pub struct ContentOutput' holochain/dna/elohim/zomes/content_store/src/lib.rs 2>/dev/null | \
+                                grep 'pub ' | head -20 || echo "  (Could not extract - check struct name)"
+
+                            echo ""
+                            echo "=== Seed Data Sample Fields ==="
+                            # Sample a seed file to see what fields exist
+                            SAMPLE_FILE=\$(find genesis/data/lamad/content -name "*.json" -type f | head -1)
+                            if [ -n "\$SAMPLE_FILE" ]; then
+                                echo "Sample: \$SAMPLE_FILE"
+                                cat "\$SAMPLE_FILE" | jq 'keys' 2>/dev/null || echo "  (Could not parse JSON)"
+                            fi
+
+                            echo ""
+                            echo "=== Path Schema Sample ==="
+                            PATH_FILE=\$(find genesis/data/lamad/paths -name "*.json" -type f | head -1)
+                            if [ -n "\$PATH_FILE" ]; then
+                                echo "Sample: \$PATH_FILE"
+                                cat "\$PATH_FILE" | jq 'keys' 2>/dev/null || echo "  (Could not parse JSON)"
+                            fi
+
+                            echo ""
+                            echo "=== Seed Data Statistics ==="
+                            CONTENT_COUNT=\$(find genesis/data/lamad/content -name "*.json" -type f | wc -l)
+                            PATH_COUNT=\$(find genesis/data/lamad/paths -name "*.json" -type f | wc -l)
+                            ASSESSMENT_COUNT=\$(find genesis/data/lamad/assessments -name "*.json" -type f 2>/dev/null | wc -l || echo 0)
+
+                            echo "  Content nodes: \$CONTENT_COUNT"
+                            echo "  Learning paths: \$PATH_COUNT"
+                            echo "  Assessments: \$ASSESSMENT_COUNT"
+
+                            echo ""
+                            echo "=== Content Type Distribution ==="
+                            find genesis/data/lamad/content -name "*.json" -type f -exec jq -r '.contentType // "unknown"' {} \\; 2>/dev/null | \
+                                sort | uniq -c | sort -rn | head -10 || echo "  (Could not analyze)"
+
+                            echo ""
+                            echo "=== Missing Required Fields Check ==="
+                            MISSING_ID=\$(find genesis/data/lamad/content -name "*.json" -type f -exec sh -c 'jq -e ".id" "{}" >/dev/null 2>&1 || echo "{}"' \\; | grep -v '^$' | wc -l)
+                            MISSING_TITLE=\$(find genesis/data/lamad/content -name "*.json" -type f -exec sh -c 'jq -e ".title" "{}" >/dev/null 2>&1 || echo "{}"' \\; | grep -v '^$' | wc -l)
+
+                            if [ "\$MISSING_ID" -gt 0 ] || [ "\$MISSING_TITLE" -gt 0 ]; then
+                                echo "  ⚠️ Files missing 'id': \$MISSING_ID"
+                                echo "  ⚠️ Files missing 'title': \$MISSING_TITLE"
+                            else
+                                echo "  ✅ All files have required fields (id, title)"
+                            fi
+                        """
+
+                        echo """
+═══════════════════════════════════════════════════════════
+✅ DRIFT ANALYSIS COMPLETE
+═══════════════════════════════════════════════════════════
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            container('builder') {
+                dir('elohim-app') {
+                    sh '''
+                        rm -rf cypress/e2e/features/dynamic/*.feature 2>/dev/null || true
+                        echo "Cleanup complete"
+                    '''
+                }
+            }
+        }
+        success {
+            script {
+                def testStatus = params.SKIP_TESTS ? 'Skipped (SKIP_TESTS)' :
+                    (!params.FEATURE_AREAS ? 'Skipped (no areas selected)' :
+                    (params.FEATURE_AREAS ?: 'All'))
+                echo """
+═══════════════════════════════════════════════════════════
+✅ GENESIS PIPELINE COMPLETE
+═══════════════════════════════════════════════════════════
+Target: ${params.TARGET_HOST}
+Seeded: ${params.SEED_DATA}
+Feature Areas: ${params.FEATURE_AREAS ?: '(none)'}
+Tests: ${testStatus}
+═══════════════════════════════════════════════════════════
+                """
+            }
+        }
+        failure {
+            script {
+                def testStatus = params.SKIP_TESTS ? 'Skipped (SKIP_TESTS)' :
+                    (!params.FEATURE_AREAS ? 'Skipped (no areas selected)' :
+                    (params.FEATURE_AREAS ?: 'All'))
+                echo """
+═══════════════════════════════════════════════════════════
+❌ GENESIS PIPELINE FAILED
+═══════════════════════════════════════════════════════════
+Target: ${params.TARGET_HOST}
+Seeded: ${params.SEED_DATA}
+Feature Areas: ${params.FEATURE_AREAS ?: '(none)'}
+Tests: ${testStatus}
+
+Check the logs and Cucumber report for details.
+═══════════════════════════════════════════════════════════
+                """
+            }
+        }
+    }
+}

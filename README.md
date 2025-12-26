@@ -47,6 +47,14 @@ This manifesto proposes technology that actively defends against corruption whil
 ├── Jenkinsfile               # CI/CD pipeline definition
 ├── VERSION                   # Semantic versioning (1.0.0)
 │
+├── genesis/                  # Meta-infrastructure: source → seed → validate
+│   ├── Jenkinsfile           # Seed + validate pipeline
+│   ├── docs/                 # Raw source documentation
+│   │   └── content/          # Markdown, Gherkin source files
+│   ├── data/                 # Structured seed data
+│   │   └── lamad/            # Learning content JSON
+│   └── seeder/               # Holochain seeding tools
+│
 ├── elohim-app/               # Angular application (Main Platform)
 │   └── src/app/
 │       ├── components/       # Landing page components
@@ -71,13 +79,10 @@ This manifesto proposes technology that actively defends against corruption whil
 │       └── lamad-ui/         # UI Pattern Library
 │
 ├── holochain/                # Holochain Edge Node Infrastructure
-│   ├── admin-proxy/          # Authenticated WebSocket proxy
+│   ├── doorway/              # Gateway service (auth, routing, caching)
+│   ├── dna/                  # DNA definitions and zomes
 │   ├── manifests/            # K8s deployments for Edge Nodes
 │   └── Jenkinsfile           # CI/CD for Holochain components
-│
-├── data/                     # Content and documentation
-│   ├── content/              # Learning content by domain
-│   └── humans/               # Human-readable documentation
 │
 └── manifests/                # Kubernetes deployment manifests
     ├── *-deployment.yaml     # Environment-specific deployments
@@ -135,9 +140,9 @@ This monorepo uses a three-pipeline Jenkins architecture to manage builds effici
     │        │          │           │
     ▼        ▼          ▼           │
 ┌────────┐┌──────────┐┌─────────┐  │
-│Elohim  ││Holochain││Steward  │  │
-│App     ││Pipeline ││Pipeline │  │
-│Job     ││Job      ││Job      │  │
+│Elohim  ││Holochain ││Steward  │  │
+│App     ││Pipeline  ││Pipeline │  │
+│Job     ││Job       ││Job      │  │
 └────────┘└──────────┘└─────────┘  │
     │        │          │          │
     │    ┌───┴──────────┘          │
@@ -151,7 +156,7 @@ This monorepo uses a three-pipeline Jenkins architecture to manage builds effici
    Steward        (Builds with     │
    Fetches        fetched artifact)│
    hApp           30 sec vs 40 min │
-                                  │
+                                   │
 ROOT JOB ORCHESTRATOR:             │
 ┌──────────────────────────────────┘
 │ 🚀 Detects changesets
@@ -164,6 +169,24 @@ Each pipeline respects its own when{} conditions:
     ▼
    Docker Images → Harbor Registry
    (Production Deployment)
+
+
+┌─────────────────────────────────────────────────────────────┐
+│ GENESIS PIPELINE (standalone, manual trigger)               │
+│ genesis/Jenkinsfile - Seed + Validate + Drift Analysis      │
+└─────────────────────────────────────────────────────────────┘
+        ↓
+   genesis/docs/       [Raw markdown, Gherkin - human authored]
+        ↓
+   Claude + MCP        [Non-deterministic synthesis]
+        ↓
+   genesis/data/       [Structured JSON - schema-aligned]
+        ↓
+   genesis/seeder      [Deterministic load to DHT]
+        ↓
+   Holochain DHT       [Production data]
+        ↓
+   BDD Validation      [Confirms it works]
 ```
 
 ### Three-Pipeline Design
@@ -181,7 +204,7 @@ Each pipeline respects its own when{} conditions:
 
 #### 2. **Holochain Pipeline** (`/projects/elohim/holochain/Jenkinsfile`)
 - **Triggers on:** `holochain/**`
-- **Builds:** DNA, hApp bundle, Gateway service
+- **Builds:** DNA, hApp bundle, Doorway gateway service
 - **Deploys to:** Dev edge node (dev/branches), Production (main)
 - **Artifacts:**
   - `elohim.happ` (archived for steward to fetch)
@@ -190,14 +213,8 @@ Each pipeline respects its own when{} conditions:
   - Efficient Rust/WASM compilation with Nix caching
   - Automatic artifact archival for downstream consumption
   - Edge node deployment
-  - **Dev-only: Automatic seeding** when DNA or seed data changes
 
-**Sub-stage: 🔧 Seed Dev Database**
-- Runs AFTER deployment, only when DNA is rebuilt
-- Populates holochain-dev with test/prototype data
-- Triggered by: `holochain/dna/**` or `holochain/seeder/**` changes (not other holochain modifications)
-- Skipped on production (main branch) - dev branches only
-- Useful for rapid prototyping iteration with fresh data
+> **Note:** Seeding is now handled by the Genesis pipeline (`genesis/Jenkinsfile`), which can be triggered manually after deployment.
 
 #### 3. **Steward Pipeline** (`/projects/elohim/steward/Jenkinsfile`)
 - **Triggers on:** `steward/**`, `holochain/dna/**`, `elohim-app/src/**`, `VERSION`
@@ -208,23 +225,37 @@ Each pipeline respects its own when{} conditions:
   - Three-tier fallback: artifact fetch → local build → error
   - **99% faster** when artifacts available (30 sec vs 40 min)
 
+#### 4. **Genesis Pipeline** (`/projects/elohim/genesis/Jenkinsfile`)
+- **Triggers on:** Manual / scheduled (not on push)
+- **Purpose:** Seed content + validate with BDD tests + analyze drift
+- **Parameters:**
+  - `TARGET_HOST` - Environment to seed/test
+  - `FEATURE_AREAS` - Feature areas to test (doorway, imagodei, lamad, shefa, qahal)
+  - `SEED_DATA` - Whether to run seeding
+  - `ANALYZE_DRIFT` - Compare DNA schema with seed data
+- **Key Features:**
+  - Standalone pipeline for content lifecycle management
+  - BDD tests fetched from the app itself (dogfooding)
+  - Schema drift analysis between DNA and seed data
+
+See [`genesis/README.md`](./genesis/README.md) for the full vision of the Genesis project.
+
 ### Build Matrix & Changeset Filtering
 
 The root orchestrator detects changes and determines which pipelines to run:
 
-| Changed Files | Pipelines Triggered | Extra Actions |
-|---|---|---|
-| `elohim-app/**`, `elohim-library/**` | ✅ Elohim App | - |
-| `holochain/**` (other files) | ✅ Holochain | - |
-| `holochain/dna/**` | ✅ Holochain | 🔧 Seed dev DB *after deploy* |
-| `holochain/seeder/**` | ✅ Holochain | 🔧 Seed dev DB *after deploy* |
-| `steward/**` | ✅ Steward | - |
-| `docs/**`, `*.md` | ⏭️ None | (doc-only changes) |
-| `VERSION` | ✅ All pipelines | 🔧 Seed dev DB (if DNA rebuilt) |
+| Changed Files | Pipelines Triggered |
+|---|---|
+| `elohim-app/**`, `elohim-library/**` | ✅ Elohim App |
+| `holochain/**` | ✅ Holochain |
+| `steward/**` | ✅ Steward |
+| `genesis/**` | ⏭️ None (manual trigger) |
+| `docs/**`, `*.md` | ⏭️ None (doc-only) |
+| `VERSION` | ✅ All pipelines |
 
 **Safety valves:** Main and dev branches always build, regardless of changesets.
 
-**Seeding:** Runs AFTER deployment, only for dev/feature/claude branches when DNA or seed files change. Never runs on production (main). Ensures fresh test data every time DNA is rebuilt.
+**Seeding:** Now handled by the Genesis pipeline (`genesis/Jenkinsfile`). Trigger manually after deployment to seed content and run BDD validation.
 
 ### Artifact Sharing Strategy
 
@@ -308,18 +339,15 @@ The build description shows a quick summary:
 
 ### Troubleshooting
 
-**Q: Why is my dev database being reset after deployment?**
-- The seeding stage automatically resets and repopulates the database when DNA changes
-- This is intentional for rapid prototyping iteration (dev branches only)
-- Seeding runs automatically AFTER deployment when: `holochain/dna/**` or `holochain/seeder/**` change
-- Other holochain changes (manifests, doorway code, etc.) won't trigger seeding
-- Production (main branch) is never seeded - only dev/feature/claude branches
-- To disable seeding for a specific commit, don't change DNA or seeder files
+**Q: How do I seed the database?**
+- Seeding is handled by the Genesis pipeline: trigger `genesis/Jenkinsfile` manually
+- Or run directly: `cd genesis/seeder && HOLOCHAIN_ADMIN_URL="ws://..." npx tsx src/seed.ts`
+- See [`genesis/README.md`](./genesis/README.md) for full options
 
-**Q: Can I seed manually?**
-- Yes! Seeding is just an npm script: `cd holochain/seeder && npx tsx src/seed.ts`
-- Set `HOLOCHAIN_ADMIN_URL` env var to the target holochain instance
-- Useful for testing without triggering the full pipeline
+**Q: How do I run BDD validation tests?**
+- Trigger the Genesis pipeline with `SEED_DATA=false` to skip seeding
+- Select feature areas (doorway, imagodei, lamad, shefa, qahal) or "all"
+- Tests are fetched from the running app itself (dogfooding)
 
 **Q: Steward building hApp locally instead of fetching?**
 - This is expected if the holochain pipeline hasn't run yet
