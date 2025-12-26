@@ -3,73 +3,356 @@
   "contentType": "assessment",
   "title": "Governance Foundations",
   "description": "Test your understanding of constitutional AI governance principles",
-  "content": {
-    "passingScore": 70,
-    "allowRetake": true,
-    "showCorrectAnswers": true,
-    "questions": [
-      {
-        "id": "gf-q1",
-        "type": "multiple-choice",
-        "question": "What is the primary purpose of Elohim agents in governance?",
-        "options": [
-          "To make all decisions for humans",
-          "To serve as constitutional guardians while respecting human agency",
-          "To maximize engagement metrics",
-          "To enforce rules without exception"
-        ],
-        "correctAnswer": 1,
-        "explanation": "Elohim serve as guardians of constitutional principles while preserving human agency and dignity."
+  "content": [
+    {
+      "id": "gf-q1",
+      "question": {
+        "content": "What is the primary purpose of Elohim agents in governance?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "To make all decisions for humans",
+                  "correct": false
+                },
+                {
+                  "content": "To serve as constitutional guardians while respecting human agency",
+                  "correct": true
+                },
+                {
+                  "content": "To maximize engagement metrics",
+                  "correct": false
+                },
+                {
+                  "content": "To enforce rules without exception",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
       },
-      {
-        "id": "gf-q2",
-        "type": "multiple-choice",
-        "question": "In the Elohim hierarchy, which level handles family-specific matters?",
-        "options": [
-          "Global Elohim",
-          "Community Elohim",
-          "Family Elohim",
-          "Personal Agent"
-        ],
-        "correctAnswer": 2,
-        "explanation": "Family Elohim handle matters at the household level, protecting family privacy and values."
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
       },
-      {
-        "id": "gf-q3",
-        "type": "true-false",
-        "question": "Every governance decision in the protocol can be challenged.",
-        "correctAnswer": true,
-        "explanation": "The right to challenge is constitutional - no decision is exempt from review."
-      },
-      {
-        "id": "gf-q4",
-        "type": "multiple-choice",
-        "question": "What happens if a governance SLA is breached?",
-        "options": [
-          "Nothing, SLAs are aspirational",
-          "The decision defaults in favor of the challenger",
-          "The system shuts down",
-          "Users lose their accounts"
+      "hints": [
+        {
+          "content": "Elohim serve as guardians of constitutional principles while preserving human agency and dignity.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-governance-foundations",
+        "assessesContentId": "governance-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "intermediate",
+        "tags": [
+          "quiz",
+          "governance",
+          "foundations",
+          "assessment"
         ],
-        "correctAnswer": 1,
-        "explanation": "SLA breaches have constitutional consequences to ensure responsive governance."
-      },
-      {
-        "id": "gf-q5",
-        "type": "multiple-choice",
-        "question": "What is the purpose of precedent in the governance system?",
-        "options": [
-          "To make governance predictable and consistent over time",
-          "To lock in decisions permanently",
-          "To benefit long-time users",
-          "To reduce the number of appeals"
-        ],
-        "correctAnswer": 0,
-        "explanation": "Precedent creates constitutional evolution through consistent, predictable decisions."
+        "createdAt": "2025-12-25T23:31:36.264Z"
       }
-    ]
-  },
-  "contentFormat": "quiz-json",
+    },
+    {
+      "id": "gf-q2",
+      "question": {
+        "content": "In the Elohim hierarchy, which level handles family-specific matters?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Global Elohim",
+                  "correct": false
+                },
+                {
+                  "content": "Community Elohim",
+                  "correct": false
+                },
+                {
+                  "content": "Family Elohim",
+                  "correct": true
+                },
+                {
+                  "content": "Personal Agent",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [
+        {
+          "content": "Family Elohim handle matters at the household level, protecting family privacy and values.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-governance-foundations",
+        "assessesContentId": "governance-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "intermediate",
+        "tags": [
+          "quiz",
+          "governance",
+          "foundations",
+          "assessment"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    },
+    {
+      "id": "gf-q3",
+      "question": {
+        "content": "Every governance decision in the protocol can be challenged.\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "True",
+                  "correct": true
+                },
+                {
+                  "content": "False",
+                  "correct": false
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [
+        {
+          "content": "The right to challenge is constitutional - no decision is exempt from review.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-governance-foundations",
+        "assessesContentId": "governance-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "easy",
+        "tags": [
+          "quiz",
+          "governance",
+          "foundations",
+          "assessment"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    },
+    {
+      "id": "gf-q4",
+      "question": {
+        "content": "What happens if a governance SLA is breached?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Nothing, SLAs are aspirational",
+                  "correct": false
+                },
+                {
+                  "content": "The decision defaults in favor of the challenger",
+                  "correct": true
+                },
+                {
+                  "content": "The system shuts down",
+                  "correct": false
+                },
+                {
+                  "content": "Users lose their accounts",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [
+        {
+          "content": "SLA breaches have constitutional consequences to ensure responsive governance.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-governance-foundations",
+        "assessesContentId": "governance-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "intermediate",
+        "tags": [
+          "quiz",
+          "governance",
+          "foundations",
+          "assessment"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    },
+    {
+      "id": "gf-q5",
+      "question": {
+        "content": "What is the purpose of precedent in the governance system?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "To make governance predictable and consistent over time",
+                  "correct": true
+                },
+                {
+                  "content": "To lock in decisions permanently",
+                  "correct": false
+                },
+                {
+                  "content": "To benefit long-time users",
+                  "correct": false
+                },
+                {
+                  "content": "To reduce the number of appeals",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [
+        {
+          "content": "Precedent creates constitutional evolution through consistent, predictable decisions.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-governance-foundations",
+        "assessesContentId": "governance-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "intermediate",
+        "tags": [
+          "quiz",
+          "governance",
+          "foundations",
+          "assessment"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    }
+  ],
+  "contentFormat": "perseus",
   "tags": [
     "quiz",
     "governance",
@@ -83,7 +366,10 @@
   "metadata": {
     "category": "governance",
     "attestationId": "governance-foundations",
-    "difficulty": "intermediate"
+    "difficulty": "intermediate",
+    "questionCount": 5,
+    "sourceFormat": "quiz-json",
+    "migratedAt": "2025-12-26T05:36:35.096Z"
   },
   "createdAt": "2025-11-28T00:09:03.479353",
   "updatedAt": "2025-11-28T00:09:03.479355"

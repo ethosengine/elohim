@@ -3,47 +3,214 @@
   "contentType": "assessment",
   "title": "Distributed Ownership Models",
   "description": "Test your understanding of worker ownership and autonomous entities",
-  "content": {
-    "passingScore": 70,
-    "allowRetake": true,
-    "showCorrectAnswers": true,
-    "questions": [
-      {
-        "id": "do-q1",
-        "type": "multiple-choice",
-        "question": "What distinguishes an autonomous entity from a traditional corporation?",
-        "options": [
-          "Size of the organization",
-          "Distributed ownership and governance among stakeholders",
-          "Industry sector",
-          "Geographic location"
-        ],
-        "correctAnswer": 1,
-        "explanation": "Autonomous entities feature distributed ownership and democratic governance."
+  "content": [
+    {
+      "id": "do-q1",
+      "question": {
+        "content": "What distinguishes an autonomous entity from a traditional corporation?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Size of the organization",
+                  "correct": false
+                },
+                {
+                  "content": "Distributed ownership and governance among stakeholders",
+                  "correct": true
+                },
+                {
+                  "content": "Industry sector",
+                  "correct": false
+                },
+                {
+                  "content": "Geographic location",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
       },
-      {
-        "id": "do-q2",
-        "type": "true-false",
-        "question": "In an autonomous entity, workers have no voice in governance.",
-        "correctAnswer": false,
-        "explanation": "Worker voice is central to autonomous entity governance."
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
       },
-      {
-        "id": "do-q3",
-        "type": "multiple-choice",
-        "question": "What is 'exit' in the context of worker rights?",
-        "options": [
-          "A door",
-          "The ability to leave with fair compensation for contribution",
-          "Being fired",
-          "A software term"
+      "hints": [
+        {
+          "content": "Autonomous entities feature distributed ownership and democratic governance.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-distributed-ownership",
+        "assessesContentId": "autonomous-entity-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "tags": [
+          "quiz",
+          "autonomous-entity",
+          "ownership",
+          "worker-rights"
         ],
-        "correctAnswer": 1,
-        "explanation": "Exit rights ensure workers can leave with fair recognition of their contributions."
+        "createdAt": "2025-12-25T23:31:36.264Z"
       }
-    ]
-  },
-  "contentFormat": "quiz-json",
+    },
+    {
+      "id": "do-q2",
+      "question": {
+        "content": "In an autonomous entity, workers have no voice in governance.\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "True",
+                  "correct": false
+                },
+                {
+                  "content": "False",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [
+        {
+          "content": "Worker voice is central to autonomous entity governance.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-distributed-ownership",
+        "assessesContentId": "autonomous-entity-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "easy",
+        "tags": [
+          "quiz",
+          "autonomous-entity",
+          "ownership",
+          "worker-rights"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    },
+    {
+      "id": "do-q3",
+      "question": {
+        "content": "What is 'exit' in the context of worker rights?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "A door",
+                  "correct": false
+                },
+                {
+                  "content": "The ability to leave with fair compensation for contribution",
+                  "correct": true
+                },
+                {
+                  "content": "Being fired",
+                  "correct": false
+                },
+                {
+                  "content": "A software term",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [
+        {
+          "content": "Exit rights ensure workers can leave with fair recognition of their contributions.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-distributed-ownership",
+        "assessesContentId": "autonomous-entity-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "tags": [
+          "quiz",
+          "autonomous-entity",
+          "ownership",
+          "worker-rights"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    }
+  ],
+  "contentFormat": "perseus",
   "tags": [
     "quiz",
     "autonomous-entity",
@@ -56,7 +223,10 @@
   ],
   "metadata": {
     "category": "autonomous-entity",
-    "attestationId": "ownership-explorer"
+    "attestationId": "ownership-explorer",
+    "questionCount": 3,
+    "sourceFormat": "quiz-json",
+    "migratedAt": "2025-12-26T05:36:35.096Z"
   },
   "createdAt": "2025-11-28T00:09:03.479367",
   "updatedAt": "2025-11-28T00:09:03.479368"

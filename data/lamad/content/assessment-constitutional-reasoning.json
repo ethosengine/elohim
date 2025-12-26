@@ -3,75 +3,261 @@
   "contentType": "assessment",
   "title": "Constitutional Reasoning Assessment",
   "description": "Demonstrate your ability to reason about constitutional principles",
-  "content": {
-    "instrumentType": "competency",
-    "domain": "governance",
-    "passingScore": 80,
-    "allowRetake": true,
-    "showCorrectAnswers": true,
-    "preAssessmentContent": "This assessment tests your understanding of constitutional principles and your ability to apply them to governance scenarios.",
-    "questions": [
-      {
-        "id": "cr-q1",
-        "type": "multiple-choice",
-        "question": "A community Elohim makes a decision that a family disagrees with. What is the appropriate first step?",
-        "options": [
-          "Accept the decision without question",
-          "File a challenge at the family level",
-          "Escalate directly to global Elohim",
-          "Leave the community"
-        ],
-        "correctAnswer": 1,
-        "explanation": "Challenges should start at the appropriate level - family matters begin with family Elohim."
+  "content": [
+    {
+      "id": "cr-q1",
+      "question": {
+        "content": "A community Elohim makes a decision that a family disagrees with. What is the appropriate first step?\n\n[[☃ widget 1]]",
+        "images": {},
+        "widgets": {
+          "widget 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Accept the decision without question",
+                  "correct": false
+                },
+                {
+                  "content": "File a challenge at the family level",
+                  "correct": true
+                },
+                {
+                  "content": "Escalate directly to global Elohim",
+                  "correct": false
+                },
+                {
+                  "content": "Leave the community",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
       },
-      {
-        "id": "cr-q2",
-        "type": "multiple-choice",
-        "question": "Which principle takes precedence in the constitutional hierarchy?",
-        "options": [
-          "Community consensus",
-          "Individual preference",
-          "Love as committed action",
-          "Economic efficiency"
-        ],
-        "correctAnswer": 2,
-        "explanation": "Love as committed action (not emotion) is the foundational constitutional principle."
-      },
-      {
-        "id": "cr-q3",
-        "type": "short-answer",
-        "question": "Explain in your own words why 'no extinction, no genocide, no slavery' are non-negotiable boundaries.",
-        "rubric": "Answer should demonstrate understanding of absolute human dignity and existential protections."
-      },
-      {
-        "id": "cr-q4",
-        "type": "multiple-choice",
-        "question": "A governance decision was made 2 weeks ago. The SLA requires response within 14 days. What happens now?",
-        "options": [
-          "The decision stands permanently",
-          "The case auto-escalates to higher authority",
-          "Nothing happens",
-          "The user loses their right to appeal"
-        ],
-        "correctAnswer": 1,
-        "explanation": "SLA breaches trigger automatic escalation to ensure responsive governance."
-      },
-      {
-        "id": "cr-q5",
-        "type": "multiple-choice",
-        "question": "Why is precedent important in constitutional governance?",
-        "options": [
-          "It makes governance predictable and fair",
-          "It prevents all future changes",
-          "It benefits established users",
-          "It reduces workload"
-        ],
-        "correctAnswer": 0,
-        "explanation": "Precedent ensures consistent, predictable governance that evolves constitutionally."
+      "hints": [
+        {
+          "content": "Challenges should start at the appropriate level - family matters begin with family Elohim.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "cr-q1",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "tags": [],
+        "instrumentType": "discovery"
       }
-    ]
-  },
-  "contentFormat": "assessment-json",
+    },
+    {
+      "id": "cr-q2",
+      "question": {
+        "content": "Which principle takes precedence in the constitutional hierarchy?\n\n[[☃ widget 2]]",
+        "images": {},
+        "widgets": {
+          "widget 2": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Community consensus",
+                  "correct": false
+                },
+                {
+                  "content": "Individual preference",
+                  "correct": false
+                },
+                {
+                  "content": "Love as committed action",
+                  "correct": true
+                },
+                {
+                  "content": "Economic efficiency",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "Love as committed action (not emotion) is the foundational constitutional principle.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "cr-q2",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "tags": [],
+        "instrumentType": "discovery"
+      }
+    },
+    {
+      "id": "cr-q3",
+      "question": {
+        "content": "Explain in your own words why 'no extinction, no genocide, no slavery' are non-negotiable boundaries.\n\n[[☃ widget 3]]",
+        "images": {},
+        "widgets": {
+          "widget 3": {
+            "type": "input-number",
+            "options": {
+              "value": "",
+              "simplify": "optional",
+              "size": "normal",
+              "answerForms": []
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "openResponse": true
+      }
+    },
+    {
+      "id": "cr-q4",
+      "question": {
+        "content": "A governance decision was made 2 weeks ago. The SLA requires response within 14 days. What happens now?\n\n[[☃ widget 4]]",
+        "images": {},
+        "widgets": {
+          "widget 4": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "The decision stands permanently",
+                  "correct": false
+                },
+                {
+                  "content": "The case auto-escalates to higher authority",
+                  "correct": true
+                },
+                {
+                  "content": "Nothing happens",
+                  "correct": false
+                },
+                {
+                  "content": "The user loses their right to appeal",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "SLA breaches trigger automatic escalation to ensure responsive governance.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "cr-q4",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "tags": [],
+        "instrumentType": "discovery"
+      }
+    },
+    {
+      "id": "cr-q5",
+      "question": {
+        "content": "Why is precedent important in constitutional governance?\n\n[[☃ widget 5]]",
+        "images": {},
+        "widgets": {
+          "widget 5": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "It makes governance predictable and fair",
+                  "correct": true
+                },
+                {
+                  "content": "It prevents all future changes",
+                  "correct": false
+                },
+                {
+                  "content": "It benefits established users",
+                  "correct": false
+                },
+                {
+                  "content": "It reduces workload",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "Precedent ensures consistent, predictable governance that evolves constitutionally.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "cr-q5",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "tags": [],
+        "instrumentType": "discovery"
+      }
+    }
+  ],
+  "contentFormat": "perseus",
   "tags": [
     "assessment",
     "governance",
@@ -83,11 +269,14 @@
     "governance-deep-dive"
   ],
   "metadata": {
-    "instrumentType": "competency",
+    "instrumentType": "discovery",
     "domain": "governance",
     "estimatedTime": "30-45 minutes",
     "attestationId": "governance-practitioner",
-    "prerequisiteAttestation": "governance-foundations"
+    "prerequisiteAttestation": "governance-foundations",
+    "sourceFormat": "assessment-json",
+    "migratedAt": "2025-12-26T05:42:25.351Z",
+    "questionCount": 5
   },
   "createdAt": "2025-11-28T00:09:03.479952",
   "updatedAt": "2025-11-28T00:09:03.479954"

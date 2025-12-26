@@ -69,12 +69,11 @@ pub const CONTENT_FORMATS: &[&str] = &[
     "interactive",     // Interactive content
     "external",        // External URL reference
     "gherkin",         // Gherkin/Cucumber scenario format (imported from .feature files)
-    "quiz-json",       // Quiz in JSON format
-    "assessment-json", // Assessment instrument in JSON format
+    "perseus",         // Perseus quiz/assessment format (Khan Academy derived, canonical)
+    "perseus-json",    // Perseus format (alias)
     "video-embed",     // Embedded video (YouTube, Vimeo, etc.)
     "audio-file",      // Audio file reference
     "html5-app",       // HTML5 interactive application
-    "perseus-json",    // Perseus quiz format (Khan Academy derived)
     "human-json",      // Human persona JSON format
     "organization-json", // Organization JSON format
     "json",            // Generic JSON format

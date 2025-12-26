@@ -3,117 +3,285 @@
   "contentType": "assessment",
   "title": "Find Your Path in the Protocol",
   "description": "A brief quiz to help you discover which epic domain resonates with you",
-  "content": {
-    "passingScore": 0,
-    "allowRetake": true,
-    "showCorrectAnswers": false,
-    "questions": [
-      {
-        "id": "q1",
-        "type": "multiple-choice",
-        "question": "Which of these activities interests you most?",
-        "options": [
-          "Shaping AI policy and constitutional frameworks",
-          "Supporting caregivers and recognizing invisible work",
-          "Transforming workplace ownership and governance",
-          "Civic participation and public oversight",
-          "Building healthier digital communication spaces"
-        ],
-        "rubric": {
-          "0": "governance",
-          "1": "value_scanner",
-          "2": "autonomous_entity",
-          "3": "public_observer",
-          "4": "social_medium"
+  "content": [
+    {
+      "id": "q1",
+      "question": {
+        "content": "Which of these activities interests you most?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Shaping AI policy and constitutional frameworks",
+                  "correct": true
+                },
+                {
+                  "content": "Supporting caregivers and recognizing invisible work",
+                  "correct": false
+                },
+                {
+                  "content": "Transforming workplace ownership and governance",
+                  "correct": false
+                },
+                {
+                  "content": "Civic participation and public oversight",
+                  "correct": false
+                },
+                {
+                  "content": "Building healthier digital communication spaces",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
         }
       },
-      {
-        "id": "q2",
-        "type": "multiple-choice",
-        "question": "What aspect of the current system concerns you most?",
-        "options": [
-          "AI systems making decisions without democratic oversight",
-          "Unpaid care work being invisible in our economy",
-          "Workers having no voice in their workplaces",
-          "Citizens being disconnected from decision-making",
-          "Social media amplifying division and misinformation"
-        ],
-        "rubric": {
-          "0": "governance",
-          "1": "value_scanner",
-          "2": "autonomous_entity",
-          "3": "public_observer",
-          "4": "social_medium"
-        }
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
       },
-      {
-        "id": "q3",
-        "type": "multiple-choice",
-        "question": "Which role resonates most with how you see yourself?",
-        "options": [
-          "Policy maker, constitutional council member, or researcher",
-          "Caregiver, parent, or community supporter",
-          "Worker, business owner, or economic participant",
-          "Citizen, activist, journalist, or community organizer",
-          "Content creator, moderator, or digital community builder"
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "quiz-who-are-you",
+        "assessesContentId": "governance",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "tags": [
+          "assessment",
+          "onboarding",
+          "personalization",
+          "quiz"
         ],
-        "rubric": {
-          "0": "governance",
-          "1": "value_scanner",
-          "2": "autonomous_entity",
-          "3": "public_observer",
-          "4": "social_medium"
-        }
-      },
-      {
-        "id": "q4",
-        "type": "multiple-choice",
-        "question": "What kind of impact do you want to have?",
-        "options": [
-          "Ensuring AI serves humanity through proper governance",
-          "Making care work visible and valued in society",
-          "Creating more equitable economic relationships",
-          "Strengthening democratic participation and transparency",
-          "Fostering genuine human connection online"
-        ],
-        "rubric": {
-          "0": "governance",
-          "1": "value_scanner",
-          "2": "autonomous_entity",
-          "3": "public_observer",
-          "4": "social_medium"
-        }
+        "createdAt": "2025-12-25T23:31:36.264Z"
       }
-    ],
-    "resultMapping": {
-      "governance": {
-        "epicId": "governance-epic",
-        "title": "AI Governance",
-        "description": "You're drawn to constitutional oversight and democratic AI governance"
+    },
+    {
+      "id": "q2",
+      "question": {
+        "content": "What aspect of the current system concerns you most?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "AI systems making decisions without democratic oversight",
+                  "correct": true
+                },
+                {
+                  "content": "Unpaid care work being invisible in our economy",
+                  "correct": false
+                },
+                {
+                  "content": "Workers having no voice in their workplaces",
+                  "correct": false
+                },
+                {
+                  "content": "Citizens being disconnected from decision-making",
+                  "correct": false
+                },
+                {
+                  "content": "Social media amplifying division and misinformation",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
       },
-      "value_scanner": {
-        "epicId": "value-scanner-epic",
-        "title": "Value Scanner",
-        "description": "You're passionate about recognizing and valuing care work"
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
       },
-      "autonomous_entity": {
-        "epicId": "autonomous-entity-epic",
-        "title": "Autonomous Entity",
-        "description": "You want to transform workplace ownership and economic relationships"
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "quiz-who-are-you",
+        "assessesContentId": "governance",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "tags": [
+          "assessment",
+          "onboarding",
+          "personalization",
+          "quiz"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    },
+    {
+      "id": "q3",
+      "question": {
+        "content": "Which role resonates most with how you see yourself?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Policy maker, constitutional council member, or researcher",
+                  "correct": true
+                },
+                {
+                  "content": "Caregiver, parent, or community supporter",
+                  "correct": false
+                },
+                {
+                  "content": "Worker, business owner, or economic participant",
+                  "correct": false
+                },
+                {
+                  "content": "Citizen, activist, journalist, or community organizer",
+                  "correct": false
+                },
+                {
+                  "content": "Content creator, moderator, or digital community builder",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
       },
-      "public_observer": {
-        "epicId": "public-observer-epic",
-        "title": "Public Observer",
-        "description": "You're committed to civic participation and public accountability"
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
       },
-      "social_medium": {
-        "epicId": "social-medium-epic",
-        "title": "Social Medium",
-        "description": "You want to build healthier digital communication spaces"
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "quiz-who-are-you",
+        "assessesContentId": "governance",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "tags": [
+          "assessment",
+          "onboarding",
+          "personalization",
+          "quiz"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    },
+    {
+      "id": "q4",
+      "question": {
+        "content": "What kind of impact do you want to have?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Ensuring AI serves humanity through proper governance",
+                  "correct": true
+                },
+                {
+                  "content": "Making care work visible and valued in society",
+                  "correct": false
+                },
+                {
+                  "content": "Creating more equitable economic relationships",
+                  "correct": false
+                },
+                {
+                  "content": "Strengthening democratic participation and transparency",
+                  "correct": false
+                },
+                {
+                  "content": "Fostering genuine human connection online",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "quiz-who-are-you",
+        "assessesContentId": "governance",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "tags": [
+          "assessment",
+          "onboarding",
+          "personalization",
+          "quiz"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
       }
     }
-  },
-  "contentFormat": "quiz-json",
+  ],
+  "contentFormat": "perseus",
   "tags": [
     "assessment",
     "onboarding",
@@ -132,7 +300,10 @@
   "metadata": {
     "recommendsEpics": true,
     "quizType": "domain-discovery",
-    "category": "onboarding"
+    "category": "onboarding",
+    "questionCount": 4,
+    "sourceFormat": "quiz-json",
+    "migratedAt": "2025-12-26T05:36:35.096Z"
   },
   "createdAt": "2025-11-28T21:09:48.290906",
   "updatedAt": "2025-11-28T21:09:48.290906"

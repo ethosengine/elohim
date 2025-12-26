@@ -3,88 +3,348 @@
   "contentType": "assessment",
   "title": "Attachment Style Exploration",
   "description": "Understand your patterns in close relationships",
-  "content": {
-    "instrumentType": "attachment",
-    "domain": "attachment",
-    "passingScore": 0,
-    "allowRetake": true,
-    "showCorrectAnswers": false,
-    "contentWarning": "This assessment explores relationship patterns. Some questions may bring up feelings about past relationships.",
-    "preAssessmentContent": "Attachment styles describe patterns in how we relate to others in close relationships. Understanding your style can improve relationship awareness.",
-    "sections": [
-      {
-        "id": "sec-anxiety",
-        "title": "Relationship Feelings",
-        "instructions": "Think about your close relationships. How much do you agree with each statement?",
-        "questions": [
-          {
-            "id": "att-q1",
-            "type": "likert-7",
-            "text": "I worry about being abandoned by people close to me.",
-            "subscales": [
-              "anxiety"
-            ],
-            "scaleAnchors": {
-              "low": "Strongly Disagree",
-              "high": "Strongly Agree"
+  "content": [
+    {
+      "id": "att-q1",
+      "question": {
+        "content": "I worry about being abandoned by people close to me.\n\n[[☃ widget 1]]",
+        "images": {},
+        "widgets": {
+          "widget 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Strongly Disagree",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5",
+                  "correct": true
+                },
+                {
+                  "content": "6",
+                  "correct": true
+                },
+                {
+                  "content": "7 - Strongly Agree",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
             },
-            "reverseScored": false
-          },
-          {
-            "id": "att-q2",
-            "type": "likert-7",
-            "text": "I find it easy to depend on others.",
-            "subscales": [
-              "avoidance"
-            ],
-            "scaleAnchors": {
-              "low": "Strongly Disagree",
-              "high": "Strongly Agree"
-            },
-            "reverseScored": true
-          },
-          {
-            "id": "att-q3",
-            "type": "likert-7",
-            "text": "I often worry that my partner doesn't really love me.",
-            "subscales": [
-              "anxiety"
-            ],
-            "scaleAnchors": {
-              "low": "Strongly Disagree",
-              "high": "Strongly Agree"
-            },
-            "reverseScored": false
-          },
-          {
-            "id": "att-q4",
-            "type": "likert-7",
-            "text": "I feel comfortable opening up to others.",
-            "subscales": [
-              "avoidance"
-            ],
-            "scaleAnchors": {
-              "low": "Strongly Disagree",
-              "high": "Strongly Agree"
-            },
-            "reverseScored": true
-          },
-          {
-            "id": "att-q5",
-            "type": "likert-7",
-            "text": "I need a lot of reassurance that I am loved.",
-            "subscales": [
-              "anxiety"
-            ],
-            "scaleAnchors": {
-              "low": "Strongly Disagree",
-              "high": "Strongly Agree"
-            },
-            "reverseScored": false
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
           }
-        ]
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "anxiety"
+        ],
+        "scaleType": "likert-7",
+        "reverseScored": false
       }
-    ],
+    },
+    {
+      "id": "att-q2",
+      "question": {
+        "content": "I find it easy to depend on others.\n\n[[☃ widget 2]]",
+        "images": {},
+        "widgets": {
+          "widget 2": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Strongly Disagree",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5",
+                  "correct": true
+                },
+                {
+                  "content": "6",
+                  "correct": true
+                },
+                {
+                  "content": "7 - Strongly Agree",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "avoidance"
+        ],
+        "scaleType": "likert-7",
+        "reverseScored": true
+      }
+    },
+    {
+      "id": "att-q3",
+      "question": {
+        "content": "I often worry that my partner doesn't really love me.\n\n[[☃ widget 3]]",
+        "images": {},
+        "widgets": {
+          "widget 3": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Strongly Disagree",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5",
+                  "correct": true
+                },
+                {
+                  "content": "6",
+                  "correct": true
+                },
+                {
+                  "content": "7 - Strongly Agree",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "anxiety"
+        ],
+        "scaleType": "likert-7",
+        "reverseScored": false
+      }
+    },
+    {
+      "id": "att-q4",
+      "question": {
+        "content": "I feel comfortable opening up to others.\n\n[[☃ widget 4]]",
+        "images": {},
+        "widgets": {
+          "widget 4": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Strongly Disagree",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5",
+                  "correct": true
+                },
+                {
+                  "content": "6",
+                  "correct": true
+                },
+                {
+                  "content": "7 - Strongly Agree",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "avoidance"
+        ],
+        "scaleType": "likert-7",
+        "reverseScored": true
+      }
+    },
+    {
+      "id": "att-q5",
+      "question": {
+        "content": "I need a lot of reassurance that I am loved.\n\n[[☃ widget 5]]",
+        "images": {},
+        "widgets": {
+          "widget 5": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Strongly Disagree",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5",
+                  "correct": true
+                },
+                {
+                  "content": "6",
+                  "correct": true
+                },
+                {
+                  "content": "7 - Strongly Agree",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "anxiety"
+        ],
+        "scaleType": "likert-7",
+        "reverseScored": false
+      }
+    }
+  ],
+  "contentFormat": "perseus",
+  "tags": [
+    "assessment",
+    "attachment",
+    "relationships",
+    "self-knowledge"
+  ],
+  "sourcePath": "generated/assessment-attachment-style.json",
+  "relatedNodeIds": [
+    "know-thyself-path"
+  ],
+  "metadata": {
+    "instrumentType": "discovery",
+    "domain": "attachment",
+    "estimatedTime": "25-35 minutes",
+    "attestationId": "attachment-aware",
+    "contentAccess": "gated",
+    "prerequisiteAttestation": "values-examined",
+    "validation": {
+      "inspired_by": "Experiences in Close Relationships (ECR-R)",
+      "reliability": "Adapted for educational purposes"
+    },
+    "sourceFormat": "assessment-json",
+    "migratedAt": "2025-12-26T05:45:22.654Z",
+    "questionCount": 5,
     "interpretation": {
       "method": "quadrant",
       "dimensions": [
@@ -113,29 +373,6 @@
           "avoidance": "high"
         }
       ]
-    }
-  },
-  "contentFormat": "assessment-json",
-  "tags": [
-    "assessment",
-    "attachment",
-    "relationships",
-    "self-knowledge"
-  ],
-  "sourcePath": "generated/assessment-attachment-style.json",
-  "relatedNodeIds": [
-    "know-thyself-path"
-  ],
-  "metadata": {
-    "instrumentType": "attachment",
-    "domain": "attachment",
-    "estimatedTime": "25-35 minutes",
-    "attestationId": "attachment-aware",
-    "contentAccess": "gated",
-    "prerequisiteAttestation": "values-examined",
-    "validation": {
-      "inspired_by": "Experiences in Close Relationships (ECR-R)",
-      "reliability": "Adapted for educational purposes"
     }
   },
   "createdAt": "2025-11-28T00:09:03.479938",

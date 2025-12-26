@@ -3,47 +3,214 @@
   "contentType": "assessment",
   "title": "Digital Dignity Check",
   "description": "Assess understanding of dignity-preserving platform design",
-  "content": {
-    "passingScore": 70,
-    "allowRetake": true,
-    "showCorrectAnswers": true,
-    "questions": [
-      {
-        "id": "dd-q1",
-        "type": "multiple-choice",
-        "question": "What does 'virality as privilege' mean?",
-        "options": [
-          "Only privileged people can go viral",
-          "Wide reach must be earned through trust, not just engagement",
-          "Viruses are privileged",
-          "Viral content gets special treatment"
-        ],
-        "correctAnswer": 1,
-        "explanation": "Virality as privilege means reach is earned through demonstrated trustworthiness."
+  "content": [
+    {
+      "id": "dd-q1",
+      "question": {
+        "content": "What does 'virality as privilege' mean?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Only privileged people can go viral",
+                  "correct": false
+                },
+                {
+                  "content": "Wide reach must be earned through trust, not just engagement",
+                  "correct": true
+                },
+                {
+                  "content": "Viruses are privileged",
+                  "correct": false
+                },
+                {
+                  "content": "Viral content gets special treatment",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
       },
-      {
-        "id": "dd-q2",
-        "type": "true-false",
-        "question": "The Social Medium epic supports 'like' buttons as primary engagement.",
-        "correctAnswer": false,
-        "explanation": "The protocol explicitly avoids low-friction 'likes' in favor of more meaningful engagement."
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
       },
-      {
-        "id": "dd-q3",
-        "type": "multiple-choice",
-        "question": "What is 'mediated reaction'?",
-        "options": [
-          "Reactions by mediators",
-          "Elohim intercepting potentially harmful reactions with teaching",
-          "Delayed reactions",
-          "Reactions on media"
+      "hints": [
+        {
+          "content": "Virality as privilege means reach is earned through demonstrated trustworthiness.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-digital-dignity",
+        "assessesContentId": "social-medium-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "tags": [
+          "quiz",
+          "social-medium",
+          "dignity",
+          "design"
         ],
-        "correctAnswer": 1,
-        "explanation": "Mediated reactions teach rather than block, preserving agency while protecting dignity."
+        "createdAt": "2025-12-25T23:31:36.264Z"
       }
-    ]
-  },
-  "contentFormat": "quiz-json",
+    },
+    {
+      "id": "dd-q2",
+      "question": {
+        "content": "The Social Medium epic supports 'like' buttons as primary engagement.\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "True",
+                  "correct": false
+                },
+                {
+                  "content": "False",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [
+        {
+          "content": "The protocol explicitly avoids low-friction 'likes' in favor of more meaningful engagement.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-digital-dignity",
+        "assessesContentId": "social-medium-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "easy",
+        "tags": [
+          "quiz",
+          "social-medium",
+          "dignity",
+          "design"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    },
+    {
+      "id": "dd-q3",
+      "question": {
+        "content": "What is 'mediated reaction'?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Reactions by mediators",
+                  "correct": false
+                },
+                {
+                  "content": "Elohim intercepting potentially harmful reactions with teaching",
+                  "correct": true
+                },
+                {
+                  "content": "Delayed reactions",
+                  "correct": false
+                },
+                {
+                  "content": "Reactions on media",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [
+        {
+          "content": "Mediated reactions teach rather than block, preserving agency while protecting dignity.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-digital-dignity",
+        "assessesContentId": "social-medium-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "tags": [
+          "quiz",
+          "social-medium",
+          "dignity",
+          "design"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    }
+  ],
+  "contentFormat": "perseus",
   "tags": [
     "quiz",
     "social-medium",
@@ -56,7 +223,10 @@
   ],
   "metadata": {
     "category": "social-medium",
-    "attestationId": "dignity-advocate"
+    "attestationId": "dignity-advocate",
+    "questionCount": 3,
+    "sourceFormat": "quiz-json",
+    "migratedAt": "2025-12-26T05:36:35.095Z"
   },
   "createdAt": "2025-11-28T00:09:03.479370",
   "updatedAt": "2025-11-28T00:09:03.479371"
