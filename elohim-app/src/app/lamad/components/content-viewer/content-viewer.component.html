@@ -154,6 +154,58 @@
           </div>
         </div>
 
+        <!-- Contextual Feedback Section -->
+        <div class="feedback-section" *ngIf="showFeedbackSection && node">
+          <h2 class="feedback-section-title">📣 Share Your Feedback</h2>
+
+          <!-- Reaction Bar (Low Friction) -->
+          <div class="reaction-section">
+            <app-reaction-bar
+              [contentId]="node.id"
+              [allowedReactions]="allowedReactions"
+              [constraints]="feedbackProfile?.emotionalReactionConstraints"
+              [contentType]="mapContentTypeToProfileType(node.contentType)"
+              [showCounts]="true">
+            </app-reaction-bar>
+          </div>
+
+          <!-- Graduated Feedback (Medium Friction) -->
+          <div class="graduated-section">
+            <app-graduated-feedback
+              [contentId]="node.id"
+              [context]="feedbackContext"
+              [requiresReasoning]="false"
+              [showAggregates]="true">
+            </app-graduated-feedback>
+          </div>
+
+          <!-- Signal Summary (when aggregates exist) -->
+          <div class="signal-summary" *ngIf="aggregatedSignals && aggregatedSignals.reactionCounts.total > 0">
+            <div class="signal-metric">
+              <span class="metric-label">Community Sentiment</span>
+              <span class="metric-value" [ngClass]="{
+                'positive': aggregatedSignals.sentimentScore > 0.6,
+                'neutral': aggregatedSignals.sentimentScore >= 0.4 && aggregatedSignals.sentimentScore <= 0.6,
+                'negative': aggregatedSignals.sentimentScore < 0.4
+              }">
+                {{ (aggregatedSignals.sentimentScore * 100) | number:'1.0-0' }}%
+              </span>
+            </div>
+            <div class="signal-metric" *ngIf="aggregatedSignals.effectivenessScore > 0">
+              <span class="metric-label">Effectiveness</span>
+              <span class="metric-value">
+                {{ (aggregatedSignals.effectivenessScore * 100) | number:'1.0-0' }}%
+              </span>
+            </div>
+            <div class="signal-metric">
+              <span class="metric-label">Consensus</span>
+              <span class="metric-value consensus-badge" [ngClass]="aggregatedSignals.consensusState.level">
+                {{ aggregatedSignals.consensusState.level | titlecase }}
+              </span>
+            </div>
+          </div>
+        </div>
+
         <!-- Appears in Paths (Wikipedia-style back-links) -->
         <div *ngIf="containingPaths.length > 0 || loadingPaths" class="paths-section">
           <h2>📚 Appears in Learning Paths</h2>

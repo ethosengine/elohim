@@ -5,6 +5,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '@app/elohim/services/agent.service';
+import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
 import { SeoService } from '../../../services/seo.service';
 import { PathStepView, LearningPath, PathChapter, PathModule, PathSection } from '../../models/learning-path.model';
 import { MasteryLevel } from '../../models/content-mastery.model';
@@ -91,11 +92,15 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   private readonly seoService = inject(SeoService);
 
+  // Learning signal tracking
+  private contentViewStartTime: number | null = null;
+
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly pathService: PathService,
     private readonly agentService: AgentService,
+    private readonly governanceSignalService: GovernanceSignalService,
     private readonly pathContextService: PathContextService,
     private readonly cdr: ChangeDetectorRef
   ) {}
@@ -110,6 +115,9 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    // Emit progress signal before destroying
+    this.emitProgressSignal();
+
     this.destroy$.next();
     this.destroy$.complete();
     // Exit path context when leaving the navigator
@@ -193,12 +201,29 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
           }
         });
 
-        // Mark content as seen
+        // Mark content as seen and emit learning signal
         if (content) {
           this.agentService.markContentSeen(conceptId).pipe(takeUntil(this.destroy$)).subscribe();
           this.agentService.getContentMastery(conceptId).pipe(takeUntil(this.destroy$)).subscribe(level => {
             this.currentBloomLevel = level;
           });
+
+          // Track view start time for learning signals
+          this.contentViewStartTime = Date.now();
+
+          // Emit content viewed learning signal
+          this.governanceSignalService.recordLearningSignal({
+            contentId: conceptId,
+            signalType: 'content_viewed',
+            payload: {
+              pathId: this.pathId,
+              stepIndex: this.stepIndex,
+              contentType: content.contentType,
+              chapter: this.lessonContext?.chapter.title,
+              module: this.lessonContext?.module.title,
+              section: this.lessonContext?.section.title,
+            },
+          }).pipe(takeUntil(this.destroy$)).subscribe();
         }
 
         this.isLoading = false;
@@ -497,6 +522,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
    * Navigation Methods
    */
   goToStep(index: number): void {
+    // Emit progress signal before navigating
+    this.emitProgressSignal();
     this.router.navigate(['/lamad/path', this.pathId, 'step', index]);
   }
 
@@ -654,9 +681,60 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
    * Handle completion event from LessonView (interactive content).
    */
   onLessonComplete(event: RendererCompletionEvent): void {
+    const contentId = this.stepView?.content?.id;
+    if (!contentId) return;
+
+    // Calculate time spent on this content
+    const timeSpent = this.contentViewStartTime
+      ? Math.round((Date.now() - this.contentViewStartTime) / 1000)
+      : 0;
+
+    // Emit interactive completion learning signal
+    this.governanceSignalService.recordInteractiveCompletion({
+      contentId,
+      interactionType: event.interactionType || 'interactive',
+      passed: event.passed,
+      score: event.score,
+      details: {
+        ...event.details,
+        pathId: this.pathId,
+        stepIndex: this.stepIndex,
+        timeSpentSeconds: timeSpent,
+        chapter: this.lessonContext?.chapter.title,
+        module: this.lessonContext?.module.title,
+      },
+    }).pipe(takeUntil(this.destroy$)).subscribe();
+
     // If passed, advance mastery level
     if (event.passed) {
       this.markComplete();
     }
+  }
+
+  /**
+   * Emit progress signal when navigating away (time spent tracking).
+   */
+  private emitProgressSignal(): void {
+    const contentId = this.stepView?.content?.id;
+    if (!contentId || !this.contentViewStartTime) return;
+
+    const timeSpent = Math.round((Date.now() - this.contentViewStartTime) / 1000);
+
+    // Only emit if meaningful time was spent (>5 seconds)
+    if (timeSpent > 5) {
+      this.governanceSignalService.recordLearningSignal({
+        contentId,
+        signalType: 'progress_update',
+        payload: {
+          pathId: this.pathId,
+          stepIndex: this.stepIndex,
+          timeSpentSeconds: timeSpent,
+          masteryLevel: this.currentBloomLevel,
+          progressPercent: this.getProgressPercentage(),
+        },
+      }).pipe(takeUntil(this.destroy$)).subscribe();
+    }
+
+    this.contentViewStartTime = null;
   }
 }

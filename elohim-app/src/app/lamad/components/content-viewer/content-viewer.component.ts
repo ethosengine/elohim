@@ -22,6 +22,10 @@ import {
   GovernanceStateRecord
 } from '@app/elohim/services/data-loader.service';
 import { GovernanceService } from '@app/elohim/services/governance.service';
+import {
+  GovernanceSignalService,
+  AggregatedSignals,
+} from '@app/elohim/services/governance-signal.service';
 import { SeoService } from '../../../services/seo.service';
 import { ContentNode } from '../../models/content-node.model';
 import {
@@ -42,10 +46,27 @@ import { PathContextService } from '../../services/path-context.service';
 import { PathContext } from '../../models/exploration-context.model';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 
+// Governance feedback components
+import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
+import { GraduatedFeedbackComponent, FeedbackContext } from '@app/qahal/components/graduated-feedback/graduated-feedback.component';
+import {
+  EmotionalReactionType,
+  FeedbackProfile,
+  DEFAULT_FEEDBACK_PROFILES,
+  createProfileFromTemplate,
+} from '@app/lamad/models/feedback-profile.model';
+
 @Component({
   selector: 'app-content-viewer',
   standalone: true,
-  imports: [CommonModule, RouterModule, ContentDownloadComponent, MiniGraphComponent],
+  imports: [
+    CommonModule,
+    RouterModule,
+    ContentDownloadComponent,
+    MiniGraphComponent,
+    ReactionBarComponent,
+    GraduatedFeedbackComponent,
+  ],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],
 })
@@ -68,6 +89,13 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   challenges: ChallengeRecord[] = [];
   discussions: DiscussionRecord[] = [];
   isLoadingGovernance = false;
+
+  // Governance feedback (signals)
+  feedbackProfile: FeedbackProfile | null = null;
+  aggregatedSignals: AggregatedSignals | null = null;
+  allowedReactions: EmotionalReactionType[] = [];
+  feedbackContext: FeedbackContext = 'usefulness';
+  showFeedbackSection = true;
 
   // "Appears in paths" back-links (Wikipedia-style)
   containingPaths: Array<{ pathId: string; pathTitle: string; stepIndex: number }> = [];
@@ -107,7 +135,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     private readonly trustBadgeService: TrustBadgeService,
     private readonly editorService: ContentEditorService,
     private readonly pathContextService: PathContextService,
-    private readonly governanceService: GovernanceService
+    private readonly governanceService: GovernanceService,
+    private readonly signalService: GovernanceSignalService
   ) {}
 
   ngOnInit(): void {
@@ -207,6 +236,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   /**
    * Handle completion events from interactive renderers (quiz, simulation, etc.)
    * Updates affinity based on the completion result.
+   * Also emits governance signals for content effectiveness tracking.
    */
   private onRendererComplete(event: RendererCompletionEvent): void {
     if (!this.nodeId) return;
@@ -218,6 +248,24 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       : 0.1;                              // Small bump for attempting
 
     this.affinityService.incrementAffinity(this.nodeId, affinityDelta);
+
+    // Emit governance signal for content effectiveness tracking
+    // Note: attempts may be in details if present
+    const attempts = (event.details?.['attempts'] as number) ?? 1;
+    this.signalService.recordInteractiveCompletion({
+      contentId: this.nodeId,
+      type: event.type,
+      passed: event.passed,
+      score: event.score,
+      attempts,
+    }).subscribe();
+
+    // Check if this triggers an attestation suggestion
+    this.signalService.checkAttestationTrigger(
+      this.nodeId,
+      event.score / 100,
+      attempts
+    ).subscribe();
   }
 
   /**
@@ -273,6 +321,10 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
         // Load governance data for Governance tab
         this.loadGovernanceData(nodeId);
+
+        // Load feedback profile and aggregated signals
+        this.loadFeedbackProfile(contentNode);
+        this.loadAggregatedSignals(nodeId);
 
         this.isLoading = false;
 
@@ -370,6 +422,100 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
         },
         error: () => {
           // Discussions are optional
+        }
+      });
+  }
+
+  /**
+   * Load feedback profile based on content type.
+   * Determines what feedback mechanisms are allowed.
+   */
+  private loadFeedbackProfile(node: ContentNode): void {
+    // Map content type to feedback profile template
+    const contentType = node.contentType;
+    const profileType = this.mapContentTypeToProfileType(contentType);
+
+    const template = DEFAULT_FEEDBACK_PROFILES[profileType];
+    if (template) {
+      this.feedbackProfile = createProfileFromTemplate(template, `profile-${node.id}`);
+
+      // Extract allowed reactions from profile
+      if (this.feedbackProfile.emotionalReactionConstraints?.permittedTypes) {
+        this.allowedReactions = this.feedbackProfile.emotionalReactionConstraints.permittedTypes;
+      } else {
+        // Default reactions for learning content
+        this.allowedReactions = ['moved', 'grateful', 'inspired', 'challenged', 'concerned'];
+      }
+
+      // Determine feedback context based on content type
+      this.feedbackContext = this.determineFeedbackContext(node);
+
+      // Check if feedback should be shown (view-only profile hides feedback)
+      this.showFeedbackSection = this.feedbackProfile.permittedMechanisms.length > 0 &&
+        !this.feedbackProfile.permittedMechanisms.includes('view-only');
+    } else {
+      // Default to learning content profile
+      this.feedbackProfile = null;
+      this.allowedReactions = ['moved', 'grateful', 'inspired', 'challenged', 'concerned'];
+      this.feedbackContext = 'usefulness';
+      this.showFeedbackSection = true;
+    }
+  }
+
+  /**
+   * Map content type to feedback profile type.
+   */
+  private mapContentTypeToProfileType(contentType: string): string {
+    const mapping: Record<string, string> = {
+      'epic': 'learning-content',
+      'feature': 'learning-content',
+      'scenario': 'learning-content',
+      'tutorial': 'learning-content',
+      'guide': 'learning-content',
+      'concept': 'learning-content',
+      'lesson': 'learning-content',
+      'research': 'research-content',
+      'paper': 'research-content',
+      'testimony': 'personal-testimony',
+      'story': 'personal-testimony',
+      'announcement': 'community-announcement',
+      'proposal': 'governance-proposal',
+    };
+    return mapping[contentType.toLowerCase()] || 'learning-content';
+  }
+
+  /**
+   * Determine the appropriate feedback context for content.
+   */
+  private determineFeedbackContext(node: ContentNode): FeedbackContext {
+    const contentType = node.contentType.toLowerCase();
+
+    if (['research', 'paper'].includes(contentType)) {
+      return 'accuracy';
+    }
+    if (['proposal'].includes(contentType)) {
+      return 'proposal';
+    }
+    if (['tutorial', 'guide', 'lesson'].includes(contentType)) {
+      return 'clarity';
+    }
+    // Default to usefulness for most learning content
+    return 'usefulness';
+  }
+
+  /**
+   * Load aggregated governance signals for content.
+   */
+  private loadAggregatedSignals(nodeId: string): void {
+    this.signalService.getContentSignals(nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (signals) => {
+          this.aggregatedSignals = signals;
+        },
+        error: () => {
+          // Signals are optional
+          this.aggregatedSignals = null;
         }
       });
   }

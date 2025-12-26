@@ -1,0 +1,151 @@
+<div class="graduated-feedback" [class.compact]="compact" [class.submitted]="hasSubmitted">
+  <!-- Question/Context Label -->
+  <div class="feedback-header">
+    <h4 class="feedback-question">{{ currentScale.label }}</h4>
+    <span class="response-count" *ngIf="showAggregates && stats && stats.totalResponses > 0">
+      {{ stats.totalResponses }} responses
+    </span>
+  </div>
+
+  <!-- Position Scale -->
+  <div class="position-scale" *ngIf="!hasSubmitted">
+    <div class="scale-track">
+      <button
+        *ngFor="let position of currentScale.positions"
+        class="position-marker"
+        [class.selected]="selectedPosition === position.index"
+        [style.--position-color]="position.color"
+        [style.left.%]="position.index * 100"
+        [attr.aria-label]="position.label"
+        (click)="selectPosition(position)"
+        type="button">
+        <span class="marker-dot"></span>
+        <span class="marker-label">{{ position.label }}</span>
+        <span class="requires-reasoning" *ngIf="position.requiresReasoning" title="Reasoning required">
+          *
+        </span>
+      </button>
+    </div>
+
+    <!-- Slider for continuous selection (alternative UI) -->
+    <div class="scale-labels">
+      <span class="label-start">{{ currentScale.positions[0].label }}</span>
+      <span class="label-end">{{ currentScale.positions[currentScale.positions.length - 1].label }}</span>
+    </div>
+  </div>
+
+  <!-- Selected Position Confirmation -->
+  <div class="selected-confirmation" *ngIf="selectedPositionData && !hasSubmitted">
+    <div class="confirmation-badge" [style.background-color]="selectedPositionData.color">
+      <span class="badge-label">{{ selectedPositionData.label }}</span>
+    </div>
+  </div>
+
+  <!-- Intensity Slider (ARCH Pattern) -->
+  <div class="intensity-section" *ngIf="selectedPosition !== null && !hasSubmitted">
+    <label class="intensity-label">
+      How strongly do you feel about this?
+      <span class="intensity-value">{{ getIntensityLabel() }}</span>
+    </label>
+    <div class="intensity-slider">
+      <span class="intensity-low">Slightly</span>
+      <input
+        type="range"
+        min="1"
+        max="10"
+        [(ngModel)]="intensity"
+        class="slider"
+        [style.--intensity-percent]="(intensity - 1) / 9 * 100 + '%'" />
+      <span class="intensity-high">Very Strongly</span>
+    </div>
+  </div>
+
+  <!-- Reasoning Field -->
+  <div class="reasoning-section" *ngIf="selectedPosition !== null && !hasSubmitted">
+    <button
+      *ngIf="!reasoningRequired && !showReasoningField"
+      class="add-reasoning-btn"
+      (click)="toggleReasoning()"
+      type="button">
+      + Add reasoning (optional)
+    </button>
+
+    <div class="reasoning-field" *ngIf="showReasoningField || reasoningRequired">
+      <label class="reasoning-label">
+        {{ reasoningRequired ? 'Please explain your position:' : 'Your reasoning (optional):' }}
+        <span class="required-indicator" *ngIf="reasoningRequired">*</span>
+      </label>
+      <textarea
+        [(ngModel)]="reasoning"
+        rows="3"
+        placeholder="Share your perspective..."
+        class="reasoning-textarea"
+        [class.error]="reasoningRequired && !reasoning.trim()">
+      </textarea>
+      <p class="reasoning-hint" *ngIf="context === 'proposal' && selectedPosition === 0">
+        Blocking a proposal is a serious action. Please explain the constitutional or principled
+        basis for your objection so it can be properly considered.
+      </p>
+    </div>
+  </div>
+
+  <!-- Submit Button -->
+  <div class="submit-section" *ngIf="selectedPosition !== null && !hasSubmitted">
+    <button
+      class="submit-btn"
+      [disabled]="!canSubmit || isSubmitting"
+      (click)="submit()"
+      type="button">
+      <span *ngIf="!isSubmitting">Submit Feedback</span>
+      <span *ngIf="isSubmitting">Submitting...</span>
+    </button>
+  </div>
+
+  <!-- Success State -->
+  <div class="success-state" *ngIf="hasSubmitted">
+    <div class="success-icon">✓</div>
+    <p class="success-message">Thank you for your feedback!</p>
+    <div class="your-response">
+      <span class="response-badge" [style.background-color]="selectedPositionData?.color">
+        {{ selectedPositionData?.label }}
+      </span>
+      <span class="response-intensity">({{ getIntensityLabel() }})</span>
+    </div>
+    <button class="change-btn" (click)="reset()" type="button">
+      Change response
+    </button>
+  </div>
+
+  <!-- Aggregate Distribution -->
+  <div class="distribution-section" *ngIf="showAggregates && stats && stats.totalResponses > 0">
+    <h5 class="distribution-title">Community Response</h5>
+    <div class="distribution-bar">
+      <div
+        *ngFor="let position of currentScale.positions"
+        class="distribution-segment"
+        [style.width.%]="getDistributionWidth(position)"
+        [style.background-color]="position.color"
+        [title]="position.label + ': ' + (stats.distribution[position.label] || 0)">
+      </div>
+    </div>
+    <div class="distribution-legend">
+      <div
+        *ngFor="let position of currentScale.positions"
+        class="legend-item"
+        [class.has-responses]="(stats.distribution[position.label] || 0) > 0">
+        <span class="legend-dot" [style.background-color]="position.color"></span>
+        <span class="legend-label">{{ position.label }}</span>
+        <span class="legend-count">({{ stats.distribution[position.label] || 0 }})</span>
+      </div>
+    </div>
+
+    <!-- Consensus Indicator -->
+    <div class="consensus-indicator" *ngIf="stats.totalResponses >= 3">
+      <span class="consensus-label">Average Position:</span>
+      <span class="consensus-value">{{ formatPercentage(stats.averagePosition) }}</span>
+      <span class="consensus-bar">
+        <span class="consensus-marker" [style.left.%]="stats.averagePosition * 100"></span>
+      </span>
+    </div>
+  </div>
+</div>

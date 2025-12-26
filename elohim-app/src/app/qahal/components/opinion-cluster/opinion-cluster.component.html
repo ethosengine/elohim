@@ -1,0 +1,135 @@
+<div class="opinion-cluster">
+  <!-- Header Stats -->
+  <div class="cluster-header">
+    <div class="stat-card">
+      <span class="stat-value">{{ totalParticipants }}</span>
+      <span class="stat-label">Participants</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value">{{ clusterCount }}</span>
+      <span class="stat-label">Opinion Groups</span>
+    </div>
+    <div class="stat-card consensus">
+      <span class="stat-value">{{ consensusScore }}%</span>
+      <span class="stat-label">Consensus</span>
+    </div>
+  </div>
+
+  <!-- Canvas Visualization -->
+  <div class="canvas-container">
+    <canvas #canvas></canvas>
+
+    <!-- Empty state -->
+    <div class="empty-state" *ngIf="participants.length === 0">
+      <span class="empty-icon">🗺️</span>
+      <p>No opinion data yet</p>
+      <span class="empty-hint">Votes will appear as a map of perspectives</span>
+    </div>
+  </div>
+
+  <!-- Statement Analysis -->
+  <div class="statement-analysis" *ngIf="statements.length > 0">
+    <!-- Consensus Statements -->
+    <div class="statement-section consensus-section" *ngIf="consensusStatements.length > 0">
+      <h4 class="section-title">
+        <span class="section-icon">🤝</span>
+        Consensus Statements
+        <span class="section-badge">{{ consensusStatements.length }}</span>
+      </h4>
+      <p class="section-description">
+        These statements have broad agreement across groups.
+      </p>
+      <div class="statement-list">
+        <div
+          *ngFor="let statement of consensusStatements"
+          class="statement-item consensus"
+          (click)="selectStatement(statement)">
+          <span class="statement-text">{{ statement.text }}</span>
+          <span class="statement-indicator">✓ High Agreement</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Divisive Statements -->
+    <div class="statement-section divisive-section" *ngIf="divisiveStatements.length > 0">
+      <h4 class="section-title">
+        <span class="section-icon">⚡</span>
+        Divisive Statements
+        <span class="section-badge">{{ divisiveStatements.length }}</span>
+      </h4>
+      <p class="section-description">
+        These statements reveal different perspectives. More dialogue may help.
+      </p>
+      <div class="statement-list">
+        <div
+          *ngFor="let statement of divisiveStatements"
+          class="statement-item divisive"
+          (click)="selectStatement(statement)">
+          <span class="statement-text">{{ statement.text }}</span>
+          <span class="statement-indicator">↔ Mixed Views</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cluster Details (when selected) -->
+  <div class="cluster-details" *ngIf="selectedCluster">
+    <div class="cluster-detail-header">
+      <span class="cluster-dot" [style.background-color]="selectedCluster.color"></span>
+      <h4 class="cluster-name">{{ selectedCluster.name }}</h4>
+      <span class="cluster-size">{{ selectedCluster.size }} participants</span>
+      <button class="close-btn" (click)="selectedCluster = null" aria-label="Close">×</button>
+    </div>
+    <div class="cluster-statements" *ngIf="selectedCluster.statements.length > 0">
+      <p class="detail-label">Top agreements in this group:</p>
+      <ul class="agreement-list">
+        <li *ngFor="let stmt of selectedCluster.statements.slice(0, 3)">
+          {{ stmt }}
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Your Position -->
+  <div class="your-position" *ngIf="currentUserPosition">
+    <div class="position-header">
+      <span class="position-icon">📍</span>
+      <span class="position-label">Your Position</span>
+    </div>
+    <div class="position-details">
+      <div class="position-cluster" *ngIf="currentUserPosition.cluster">
+        <span>Group:</span>
+        <span
+          class="cluster-badge"
+          [style.background-color]="clusters.find(c => c.id === currentUserPosition!.cluster)?.color">
+          {{ clusters.find(c => c.id === currentUserPosition!.cluster)?.name }}
+        </span>
+      </div>
+      <div class="position-votes">
+        <span>Votes cast:</span>
+        <span class="vote-count">{{ currentUserPosition.voteCount }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Explanation -->
+  <div class="explanation-footer">
+    <details>
+      <summary>How to read this map</summary>
+      <div class="explanation-content">
+        <p>
+          Each dot represents a participant's opinion pattern. Dots close together
+          share similar views; dots far apart have different perspectives.
+        </p>
+        <p>
+          Colored regions show natural "opinion groups" that emerged from the data.
+          This isn't about sides—it's about understanding the landscape of perspectives.
+        </p>
+        <p>
+          <strong>Consensus statements</strong> are agreed upon across groups.
+          <strong>Divisive statements</strong> reveal where perspectives differ most.
+        </p>
+      </div>
+    </details>
+  </div>
+</div>

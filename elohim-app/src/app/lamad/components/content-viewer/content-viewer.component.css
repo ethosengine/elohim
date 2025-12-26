@@ -1552,3 +1552,125 @@
     gap: 0.5rem;
   }
 }
+
+/* ============================================================================
+   Feedback Section Styles
+   ============================================================================ */
+
+.feedback-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(108, 92, 231, 0.03) 0%, rgba(108, 92, 231, 0.08) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(108, 92, 231, 0.15);
+}
+
+.feedback-section-title {
+  margin: 0 0 1.25rem 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--lamad-text-primary, #212529);
+}
+
+.reaction-section {
+  margin-bottom: 1.5rem;
+}
+
+.graduated-section {
+  margin-bottom: 1.5rem;
+}
+
+/* Signal Summary */
+.signal-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding: 1rem;
+  background: var(--lamad-surface-primary, #ffffff);
+  border-radius: 12px;
+  border: 1px solid var(--lamad-border-light, #e9ecef);
+}
+
+.signal-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 100px;
+}
+
+.metric-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--lamad-text-muted, #868e96);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--lamad-text-primary, #212529);
+}
+
+.metric-value.positive {
+  color: #27ae60;
+}
+
+.metric-value.neutral {
+  color: #f39c12;
+}
+
+.metric-value.negative {
+  color: #e74c3c;
+}
+
+.consensus-badge {
+  font-size: 0.9375rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 16px;
+  display: inline-block;
+}
+
+.consensus-badge.strong {
+  background: rgba(39, 174, 96, 0.15);
+  color: #27ae60;
+}
+
+.consensus-badge.moderate {
+  background: rgba(52, 152, 219, 0.15);
+  color: #3498db;
+}
+
+.consensus-badge.contested {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+}
+
+.consensus-badge.unknown {
+  background: rgba(149, 165, 166, 0.15);
+  color: #95a5a6;
+}
+
+/* Responsive feedback section */
+@media (max-width: 600px) {
+  .feedback-section {
+    padding: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .signal-summary {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .signal-metric {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    min-width: auto;
+  }
+
+  .metric-value {
+    font-size: 1.25rem;
+  }
+}
