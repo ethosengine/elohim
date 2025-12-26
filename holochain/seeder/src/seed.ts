@@ -282,12 +282,20 @@ class PerformanceTimer {
 const timer = new PerformanceTimer();
 
 // Configuration
-// Check for local data directory first (CI/CD), then fall back to workspace path
+// Prefer workspace data directory (has latest migrated content), fall back to local for CI/CD
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const SEEDER_DIR = path.dirname(path.dirname(__filename)); // Go up from src/ to seeder/
+const WORKSPACE_DATA_DIR = '/projects/elohim/data/lamad';
 const LOCAL_DATA_DIR = path.join(SEEDER_DIR, 'data', 'lamad');
-const DATA_DIR = process.env.DATA_DIR || (fs.existsSync(LOCAL_DATA_DIR) ? LOCAL_DATA_DIR : '/projects/elohim/data/lamad');
+const DATA_DIR = process.env.DATA_DIR || (fs.existsSync(WORKSPACE_DATA_DIR) ? WORKSPACE_DATA_DIR : LOCAL_DATA_DIR);
+
+// Parse command-line arguments
+const args = process.argv.slice(2);
+const LIMIT_ARG = args.find(a => a.startsWith('--limit'));
+const LIMIT = LIMIT_ARG ? parseInt(LIMIT_ARG.split('=')[1] || args[args.indexOf(LIMIT_ARG) + 1] || '0', 10) : 0;
+const IDS_ARG = args.find(a => a.startsWith('--ids'));
+const IDS = IDS_ARG ? (IDS_ARG.split('=')[1] || args[args.indexOf(IDS_ARG) + 1] || '').split(',').filter(Boolean) : [];
 const LOCAL_DEV_DIR = process.env.LOCAL_DEV_DIR || '/projects/elohim/holochain/local-dev';
 const HC_PORTS_FILE = process.env.HC_PORTS_FILE || path.join(LOCAL_DEV_DIR, '.hc_ports');
 const APP_ID = 'elohim';
@@ -617,6 +625,8 @@ async function seed() {
   console.log('🌱 Holochain Content Seeder (JSON mode)');
   console.log(`📁 Data directory: ${DATA_DIR}`);
   console.log(`🔌 Admin WebSocket: ${ADMIN_WS_URL}`);
+  if (IDS.length > 0) console.log(`🎯 Filtering to IDs: ${IDS.join(', ')}`);
+  if (LIMIT > 0) console.log(`📊 Limit: ${LIMIT}`);
 
   timer.startPhase('Connection Setup');
 
@@ -762,10 +772,23 @@ async function seed() {
   }
   console.log(`   Loaded ${allConcepts.length} concepts (${loadErrorCount} failed to load)`);
 
+  // Apply ID filter if specified
+  let filteredConcepts = allConcepts;
+  if (IDS.length > 0) {
+    filteredConcepts = allConcepts.filter(({ concept }) => IDS.includes(concept.id));
+    console.log(`   Filtered to ${filteredConcepts.length} concepts matching IDs`);
+  }
+
+  // Apply limit if specified
+  if (LIMIT > 0 && filteredConcepts.length > LIMIT) {
+    filteredConcepts = filteredConcepts.slice(0, LIMIT);
+    console.log(`   Limited to ${LIMIT} concepts`);
+  }
+
   // For now, skip batch existence check - just try to create all content
   // The bulk_create_content should handle duplicates gracefully
   console.log('   Skipping existence check - will create all content (duplicates handled by zome)');
-  const newConcepts = allConcepts;
+  const newConcepts = filteredConcepts;
   console.log(`   ${newConcepts.length} concepts to process`);
 
   // Detect if we're running against a remote conductor (needs gentler approach)
@@ -903,9 +926,16 @@ async function seed() {
   }
   console.log(`   Loaded ${allPaths.length} paths (${pathLoadErrorCount} failed to load)`);
 
+  // Apply ID filter to paths if specified
+  let filteredPaths = allPaths;
+  if (IDS.length > 0) {
+    filteredPaths = allPaths.filter((p) => IDS.includes(p.id));
+    console.log(`   Filtered to ${filteredPaths.length} paths matching IDs`);
+  }
+
   // Skip batch existence check for paths too - just try to create all
   console.log('   Skipping path existence check - will create all paths');
-  const newPaths = allPaths;
+  const newPaths = filteredPaths;
   console.log(`   ${newPaths.length} paths to process`);
 
   let pathSuccessCount = 0;

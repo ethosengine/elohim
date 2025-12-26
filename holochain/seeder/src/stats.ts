@@ -7,7 +7,7 @@ import * as fs from 'fs';
 
 const HC_PORTS_FILE = process.env.HC_PORTS_FILE || '/projects/elohim/holochain/local-dev/.hc_ports';
 const APP_ID = 'elohim';
-const ROLE_NAME = 'elohim';
+// Role name is auto-detected - support both 'elohim' and legacy 'lamad'
 const ZOME_NAME = 'content_store';
 
 function readHcPorts(): { adminPort: number; appPort: number } {
@@ -50,7 +50,15 @@ async function getStats() {
       process.exit(0);
     }
 
-    const cellInfo = app.cell_info[ROLE_NAME];
+    // Auto-detect role name from app's cell_info (supports both 'elohim' and legacy 'lamad')
+    const availableRoles = Object.keys(app.cell_info);
+    const roleName = availableRoles.find(r => r === 'elohim') || availableRoles.find(r => r === 'lamad') || availableRoles[0];
+    if (!roleName) {
+      console.log('total_count: 0');
+      process.exit(0);
+    }
+
+    const cellInfo = app.cell_info[roleName];
     if (!cellInfo || cellInfo.length === 0) {
       console.log('total_count: 0');
       process.exit(0);
