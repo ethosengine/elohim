@@ -5,14 +5,8 @@
   "activityPubType": "Group",
   "title": "Regen Ag Network",
   "description": "Community with 1 members",
-  "content": {
-    "name": "Regen Ag Network",
-    "memberCount": 1,
-    "memberIds": [
-      "human-frank-farmer"
-    ]
-  },
-  "contentFormat": "html",
+  "content": "# Regen Ag Network\n\n**Members:** 1\n\n## Member List\n\n- human-frank-farmer",
+  "contentFormat": "markdown",
   "tags": [
     "community",
     "human-graph"
@@ -26,5 +20,5 @@
   },
   "reach": "community",
   "createdAt": "2025-12-01T20:29:49.320609Z",
-  "updatedAt": "2025-12-01T20:29:49.320609Z"
+  "updatedAt": "2025-12-26T21:04:01.763Z"
 }

@@ -5,14 +5,8 @@
   "activityPubType": "Group",
   "title": "Refugee Resettlement",
   "description": "Community with 1 members",
-  "content": {
-    "name": "Refugee Resettlement",
-    "memberCount": 1,
-    "memberIds": [
-      "human-ronald-refugee"
-    ]
-  },
-  "contentFormat": "html",
+  "content": "# Refugee Resettlement\n\n**Members:** 1\n\n## Member List\n\n- human-ronald-refugee",
+  "contentFormat": "markdown",
   "tags": [
     "community",
     "human-graph"
@@ -26,5 +20,5 @@
   },
   "reach": "community",
   "createdAt": "2025-12-01T20:29:49.320609Z",
-  "updatedAt": "2025-12-01T20:29:49.320609Z"
+  "updatedAt": "2025-12-26T21:04:01.763Z"
 }

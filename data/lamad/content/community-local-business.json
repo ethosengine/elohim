@@ -5,15 +5,8 @@
   "activityPubType": "Group",
   "title": "Local Business",
   "description": "Community with 2 members",
-  "content": {
-    "name": "Local Business",
-    "memberCount": 2,
-    "memberIds": [
-      "human-georgina-grocer",
-      "human-manny-manufacturer"
-    ]
-  },
-  "contentFormat": "html",
+  "content": "# Local Business\n\n**Members:** 2\n\n## Member List\n\n- human-georgina-grocer\n- human-manny-manufacturer",
+  "contentFormat": "markdown",
   "tags": [
     "community",
     "human-graph"
@@ -28,5 +21,5 @@
   },
   "reach": "community",
   "createdAt": "2025-12-01T20:29:49.320609Z",
-  "updatedAt": "2025-12-01T20:29:49.320609Z"
+  "updatedAt": "2025-12-26T21:04:01.745Z"
 }

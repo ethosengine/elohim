@@ -3,11 +3,8 @@
   "contentType": "podcast",
   "title": "\"The Ezra Klein Show\" episode with Tressie McMillan Cottom",
   "description": "Podcast recommended in FCT Module 12",
-  "content": {
-    "format": "podcast",
-    "title": "\"The Ezra Klein Show\" episode with Tressie McMillan Cottom"
-  },
-  "contentFormat": "audio-file",
+  "content": "# \"The Ezra Klein Show\" episode with Tressie McMillan Cottom\n",
+  "contentFormat": "markdown",
   "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
   "tags": [
     "podcast",
@@ -24,7 +21,7 @@
     "mediaType": "podcast"
   },
   "createdAt": "2025-11-28T21:10:19.220395",
-  "updatedAt": "2025-12-24T03:05:26.167Z",
+  "updatedAt": "2025-12-26T21:04:01.813Z",
   "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
   "activityPubType": "AudioObject",
   "openGraphMetadata": {

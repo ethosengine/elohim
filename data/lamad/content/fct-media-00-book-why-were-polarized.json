@@ -3,11 +3,7 @@
   "contentType": "book",
   "title": "Why We're Polarized",
   "description": "Book by Ezra Klein",
-  "content": {
-    "title": "Why We're Polarized",
-    "author": "Ezra Klein",
-    "format": "book"
-  },
+  "content": "# Why We're Polarized\n\n**Author:** Ezra Klein\n**Format:** book",
   "contentFormat": "markdown",
   "sourcePath": "fct/Module 1 - The Church Dilemma.md",
   "tags": [
@@ -26,7 +22,7 @@
   },
   "_contributor": "Ezra Klein",
   "createdAt": "2025-11-28T21:10:19.189590",
-  "updatedAt": "2025-12-24T03:05:26.094Z",
+  "updatedAt": "2025-12-26T21:04:01.783Z",
   "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
   "activityPubType": "Document",
   "openGraphMetadata": {

@@ -3,11 +3,7 @@
   "contentType": "book",
   "title": "The Color of Law",
   "description": "Book by Richard Rothstein",
-  "content": {
-    "title": "The Color of Law",
-    "author": "Richard Rothstein",
-    "format": "book"
-  },
+  "content": "# The Color of Law\n\n**Author:** Richard Rothstein\n**Format:** book",
   "contentFormat": "markdown",
   "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
   "tags": [
@@ -26,7 +22,7 @@
   },
   "_contributor": "Richard Rothstein",
   "createdAt": "2025-11-28T21:10:19.219745",
-  "updatedAt": "2025-12-24T03:05:26.131Z",
+  "updatedAt": "2025-12-26T21:04:01.800Z",
   "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
   "activityPubType": "Document",
   "openGraphMetadata": {

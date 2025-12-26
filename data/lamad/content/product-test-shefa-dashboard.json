@@ -1,0 +1,33 @@
+{
+  "id": "product-test-shefa-dashboard",
+  "did": "did:elohim:product-test-shefa-dashboard",
+  "contentType": "feature",
+  "contentFormat": "gherkin",
+  "title": "Shefa Dashboard Product Tests",
+  "description": "BDD product tests validating the Shefa dashboard displays and functions correctly",
+  "content": "Feature: Shefa Dashboard\n  As a community participant\n  I want to view the Shefa dashboard\n  So that I can see community metrics and my participation\n\n  @smoke @shefa @navigation\n  Scenario: Shefa dashboard route is accessible\n    Given I am on the home page\n    When I navigate to \"/shefa\"\n    Then the page should load successfully\n    And the page should not show an error message\n\n  @shefa @navigation\n  Scenario: Dashboard displays after navigation\n    Given I am on the Shefa dashboard\n    Then the dashboard should display\n    And no loading spinner should be visible\n\n  @shefa @navigation\n  Scenario: Navigation to Shefa from main nav\n    Given I am on the home page\n    When I click on \"Shefa\" in the navigation\n    Then I should be on the \"/shefa\" page\n    And the page should load successfully\n\n  @shefa @data\n  Scenario: Dashboard content renders without errors\n    Given I am on the Shefa dashboard\n    Then the page should be accessible\n    And there should be no console errors",
+  "tags": [
+    "product-test",
+    "shefa",
+    "dashboard",
+    "navigation",
+    "category:shefa"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "shefa",
+    "testType": "product",
+    "scenarioCount": 4,
+    "priority": "high"
+  },
+  "openGraph": {
+    "title": "Shefa Dashboard Product Tests",
+    "description": "BDD product tests for Shefa dashboard functionality"
+  },
+  "linkedData": {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "programmingLanguage": "Gherkin",
+    "codeRepository": "https://github.com/EthosEngine/elohim"
+  }
+}

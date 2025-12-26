@@ -5,26 +5,8 @@
   "activityPubType": "Group",
   "title": "Local Church",
   "description": "Community with 13 members",
-  "content": {
-    "name": "Local Church",
-    "memberCount": 13,
-    "memberIds": [
-      "human-matthew-manager",
-      "human-susan-spouse",
-      "human-gertrude-grandma",
-      "human-nancy-neighbor",
-      "human-pam-polarized",
-      "human-janice-janitor",
-      "human-pete-pastor",
-      "human-timothy-tutor",
-      "human-tommy-teacher",
-      "human-meriadoc-moneybags",
-      "human-bub-builder",
-      "human-lenny-lineworker",
-      "human-mary-migrant"
-    ]
-  },
-  "contentFormat": "html",
+  "content": "# Local Church\n\n**Members:** 13\n\n## Member List\n\n- human-matthew-manager\n- human-susan-spouse\n- human-gertrude-grandma\n- human-nancy-neighbor\n- human-pam-polarized\n- human-janice-janitor\n- human-pete-pastor\n- human-timothy-tutor\n- human-tommy-teacher\n- human-meriadoc-moneybags\n- human-bub-builder\n- human-lenny-lineworker\n- human-mary-migrant",
+  "contentFormat": "markdown",
   "tags": [
     "community",
     "human-graph"
@@ -50,5 +32,5 @@
   },
   "reach": "community",
   "createdAt": "2025-12-01T20:29:49.320609Z",
-  "updatedAt": "2025-12-01T20:29:49.320609Z"
+  "updatedAt": "2025-12-26T21:04:01.745Z"
 }

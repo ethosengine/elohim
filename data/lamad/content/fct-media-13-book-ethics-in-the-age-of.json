@@ -3,11 +3,7 @@
   "contentType": "book",
   "title": "Ethics in the Age of Technology",
   "description": "Book by George Hunsberger",
-  "content": {
-    "title": "Ethics in the Age of Technology",
-    "author": "George Hunsberger",
-    "format": "book"
-  },
+  "content": "# Ethics in the Age of Technology\n\n**Author:** George Hunsberger\n**Format:** book",
   "contentFormat": "markdown",
   "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
   "tags": [
@@ -26,7 +22,7 @@
   },
   "_contributor": "George Hunsberger",
   "createdAt": "2025-11-28T21:10:19.225410",
-  "updatedAt": "2025-12-24T03:05:26.168Z",
+  "updatedAt": "2025-12-26T21:04:01.813Z",
   "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
   "activityPubType": "Document",
   "openGraphMetadata": {

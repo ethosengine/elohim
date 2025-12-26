@@ -3,11 +3,7 @@
   "contentType": "book",
   "title": "Evicted",
   "description": "Book by Matthew Desmond",
-  "content": {
-    "title": "Evicted",
-    "author": "Matthew Desmond",
-    "format": "book"
-  },
+  "content": "# Evicted\n\n**Author:** Matthew Desmond\n**Format:** book",
   "contentFormat": "markdown",
   "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
   "tags": [
@@ -26,7 +22,7 @@
   },
   "_contributor": "Matthew Desmond",
   "createdAt": "2025-11-28T21:10:19.219816",
-  "updatedAt": "2025-12-24T03:05:26.130Z",
+  "updatedAt": "2025-12-26T21:04:01.800Z",
   "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
   "activityPubType": "Document",
   "openGraphMetadata": {

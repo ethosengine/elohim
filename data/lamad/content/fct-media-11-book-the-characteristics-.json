@@ -3,11 +3,7 @@
   "contentType": "book",
   "title": "The Characteristics of White Supremacy Culture",
   "description": "Book by Tema Okun",
-  "content": {
-    "title": "The Characteristics of White Supremacy Culture",
-    "author": "Tema Okun",
-    "format": "book"
-  },
+  "content": "# The Characteristics of White Supremacy Culture\n\n**Author:** Tema Okun\n**Format:** book",
   "contentFormat": "markdown",
   "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
   "tags": [
@@ -26,7 +22,7 @@
   },
   "_contributor": "Tema Okun",
   "createdAt": "2025-11-28T21:10:19.220445",
-  "updatedAt": "2025-12-24T03:05:26.131Z",
+  "updatedAt": "2025-12-26T21:04:01.800Z",
   "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
   "activityPubType": "Document",
   "openGraphMetadata": {

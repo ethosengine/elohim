@@ -3,11 +3,8 @@
   "contentType": "podcast",
   "title": "Bodies Behind the Bus",
   "description": "Podcast recommended in FCT Module 1",
-  "content": {
-    "format": "podcast",
-    "title": "Bodies Behind the Bus"
-  },
-  "contentFormat": "audio-file",
+  "content": "# Bodies Behind the Bus\n",
+  "contentFormat": "markdown",
   "sourcePath": "fct/Module 1 - The Church Dilemma.md",
   "tags": [
     "podcast",
@@ -24,7 +21,7 @@
     "mediaType": "podcast"
   },
   "createdAt": "2025-11-28T21:10:19.182113",
-  "updatedAt": "2025-12-24T03:05:26.095Z",
+  "updatedAt": "2025-12-26T21:04:01.784Z",
   "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
   "activityPubType": "AudioObject",
   "openGraphMetadata": {

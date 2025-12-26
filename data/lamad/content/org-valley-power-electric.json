@@ -5,17 +5,8 @@
   "activityPubType": "Organization",
   "title": "Valley Power & Electric",
   "description": "Organization with 1 members",
-  "content": {
-    "name": "Valley Power & Electric",
-    "memberCount": 1,
-    "members": [
-      {
-        "humanId": "human-lenny-lineworker",
-        "role": "journeyman-lineman"
-      }
-    ]
-  },
-  "contentFormat": "html",
+  "content": "# Valley Power & Electric\n\n**Members:** 1",
+  "contentFormat": "markdown",
   "tags": [
     "organization",
     "human-graph"
@@ -29,5 +20,5 @@
   },
   "reach": "community",
   "createdAt": "2025-12-01T20:29:49.320609Z",
-  "updatedAt": "2025-12-01T20:29:49.320609Z"
+  "updatedAt": "2025-12-26T21:04:01.858Z"
 }

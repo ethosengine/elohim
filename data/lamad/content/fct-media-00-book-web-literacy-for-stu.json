@@ -3,11 +3,7 @@
   "contentType": "book",
   "title": "Web Literacy for Student Fact-Checkers",
   "description": "Book by Mike Caulfield",
-  "content": {
-    "title": "Web Literacy for Student Fact-Checkers",
-    "author": "Mike Caulfield",
-    "format": "book"
-  },
+  "content": "# Web Literacy for Student Fact-Checkers\n\n**Author:** Mike Caulfield\n**Format:** book",
   "contentFormat": "markdown",
   "sourcePath": "fct/Module 1 - The Church Dilemma.md",
   "tags": [
@@ -26,7 +22,7 @@
   },
   "_contributor": "Mike Caulfield",
   "createdAt": "2025-11-28T21:10:19.190516",
-  "updatedAt": "2025-12-24T03:05:26.094Z",
+  "updatedAt": "2025-12-26T21:04:01.783Z",
   "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
   "activityPubType": "Document",
   "openGraphMetadata": {

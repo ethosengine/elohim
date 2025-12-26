@@ -5,17 +5,8 @@
   "activityPubType": "Organization",
   "title": "Valley Market",
   "description": "Organization with 1 members",
-  "content": {
-    "name": "Valley Market",
-    "memberCount": 1,
-    "members": [
-      {
-        "humanId": "human-georgina-grocer",
-        "role": "owner"
-      }
-    ]
-  },
-  "contentFormat": "html",
+  "content": "# Valley Market\n\n**Members:** 1",
+  "contentFormat": "markdown",
   "tags": [
     "organization",
     "human-graph"
@@ -29,5 +20,5 @@
   },
   "reach": "community",
   "createdAt": "2025-12-01T20:29:49.320609Z",
-  "updatedAt": "2025-12-01T20:29:49.320609Z"
+  "updatedAt": "2025-12-26T21:04:01.858Z"
 }

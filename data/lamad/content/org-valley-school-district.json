@@ -5,21 +5,8 @@
   "activityPubType": "Organization",
   "title": "Valley School District",
   "description": "Organization with 2 members",
-  "content": {
-    "name": "Valley School District",
-    "memberCount": 2,
-    "members": [
-      {
-        "humanId": "human-janice-janitor",
-        "role": "custodian"
-      },
-      {
-        "humanId": "human-tommy-teacher",
-        "role": "teacher"
-      }
-    ]
-  },
-  "contentFormat": "html",
+  "content": "# Valley School District\n\n**Members:** 2",
+  "contentFormat": "markdown",
   "tags": [
     "organization",
     "human-graph"
@@ -34,5 +21,5 @@
   },
   "reach": "community",
   "createdAt": "2025-12-01T20:29:49.320609Z",
-  "updatedAt": "2025-12-01T20:29:49.320609Z"
+  "updatedAt": "2025-12-26T21:04:01.866Z"
 }

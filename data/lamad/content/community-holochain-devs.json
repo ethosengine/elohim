@@ -5,14 +5,8 @@
   "activityPubType": "Group",
   "title": "Holochain Devs",
   "description": "Community with 1 members",
-  "content": {
-    "name": "Holochain Devs",
-    "memberCount": 1,
-    "memberIds": [
-      "human-dan-developer"
-    ]
-  },
-  "contentFormat": "html",
+  "content": "# Holochain Devs\n\n**Members:** 1\n\n## Member List\n\n- human-dan-developer",
+  "contentFormat": "markdown",
   "tags": [
     "community",
     "human-graph"
@@ -26,5 +20,5 @@
   },
   "reach": "community",
   "createdAt": "2025-12-01T20:29:49.320609Z",
-  "updatedAt": "2025-12-01T20:29:49.320609Z"
+  "updatedAt": "2025-12-26T21:04:01.744Z"
 }

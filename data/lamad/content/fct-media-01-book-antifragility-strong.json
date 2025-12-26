@@ -3,11 +3,7 @@
   "contentType": "book",
   "title": "Antifragility: Strong Towns supports building systems that thrive under stress, inspired",
   "description": "Book by Nassim Taleb",
-  "content": {
-    "title": "Antifragility: Strong Towns supports building systems that thrive under stress, inspired",
-    "author": "Nassim Taleb",
-    "format": "book"
-  },
+  "content": "# Antifragility: Strong Towns supports building systems that thrive under stress, inspired\n\n**Author:** Nassim Taleb\n**Format:** book",
   "contentFormat": "markdown",
   "sourcePath": "fct/Module 2 - Systems Thinking.md",
   "tags": [
@@ -26,7 +22,7 @@
   },
   "_contributor": "Nassim Taleb",
   "createdAt": "2025-11-28T21:10:19.191969",
-  "updatedAt": "2025-12-24T03:05:26.108Z",
+  "updatedAt": "2025-12-26T21:04:01.784Z",
   "did": "did:web:elohim.host:content:fct:module 2 - systems thinking",
   "activityPubType": "Document",
   "openGraphMetadata": {

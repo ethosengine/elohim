@@ -5,17 +5,8 @@
   "activityPubType": "Organization",
   "title": "Valley Learning Collective",
   "description": "Organization with 1 members",
-  "content": {
-    "name": "Valley Learning Collective",
-    "memberCount": 1,
-    "members": [
-      {
-        "humanId": "human-timothy-tutor",
-        "role": "facilitator"
-      }
-    ]
-  },
-  "contentFormat": "html",
+  "content": "# Valley Learning Collective\n\n**Members:** 1",
+  "contentFormat": "markdown",
   "tags": [
     "organization",
     "human-graph"
@@ -29,5 +20,5 @@
   },
   "reach": "community",
   "createdAt": "2025-12-01T20:29:49.320609Z",
-  "updatedAt": "2025-12-01T20:29:49.320609Z"
+  "updatedAt": "2025-12-26T21:04:01.857Z"
 }

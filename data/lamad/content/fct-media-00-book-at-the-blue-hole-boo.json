@@ -3,11 +3,7 @@
   "contentType": "book",
   "title": "\\* At the Blue Hole (book",
   "description": "Book by Jack Reese",
-  "content": {
-    "title": "\\* At the Blue Hole (book",
-    "author": "Jack Reese",
-    "format": "book"
-  },
+  "content": "# \\* At the Blue Hole (book\n\n**Author:** Jack Reese\n**Format:** book",
   "contentFormat": "markdown",
   "sourcePath": "fct/Module 1 - The Church Dilemma.md",
   "tags": [
@@ -26,7 +22,7 @@
   },
   "_contributor": "Jack Reese",
   "createdAt": "2025-11-28T21:10:19.182680",
-  "updatedAt": "2025-12-24T03:05:26.081Z",
+  "updatedAt": "2025-12-26T21:04:01.769Z",
   "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
   "activityPubType": "Document",
   "openGraphMetadata": {

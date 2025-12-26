@@ -1,0 +1,35 @@
+{
+  "id": "product-test-lamad-paths",
+  "did": "did:elohim:product-test-lamad-paths",
+  "contentType": "feature",
+  "contentFormat": "gherkin",
+  "title": "Lamad Learning Paths Product Tests",
+  "description": "BDD product tests validating learning path navigation and progression in Lamad",
+  "content": "Feature: Lamad Learning Paths\n  As a learner using Lamad\n  I want to navigate through learning paths\n  So that I can follow a structured learning journey\n\n  @smoke @lamad @api\n  Scenario: Learning paths API returns data\n    Given the backend API is available\n    When I request the learning paths from the API\n    Then the response should be successful\n    And the response should contain paths\n\n  @lamad @navigation\n  Scenario: Learning paths are displayed\n    Given I am on the Lamad section\n    Then at least one learning path should be displayed\n\n  @lamad @navigation @workflow\n  Scenario: User can navigate to a learning path\n    Given I am on the Lamad section\n    When I click on the first learning path\n    Then the page should load successfully\n    And the content should finish loading\n\n  @lamad @data\n  Scenario: Learning path shows title and description\n    Given I am on the Lamad section\n    Then each path should show a title and description\n\n  @lamad @api @data\n  Scenario: API paths match displayed paths\n    Given the backend API is available\n    When I request the learning paths from the API\n    Then the response should contain paths\n    And the learning paths should match the API data",
+  "tags": [
+    "product-test",
+    "lamad",
+    "paths",
+    "navigation",
+    "category:lamad"
+  ],
+  "relatedNodeIds": [
+    "product-test-lamad-content"
+  ],
+  "metadata": {
+    "category": "lamad",
+    "testType": "product",
+    "scenarioCount": 5,
+    "priority": "high"
+  },
+  "openGraph": {
+    "title": "Lamad Learning Paths Product Tests",
+    "description": "BDD product tests for learning path navigation"
+  },
+  "linkedData": {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "programmingLanguage": "Gherkin",
+    "codeRepository": "https://github.com/EthosEngine/elohim"
+  }
+}

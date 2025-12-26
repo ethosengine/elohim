@@ -3,11 +3,7 @@
   "contentType": "book",
   "title": "The Enigma of Reason",
   "description": "Book by Hugo Mercier",
-  "content": {
-    "title": "The Enigma of Reason",
-    "author": "Hugo Mercier",
-    "format": "book"
-  },
+  "content": "# The Enigma of Reason\n\n**Author:** Hugo Mercier\n**Format:** book",
   "contentFormat": "markdown",
   "sourcePath": "fct/Module 1 - The Church Dilemma.md",
   "tags": [
@@ -26,7 +22,7 @@
   },
   "_contributor": "Hugo Mercier",
   "createdAt": "2025-11-28T21:10:19.190364",
-  "updatedAt": "2025-12-24T03:05:26.093Z",
+  "updatedAt": "2025-12-26T21:04:01.770Z",
   "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
   "activityPubType": "Document",
   "openGraphMetadata": {

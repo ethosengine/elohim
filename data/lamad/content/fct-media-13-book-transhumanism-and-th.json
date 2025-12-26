@@ -3,11 +3,7 @@
   "contentType": "book",
   "title": "Transhumanism and the Image of God",
   "description": "Book by Jacob Shatzer",
-  "content": {
-    "title": "Transhumanism and the Image of God",
-    "author": "Jacob Shatzer",
-    "format": "book"
-  },
+  "content": "# Transhumanism and the Image of God\n\n**Author:** Jacob Shatzer\n**Format:** book",
   "contentFormat": "markdown",
   "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
   "tags": [
@@ -26,7 +22,7 @@
   },
   "_contributor": "Jacob Shatzer",
   "createdAt": "2025-11-28T21:10:19.225064",
-  "updatedAt": "2025-12-24T03:05:26.169Z",
+  "updatedAt": "2025-12-26T21:04:01.814Z",
   "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
   "activityPubType": "Document",
   "openGraphMetadata": {

@@ -3,14 +3,8 @@
   "contentType": "documentary",
   "title": "Coded Bias",
   "description": "Coded Bias (2020)",
-  "content": {
-    "title": "Coded Bias",
-    "year": 2020,
-    "platform": null,
-    "duration": null,
-    "format": "documentary"
-  },
-  "contentFormat": "video-embed",
+  "content": "# Coded Bias\n",
+  "contentFormat": "markdown",
   "sourcePath": "fct/Module 1 - The Church Dilemma.md",
   "tags": [
     "documentary",
@@ -28,7 +22,7 @@
   },
   "_organization": null,
   "createdAt": "2025-11-28T21:10:19.189764",
-  "updatedAt": "2025-12-24T03:05:26.095Z",
+  "updatedAt": "2025-12-26T21:04:01.783Z",
   "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
   "activityPubType": "Page",
   "openGraphMetadata": {
