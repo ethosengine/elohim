@@ -1,0 +1,285 @@
+{
+  "id": "quiz-who-are-you",
+  "title": "Find Your Path in the Protocol",
+  "description": "A brief quiz to help you discover which epic domain resonates with you",
+  "sourceFormat": "quiz-json",
+  "migratedAt": "2025-12-25T23:31:36.265Z",
+  "questions": [
+    {
+      "id": "q1",
+      "question": {
+        "content": "Which of these activities interests you most?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Shaping AI policy and constitutional frameworks",
+                  "correct": true
+                },
+                {
+                  "content": "Supporting caregivers and recognizing invisible work",
+                  "correct": false
+                },
+                {
+                  "content": "Transforming workplace ownership and governance",
+                  "correct": false
+                },
+                {
+                  "content": "Civic participation and public oversight",
+                  "correct": false
+                },
+                {
+                  "content": "Building healthier digital communication spaces",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "quiz-who-are-you",
+        "assessesContentId": "governance",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "tags": [
+          "assessment",
+          "onboarding",
+          "personalization",
+          "quiz"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    },
+    {
+      "id": "q2",
+      "question": {
+        "content": "What aspect of the current system concerns you most?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "AI systems making decisions without democratic oversight",
+                  "correct": true
+                },
+                {
+                  "content": "Unpaid care work being invisible in our economy",
+                  "correct": false
+                },
+                {
+                  "content": "Workers having no voice in their workplaces",
+                  "correct": false
+                },
+                {
+                  "content": "Citizens being disconnected from decision-making",
+                  "correct": false
+                },
+                {
+                  "content": "Social media amplifying division and misinformation",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "quiz-who-are-you",
+        "assessesContentId": "governance",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "tags": [
+          "assessment",
+          "onboarding",
+          "personalization",
+          "quiz"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    },
+    {
+      "id": "q3",
+      "question": {
+        "content": "Which role resonates most with how you see yourself?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Policy maker, constitutional council member, or researcher",
+                  "correct": true
+                },
+                {
+                  "content": "Caregiver, parent, or community supporter",
+                  "correct": false
+                },
+                {
+                  "content": "Worker, business owner, or economic participant",
+                  "correct": false
+                },
+                {
+                  "content": "Citizen, activist, journalist, or community organizer",
+                  "correct": false
+                },
+                {
+                  "content": "Content creator, moderator, or digital community builder",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "quiz-who-are-you",
+        "assessesContentId": "governance",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "tags": [
+          "assessment",
+          "onboarding",
+          "personalization",
+          "quiz"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    },
+    {
+      "id": "q4",
+      "question": {
+        "content": "What kind of impact do you want to have?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Ensuring AI serves humanity through proper governance",
+                  "correct": true
+                },
+                {
+                  "content": "Making care work visible and valued in society",
+                  "correct": false
+                },
+                {
+                  "content": "Creating more equitable economic relationships",
+                  "correct": false
+                },
+                {
+                  "content": "Strengthening democratic participation and transparency",
+                  "correct": false
+                },
+                {
+                  "content": "Fostering genuine human connection online",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": {
+          "content": "",
+          "images": {},
+          "widgets": {}
+        },
+        "calculator": false
+      },
+      "hints": [],
+      "metadata": {
+        "sourceContentId": "quiz-who-are-you",
+        "assessesContentId": "governance",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "tags": [
+          "assessment",
+          "onboarding",
+          "personalization",
+          "quiz"
+        ],
+        "createdAt": "2025-12-25T23:31:36.264Z"
+      }
+    }
+  ]
+}

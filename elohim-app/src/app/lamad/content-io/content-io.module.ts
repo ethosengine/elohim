@@ -13,9 +13,9 @@ import { DefaultCodeEditorComponent } from './components/default-code-editor/def
 // Unified format plugins
 import { MarkdownFormatPlugin } from './plugins/markdown/markdown-format.plugin';
 import { GherkinFormatPlugin } from './plugins/gherkin/gherkin-format.plugin';
-// Perseus disabled in tests until Karma SVG loader is configured
-// Build works with Perseus enabled (npm run build passes)
-// import { PerseusFormatPlugin } from './plugins/perseus/perseus-format.plugin';
+// Perseus enabled for build (npm run build passes)
+// Note: Tests run with Perseus disabled (Karma needs separate SVG loader config)
+import { PerseusFormatPlugin } from './plugins/perseus/perseus-format.plugin';
 
 /**
  * Initializer function to register unified format plugins.
@@ -26,7 +26,7 @@ function initializeFormatPlugins(): void {
   // Register built-in unified plugins
   registry.register(new MarkdownFormatPlugin());
   registry.register(new GherkinFormatPlugin());
-  // registry.register(new PerseusFormatPlugin()); // Disabled until Karma SVG loader configured
+  registry.register(new PerseusFormatPlugin());
 }
 
 /**
