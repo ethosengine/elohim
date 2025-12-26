@@ -39,10 +39,11 @@ The Holochain coordinator zome has **22 build errors** in the Shefa transaction 
 ## Files to Review
 
 ### Holochain (Rust)
+
 | File | Purpose |
 |------|---------|
-| `holochain/dna/lamad-spike/zomes/content_store/src/lib.rs` | Coordinator zome - errors at lines 11763+ |
-| `holochain/dna/lamad-spike/zomes/content_store_integrity/src/lib.rs` | Entry types & LinkTypes definitions |
+| `holochain/dna/elohim/zomes/content_store/src/lib.rs` | Coordinator zome |
+| `holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` | Entry types & LinkTypes definitions |
 
 ### Angular Frontend
 | File | Purpose |
@@ -98,7 +99,7 @@ The Holochain coordinator zome has **22 build errors** in the Shefa transaction 
 ## Build Commands
 
 ```bash
-cd /projects/elohim/holochain/dna/lamad-spike
+cd /projects/elohim/holochain/dna/elohim
 
 # Check only (faster)
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo check --target wasm32-unknown-unknown
