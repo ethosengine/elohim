@@ -210,27 +210,10 @@
             "Complete the epic"
           ],
           "estimatedTime": "45-60 minutes"
-        },
-        {
-          "order": 2,
-          "stepType": "assessment",
-          "resourceId": "quiz-hrea-care-economy",
-          "stepTitle": "Integration Assessment",
-          "stepNarrative": "Test your understanding of how hREA provides the foundation for care-based economics.",
-          "learningObjectives": [
-            "Validate understanding of core concepts",
-            "Apply concepts to scenarios",
-            "Demonstrate integration of technical and visionary understanding"
-          ],
-          "optional": false,
-          "completionCriteria": [
-            "Score 70% or higher"
-          ],
-          "estimatedTime": "15-20 minutes"
         }
       ],
       "attestationGranted": "care-economy-practitioner",
-      "estimatedDuration": "60-80 minutes"
+      "estimatedDuration": "45-60 minutes"
     }
   ],
   "tags": [

@@ -282,13 +282,13 @@ class PerformanceTimer {
 const timer = new PerformanceTimer();
 
 // Configuration
-// Prefer workspace data directory (has latest migrated content), fall back to local for CI/CD
+// Data directory is at the git root: elohim/data/lamad
+// Seeder is at: elohim/holochain/seeder/src/seed.ts
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const SEEDER_DIR = path.dirname(path.dirname(__filename)); // Go up from src/ to seeder/
-const WORKSPACE_DATA_DIR = '/projects/elohim/data/lamad';
-const LOCAL_DATA_DIR = path.join(SEEDER_DIR, 'data', 'lamad');
-const DATA_DIR = process.env.DATA_DIR || (fs.existsSync(WORKSPACE_DATA_DIR) ? WORKSPACE_DATA_DIR : LOCAL_DATA_DIR);
+const GIT_ROOT = path.resolve(SEEDER_DIR, '..', '..'); // Go up from holochain/seeder to elohim/
+const DATA_DIR = process.env.DATA_DIR || path.join(GIT_ROOT, 'data', 'lamad');
 
 // Parse command-line arguments
 const args = process.argv.slice(2);
@@ -412,7 +412,7 @@ interface ConceptJson {
   id: string;
   title: string;
   content: string | object;  // Can be string (markdown) or object (quiz-json, etc.)
-  contentFormat?: 'markdown' | 'html' | 'plain' | 'quiz-json';
+  contentFormat?: 'markdown' | 'html' | 'plain' | 'perseus-quiz-json' | 'gherkin';
   // Simple schema fields
   sourceDoc?: string;
   relationships?: { target: string; type: string }[];
