@@ -16,12 +16,34 @@ echo "🔷 Starting Holochain Development Stack..."
 # Check if hApp file exists
 if [ ! -f "$HAPP_PATH" ]; then
     echo "⚠️  hApp not found at $HAPP_PATH"
-    echo "   Building hApp first..."
+    echo "   Building multi-DNA hApp..."
+
+    WORKDIR="$HC_DIR/dna/elohim/workdir"
+    mkdir -p "$WORKDIR"
+
+    # Build and pack lamad DNA (elohim)
+    echo "📦 Building lamad DNA..."
     cd "$HC_DIR/dna/elohim"
     RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
-    hc dna pack . -o workdir/lamad.dna
-    hc app pack workdir -o workdir/elohim.happ
-    echo "✅ hApp built"
+    hc dna pack . -o "$WORKDIR/lamad.dna"
+
+    # Build and pack imagodei DNA
+    echo "📦 Building imagodei DNA..."
+    cd "$HC_DIR/dna/imagodei"
+    RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
+    hc dna pack . -o "$WORKDIR/imagodei.dna"
+
+    # Build and pack infrastructure DNA
+    echo "📦 Building infrastructure DNA..."
+    cd "$HC_DIR/dna/infrastructure"
+    RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
+    hc dna pack . -o "$WORKDIR/infrastructure.dna"
+
+    # Pack the hApp with all three DNAs
+    echo "📦 Packing elohim.happ..."
+    hc app pack "$WORKDIR" -o "$WORKDIR/elohim.happ"
+
+    echo "✅ Multi-DNA hApp built (lamad + imagodei + infrastructure)"
 fi
 
 # Function to get admin port from running sandbox or ports file
