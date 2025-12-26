@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
 HC_DIR="$APP_DIR/../holochain"
 LOCAL_DEV_DIR="$HC_DIR/local-dev"
-HAPP_PATH="$HC_DIR/dna/lamad-spike/workdir/lamad-spike.happ"
+HAPP_PATH="$HC_DIR/dna/elohim/workdir/elohim.happ"
 HC_PORTS_FILE="$LOCAL_DEV_DIR/.hc_ports"
 DOORWAY_BIN="$HC_DIR/doorway/target/release/doorway"
 
@@ -27,10 +27,10 @@ fi
 if [ ! -f "$HAPP_PATH" ]; then
     echo "⚠️  hApp not found at $HAPP_PATH"
     echo "   Building hApp first..."
-    cd "$HC_DIR/dna/lamad-spike"
+    cd "$HC_DIR/dna/elohim"
     RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
-    hc dna pack . -o workdir/lamad_spike.dna
-    hc app pack workdir -o workdir/lamad-spike.happ
+    hc dna pack . -o workdir/lamad.dna
+    hc app pack workdir -o workdir/elohim.happ
     echo "✅ hApp built"
 fi
 
@@ -64,7 +64,7 @@ if [ "$CONDUCTOR_RUNNING" = false ]; then
 
     cat > "$HC_WRAPPER" << EOF
 #!/bin/bash
-exec hc sandbox generate --app-id lamad-spike --in-process-lair -r=4445 "$HAPP_PATH"
+exec hc sandbox generate --app-id elohim --in-process-lair -r=4445 "$HAPP_PATH"
 EOF
     chmod +x "$HC_WRAPPER"
 

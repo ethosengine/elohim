@@ -139,7 +139,7 @@ GET /sessions/:sessionId/did.json   // Session DID Documents (ephemeral)
 
 **Goal:** Holochain DNA stores and indexes DIDs.
 
-### Modify: `holochain/dna/lamad-spike/zomes/content_store_integrity/src/lib.rs`
+### Modify: `holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs`
 
 Add `did` field to `Human` struct (Agent already has it):
 
@@ -155,7 +155,7 @@ Add link type:
 DIDToHuman,  // For DID-based human lookup
 ```
 
-### Modify: `holochain/dna/lamad-spike/zomes/content_store/src/lib.rs`
+### Modify: `holochain/dna/elohim/zomes/content_store/src/lib.rs`
 
 Add zome functions:
 
@@ -295,8 +295,8 @@ P2P (did:key:z6Mkq...)
 | `holochain/admin-proxy/src/auth-service.ts` | MODIFY | Generate DID on registration |
 | `holochain/admin-proxy/src/did-routes.ts` | NEW | DID Document endpoints |
 | `holochain/admin-proxy/src/index.ts` | MODIFY | Register DID routes |
-| `holochain/dna/lamad-spike/zomes/content_store_integrity/src/lib.rs` | MODIFY | Add `did` to Human struct |
-| `holochain/dna/lamad-spike/zomes/content_store/src/lib.rs` | MODIFY | Add DID zome functions |
+| `holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` | MODIFY | Add `did` to Human struct |
+| `holochain/dna/elohim/zomes/content_store/src/lib.rs` | MODIFY | Add DID zome functions |
 | `holochain/sdk/src/types.ts` | MODIFY | Add DID to TypeScript types |
 
 ---

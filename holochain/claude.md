@@ -13,6 +13,7 @@ The Elohim app supports three distinct modes for connecting to Holochain, each s
 | **Remote Edge Node** | Deployed infrastructure | Kubernetes cluster | Yes |
 | **Device-Local (Packaged App)** | End-user installation | User's device | No |
 
+
 ---
 
 ## Mode 1: Local Development (Eclipse Che)
@@ -45,7 +46,7 @@ Manual startup (if needed):
 ```bash
 # 1. Start sandbox with hApp
 cd /projects/elohim/holochain/local-dev
-hc sandbox generate --app-id lamad-spike --in-process-lair -r=4445 ../dna/lamad-spike/workdir/lamad-spike.happ
+hc sandbox generate --app-id elohim --in-process-lair -r=4445 ../dna/elohim/elohim.happ
 
 # 2. Start Doorway gateway (uses dynamic admin port from .hc_ports file)
 ADMIN_PORT=$(cat .hc_ports | grep admin_port | cut -d= -f2)
@@ -385,7 +386,7 @@ kubectl port-forward -n ethosengine deploy/elohim-edgenode-dev 4444:8444
 holochain/
 ├── Jenkinsfile           # CI/CD pipeline for DNA build & Edge Node deployment
 ├── dna/
-│   └── lamad-spike/      # Minimal DNA for browser connectivity testing
+│   └── elohim/           # Multi-DNA hApp (lamad, infrastructure, imagodei)
 │       ├── flake.nix     # Nix flake for Holonix dev environment
 │       ├── dna.yaml      # DNA manifest
 │       ├── workdir/
@@ -488,7 +489,7 @@ hc app pack workdir/
 The `Jenkinsfile` builds DNA with Nix and deploys Edge Node:
 
 1. **Build DNA** - Uses `ci-builder-nix` image with Holonix
-2. **Package hApp** - Creates `lamad-spike.happ`
+2. **Package hApp** - Creates `elohim.happ`
 3. **Build Edge Node Image** - Docker image with hApp baked in
 4. **Push to Harbor** - `harbor.ethosengine.com/ethosengine/elohim-edgenode`
 5. **Deploy** - Applies K8s manifests to ethosengine namespace

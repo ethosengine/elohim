@@ -20,7 +20,7 @@ const LOCAL_DEV_DIR = process.env.LOCAL_DEV_DIR || '/projects/elohim/holochain/l
 const CONDUCTOR_DATA_DIR = path.join(LOCAL_DEV_DIR, 'conductor-data');
 const SNAPSHOTS_DIR = path.join(LOCAL_DEV_DIR, 'snapshots');
 const SEED_REPORT_PATH = path.join(LOCAL_DEV_DIR, 'last-seed-report.json');
-const HAPP_PATH = '/projects/elohim/holochain/dna/lamad-spike/workdir/elohim.happ';
+const HAPP_PATH = '/projects/elohim/holochain/dna/elohim/elohim.happ';
 const APP_ID = 'elohim';
 
 interface SeedReport {
@@ -133,7 +133,7 @@ async function createSnapshot(name?: string): Promise<void> {
   // Check if happ exists
   if (!fs.existsSync(HAPP_PATH)) {
     console.error(`   hApp not found: ${HAPP_PATH}`);
-    console.error('   Run: cd holochain/dna/lamad-spike && hc app pack workdir');
+    console.error('   Run: cd holochain/dna/elohim && ./build.sh');
     process.exit(1);
   }
 

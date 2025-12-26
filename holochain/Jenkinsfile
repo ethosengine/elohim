@@ -68,7 +68,7 @@ def withBuildVars(props, Closure body) {
  */
 def fetchHappArtifact(String destPath) {
     // Try 1: Current branch
-    def branchUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ"
+    def branchUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
     echo "Attempting to fetch hApp from current branch: ${env.BRANCH_NAME}"
 
     def result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${branchUrl}' 2>&1", returnStatus: true)
@@ -80,7 +80,7 @@ def fetchHappArtifact(String destPath) {
     // Try 2: Dev branch (fallback)
     if (env.BRANCH_NAME != 'dev') {
         echo "Branch artifact not found, trying dev branch..."
-        def devUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ"
+        def devUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
         result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${devUrl}' 2>&1", returnStatus: true)
         if (result == 0 && fileExists(destPath)) {
             echo "hApp fetched from dev branch artifacts (fallback)"
@@ -91,7 +91,7 @@ def fetchHappArtifact(String destPath) {
     // Try 3: Main branch (last resort)
     if (env.BRANCH_NAME != 'main') {
         echo "Dev artifact not found, trying main branch..."
-        def mainUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ"
+        def mainUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
         result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${mainUrl}' 2>&1", returnStatus: true)
         if (result == 0 && fileExists(destPath)) {
             echo "hApp fetched from main branch artifacts (fallback)"
@@ -191,7 +191,7 @@ spec:
 
     environment {
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
-        HAPP_NAME = "lamad-spike"
+        HAPP_NAME = "elohim"
         PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
         // Pipeline state tracking
         IMAGES_PUSHED = 'false'
@@ -294,7 +294,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
             steps {
                 container('builder') {
-                    dir('holochain/dna/lamad-spike') {
+                    dir('holochain/dna/elohim') {
                         script {
                             echo 'Building Holochain DNA with Nix...'
                             echo 'First build may take 20-40 minutes. Subsequent builds use cache.'
@@ -325,20 +325,20 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                     echo ""
                                     echo "=== Packaging DNA ==="
-                                    hc dna pack . -o workdir/lamad_spike.dna
+                                    hc dna pack . -o workdir/lamad.dna
 
                                     echo ""
                                     echo "=== Packaging hApp ==="
-                                    hc app pack workdir -o lamad-spike.happ
+                                    hc app pack workdir -o elohim.happ
 
                                     echo ""
                                     echo "=== Build artifacts ==="
-                                    ls -lh lamad-spike.happ workdir/lamad_spike.dna
+                                    ls -lh elohim.happ workdir/lamad.dna
                                 '
                             '''
 
-                            archiveArtifacts artifacts: 'lamad-spike.happ,workdir/lamad_spike.dna', allowEmptyArchive: false
-                            stash name: 'happ-bundle', includes: 'lamad-spike.happ'
+                            archiveArtifacts artifacts: 'elohim.happ,workdir/lamad.dna', allowEmptyArchive: false
+                            stash name: 'happ-bundle', includes: 'elohim.happ'
 
                             def props = loadBuildVars()
 
@@ -348,7 +348,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             ═══════════════════════════════════════════════════════════
 
                             Artifact URL (for downstream consumers):
-                            ${env.BUILD_URL}artifact/holochain/dna/lamad-spike/lamad-spike.happ
+                            ${env.BUILD_URL}artifact/holochain/dna/elohim/elohim.happ
 
                             Build Details:
                             - Image Tag: ${props.IMAGE_TAG ?: 'unknown'}
@@ -422,7 +422,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 haveHapp = true
                             } catch (Exception e) {
                                 echo "No hApp stashed - fetching from artifacts with fallback..."
-                                haveHapp = fetchHappArtifact('holochain/edgenode/lamad-spike.happ')
+                                haveHapp = fetchHappArtifact('holochain/edgenode/elohim.happ')
                             }
 
                             if (haveHapp) {
@@ -476,7 +476,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 haveHapp = true
                             } catch (Exception e) {
                                 echo "No hApp stashed - fetching from artifacts with fallback..."
-                                haveHapp = fetchHappArtifact('holochain/edgenode/scripts/lamad-spike.happ')
+                                haveHapp = fetchHappArtifact('holochain/edgenode/scripts/elohim.happ')
                             }
 
                             if (haveHapp) {

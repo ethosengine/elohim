@@ -406,8 +406,8 @@ export const DEFAULT_HOLOCHAIN_CONFIG: HolochainConfig = {
   adminUrl: holochainConfig?.adminUrl ?? 'ws://localhost:4444',
   appUrl: holochainConfig?.appUrl ?? 'ws://localhost:4445',
   origin: 'elohim-app',
-  appId: 'lamad-spike',
-  happPath: '/opt/holochain/lamad-spike.happ',
+  appId: 'elohim',
+  happPath: '/opt/holochain/elohim.happ',
   proxyApiKey: holochainConfig?.proxyApiKey,
   useLocalProxy: holochainConfig?.useLocalProxy ?? true, // Auto-detect Che and use dev-proxy
 };

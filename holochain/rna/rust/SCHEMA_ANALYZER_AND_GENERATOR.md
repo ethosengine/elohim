@@ -138,8 +138,8 @@ Options:
 ```bash
 # Generate providers for Lamad
 hc-rna-generate \
-  --integrity holochain/dna/lamad-spike/zomes/content_store_integrity/src/lib.rs \
-  --output holochain/dna/lamad-spike/zomes/content_store/src/providers_generated.rs
+  --integrity holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs \
+  --output holochain/dna/elohim/zomes/content_store/src/providers_generated.rs
 
 # Preview before writing
 hc-rna-generate \

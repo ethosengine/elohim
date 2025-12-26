@@ -174,7 +174,7 @@ spec:
                             // 2. Fall back to local build (slow, ~20-40 min)
                             // 3. Error if neither works
 
-                            def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ"
+                            def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
 
                             // Ensure workdir exists
                             sh 'mkdir -p workdir'
@@ -228,17 +228,17 @@ spec:
                                     echo "    directory = *" >> "$HOME/.gitconfig"
                                     export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 
-                                    cd ../holochain/dna/lamad-spike
+                                    cd ../holochain/dna/elohim
 
                                     echo "Building hApp from source (this will take 20-40 minutes)..."
                                     nix develop --accept-flake-config --command bash -c '
                                         set -euo pipefail
                                         cargo build --release --target wasm32-unknown-unknown
-                                        hc dna pack . -o workdir/lamad_spike.dna
-                                        hc app pack workdir -o lamad-spike.happ
+                                        hc dna pack . -o workdir/lamad.dna
+                                        hc app pack workdir -o elohim.happ
                                     '
 
-                                    cp lamad-spike.happ ../../../steward/workdir/elohim.happ
+                                    cp elohim.happ ../../../steward/workdir/elohim.happ
                                     echo "✅ Local hApp build completed"
                                 '''
                             }

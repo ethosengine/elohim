@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn test_build_issue_token_request() {
-        let request = build_issue_token_request("lamad-spike", 300);
+        let request = build_issue_token_request("elohim", 300);
         assert!(!request.is_empty());
 
         // Verify it can be decoded

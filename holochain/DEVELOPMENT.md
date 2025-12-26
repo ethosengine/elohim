@@ -42,7 +42,7 @@ npm run hc:seed:sample
 
 - **Angular App**: Frontend UI, runs at `localhost:4200` (or via Che endpoint)
 - **Doorway Gateway**: Rust WebSocket gateway with JWT auth and worker pool
-- **Holochain Conductor**: DHT node running the lamad-spike hApp
+- **Holochain Conductor**: DHT node running the elohim hApp
 
 ## Commands Reference
 
@@ -196,7 +196,7 @@ ss -tlnp | grep holochain
 | `holochain/local-dev/conductor-data/` | Holochain persistent data |
 | `holochain/local-dev/.hc_ports` | Dynamic port assignments |
 | `holochain/seeder/data/lamad/` | Content seed data |
-| `holochain/dna/lamad-spike/` | Holochain DNA source |
+| `holochain/dna/elohim/` | Holochain hApp source (multi-DNA) |
 | `holochain/doorway/` | Doorway gateway (Rust) |
 
 ## Test Credentials

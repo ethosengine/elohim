@@ -10,7 +10,7 @@ FROM ghcr.io/holo-host/edgenode:v0.0.8-alpha31-hc0.6.0-go-pion-custom
 COPY conductor-config.yaml /etc/holochain/conductor-config.yaml
 
 # Copy hApp bundle
-COPY lamad-spike.happ /opt/holochain/
+COPY elohim.happ /opt/holochain/
 
 # Expose WebSocket ports
 EXPOSE 4444 4445

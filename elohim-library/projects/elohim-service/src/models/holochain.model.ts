@@ -1,7 +1,7 @@
 /**
  * Holochain Types for elohim-service CLI
  *
- * These types match the Rust structures in the lamad-spike DNA.
+ * These types match the Rust structures in the lamad DNA.
  * Used for communication between Node.js CLI and Holochain conductor.
  */
 
@@ -219,7 +219,7 @@ export interface HolochainContentRelationship {
 export interface HolochainClientConfig {
   /** WebSocket URL for admin interface (e.g., ws://localhost:4444 or wss://holochain-dev.elohim.host) */
   adminUrl: string;
-  /** Installed app ID (e.g., lamad-spike) */
+  /** Installed app ID (e.g., elohim) */
   appId: string;
   /** Optional path to .happ file for installation */
   happPath?: string;

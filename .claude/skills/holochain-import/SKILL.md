@@ -25,8 +25,8 @@ All commands run from `elohim-library/projects/elohim-service/`:
 # Full import
 npx ts-node src/cli/holo-import.ts holo:import \
   --source ./docs/content \
-  --admin-url wss://holochain-dev.elohim.host \
-  --app-id lamad-spike \
+  --admin-url wss://doorway-dev.elohim.host \
+  --app-id elohim \
   --batch-size 50
 
 # Dry run (parse and transform only)
@@ -42,7 +42,7 @@ npx ts-node src/cli/holo-import.ts holo:import --skip-relationships
 **Options:**
 - `-s, --source <dir>` - Source content directory (default: `./docs/content`)
 - `--admin-url <url>` - Holochain admin WebSocket URL (default: `wss://holochain-dev.elohim.host`)
-- `--app-id <id>` - Holochain app ID (default: `lamad-spike`)
+- `--app-id <id>` - Holochain app ID (default: `elohim`)
 - `--happ-path <path>` - Path to .happ file for installation
 - `--batch-size <n>` - Entries per bulk call (default: `50`)
 - `-f, --full` - Force full reimport
@@ -202,8 +202,8 @@ pub enum LinkTypes {
 - `elohim-app/src/app/elohim/models/holochain-connection.model.ts` - Shared types
 
 ### DNA Source
-- `holochain/dna/lamad-spike/zomes/content_store_integrity/src/lib.rs` - Entry types + validation
-- `holochain/dna/lamad-spike/zomes/content_store/src/lib.rs` - Coordinator functions
+- `holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` - Entry types + validation
+- `holochain/dna/elohim/zomes/content_store/src/lib.rs` - Coordinator functions
 
 ## Validation Rules
 
@@ -295,8 +295,8 @@ const service = createLamadImportService('wss://holochain-dev.elohim.host');
 
 // Or with custom config
 const service = new HolochainImportService({
-  adminUrl: 'wss://holochain-dev.elohim.host',
-  appId: 'lamad-spike',
+  adminUrl: 'wss://doorway-dev.elohim.host',
+  appId: 'elohim',
   batchSize: 50,
 });
 

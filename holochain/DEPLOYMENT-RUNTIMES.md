@@ -140,8 +140,8 @@ holochain: {
 │  Same as Runtime 2                                                  │
 │                                                                      │
 │  Consolidated architecture - supports multiple hApp versions:       │
-│  ├── lamad-spike (current version)                                  │
-│  └── lamad-v2 (future RNA upgrades)                                 │
+│  ├── elohim (current multi-DNA hApp)                                │
+│  └── future upgrades via DNA migration                              │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 

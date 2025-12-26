@@ -4,7 +4,7 @@ This document tracks schema changes across DNA versions for migration planning.
 
 ## Version: v1 (Current)
 
-**DNA Name**: `lamad-spike`
+**DNA Name**: `lamad` (within `elohim` hApp)
 **Status**: Active development
 **Holochain Compatibility**: 0.6.x
 

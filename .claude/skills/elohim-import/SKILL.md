@@ -507,7 +507,7 @@ All content should have a `contentFormat` that maps to a renderer. Valid values:
 | Field | Type | Description |
 |-------|------|-------------|
 | `estimatedMinutes` | number | Reading/viewing time in minutes |
-| `contentType` | `"article"` \| `"video"` \| `"simulation"` \| `"assessment"` | Semantic type |
+| `contentType` | `"article"` \| `"video"` \| `"simulation"` \| `"assessment"` \| `"discovery-assessment"` | Semantic type |
 | `contentFormat` | ContentFormat | How content is rendered (see table above) |
 | `metadata` | object | Extensible JSON for additional data |
 

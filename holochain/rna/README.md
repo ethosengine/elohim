@@ -421,7 +421,7 @@ Ok(None)
 | `LocalRepairOnlyStrategy` | Never use v1, only local repair |
 | `NoHealingStrategy` | Accept entries as-is, no healing |
 
-See `holochain/dna/lamad-spike/` for a complete implementation example.
+See `holochain/dna/elohim/` for a complete implementation example.
 
 ## Contributing
 

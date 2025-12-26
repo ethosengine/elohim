@@ -3013,8 +3013,8 @@ export const MAX_BATCH_SIZE = 100;
 /** Zome name */
 export const ZOME_NAME = 'content_store';
 
-/** App ID for lamad-spike */
-export const DEFAULT_APP_ID = 'lamad-spike';
+/** App ID for Elohim hApp */
+export const DEFAULT_APP_ID = 'elohim';
 
 /** Role ID for lamad DNA */
 export const DEFAULT_ROLE_ID = 'lamad';

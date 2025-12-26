@@ -172,15 +172,15 @@ commands:
   - id: build-happ
     exec:
       component: tools
-      workingDir: /projects/elohim/holochain/dna/lamad-spike
+      workingDir: /projects/elohim/holochain/dna/elohim
       commandLine: |
         echo "Building Holochain WASM zomes..."
         cargo build --release --target wasm32-unknown-unknown
         echo "Packing DNA..."
-        hc dna pack . -o workdir/lamad_spike.dna
+        hc dna pack . -o workdir/lamad.dna
         echo "Packing hApp..."
-        hc app pack workdir -o workdir/lamad-spike.happ
-        echo "Done! hApp at: workdir/lamad-spike.happ"
+        hc app pack workdir -o workdir/elohim.happ
+        echo "Done! hApp at: workdir/elohim.happ"
 
   - id: seed-holochain
     exec:

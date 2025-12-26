@@ -61,7 +61,7 @@ Re-exports all types for public use.
 - All healing strategy types exported
 - All orchestrator types exported
 
-### 2. Lamad Application (holochain/dna/lamad-spike/zomes/content_store)
+### 2. Lamad Application (holochain/dna/elohim/zomes/content_store)
 
 **One new file** that provides all Lamad entry type implementations:
 

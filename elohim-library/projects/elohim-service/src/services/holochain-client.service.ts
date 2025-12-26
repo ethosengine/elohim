@@ -36,7 +36,7 @@ import {
  * ```typescript
  * const client = new HolochainClientService({
  *   adminUrl: 'ws://localhost:4444',
- *   appId: 'lamad-spike',
+ *   appId: 'elohim',
  * });
  *
  * await client.connect();

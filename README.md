@@ -184,7 +184,7 @@ Each pipeline respects its own when{} conditions:
 - **Builds:** DNA, hApp bundle, Gateway service
 - **Deploys to:** Dev edge node (dev/branches), Production (main)
 - **Artifacts:**
-  - `lamad-spike.happ` (archived for steward to fetch)
+  - `elohim.happ` (archived for steward to fetch)
   - Docker images (edgenode, doorway, happ-installer)
 - **Key Features:**
   - Efficient Rust/WASM compilation with Nix caching
@@ -245,7 +245,7 @@ The steward pipeline uses a **three-tier fallback** to fetch the hApp:
 
 **URL Pattern:**
 ```
-https://jenkins.ethosengine.com/job/elohim-holochain/job/{BRANCH}/lastSuccessfulBuild/artifact/holochain/dna/lamad-spike/lamad-spike.happ
+https://jenkins.ethosengine.com/job/elohim-holochain/job/{BRANCH}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ
 ```
 
 ### Build Time Impact

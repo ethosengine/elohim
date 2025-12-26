@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
 HC_DIR="$APP_DIR/../holochain"
 LOCAL_DEV_DIR="$HC_DIR/local-dev"
-HAPP_PATH="$HC_DIR/dna/lamad-spike/workdir/lamad-spike.happ"
+HAPP_PATH="$HC_DIR/dna/elohim/workdir/elohim.happ"
 HC_PORTS_FILE="$LOCAL_DEV_DIR/.hc_ports"
 
 echo "🔷 Starting Holochain Development Stack..."
@@ -17,10 +17,10 @@ echo "🔷 Starting Holochain Development Stack..."
 if [ ! -f "$HAPP_PATH" ]; then
     echo "⚠️  hApp not found at $HAPP_PATH"
     echo "   Building hApp first..."
-    cd "$HC_DIR/dna/lamad-spike"
-    cargo build --release --target wasm32-unknown-unknown
-    hc dna pack . -o workdir/lamad_spike.dna
-    hc app pack workdir -o workdir/lamad-spike.happ
+    cd "$HC_DIR/dna/elohim"
+    RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
+    hc dna pack . -o workdir/lamad.dna
+    hc app pack workdir -o workdir/elohim.happ
     echo "✅ hApp built"
 fi
 

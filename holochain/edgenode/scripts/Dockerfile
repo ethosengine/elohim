@@ -15,7 +15,7 @@ COPY install-happ.mjs ./
 # Copy hApp bundle (passed in during build via --build-arg or COPY)
 # Default location matches script's default HAPP_PATH
 RUN mkdir -p /opt/holochain
-COPY lamad-spike.happ /opt/holochain/lamad-spike.happ
+COPY elohim.happ /opt/holochain/elohim.happ
 
 # Run installer, then sleep to keep container alive
 # (Kubernetes restarts containers that exit)
