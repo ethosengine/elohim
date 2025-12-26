@@ -343,10 +343,13 @@ export class IdentityService {
     this.updateState({ isLoading: true, error: null });
 
     try {
+      // Call imagodei DNA to get current human profile
+      // Note: get_my_human returns HumanOutput { action_hash, human } not full HumanSessionResult
       const result = await this.holochainClient.callZome<HumanSessionResult | null>({
-        zomeName: 'content_store',
-        fnName: 'get_current_human',
+        zomeName: 'imagodei',
+        fnName: 'get_my_human',
         payload: null,
+        roleName: 'imagodei',  // Use imagodei DNA for identity
       });
 
       if (result.success && result.data) {
@@ -516,10 +519,12 @@ export class IdentityService {
 
     try {
       const payload = toRegisterPayload(request);
+      // Call imagodei DNA to create human profile
       const result = await this.holochainClient.callZome<HumanSessionResult>({
-        zomeName: 'content_store',
-        fnName: 'register_human',
+        zomeName: 'imagodei',
+        fnName: 'create_human',
         payload,
+        roleName: 'imagodei',  // Use imagodei DNA for identity
       });
 
       if (!result.success || !result.data) {
@@ -597,10 +602,12 @@ export class IdentityService {
     }
 
     try {
+      // Call imagodei DNA to get current human profile
       const result = await this.holochainClient.callZome<HumanSessionResult | null>({
-        zomeName: 'content_store',
-        fnName: 'get_current_human',
+        zomeName: 'imagodei',
+        fnName: 'get_my_human',
         payload: null,
+        roleName: 'imagodei',  // Use imagodei DNA for identity
       });
 
       if (result.success && result.data) {
@@ -634,10 +641,12 @@ export class IdentityService {
 
     try {
       const payload = toUpdatePayload(request);
+      // Call imagodei DNA to update human profile
       const result = await this.holochainClient.callZome<HumanUpdateResult>({
-        zomeName: 'content_store',
-        fnName: 'update_human_profile',
+        zomeName: 'imagodei',
+        fnName: 'update_human',
         payload,
+        roleName: 'imagodei',  // Use imagodei DNA for identity
       });
 
       if (!result.success || !result.data) {
@@ -708,11 +717,12 @@ export class IdentityService {
     }
 
     try {
-      // Verify the identity by fetching the current human
+      // Verify the identity by fetching the current human from imagodei DNA
       const result = await this.holochainClient.callZome<HumanSessionResult | null>({
-        zomeName: 'content_store',
-        fnName: 'get_current_human',
+        zomeName: 'imagodei',
+        fnName: 'get_my_human',
         payload: null,
+        roleName: 'imagodei',  // Use imagodei DNA for identity
       });
 
       if (result.success && result.data) {

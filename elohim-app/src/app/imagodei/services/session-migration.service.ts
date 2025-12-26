@@ -165,23 +165,30 @@ export class SessionMigrationService {
     lastActivityAt: string;
   }): Promise<void> {
     try {
+      // Agent progress lives in imagodei DNA (identity-bound learning state)
+      // Note: imagodei expects agent_id - we use current agent's human ID
+      const agentId = this.identityService.humanId() ?? 'anonymous';
+
       await this.holochainClient.callZome({
-        zomeName: 'content_store',
+        zomeName: 'imagodei',
         fnName: 'get_or_create_agent_progress',
         payload: {
+          agent_id: agentId,
           path_id: progress.pathId,
         },
+        roleName: 'imagodei',
       });
 
       // Update with migrated data
       await this.holochainClient.callZome({
-        zomeName: 'content_store',
+        zomeName: 'imagodei',
         fnName: 'update_agent_progress',
         payload: {
+          agent_id: agentId,
           path_id: progress.pathId,
           completed_step_index: progress.currentStepIndex > 0 ? progress.currentStepIndex - 1 : undefined,
-          note: `Migrated from session on ${new Date().toISOString()}`,
         },
+        roleName: 'imagodei',
       });
     } catch (err) {
       console.warn('[SessionMigration] Failed to transfer path progress:', progress.pathId, err);

@@ -217,10 +217,13 @@ export class PresenceService {
 
     try {
       const payload = toCreatePayload(request);
+      // ContributorPresence is identity domain - routes to imagodei DNA
+      // TODO: Implement create_contributor_presence in imagodei zome
       const result = await this.holochainClient.callZome<PresenceResult>({
-        zomeName: 'content_store',
+        zomeName: 'imagodei',
         fnName: 'create_contributor_presence',
         payload,
+        roleName: 'imagodei',
       });
 
       if (!result.success || !result.data) {
@@ -267,10 +270,13 @@ export class PresenceService {
         commitment_note: commitmentNote,
       };
 
+      // ContributorPresence stewardship is identity domain - routes to imagodei DNA
+      // TODO: Implement begin_stewardship in imagodei zome
       const result = await this.holochainClient.callZome<PresenceResult>({
-        zomeName: 'content_store',
+        zomeName: 'imagodei',
         fnName: 'begin_stewardship',
         payload,
+        roleName: 'imagodei',
       });
 
       if (!result.success || !result.data) {
@@ -307,10 +313,13 @@ export class PresenceService {
     }
 
     try {
+      // Query presences by steward - routes to imagodei DNA
+      // TODO: Implement get_presences_by_steward in imagodei zome
       const result = await this.holochainClient.callZome<PresenceResult[]>({
-        zomeName: 'content_store',
+        zomeName: 'imagodei',
         fnName: 'get_presences_by_steward',
         payload: agentPubKey,
+        roleName: 'imagodei',
       });
 
       if (!result.success || !result.data) {
@@ -350,10 +359,13 @@ export class PresenceService {
         verification_method: request.verificationMethod,
       };
 
+      // Claim initiation is identity domain - routes to imagodei DNA
+      // TODO: Implement initiate_claim in imagodei zome
       const result = await this.holochainClient.callZome<PresenceResult>({
-        zomeName: 'content_store',
+        zomeName: 'imagodei',
         fnName: 'initiate_claim',
         payload,
+        roleName: 'imagodei',
       });
 
       if (!result.success || !result.data) {
@@ -385,10 +397,13 @@ export class PresenceService {
     this.errorSignal.set(null);
 
     try {
+      // Claim verification is identity domain - routes to imagodei DNA
+      // TODO: Implement verify_claim in imagodei zome
       const result = await this.holochainClient.callZome<PresenceResult>({
-        zomeName: 'content_store',
+        zomeName: 'imagodei',
         fnName: 'verify_claim',
         payload: presenceId,
+        roleName: 'imagodei',
       });
 
       if (!result.success || !result.data) {
@@ -427,10 +442,13 @@ export class PresenceService {
     }
 
     try {
+      // Presence lookup by ID - routes to imagodei DNA
+      // TODO: Implement get_contributor_presence_by_id in imagodei zome
       const result = await this.holochainClient.callZome<PresenceResult | null>({
-        zomeName: 'content_store',
+        zomeName: 'imagodei',
         fnName: 'get_contributor_presence_by_id',
         payload: id,
+        roleName: 'imagodei',
       });
 
       if (!result.success || !result.data) {
@@ -456,10 +474,14 @@ export class PresenceService {
     }
 
     try {
+      // Query presences by state - routes to imagodei DNA
+      // Note: Per LINK_ARCHITECTURE.md, *ByState queries should prefer projection
+      // TODO: Implement get_presences_by_state in imagodei zome or use projection
       const result = await this.holochainClient.callZome<PresenceResult[]>({
-        zomeName: 'content_store',
+        zomeName: 'imagodei',
         fnName: 'get_presences_by_state',
         payload: state,
+        roleName: 'imagodei',
       });
 
       if (!result.success || !result.data) {

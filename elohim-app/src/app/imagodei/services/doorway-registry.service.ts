@@ -295,13 +295,20 @@ export class DoorwayRegistryService {
 
   /**
    * Fetch doorways from DHT via Holochain.
+   *
+   * Note: Per LINK_ARCHITECTURE.md, "get all doorways" is a query candidate
+   * that should prefer projection queries. This method uses infrastructure DNA
+   * as a fallback when projection isn't available.
    */
   private async fetchFromDHT(): Promise<DoorwayInfo[]> {
     try {
+      // Infrastructure DNA handles doorway federation
+      // TODO: Add get_all_doorways or use projection query instead
       const result = await this.holochainClient.callZome<DoorwayInfo[]>({
-        zomeName: 'content_store',
-        fnName: 'get_registered_doorways',
-        payload: null,
+        zomeName: 'infrastructure',
+        fnName: 'get_doorways_by_region',
+        payload: 'global',  // Use 'global' region to get all doorways
+        roleName: 'infrastructure',
       });
 
       if (result.success && result.data) {
@@ -309,6 +316,7 @@ export class DoorwayRegistryService {
       }
       return [];
     } catch {
+      // Falls back to fetchFromDoorway() REST API
       return [];
     }
   }
