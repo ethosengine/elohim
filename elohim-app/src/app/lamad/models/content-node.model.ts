@@ -407,6 +407,7 @@ export type ContentType =
   | 'simulation'
   | 'video'
   | 'assessment'
+  | 'discovery-assessment' // Self-discovery quizzes (Enneagram, learning style, etc.) - visible path steps
   | 'organization'
   | 'book-chapter'
   | 'tool'
