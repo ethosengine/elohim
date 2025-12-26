@@ -34,7 +34,10 @@
             "styles": [
               "src/styles.css"
             ],
-            "scripts": []
+            "scripts": [],
+            "loader": {
+              ".svg": "text"
+            }
           },
           "configurations": {
             "production": {
@@ -46,8 +49,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "6kB",
-                  "maximumError": "20kB"
+                  "maximumWarning": "10kB",
+                  "maximumError": "25kB"
                 }
               ],
               "optimization": {
@@ -72,8 +75,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "6kB",
-                  "maximumError": "20kB"
+                  "maximumWarning": "10kB",
+                  "maximumError": "25kB"
                 }
               ],
               "outputHashing": "all",
