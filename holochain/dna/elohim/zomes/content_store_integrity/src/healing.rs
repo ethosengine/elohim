@@ -8,49 +8,111 @@ use hc_rna::{SelfHealingEntry, ValidationStatus};
 use crate::*;
 
 // ============================================================================
-// Validation Constants
+// Validation Constants - Aligned with lib.rs and data/lamad content
 // ============================================================================
 
+/// Content types - extended to support all imported content
 pub const CONTENT_TYPES: &[&str] = &[
-    "concept",       // Atomic knowledge concept
-    "lesson",        // Structured learning unit
-    "practice",      // Hands-on practice activity
-    "assessment",    // Knowledge check
-    "reference",     // External reference material
+    // Core types (from lib.rs)
+    "epic",           // High-level narrative/vision document
+    "concept",        // Atomic knowledge unit
+    "lesson",         // Digestible learning session (AI-derived from concepts)
+    "scenario",       // Gherkin feature/scenario
+    "assessment",     // Quiz or test
+    "resource",       // Supporting material
+    "reflection",     // Journaling/reflection prompt
+    "discussion",     // Discussion topic
+    "exercise",       // Practice activity
+    "example",        // Illustrative example
+    "reference",      // Reference material
+    "article",        // Long-form article content
+    "feature",        // Gherkin feature (imported from .feature files)
+    "practice",       // Practice activity (legacy alias)
+    "human",          // Human persona files
+    // Extended types (from FCT and other imports)
+    "organization",   // Organization reference
+    "contributor",    // Contributor profile
+    "video",          // Video content reference
+    "audio",          // Audio content reference
+    "book",           // Book reference
+    "book-chapter",   // Book chapter reference
+    "documentary",    // Documentary reference
+    "bible-verse",    // Biblical scripture reference
+    "activity",       // Learning activity
+    "narrative",      // Narrative/story content
+    "course-module",  // Course module structure
+    "module",         // Generic module
+    "quiz",           // Quiz content (distinct from assessment)
 ];
 
+/// Reach levels - must match REACH_LEVELS in lib.rs
 pub const REACH_LEVELS: &[&str] = &[
-    "public",   // Open to everyone
-    "commons",  // Shared commons (curated)
-    "private",  // Private/restricted
+    "private",    // Only self
+    "self",       // Only self (alias)
+    "intimate",   // Closest relationships
+    "trusted",    // Trusted circle
+    "familiar",   // Extended network
+    "community",  // Community members
+    "public",     // Anyone authenticated
+    "commons",    // Anyone, including anonymous
 ];
 
+/// Content formats - all formats used in data/lamad content
 pub const CONTENT_FORMATS: &[&str] = &[
-    "markdown",   // Markdown format
-    "html",       // HTML format
-    "plaintext",  // Plain text
-    "video",      // Video media
+    "markdown",        // Markdown format
+    "html",            // HTML format
+    "plaintext",       // Plain text
+    "text",            // Plain text (alias)
+    "plain",           // Plain text (alias)
+    "video",           // Video media reference
+    "audio",           // Audio media reference
+    "interactive",     // Interactive content
+    "external",        // External URL reference
+    "gherkin",         // Gherkin/Cucumber scenario format (imported from .feature files)
+    "quiz-json",       // Quiz in JSON format
+    "assessment-json", // Assessment instrument in JSON format
+    "video-embed",     // Embedded video (YouTube, Vimeo, etc.)
+    "audio-file",      // Audio file reference
+    "html5-app",       // HTML5 interactive application
+    "perseus-json",    // Perseus quiz format (Khan Academy derived)
+    "human-json",      // Human persona JSON format
+    "organization-json", // Organization JSON format
+    "json",            // Generic JSON format
 ];
 
 pub const PATH_VISIBILITIES: &[&str] = &[
-    "public",  // Published path
-    "private", // Private path
-    "draft",   // Draft in progress
+    "private",   // Only creator
+    "unlisted",  // Accessible by link
+    "community", // Community members
+    "public",    // Anyone
+    "draft",     // Draft in progress
 ];
 
 pub const STEP_TYPES: &[&str] = &[
     "content",   // Reference content
+    "read",      // Read content (seeder default)
     "path",      // Reference another path
     "external",  // External URL
     "practice",  // Practice activity
+    "assess",    // Assessment step
+    "video",     // Video content step
+    "interactive", // Interactive activity
 ];
 
+/// Mastery levels - must match MASTERY_LEVELS in lib.rs (Bloom's Taxonomy)
 pub const MASTERY_LEVELS: &[&str] = &[
-    "recognize",    // Can identify
-    "recall",       // Can recall
-    "understand",   // Understands concepts
-    "apply",        // Can apply knowledge
-    "synthesize",   // Can combine and create
+    "not_started", // 0 - No engagement
+    "seen",        // 1 - Content viewed
+    "remember",    // 2 - Basic recall demonstrated
+    "understand",  // 3 - Comprehension demonstrated
+    "apply",       // 4 - Application in novel contexts (ATTESTATION GATE)
+    "analyze",     // 5 - Can break down, connect, contribute analysis
+    "evaluate",    // 6 - Can assess, critique, peer review
+    "create",      // 7 - Can author, derive, synthesize
+    // Legacy aliases
+    "recognize",   // Alias for remember
+    "recall",      // Alias for remember
+    "synthesize",  // Alias for create
 ];
 
 pub const COMPLETION_CRITERIA: &[&str] = &[

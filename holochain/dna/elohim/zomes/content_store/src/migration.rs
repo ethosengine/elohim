@@ -30,7 +30,6 @@
 // See: holochain/rna/ for the reusable RNA toolkit
 
 use hdk::prelude::*;
-use hc_rna::bridge_call;
 use crate::{Content, LearningPath, PathStep, ContentMastery, AgentProgress, create_content, CreateContentInput};
 
 /// Migration report tracking success/failure of migrated items
