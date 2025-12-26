@@ -13,4 +13,5 @@ export * from './identity.model';
 export * from './presence.model';
 export * from './doorway.model';
 export * from './recovery.model';
+export * from './consent-relationship.model';
 // Note: Node status types are in shefa/models/shefa-dashboard.model.ts

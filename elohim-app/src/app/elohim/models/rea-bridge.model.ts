@@ -205,6 +205,11 @@ export type ResourceClassification =
   | 'compute'           // Computational resources (for Elohim)
   | 'currency'          // Mutual credit (Unyt/HoloFuel integration)
 
+  // Consent & Data Economy classifications (ImagoDei/Qahal Research)
+  | 'consent'           // Consent grant (the relationship itself is a resource)
+  | 'data'              // Personal data shared under consent (research responses, etc.)
+  | 'data-token'        // Token representing data value contribution
+
   // Shefa token classifications (from whitepaper)
   | 'care-token'        // Witnessed caregiving acts
   | 'time-token'        // Hours contributed to community
@@ -1127,6 +1132,32 @@ export const LAMAD_RESOURCE_SPECS: Record<string, ResourceSpecification> = {
     defaultUnitOfResource: LAMAD_UNITS.cycle,
     resourceClassifiedAs: ['compute'],
     substitutable: true,
+  },
+
+  // Consent & Data Economy resources (ImagoDei/Qahal Research)
+  'consent-grant': {
+    id: 'spec-consent',
+    name: 'Consent Grant',
+    note: 'A consent relationship for data access - the grant itself is a resource',
+    defaultUnitOfResource: LAMAD_UNITS.each,
+    resourceClassifiedAs: ['consent'],
+    substitutable: false, // Each consent relationship is unique
+  },
+  'research-data': {
+    id: 'spec-data',
+    name: 'Research Data',
+    note: 'Personal data contributed under consent (assessment responses, etc.)',
+    defaultUnitOfResource: LAMAD_UNITS.each,
+    resourceClassifiedAs: ['data'],
+    substitutable: false, // Each data contribution is unique
+  },
+  'data-token': {
+    id: 'spec-data-token',
+    name: 'Data Token',
+    note: 'Token representing value from data contribution - flows back to data subject',
+    defaultUnitOfResource: LAMAD_UNITS.token,
+    resourceClassifiedAs: ['data-token'],
+    substitutable: true, // Fungible value token
   },
 };
 

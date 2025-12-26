@@ -250,7 +250,15 @@ export type LamadEventType =
   | 'prevention-incentive-awarded' // Premium discount/reward for risk mitigation (raise + care-token)
   | 'coverage-decision'         // Community decided coverage (work + membership)
   | 'claim-review-initiated'    // Governance review of adjuster decision (work + membership)
-  | 'reserve-adjustment';       // Regulatory reserve change (modify + currency)
+  | 'reserve-adjustment'        // Regulatory reserve change (modify + currency)
+
+  // Consent & Data Economy Events (ImagoDei/Qahal Research)
+  | 'consent-grant'             // Human granted consent for data use (produce + consent)
+  | 'consent-withdraw'          // Human withdrew consent (modify + consent)
+  | 'data-access'               // Researcher accessed data under consent (use + data)
+  | 'data-value-transfer'       // Value transferred for data access (transfer + token)
+  | 'consent-audit-complete'    // Periodic consent review completed (work + stewardship)
+  | 'research-response-submit'; // Research assessment response submitted (produce + data)
 
 /**
  * Event type to action+resource mapping.
@@ -316,6 +324,14 @@ export const LAMAD_EVENT_MAPPINGS: Record<LamadEventType, {
   'coverage-decision': { action: 'work', resourceType: 'membership', defaultUnit: 'unit-each' },
   'claim-review-initiated': { action: 'work', resourceType: 'membership', defaultUnit: 'unit-each' },
   'reserve-adjustment': { action: 'modify', resourceType: 'currency', defaultUnit: 'unit-token' },
+
+  // Consent & Data Economy Events
+  'consent-grant': { action: 'produce', resourceType: 'consent', defaultUnit: 'unit-each' },
+  'consent-withdraw': { action: 'modify', resourceType: 'consent', defaultUnit: 'unit-each' },
+  'data-access': { action: 'use', resourceType: 'data', defaultUnit: 'unit-each' },
+  'data-value-transfer': { action: 'transfer', resourceType: 'data-token', defaultUnit: 'unit-token' },
+  'consent-audit-complete': { action: 'work', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'research-response-submit': { action: 'produce', resourceType: 'data', defaultUnit: 'unit-each' },
 };
 
 // ============================================================================
