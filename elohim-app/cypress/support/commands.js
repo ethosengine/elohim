@@ -52,3 +52,44 @@ Cypress.Commands.add('waitForAppReady', () => {
   // Additional check for page readiness
   cy.get('body').should('be.visible');
 })
+
+// Get the Doorway API host based on current environment
+Cypress.Commands.add('getDoorwayHost', () => {
+  // Check for explicit doorway host in environment
+  const explicitDoorway = Cypress.env('DOORWAY_HOST');
+  if (explicitDoorway) {
+    return explicitDoorway;
+  }
+
+  // Auto-detect from base URL
+  const baseUrl = Cypress.config('baseUrl') || '';
+
+  if (baseUrl.includes('alpha.elohim.host')) {
+    return 'https://doorway-dev.elohim.host';
+  } else if (baseUrl.includes('staging.elohim.host')) {
+    return 'https://doorway-staging.elohim.host';
+  } else if (baseUrl.includes('elohim.host') && !baseUrl.includes('doorway')) {
+    return 'https://doorway.elohim.host';
+  } else if (baseUrl.includes('localhost')) {
+    // Local development - use local doorway or dev
+    return Cypress.env('LOCAL_DOORWAY_HOST') || 'http://localhost:8888';
+  }
+
+  // Fallback: try to construct doorway URL from base URL
+  return baseUrl.replace('://', '://doorway.');
+})
+
+// Check if we're in BDD pipeline mode
+Cypress.Commands.add('isBDDPipeline', () => {
+  return Cypress.env('ENV') === 'bdd-pipeline';
+})
+
+// Get dynamic feature manifest (if fetched)
+Cypress.Commands.add('getDynamicManifest', () => {
+  return cy.task('readDynamicManifest');
+})
+
+// List dynamic feature files
+Cypress.Commands.add('listDynamicFeatures', () => {
+  return cy.task('listDynamicFeatures');
+})
