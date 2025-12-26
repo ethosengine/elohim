@@ -172,22 +172,22 @@ export {
 
 // ============================================================================
 // RE-EXPORTS FROM ELOHIM (Protocol-Core)
+// TODO: Remove these re-exports. Import directly from @app/elohim/models/*
 // ============================================================================
 
-// Protocol-core primitives
+/** @deprecated Import from '@app/elohim/models/protocol-core.model' */
 export * from '@app/elohim/models/protocol-core.model';
 
-// REA Bridge models (ValueFlows/hREA integration - canonical location)
+/** @deprecated Import from '@app/elohim/models/rea-bridge.model' */
 export * from '@app/elohim/models/rea-bridge.model';
 
-// Agent models (Traveler state)
+/** @deprecated Import from '@app/elohim/models/agent.model' */
 export * from '@app/elohim/models/agent.model';
 
-// Elohim Agent models (Autonomous constitutional guardians)
+/** @deprecated Import from '@app/elohim/models/elohim-agent.model' */
 export * from '@app/elohim/models/elohim-agent.model';
 
-// Trust Badge models (UI-ready trust display)
-// Export selectively to avoid ContentAttestationType collision
+/** @deprecated Import from '@app/elohim/models/trust-badge.model' */
 export type {
   TrustBadge,
   BadgeDisplay,
@@ -201,6 +201,7 @@ export type {
   BadgeAction,
   CompactTrustBadge
 } from '@app/elohim/models/trust-badge.model';
+/** @deprecated Import from '@app/elohim/models/trust-badge.model' */
 export {
   badgeToIndicator,
   warningToIndicator,
@@ -214,24 +215,27 @@ export {
   toCompactBadge
 } from '@app/elohim/models/trust-badge.model';
 
-// Infrastructure models (JSON-LD, Open Graph, Verifiable Credentials, Source Chain)
+/** @deprecated Import from '@app/elohim/models/json-ld.model' */
 export * from '@app/elohim/models/json-ld.model';
+/** @deprecated Import from '@app/elohim/models/open-graph.model' */
 export * from '@app/elohim/models/open-graph.model';
+/** @deprecated Import from '@app/elohim/models/verifiable-credential.model' */
 export * from '@app/elohim/models/verifiable-credential.model';
+/** @deprecated Import from '@app/elohim/models/source-chain.model' */
 export * from '@app/elohim/models/source-chain.model';
 
 // ============================================================================
 // RE-EXPORTS FROM IMAGODEI (Identity)
+// TODO: Remove these re-exports. Import directly from @app/imagodei/models/*
 // ============================================================================
 
-// Session Human models (MVP temporary identity)
+/** @deprecated Import from '@app/imagodei/models/session-human.model' */
 export * from '@app/imagodei/models/session-human.model';
 
-// Profile models (human-centered identity, Imago Dei aligned)
+/** @deprecated Import from '@app/imagodei/models/profile.model' */
 export * from '@app/imagodei/models/profile.model';
 
-// Agent Attestation models (Credentials earned BY humans/agents)
-// Export selectively to avoid Attestation/AttestationType collision with protocol-core
+/** @deprecated Import from '@app/imagodei/models/attestations.model' */
 export type {
   Attestation as ImagodeiAttestation,
   AttestationJourney,
@@ -244,39 +248,39 @@ export type {
 
 // ============================================================================
 // RE-EXPORTS FROM ELOHIM (Economy - canonical location)
+// TODO: Remove these re-exports. Import directly from @app/elohim/models/*
 // ============================================================================
 
-// Economic Event models
+/** @deprecated Import from '@app/elohim/models/economic-event.model' */
 export * from '@app/elohim/models/economic-event.model';
 
-// Contributor Presence models (stewardship lifecycle for absent contributors)
+/** @deprecated Import from '@app/elohim/models/contributor-presence.model' */
 export * from '@app/elohim/models/contributor-presence.model';
 
-// Steward Economy models (credentials, gates, access, revenue)
+// Steward Economy models - LAMAD-NATIVE (stay here)
 export * from './steward-economy.model';
 
 // ============================================================================
 // RE-EXPORTS FROM QAHAL (Community)
+// TODO: Remove these re-exports. Import directly from @app/qahal/models/*
 // ============================================================================
 
-// Human Affinity models (engagement depth tracking)
+/** @deprecated Import from '@app/qahal/models/human-affinity.model' */
 export * from '@app/qahal/models/human-affinity.model';
 
-// Human Consent models (graduated intimacy) - re-exported from elohim
-// Export selectively to avoid collision with protocol-core
+/** @deprecated Import from '@app/elohim/models/human-consent.model' */
 export type {
   HumanConsent,
   ConsentRequest
 } from '@app/elohim/models/human-consent.model';
 
-// Governance & Feedback models (the protocol's immune system)
+/** @deprecated Import from '@app/qahal/models/governance-feedback.model' */
 export * from '@app/qahal/models/governance-feedback.model';
 
-// Governance Deliberation models (context-aware feedback, deliberation, sensemaking)
+/** @deprecated Import from '@app/qahal/models/governance-deliberation.model' */
 export * from '@app/qahal/models/governance-deliberation.model';
 
-// Place models (bioregional awareness)
-// Export selectively to avoid collision with protocol-core GeographicContext
+/** @deprecated Import from '@app/qahal/models/place.model' */
 export type {
   Place,
   PlaceType,
@@ -302,4 +306,5 @@ export type {
   PlaceHierarchyNode,
   PlaceServiceInterface
 } from '@app/qahal/models/place.model';
+/** @deprecated Import from '@app/qahal/models/place.model' */
 export { PLACE_TYPE_CATEGORIES } from '@app/qahal/models/place.model';

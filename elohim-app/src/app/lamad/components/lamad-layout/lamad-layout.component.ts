@@ -6,7 +6,7 @@ import { Subject } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { RendererInitializerService } from '../../renderers/renderer-initializer.service';
-import { ElohimNavigatorComponent } from '../../../elohim/components/elohim-navigator/elohim-navigator.component';
+import { ElohimNavigatorComponent } from '@app/elohim/components/elohim-navigator/elohim-navigator.component';
 
 @Component({
   selector: 'app-lamad-layout',

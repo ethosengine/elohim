@@ -13,7 +13,7 @@ import { CommonModule } from '@angular/common';
 import { IdentityService } from '../../services/identity.service';
 import { type IdentityMode } from '../../models/identity.model';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
-import { HolochainClientService } from '../../../elohim/services/holochain-client.service';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 /** Extended connection status including transient states */
 export type ConnectionMode = IdentityMode | 'connecting' | 'offline';

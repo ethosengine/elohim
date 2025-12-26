@@ -8,8 +8,8 @@
 import { Component, inject, signal, output, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { SovereigntyService } from '../../../imagodei/services/sovereignty.service';
-import { HolochainClientService } from '../../../elohim/services/holochain-client.service';
+import { SovereigntyService } from '@app/imagodei/services/sovereignty.service';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 @Component({
   selector: 'app-sovereignty-badge',

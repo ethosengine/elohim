@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterLink } from '@angular/router';
-import { ElohimNavigatorComponent } from '../../../elohim/components/elohim-navigator/elohim-navigator.component';
+import { ElohimNavigatorComponent } from '@app/elohim/components/elohim-navigator/elohim-navigator.component';
 
 /**
  * CommunityLayoutComponent - Layout wrapper for the Community context app

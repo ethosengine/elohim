@@ -14,19 +14,19 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { IdentityService } from '../../services/identity.service';
 import { SovereigntyService } from '../../services/sovereignty.service';
-import { DiscoveryAttestationService } from '../../../lamad/quiz-engine/services/discovery-attestation.service';
+import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 import {
   type UpdateProfileRequest,
   type ProfileReach,
   getReachLabel,
   getReachDescription,
   getInitials,
-} from '../../models/identity.model';
+} from '@app/imagodei/models/identity.model';
 import {
   type DiscoveryResult,
   getFrameworkDisplayName,
   getCategoryIcon,
-} from '../../../lamad/quiz-engine/models/discovery-assessment.model';
+} from '@app/lamad/quiz-engine/models/discovery-assessment.model';
 
 @Component({
   selector: 'app-profile',

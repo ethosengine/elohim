@@ -15,7 +15,7 @@ import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { IdentityService } from '../../services/identity.service';
 import { SessionHumanService } from '../../services/session-human.service';
 import { SessionMigrationService } from '../../services/session-migration.service';
-import { HolochainClientService } from '../../../elohim/services/holochain-client.service';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { AuthService } from '../../services/auth.service';
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';

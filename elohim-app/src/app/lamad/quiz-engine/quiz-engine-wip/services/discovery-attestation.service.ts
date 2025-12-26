@@ -26,7 +26,7 @@ import {
   getFrameworkDisplayName,
   getCategoryIcon,
 } from '../models/discovery-assessment.model';
-import { type Attestation } from '../../../imagodei/models/attestations.model';
+import { type Attestation } from '@app/imagodei/models/attestations.model';
 
 // =============================================================================
 // Storage Keys

@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, of, forkJoin, map, catchError, shareReplay } from 'rxjs';
-import { DataLoaderService } from '../../../elohim/services/data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { PathService } from '../../services/path.service';
 import type { PerseusItem, BloomsLevel, QuestionDifficulty } from '../../content-io/plugins/perseus/perseus-item.model';
 import type {

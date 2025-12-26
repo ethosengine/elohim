@@ -4,15 +4,15 @@ import { RouterLink, Router, NavigationEnd } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
-import { SessionHumanService } from '../../../imagodei/services/session-human.service';
-import { SessionHuman, HolochainUpgradePrompt } from '../../../imagodei/models/session-human.model';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SessionHuman, HolochainUpgradePrompt } from '@app/imagodei/models/session-human.model';
 import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
-import { HolochainClientService } from '../../services/holochain-client.service';
-import { EdgeNodeDisplayInfo } from '../../models/holochain-connection.model';
-import { SovereigntyBadgeComponent } from '../../../lamad/components/sovereignty-badge/sovereignty-badge.component';
-import { IdentityService } from '../../../imagodei/services/identity.service';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { EdgeNodeDisplayInfo } from '@app/elohim/models/holochain-connection.model';
+import { SovereigntyBadgeComponent } from '@app/lamad/components/sovereignty-badge/sovereignty-badge.component';
+import { IdentityService } from '@app/imagodei/services/identity.service';
 import { RunningContextService } from '@app/doorway/services/running-context.service';
-import { ConnectionIndicatorComponent } from '../../../imagodei/components/connection-indicator/connection-indicator.component';
+import { ConnectionIndicatorComponent } from '@app/imagodei/components/connection-indicator/connection-indicator.component';
 
 /**
  * Context app identifiers for the Elohim Protocol

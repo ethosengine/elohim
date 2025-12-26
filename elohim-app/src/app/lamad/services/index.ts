@@ -54,7 +54,7 @@ export { PracticeService } from './practice.service';
 // Learning points (Shefa integration)
 export { PointsService } from './points.service';
 
-// Local source chain (agent-centric storage) - re-exported from elohim
+/** @deprecated Import from '@app/elohim/services/local-source-chain.service' */
 export { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 
 // Progress migration
@@ -72,12 +72,13 @@ export { StewardService } from './steward.service';
 
 // ============================================================================
 // RE-EXPORTS FROM ELOHIM (Protocol-Core)
+// TODO: Remove these re-exports. Import directly from @app/elohim/services/*
 // ============================================================================
 
-// Data loading
+/** @deprecated Import from '@app/elohim/services/data-loader.service' */
 export { DataLoaderService } from '@app/elohim/services/data-loader.service';
 
-// Also export data types for consumers
+/** @deprecated Import from '@app/elohim/services/data-loader.service' */
 export type {
   AssessmentIndex,
   AssessmentIndexEntry,
@@ -89,38 +90,38 @@ export type {
   GovernanceStateRecord
 } from '@app/elohim/services/data-loader.service';
 
-// Agent management
+/** @deprecated Import from '@app/elohim/services/agent.service' */
 export { AgentService } from '@app/elohim/services/agent.service';
 
-// Elohim agent (AI guardians)
+/** @deprecated Import from '@app/elohim/services/elohim-agent.service' */
 export { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
 
-// Trust indicators
+/** @deprecated Import from '@app/elohim/services/trust-badge.service' */
 export { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
 
 // ============================================================================
 // RE-EXPORTS FROM IMAGODEI (Identity)
+// TODO: Remove these re-exports. Import directly from @app/imagodei/services/*
 // ============================================================================
 
-// Session human (MVP temporary identity)
+/** @deprecated Import from '@app/imagodei/services/session-human.service' */
 export { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
-// Profile (human-centered identity view, Imago Dei aligned)
-// Note: ProfileService is in elohim/services (cross-pillar service)
+/** @deprecated Import from '@app/elohim/services/profile.service' - Note: should move to imagodei */
 export { ProfileService } from '@app/elohim/services/profile.service';
 
 // ============================================================================
 // RE-EXPORTS FROM QAHAL (Community)
+// TODO: Remove these re-exports. Import directly from @app/qahal/services/* or @app/elohim/services/*
 // ============================================================================
 
-// Learning state / affinity tracking
+/** @deprecated Import from '@app/elohim/services/affinity-tracking.service' */
 export { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 
-// Human consent (graduated intimacy)
-// Note: HumanConsentService is in elohim/services (cross-pillar service)
+/** @deprecated Import from '@app/elohim/services/human-consent.service' */
 export { HumanConsentService } from '@app/elohim/services/human-consent.service';
 
-// Governance (challenges, proposals, precedents, deliberation)
-// Note: GovernanceService is in elohim/services (cross-pillar service)
+/** @deprecated Import from '@app/elohim/services/governance.service' */
 export { GovernanceService } from '@app/elohim/services/governance.service';
+/** @deprecated Import from '@app/elohim/services/governance.service' */
 export type { ChallengeSubmission, ProposalSubmission, Vote, DiscussionMessage } from '@app/elohim/services/governance.service';
