@@ -1,16 +1,16 @@
 /**
- * Perseus Element Loader - Lazy loads React and Perseus.
+ * Perseus Element Loader - Loads Perseus plugin from external bundle.
  *
- * This module provides lazy loading of the Perseus custom element,
- * ensuring React and Perseus are only bundled/loaded when needed.
+ * This module provides lazy loading of the Perseus custom element from
+ * an external UMD bundle, ensuring React and Perseus are only loaded when needed.
  *
- * The actual React component is in perseus-element.tsx which will
- * be dynamically imported when registerPerseusElement is called.
+ * The actual Perseus React component is in the @elohim/perseus-plugin package,
+ * which is built separately and loaded at runtime via script tag.
  */
 
 import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
 
-// Re-export types
+// Re-export types for consumers
 export type { PerseusItem, PerseusScoreResult };
 
 /**
@@ -32,31 +32,78 @@ export interface PerseusQuestionElement extends HTMLElement {
 let loadPromise: Promise<void> | null = null;
 let isRegistered = false;
 
+// Configuration - can be overridden via window globals before loading
+const getPerseusPluginUrl = (): string => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (window as any)['__PERSEUS_PLUGIN_URL__'] as string
+    || '/assets/perseus-plugin/perseus-plugin.umd.js';
+};
+
 /**
- * Lazily register the Perseus custom element.
+ * Load an external script by URL.
+ */
+function loadScript(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // Check if already loaded
+    if (document.querySelector(`script[src="${url}"]`)) {
+      resolve();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = url;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
+    document.head.appendChild(script);
+  });
+}
+
+/**
+ * Lazily register the Perseus custom element by loading the external bundle.
  *
- * This function dynamically imports React and the Perseus element,
- * ensuring they're only loaded when actually needed.
+ * This function loads the Perseus plugin UMD bundle from /assets/perseus-plugin/
+ * which contains React and all Khan Academy dependencies.
  *
  * @returns Promise that resolves when the element is registered
  */
 export async function registerPerseusElement(): Promise<void> {
-  if (isRegistered) {
+  // Already registered
+  if (isRegistered || customElements.get('perseus-question')) {
+    isRegistered = true;
     return;
   }
 
+  // Loading in progress
   if (loadPromise) {
     return loadPromise;
   }
 
   loadPromise = (async () => {
     try {
-      // Dynamically import the TSX module which contains React
-      const module = await import('./perseus-element');
-      module.registerPerseusElement();
+      const pluginUrl = getPerseusPluginUrl();
+      console.log('[Perseus] Loading plugin from:', pluginUrl);
+
+      // Load the UMD bundle - it auto-registers the custom element
+      await loadScript(pluginUrl);
+
+      // Wait a moment for the element to register (async registration in bundle)
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Verify registration
+      if (!customElements.get('perseus-question')) {
+        // Try waiting a bit longer
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        if (!customElements.get('perseus-question')) {
+          throw new Error('Perseus custom element not registered after bundle load');
+        }
+      }
+
       isRegistered = true;
+      console.log('[Perseus] Plugin loaded successfully');
     } catch (error) {
-      console.error('[Perseus] Failed to load Perseus element:', error);
+      console.error('[Perseus] Failed to load plugin:', error);
       loadPromise = null;
       throw error;
     }

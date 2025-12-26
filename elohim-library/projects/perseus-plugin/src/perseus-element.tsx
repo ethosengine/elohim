@@ -26,9 +26,7 @@ import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Type Definitions for Perseus (dynamic import)
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Perseus renderer API reference type.
@@ -52,9 +50,7 @@ interface PerseusItemWrapperProps {
   reviewMode?: boolean;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // React Wrapper Component
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Internal React component that renders Perseus ItemRenderer.
@@ -131,7 +127,7 @@ function PerseusItemWrapper({
   if (error) {
     return (
       <div className="perseus-error">
-        <span className="perseus-error-icon">⚠</span>
+        <span className="perseus-error-icon">!</span>
         <span>{error}</span>
       </div>
     );
@@ -185,9 +181,7 @@ function PerseusItemWrapper({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Custom Element Definition
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * PerseusQuestionElement - Web Component wrapper for Perseus.
@@ -242,9 +236,7 @@ class PerseusQuestionElement extends HTMLElement {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
   // Public Properties
-  // ─────────────────────────────────────────────────────────────────────────
 
   /**
    * Set the Perseus item to render.
@@ -291,9 +283,7 @@ class PerseusQuestionElement extends HTMLElement {
     return this._reviewMode;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
   // Public Methods
-  // ─────────────────────────────────────────────────────────────────────────
 
   /**
    * Score the current answer and return the result.
@@ -346,9 +336,7 @@ class PerseusQuestionElement extends HTMLElement {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
   // Private Methods
-  // ─────────────────────────────────────────────────────────────────────────
 
   private render(): void {
     if (!this.root) return;
@@ -458,9 +446,14 @@ class PerseusQuestionElement extends HTMLElement {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Registration
-// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Check if the Perseus element is registered.
+ */
+export function isPerseusElementRegistered(): boolean {
+  return !!customElements.get('perseus-question');
+}
 
 /**
  * Register the custom element if not already registered.
@@ -468,6 +461,7 @@ class PerseusQuestionElement extends HTMLElement {
 export function registerPerseusElement(): void {
   if (!customElements.get('perseus-question')) {
     customElements.define('perseus-question', PerseusQuestionElement);
+    console.log('[Perseus Plugin] Custom element registered');
   }
 }
 

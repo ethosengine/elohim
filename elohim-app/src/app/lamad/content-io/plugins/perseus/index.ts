@@ -23,9 +23,13 @@ export * from './perseus-item.model';
 export { PerseusWrapperComponent } from './perseus-wrapper.component';
 export { PerseusRendererComponent } from './perseus-renderer.component';
 
-// Custom Element
-export { registerPerseusElement } from './perseus-element';
-export type { PerseusQuestionElement } from './perseus-element';
+// Custom Element Loader (loads external bundle)
+export {
+  registerPerseusElement,
+  isPerseusElementRegistered,
+  getPerseusElement
+} from './perseus-element-loader';
+export type { PerseusQuestionElement } from './perseus-element-loader';
 
 // Plugin
 export { PerseusFormatPlugin } from './perseus-format.plugin';

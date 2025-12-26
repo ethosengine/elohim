@@ -29,6 +29,11 @@
                 "glob": "**/*",
                 "input": "src/assets",
                 "output": "/assets"
+              },
+              {
+                "glob": "**/*",
+                "input": "../elohim-library/projects/perseus-plugin/dist",
+                "output": "/assets/perseus-plugin"
               }
             ],
             "styles": [
