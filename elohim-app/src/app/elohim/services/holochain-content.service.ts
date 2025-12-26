@@ -292,6 +292,92 @@ export interface QueryAttestationsInput {
 }
 
 // =============================================================================
+// Holochain Content Attestation Types (Trust claims about content)
+// =============================================================================
+
+/**
+ * ContentAttestation entry as stored in Holochain
+ * Matches ContentAttestation struct in integrity zome
+ *
+ * Different from HolochainAttestationEntry which is for agents:
+ * - HolochainAttestationEntry = credentials granted to AGENTS
+ * - HolochainContentAttestationEntry = trust claims about CONTENT
+ */
+export interface HolochainContentAttestationEntry {
+  id: string;
+  content_id: string;
+  attestation_type: string;        // author-verified, steward-approved, etc.
+  reach_granted: string;           // private, local, community, commons
+  granted_by_json: string;         // AttestationGrantor serialized
+  granted_at: string;
+  expires_at: string | null;
+  status: string;                  // active, expired, revoked, superseded
+  revocation_json: string | null;  // AttestationRevocation if revoked
+  evidence_json: string | null;    // AttestationEvidence
+  scope_json: string | null;       // AttestationScope (optional)
+  metadata_json: string;
+  created_at: string;
+  updated_at: string;
+  schema_version: number;
+  validation_status: string;
+}
+
+/**
+ * Output from content attestation retrieval zome calls
+ */
+export interface HolochainContentAttestationOutput {
+  action_hash: Uint8Array;
+  entry_hash: Uint8Array;
+  content_attestation: HolochainContentAttestationEntry;
+}
+
+/**
+ * Input for creating a content attestation
+ */
+export interface CreateContentAttestationInput {
+  id?: string;
+  content_id: string;
+  attestation_type: string;
+  reach_granted: string;
+  granted_by_json: string;
+  expires_at?: string;
+  evidence_json?: string;
+  scope_json?: string;
+  metadata_json?: string;
+}
+
+/**
+ * Input for querying content attestations
+ */
+export interface QueryContentAttestationsInput {
+  content_id?: string;
+  attestation_type?: string;
+  reach_granted?: string;
+  status?: string;
+  limit?: number;
+}
+
+/**
+ * Input for updating a content attestation
+ */
+export interface UpdateContentAttestationInput {
+  id: string;
+  status?: string;
+  revocation_json?: string;
+  metadata_json?: string;
+}
+
+/**
+ * Input for revoking a content attestation
+ */
+export interface RevokeContentAttestationInput {
+  id: string;
+  revoked_by: string;
+  reason: string;
+  appealable: boolean;
+}
+
+// =============================================================================
 // Holochain Relationship/Graph Types (match Rust DNA structures)
 // =============================================================================
 
@@ -1223,6 +1309,112 @@ export class HolochainContentService {
 
     if (!result.success || !result.data) {
       return [];
+    }
+
+    return result.data;
+  }
+
+  // ===========================================================================
+  // Content Attestation Methods (Trust claims about content)
+  // ===========================================================================
+
+  /**
+   * Create a content attestation.
+   */
+  async createContentAttestation(input: CreateContentAttestationInput): Promise<HolochainContentAttestationOutput | null> {
+    const result = await this.holochainClient.callZome<HolochainContentAttestationOutput>({
+      zomeName: 'content_store',
+      fnName: 'create_content_attestation',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Get content attestation by ID.
+   */
+  async getContentAttestationById(id: string): Promise<HolochainContentAttestationOutput | null> {
+    const result = await this.holochainClient.callZome<HolochainContentAttestationOutput | null>({
+      zomeName: 'content_store',
+      fnName: 'get_content_attestation_by_id',
+      payload: id,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Get all attestations for a specific content node.
+   */
+  async getAttestationsForContent(contentId: string): Promise<HolochainContentAttestationOutput[]> {
+    const result = await this.holochainClient.callZome<HolochainContentAttestationOutput[]>({
+      zomeName: 'content_store',
+      fnName: 'get_attestations_for_content',
+      payload: contentId,
+    });
+
+    if (!result.success || !result.data) {
+      return [];
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Query content attestations with filters.
+   */
+  async queryContentAttestations(input: QueryContentAttestationsInput): Promise<HolochainContentAttestationOutput[]> {
+    const result = await this.holochainClient.callZome<HolochainContentAttestationOutput[]>({
+      zomeName: 'content_store',
+      fnName: 'query_content_attestations',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return [];
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Update a content attestation.
+   */
+  async updateContentAttestation(input: UpdateContentAttestationInput): Promise<HolochainContentAttestationOutput | null> {
+    const result = await this.holochainClient.callZome<HolochainContentAttestationOutput>({
+      zomeName: 'content_store',
+      fnName: 'update_content_attestation',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Revoke a content attestation.
+   */
+  async revokeContentAttestation(input: RevokeContentAttestationInput): Promise<HolochainContentAttestationOutput | null> {
+    const result = await this.holochainClient.callZome<HolochainContentAttestationOutput>({
+      zomeName: 'content_store',
+      fnName: 'revoke_content_attestation',
+      payload: input,
+    });
+
+    if (!result.success || !result.data) {
+      return null;
     }
 
     return result.data;

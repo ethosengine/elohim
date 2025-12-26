@@ -10,6 +10,7 @@ import {
   HolochainAttestationEntry,
   HolochainContentGraph,
   HolochainContentGraphNode,
+  HolochainContentAttestationEntry,
 } from './holochain-content.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
@@ -1022,16 +1023,27 @@ export class DataLoaderService {
   /**
    * Load all content attestations.
    *
-   * NOTE: ContentAttestations (trust claims about content) are different from
-   * Agent Attestations (credentials/achievements). Content attestations need
-   * their own entry type in Holochain. For now, returns empty array.
+   * ContentAttestations (trust claims about content) are different from
+   * Agent Attestations (credentials/achievements).
    *
    * Use getAgentAttestations() for agent credentials.
    */
   getAttestations(): Observable<ContentAttestation[]> {
-    // Content attestations need their own entry type - not yet implemented
-    // The zome has Agent attestations, not Content attestations
-    this.attestationCache$ ??= of([]);
+    if (!this.holochainContent.isAvailable()) {
+      this.attestationCache$ ??= of([]);
+      return this.attestationCache$;
+    }
+
+    this.attestationCache$ ??= defer(() =>
+      from(this.holochainContent.queryContentAttestations({ status: 'active' }))
+    ).pipe(
+      map(results => results.map(r => this.transformHolochainContentAttestation(r.content_attestation))),
+      shareReplay(1),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load content attestations:', err);
+        return of([]);
+      })
+    );
     return this.attestationCache$;
   }
 
@@ -1087,8 +1099,60 @@ export class DataLoaderService {
   }
 
   /**
+   * Transform Holochain content attestation entry to frontend ContentAttestation model.
+   */
+  private transformHolochainContentAttestation(hcAtt: HolochainContentAttestationEntry): ContentAttestation {
+    let grantedBy: ContentAttestation['grantedBy'] = { type: 'system', grantorId: 'unknown' };
+    let revocation: ContentAttestation['revocation'] = undefined;
+    let evidence: ContentAttestation['evidence'] = undefined;
+    let scope: ContentAttestation['scope'] = undefined;
+    let metadata: ContentAttestation['metadata'] = {};
+
+    try {
+      grantedBy = JSON.parse(hcAtt.granted_by_json || '{}');
+    } catch { /* ignore */ }
+
+    try {
+      if (hcAtt.revocation_json) {
+        revocation = JSON.parse(hcAtt.revocation_json);
+      }
+    } catch { /* ignore */ }
+
+    try {
+      if (hcAtt.evidence_json) {
+        evidence = JSON.parse(hcAtt.evidence_json);
+      }
+    } catch { /* ignore */ }
+
+    try {
+      if (hcAtt.scope_json) {
+        scope = JSON.parse(hcAtt.scope_json);
+      }
+    } catch { /* ignore */ }
+
+    try {
+      metadata = JSON.parse(hcAtt.metadata_json || '{}');
+    } catch { /* ignore */ }
+
+    return {
+      id: hcAtt.id,
+      contentId: hcAtt.content_id,
+      attestationType: hcAtt.attestation_type as ContentAttestation['attestationType'],
+      reachGranted: hcAtt.reach_granted as ContentAttestation['reachGranted'],
+      grantedBy,
+      grantedAt: hcAtt.granted_at,
+      expiresAt: hcAtt.expires_at ?? undefined,
+      status: hcAtt.status as ContentAttestation['status'],
+      revocation,
+      evidence,
+      scope,
+      metadata,
+    };
+  }
+
+  /**
    * Get attestations for a specific content node.
-   * Filters from the attestation index.
+   * Uses dedicated Holochain query for efficiency.
    */
   getAttestationsForContent(contentId: string): Observable<ContentAttestation[]> {
     // Check local cache first
@@ -1096,11 +1160,21 @@ export class DataLoaderService {
       return of(this.attestationsByContentCache.get(contentId)!);
     }
 
-    return this.getAttestations().pipe(
-      map(attestations => {
-        const filtered = attestations.filter(att => att.contentId === contentId);
-        this.attestationsByContentCache.set(contentId, filtered);
-        return filtered;
+    if (!this.holochainContent.isAvailable()) {
+      return of([]);
+    }
+
+    return defer(() =>
+      from(this.holochainContent.getAttestationsForContent(contentId))
+    ).pipe(
+      map(results => {
+        const attestations = results.map(r => this.transformHolochainContentAttestation(r.content_attestation));
+        this.attestationsByContentCache.set(contentId, attestations);
+        return attestations;
+      }),
+      catchError((err) => {
+        console.warn('[DataLoader] Failed to load attestations for content:', err);
+        return of([]);
       })
     );
   }
