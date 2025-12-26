@@ -2,6 +2,7 @@
 .hero {
   position: relative;
   height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile browsers */
   display: flex;
   align-items: center;
   justify-content: center;

@@ -318,7 +318,6 @@
 .filter-select:hover,
 .filter-select:focus {
   border-color: #007bff;
-  outline: none;
 }
 
 /* Custodians Table */

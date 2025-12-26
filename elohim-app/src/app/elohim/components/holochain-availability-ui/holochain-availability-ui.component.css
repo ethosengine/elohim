@@ -180,7 +180,6 @@
 .features-list summary {
   font-weight: 600;
   padding: 8px 0;
-  outline: none;
   transition: color 0.2s;
 }
 

@@ -27,6 +27,7 @@
 .path-player-container {
   display: flex;
   height: calc(100vh - 64px); /* Adjust based on global header height */
+  height: calc(100dvh - 64px); /* Dynamic viewport height for mobile browsers */
   background-color: var(--lamad-bg-primary, #ffffff);
   overflow: hidden;
   position: relative;

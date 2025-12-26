@@ -143,7 +143,6 @@
 }
 
 .form-input:focus {
-  outline: none;
   border-color: var(--primary-color, #2196f3);
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
@@ -226,7 +225,7 @@
 }
 
 .content-textarea:focus {
-  outline: none;
+  /* Focus handled by global :focus-visible */
 }
 
 .content-textarea.with-line-numbers {
