@@ -14,6 +14,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { IdentityService } from '../../services/identity.service';
 import { SovereigntyService } from '../../services/sovereignty.service';
+import { DiscoveryAttestationService } from '../../../lamad/quiz-engine/services/discovery-attestation.service';
 import {
   type UpdateProfileRequest,
   type ProfileReach,
@@ -21,6 +22,11 @@ import {
   getReachDescription,
   getInitials,
 } from '../../models/identity.model';
+import {
+  type DiscoveryResult,
+  getFrameworkDisplayName,
+  getCategoryIcon,
+} from '../../../lamad/quiz-engine/models/discovery-assessment.model';
 
 @Component({
   selector: 'app-profile',
@@ -32,6 +38,7 @@ import {
 export class ProfileComponent implements OnInit {
   private readonly identityService = inject(IdentityService);
   private readonly sovereigntyService = inject(SovereigntyService);
+  private readonly discoveryService = inject(DiscoveryAttestationService);
   private readonly router = inject(Router);
 
   // ==========================================================================
@@ -69,6 +76,16 @@ export class ProfileComponent implements OnInit {
 
   readonly sovereigntyStage = this.sovereigntyService.currentStage;
   readonly sovereigntyInfo = this.sovereigntyService.stageInfo;
+
+  // ==========================================================================
+  // Discovery Signals
+  // ==========================================================================
+
+  /** Featured discovery results for profile display */
+  readonly discoveryResults = this.discoveryService.featuredResults;
+
+  /** All discovery results */
+  readonly allDiscoveryResults = this.discoveryService.results;
 
   // ==========================================================================
   // Computed
@@ -229,5 +246,37 @@ export class ProfileComponent implements OnInit {
     } catch {
       return dateString;
     }
+  }
+
+  // ==========================================================================
+  // Discovery Helpers
+  // ==========================================================================
+
+  /**
+   * Get framework display name.
+   */
+  getFrameworkName(result: DiscoveryResult): string {
+    return getFrameworkDisplayName(result.framework);
+  }
+
+  /**
+   * Get category icon for a discovery result.
+   */
+  getCategoryIcon(result: DiscoveryResult): string {
+    return getCategoryIcon(result.category);
+  }
+
+  /**
+   * Toggle featured status for a discovery result.
+   */
+  toggleDiscoveryFeatured(resultId: string): void {
+    this.discoveryService.toggleFeatured(resultId);
+  }
+
+  /**
+   * Navigate to discovery assessment.
+   */
+  navigateToDiscovery(): void {
+    this.router.navigate(['/lamad/discovery']);
   }
 }

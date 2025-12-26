@@ -40,7 +40,8 @@ export type AttestationType =
   | 'professional'     // Work credentials and expertise
   | 'emotional'        // Emotional maturity and capacity (trauma support, etc.)
   | 'time-based'       // Sustained engagement over time (consistency, dedication)
-  | 'social-proof';    // Community endorsements
+  | 'social-proof'     // Community endorsements
+  | 'discovery';       // Self-discovery assessments (Enneagram, MBTI, CliftonStrengths, etc.)
 
 /**
  * An earned attestation/achievement/badge
