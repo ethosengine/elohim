@@ -320,24 +320,37 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     cargo --version
 
                                     echo ""
-                                    echo "=== Building zomes (Rust -> WASM) ==="
+                                    echo "=== Building lamad DNA (elohim) ==="
                                     cargo build --release --target wasm32-unknown-unknown
-
-                                    echo ""
-                                    echo "=== Packaging DNA ==="
                                     hc dna pack . -o workdir/lamad.dna
+                                    echo "   ✅ lamad.dna"
 
                                     echo ""
-                                    echo "=== Packaging hApp ==="
+                                    echo "=== Building imagodei DNA ==="
+                                    cd ../imagodei
+                                    cargo build --release --target wasm32-unknown-unknown
+                                    hc dna pack . -o ../elohim/workdir/imagodei.dna
+                                    echo "   ✅ imagodei.dna"
+
+                                    echo ""
+                                    echo "=== Building infrastructure DNA ==="
+                                    cd ../infrastructure
+                                    cargo build --release --target wasm32-unknown-unknown
+                                    hc dna pack . -o ../elohim/workdir/infrastructure.dna
+                                    echo "   ✅ infrastructure.dna"
+
+                                    echo ""
+                                    echo "=== Packaging hApp (all 3 DNAs) ==="
+                                    cd ../elohim
                                     hc app pack workdir -o elohim.happ
 
                                     echo ""
                                     echo "=== Build artifacts ==="
-                                    ls -lh elohim.happ workdir/lamad.dna
+                                    ls -lh elohim.happ workdir/*.dna
                                 '
                             '''
 
-                            archiveArtifacts artifacts: 'elohim.happ,workdir/lamad.dna', allowEmptyArchive: false
+                            archiveArtifacts artifacts: 'elohim.happ,workdir/*.dna', allowEmptyArchive: false
                             stash name: 'happ-bundle', includes: 'elohim.happ'
 
                             def props = loadBuildVars()
