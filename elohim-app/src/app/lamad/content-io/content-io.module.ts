@@ -13,7 +13,8 @@ import { DefaultCodeEditorComponent } from './components/default-code-editor/def
 // Unified format plugins
 import { MarkdownFormatPlugin } from './plugins/markdown/markdown-format.plugin';
 import { GherkinFormatPlugin } from './plugins/gherkin/gherkin-format.plugin';
-// TODO: Perseus plugin requires React dependencies - enable when ready
+// Perseus requires separate bundling due to React + Khan Academy dependencies.
+// See: src/app/lamad/content-io/plugins/perseus/README.md for setup instructions.
 // import { PerseusFormatPlugin } from './plugins/perseus/perseus-format.plugin';
 
 /**
@@ -25,8 +26,7 @@ function initializeFormatPlugins(): void {
   // Register built-in unified plugins
   registry.register(new MarkdownFormatPlugin());
   registry.register(new GherkinFormatPlugin());
-  // TODO: Perseus plugin requires React dependencies - enable when ready
-  // registry.register(new PerseusFormatPlugin());
+  // Perseus loaded separately when enabled (requires React bundling)
 }
 
 /**
