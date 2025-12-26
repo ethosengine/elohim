@@ -13,6 +13,8 @@ import { DefaultCodeEditorComponent } from './components/default-code-editor/def
 // Unified format plugins
 import { MarkdownFormatPlugin } from './plugins/markdown/markdown-format.plugin';
 import { GherkinFormatPlugin } from './plugins/gherkin/gherkin-format.plugin';
+// TODO: Perseus plugin requires React dependencies - enable when ready
+// import { PerseusFormatPlugin } from './plugins/perseus/perseus-format.plugin';
 
 /**
  * Initializer function to register unified format plugins.
@@ -23,6 +25,8 @@ function initializeFormatPlugins(): void {
   // Register built-in unified plugins
   registry.register(new MarkdownFormatPlugin());
   registry.register(new GherkinFormatPlugin());
+  // TODO: Perseus plugin requires React dependencies - enable when ready
+  // registry.register(new PerseusFormatPlugin());
 }
 
 /**

@@ -26,6 +26,14 @@ import {
 } from '../../renderers/renderer-registry.service';
 import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
+// TODO: Quiz engine requires Perseus/React dependencies - enable when ready
+// import { InlineQuizComponent, InlineQuizCompletionEvent } from '../../quiz-engine';
+
+// Temporary stub types until quiz-engine is ready
+interface InlineQuizCompletionEvent {
+  streak: number;
+  totalCorrect: number;
+}
 
 /**
  * LessonViewComponent - Primary atomic content display with exploration.
@@ -59,7 +67,8 @@ import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
     CommonModule,
     RouterModule,
     RelatedConceptsPanelComponent,
-    MiniGraphComponent
+    MiniGraphComponent,
+    // TODO: InlineQuizComponent - requires Perseus/React dependencies
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -104,6 +113,20 @@ import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
             </div>
           }
         </article>
+
+        <!-- Inline quiz for post-content knowledge check -->
+        <!-- TODO: Enable when quiz-engine/Perseus is ready
+        @if (showInlineQuiz && humanId) {
+          <app-inline-quiz
+            [contentId]="content.id"
+            [humanId]="humanId"
+            [targetStreak]="3"
+            [collapseIfAchieved]="true"
+            (completed)="onInlineQuizCompleted($event)"
+            (attestationEarned)="onPracticedAttestation()">
+          </app-inline-quiz>
+        }
+        -->
       </div>
 
       <!-- Exploration panel toggle (mobile) -->
@@ -490,6 +513,12 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
   /** Exploration mode - affects layout */
   @Input() explorationMode: 'path' | 'standalone' = 'path';
 
+  /** Human ID for quiz tracking (required for inline quiz) */
+  @Input() humanId?: string;
+
+  /** Whether to show inline quiz after content */
+  @Input() showInlineQuiz = false;
+
   /** Emitted when user clicks on related content to explore */
   @Output() exploreContent = new EventEmitter<string>();
 
@@ -498,6 +527,12 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
 
   /** Emitted when an interactive renderer completes */
   @Output() complete = new EventEmitter<RendererCompletionEvent>();
+
+  /** Emitted when inline quiz is completed */
+  @Output() quizCompleted = new EventEmitter<InlineQuizCompletionEvent>();
+
+  /** Emitted when practiced attestation is earned from inline quiz */
+  @Output() practicedEarned = new EventEmitter<void>();
 
   /** ViewChild for dynamic renderer injection */
   @ViewChild('rendererHost', { read: ViewContainerRef, static: false })
@@ -560,6 +595,20 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
   }
 
   /**
+   * Handle inline quiz completion.
+   */
+  onInlineQuizCompleted(event: InlineQuizCompletionEvent): void {
+    this.quizCompleted.emit(event);
+  }
+
+  /**
+   * Handle practiced attestation earned from inline quiz.
+   */
+  onPracticedAttestation(): void {
+    this.practicedEarned.emit();
+  }
+
+  /**
    * Get display label for content type.
    */
   getContentTypeLabel(): string {
@@ -571,6 +620,7 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
       'simulation': 'Simulation',
       'video': 'Video',
       'assessment': 'Assessment',
+      'discovery-assessment': 'Self-Discovery', // Enneagram, learning style, etc.
       'organization': 'Organization',
       'book-chapter': 'Chapter',
       'tool': 'Tool',

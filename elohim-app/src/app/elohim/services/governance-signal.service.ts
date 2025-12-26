@@ -251,19 +251,23 @@ export class GovernanceSignalService {
     const agentId = this.getAgentId();
     const signalRecord: LearningSignalRecord = {
       id: `learning-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      pathId: signal.pathId,
-      stepIndex: signal.stepIndex,
       contentId: signal.contentId,
+      signalType: signal.signalType,
+      payload: signal.payload,
       learnerId: agentId,
-      masteryLevel: signal.masteryLevel,
-      timeSpentSeconds: signal.timeSpent,
-      scaffoldingEffective: signal.scaffoldingEffective,
       createdAt: new Date().toISOString(),
     };
 
-    // Save to both content and path indices
+    // Extract pathId from payload if present for path indexing
+    const pathId = signal.payload?.['pathId'] as string | undefined;
+
+    // Save to content index
     const savedToContent = this.saveSignal('learning-signals', signal.contentId, signalRecord);
-    const savedToPath = this.saveSignal('path-learning-signals', signal.pathId, signalRecord);
+
+    // Also save to path index if pathId is provided
+    const savedToPath = pathId
+      ? this.saveSignal('path-learning-signals', pathId, signalRecord)
+      : true;
 
     if (savedToContent) {
       this.invalidateCache(signal.contentId);
@@ -306,10 +310,10 @@ export class GovernanceSignalService {
     const completionRecord: CompletionSignalRecord = {
       id: `completion-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       contentId: signal.contentId,
-      type: signal.type,
+      interactionType: signal.interactionType,
       passed: signal.passed,
       score: signal.score,
-      attempts: signal.attempts,
+      details: signal.details,
       completedBy: agentId,
       completedAt: new Date().toISOString(),
     };
@@ -407,16 +411,27 @@ export class GovernanceSignalService {
             };
           }
 
+          // Helper to extract payload values
+          const getPayloadNumber = (s: LearningSignalRecord, key: string, defaultVal: number): number => {
+            const val = s.payload?.[key];
+            return typeof val === 'number' ? val : defaultVal;
+          };
+          const getPayloadString = (s: LearningSignalRecord, key: string, defaultVal: string): string => {
+            const val = s.payload?.[key];
+            return typeof val === 'string' ? val : defaultVal;
+          };
+
           // Group by step
           const byStep = new Map<number, LearningSignalRecord[]>();
           const uniqueLearners = new Set<string>();
 
           for (const s of signals) {
             uniqueLearners.add(s.learnerId);
-            if (!byStep.has(s.stepIndex)) {
-              byStep.set(s.stepIndex, []);
+            const stepIndex = getPayloadNumber(s, 'stepIndex', 0);
+            if (!byStep.has(stepIndex)) {
+              byStep.set(stepIndex, []);
             }
-            byStep.get(s.stepIndex)!.push(s);
+            byStep.get(stepIndex)!.push(s);
           }
 
           // Compute per-step metrics
@@ -428,17 +443,17 @@ export class GovernanceSignalService {
           for (const [step, stepSignals] of byStep.entries()) {
             completionsByStep[step] = stepSignals.length;
             averageMasteryByStep[step] =
-              stepSignals.reduce((sum, s) => sum + this.masteryToNumber(s.masteryLevel), 0) /
+              stepSignals.reduce((sum, s) => sum + this.masteryToNumber(getPayloadString(s, 'masteryLevel', 'none')), 0) /
               stepSignals.length;
             averageTimeByStep[step] =
-              stepSignals.reduce((sum, s) => sum + s.timeSpentSeconds, 0) / stepSignals.length;
+              stepSignals.reduce((sum, s) => sum + getPayloadNumber(s, 'timeSpentSeconds', 0), 0) / stepSignals.length;
             scaffoldingScoreByStep[step] =
-              stepSignals.reduce((sum, s) => sum + (s.scaffoldingEffective ?? 0.5), 0) /
+              stepSignals.reduce((sum, s) => sum + getPayloadNumber(s, 'scaffoldingEffective', 0.5), 0) /
               stepSignals.length;
           }
 
           // Overall effectiveness
-          const allMasteries = signals.map(s => this.masteryToNumber(s.masteryLevel));
+          const allMasteries = signals.map(s => this.masteryToNumber(getPayloadString(s, 'masteryLevel', 'none')));
           const overallEffectiveness =
             allMasteries.reduce((sum, m) => sum + m, 0) / allMasteries.length;
 
@@ -754,8 +769,10 @@ export class GovernanceSignalService {
     // Weight learning signals
     if (learningSignals.length > 0) {
       const avgMastery =
-        learningSignals.reduce((sum, s) => sum + this.masteryToNumber(s.masteryLevel), 0) /
-        learningSignals.length;
+        learningSignals.reduce((sum, s) => {
+          const masteryLevel = (s.payload?.['masteryLevel'] as string) ?? 'none';
+          return sum + this.masteryToNumber(masteryLevel);
+        }, 0) / learningSignals.length;
       score += avgMastery * 0.6;
       weight += 0.6;
     }
@@ -961,27 +978,23 @@ export interface FeedbackStats {
 }
 
 export interface LearningSignalInput {
-  pathId: string;
-  stepIndex: number;
   contentId: string;
-  masteryLevel: string;
-  timeSpent: number; // seconds
-  scaffoldingEffective?: number; // 0-1
+  signalType: 'content_viewed' | 'progress_update' | 'quiz_attempt' | 'mastery_achieved' | 'interactive_completion';
+  payload: Record<string, unknown>;
 }
 
-export interface LearningSignalRecord extends Omit<LearningSignalInput, 'timeSpent'> {
+export interface LearningSignalRecord extends LearningSignalInput {
   id: string;
   learnerId: string;
-  timeSpentSeconds: number;
   createdAt: string;
 }
 
 export interface CompletionSignalInput {
   contentId: string;
-  type: string; // renderer type
+  interactionType: string; // renderer type
   passed: boolean;
   score?: number;
-  attempts?: number;
+  details?: Record<string, unknown>;
 }
 
 export interface CompletionSignalRecord extends CompletionSignalInput {

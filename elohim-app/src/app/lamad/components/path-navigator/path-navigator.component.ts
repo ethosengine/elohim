@@ -692,7 +692,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     // Emit interactive completion learning signal
     this.governanceSignalService.recordInteractiveCompletion({
       contentId,
-      interactionType: event.interactionType || 'interactive',
+      interactionType: event.type || 'interactive',
       passed: event.passed,
       score: event.score,
       details: {

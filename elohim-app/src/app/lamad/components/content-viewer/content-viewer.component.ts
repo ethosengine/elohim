@@ -250,17 +250,16 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     this.affinityService.incrementAffinity(this.nodeId, affinityDelta);
 
     // Emit governance signal for content effectiveness tracking
-    // Note: attempts may be in details if present
-    const attempts = (event.details?.['attempts'] as number) ?? 1;
     this.signalService.recordInteractiveCompletion({
       contentId: this.nodeId,
-      type: event.type,
+      interactionType: event.type,
       passed: event.passed,
       score: event.score,
-      attempts,
+      details: event.details,
     }).subscribe();
 
     // Check if this triggers an attestation suggestion
+    const attempts = (event.details?.['attempts'] as number) ?? 1;
     this.signalService.checkAttestationTrigger(
       this.nodeId,
       event.score / 100,
@@ -465,7 +464,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   /**
    * Map content type to feedback profile type.
    */
-  private mapContentTypeToProfileType(contentType: string): string {
+  mapContentTypeToProfileType(contentType: string): string {
     const mapping: Record<string, string> = {
       'epic': 'learning-content',
       'feature': 'learning-content',
