@@ -7,4 +7,5 @@
  * - Scoring utilities
  */
 
-export * from './quiz-migration';
+// TODO: Re-enable when Perseus plugin is complete
+// export * from './quiz-migration';

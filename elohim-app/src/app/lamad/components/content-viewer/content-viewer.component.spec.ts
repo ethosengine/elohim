@@ -8,6 +8,7 @@ import { AgentService } from '@app/elohim/services/agent.service';
 import { ContentService } from '../../services/content.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
+import { GovernanceService } from '@app/elohim/services/governance.service';
 import { ContentEditorService } from '../../content-io/services/content-editor.service';
 import { PathContextService } from '../../services/path-context.service';
 import { SeoService } from '../../../services/seo.service';
@@ -22,6 +23,7 @@ describe('ContentViewerComponent', () => {
   let contentServiceSpy: jasmine.SpyObj<ContentService>;
   let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
   let trustBadgeServiceSpy: jasmine.SpyObj<TrustBadgeService>;
+  let governanceServiceSpy: jasmine.SpyObj<GovernanceService>;
   let editorServiceSpy: jasmine.SpyObj<ContentEditorService>;
   let pathContextServiceSpy: jasmine.SpyObj<PathContextService>;
   let rendererRegistrySpy: jasmine.SpyObj<RendererRegistryService>;
@@ -63,8 +65,13 @@ describe('ContentViewerComponent', () => {
 
     const agentSpyObj = jasmine.createSpyObj('AgentService', ['markContentSeen']);
     const contentSpyObj = jasmine.createSpyObj('ContentService', ['getContainingPathsSummary']);
-    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', ['getContent']);
+    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', [
+      'getContent', 'getGovernanceState'
+    ]);
     const trustBadgeSpyObj = jasmine.createSpyObj('TrustBadgeService', ['getBadge']);
+    const governanceSpyObj = jasmine.createSpyObj('GovernanceService', [
+      'getGovernanceState', 'getChallengesForEntity', 'getDiscussionsForEntity'
+    ]);
     const editorSpyObj = jasmine.createSpyObj('ContentEditorService', ['canEdit']);
     const pathContextSpyObj = jasmine.createSpyObj('PathContextService', [
       'startDetour', 'returnToPath'
@@ -89,6 +96,7 @@ describe('ContentViewerComponent', () => {
         { provide: ContentService, useValue: contentSpyObj },
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
         { provide: TrustBadgeService, useValue: trustBadgeSpyObj },
+        { provide: GovernanceService, useValue: governanceSpyObj },
         { provide: ContentEditorService, useValue: editorSpyObj },
         { provide: PathContextService, useValue: pathContextSpyObj },
         { provide: RendererRegistryService, useValue: rendererRegistrySpyObj },
@@ -101,6 +109,7 @@ describe('ContentViewerComponent', () => {
     contentServiceSpy = TestBed.inject(ContentService) as jasmine.SpyObj<ContentService>;
     dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
     trustBadgeServiceSpy = TestBed.inject(TrustBadgeService) as jasmine.SpyObj<TrustBadgeService>;
+    governanceServiceSpy = TestBed.inject(GovernanceService) as jasmine.SpyObj<GovernanceService>;
     editorServiceSpy = TestBed.inject(ContentEditorService) as jasmine.SpyObj<ContentEditorService>;
     pathContextServiceSpy = TestBed.inject(PathContextService) as jasmine.SpyObj<PathContextService>;
     rendererRegistrySpy = TestBed.inject(RendererRegistryService) as jasmine.SpyObj<RendererRegistryService>;
@@ -111,8 +120,12 @@ describe('ContentViewerComponent', () => {
     affinityServiceSpy.getAffinity.and.returnValue(0.5);
     agentServiceSpy.markContentSeen.and.returnValue(of(undefined));
     dataLoaderSpy.getContent.and.returnValue(of(mockContentNode));
+    dataLoaderSpy.getGovernanceState.and.returnValue(of(null));
     contentServiceSpy.getContainingPathsSummary.and.returnValue(of([]));
     trustBadgeServiceSpy.getBadge.and.returnValue(of(null as any));
+    governanceServiceSpy.getGovernanceState.and.returnValue(of(null));
+    governanceServiceSpy.getChallengesForEntity.and.returnValue(of([]));
+    governanceServiceSpy.getDiscussionsForEntity.and.returnValue(of([]));
     editorServiceSpy.canEdit.and.returnValue(false);
     rendererRegistrySpy.getRenderer.and.returnValue(null);
 
