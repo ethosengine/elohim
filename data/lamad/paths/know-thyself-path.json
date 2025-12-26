@@ -1,77 +1,118 @@
 {
   "id": "know-thyself-path",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "title": "Know Thyself: Self-Discovery Journey",
   "description": "A guided journey of self-discovery using validated assessments",
   "purpose": "Build self-knowledge through scientifically-grounded reflection",
   "createdBy": "elohim-curriculum",
   "contributors": [],
   "createdAt": "2025-11-23T00:09:03.478464",
-  "updatedAt": "2025-11-28T00:09:03.478468",
-  "steps": [
+  "updatedAt": "2025-12-26T00:00:00.000Z",
+  "thumbnailUrl": "/images/know-thyself.png",
+  "thumbnailAlt": "Mirror reflecting inner self",
+  "chapters": [
     {
-      "order": 0,
-      "resourceId": "content-self-knowledge-intro",
-      "stepTitle": "The Value of Self-Knowledge",
-      "stepNarrative": "Understand why 'know thyself' remains timeless wisdom",
-      "learningObjectives": [
-        "Appreciate the value of self-knowledge",
-        "Learn about validated assessment instruments"
+      "id": "chapter-1-foundations",
+      "title": "Foundations of Self-Knowledge",
+      "description": "Understanding the value and methods of self-discovery",
+      "order": 1,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "content",
+          "resourceId": "content-self-knowledge-intro",
+          "stepTitle": "The Value of Self-Knowledge",
+          "stepNarrative": "Understand why 'know thyself' remains timeless wisdom",
+          "learningObjectives": [
+            "Appreciate the value of self-knowledge",
+            "Learn about validated assessment instruments"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Read introduction"
+          ],
+          "estimatedTime": "10-15 minutes"
+        }
       ],
-      "optional": false,
-      "completionCriteria": [
-        "Read introduction"
-      ],
-      "estimatedTime": "10-15 minutes"
+      "estimatedDuration": "10-15 minutes"
     },
     {
-      "order": 1,
-      "resourceId": "assessment-values-hierarchy",
-      "stepTitle": "Values Hierarchy Assessment",
-      "stepNarrative": "Discover what you truly value most",
-      "learningObjectives": [
-        "Identify your core values",
-        "Understand how values guide decisions"
-      ],
-      "optional": false,
-      "completionCriteria": [
-        "Complete values assessment"
+      "id": "chapter-2-values",
+      "title": "Discovering Your Values",
+      "description": "Identify and prioritize what matters most to you",
+      "order": 2,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "assessment",
+          "resourceId": "assessment-values-hierarchy",
+          "stepTitle": "Values Hierarchy Assessment",
+          "stepNarrative": "Discover what you truly value most",
+          "learningObjectives": [
+            "Identify your core values",
+            "Understand how values guide decisions"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Complete values assessment"
+          ],
+          "estimatedTime": "20-30 minutes"
+        }
       ],
       "attestationGranted": "values-examined",
-      "estimatedTime": "20-30 minutes"
+      "estimatedDuration": "20-30 minutes"
     },
     {
-      "order": 2,
-      "resourceId": "assessment-attachment-style",
-      "stepTitle": "Attachment Style Exploration",
-      "stepNarrative": "Understand your relationship patterns",
-      "learningObjectives": [
-        "Identify attachment patterns",
-        "Understand impact on relationships"
-      ],
-      "optional": true,
-      "completionCriteria": [
-        "Complete attachment assessment"
+      "id": "chapter-3-relationships",
+      "title": "Understanding Relationships",
+      "description": "Explore your attachment patterns and relationship dynamics",
+      "order": 3,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "assessment",
+          "resourceId": "assessment-attachment-style",
+          "stepTitle": "Attachment Style Exploration",
+          "stepNarrative": "Understand your relationship patterns",
+          "learningObjectives": [
+            "Identify attachment patterns",
+            "Understand impact on relationships"
+          ],
+          "optional": true,
+          "completionCriteria": [
+            "Complete attachment assessment"
+          ],
+          "estimatedTime": "25-35 minutes"
+        }
       ],
       "attestationGranted": "attachment-aware",
-      "contentAccess": "gated",
-      "estimatedTime": "25-35 minutes"
+      "estimatedDuration": "25-35 minutes"
     },
     {
-      "order": 3,
-      "resourceId": "assessment-strengths-finder",
-      "stepTitle": "Character Strengths",
-      "stepNarrative": "Discover your signature strengths",
-      "learningObjectives": [
-        "Identify top character strengths",
-        "Learn to apply strengths intentionally"
-      ],
-      "optional": true,
-      "completionCriteria": [
-        "Complete strengths assessment"
+      "id": "chapter-4-strengths",
+      "title": "Recognizing Your Strengths",
+      "description": "Discover and leverage your character strengths",
+      "order": 4,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "assessment",
+          "resourceId": "assessment-strengths-finder",
+          "stepTitle": "Character Strengths",
+          "stepNarrative": "Discover your signature strengths",
+          "learningObjectives": [
+            "Identify top character strengths",
+            "Learn to apply strengths intentionally"
+          ],
+          "optional": true,
+          "completionCriteria": [
+            "Complete strengths assessment"
+          ],
+          "estimatedTime": "20-30 minutes"
+        }
       ],
       "attestationGranted": "strengths-aware",
-      "estimatedTime": "20-30 minutes"
+      "estimatedDuration": "20-30 minutes"
     }
   ],
   "tags": [
@@ -83,6 +124,7 @@
   "difficulty": "intermediate",
   "estimatedDuration": "2-3 hours",
   "visibility": "public",
+  "pathType": "journey",
   "prerequisitePaths": [
     "elohim-protocol"
   ],
