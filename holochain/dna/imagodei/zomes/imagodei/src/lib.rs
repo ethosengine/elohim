@@ -939,6 +939,353 @@ pub fn get_my_all_mastery(_: ()) -> ExternResult<Vec<ContentMasteryOutput>> {
 }
 
 // =============================================================================
+// ContributorPresence Functions
+// =============================================================================
+
+/// Output from presence operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PresenceOutput {
+    pub action_hash: ActionHash,
+    pub presence: ContributorPresence,
+}
+
+/// Input for creating a contributor presence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatePresenceInput {
+    pub display_name: String,
+    pub external_identifiers_json: Option<String>,
+    pub establishing_content_ids_json: Option<String>,
+    pub note: Option<String>,
+    pub image: Option<String>,
+    pub metadata_json: Option<String>,
+}
+
+/// Input for beginning stewardship
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BeginStewardshipInput {
+    pub presence_id: String,
+    pub steward_agent_id: String,
+    pub commitment_note: Option<String>,
+}
+
+/// Input for initiating a claim
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitiateClaimInput {
+    pub presence_id: String,
+    pub claim_evidence_json: String,
+    pub verification_method: String,
+}
+
+/// Create a new contributor presence (for absent contributors)
+#[hdk_extern]
+pub fn create_contributor_presence(input: CreatePresenceInput) -> ExternResult<PresenceOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Generate unique ID
+    let presence_id = format!("presence-{}", timestamp.replace([':', ' ', '(', ')'], "-"));
+
+    let presence = ContributorPresence {
+        id: presence_id.clone(),
+        display_name: input.display_name,
+        presence_state: "unclaimed".to_string(),
+        external_identifiers_json: input.external_identifiers_json.unwrap_or_else(|| "[]".to_string()),
+        establishing_content_ids_json: input.establishing_content_ids_json.unwrap_or_else(|| "[]".to_string()),
+        established_at: timestamp.clone(),
+        affinity_total: 0,
+        unique_engagers: 0,
+        citation_count: 0,
+        endorsements_json: "[]".to_string(),
+        recognition_score: 0.0,
+        recognition_by_content_json: "{}".to_string(),
+        accumulating_since: timestamp.clone(),
+        last_recognition_at: timestamp.clone(),
+        steward_id: None,
+        stewardship_started_at: None,
+        stewardship_commitment_id: None,
+        stewardship_quality_score: None,
+        claim_initiated_at: None,
+        claim_verified_at: None,
+        claim_verification_method: None,
+        claim_evidence_json: None,
+        claimed_agent_id: None,
+        claim_recognition_transferred_value: None,
+        claim_recognition_transferred_unit: None,
+        claim_facilitated_by: None,
+        invitations_json: "[]".to_string(),
+        note: input.note,
+        image: input.image,
+        metadata_json: input.metadata_json.unwrap_or_else(|| "{}".to_string()),
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::ContributorPresence(presence.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("presence_id", &presence_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPresence, ())?;
+
+    // Create state link
+    let state_anchor = StringAnchor::new("presence_state", "unclaimed");
+    let state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(state_anchor))?;
+    create_link(state_anchor_hash, action_hash.clone(), LinkTypes::PresenceByState, ())?;
+
+    Ok(PresenceOutput { action_hash, presence })
+}
+
+/// Begin stewardship of an unclaimed presence
+#[hdk_extern]
+pub fn begin_stewardship(input: BeginStewardshipInput) -> ExternResult<PresenceOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get the existing presence
+    let existing = get_contributor_presence_by_id(input.presence_id.clone())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Presence not found".to_string())))?;
+
+    if existing.presence.presence_state != "unclaimed" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Can only begin stewardship of unclaimed presences".to_string()
+        )));
+    }
+
+    // Update presence with stewardship info
+    let mut updated = existing.presence.clone();
+    updated.presence_state = "stewarded".to_string();
+    updated.steward_id = Some(input.steward_agent_id.clone());
+    updated.stewardship_started_at = Some(timestamp.clone());
+    updated.updated_at = timestamp;
+
+    // Create new entry
+    let action_hash = create_entry(&EntryTypes::ContributorPresence(updated.clone()))?;
+
+    // Update ID link to point to new entry
+    let id_anchor = StringAnchor::new("presence_id", &input.presence_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    // Delete old link and create new
+    let old_links = get_links(
+        LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToPresence)?,
+        GetStrategy::default(),
+    )?;
+    for link in old_links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPresence, ())?;
+
+    // Update state links
+    let old_state_anchor = StringAnchor::new("presence_state", "unclaimed");
+    let old_state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_state_anchor))?;
+    let old_state_links = get_links(
+        LinkQuery::try_new(old_state_anchor_hash, LinkTypes::PresenceByState)?,
+        GetStrategy::default(),
+    )?;
+    for link in old_state_links {
+        if link.target == existing.action_hash.clone().into() {
+            delete_link(link.create_link_hash, GetOptions::default())?;
+        }
+    }
+
+    let new_state_anchor = StringAnchor::new("presence_state", "stewarded");
+    let new_state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_state_anchor))?;
+    create_link(new_state_anchor_hash, action_hash.clone(), LinkTypes::PresenceByState, ())?;
+
+    // Create steward link
+    let steward_anchor = StringAnchor::new("steward_presences", &input.steward_agent_id);
+    let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor))?;
+    create_link(steward_anchor_hash, action_hash.clone(), LinkTypes::StewardToPresence, ())?;
+
+    Ok(PresenceOutput { action_hash, presence: updated })
+}
+
+/// Get presences by steward ID
+#[hdk_extern]
+pub fn get_presences_by_steward(steward_agent_id: String) -> ExternResult<Vec<PresenceOutput>> {
+    let steward_anchor = StringAnchor::new("steward_presences", &steward_agent_id);
+    let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor))?;
+
+    let query = LinkQuery::try_new(steward_anchor_hash, LinkTypes::StewardToPresence)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(presence) = record.entry().to_app_option::<ContributorPresence>().ok().flatten() {
+                    results.push(PresenceOutput { action_hash, presence });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Initiate a claim on a presence
+#[hdk_extern]
+pub fn initiate_claim(input: InitiateClaimInput) -> ExternResult<PresenceOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+    let agent_info = agent_info()?;
+
+    // Get the existing presence
+    let existing = get_contributor_presence_by_id(input.presence_id.clone())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Presence not found".to_string())))?;
+
+    if existing.presence.presence_state == "claimed" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Presence is already claimed".to_string()
+        )));
+    }
+
+    // Update presence with claim info
+    let mut updated = existing.presence.clone();
+    updated.claim_initiated_at = Some(timestamp.clone());
+    updated.claim_evidence_json = Some(input.claim_evidence_json);
+    updated.claim_verification_method = Some(input.verification_method);
+    updated.claimed_agent_id = Some(agent_info.agent_initial_pubkey.to_string());
+    updated.updated_at = timestamp;
+
+    // Create new entry
+    let action_hash = create_entry(&EntryTypes::ContributorPresence(updated.clone()))?;
+
+    // Update ID link
+    let id_anchor = StringAnchor::new("presence_id", &input.presence_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    let old_links = get_links(
+        LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToPresence)?,
+        GetStrategy::default(),
+    )?;
+    for link in old_links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPresence, ())?;
+
+    Ok(PresenceOutput { action_hash, presence: updated })
+}
+
+/// Verify and complete a claim
+#[hdk_extern]
+pub fn verify_claim(presence_id: String) -> ExternResult<PresenceOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+    let agent_info = agent_info()?;
+
+    // Get the existing presence
+    let existing = get_contributor_presence_by_id(presence_id.clone())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Presence not found".to_string())))?;
+
+    if existing.presence.claimed_agent_id.is_none() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Claim must be initiated first".to_string()
+        )));
+    }
+
+    if existing.presence.presence_state == "claimed" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Presence is already claimed".to_string()
+        )));
+    }
+
+    let old_state = existing.presence.presence_state.clone();
+
+    // Update presence to claimed
+    let mut updated = existing.presence.clone();
+    updated.presence_state = "claimed".to_string();
+    updated.claim_verified_at = Some(timestamp.clone());
+    updated.claim_facilitated_by = Some(agent_info.agent_initial_pubkey.to_string());
+    updated.updated_at = timestamp;
+
+    // Create new entry
+    let action_hash = create_entry(&EntryTypes::ContributorPresence(updated.clone()))?;
+
+    // Update ID link
+    let id_anchor = StringAnchor::new("presence_id", &presence_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    let old_links = get_links(
+        LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToPresence)?,
+        GetStrategy::default(),
+    )?;
+    for link in old_links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPresence, ())?;
+
+    // Update state links
+    let old_state_anchor = StringAnchor::new("presence_state", &old_state);
+    let old_state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_state_anchor))?;
+    let old_state_links = get_links(
+        LinkQuery::try_new(old_state_anchor_hash, LinkTypes::PresenceByState)?,
+        GetStrategy::default(),
+    )?;
+    for link in old_state_links {
+        if link.target == existing.action_hash.clone().into() {
+            delete_link(link.create_link_hash, GetOptions::default())?;
+        }
+    }
+
+    let new_state_anchor = StringAnchor::new("presence_state", "claimed");
+    let new_state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_state_anchor))?;
+    create_link(new_state_anchor_hash, action_hash.clone(), LinkTypes::PresenceByState, ())?;
+
+    // Create claimed agent link
+    if let Some(ref claimed_agent) = updated.claimed_agent_id {
+        let agent_anchor = StringAnchor::new("claimed_agent_presence", claimed_agent);
+        let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
+        create_link(agent_anchor_hash, action_hash.clone(), LinkTypes::ClaimedAgentToPresence, ())?;
+    }
+
+    Ok(PresenceOutput { action_hash, presence: updated })
+}
+
+/// Get contributor presence by ID
+#[hdk_extern]
+pub fn get_contributor_presence_by_id(id: String) -> ExternResult<Option<PresenceOutput>> {
+    let id_anchor = StringAnchor::new("presence_id", &id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToPresence)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(presence) = record.entry().to_app_option::<ContributorPresence>().ok().flatten() {
+                    return Ok(Some(PresenceOutput { action_hash, presence }));
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Get presences by state
+#[hdk_extern]
+pub fn get_presences_by_state(state: String) -> ExternResult<Vec<PresenceOutput>> {
+    let state_anchor = StringAnchor::new("presence_state", &state);
+    let state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(state_anchor))?;
+
+    let query = LinkQuery::try_new(state_anchor_hash, LinkTypes::PresenceByState)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(presence) = record.entry().to_app_option::<ContributorPresence>().ok().flatten() {
+                    results.push(PresenceOutput { action_hash, presence });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// =============================================================================
 // Init
 // =============================================================================
 

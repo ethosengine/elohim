@@ -80,6 +80,25 @@ pub const ATTESTATION_CATEGORIES: [&str; 8] = [
 pub const ATTESTATION_TIERS: [&str; 4] = ["bronze", "silver", "gold", "platinum"];
 
 // =============================================================================
+// ContributorPresence Constants
+// =============================================================================
+
+/// Presence states in the claim lifecycle
+/// UNCLAIMED: Created for absent contributor, recognition accumulating
+/// STEWARDED: A steward is caring for the presence
+/// CLAIMED: Contributor has verified ownership and claimed the presence
+pub const PRESENCE_STATES: [&str; 3] = ["unclaimed", "stewarded", "claimed"];
+
+/// Verification methods for claiming a presence
+pub const CLAIM_VERIFICATION_METHODS: [&str; 5] = [
+    "email",       // Email verification to known address
+    "social",      // Social media proof (Twitter, GitHub, etc.)
+    "attestation", // Vouched by trusted attesters
+    "signature",   // Cryptographic signature proof
+    "manual",      // Manual verification by governance
+];
+
+// =============================================================================
 // Mastery Constants
 // =============================================================================
 
@@ -293,6 +312,69 @@ pub struct ContentMastery {
 }
 
 // =============================================================================
+// ContributorPresence Entry
+// =============================================================================
+
+/// ContributorPresence - Recognition placeholder for absent contributors.
+///
+/// Philosophy:
+/// - Anyone can create a presence for an absent contributor
+/// - Recognition accumulates even while unclaimed
+/// - Stewards care-take presences until the contributor joins
+/// - Contributors can claim their presence and receive accumulated recognition
+///
+/// Lifecycle: UNCLAIMED → STEWARDED → CLAIMED
+///
+/// This enables "recognition before registration" - a key feature for
+/// citing authors, speakers, and contributors who aren't yet on the network.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ContributorPresence {
+    pub id: String,
+    pub display_name: String,
+    pub presence_state: String, // unclaimed, stewarded, claimed
+
+    // === EXTERNAL IDENTITY ===
+    pub external_identifiers_json: String,    // ExternalIdentifier[] as JSON
+    pub establishing_content_ids_json: String, // Content IDs that cite this contributor
+    pub established_at: String,
+
+    // === RECOGNITION ACCUMULATION ===
+    pub affinity_total: i64,         // Total affinity points accumulated
+    pub unique_engagers: u32,        // Count of unique agents who engaged
+    pub citation_count: u32,         // How many times cited in content
+    pub endorsements_json: String,   // Endorsement[] as JSON
+    pub recognition_score: f64,      // Computed recognition score
+    pub recognition_by_content_json: String, // Record<contentId, score> as JSON
+    pub accumulating_since: String,
+    pub last_recognition_at: String,
+
+    // === STEWARDSHIP ===
+    pub steward_id: Option<String>,
+    pub stewardship_started_at: Option<String>,
+    pub stewardship_commitment_id: Option<String>,
+    pub stewardship_quality_score: Option<f64>,
+
+    // === CLAIM PROCESS ===
+    pub claim_initiated_at: Option<String>,
+    pub claim_verified_at: Option<String>,
+    pub claim_verification_method: Option<String>,
+    pub claim_evidence_json: Option<String>,
+    pub claimed_agent_id: Option<String>,
+    pub claim_recognition_transferred_value: Option<i64>,
+    pub claim_recognition_transferred_unit: Option<String>,
+    pub claim_facilitated_by: Option<String>,
+
+    // === METADATA ===
+    pub invitations_json: String, // Invitation[] as JSON
+    pub note: Option<String>,
+    pub image: Option<String>,
+    pub metadata_json: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// =============================================================================
 // Anchor Entry (for link indexing)
 // =============================================================================
 
@@ -327,6 +409,7 @@ pub enum EntryTypes {
     HumanRelationship(HumanRelationship),
     Attestation(Attestation),
     ContentMastery(ContentMastery),
+    ContributorPresence(ContributorPresence),
     StringAnchor(StringAnchor),
 }
 
@@ -367,6 +450,12 @@ pub enum LinkTypes {
     HumanToMastery,          // Anchor(human_id) -> ContentMastery
     ContentToMastery,        // Anchor(content_id) -> ContentMastery
     MasteryByLevel,          // Anchor(level) -> ContentMastery
+
+    // ContributorPresence links
+    IdToPresence,            // Anchor(presence_id) -> ContributorPresence
+    PresenceByState,         // Anchor(state) -> ContributorPresence
+    StewardToPresence,       // Anchor(steward_id) -> ContributorPresence
+    ClaimedAgentToPresence,  // Anchor(claimed_agent_id) -> ContributorPresence
 }
 
 // =============================================================================
@@ -388,6 +477,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::HumanRelationship(rel) => validate_human_relationship(&rel, &action),
                 EntryTypes::Attestation(attestation) => validate_attestation(&attestation),
                 EntryTypes::ContentMastery(mastery) => validate_content_mastery(&mastery),
+                EntryTypes::ContributorPresence(presence) => validate_contributor_presence(&presence),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
@@ -562,6 +652,54 @@ fn validate_content_mastery(mastery: &ContentMastery) -> ExternResult<ValidateCa
     if mastery.freshness_score < 0.0 || mastery.freshness_score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "freshness_score must be between 0.0 and 1.0".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate ContributorPresence entry
+fn validate_contributor_presence(presence: &ContributorPresence) -> ExternResult<ValidateCallbackResult> {
+    if presence.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ContributorPresence ID cannot be empty".to_string(),
+        ));
+    }
+
+    if presence.display_name.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ContributorPresence display_name cannot be empty".to_string(),
+        ));
+    }
+
+    if !PRESENCE_STATES.contains(&presence.presence_state.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid presence_state '{}'. Must be one of: {:?}",
+            presence.presence_state, PRESENCE_STATES
+        )));
+    }
+
+    // Validate claim verification method if claim has been initiated
+    if let Some(ref method) = presence.claim_verification_method {
+        if !CLAIM_VERIFICATION_METHODS.contains(&method.as_str()) {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Invalid claim_verification_method '{}'. Must be one of: {:?}",
+                method, CLAIM_VERIFICATION_METHODS
+            )));
+        }
+    }
+
+    // If claimed, must have claimed_agent_id
+    if presence.presence_state == "claimed" && presence.claimed_agent_id.is_none() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Claimed presence must have claimed_agent_id".to_string(),
+        ));
+    }
+
+    // If stewarded, must have steward_id
+    if presence.presence_state == "stewarded" && presence.steward_id.is_none() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Stewarded presence must have steward_id".to_string(),
         ));
     }
 
