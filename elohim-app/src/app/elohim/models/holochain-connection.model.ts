@@ -90,8 +90,17 @@ export interface HolochainConnection {
   /** Current agent's public key */
   agentPubKey: AgentPubKey | null;
 
-  /** Cell ID for the installed app */
+  /**
+   * Cell ID for the installed app (DEPRECATED - use cellIds map)
+   * @deprecated Use cellIds[roleName] instead for multi-DNA hApps
+   */
   cellId: CellId | null;
+
+  /**
+   * Cell IDs by role name for multi-DNA hApps
+   * Maps role name (e.g., 'lamad', 'infrastructure', 'imagodei') to CellId
+   */
+  cellIds: Map<string, CellId>;
 
   /** App info after installation */
   appInfo: AppInfo | null;
@@ -124,6 +133,12 @@ export interface ZomeCallInput {
 
   /** Payload to send */
   payload: unknown;
+
+  /**
+   * Role name for multi-DNA hApps (e.g., 'lamad', 'infrastructure', 'imagodei')
+   * If not specified, defaults to 'lamad' (the primary content DNA)
+   */
+  roleName?: string;
 }
 
 // =============================================================================
@@ -426,6 +441,7 @@ export const INITIAL_CONNECTION_STATE: HolochainConnection = {
   appWs: null,
   agentPubKey: null,
   cellId: null,
+  cellIds: new Map(),
   appInfo: null,
 };
 

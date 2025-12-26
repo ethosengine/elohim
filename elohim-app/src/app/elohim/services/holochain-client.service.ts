@@ -294,35 +294,45 @@ export class HolochainClientService {
 
       this.updateState({ appInfo });
 
-      // Step 5: Get cell ID from app info
-      const cellId = this.extractCellId(appInfo);
-      if (!cellId) {
-        throw new Error('Could not extract cell ID from app info');
+      // Step 5: Get all cell IDs from app info (multi-DNA support)
+      const cellIds = this.extractAllCellIds(appInfo);
+      if (cellIds.size === 0) {
+        throw new Error('Could not extract any cell IDs from app info');
       }
-      this.updateState({ cellId });
 
-      // Step 6: Grant zome call capability
-      await adminWs.grantZomeCallCapability({
-        cell_id: cellId,
-        cap_grant: {
-          tag: 'browser-signing',
-          functions: { type: 'all' },
-          access: {
-            type: 'assigned',
-            value: {
-              secret: capSecret,
-              assignees: [signingKey],
+      // For backwards compatibility, also set the first cell as 'cellId'
+      const firstCellId = cellIds.values().next().value;
+      this.updateState({ cellId: firstCellId, cellIds });
+
+      console.log('[Holochain] Found', cellIds.size, 'cells:', Array.from(cellIds.keys()));
+
+      // Step 6: Grant zome call capability for ALL cells (multi-DNA)
+      for (const [roleName, cellId] of cellIds) {
+        await adminWs.grantZomeCallCapability({
+          cell_id: cellId,
+          cap_grant: {
+            tag: `browser-signing-${roleName}`,
+            functions: { type: 'all' },
+            access: {
+              type: 'assigned',
+              value: {
+                secret: capSecret,
+                assignees: [signingKey],
+              },
             },
           },
-        },
-      });
+        });
+        console.log(`[Holochain] Granted cap for role '${roleName}'`);
+      }
 
-      // Step 7: Register signing credentials with client
-      setSigningCredentials(cellId, {
-        capSecret,
-        keyPair,
-        signingKey,
-      });
+      // Step 7: Register signing credentials for ALL cells
+      for (const [, cellId] of cellIds) {
+        setSigningCredentials(cellId, {
+          capSecret,
+          keyPair,
+          signingKey,
+        });
+      }
 
       // Store credentials for persistence (optional)
       this.storeSigningCredentials({ capSecret, keyPair, signingKey });
@@ -347,9 +357,11 @@ export class HolochainClientService {
         console.log(`[Holochain] Created new app interface on port ${appPort}`);
       }
 
-      // Step 9: Authorize signing credentials for the cell
-      await adminWs.authorizeSigningCredentials(cellId);
-      console.log('[Holochain] Signing credentials authorized');
+      // Step 9: Authorize signing credentials for ALL cells (multi-DNA)
+      for (const [roleName, cellId] of cellIds) {
+        await adminWs.authorizeSigningCredentials(cellId);
+        console.log(`[Holochain] Signing credentials authorized for role '${roleName}'`);
+      }
 
       // Step 10: Get app authentication token
       const issuedToken = await adminWs.issueAppAuthenticationToken({
@@ -426,9 +438,9 @@ export class HolochainClientService {
     const pollInterval = 100;
 
     while (Date.now() - startTime < timeoutMs) {
-      const { state, appWs, cellId } = this.connectionSignal();
+      const { state, appWs, cellIds } = this.connectionSignal();
 
-      if (state === 'connected' && appWs && cellId) {
+      if (state === 'connected' && appWs && cellIds.size > 0) {
         return true;
       }
 
@@ -445,12 +457,20 @@ export class HolochainClientService {
   /**
    * Make a zome call (waits for connection if not yet established)
    * Records performance metrics for all calls.
+   *
+   * For multi-DNA hApps, use input.roleName to specify which DNA to call:
+   * - 'lamad' (default) - Content & Learning DNA (content_store zome)
+   * - 'infrastructure' - Doorway Federation DNA
+   * - 'imagodei' - Identity & Relationships DNA
    */
   async callZome<T>(input: ZomeCallInput): Promise<ZomeCallResult<T>> {
-    let { appWs, cellId, state } = this.connectionSignal();
+    let { appWs, cellIds, state } = this.connectionSignal();
 
     // Record start time for metrics
     const startTime = Date.now();
+
+    // Default to 'lamad' role if not specified (backwards compatibility)
+    const roleName = input.roleName ?? 'lamad';
 
     // Return immediately if in disconnected or error state
     if (state === 'disconnected' || state === 'error') {
@@ -463,7 +483,7 @@ export class HolochainClientService {
     }
 
     // If not connected yet, wait for connection (only if actively connecting)
-    if (!appWs || !cellId) {
+    if (!appWs || cellIds.size === 0) {
       if (state === 'connecting' || state === 'authenticating') {
         console.log('[HolochainClient] Waiting for connection before zome call...');
         const connected = await this.waitForConnection();
@@ -476,16 +496,28 @@ export class HolochainClientService {
           };
         }
         // Re-read connection state after waiting
-        ({ appWs, cellId } = this.connectionSignal());
+        ({ appWs, cellIds } = this.connectionSignal());
       }
     }
 
-    if (!appWs || !cellId) {
+    if (!appWs || cellIds.size === 0) {
       const duration = Date.now() - startTime;
       this.metrics.recordQuery(duration, false);
       return {
         success: false,
         error: 'Not connected to Holochain conductor',
+      };
+    }
+
+    // Look up the correct cell ID for this role
+    const cellId = cellIds.get(roleName);
+    if (!cellId) {
+      const duration = Date.now() - startTime;
+      this.metrics.recordQuery(duration, false);
+      const availableRoles = Array.from(cellIds.keys()).join(', ');
+      return {
+        success: false,
+        error: `No cell found for role '${roleName}'. Available roles: ${availableRoles}`,
       };
     }
 
@@ -545,11 +577,14 @@ export class HolochainClientService {
    * Endpoint: POST /api/v1/zome/{dna_hash}/{zome_name}/{fn_name}
    */
   async callZomeRest<T>(input: ZomeCallInput): Promise<ZomeCallResult<T>> {
-    const { cellId, state } = this.connectionSignal();
+    let { cellIds, state } = this.connectionSignal();
     const startTime = Date.now();
 
-    // Need cellId for DNA hash
-    if (!cellId) {
+    // Default to 'lamad' role if not specified
+    const roleName = input.roleName ?? 'lamad';
+
+    // Need cellIds for DNA hash lookup
+    if (cellIds.size === 0) {
       // If not connected but connecting, wait briefly
       if (state === 'connecting' || state === 'authenticating') {
         const connected = await this.waitForConnection(5000);
@@ -558,23 +593,26 @@ export class HolochainClientService {
           this.metrics.recordQuery(duration, false);
           return { success: false, error: 'Connection timed out' };
         }
+        // Re-read connection state after waiting
+        ({ cellIds } = this.connectionSignal());
       } else {
         const duration = Date.now() - startTime;
         this.metrics.recordQuery(duration, false);
-        return { success: false, error: 'Not connected - no cell ID available' };
+        return { success: false, error: 'Not connected - no cell IDs available' };
       }
     }
 
-    // Get current cellId after potential wait
-    const currentCellId = this.connectionSignal().cellId;
-    if (!currentCellId) {
+    // Look up the correct cell ID for this role
+    const cellId = cellIds.get(roleName);
+    if (!cellId) {
       const duration = Date.now() - startTime;
       this.metrics.recordQuery(duration, false);
-      return { success: false, error: 'No cell ID available' };
+      const availableRoles = Array.from(cellIds.keys()).join(', ');
+      return { success: false, error: `No cell found for role '${roleName}'. Available roles: ${availableRoles}` };
     }
 
     // Build REST API URL
-    const dnaHash = this.uint8ArrayToBase64(currentCellId[0]);
+    const dnaHash = this.uint8ArrayToBase64(cellId[0]);
     const restUrl = this.resolveRestUrl(dnaHash, input.zomeName, input.fnName);
 
     try {
@@ -645,10 +683,12 @@ export class HolochainClientService {
   }
 
   /**
-   * Extract cell ID from app info
+   * Extract cell ID from app info (DEPRECATED - use extractAllCellIds)
    *
    * Holochain cell_info structure (0.6.x):
    * { "role_name": [{ type: "provisioned", value: { cell_id: {...} } }] }
+   *
+   * @deprecated Use extractAllCellIds for multi-DNA hApps
    */
   private extractCellId(appInfo: AppInfo): CellId | null {
     const cellInfoEntries = Object.entries(appInfo.cell_info);
@@ -661,6 +701,37 @@ export class HolochainClientService {
       }
     }
     return null;
+  }
+
+  /**
+   * Extract all cell IDs from app info, keyed by role name.
+   *
+   * For multi-DNA hApps like Elohim, this returns a map:
+   * - 'lamad' → CellId for content/learning DNA
+   * - 'infrastructure' → CellId for doorway/network DNA
+   * - 'imagodei' → CellId for identity DNA
+   *
+   * Holochain cell_info structure (0.6.x):
+   * { "role_name": [{ type: "provisioned", value: { cell_id: [...] } }] }
+   */
+  private extractAllCellIds(appInfo: AppInfo): Map<string, CellId> {
+    const cellIds = new Map<string, CellId>();
+    const cellInfoEntries = Object.entries(appInfo.cell_info);
+
+    for (const [roleName, cells] of cellInfoEntries) {
+      const cellArray = cells as Array<{ type: string; value: { cell_id: CellId } }>;
+      for (const cell of cellArray) {
+        if (cell.type === 'provisioned' && cell.value?.cell_id) {
+          cellIds.set(roleName, cell.value.cell_id);
+          console.log(`[Holochain] Found cell for role '${roleName}':`, {
+            dnaHash: this.uint8ArrayToBase64(cell.value.cell_id[0]).slice(0, 12) + '...',
+          });
+          break; // Only take first provisioned cell per role
+        }
+      }
+    }
+
+    return cellIds;
   }
 
   /**
