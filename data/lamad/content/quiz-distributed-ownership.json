@@ -210,7 +210,7 @@
       }
     }
   ],
-  "contentFormat": "perseus",
+  "contentFormat": "perseus-quiz-json",
   "tags": [
     "quiz",
     "autonomous-entity",

@@ -63,6 +63,11 @@ components:
         # Jenkins integration
         - name: JENKINS_URL
           value: "https://jenkins.ethosengine.com"
+        # SonarQube MCP configuration (SONARQUBE_TOKEN comes from K8s secret)
+        - name: STORAGE_PATH
+          value: /projects/.sonarqube-mcp
+        - name: SONARQUBE_URL
+          value: "https://sonarqube.ethosengine.com"
         # Chrome for Angular testing
         - name: CHROME_BIN
           value: /usr/local/bin/chrome
@@ -130,38 +135,41 @@ commands:
       component: tools
       commandLine: |
         # Create VS Code CLI symlink (code-oss -> code)
-        # ⚠️ REVIEW REQUIRED: If base UBI image changes, verify /checode path exists
-        # See containers/udi-plus/Dockerfile for details
+        # checode only ships ubi8/ubi9 binaries, use ubi9 (forward compatible with ubi10)
         mkdir -p /home/user/.local/bin
-        ln -sf /checode/checode-linux-libc/ubi9/bin/remote-cli/code-oss /home/user/.local/bin/code
+        if [ -f /checode/checode-linux-libc/ubi9/bin/remote-cli/code-oss ]; then
+          ln -sf /checode/checode-linux-libc/ubi9/bin/remote-cli/code-oss /home/user/.local/bin/code
+        fi
+
+        # Link ~/.claude to persistent config dir for VS Code extension IDE detection
+        # The extension uses ~/.claude/ide for IPC sockets, must match CLAUDE_CONFIG_DIR
+        rm -rf /home/user/.claude 2>/dev/null || true
+        ln -sf "$CLAUDE_CONFIG_DIR" /home/user/.claude
+        mkdir -p /home/user/.claude/ide
 
   - id: setup-claude-mcp
     exec:
       component: tools
       workingDir: /projects/elohim
       commandLine: |
-        export STORAGE_PATH=/tmp/sonarqube-mcp-storage
+        # Create persistent storage directory for SonarQube MCP
         mkdir -p "$STORAGE_PATH"
+
+        # Configure SonarQube MCP (env vars from devfile, SONARQUBE_TOKEN from K8s secret)
         claude mcp remove sonarqube 2>/dev/null || true
         claude mcp add sonarqube \
           --env STORAGE_PATH="$STORAGE_PATH" \
           --env SONARQUBE_TOKEN="$SONARQUBE_TOKEN" \
           --env SONARQUBE_URL="$SONARQUBE_URL" \
           -- java -jar /opt/mcp/sonarqube-mcp.jar
-
+        # Configure Jenkins MCP (requires mcp-server plugin and allowTokenAccessWithoutOicSession)
         claude mcp remove jenkins 2>/dev/null || true
-
-        export JENKINS_AUTH=$(echo -n "$JENKINS_USERNAME:$JENKINS_TOKEN" | base64)
-
-        # Add Jenkins MCP server using HTTP transport,
-        # connection might fail if the jenkins user (token owner) does not have an active oidc session
-        claude mcp add jenkins "$JENKINS_URL/mcp-server/mcp" \
-          --transport http \
-          --header "Authorization: Basic $JENKINS_AUTH" \
-          --env JENKINS_URL="$JENKINS_URL" \
-          --env JENKINS_USERNAME="$JENKINS_USERNAME" \
-          --env JENKINS_TOKEN="$JENKINS_TOKEN"
-
+        if [ -n "$JENKINS_USERNAME" ] && [ -n "$JENKINS_TOKEN" ]; then
+          JENKINS_AUTH=$(echo -n "$JENKINS_USERNAME:$JENKINS_TOKEN" | base64)
+          claude mcp add jenkins "$JENKINS_URL/mcp-server/mcp" \
+            --transport http \
+            --header "Authorization: Basic $JENKINS_AUTH"
+        fi
   - id: start-doorway
     exec:
       component: tools
@@ -189,8 +197,8 @@ commands:
       commandLine: |
         npm install && npm run seed
 
-#events:
-#  postStart:
-#    - setup-vscode-cli
+events:
+  postStart:
+    - setup-vscode-cli
 #    - setup-npm-env
-#    - setup-claude-mcp
+    - setup-claude-mcp

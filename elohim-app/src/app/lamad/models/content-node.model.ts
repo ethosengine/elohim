@@ -521,13 +521,12 @@ export type ContentFormat =
   | 'video-embed'
   | 'video-file'
   | 'audio-file'
-  | 'quiz-json'
+  | 'perseus-quiz-json'  // Khan Academy Perseus quiz format
   | 'external-link'
   | 'epub'
   | 'gherkin'
   | 'html'
-  | 'plaintext'
-  | 'assessment-json';
+  | 'plaintext';
 
 /**
  * ContentPreview - Lightweight preview data for listing/composing content.

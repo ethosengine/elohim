@@ -36,8 +36,7 @@ export type ContentFormat =
   | 'plaintext'
   | 'video-embed'
   | 'external-link'
-  | 'quiz-json'
-  | 'assessment-json';
+  | 'perseus-quiz-json';  // Khan Academy Perseus quiz format
 
 /**
  * Content reach level - visibility scope

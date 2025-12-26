@@ -352,7 +352,7 @@
       }
     }
   ],
-  "contentFormat": "perseus",
+  "contentFormat": "perseus-quiz-json",
   "tags": [
     "quiz",
     "governance",

@@ -335,7 +335,7 @@
       }
     }
   ],
-  "contentFormat": "perseus",
+  "contentFormat": "perseus-quiz-json",
   "tags": [
     "assessment",
     "strengths",

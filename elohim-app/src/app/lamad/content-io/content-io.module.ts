@@ -20,13 +20,21 @@ import { PerseusFormatPlugin } from './plugins/perseus/perseus-format.plugin';
 /**
  * Initializer function to register unified format plugins.
  * This ensures plugins are registered before any component tries to use them.
+ *
+ * Architecture: Content formats describe the DATA SCHEMA (what the content IS),
+ * while renderers describe HOW to display that data. Aliases map formats to renderers.
  */
 function initializeFormatPlugins(): void {
   const registry = inject(ContentFormatRegistryService);
+
   // Register built-in unified plugins
   registry.register(new MarkdownFormatPlugin());
   registry.register(new GherkinFormatPlugin());
   registry.register(new PerseusFormatPlugin());
+
+  // Register format aliases: map data formats to their renderers
+  // This keeps content storage format-agnostic while providing flexible rendering
+  registry.registerAlias('perseus-quiz-json', 'perseus'); // Perseus quiz data schema → Perseus renderer
 }
 
 /**
