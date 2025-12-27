@@ -76,18 +76,20 @@ async function main() {
     process.exit(1);
   }
 
+  const pathResult = result as { path: any; steps: any[] };
+
   console.log('\n📋 Path data from Holochain:');
-  console.log('  id:', result.path.id);
-  console.log('  title:', result.path.title);
-  console.log('  steps:', result.steps?.length || 0);
-  console.log('  metadata_json RAW:', JSON.stringify(result.path.metadata_json));
-  console.log('  metadata_json value:', result.path.metadata_json);
-  console.log('  All path keys:', Object.keys(result.path));
+  console.log('  id:', pathResult.path.id);
+  console.log('  title:', pathResult.path.title);
+  console.log('  steps:', pathResult.steps?.length || 0);
+  console.log('  metadata_json RAW:', JSON.stringify(pathResult.path.metadata_json));
+  console.log('  metadata_json value:', pathResult.path.metadata_json);
+  console.log('  All path keys:', Object.keys(pathResult.path));
 
   // Parse metadata
-  if (result.path.metadata_json) {
+  if (pathResult.path.metadata_json) {
     try {
-      const meta = JSON.parse(result.path.metadata_json);
+      const meta = JSON.parse(pathResult.path.metadata_json);
       console.log('  chapters in metadata:', meta.chapters?.length || 0);
     } catch (e) {
       console.log('  ⚠️ Failed to parse metadata_json');

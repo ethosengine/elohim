@@ -38,7 +38,7 @@ async function main() {
     console.error('Could not get cell info');
     process.exit(1);
   }
-  const cellId = cellInfo.provisioned.cell_id;
+  const cellId = (cellInfo as { provisioned: { cell_id: any } }).provisioned.cell_id;
 
   // Get path with steps
   const result = await appWs.callZome({

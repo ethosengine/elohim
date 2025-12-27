@@ -78,7 +78,7 @@ async function main() {
     console.error('Could not get cell info');
     process.exit(1);
   }
-  const cellId = cellInfo.provisioned.cell_id;
+  const cellId = (cellInfo as { provisioned: { cell_id: any } }).provisioned.cell_id;
   console.log(`📦 Using cell: ${encodeHashToBase64(cellId[0]).slice(0, 15)}...`);
 
   // Load elohim-protocol.json

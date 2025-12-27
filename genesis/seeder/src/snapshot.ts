@@ -346,7 +346,7 @@ async function restoreSnapshot(name?: string): Promise<void> {
       if (metadata.seedDuration) {
         console.log(`   Original seed time: ${metadata.seedDuration}`);
       }
-      if (metadata.seedReport?.skippedFiles?.total > 0) {
+      if (metadata.seedReport?.skippedFiles?.total && metadata.seedReport.skippedFiles.total > 0) {
         console.log(`   Skipped files: ${metadata.seedReport.skippedFiles.total}`);
       }
     }
@@ -433,7 +433,7 @@ function showStatus(): void {
             console.log(`      Errors: ${r.conceptErrors} concept, ${r.pathErrors} path`);
           }
         }
-        if (snap.metadata.seedReport?.skippedFiles?.total > 0) {
+        if (snap.metadata.seedReport?.skippedFiles?.total && snap.metadata.seedReport.skippedFiles.total > 0) {
           console.log(`      Skipped: ${snap.metadata.seedReport.skippedFiles.total} files`);
         }
       }
@@ -511,7 +511,7 @@ async function saveSnapshot(name?: string): Promise<void> {
       console.log(`      Paths: ${pathCount} created, ${seedReport?.results?.pathErrors || 0} errors`);
       console.log(`      Duration: ${seedDuration}`);
 
-      if (seedReport?.skippedFiles?.total > 0) {
+      if (seedReport?.skippedFiles?.total && seedReport.skippedFiles.total > 0) {
         console.log(`      Skipped files: ${seedReport.skippedFiles.total}`);
       }
     } catch (err) {
