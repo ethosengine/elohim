@@ -194,6 +194,16 @@ spec:
         buildDiscarder(logRotator(numToKeepStr: '20'))
     }
 
+    triggers {
+        // Only run when upstream pipelines succeed:
+        // - elohim-holochain: provides the doorway/edgenode for seeding
+        // - elohim: provides the app for BDD tests
+        upstream(
+            upstreamProjects: "elohim-holochain/${env.BRANCH_NAME},elohim/${env.BRANCH_NAME}",
+            threshold: hudson.model.Result.SUCCESS
+        )
+    }
+
     stages {
         stage('Checkout') {
             steps {
