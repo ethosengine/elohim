@@ -2,7 +2,6 @@
 
 pub mod admin;
 pub mod api;
-pub mod apps;
 pub mod auth_routes;
 pub mod blob;
 pub mod dashboard_ws;
