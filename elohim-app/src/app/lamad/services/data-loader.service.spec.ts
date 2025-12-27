@@ -4,9 +4,10 @@ import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { HolochainContentService } from '@app/elohim/services/holochain-content.service';
 import { IndexedDBCacheService } from '@app/elohim/services/indexeddb-cache.service';
 import { ProjectionAPIService } from '@app/elohim/services/projection-api.service';
+import { ContentResolverService, SourceTier } from '@app/elohim/services/content-resolver.service';
 import { LearningPath, PathIndex, ContentNode } from '../models';
 import { AgentProgress } from '@app/elohim/models/agent.model';
-import { of, throwError } from 'rxjs';
+import { of, throwError, BehaviorSubject } from 'rxjs';
 
 describe('DataLoaderService', () => {
   let service: DataLoaderService;
@@ -14,6 +15,7 @@ describe('DataLoaderService', () => {
   let mockHolochainContent: jasmine.SpyObj<HolochainContentService>;
   let mockIndexedDBCache: jasmine.SpyObj<IndexedDBCacheService>;
   let mockProjectionApi: jasmine.SpyObj<ProjectionAPIService>;
+  let mockContentResolver: jasmine.SpyObj<ContentResolverService>;
   const basePath = '/assets/lamad-data';
 
   const mockContent: ContentNode = {
@@ -78,6 +80,17 @@ describe('DataLoaderService', () => {
       enabled: false  // Disabled by default so tests use Holochain path
     });
 
+    mockContentResolver = jasmine.createSpyObj('ContentResolverService', [
+      'initialize',
+      'resolveContent',
+      'resolvePath',
+      'cacheContent',
+      'cachePath'
+    ], {
+      isReady: true,
+      state$: new BehaviorSubject('ready').asObservable()
+    });
+
     // Projection API mock returns (disabled by default)
     mockProjectionApi.getContent.and.returnValue(of(null));
     mockProjectionApi.queryContent.and.returnValue(of([]));
@@ -106,13 +119,21 @@ describe('DataLoaderService', () => {
     mockIndexedDBCache.getStats.and.returnValue(Promise.resolve({ contentCount: 0, pathCount: 0, isAvailable: false }));
     mockIndexedDBCache.clearAll.and.returnValue(Promise.resolve());
 
+    // ContentResolver mock returns
+    mockContentResolver.initialize.and.returnValue(Promise.resolve({ success: true, implementation: 'typescript' }));
+    mockContentResolver.resolveContent.and.returnValue(Promise.resolve(null));
+    mockContentResolver.resolvePath.and.returnValue(Promise.resolve(null));
+    mockContentResolver.cacheContent.and.returnValue(Promise.resolve());
+    mockContentResolver.cachePath.and.returnValue(Promise.resolve());
+
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
       providers: [
         DataLoaderService,
         { provide: HolochainContentService, useValue: mockHolochainContent },
         { provide: IndexedDBCacheService, useValue: mockIndexedDBCache },
-        { provide: ProjectionAPIService, useValue: mockProjectionApi }
+        { provide: ProjectionAPIService, useValue: mockProjectionApi },
+        { provide: ContentResolverService, useValue: mockContentResolver }
       ]
     });
 
@@ -129,62 +150,79 @@ describe('DataLoaderService', () => {
   });
 
   describe('getPath', () => {
-    it('should load path from Holochain', (done) => {
-      const mockHcPath = {
-        action_hash: new Uint8Array(),
-        path: {
-          id: 'test-path',
-          version: '1.0.0',
-          title: 'Test Path',
-          description: 'A test path',
-          purpose: 'Testing',
-          created_by: 'test-agent',
-          difficulty: 'beginner',
-          estimated_duration: '1 hour',
-          visibility: 'public',
-          path_type: 'journey',
-          tags: ['test'],
-          created_at: '2025-01-01T00:00:00.000Z',
-          updated_at: '2025-01-01T00:00:00.000Z',
-        },
-        steps: [],
+    it('should load path via ContentResolver', (done) => {
+      const mockPath: LearningPath = {
+        id: 'test-path',
+        version: '1.0.0',
+        title: 'Test Path',
+        description: 'A test path',
+        purpose: 'Testing',
+        createdBy: 'test-agent',
+        contributors: [],
+        difficulty: 'beginner',
+        estimatedDuration: '1 hour',
+        visibility: 'public',
+        pathType: 'journey',
+        tags: ['test'],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+        steps: []
       };
 
-      (mockHolochainContent.getPathWithSteps as jasmine.Spy).and.returnValue(Promise.resolve(mockHcPath));
+      // ContentResolver returns path with resolution metadata
+      mockContentResolver.resolvePath.and.returnValue(Promise.resolve({
+        data: mockPath,
+        sourceId: 'conductor',
+        tier: SourceTier.Authoritative,
+        durationMs: 50
+      }));
 
       service.getPath('test-path').subscribe(path => {
         expect(path.id).toBe('test-path');
         expect(path.title).toBe('Test Path');
+        expect(mockContentResolver.resolvePath).toHaveBeenCalledWith('test-path');
         done();
       });
     });
   });
 
   describe('getContent', () => {
-    it('should load content from Holochain', (done) => {
-      mockHolochainContent.getContent.and.returnValue(of(mockContent));
+    it('should load content via ContentResolver', (done) => {
+      // ContentResolver returns content with resolution metadata
+      mockContentResolver.resolveContent.and.returnValue(Promise.resolve({
+        data: mockContent,
+        sourceId: 'conductor',
+        tier: SourceTier.Authoritative,
+        durationMs: 50
+      }));
 
       service.getContent('test-content').subscribe(content => {
         expect(content).toEqual(mockContent);
-        expect(mockHolochainContent.getContent).toHaveBeenCalledWith('test-content');
+        expect(mockContentResolver.resolveContent).toHaveBeenCalledWith('test-content');
         done();
       });
     });
 
-    it('should cache content requests', (done) => {
-      mockHolochainContent.getContent.and.returnValue(of(mockContent));
+    it('should cache content requests in memory', (done) => {
+      mockContentResolver.resolveContent.and.returnValue(Promise.resolve({
+        data: mockContent,
+        sourceId: 'conductor',
+        tier: SourceTier.Authoritative,
+        durationMs: 50
+      }));
 
       service.getContent('test-content').subscribe();
       service.getContent('test-content').subscribe(content => {
         expect(content).toEqual(mockContent);
-        // Should only call Holochain once due to caching
-        expect(mockHolochainContent.getContent).toHaveBeenCalledTimes(1);
+        // Should only call resolver once due to in-memory caching
+        expect(mockContentResolver.resolveContent).toHaveBeenCalledTimes(1);
         done();
       });
     });
 
     it('should return placeholder when content not found', (done) => {
-      mockHolochainContent.getContent.and.returnValue(of(null));
+      // Resolver returns null when content not found
+      mockContentResolver.resolveContent.and.returnValue(Promise.resolve(null));
 
       service.getContent('missing-content').subscribe({
         next: content => {

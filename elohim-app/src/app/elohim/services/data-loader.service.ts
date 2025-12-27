@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, of, from, defer, throwError, timer, forkJoin, firstValueFrom } from 'rxjs';
+import { Observable, of, from, defer, throwError, timer, forkJoin } from 'rxjs';
 import { catchError, map, shareReplay, timeout, retry, tap, switchMap, take } from 'rxjs/operators';
 import {
   HolochainContentService,
@@ -14,6 +14,7 @@ import {
 } from './holochain-content.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
+import { ContentResolverService, SourceTier } from './content-resolver.service';
 
 // Models from elohim (local)
 import { Agent, AgentProgress, AgentAttestation } from '../models/agent.model';
@@ -201,27 +202,46 @@ export class DataLoaderService {
   /** Projection API service for fast cached reads */
   private readonly projectionApi = inject(ProjectionAPIService);
 
+  /** Content Resolver for unified tiered resolution */
+  private readonly contentResolver = inject(ContentResolverService);
+
   constructor(
     private readonly holochainContent: HolochainContentService,
     private readonly idbCache: IndexedDBCacheService
   ) {
-    // Initialize IndexedDB cache in background
-    this.initIndexedDB();
+    // Initialize caches in background
+    this.initCaches();
   }
 
   /**
-   * Initialize IndexedDB cache.
+   * Initialize caches and content resolver.
    * Non-blocking - app continues to work without persistent cache if it fails.
    */
-  private async initIndexedDB(): Promise<void> {
+  private async initCaches(): Promise<void> {
     try {
+      // Initialize IndexedDB
       this.idbInitialized = await this.idbCache.init();
       if (this.idbInitialized) {
         const stats = await this.idbCache.getStats();
         console.log('[DataLoader] IndexedDB cache initialized:', stats);
       }
-    } catch {
-      console.warn('[DataLoader] IndexedDB initialization failed, using memory-only cache');
+
+      // Initialize ContentResolver and register sources
+      await this.contentResolver.initialize();
+      this.contentResolver.registerStandardSource('indexeddb');
+      if (this.projectionApi.enabled) {
+        this.contentResolver.registerStandardSource('projection');
+      }
+      this.contentResolver.registerStandardSource('conductor');
+
+      // Set source availability
+      this.contentResolver.setSourceAvailable('indexeddb', this.idbInitialized);
+      this.contentResolver.setSourceAvailable('projection', this.projectionApi.enabled);
+      this.contentResolver.setSourceAvailable('conductor', this.holochainContent.isAvailable());
+
+      console.log('[DataLoader] ContentResolver initialized with sources');
+    } catch (err) {
+      console.warn('[DataLoader] Cache initialization failed:', err);
     }
   }
 
@@ -388,46 +408,30 @@ export class DataLoaderService {
   }
 
   /**
-   * Load path with cache fallback chain.
+   * Load path with unified cache resolution.
    *
+   * Uses ContentResolver for intelligent tiered source selection.
    * Cache hierarchy:
    * 1. IndexedDB (local persistent cache)
    * 2. Projection API (Doorway's MongoDB cache - fast HTTP)
    * 3. Holochain (direct conductor - slow, authoritative)
    */
   private async loadPathWithIDBFallback(pathId: string): Promise<LearningPath | null> {
-    // 1. Try IndexedDB first (fastest, local)
-    if (this.idbInitialized) {
-      const cached = await this.idbCache.getPath(pathId);
-      if (cached) {
-        console.log(`[DataLoader] Path "${pathId}" loaded from IndexedDB cache`);
-        return cached;
-      }
+    // Ensure ContentResolver is initialized
+    if (!this.contentResolver.isReady) {
+      await this.contentResolver.initialize();
     }
 
-    // 2. Try Projection API (Doorway's MongoDB cache)
-    if (this.projectionApi.enabled) {
-      try {
-        const projected = await firstValueFrom(this.projectionApi.getPath(pathId));
-        if (projected) {
-          console.log(`[DataLoader] Path "${pathId}" loaded from projection cache`);
-          return projected;
-        }
-      } catch (err) {
-        console.debug(`[DataLoader] Projection API miss for path "${pathId}":`, err);
-        // Continue to Holochain fallback
+    const resolution = await this.contentResolver.resolvePath(pathId);
+    if (resolution) {
+      console.log(`[DataLoader] Path "${pathId}" loaded from ${resolution.sourceId} (${resolution.durationMs.toFixed(0)}ms)`);
+      // Cache in IndexedDB if loaded from remote source
+      if (resolution.tier !== SourceTier.Local && this.idbInitialized) {
+        this.contentResolver.cachePath(resolution.data).catch(() => {});
       }
+      return resolution.data;
     }
-
-    // 3. Fall back to Holochain (authoritative source)
-    console.log(`[DataLoader] Loading path "${pathId}" from Holochain...`);
-    const hcPath = await this.holochainContent.getPathWithSteps(pathId);
-    if (!hcPath) {
-      return null;
-    }
-    const transformed = this.transformHolochainPath(hcPath);
-    console.log(`[DataLoader] Path "${pathId}" loaded from Holochain, chapters:`, transformed.chapters?.length ?? 'none');
-    return transformed;
+    return null;
   }
 
   /**
@@ -554,37 +558,29 @@ export class DataLoaderService {
   }
 
   /**
-   * Load content with cache fallback chain.
+   * Load content with unified cache resolution.
    *
+   * Uses ContentResolver for intelligent tiered source selection.
    * Cache hierarchy:
    * 1. IndexedDB (local persistent cache)
    * 2. Projection API (Doorway's MongoDB cache - fast HTTP)
    * 3. Holochain (direct conductor - slow, authoritative)
    */
   private async loadContentWithIDBFallback(resourceId: string): Promise<ContentNode | null> {
-    // 1. Try IndexedDB first (fastest, local)
-    if (this.idbInitialized) {
-      const cached = await this.idbCache.getContent(resourceId);
-      if (cached) {
-        return cached;
-      }
+    // Ensure ContentResolver is initialized
+    if (!this.contentResolver.isReady) {
+      await this.contentResolver.initialize();
     }
 
-    // 2. Try Projection API (Doorway's MongoDB cache)
-    if (this.projectionApi.enabled) {
-      try {
-        const projected = await firstValueFrom(this.projectionApi.getContent(resourceId));
-        if (projected) {
-          return projected;
-        }
-      } catch {
-        // Continue to Holochain fallback
+    const resolution = await this.contentResolver.resolveContent(resourceId);
+    if (resolution) {
+      // Cache in IndexedDB if loaded from remote source
+      if (resolution.tier !== SourceTier.Local && this.idbInitialized) {
+        this.contentResolver.cacheContent(resolution.data).catch(() => {});
       }
+      return resolution.data;
     }
-
-    // 3. Fall back to Holochain (authoritative source)
-    const result = await this.holochainContent.getContent(resourceId).toPromise();
-    return result ?? null;
+    return null;
   }
 
   /**
@@ -621,13 +617,12 @@ export class DataLoaderService {
   }
 
   /**
-   * Internal batch get with full cache hierarchy.
+   * Internal batch get with unified cache resolution.
    *
+   * Uses ContentResolver for intelligent tiered source selection.
    * Cache hierarchy:
    * 1. In-memory cache (checked individually)
-   * 2. IndexedDB batch lookup
-   * 3. Projection API batch lookup (Doorway's MongoDB cache)
-   * 4. Holochain batch zome call (slow, authoritative)
+   * 2. ContentResolver (IndexedDB → Projection → Holochain)
    */
   private async batchGetContentWithIDB(resourceIds: string[]): Promise<Map<string, ContentNode>> {
     const contentMap = new Map<string, ContentNode>();
@@ -653,88 +648,35 @@ export class DataLoaderService {
       return contentMap;
     }
 
-    // 2. Second pass: check IndexedDB
-    let remainingIds: string[] = [];
-    if (this.idbInitialized) {
-      const idbResults = await this.idbCache.getContentBatch(uncachedIds);
-      for (const id of uncachedIds) {
-        const cached = idbResults.get(id);
-        if (cached) {
-          contentMap.set(id, cached);
-          // Populate memory cache
-          this.contentCache.set(id, of(cached).pipe(shareReplay(1)));
-        } else {
-          remainingIds.push(id);
-        }
-      }
-    } else {
-      remainingIds = [...uncachedIds];
+    // Ensure ContentResolver is initialized
+    if (!this.contentResolver.isReady) {
+      await this.contentResolver.initialize();
     }
 
-    if (remainingIds.length === 0) {
-      return contentMap;
-    }
-
-    // 3. Third pass: try Projection API batch lookup
-    let holochainIds: string[] = [];
-    if (this.projectionApi.enabled) {
-      try {
-        const projectionResults = await firstValueFrom(
-          this.projectionApi.batchGetContent(remainingIds)
-        );
-        const toCache: ContentNode[] = [];
-
-        for (const id of remainingIds) {
-          const projected = projectionResults.get(id);
-          if (projected) {
-            contentMap.set(id, projected);
-            this.contentCache.set(id, of(projected).pipe(shareReplay(1)));
-            toCache.push(projected);
-          } else {
-            holochainIds.push(id);
-          }
-        }
-
-        // Store projection hits in IndexedDB (background)
-        if (this.idbInitialized && toCache.length > 0) {
-          this.idbCache.setContentBatch(toCache).catch(() => {
-            // Ignore errors
-          });
-        }
-      } catch {
-        // Projection API failed, fall back to Holochain for all
-        holochainIds = [...remainingIds];
-      }
-    } else {
-      holochainIds = [...remainingIds];
-    }
-
-    if (holochainIds.length === 0) {
-      return contentMap;
-    }
-
-    // 4. Fourth pass: fetch from Holochain (authoritative source)
-    const result = await this.holochainContent.batchGetContent(holochainIds);
-
-    // Process found content
+    // 2. Use unified resolver for remaining IDs
+    const resolved = await this.contentResolver.batchResolveContent(uncachedIds);
     const toCache: ContentNode[] = [];
-    for (const [id, content] of result.found) {
-      contentMap.set(id, content);
-      this.contentCache.set(id, of(content).pipe(shareReplay(1)));
-      toCache.push(content);
+
+    for (const [id, resolution] of resolved) {
+      contentMap.set(id, resolution.data);
+      this.contentCache.set(id, of(resolution.data).pipe(shareReplay(1)));
+      // Queue for local caching if from remote source
+      if (resolution.tier !== SourceTier.Local) {
+        toCache.push(resolution.data);
+      }
     }
 
-    // Store in IndexedDB (background)
+    // Cache remotely-fetched content in IndexedDB
     if (this.idbInitialized && toCache.length > 0) {
-      this.idbCache.setContentBatch(toCache).catch(() => {
-        // Ignore errors
-      });
+      this.idbCache.setContentBatch(toCache).catch(() => {});
     }
 
     // Add placeholders for not found
-    for (const id of result.notFound) {
-      const placeholder = this.createPlaceholderContent(id);
-      contentMap.set(id, placeholder);
+    for (const id of uncachedIds) {
+      if (!resolved.has(id)) {
+        const placeholder = this.createPlaceholderContent(id);
+        contentMap.set(id, placeholder);
+      }
     }
 
     return contentMap;
