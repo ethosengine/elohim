@@ -536,8 +536,8 @@ Comparing DNA schema with seed data structure...
 
                             echo ""
                             echo "=== Missing Required Fields Check ==="
-                            MISSING_ID=\$(find genesis/data/lamad/content -name "*.json" -type f -exec sh -c 'jq -e ".id" "{}" >/dev/null 2>&1 || echo "{}"' \\; | grep -v '^$' | wc -l)
-                            MISSING_TITLE=\$(find genesis/data/lamad/content -name "*.json" -type f -exec sh -c 'jq -e ".title" "{}" >/dev/null 2>&1 || echo "{}"' \\; | grep -v '^$' | wc -l)
+                            MISSING_ID=\$(find genesis/data/lamad/content -name "*.json" -type f -exec sh -c 'jq -e ".id" "{}" >/dev/null 2>&1 || echo "{}"' \\; | grep -v '^\$' | wc -l)
+                            MISSING_TITLE=\$(find genesis/data/lamad/content -name "*.json" -type f -exec sh -c 'jq -e ".title" "{}" >/dev/null 2>&1 || echo "{}"' \\; | grep -v '^\$' | wc -l)
 
                             if [ "\$MISSING_ID" -gt 0 ] || [ "\$MISSING_TITLE" -gt 0 ]; then
                                 echo "  ⚠️ Files missing 'id': \$MISSING_ID"
