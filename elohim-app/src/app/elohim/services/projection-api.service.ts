@@ -1,12 +1,11 @@
 /**
  * Projection API Service
  *
- * Connects to Doorway's projection cache for fast reads.
- * The projection layer provides pre-computed, MongoDB-cached data
- * that's updated in real-time via DHT signals.
+ * Connects to Doorway's cache API for fast reads.
+ * Uses the generic cache endpoints: /api/v1/cache/{type}/{id}
  *
- * This is the preferred read path for production - it never blocks
- * on Holochain conductor calls.
+ * The app (elohim-app) owns all content structure and transformations.
+ * Doorway is just a cache that serves stored content.
  */
 
 import { Injectable, inject } from '@angular/core';
@@ -93,15 +92,24 @@ export interface ProjectionStats {
 export class ProjectionAPIService {
   private readonly http = inject(HttpClient);
 
-  /** Base URL for projection API */
+  /** Base URL for cache API */
   private get baseUrl(): string {
-    // Use Doorway's API endpoint
     const doorwayUrl = environment.holochain?.authUrl || environment.holochain?.appUrl || 'http://localhost:8080';
-    // Strip ws/wss protocol if present
     const httpUrl = doorwayUrl
       .replace('wss://', 'https://')
       .replace('ws://', 'http://');
-    return `${httpUrl}/api/v1/projection`;
+    return `${httpUrl}/api/v1/cache`;
+  }
+
+  /** API key for authenticated requests */
+  private get apiKey(): string | undefined {
+    return environment.holochain?.apiKey;
+  }
+
+  /** Build URL with optional API key */
+  private buildApiUrl(path: string): string {
+    const url = `${this.baseUrl}${path}`;
+    return this.apiKey ? `${url}${path.includes('?') ? '&' : '?'}apiKey=${this.apiKey}` : url;
   }
 
   /** Default timeout for projection API calls */
@@ -124,11 +132,11 @@ export class ProjectionAPIService {
       return of(null);
     }
 
-    return this.http.get<ProjectionResponse<ContentNode>>(
-      `${this.baseUrl}/content/${encodeURIComponent(id)}`
-    ).pipe(
+    const url = this.buildApiUrl(`/Content/${encodeURIComponent(id)}`);
+
+    return this.http.get<any>(url).pipe(
       timeout(this.defaultTimeout),
-      map(response => this.transformContent(response.data)),
+      map(data => this.transformContent(data)),
       catchError(err => this.handleContentError(err, `getContent(${id})`)),
       shareReplay(1)
     );
@@ -136,22 +144,69 @@ export class ProjectionAPIService {
 
   /**
    * Query content nodes with filters
+   *
+   * Note: The generic cache API only supports limit/skip.
+   * Client-side filtering is applied for other filters.
    */
   queryContent(filters: ContentQueryFilters): Observable<ContentNode[]> {
     if (!this.enabled) {
       return of([]);
     }
 
-    const params = this.buildContentParams(filters);
+    let params = new HttpParams();
+    if (filters.limit) {
+      params = params.set('limit', filters.limit.toString());
+    }
+    if (filters.skip) {
+      params = params.set('skip', filters.skip.toString());
+    }
 
-    return this.http.get<ProjectionResponse<ContentNode[]>>(
-      `${this.baseUrl}/content`,
-      { params }
-    ).pipe(
+    const url = this.buildApiUrl('/Content');
+
+    return this.http.get<any[]>(url, { params }).pipe(
       timeout(this.defaultTimeout),
-      map(response => (response.data || []).map(c => this.transformContent(c))),
+      map(data => (data || []).map(c => this.transformContent(c))),
+      // Apply client-side filters
+      map(contents => this.applyContentFilters(contents, filters)),
       catchError(err => this.handleContentArrayError(err, 'queryContent')),
     );
+  }
+
+  /**
+   * Apply client-side content filters
+   */
+  private applyContentFilters(contents: ContentNode[], filters: ContentQueryFilters): ContentNode[] {
+    let result = contents;
+
+    if (filters.id) {
+      result = result.filter(c => c.id === filters.id);
+    }
+    if (filters.ids?.length) {
+      const idSet = new Set(filters.ids);
+      result = result.filter(c => idSet.has(c.id));
+    }
+    if (filters.contentType) {
+      const types = Array.isArray(filters.contentType) ? filters.contentType : [filters.contentType];
+      result = result.filter(c => types.includes(c.contentType as ContentType));
+    }
+    if (filters.tags?.length) {
+      result = result.filter(c =>
+        filters.tags!.every(tag => c.tags?.includes(tag))
+      );
+    }
+    if (filters.anyTags?.length) {
+      result = result.filter(c =>
+        filters.anyTags!.some(tag => c.tags?.includes(tag))
+      );
+    }
+    if (filters.publicOnly) {
+      result = result.filter(c => c.reach === 'commons');
+    }
+    if (filters.author) {
+      result = result.filter(c => c.authorId === filters.author);
+    }
+
+    return result;
   }
 
   /**
@@ -190,11 +245,11 @@ export class ProjectionAPIService {
       return of(null);
     }
 
-    return this.http.get<ProjectionResponse<LearningPath>>(
-      `${this.baseUrl}/path/${encodeURIComponent(id)}`
-    ).pipe(
+    const url = this.buildApiUrl(`/LearningPath/${encodeURIComponent(id)}`);
+
+    return this.http.get<any>(url).pipe(
       timeout(this.defaultTimeout),
-      map(response => this.transformPath(response.data)),
+      map(data => this.transformPath(data)),
       catchError(err => this.handlePathError(err, `getPath(${id})`)),
       shareReplay(1)
     );
@@ -202,39 +257,71 @@ export class ProjectionAPIService {
 
   /**
    * Get path overview (minimal data for listing)
+   * Note: Uses same endpoint as getPath since cache API is generic
    */
   getPathOverview(id: string): Observable<Partial<LearningPath> | null> {
-    if (!this.enabled) {
-      return of(null);
-    }
-
-    return this.http.get<ProjectionResponse<Partial<LearningPath>>>(
-      `${this.baseUrl}/path/${encodeURIComponent(id)}/overview`
-    ).pipe(
-      timeout(this.defaultTimeout),
-      map(response => response.data),
-      catchError(err => this.handlePathOverviewError(err, `getPathOverview(${id})`)),
-    );
+    return this.getPath(id);
   }
 
   /**
    * Query paths with filters
+   *
+   * Note: The generic cache API only supports limit/skip.
+   * Client-side filtering is applied for other filters.
    */
   queryPaths(filters: PathQueryFilters): Observable<LearningPath[]> {
     if (!this.enabled) {
       return of([]);
     }
 
-    const params = this.buildPathParams(filters);
+    let params = new HttpParams();
+    if (filters.limit) {
+      params = params.set('limit', filters.limit.toString());
+    }
+    if (filters.skip) {
+      params = params.set('skip', filters.skip.toString());
+    }
 
-    return this.http.get<ProjectionResponse<LearningPath[]>>(
-      `${this.baseUrl}/paths`,
-      { params }
-    ).pipe(
+    const url = this.buildApiUrl('/LearningPath');
+
+    return this.http.get<any[]>(url, { params }).pipe(
       timeout(this.defaultTimeout),
-      map(response => (response.data || []).map(p => this.transformPath(p))),
+      map(data => (data || []).map(p => this.transformPath(p))),
+      // Apply client-side filters
+      map(paths => this.applyPathFilters(paths, filters)),
       catchError(err => this.handlePathArrayError(err, 'queryPaths')),
     );
+  }
+
+  /**
+   * Apply client-side path filters
+   */
+  private applyPathFilters(paths: LearningPath[], filters: PathQueryFilters): LearningPath[] {
+    let result = paths;
+
+    if (filters.id) {
+      result = result.filter(p => p.id === filters.id);
+    }
+    if (filters.ids?.length) {
+      const idSet = new Set(filters.ids);
+      result = result.filter(p => idSet.has(p.id));
+    }
+    if (filters.difficulty) {
+      result = result.filter(p => p.difficulty === filters.difficulty);
+    }
+    if (filters.visibility) {
+      result = result.filter(p => p.visibility === filters.visibility);
+    }
+    if (filters.publicOnly) {
+      result = result.filter(p => p.visibility === 'public');
+    }
+    if (filters.tags?.length) {
+      result = result.filter(p =>
+        filters.tags!.some(tag => p.tags?.includes(tag))
+      );
+    }
+
+    return result;
   }
 
   /**

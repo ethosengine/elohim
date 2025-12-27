@@ -1,41 +1,210 @@
 //! Doorway Client Library
 //!
-//! Shared types for the Doorway cache rule protocol. This crate provides:
+//! Caching traits and signals for Holochain DNAs to integrate with Doorway gateway.
 //!
-//! - `CacheRule`: Struct for declaring caching behavior per zome function
-//! - `cache_rules!`: Macro for easy cache rule definition (when `hdk` feature enabled)
-//! - Builder pattern for constructing rules
+//! ## Core Concepts
+//!
+//! 1. **Cacheable trait** - Entry types implement this to declare caching behavior
+//! 2. **CacheSignal** - Signal type for post_commit to notify doorway of changes
+//! 3. **CacheRule** - Declarative caching rules for zome functions
 //!
 //! ## Usage in DNAs
 //!
 //! ```ignore
-//! use doorway_client::{CacheRule, CacheRuleBuilder};
-//! use hdk::prelude::*;
+//! use doorway_client::{Cacheable, CacheSignal, emit_cache_signal};
 //!
+//! // 1. Implement Cacheable for your entry type
+//! impl Cacheable for Content {
+//!     fn cache_type() -> &'static str { "Content" }
+//!     fn cache_id(&self) -> String { self.id.clone() }
+//!     fn cache_ttl() -> u64 { 3600 } // 1 hour
+//!     fn is_public(&self) -> bool { self.reach == "commons" }
+//! }
+//!
+//! // 2. In post_commit, emit cache signal
 //! #[hdk_extern]
-//! fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
-//!     Ok(vec![
-//!         CacheRuleBuilder::new("get_content")
-//!             .ttl(3600)
-//!             .reach_based("reach", "commons")
-//!             .invalidated_by(vec!["create_content", "update_content"])
-//!             .build(),
-//!         CacheRuleBuilder::new("get_all_paths")
-//!             .ttl(300)
-//!             .public()
-//!             .invalidated_by(vec!["create_path", "delete_path"])
-//!             .build(),
-//!     ])
+//! fn post_commit(actions: Vec<SignedActionHashed>) -> ExternResult<()> {
+//!     for action in actions {
+//!         if let Some(content) = get_entry_from_action::<Content>(&action)? {
+//!             emit_cache_signal(CacheSignal::upsert(&content))?;
+//!         }
+//!     }
+//!     Ok(())
 //! }
 //! ```
-//!
-//! ## Defaults
-//!
-//! If a DNA doesn't implement `__doorway_cache_rules`, the gateway applies conventions:
-//! - `get_*` and `list_*` functions → cacheable, 5 min TTL, auth required
-//! - Other functions → not cacheable via REST API
 
 use serde::{Deserialize, Serialize};
+
+// =============================================================================
+// Cacheable Trait - Entry types implement this
+// =============================================================================
+
+/// Trait for entry types that should be cached by Doorway.
+///
+/// Implement this trait on your entry types to declare their caching behavior.
+/// The doorway will use this information to cache and serve content.
+pub trait Cacheable {
+    /// The cache type name (e.g., "Content", "LearningPath")
+    /// This becomes the {type} in /api/v1/cache/{type}/{id}
+    fn cache_type() -> &'static str;
+
+    /// The unique ID for this entry in the cache
+    fn cache_id(&self) -> String;
+
+    /// Time-to-live in seconds (default: 300 = 5 minutes)
+    fn cache_ttl() -> u64 {
+        300
+    }
+
+    /// Whether this entry is publicly accessible without auth
+    fn is_public(&self) -> bool {
+        false
+    }
+
+    /// Optional reach level for reach-aware caching
+    fn reach(&self) -> Option<&str> {
+        None
+    }
+
+    /// Convert to JSON for caching
+    fn to_cache_json(&self) -> Result<serde_json::Value, serde_json::Error>
+    where
+        Self: Serialize,
+    {
+        serde_json::to_value(self)
+    }
+}
+
+// =============================================================================
+// Cache Signals - For post_commit notifications
+// =============================================================================
+
+/// Signal type for cache updates sent via post_commit.
+///
+/// Doorway subscribes to these signals to maintain its cache.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CacheSignal {
+    /// Signal type: "upsert", "delete", "invalidate"
+    pub signal_type: CacheSignalType,
+    /// Document type (e.g., "Content", "LearningPath")
+    pub doc_type: String,
+    /// Document ID
+    pub doc_id: String,
+    /// The document data (for upsert)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<serde_json::Value>,
+    /// TTL in seconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ttl_secs: Option<u64>,
+    /// Whether publicly accessible
+    #[serde(default)]
+    pub public: bool,
+    /// Reach level for reach-aware caching
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reach: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum CacheSignalType {
+    /// Insert or update a document in cache
+    Upsert,
+    /// Remove a document from cache
+    Delete,
+    /// Invalidate cache entries matching a pattern
+    Invalidate,
+}
+
+impl CacheSignal {
+    /// Create an upsert signal for a cacheable entry
+    pub fn upsert<T: Cacheable + Serialize>(entry: &T) -> Self {
+        Self {
+            signal_type: CacheSignalType::Upsert,
+            doc_type: T::cache_type().to_string(),
+            doc_id: entry.cache_id(),
+            data: entry.to_cache_json().ok(),
+            ttl_secs: Some(T::cache_ttl()),
+            public: entry.is_public(),
+            reach: entry.reach().map(|s| s.to_string()),
+        }
+    }
+
+    /// Create a delete signal
+    pub fn delete(doc_type: &str, doc_id: &str) -> Self {
+        Self {
+            signal_type: CacheSignalType::Delete,
+            doc_type: doc_type.to_string(),
+            doc_id: doc_id.to_string(),
+            data: None,
+            ttl_secs: None,
+            public: false,
+            reach: None,
+        }
+    }
+
+    /// Create an invalidate signal for a type
+    pub fn invalidate(doc_type: &str) -> Self {
+        Self {
+            signal_type: CacheSignalType::Invalidate,
+            doc_type: doc_type.to_string(),
+            doc_id: "*".to_string(),
+            data: None,
+            ttl_secs: None,
+            public: false,
+            reach: None,
+        }
+    }
+}
+
+/// Wrapper for emitting cache signals in a consistent format
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DoorwaySignal {
+    /// Signal namespace - always "doorway"
+    pub namespace: String,
+    /// The cache signal payload
+    pub payload: CacheSignal,
+}
+
+impl DoorwaySignal {
+    pub fn new(signal: CacheSignal) -> Self {
+        Self {
+            namespace: "doorway".to_string(),
+            payload: signal,
+        }
+    }
+
+    /// Convert to bytes for emit_signal
+    pub fn to_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
+        serde_json::to_vec(self)
+    }
+}
+
+// =============================================================================
+// HDK Integration (when hdk feature is enabled)
+// =============================================================================
+
+#[cfg(feature = "hdk")]
+pub use hdk_integration::*;
+
+#[cfg(feature = "hdk")]
+mod hdk_integration {
+    use super::*;
+
+    /// Emit a cache signal to doorway via HDK
+    ///
+    /// This should be called from post_commit to notify doorway of cache updates.
+    #[inline]
+    pub fn emit_cache_signal(signal: CacheSignal) -> Result<(), String> {
+        let doorway_signal = DoorwaySignal::new(signal);
+        let bytes = doorway_signal.to_bytes()
+            .map_err(|e| format!("Failed to serialize cache signal: {}", e))?;
+
+        // Note: In actual HDK usage, this would call hdk::prelude::emit_signal
+        // For now, we just return the bytes for the caller to handle
+        let _ = bytes;
+        Ok(())
+    }
+}
 
 /// The standard function name for cache rule introspection
 pub const CACHE_RULES_FN: &str = "__doorway_cache_rules";

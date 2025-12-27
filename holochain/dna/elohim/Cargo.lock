@@ -136,6 +136,7 @@ dependencies = [
 name = "content_store_integrity"
 version = "0.1.0"
 dependencies = [
+ "doorway-client",
  "hc-rna",
  "hdi",
  "holochain_serialized_bytes",
@@ -246,7 +247,7 @@ dependencies = [
 
 [[package]]
 name = "doorway-client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",

@@ -11,6 +11,7 @@
 //! - Shefa: Economy (EconomicEvent, EconomicResource, ContributorPresence, Process, etc.)
 
 use hdi::prelude::*;
+use doorway_client::Cacheable;
 
 // =============================================================================
 // Self-Healing Support
@@ -478,6 +479,28 @@ pub struct Content {
     pub validation_status: String,       // Valid, Migrated, Degraded, Healing
 }
 
+impl Cacheable for Content {
+    fn cache_type() -> &'static str {
+        "Content"
+    }
+
+    fn cache_id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn cache_ttl() -> u64 {
+        3600 // 1 hour for content
+    }
+
+    fn is_public(&self) -> bool {
+        self.reach == "commons"
+    }
+
+    fn reach(&self) -> Option<&str> {
+        Some(&self.reach)
+    }
+}
+
 // =============================================================================
 // Blob (Media) Entries - Phase 1: Large Media Support
 // =============================================================================
@@ -561,6 +584,24 @@ pub struct LearningPath {
     pub schema_version: u32,
     #[serde(default)]
     pub validation_status: String,
+}
+
+impl Cacheable for LearningPath {
+    fn cache_type() -> &'static str {
+        "LearningPath"
+    }
+
+    fn cache_id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn cache_ttl() -> u64 {
+        1800 // 30 minutes for paths
+    }
+
+    fn is_public(&self) -> bool {
+        self.visibility == "public"
+    }
 }
 
 /// Path step entry - represents a single learning activity
@@ -671,6 +712,24 @@ pub struct Relationship {
     pub inference_source: String,   // See INFERENCE_SOURCES
     pub metadata_json: Option<String>,
     pub created_at: String,
+}
+
+impl Cacheable for Relationship {
+    fn cache_type() -> &'static str {
+        "Relationship"
+    }
+
+    fn cache_id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn cache_ttl() -> u64 {
+        86400 // 1 day for relationships (rarely change)
+    }
+
+    fn is_public(&self) -> bool {
+        true // Relationships are always public metadata
+    }
 }
 
 // =============================================================================

@@ -8,7 +8,7 @@
 
 use hdk::prelude::*;
 use content_store_integrity::*;
-use doorway_client::{CacheRule, CacheRuleBuilder};
+use doorway_client::{CacheRule, CacheRuleBuilder, CacheSignal, DoorwaySignal, Cacheable};
 use std::collections::HashMap;
 
 // Migration module for DNA version upgrades
@@ -9449,19 +9449,25 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
 
         // Try to deserialize as each entry type and emit the corresponding signal
         if let Some(content) = record.entry().to_app_option::<Content>().ok().flatten() {
+            // Emit projection signal (for MongoDB)
             emit_signal(ProjectionSignal::ContentCommitted {
                 action_hash,
                 entry_hash,
-                content,
+                content: content.clone(),
                 author,
             })?;
+            // Emit cache signal (for Doorway)
+            emit_signal(DoorwaySignal::new(CacheSignal::upsert(&content)))?;
         } else if let Some(path) = record.entry().to_app_option::<LearningPath>().ok().flatten() {
+            // Emit projection signal (for MongoDB)
             emit_signal(ProjectionSignal::PathCommitted {
                 action_hash,
                 entry_hash,
-                path,
+                path: path.clone(),
                 author,
             })?;
+            // Emit cache signal (for Doorway)
+            emit_signal(DoorwaySignal::new(CacheSignal::upsert(&path)))?;
         } else if let Some(step) = record.entry().to_app_option::<PathStep>().ok().flatten() {
             emit_signal(ProjectionSignal::StepCommitted {
                 action_hash,
@@ -9480,12 +9486,15 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             // Auto-create custodian commitments when relationship reaches trusted/intimate
             let _ = on_relationship_updated(relationship.clone());
 
+            // Emit projection signal (for MongoDB)
             emit_signal(ProjectionSignal::RelationshipCommitted {
                 action_hash,
                 entry_hash,
-                relationship,
+                relationship: relationship.clone(),
                 author,
             })?;
+            // Emit cache signal (for Doorway)
+            emit_signal(DoorwaySignal::new(CacheSignal::upsert(&relationship)))?;
         } else if let Some(human) = record.entry().to_app_option::<Human>().ok().flatten() {
             emit_signal(ProjectionSignal::HumanCommitted {
                 action_hash,

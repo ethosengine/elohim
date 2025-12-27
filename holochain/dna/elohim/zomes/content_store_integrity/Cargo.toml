@@ -12,3 +12,4 @@ hdi.workspace = true
 holochain_serialized_bytes.workspace = true
 serde.workspace = true
 hc-rna.workspace = true
+doorway-client.workspace = true

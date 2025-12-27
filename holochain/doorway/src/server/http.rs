@@ -521,8 +521,8 @@ async fn handle_request(
             }
         }
 
-        // REST API routes for public content
-        (Method::GET, p) if p.starts_with("/api/v1/") => {
+        // Cache API routes: GET /api/v1/cache/{type}/{id?}
+        (Method::GET, p) if p.starts_with("/api/v1/cache/") => {
             let query = req.uri().query();
             // Extract auth header and remote IP for reach-aware serving
             let auth_header = req
