@@ -103,7 +103,7 @@ export class ProjectionAPIService {
 
   /** API key for authenticated requests */
   private get apiKey(): string | undefined {
-    return environment.holochain?.apiKey;
+    return environment.holochain?.proxyApiKey;
   }
 
   /** Build URL with optional API key */
