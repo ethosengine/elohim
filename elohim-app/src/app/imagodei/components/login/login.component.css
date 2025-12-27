@@ -4,7 +4,14 @@
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background: var(--surface-ground, #f8f9fa);
+  background: var(--lamad-surface-primary, #0f172a);
+}
+
+/* Doorway picker step uses dark theme */
+.login-container :host-context(app-doorway-picker),
+.login-container app-doorway-picker {
+  width: 100%;
+  max-width: 900px;
 }
 
 .login-card {
@@ -12,7 +19,7 @@
   max-width: 400px;
   background: var(--surface-card, #ffffff);
   border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   padding: 2rem;
 }
 
