@@ -17,8 +17,8 @@ import {
   ProposedPathStructure,
   isNegotiationActive,
   isNegotiationResolved,
-  PathNegotiationContent
 } from '../models';
+import { PathNegotiationContent } from '@app/elohim/models/source-chain.model';
 import { hasMinimumIntimacy } from '@app/elohim/models/human-consent.model';
 
 /**

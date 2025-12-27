@@ -5,7 +5,8 @@ import { Subject, combineLatest } from 'rxjs';
 import { takeUntil, map } from 'rxjs/operators';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
-import { ContentNode, CategoryAffinityStats } from '../../models';
+import { ContentNode } from '../../models';
+import { CategoryAffinityStats } from '@app/qahal/models/human-affinity.model';
 
 interface CategorySection {
   name: string;

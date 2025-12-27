@@ -3,7 +3,9 @@ import { of, BehaviorSubject } from 'rxjs';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
-import { Agent, AgentProgress, FrontierItem, SessionHuman, AccessLevel, ContentAccessMetadata } from '../models';
+import { AccessLevel, ContentAccessMetadata } from '../models';
+import { Agent, AgentProgress, FrontierItem } from '@app/elohim/models/agent.model';
+import { SessionHuman } from '@app/imagodei/models/session-human.model';
 
 describe('AgentService', () => {
   let service: AgentService;

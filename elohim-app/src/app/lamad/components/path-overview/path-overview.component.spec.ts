@@ -5,7 +5,8 @@ import { PathOverviewComponent } from './path-overview.component';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { SeoService } from '../../../services/seo.service';
-import { LearningPath, AgentProgress } from '../../models';
+import { LearningPath } from '../../models';
+import { AgentProgress } from '@app/elohim/models/agent.model';
 
 describe('PathOverviewComponent', () => {
   let component: PathOverviewComponent;

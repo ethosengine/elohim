@@ -19,9 +19,6 @@ import { Routes } from '@angular/router';
  * - /lamad/map                          → Meaning map visualization
  * - /lamad/search                       → Search interface
  *
- * Legacy (deprecated):
- * - /lamad/content/:id                  → Old direct access (redirects to resource)
- *
  * SEO Notes:
  * - Static routes have title/description in route data
  * - Dynamic routes (path/:pathId, resource/:resourceId) update SEO via component
@@ -178,17 +175,6 @@ export const LAMAD_ROUTES: Routes = [
             openGraph: { ogType: 'website' }
           }
         }
-      },
-
-      // ============================================
-      // LEGACY ROUTES (Deprecated, for backwards compat)
-      // ============================================
-
-      // Old direct content access - redirect to new pattern
-      {
-        path: 'content/:id',
-        redirectTo: 'resource/:id',
-        pathMatch: 'full'
       },
 
       // ============================================

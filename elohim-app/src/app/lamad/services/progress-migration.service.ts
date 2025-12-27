@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { map, switchMap, catchError } from 'rxjs/operators';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { AgentProgress } from '../models';
+import { AgentProgress } from '@app/elohim/models/agent.model';
 
 /**
  * ProgressMigrationService - Migrates existing progress data to support cross-path completion.

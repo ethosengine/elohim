@@ -140,9 +140,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   ) {}
 
   ngOnInit(): void {
-    // Handle direct content access: /lamad/resource/:resourceId or /lamad/content/:id
+    // Handle direct content access: /lamad/resource/:resourceId
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe((params) => {
-      const resourceId = params['resourceId'] ?? params['id'];
+      const resourceId = params['resourceId'];
       if (resourceId) {
         this.nodeId = resourceId;
         this.loadContent(resourceId);

@@ -5,7 +5,7 @@ import {
   SessionActivity,
   SessionPathProgress,
   HolochainUpgradePrompt,
-} from '../models';
+} from '@app/imagodei/models/session-human.model';
 
 describe('SessionHumanService', () => {
   let service: SessionHumanService;

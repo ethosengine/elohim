@@ -17,13 +17,11 @@ import {
   AssessmentEvidence,
   LevelProgressionEvent,
   MasteryLevel,
-  isAboveGate,
-  compareMasteryLevels,
-  MasteryRecordContent,
-  SourceChainEntry,
   PathMasteryOverview,
   transformMasteryFromWire,
 } from '../models';
+import { isAboveGate, compareMasteryLevels } from '@app/elohim/models/agent.model';
+import { MasteryRecordContent, SourceChainEntry } from '@app/elohim/models/source-chain.model';
 
 /** Result of migration from local to backend */
 export interface MigrationResult {

@@ -4,7 +4,8 @@ import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { HolochainContentService } from '@app/elohim/services/holochain-content.service';
 import { IndexedDBCacheService } from '@app/elohim/services/indexeddb-cache.service';
 import { ProjectionAPIService } from '@app/elohim/services/projection-api.service';
-import { LearningPath, PathIndex, ContentNode, AgentProgress } from '../models';
+import { LearningPath, PathIndex, ContentNode } from '../models';
+import { AgentProgress } from '@app/elohim/models/agent.model';
 import { of, throwError } from 'rxjs';
 
 describe('DataLoaderService', () => {

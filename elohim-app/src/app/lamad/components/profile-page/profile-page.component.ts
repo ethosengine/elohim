@@ -10,7 +10,8 @@ import { IdentityService } from '@app/imagodei/services/identity.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { ProfileService } from '@app/elohim/services/profile.service';
-import { SessionHuman, SessionActivity, SessionPathProgress, MasteryStats, MasteryLevel } from '../../models';
+import { MasteryStats, MasteryLevel } from '../../models';
+import { SessionHuman, SessionActivity, SessionPathProgress } from '@app/imagodei/models/session-human.model';
 import { ResumePoint, PathsOverview, TimelineEvent } from '@app/imagodei/models/profile.model';
 
 /**

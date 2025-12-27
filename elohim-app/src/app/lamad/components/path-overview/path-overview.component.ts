@@ -6,8 +6,8 @@ import { takeUntil } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { SeoService } from '../../../services/seo.service';
-import { LearningPath, PathStep, PathChapter, PathModule, PathSection, AgentProgress } from '../../models';
-import { MasteryLevel, MasteryTier } from '@app/elohim/models/agent.model';
+import { LearningPath, PathStep, PathChapter, PathModule, PathSection } from '../../models';
+import { AgentProgress, MasteryLevel, MasteryTier } from '@app/elohim/models/agent.model';
 
 /**
  * Lightweight step display data - uses step metadata, NOT content.

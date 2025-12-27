@@ -88,7 +88,7 @@ describe('ContentViewerComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            params: of({ id: 'test-content-1' })
+            params: of({ resourceId: 'test-content-1' })
           }
         },
         { provide: AffinityTrackingService, useValue: affinitySpyObj },

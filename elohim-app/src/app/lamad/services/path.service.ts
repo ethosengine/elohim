@@ -3,8 +3,8 @@ import { Observable, forkJoin, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AgentService } from '@app/elohim/services/agent.service';
-import { LearningPath, PathStep, PathStepView, PathIndex, PathChapter, ContentNode, AgentProgress } from '../models';
-import { MasteryLevel, MasteryTier, getMasteryTier } from '@app/elohim/models/agent.model';
+import { LearningPath, PathStep, PathStepView, PathIndex, PathChapter, ContentNode } from '../models';
+import { AgentProgress, MasteryLevel, MasteryTier, getMasteryTier } from '@app/elohim/models/agent.model';
 
 /**
  * Access check result for fog-of-war system.

@@ -3,7 +3,8 @@ import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ContentMasteryService } from './content-mastery.service';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
-import { MasteryLevel, FRESHNESS_THRESHOLDS, SessionHuman } from '../models';
+import { MasteryLevel, FRESHNESS_THRESHOLDS } from '../models';
+import { SessionHuman } from '@app/imagodei/models/session-human.model';
 import { BehaviorSubject } from 'rxjs';
 
 describe('ContentMasteryService', () => {

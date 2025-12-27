@@ -38,7 +38,7 @@ describe('AssessmentService', () => {
     title: 'Values Assessment',
     description: 'Discover your core values',
     contentType: 'assessment',
-    contentFormat: 'quiz-json',
+    contentFormat: 'perseus-quiz-json',
     content: {
       questions: [
         { id: 'q1', text: 'Question 1', subscales: ['value-a'] },
@@ -57,7 +57,7 @@ describe('AssessmentService', () => {
     title: 'Advanced Assessment',
     description: 'Requires prerequisite',
     contentType: 'assessment',
-    contentFormat: 'quiz-json',
+    contentFormat: 'perseus-quiz-json',
     content: { questions: [], sections: [] },
     tags: [],
     relatedNodeIds: [],

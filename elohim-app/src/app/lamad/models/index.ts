@@ -2,22 +2,18 @@
  * Barrel export for Lamad models
  *
  * Lamad is the Content/Learning pillar of the Elohim Protocol.
- * This barrel re-exports types from other pillars for backward compatibility.
  *
- * Pillar Structure:
- * - elohim/: Protocol-core (shared primitives, agents, attestations)
- * - imagodei/: Identity (profile, session, human nodes)
- * - lamad/: Content (nodes, paths, exploration, mastery)
- * - qahal/: Community (consent, governance, affinity, places)
- * - shefa/: Economy (REA, economic events, contributor presence)
- *
- * Six-layer architecture:
+ * Architecture:
  * - Territory: ContentNode (the knowledge graph)
  * - Journey: LearningPath, PathStep (curated sequences)
  * - Traveler: Agent, AgentProgress (human state)
  * - Maps: KnowledgeMap (polymorphic: domain, self, person, collective)
- * - Economic: REA value flows and contributor recognition
- * - Governance: Constitutional moderation, deliberation, feedback profiles
+ *
+ * For models from other pillars, import directly:
+ * - @app/elohim/models/* - Protocol-core (agents, attestations, trust)
+ * - @app/imagodei/models/* - Identity (profile, session)
+ * - @app/qahal/models/* - Community (consent, governance, affinity)
+ * - @app/shefa/models/* - Economy (REA, economic events)
  */
 
 // ============================================================================
@@ -171,140 +167,8 @@ export {
 } from './human-node.model';
 
 // ============================================================================
-// RE-EXPORTS FROM ELOHIM (Protocol-Core)
-// TODO: Remove these re-exports. Import directly from @app/elohim/models/*
+// LAMAD STEWARD ECONOMY MODELS
 // ============================================================================
 
-/** @deprecated Import from '@app/elohim/models/protocol-core.model' */
-export * from '@app/elohim/models/protocol-core.model';
-
-/** @deprecated Import from '@app/elohim/models/rea-bridge.model' */
-export * from '@app/elohim/models/rea-bridge.model';
-
-/** @deprecated Import from '@app/elohim/models/agent.model' */
-export * from '@app/elohim/models/agent.model';
-
-/** @deprecated Import from '@app/elohim/models/elohim-agent.model' */
-export * from '@app/elohim/models/elohim-agent.model';
-
-/** @deprecated Import from '@app/elohim/models/trust-badge.model' */
-export type {
-  TrustBadge,
-  BadgeDisplay,
-  BadgeType,
-  BadgeColor,
-  TrustLevel,
-  BadgeWarning,
-  TrustIndicator,
-  IndicatorSource,
-  TrustIndicatorSet,
-  BadgeAction,
-  CompactTrustBadge
-} from '@app/elohim/models/trust-badge.model';
-/** @deprecated Import from '@app/elohim/models/trust-badge.model' */
-export {
-  badgeToIndicator,
-  warningToIndicator,
-  ATTESTATION_PRIORITY,
-  ATTESTATION_BADGE_CONFIG,
-  REACH_BADGE_CONFIG,
-  WARNING_CONFIG,
-  calculateTrustLevel,
-  generateTrustSummary,
-  generateAriaLabel,
-  toCompactBadge
-} from '@app/elohim/models/trust-badge.model';
-
-/** @deprecated Import from '@app/elohim/models/json-ld.model' */
-export * from '@app/elohim/models/json-ld.model';
-/** @deprecated Import from '@app/elohim/models/open-graph.model' */
-export * from '@app/elohim/models/open-graph.model';
-/** @deprecated Import from '@app/elohim/models/verifiable-credential.model' */
-export * from '@app/elohim/models/verifiable-credential.model';
-/** @deprecated Import from '@app/elohim/models/source-chain.model' */
-export * from '@app/elohim/models/source-chain.model';
-
-// ============================================================================
-// RE-EXPORTS FROM IMAGODEI (Identity)
-// TODO: Remove these re-exports. Import directly from @app/imagodei/models/*
-// ============================================================================
-
-/** @deprecated Import from '@app/imagodei/models/session-human.model' */
-export * from '@app/imagodei/models/session-human.model';
-
-/** @deprecated Import from '@app/imagodei/models/profile.model' */
-export * from '@app/imagodei/models/profile.model';
-
-/** @deprecated Import from '@app/imagodei/models/attestations.model' */
-export type {
-  Attestation as ImagodeiAttestation,
-  AttestationJourney,
-  Endorsement,
-  AttestationRequirement as ImagodeiAttestationRequirement,
-  AttestationAccessRequirement,
-  UserAttestations,
-  AttestationProgress
-} from '@app/imagodei/models/attestations.model';
-
-// ============================================================================
-// RE-EXPORTS FROM ELOHIM (Economy - canonical location)
-// TODO: Remove these re-exports. Import directly from @app/elohim/models/*
-// ============================================================================
-
-/** @deprecated Import from '@app/elohim/models/economic-event.model' */
-export * from '@app/elohim/models/economic-event.model';
-
-/** @deprecated Import from '@app/elohim/models/contributor-presence.model' */
-export * from '@app/elohim/models/contributor-presence.model';
-
-// Steward Economy models - LAMAD-NATIVE (stay here)
+// Steward Economy models - LAMAD-NATIVE
 export * from './steward-economy.model';
-
-// ============================================================================
-// RE-EXPORTS FROM QAHAL (Community)
-// TODO: Remove these re-exports. Import directly from @app/qahal/models/*
-// ============================================================================
-
-/** @deprecated Import from '@app/qahal/models/human-affinity.model' */
-export * from '@app/qahal/models/human-affinity.model';
-
-/** @deprecated Import from '@app/elohim/models/human-consent.model' */
-export type {
-  HumanConsent,
-  ConsentRequest
-} from '@app/elohim/models/human-consent.model';
-
-/** @deprecated Import from '@app/qahal/models/governance-feedback.model' */
-export * from '@app/qahal/models/governance-feedback.model';
-
-/** @deprecated Import from '@app/qahal/models/governance-deliberation.model' */
-export * from '@app/qahal/models/governance-deliberation.model';
-
-/** @deprecated Import from '@app/qahal/models/place.model' */
-export type {
-  Place,
-  PlaceType,
-  PlaceTypeCategory,
-  PlaceNameType,
-  PlaceNameDisputeStatus,
-  PlaceName,
-  BoundaryType,
-  GeoJSONGeometry,
-  PlaceGeography,
-  EcologicalRelationshipType,
-  EcologicalRelationship,
-  CulturalContext,
-  GeographicReach,
-  GeographicDeterminationMethod,
-  GeographicDetermination,
-  EcologicalLimitType,
-  EcologicalLimit,
-  BioregionalAuthority,
-  PlaceCapability,
-  PlaceAwareElohim,
-  PlaceHierarchy,
-  PlaceHierarchyNode,
-  PlaceServiceInterface
-} from '@app/qahal/models/place.model';
-/** @deprecated Import from '@app/qahal/models/place.model' */
-export { PLACE_TYPE_CATEGORIES } from '@app/qahal/models/place.model';
