@@ -312,25 +312,79 @@
   color: #666;
 }
 
-/* Responsive */
+/* ============================================================================
+   Responsive Breakpoints
+   ============================================================================
+   Using standardized breakpoints:
+   - 480px (--bp-sm): Small mobile
+   - 768px (--bp-md): Tablet / Large mobile
+   - 1024px (--bp-lg): Desktop
+   ============================================================================ */
+
+/* Tablet (768px - 1024px) */
+@media (max-width: 1024px) {
+  .mission-map-container {
+    padding: 1.5rem;
+  }
+
+  .mission-header h1 {
+    font-size: 2rem;
+  }
+
+  .category-content {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .stat-card {
+    padding: 1.25rem 1.5rem;
+    min-width: 130px;
+  }
+
+  /* Ensure touch-friendly category headers */
+  .category-header {
+    min-height: 60px;
+    padding: 1.25rem;
+  }
+}
+
+/* Mobile (max-width: 768px) */
 @media (max-width: 768px) {
   .mission-map-container {
     padding: 1rem;
   }
 
+  .mission-header h1 {
+    font-size: 1.75rem;
+  }
+
+  .subtitle {
+    font-size: 1rem;
+  }
+
   .overall-stats {
     flex-direction: column;
     gap: 1rem;
+    align-items: stretch;
+  }
+
+  .stat-card {
+    min-width: auto;
+    width: 100%;
+    padding: 1rem 1.25rem;
   }
 
   .category-content {
     grid-template-columns: 1fr;
+    padding: 1rem;
+    gap: 1rem;
   }
 
   .category-header {
     flex-direction: column;
     gap: 1rem;
     align-items: flex-start;
+    padding: 1rem;
   }
 
   .category-stats {
@@ -339,5 +393,56 @@
 
   .affinity-bar-container {
     flex: 1;
+  }
+
+  .content-node-card {
+    padding: 1rem;
+  }
+
+  .node-title {
+    font-size: 1rem;
+  }
+
+  .node-description {
+    font-size: 0.85rem;
+  }
+}
+
+/* Small mobile (max-width: 480px) */
+@media (max-width: 480px) {
+  .mission-map-container {
+    padding: 0.75rem;
+  }
+
+  .mission-header {
+    margin-bottom: 2rem;
+  }
+
+  .mission-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .category-section {
+    border-radius: 8px;
+  }
+
+  .category-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .category-name {
+    font-size: 1.25rem;
+  }
+
+  .node-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .affinity-indicator {
+    align-self: flex-end;
   }
 }

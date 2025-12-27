@@ -3,6 +3,18 @@
   <div class="picker-header">
     <h2 class="picker-title">{{ titleText() }}</h2>
     <p class="picker-subtitle">{{ subtitleText() }}</p>
+
+    <!-- Quick Action: Auto-select best -->
+    @if (recommendedDoorway() && !selectedId()) {
+      <button
+        type="button"
+        class="quick-connect-btn"
+        (click)="selectRecommended()"
+      >
+        <span class="material-icons">bolt</span>
+        Quick Connect to Best Gateway
+      </button>
+    }
   </div>
 
   <!-- Filters -->
@@ -41,6 +53,21 @@
         @for (region of availableRegions(); track region) {
           <option [value]="region">{{ getRegionDisplayName(region) }}</option>
         }
+      </select>
+    </div>
+
+    <!-- Sort Options -->
+    <div class="sort-filter">
+      <label class="filter-label">Sort:</label>
+      <select
+        class="sort-select"
+        [ngModel]="sortBy()"
+        (ngModelChange)="sortBy.set($event)"
+      >
+        <option value="recommended">Recommended</option>
+        <option value="latency">Fastest</option>
+        <option value="users">Most Popular</option>
+        <option value="name">Name A-Z</option>
       </select>
     </div>
 
@@ -120,11 +147,20 @@
           type="button"
           class="doorway-card"
           [class.selected]="selectedId() === doorway.id"
+          [class.recommended]="isRecommended(doorway)"
           [class.offline]="doorway.status === 'offline'"
           [class.degraded]="doorway.status === 'degraded'"
           [disabled]="doorway.status === 'offline' || !doorway.registrationOpen"
           (click)="selectDoorway(doorway)"
         >
+          <!-- Recommended Badge -->
+          @if (isRecommended(doorway)) {
+            <div class="recommended-badge">
+              <span class="material-icons">verified</span>
+              Recommended
+            </div>
+          }
+
           <!-- Status Badge -->
           <div class="status-badge" [style.backgroundColor]="getStatusDisplay(doorway.status).color">
             <span class="material-icons status-icon">{{ getStatusDisplay(doorway.status).icon }}</span>
@@ -143,16 +179,26 @@
               <span class="material-icons">public</span>
               {{ getRegionDisplayName(doorway.region) }}
             </span>
-            <span class="meta-item latency" [ngClass]="getLatencyClass(doorway.latencyMs)">
-              <span class="material-icons">speed</span>
-              {{ formatLatency(doorway.latencyMs) }}
-            </span>
             @if (doorway.userCount) {
               <span class="meta-item users">
                 <span class="material-icons">people</span>
                 {{ doorway.userCount | number }}
               </span>
             }
+          </div>
+
+          <!-- Latency Bar (visual indicator) -->
+          <div class="latency-indicator">
+            <div class="latency-bar-track">
+              <div
+                class="latency-bar-fill"
+                [ngClass]="getLatencyClass(doorway.latencyMs)"
+                [style.width.%]="getLatencyBarWidth(doorway.latencyMs)"
+              ></div>
+            </div>
+            <span class="latency-text" [ngClass]="getLatencyClass(doorway.latencyMs)">
+              {{ formatLatency(doorway.latencyMs) }}
+            </span>
           </div>
 
           <!-- Features -->
@@ -198,13 +244,31 @@
   }
 
   <!-- Footer Actions -->
-  <div class="picker-footer">
-    <button type="button" class="cancel-btn" (click)="cancel()">
-      Cancel
-    </button>
-    <p class="footer-hint">
-      <span class="material-icons">info</span>
-      You can change your doorway later in settings
-    </p>
+  <div class="picker-footer" [class.has-selection]="selectedId()">
+    @if (selectedId()) {
+      <!-- Selected doorway summary -->
+      <div class="selected-summary">
+        <span class="material-icons">check_circle</span>
+        <span class="selected-name">{{ selected()?.doorway?.name }}</span>
+      </div>
+
+      <!-- Primary action: Continue -->
+      <button
+        type="button"
+        class="continue-btn"
+        (click)="doorwaySelected.emit(selected()!.doorway)"
+      >
+        {{ actionText() }}
+        <span class="material-icons">arrow_forward</span>
+      </button>
+    } @else {
+      <button type="button" class="cancel-btn" (click)="cancel()">
+        Cancel
+      </button>
+      <p class="footer-hint">
+        <span class="material-icons">info</span>
+        You can change your doorway later in settings
+      </p>
+    }
   </div>
 </div>

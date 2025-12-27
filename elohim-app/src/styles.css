@@ -670,6 +670,69 @@ body[data-theme="dark"] .cta-button:hover {
 }
 
 /* ============================================================================
+   Touch Target Utilities
+   ============================================================================
+   Global utility classes for ensuring touch-friendly tap targets.
+   iOS Human Interface Guidelines and WCAG 2.2 recommend minimum 44x44px.
+   ============================================================================ */
+
+/* Apply to buttons, links, and other tappable elements */
+.touch-target {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Larger touch target for primary actions */
+.touch-target-lg {
+    min-height: 48px;
+    min-width: 48px;
+}
+
+/* Inline touch targets (for link text that shouldn't be too wide) */
+.touch-target-inline {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* On touch devices, ensure interactive elements meet minimums */
+@media (pointer: coarse) {
+    /* Buttons should be touch-friendly */
+    button:not([class*="touch"]),
+    [role="button"]:not([class*="touch"]) {
+        min-height: 44px;
+    }
+
+    /* Links in navigation or action areas */
+    nav a,
+    .nav-link,
+    .action-link {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+    }
+}
+
+/* ============================================================================
+   Table Scroll Wrapper Utility
+   ============================================================================
+   Use .table-scroll-wrapper around tables to enable horizontal scrolling
+   on mobile devices while maintaining readable table content.
+   ============================================================================ */
+
+.table-scroll-wrapper {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1rem;
+}
+
+.table-scroll-wrapper table {
+    margin-bottom: 0;
+}
+
+/* ============================================================================
    Accessibility: Reduced Motion
    ============================================================================
    Respects user preference for reduced motion. Users who have enabled

@@ -431,8 +431,21 @@
 }
 
 /* =============================================================================
-   Tables
+   Tables - with responsive scroll wrapper
    ============================================================================= */
+
+/* Table scroll wrapper for responsive handling */
+:host ::ng-deep .markdown-content .table-wrapper {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 16px;
+}
+
+:host ::ng-deep .markdown-content .table-wrapper table {
+  margin-bottom: 0;
+}
 
 :host ::ng-deep .markdown-content table {
   border-spacing: 0;
@@ -441,6 +454,9 @@
   margin-bottom: 16px;
   width: 100%;
   overflow: auto;
+  /* Ensure tables don't break layout on mobile */
+  display: block;
+  max-width: 100%;
 }
 
 :host ::ng-deep .markdown-content th,
@@ -557,4 +573,128 @@
   }
 
   /* Note: Colors handled by CSS variables, only border/separator colors here */
+}
+
+/* =============================================================================
+   Responsive Breakpoints
+   =============================================================================
+   Using standardized breakpoints:
+   - 480px (--bp-sm): Small mobile
+   - 768px (--bp-md): Tablet / Large mobile
+   - 1024px (--bp-lg): Desktop
+   ============================================================================= */
+
+/* Tablet (768px - 1024px) */
+@media (max-width: 1024px) {
+  .markdown-content {
+    padding: 0.75rem;
+  }
+
+  .toc-toggle {
+    /* Ensure touch-friendly size */
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  .back-to-top {
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  .toc-list a {
+    /* Touch-friendly tap target */
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+}
+
+/* Mobile (max-width: 768px) */
+@media (max-width: 768px) {
+  .markdown-wrapper {
+    flex-direction: column;
+  }
+
+  .markdown-content {
+    padding: 0.5rem;
+    font-size: 15px;
+  }
+
+  .toc-sidebar {
+    width: 85vw;
+    max-width: 300px;
+  }
+
+  .toc-toggle {
+    bottom: 4rem;
+    right: 1rem;
+  }
+
+  .back-to-top {
+    bottom: 1rem;
+    right: 1rem;
+  }
+
+  /* Ensure code blocks scroll horizontally */
+  :host ::ng-deep .markdown-content pre {
+    padding: 12px;
+    font-size: 80%;
+  }
+
+  /* Adjust heading sizes for mobile */
+  :host ::ng-deep .markdown-content h1 {
+    font-size: 1.75em;
+  }
+
+  :host ::ng-deep .markdown-content h2 {
+    font-size: 1.375em;
+  }
+
+  :host ::ng-deep .markdown-content h3 {
+    font-size: 1.125em;
+  }
+
+  /* Hide anchor links on touch (tap to reveal is confusing) */
+  :host ::ng-deep .markdown-content .heading-anchor .anchor-link {
+    display: none;
+  }
+}
+
+/* Small mobile (max-width: 480px) */
+@media (max-width: 480px) {
+  .markdown-content {
+    padding: 0.25rem;
+    font-size: 14px;
+  }
+
+  .toc-sidebar {
+    width: 100vw;
+    max-width: 100vw;
+    right: -100vw;
+  }
+
+  .toc-sidebar.toc-visible {
+    right: 0;
+  }
+
+  :host ::ng-deep .markdown-content h1 {
+    font-size: 1.5em;
+  }
+
+  :host ::ng-deep .markdown-content h2 {
+    font-size: 1.25em;
+  }
+
+  /* Tighter list padding on small screens */
+  :host ::ng-deep .markdown-content ul,
+  :host ::ng-deep .markdown-content ol {
+    padding-left: 1.5em;
+  }
+
+  /* Smaller table padding on mobile */
+  :host ::ng-deep .markdown-content th,
+  :host ::ng-deep .markdown-content td {
+    padding: 4px 8px;
+    font-size: 0.875rem;
+  }
 }

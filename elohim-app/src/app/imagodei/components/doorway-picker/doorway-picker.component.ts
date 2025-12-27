@@ -71,6 +71,9 @@ export class DoorwayPickerComponent implements OnInit {
   readonly customValidating = signal(false);
   readonly customError = signal<string | null>(null);
 
+  /** Sort option for doorway list */
+  readonly sortBy = signal<'recommended' | 'latency' | 'name' | 'users'>('recommended');
+
   // ===========================================================================
   // Delegated State
   // ===========================================================================
@@ -84,7 +87,17 @@ export class DoorwayPickerComponent implements OnInit {
   // Computed State
   // ===========================================================================
 
-  /** Filtered doorways based on search and region */
+  /** The recommended doorway (online, best latency, open registration) */
+  readonly recommendedDoorway = computed(() => {
+    const online = this.doorways().filter(
+      d => d.status === 'online' && d.registrationOpen && d.latencyMs !== null
+    );
+    if (online.length === 0) return null;
+    // Sort by latency and return the fastest
+    return online.sort((a, b) => (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity))[0];
+  });
+
+  /** Filtered and sorted doorways based on search, region, and sort option */
   readonly filteredDoorways = computed(() => {
     let result = this.doorways();
 
@@ -103,6 +116,34 @@ export class DoorwayPickerComponent implements OnInit {
         d.operator.toLowerCase().includes(query)
       );
     }
+
+    // Sort by selected option
+    const sortOption = this.sortBy();
+    const recommended = this.recommendedDoorway();
+
+    result = [...result].sort((a, b) => {
+      // Always put recommended first if sorting by recommended
+      if (sortOption === 'recommended' && recommended) {
+        if (a.id === recommended.id) return -1;
+        if (b.id === recommended.id) return 1;
+      }
+
+      switch (sortOption) {
+        case 'latency':
+        case 'recommended':
+          // Lower latency is better; null goes to end
+          const latA = a.latencyMs ?? Infinity;
+          const latB = b.latencyMs ?? Infinity;
+          return latA - latB;
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'users':
+          // Higher user count is better
+          return (b.userCount ?? 0) - (a.userCount ?? 0);
+        default:
+          return 0;
+      }
+    });
 
     return result;
   });
@@ -214,6 +255,29 @@ export class DoorwayPickerComponent implements OnInit {
   formatLatency(latencyMs: number | null): string {
     if (latencyMs === null) return '--';
     return `${latencyMs}ms`;
+  }
+
+  /** Calculate latency bar width (0-100%) for visual indicator */
+  getLatencyBarWidth(latencyMs: number | null): number {
+    if (latencyMs === null) return 0;
+    // Cap at 500ms for visual purposes (anything above is "slow")
+    const capped = Math.min(latencyMs, 500);
+    // Invert: lower latency = fuller bar (better)
+    return Math.round(((500 - capped) / 500) * 100);
+  }
+
+  /** Check if doorway is the recommended one */
+  isRecommended(doorway: DoorwayWithHealth): boolean {
+    const rec = this.recommendedDoorway();
+    return rec !== null && rec.id === doorway.id;
+  }
+
+  /** Auto-select the recommended doorway */
+  selectRecommended(): void {
+    const rec = this.recommendedDoorway();
+    if (rec) {
+      this.selectDoorway(rec);
+    }
   }
 
   trackByDoorway(_index: number, doorway: DoorwayWithHealth): string {
