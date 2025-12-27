@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, effect } from '@angular/core';
 import { Observable, of, from, defer, throwError, timer, forkJoin } from 'rxjs';
 import { catchError, map, shareReplay, timeout, retry, tap, switchMap, take } from 'rxjs/operators';
 import {
@@ -211,6 +211,18 @@ export class DataLoaderService {
   ) {
     // Initialize caches in background
     this.initCaches();
+
+    // Watch for Holochain availability changes and update conductor source
+    // This fixes the race condition where initCaches() runs before Holochain connects
+    effect(() => {
+      const isAvailable = this.holochainContent.available();
+      if (this.contentResolver.isReady) {
+        this.contentResolver.setSourceAvailable('conductor', isAvailable);
+        if (isAvailable) {
+          console.log('[DataLoader] Conductor source now available');
+        }
+      }
+    });
   }
 
   /**

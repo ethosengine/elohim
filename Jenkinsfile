@@ -399,6 +399,92 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
         
+        stage('Fetch WASM Cache Core') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'staging'
+                    branch 'dev'
+                    changeset "elohim-app/**"
+                    changeset "elohim-library/**"
+                    changeset "holochain/holochain-cache-core/**"
+                    changeset "Jenkinsfile"
+                    changeset "VERSION"
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        echo 'Fetching holochain-cache-core WASM module...'
+
+                        // Try to fetch from holochain pipeline artifacts
+                        def wasmDir = 'holochain/holochain-cache-core/pkg'
+
+                        // First, try current branch
+                        def branchUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
+                        def fetchedFromBranch = sh(
+                            script: """
+                                mkdir -p '${wasmDir}'
+                                wget --recursive --no-parent --no-host-directories --cut-dirs=6 \
+                                    --timeout=30 --tries=2 \
+                                    -P '${wasmDir}' \
+                                    '${branchUrl}' 2>&1 || exit 1
+                                ls -la '${wasmDir}/'
+                            """,
+                            returnStatus: true
+                        ) == 0
+
+                        if (!fetchedFromBranch) {
+                            echo "WASM not found for branch ${env.BRANCH_NAME}, trying dev..."
+                            def devUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
+                            def fetchedFromDev = sh(
+                                script: """
+                                    mkdir -p '${wasmDir}'
+                                    wget --recursive --no-parent --no-host-directories --cut-dirs=6 \
+                                        --timeout=30 --tries=2 \
+                                        -P '${wasmDir}' \
+                                        '${devUrl}' 2>&1 || exit 1
+                                    ls -la '${wasmDir}/'
+                                """,
+                                returnStatus: true
+                            ) == 0
+
+                            if (!fetchedFromDev) {
+                                echo "WASM not found in dev, trying main..."
+                                def mainUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
+                                def fetchedFromMain = sh(
+                                    script: """
+                                        mkdir -p '${wasmDir}'
+                                        wget --recursive --no-parent --no-host-directories --cut-dirs=6 \
+                                            --timeout=30 --tries=2 \
+                                            -P '${wasmDir}' \
+                                            '${mainUrl}' 2>&1 || exit 1
+                                        ls -la '${wasmDir}/'
+                                    """,
+                                    returnStatus: true
+                                ) == 0
+
+                                if (!fetchedFromMain) {
+                                    echo """
+                                    ⚠️ Could not fetch holochain-cache-core WASM from any branch.
+                                    App will use TypeScript fallback (slightly slower but functional).
+                                    To enable WASM: Run holochain pipeline with FORCE_BUILD=true
+                                    """
+                                }
+                            }
+                        }
+
+                        if (fileExists("${wasmDir}/holochain_cache_core.js")) {
+                            echo "✅ holochain-cache-core WASM module ready"
+                            sh "ls -lh ${wasmDir}/"
+                        } else {
+                            echo "⚠️ WASM module not available - TypeScript fallback will be used"
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Install Dependencies') {
             when {
                 anyOf {

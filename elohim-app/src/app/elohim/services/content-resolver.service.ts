@@ -514,7 +514,15 @@ export class ContentResolverService implements OnDestroy {
     const chain = this.resolver!.getResolutionChain('content');
 
     for (const source of chain) {
-      if (!this.resolver!.isSourceAvailable(source.id)) {
+      // For conductor, check actual availability (handles race condition during init)
+      if (source.id === 'conductor') {
+        if (!this.holochainContent.isAvailable()) {
+          console.debug('[ContentResolver] Conductor not yet available for content, skipping');
+          continue;
+        }
+        // Update the resolver's knowledge now that conductor is available
+        this.resolver!.setSourceAvailable('conductor', true);
+      } else if (!this.resolver!.isSourceAvailable(source.id)) {
         continue;
       }
 
@@ -573,7 +581,15 @@ export class ContentResolverService implements OnDestroy {
     const chain = this.resolver!.getResolutionChain('path');
 
     for (const source of chain) {
-      if (!this.resolver!.isSourceAvailable(source.id)) {
+      // For conductor, check actual availability (handles race condition during init)
+      if (source.id === 'conductor') {
+        if (!this.holochainContent.isAvailable()) {
+          console.debug('[ContentResolver] Conductor not yet available, skipping');
+          continue;
+        }
+        // Update the resolver's knowledge now that conductor is available
+        this.resolver!.setSourceAvailable('conductor', true);
+      } else if (!this.resolver!.isSourceAvailable(source.id)) {
         continue;
       }
 
@@ -612,6 +628,11 @@ export class ContentResolverService implements OnDestroy {
         return await firstValueFrom(this.projectionApi.getPath(pathId));
 
       case 'conductor': {
+        // Double-check actual availability (handles race conditions during init)
+        if (!this.holochainContent.isAvailable()) {
+          console.debug('[ContentResolver] Conductor not yet available, skipping');
+          return null;
+        }
         const hcPath = await this.holochainContent.getPathWithSteps(pathId);
         return hcPath ? this.transformHolochainPath(hcPath) : null;
       }
@@ -637,7 +658,16 @@ export class ContentResolverService implements OnDestroy {
 
     for (const source of chain) {
       if (remaining.size === 0) break;
-      if (!this.resolver!.isSourceAvailable(source.id)) continue;
+
+      // For conductor, check actual availability (handles race condition during init)
+      if (source.id === 'conductor') {
+        if (!this.holochainContent.isAvailable()) {
+          continue;
+        }
+        this.resolver!.setSourceAvailable('conductor', true);
+      } else if (!this.resolver!.isSourceAvailable(source.id)) {
+        continue;
+      }
 
       const toFetch = Array.from(remaining);
       const batchResult = await this.batchFetchFromSource(toFetch, source.id);

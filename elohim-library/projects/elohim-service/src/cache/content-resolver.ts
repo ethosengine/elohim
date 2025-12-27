@@ -639,10 +639,15 @@ async function loadWasmModule(): Promise<WasmModule | null> {
   if (wasmModule) return wasmModule;
 
   try {
-    // Dynamic import of WASM module
-    const mod = await import('holochain-cache-core');
+    // Dynamic import of WASM module from assets path
+    // In browser: loads from /wasm/holochain-cache-core/
+    // Falls back to TypeScript if WASM not available
+    const wasmPath = '/wasm/holochain-cache-core/holochain_cache_core.js';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod: any = await import(/* webpackIgnore: true */ wasmPath);
     await mod.default();
-    wasmModule = mod as unknown as WasmModule;
+    wasmModule = mod as WasmModule;
+    console.log('[ContentResolver] WASM module loaded successfully');
     return wasmModule;
   } catch (error) {
     console.warn('[ContentResolver] WASM module not available:', error);

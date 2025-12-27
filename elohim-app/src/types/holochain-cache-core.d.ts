@@ -8,6 +8,12 @@
  * These types mirror the interfaces in elohim-library/projects/elohim-service/src/cache/types.ts
  */
 
+// Allow URL-based imports for runtime WASM loading
+declare module '/wasm/holochain-cache-core/holochain_cache_core.js' {
+  export * from 'holochain-cache-core';
+  export { default } from 'holochain-cache-core';
+}
+
 declare module 'holochain-cache-core' {
   /**
    * Initialize the WASM module.

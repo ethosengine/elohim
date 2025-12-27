@@ -278,6 +278,54 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        stage('Build WASM Cache Core') {
+            when {
+                anyOf {
+                    changeset "holochain/holochain-cache-core/**"
+                    changeset "elohim-app/**"
+                    changeset "elohim-library/**"
+                    expression { return params.FORCE_BUILD == true }
+                }
+            }
+            steps {
+                container('builder') {
+                    dir('holochain/holochain-cache-core') {
+                        script {
+                            echo 'Building holochain-cache-core WASM module...'
+
+                            sh '''#!/usr/bin/env bash
+                                set -euo pipefail
+
+                                export HOME="${HOME:-/root}"
+                                mkdir -p "$HOME"
+                                echo "[safe]" > "$HOME/.gitconfig"
+                                echo "    directory = *" >> "$HOME/.gitconfig"
+                                export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+
+                                # Install wasm-pack if not available
+                                if ! command -v wasm-pack &> /dev/null; then
+                                    echo "Installing wasm-pack..."
+                                    curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+                                fi
+
+                                echo "=== Building WASM module ==="
+                                wasm-pack build --target web --release
+
+                                echo ""
+                                echo "=== WASM Build artifacts ==="
+                                ls -lh pkg/
+                            '''
+
+                            archiveArtifacts artifacts: 'pkg/**', allowEmptyArchive: false
+                            stash name: 'wasm-cache-core', includes: 'pkg/**'
+
+                            echo "holochain-cache-core WASM module built and archived"
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Build DNA') {
             when {
                 anyOf {

@@ -34,6 +34,11 @@
                 "glob": "**/*",
                 "input": "../elohim-library/projects/perseus-plugin/dist",
                 "output": "/assets/perseus-plugin"
+              },
+              {
+                "glob": "**/*",
+                "input": "node_modules/holochain-cache-core",
+                "output": "/wasm/holochain-cache-core"
               }
             ],
             "styles": [
