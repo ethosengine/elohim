@@ -1,7 +1,8 @@
-//! Projection Engine - transforms DHT signals into cached projections
+//! Projection Engine - type-agnostic signal processing
 //!
-//! The engine subscribes to Holochain conductor signals and transforms
-//! committed entries into MongoDB projections for fast reads.
+//! The engine receives generic projection signals from DNA and stores
+//! opaque data in MongoDB projections. Doorway does NOT interpret signal
+//! content - it just stores what DNA tells it to store.
 //!
 //! # Architecture
 //!
@@ -10,11 +11,9 @@
 //! │                    Projection Engine                        │
 //! ├─────────────────────────────────────────────────────────────┤
 //! │  ┌──────────────────┐    ┌──────────────────────────┐      │
-//! │  │ Signal Subscriber│───▶│  Transformers            │      │
-//! │  │ (WS to Conductor)│    │  - ContentTransformer    │      │
-//! │  │                  │    │  - PathTransformer       │      │
-//! │  └──────────────────┘    │  - RelationshipTransform │      │
-//! │                          └──────────┬───────────────┘      │
+//! │  │ Signal Subscriber│───▶│  Generic Handler         │      │
+//! │  │ (WS to Conductor)│    │  (type-agnostic)         │      │
+//! │  └──────────────────┘    └──────────┬───────────────┘      │
 //! │                                     │                       │
 //! │                          ┌──────────▼───────────────┐      │
 //! │                          │   ProjectionStore        │      │
@@ -22,6 +21,12 @@
 //! │                          └──────────────────────────┘      │
 //! └─────────────────────────────────────────────────────────────┘
 //! ```
+//!
+//! ## Type-Agnostic Design
+//!
+//! Doorway does NOT define content types - the Holochain DNA does.
+//! Signals include explicit metadata (search_tokens, invalidates, ttl)
+//! so doorway can process any type without parsing the data field.
 
 use std::sync::Arc;
 
@@ -34,184 +39,54 @@ use crate::types::DoorwayError;
 
 use super::document::ProjectedDocument;
 use super::store::ProjectionStore;
-use super::collections::{ContentProjection, PathProjection};
 
-/// Signal types from the DNA post_commit handler.
+/// Generic projection signal from DNA post_commit.
 ///
-/// These mirror the `ProjectionSignal` enum in the content_store zome.
+/// Doorway is type-agnostic - it stores whatever DNA sends without
+/// parsing the `data` field. DNA provides explicit metadata for:
+/// - Search indexing (search_tokens)
+/// - Cache invalidation (invalidates)
+/// - TTL/expiry (ttl_secs)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "payload")]
-pub enum ProjectionSignal {
-    /// Content entry was created or updated
-    ContentCommitted {
-        action_hash: String,
-        entry_hash: String,
-        content: ContentSignalData,
-        author: String,
-    },
-    /// LearningPath was created or updated
-    PathCommitted {
-        action_hash: String,
-        entry_hash: String,
-        path: PathSignalData,
-        author: String,
-    },
-    /// PathStep was created or updated
-    StepCommitted {
-        action_hash: String,
-        entry_hash: String,
-        step: StepSignalData,
-        author: String,
-    },
-    /// PathChapter was created or updated
-    ChapterCommitted {
-        action_hash: String,
-        entry_hash: String,
-        chapter: ChapterSignalData,
-        author: String,
-    },
-    /// Relationship was created
-    RelationshipCommitted {
-        action_hash: String,
-        entry_hash: String,
-        relationship: RelationshipSignalData,
-        author: String,
-    },
-    /// Human (agent profile) was created or updated
-    HumanCommitted {
-        action_hash: String,
-        entry_hash: String,
-        human: JsonValue,
-        author: String,
-    },
-    /// Agent was created or updated
-    AgentCommitted {
-        action_hash: String,
-        entry_hash: String,
-        agent: JsonValue,
-        author: String,
-    },
-    /// ContributorPresence was created or updated
-    PresenceCommitted {
-        action_hash: String,
-        entry_hash: String,
-        presence: JsonValue,
-        author: String,
-    },
-    /// Generic entry committed
-    EntryCommitted {
-        action_hash: String,
-        entry_hash: String,
-        entry_type: String,
-        author: String,
-    },
-}
-
-/// Content data from DNA signal (matches Content entry)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ContentSignalData {
+pub struct ProjectionSignal {
+    /// Document type (e.g., "Content", "LearningPath", "MyCustomType")
+    pub doc_type: String,
+    /// Action ("commit", "delete", "update")
+    pub action: String,
+    /// Document ID
     pub id: String,
-    pub content_type: String,
-    pub title: String,
-    pub description: String,
-    pub summary: Option<String>,
-    pub content: String,
-    pub content_format: String,
-    pub tags: Vec<String>,
-    pub source_path: Option<String>,
-    pub related_node_ids: Vec<String>,
-    pub author_id: Option<String>,
-    pub reach: String,
-    pub trust_score: f64,
-    pub estimated_minutes: Option<u32>,
-    pub thumbnail_url: Option<String>,
-    pub metadata_json: String,
-    pub created_at: String,
-    pub updated_at: String,
-}
+    /// Opaque data - doorway never parses this
+    pub data: JsonValue,
+    /// Holochain action hash
+    pub action_hash: String,
+    /// Entry hash (optional for deletes)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry_hash: Option<String>,
+    /// Author agent pub key
+    pub author: String,
 
-/// LearningPath data from DNA signal
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PathSignalData {
-    pub id: String,
-    pub version: String,
-    pub title: String,
-    pub description: String,
-    pub purpose: Option<String>,
-    pub created_by: String,
-    pub difficulty: String,
-    pub estimated_duration: Option<String>,
-    pub visibility: String,
-    pub path_type: String,
-    pub tags: Vec<String>,
-    pub metadata_json: String,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-/// PathStep data from DNA signal
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StepSignalData {
-    pub id: String,
-    pub path_id: String,
-    pub chapter_id: Option<String>,
-    pub order_index: u32,
-    pub step_type: String,
-    pub resource_id: String,
-    pub step_title: Option<String>,
-    pub step_narrative: Option<String>,
-    pub is_optional: bool,
-    pub estimated_minutes: Option<u32>,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-/// PathChapter data from DNA signal
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChapterSignalData {
-    pub id: String,
-    pub path_id: String,
-    pub order_index: u32,
-    pub title: String,
-    pub description: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-/// Relationship data from DNA signal
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RelationshipSignalData {
-    pub id: String,
-    pub source_id: String,
-    pub target_id: String,
-    pub relationship_type: String,
-    pub confidence: f64,
-    pub inference_source: String,
-    pub metadata_json: Option<String>,
-    pub created_at: String,
+    // Explicit metadata from DNA (doorway applies but doesn't compute)
+    /// Search tokens (DNA computes these from title, description, tags, etc.)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub search_tokens: Vec<String>,
+    /// Cache keys to invalidate (e.g., ["LearningPath:governance-intro"])
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub invalidates: Vec<String>,
+    /// TTL in seconds (None = no expiry)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ttl_secs: Option<u64>,
 }
 
 /// Projection Engine configuration
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
-    /// Whether to process content signals
-    pub process_content: bool,
-    /// Whether to process path signals
-    pub process_paths: bool,
-    /// Whether to process relationship signals
-    pub process_relationships: bool,
     /// Buffer size for signal processing
     pub buffer_size: usize,
 }
 
 impl Default for EngineConfig {
     fn default() -> Self {
-        Self {
-            process_content: true,
-            process_paths: true,
-            process_relationships: true,
-            buffer_size: 1000,
-        }
+        Self { buffer_size: 1000 }
     }
 }
 
@@ -246,296 +121,68 @@ impl ProjectionEngine {
         let _ = self.shutdown_tx.send(());
     }
 
-    /// Process a single projection signal
+    /// Process a single projection signal.
+    ///
+    /// This is type-agnostic - doorway stores whatever DNA sends without
+    /// parsing the data field. DNA provides explicit metadata for search
+    /// tokens and cache invalidation.
     pub async fn process_signal(&self, signal: ProjectionSignal) -> Result<(), DoorwayError> {
-        match signal {
-            ProjectionSignal::ContentCommitted {
-                action_hash,
-                entry_hash,
-                content,
-                author,
-            } => {
-                if self.config.process_content {
-                    self.process_content(action_hash, entry_hash, content, author).await?;
-                }
-            }
-            ProjectionSignal::PathCommitted {
-                action_hash,
-                entry_hash,
-                path,
-                author,
-            } => {
-                if self.config.process_paths {
-                    self.process_path(action_hash, entry_hash, path, author).await?;
-                }
-            }
-            ProjectionSignal::StepCommitted {
-                action_hash,
-                entry_hash,
-                step,
-                author,
-            } => {
-                if self.config.process_paths {
-                    self.process_step(action_hash, entry_hash, step, author).await?;
-                }
-            }
-            ProjectionSignal::ChapterCommitted {
-                action_hash,
-                entry_hash,
-                chapter,
-                author,
-            } => {
-                if self.config.process_paths {
-                    self.process_chapter(action_hash, entry_hash, chapter, author).await?;
-                }
-            }
-            ProjectionSignal::RelationshipCommitted {
-                action_hash,
-                entry_hash,
-                relationship,
-                author,
-            } => {
-                if self.config.process_relationships {
-                    self.process_relationship(action_hash, entry_hash, relationship, author).await?;
-                }
-            }
-            ProjectionSignal::HumanCommitted { action_hash, .. } => {
-                debug!("Human committed (action: {}), skipping projection", action_hash);
-            }
-            ProjectionSignal::AgentCommitted { action_hash, .. } => {
-                debug!("Agent committed (action: {}), skipping projection", action_hash);
-            }
-            ProjectionSignal::PresenceCommitted { action_hash, .. } => {
-                debug!("Presence committed (action: {}), skipping projection", action_hash);
-            }
-            ProjectionSignal::EntryCommitted { action_hash, entry_type, .. } => {
-                debug!("Generic entry committed: {} (action: {})", entry_type, action_hash);
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Process a content signal into a projection
-    async fn process_content(
-        &self,
-        action_hash: String,
-        entry_hash: String,
-        content: ContentSignalData,
-        author: String,
-    ) -> Result<(), DoorwayError> {
-        info!("Projecting content: {} ({})", content.title, content.id);
-
-        // Convert to JSON for the projection
-        let data = serde_json::to_value(&content)
-            .map_err(|e| DoorwayError::Projection(format!("Serialize content: {}", e)))?;
-
-        // Create the projected document
-        let doc = ProjectedDocument::new(
-            "Content",
-            &content.id,
-            &action_hash,
-            &author,
-            data,
-        )
-        .with_entry_hash(&entry_hash)
-        .with_search_tokens(Self::extract_content_tokens(&content));
-
-        // Store in projection store
-        self.store.set(doc).await?;
-
-        debug!("Content projected: {}", content.id);
-        Ok(())
-    }
-
-    /// Process a path signal into a projection
-    async fn process_path(
-        &self,
-        action_hash: String,
-        entry_hash: String,
-        path: PathSignalData,
-        author: String,
-    ) -> Result<(), DoorwayError> {
-        info!("Projecting path: {} ({})", path.title, path.id);
-
-        // Convert to JSON for the projection
-        let data = serde_json::to_value(&path)
-            .map_err(|e| DoorwayError::Projection(format!("Serialize path: {}", e)))?;
-
-        // Create the projected document
-        // Note: step_count would need to be calculated separately
-        let doc = ProjectedDocument::new(
-            "LearningPath",
-            &path.id,
-            &action_hash,
-            &author,
-            data,
-        )
-        .with_entry_hash(&entry_hash)
-        .with_search_tokens(Self::extract_path_tokens(&path));
-
-        // Store in projection store
-        self.store.set(doc).await?;
-
-        debug!("Path projected: {}", path.id);
-        Ok(())
-    }
-
-    /// Process a step signal into a projection
-    async fn process_step(
-        &self,
-        action_hash: String,
-        entry_hash: String,
-        step: StepSignalData,
-        author: String,
-    ) -> Result<(), DoorwayError> {
-        debug!("Projecting step: {} (path: {})", step.id, step.path_id);
-
-        // Convert to JSON for the projection
-        let data = serde_json::to_value(&step)
-            .map_err(|e| DoorwayError::Projection(format!("Serialize step: {}", e)))?;
-
-        // Create the projected document
-        let doc = ProjectedDocument::new(
-            "PathStep",
-            &step.id,
-            &action_hash,
-            &author,
-            data,
-        )
-        .with_entry_hash(&entry_hash);
-
-        // Store in projection store
-        self.store.set(doc).await?;
-
-        // Also invalidate the parent path's cache so step count updates
-        let pattern = format!("LearningPath:{}", step.path_id);
-        let _ = self.store.invalidate(&pattern).await;
-
-        debug!("Step projected: {}", step.id);
-        Ok(())
-    }
-
-    /// Process a chapter signal into a projection
-    async fn process_chapter(
-        &self,
-        action_hash: String,
-        entry_hash: String,
-        chapter: ChapterSignalData,
-        author: String,
-    ) -> Result<(), DoorwayError> {
-        debug!("Projecting chapter: {} (path: {})", chapter.id, chapter.path_id);
-
-        // Convert to JSON for the projection
-        let data = serde_json::to_value(&chapter)
-            .map_err(|e| DoorwayError::Projection(format!("Serialize chapter: {}", e)))?;
-
-        // Create the projected document
-        let doc = ProjectedDocument::new(
-            "PathChapter",
-            &chapter.id,
-            &action_hash,
-            &author,
-            data,
-        )
-        .with_entry_hash(&entry_hash);
-
-        // Store in projection store
-        self.store.set(doc).await?;
-
-        // Also invalidate the parent path's cache so chapter count updates
-        let pattern = format!("LearningPath:{}", chapter.path_id);
-        let _ = self.store.invalidate(&pattern).await;
-
-        debug!("Chapter projected: {}", chapter.id);
-        Ok(())
-    }
-
-    /// Process a relationship signal into a projection
-    async fn process_relationship(
-        &self,
-        action_hash: String,
-        entry_hash: String,
-        relationship: RelationshipSignalData,
-        author: String,
-    ) -> Result<(), DoorwayError> {
-        debug!(
-            "Projecting relationship: {} ({} -> {})",
-            relationship.id, relationship.source_id, relationship.target_id
+        info!(
+            doc_type = signal.doc_type,
+            action = signal.action,
+            id = signal.id,
+            "Processing projection signal"
         );
 
-        // Convert to JSON for the projection
-        let data = serde_json::to_value(&relationship)
-            .map_err(|e| DoorwayError::Projection(format!("Serialize relationship: {}", e)))?;
+        match signal.action.as_str() {
+            "commit" | "update" => {
+                // Store opaque data with DNA-provided metadata
+                let mut doc = ProjectedDocument::new(
+                    &signal.doc_type,
+                    &signal.id,
+                    &signal.action_hash,
+                    &signal.author,
+                    signal.data,
+                );
 
-        // Create the projected document
-        let doc = ProjectedDocument::new(
-            "Relationship",
-            &relationship.id,
-            &action_hash,
-            &author,
-            data,
-        )
-        .with_entry_hash(&entry_hash);
+                if let Some(ref entry_hash) = signal.entry_hash {
+                    doc = doc.with_entry_hash(entry_hash);
+                }
 
-        // Store in projection store
-        self.store.set(doc).await?;
+                if !signal.search_tokens.is_empty() {
+                    doc = doc.with_search_tokens(signal.search_tokens.clone());
+                }
 
-        debug!("Relationship projected: {}", relationship.id);
+                self.store.set(doc).await?;
+                debug!(
+                    doc_type = signal.doc_type,
+                    id = signal.id,
+                    "Document projected"
+                );
+            }
+            "delete" => {
+                // Delete by invalidating the cache entry
+                let pattern = format!("{}:{}", signal.doc_type, signal.id);
+                self.store.invalidate(&pattern).await?;
+                debug!(
+                    doc_type = signal.doc_type,
+                    id = signal.id,
+                    "Document deleted (via invalidation)"
+                );
+            }
+            other => {
+                debug!(action = other, "Unknown signal action, ignoring");
+            }
+        }
+
+        // Apply cache invalidations from DNA
+        for pattern in &signal.invalidates {
+            if let Err(e) = self.store.invalidate(pattern).await {
+                warn!(pattern = pattern, error = ?e, "Cache invalidation failed");
+            }
+        }
+
         Ok(())
-    }
-
-    /// Extract search tokens from content
-    fn extract_content_tokens(content: &ContentSignalData) -> Vec<String> {
-        let mut tokens = Vec::new();
-
-        // Add tokens from title and description
-        tokens.extend(Self::tokenize(&content.title));
-        tokens.extend(Self::tokenize(&content.description));
-
-        // Add tags directly
-        for tag in &content.tags {
-            tokens.push(tag.to_lowercase());
-        }
-
-        // Add content type
-        tokens.push(content.content_type.to_lowercase());
-
-        tokens.sort();
-        tokens.dedup();
-        tokens
-    }
-
-    /// Extract search tokens from path
-    fn extract_path_tokens(path: &PathSignalData) -> Vec<String> {
-        let mut tokens = Vec::new();
-
-        tokens.extend(Self::tokenize(&path.title));
-        tokens.extend(Self::tokenize(&path.description));
-
-        for tag in &path.tags {
-            tokens.push(tag.to_lowercase());
-        }
-
-        tokens.push(path.difficulty.to_lowercase());
-
-        tokens.sort();
-        tokens.dedup();
-        tokens
-    }
-
-    /// Tokenize text for search
-    fn tokenize(text: &str) -> Vec<String> {
-        text.split_whitespace()
-            .filter(|word| word.len() >= 3)
-            .map(|word| {
-                word.to_lowercase()
-                    .chars()
-                    .filter(|c| c.is_alphanumeric())
-                    .collect()
-            })
-            .filter(|word: &String| !word.is_empty())
-            .collect()
     }
 }
 
@@ -587,39 +234,74 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_tokenize() {
-        let tokens = ProjectionEngine::tokenize("The quick brown fox");
-        assert!(tokens.contains(&"quick".to_string()));
-        assert!(tokens.contains(&"brown".to_string()));
-        assert!(!tokens.contains(&"the".to_string())); // Too short
+    fn test_signal_serialization() {
+        let signal = ProjectionSignal {
+            doc_type: "Content".to_string(),
+            action: "commit".to_string(),
+            id: "manifesto".to_string(),
+            data: serde_json::json!({
+                "title": "The Elohim Protocol",
+                "description": "A manifesto for decentralized governance"
+            }),
+            action_hash: "uhCkk...".to_string(),
+            entry_hash: Some("uhCEk...".to_string()),
+            author: "uhCAk...".to_string(),
+            search_tokens: vec!["elohim".to_string(), "protocol".to_string(), "governance".to_string()],
+            invalidates: vec![],
+            ttl_secs: None,
+        };
+
+        let json = serde_json::to_string(&signal).unwrap();
+        assert!(json.contains("Content"));
+        assert!(json.contains("manifesto"));
+        assert!(json.contains("governance"));
     }
 
     #[test]
-    fn test_content_tokens() {
-        let content = ContentSignalData {
-            id: "test".to_string(),
-            content_type: "concept".to_string(),
-            title: "Economic Flows".to_string(),
-            description: "Understanding value in networks".to_string(),
-            summary: None,
-            content: "".to_string(),
-            content_format: "markdown".to_string(),
-            tags: vec!["economics".to_string(), "governance".to_string()],
-            source_path: None,
-            related_node_ids: Vec::new(),
-            author_id: None,
-            reach: "public".to_string(),
-            trust_score: 1.0,
-            estimated_minutes: None,
-            thumbnail_url: None,
-            metadata_json: "{}".to_string(),
-            created_at: "".to_string(),
-            updated_at: "".to_string(),
-        };
+    fn test_signal_deserialization() {
+        let json = r#"{
+            "doc_type": "LearningPath",
+            "action": "commit",
+            "id": "governance-intro",
+            "data": {"title": "Introduction to Governance"},
+            "action_hash": "uhCkk...",
+            "author": "uhCAk...",
+            "search_tokens": ["governance", "intro"],
+            "invalidates": ["Content:manifesto"]
+        }"#;
 
-        let tokens = ProjectionEngine::extract_content_tokens(&content);
-        assert!(tokens.contains(&"economic".to_string()));
-        assert!(tokens.contains(&"economics".to_string()));
-        assert!(tokens.contains(&"concept".to_string()));
+        let signal: ProjectionSignal = serde_json::from_str(json).unwrap();
+        assert_eq!(signal.doc_type, "LearningPath");
+        assert_eq!(signal.action, "commit");
+        assert_eq!(signal.id, "governance-intro");
+        assert_eq!(signal.search_tokens.len(), 2);
+        assert_eq!(signal.invalidates.len(), 1);
+        assert!(signal.entry_hash.is_none()); // Optional field
+        assert!(signal.ttl_secs.is_none()); // Optional field
+    }
+
+    #[test]
+    fn test_signal_minimal() {
+        // Test minimal signal with only required fields
+        let json = r#"{
+            "doc_type": "CustomType",
+            "action": "delete",
+            "id": "some-id",
+            "data": null,
+            "action_hash": "uhCkk...",
+            "author": "uhCAk..."
+        }"#;
+
+        let signal: ProjectionSignal = serde_json::from_str(json).unwrap();
+        assert_eq!(signal.doc_type, "CustomType");
+        assert_eq!(signal.action, "delete");
+        assert!(signal.search_tokens.is_empty());
+        assert!(signal.invalidates.is_empty());
+    }
+
+    #[test]
+    fn test_config_default() {
+        let config = EngineConfig::default();
+        assert_eq!(config.buffer_size, 1000);
     }
 }

@@ -192,13 +192,21 @@ struct SignalRelay {
 
 **Purpose**: HTTP/WebSocket gateway to Holochain conductor.
 
+**Design Principle: Type-Agnostic**
+
+Doorway is a thin gateway that does NOT define content types or routes.
+The Holochain DNA defines what types exist. Doorway simply:
+1. Accepts any `{type}/{id}` path
+2. Passes the type string through to projection/conductor
+3. Returns whatever the DNA returns
+
+This keeps doorway generic and reusable across different DNAs.
+
 **Current Routes**:
 - `/admin` - Admin interface (worker pool protection)
 - `/app/{port}` - App interface (direct proxy)
-
-**Future Routes (REST Cache Layer)**:
-- `/api/v1/{dna}/{zome}/{fn}` - Cached GET requests
-- Content-addressed responses are infinitely cacheable
+- `/api/v1/cache/{type}/{id}` - Generic cache layer (type-agnostic)
+- `/api/v1/cache/{type}` - Collection queries
 
 ---
 
@@ -251,11 +259,12 @@ Features:
 4. ✅ HTTP cache headers (Cache-Control, ETag, Vary, X-Cache)
 5. ✅ Pattern-based cache invalidation (per DNA, per function)
 6. ✅ Cache stats in /status endpoint
-7. ✅ Generic route pattern for any DNA/zome
+7. ✅ Generic route pattern for any content type
 
 **Route**:
 ```
-GET /api/v1/{dna_hash}/{zome}/{fn}?{args}
+GET /api/v1/cache/{type}/{id}     → Single document
+GET /api/v1/cache/{type}          → Collection query
 ```
 
 **Cache Rule Discovery Protocol**:
@@ -279,7 +288,163 @@ fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
 - `get_*` and `list_*` functions → cacheable, 5 min TTL, auth required
 - Other functions → not cacheable via REST API
 
-**Next**: Connect to conductor for actual zome calls
+### Phase 4: Tiered Content Resolution ✅
+
+**Status**: Implemented
+**Complexity**: Medium
+
+Integration with `holochain-cache-core` for unified content resolution.
+
+**DoorwayResolver** provides tiered source routing:
+```
+Request → Projection Cache (MongoDB, fast)
+             ↓ miss
+          Conductor (DHT, authoritative)
+             ↓ miss
+          External (CDN/URLs, last resort)
+```
+
+Features:
+1. ✅ Automatic fallback chain (Projection → Conductor)
+2. ✅ Source availability tracking
+3. ✅ Resolution statistics and metrics
+4. ✅ **Type-agnostic resolution** - doorway passes through any type string
+5. ✅ Integration with WorkerPool for conductor calls
+
+**Type-Agnostic Design**:
+
+Doorway does NOT define content types - the Holochain DNA does. The resolver
+accepts any type string and passes it through to projection/conductor:
+
+```rust
+// AppState includes resolver
+pub struct AppState {
+    // ...existing fields...
+    pub resolver: Arc<DoorwayResolver>,
+    pub write_buffer: Option<Arc<DoorwayWriteBuffer>>,
+}
+
+// Generic resolution - type comes from request path
+// Doorway doesn't know or care what types exist
+let result = state.resolver.resolve(doc_type, id).await;
+
+// Works for any type the DNA defines:
+resolver.resolve("Content", "manifesto").await;
+resolver.resolve("LearningPath", "governance-intro").await;
+resolver.resolve("CustomDnaType", "custom-id").await;
+```
+
+### Phase 5: Batched Conductor Writes ✅
+
+**Status**: Implemented
+**Complexity**: Medium
+
+**DoorwayWriteBuffer** protects conductor from heavy write loads:
+
+```
+Write Request → Priority Queue (High/Normal/Bulk)
+                    ↓ batched
+                Conductor (batched zome calls)
+```
+
+Features:
+1. ✅ Priority queues: High (identity/auth) → Normal → Bulk (seeding)
+2. ✅ Deduplication (last write wins within batch window)
+3. ✅ Retry logic with exponential backoff
+4. ✅ Backpressure signaling (0-100%)
+5. ✅ Auto-flush background task
+6. ✅ Presets: `for_seeding()`, `for_recovery()`, `for_interactive()`
+
+**Use Cases**:
+- Bulk content imports (seeding)
+- Recovery sync from family network
+- Incremental projection updates
+
+### Phase 6: Type-Agnostic Projection Signals ✅
+
+**Status**: Implemented
+**Complexity**: Medium
+
+DNA signals use a **generic format** - doorway never parses signal content.
+
+**Signal Format**:
+```json
+{
+  "doc_type": "Content",
+  "action": "commit",
+  "id": "manifesto",
+  "data": { ... },              // Opaque - doorway never parses this
+  "action_hash": "uhCkk...",
+  "entry_hash": "uhCEk...",
+  "author": "uhCAk...",
+
+  // Explicit metadata (DNA controls all of this)
+  "search_tokens": ["governance", "manifesto", "protocol"],
+  "invalidates": ["LearningPath:governance-intro"],
+  "ttl_secs": 3600
+}
+```
+
+**Key Principles**:
+
+1. **Doorway is type-agnostic**: Accepts any `doc_type` string, stores `data` as opaque JSON
+2. **DNA computes metadata**: Search tokens, cache invalidation patterns, TTL
+3. **No backwards compatibility**: Clean break from type-specific enum
+
+**Signal Processing**:
+```rust
+// Generic handler - works for any type
+pub async fn process_signal(&self, signal: ProjectionSignal) {
+    match signal.action.as_str() {
+        "commit" | "update" => {
+            // Store opaque data with DNA-provided metadata
+            let doc = ProjectedDocument::new(
+                &signal.doc_type,  // Any type string
+                &signal.id,
+                &signal.action_hash,
+                &signal.author,
+                signal.data,       // Opaque - doorway doesn't parse
+            )
+            .with_entry_hash(signal.entry_hash.as_deref())
+            .with_search_tokens(signal.search_tokens);
+
+            self.store.set(doc).await?;
+        }
+        "delete" => {
+            self.store.invalidate(&format!("{}:{}", signal.doc_type, signal.id)).await?;
+        }
+    }
+
+    // Apply cache invalidations from DNA
+    for pattern in signal.invalidates {
+        self.store.invalidate(&pattern).await;
+    }
+}
+```
+
+**DNA Responsibility**:
+
+DNA computes all domain logic and tells doorway what to do:
+```rust
+fn post_commit_signal(content: Content) {
+    emit_signal(ProjectionSignal {
+        doc_type: "Content".to_string(),
+        id: content.id,
+        action: "commit".to_string(),
+        data: serialize(content),
+
+        // DNA computes these - doorway just applies them
+        search_tokens: tokenize(&content.title, &content.description, &content.tags),
+        invalidates: vec![],  // Content doesn't invalidate anything
+        ttl_secs: None,
+    });
+}
+```
+
+**Benefits**:
+- Doorway is fully reusable across different DNAs
+- New content types require no doorway changes
+- Clear separation: DNA = domain logic, Doorway = infrastructure
 
 ---
 
@@ -295,47 +460,81 @@ fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
               └────────┬────────┘
                        │
                        ▼
-         ┌─────────────────────────┐
-         │        DOORWAY          │
-         │                         │
-         │  ┌───────────────────┐  │
-         │  │   Axum Router     │  │
-         │  │                   │  │
-         │  │ /bootstrap/* ────────────┐
-         │  │ /signal/*    ────────────┼──► In-Memory State
-         │  │ /admin       ────────────┼──► Worker Pool (4 conns)
-         │  │ /app/:port   ────────────┼──► Direct Proxy
-         │  │ /api/v1/*    ────────────┼──► Cache Layer
-         │  │                   │  │   │
-         │  └───────────────────┘  │   │
-         │                         │   │
-         │  ┌───────────────────┐  │   │
-         │  │  Bootstrap Store  │◄─────┘
-         │  │  - agents map     │  │
-         │  │  - space index    │  │
-         │  └───────────────────┘  │
-         │                         │
-         │  ┌───────────────────┐  │
-         │  │  Signal Relay     │◄─────┐
-         │  │  - connections    │  │   │
-         │  │  - rate limiter   │  │   │
-         │  └───────────────────┘  │   │
-         │                         │   │
-         │  ┌───────────────────┐  │   │
-         │  │  Response Cache   │◄─────┤
-         │  │  - LRU cache      │  │   │
-         │  └───────────────────┘  │   │
-         │                         │   │
-         └─────────┬───────────────┘   │
-                   │                   │
-                   ▼                   │
-         ┌─────────────────┐           │
-         │   Holochain     │           │
-         │   Conductor     │◄──────────┘
+         ┌─────────────────────────────────────────────────┐
+         │                    DOORWAY                       │
+         │                                                  │
+         │  ┌───────────────────┐  ┌─────────────────────┐ │
+         │  │   Hyper Router    │  │  holochain-cache-   │ │
+         │  │                   │  │       core          │ │
+         │  │ /bootstrap/*  ───────►  ┌───────────────┐  │ │
+         │  │ /signal/*     ───────►  │ DoorwayResolver│  │ │
+         │  │ /admin        ───────►  │ (Projection →  │  │ │
+         │  │ /app/:port    ───────►  │  Conductor)    │  │ │
+         │  │ /api/v1/cache ───────►  └───────────────┘  │ │
+         │  │                   │  │  ┌───────────────┐  │ │
+         │  └───────────────────┘  │  │WriteBuffer    │  │ │
+         │                         │  │ (Priority     │  │ │
+         │  ┌───────────────────┐  │  │  Batching)    │  │ │
+         │  │  Bootstrap Store  │  │  └───────────────┘  │ │
+         │  │  - agents map     │  └─────────────────────┘ │
+         │  │  - space index    │                          │
+         │  └───────────────────┘                          │
+         │                                                  │
+         │  ┌───────────────────┐  ┌─────────────────────┐ │
+         │  │  Signal Relay     │  │  ProjectionStore    │ │
+         │  │  - connections    │  │  (MongoDB cache)    │ │
+         │  │  - rate limiter   │  └─────────────────────┘ │
+         │  └───────────────────┘                          │
+         │                                                  │
+         │  ┌───────────────────┐  ┌─────────────────────┐ │
+         │  │  WorkerPool       │  │  TieredBlobCache    │ │
+         │  │  (4 connections)  │  │  (media streaming)  │ │
+         │  └─────────┬─────────┘  └─────────────────────┘ │
+         │            │                                     │
+         └────────────┼─────────────────────────────────────┘
+                      │
+                      ▼
+         ┌─────────────────┐
+         │   Holochain     │
+         │   Conductor     │
          │                 │
          │  - Admin WS     │
          │  - App WS       │
          └─────────────────┘
+```
+
+**Data Flow (Content Resolution)**:
+```
+GET /api/v1/cache/{type}/{id}
+        │
+        ▼
+  DoorwayResolver.resolve(type, id)    ← Type-agnostic!
+        │
+        ├── 1. Check ProjectionStore (MongoDB)
+        │       └── HIT → Return immediately
+        │
+        └── 2. Fallback to WorkerPool → Conductor
+                └── HIT → Cache in Projection, Return
+
+Examples:
+  /api/v1/cache/Content/manifesto      → resolve("Content", "manifesto")
+  /api/v1/cache/LearningPath/intro     → resolve("LearningPath", "intro")
+  /api/v1/cache/CustomType/custom-id   → resolve("CustomType", "custom-id")
+```
+
+**Data Flow (Batched Writes)**:
+```
+Bulk Import Request
+        │
+        ▼
+  DoorwayWriteBuffer.queue_content_create(...)
+        │
+        ├── Priority: High (identity) → Flush immediately
+        ├── Priority: Normal (content) → Batch moderately
+        └── Priority: Bulk (seeding) → Batch aggressively
+                │
+                ▼
+          Batched zome calls to Conductor
 ```
 
 ---
@@ -385,22 +584,36 @@ doorway:
 
 ---
 
-## Dependencies to Add
+## Key Dependencies
 
 ```toml
 [dependencies]
-# MessagePack (for bootstrap)
-rmp-serde = "1.1"
+# Shared caching primitives (O(log n) operations, WASM-compatible)
+holochain-cache-core = { path = "../holochain-cache-core" }
+
+# MessagePack (for bootstrap/Holochain protocol)
+rmp-serde = "1.3"
 
 # Ed25519 (for bootstrap + signal auth)
 ed25519-dalek = "2.1"
 
-# Rate limiting
-governor = "0.6"
-
 # Concurrent data structures
-dashmap = "5.5"
+dashmap = "6.1"
+
+# MongoDB for projection cache
+mongodb = "3.1"
+
+# Async runtime
+tokio = { version = "1.43", features = ["full"] }
 ```
+
+**holochain-cache-core** provides:
+- `ContentResolver` - Type-agnostic tiered source routing (Projection → Conductor → External)
+- `WriteBuffer` - Priority-based batching (High → Normal → Bulk)
+- `BlobCache` - O(log n) LRU eviction for media
+
+Note: holochain-cache-core is type-agnostic. It doesn't know what content types
+exist - it just routes requests to the appropriate source tier.
 
 ---
 

@@ -9,6 +9,17 @@
 //! - Custodian-aware distribution with geographic awareness
 //! - Mastery-based TTL with freshness decay
 //! - O(log n) operations via BTreeMap indices
+//! - Unified tiered content resolution with learning
+
+// Module exports
+pub mod resolution;
+pub mod write_buffer;
+
+// Re-export resolution types for convenience
+pub use resolution::{ContentResolver, SourceTier, ResolutionResult, ResolutionError};
+
+// Re-export write buffer types for convenience
+pub use write_buffer::{WriteBuffer, WritePriority, WriteOpType, WriteBatch, WriteBufferStats, WriteOperation, BatchResult};
 
 use std::collections::{BTreeMap, HashMap};
 use wasm_bindgen::prelude::*;
@@ -802,7 +813,7 @@ pub fn calculate_freshness(mastery_level: u8, age_seconds: f64) -> f64 {
 // Time Utility
 // ============================================================================
 
-fn current_time_ms() -> u64 {
+pub(crate) fn current_time_ms() -> u64 {
     #[cfg(target_arch = "wasm32")]
     {
         js_sys::Date::now() as u64

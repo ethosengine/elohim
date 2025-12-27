@@ -67,6 +67,10 @@ hex = "0.4"
 sha2 = "0.10"
 holochain-cache-core = { path = "../holochain-cache-core" }
 
+# Zip extraction for HTML5 apps
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+async-trait = "0.1"
+
 # Pin to version compatible with Rust 1.83 (base64ct 1.8.1 requires edition 2024)
 base64ct = "=1.6.0"
 

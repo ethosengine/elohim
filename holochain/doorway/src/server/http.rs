@@ -18,7 +18,7 @@ use tracing::{debug, error, info, warn};
 use crate::bootstrap::{self, BootstrapStore};
 use crate::cache::{
     self, CacheConfig, CacheRuleStore, ContentCache, TieredBlobCache, TieredCacheConfig,
-    spawn_tiered_cleanup_task,
+    spawn_tiered_cleanup_task, DoorwayResolver, DoorwayWriteBuffer, WriteBufferConfig,
 };
 use crate::orchestrator::OrchestratorState;
 use crate::services::{
@@ -29,7 +29,7 @@ use crate::config::Args;
 use crate::db::MongoClient;
 use crate::nats::{HostRouter, NatsClient};
 use crate::projection::{ProjectionConfig, ProjectionStore};
-use crate::routes;
+use crate::routes::{self, apps::{AppCache, AppMetadata, AppError as AppsError}};
 use crate::server::websocket;
 use crate::signal::{self, SignalStore, DEFAULT_MAX_CLIENTS};
 use crate::signing::{SigningConfig, SigningService};
@@ -66,6 +66,12 @@ pub struct AppState {
     pub verification: Arc<VerificationService>,
     /// Orchestrator state for cluster management (node health, provisioning)
     pub orchestrator: Option<Arc<OrchestratorState>>,
+    /// App cache for HTML5 app bundles (zip extraction)
+    pub app_cache: Arc<AppCache>,
+    /// Content resolver with tiered fallback (Projection → Conductor)
+    pub resolver: Arc<DoorwayResolver>,
+    /// Write buffer for batched conductor writes
+    pub write_buffer: Option<Arc<DoorwayWriteBuffer>>,
 }
 
 impl AppState {
@@ -90,6 +96,10 @@ impl AppState {
         let tiered_cache = Arc::new(TieredBlobCache::new(TieredCacheConfig::from_env()));
         let custodian = Arc::new(CustodianService::new(CustodianServiceConfig::default()));
         let verification = Arc::new(VerificationService::default());
+
+        // Create resolver with projection only (no pool in this mode)
+        let resolver = Arc::new(DoorwayResolver::new(projection.clone(), None, None));
+
         Self {
             args,
             mongo: None,
@@ -106,6 +116,9 @@ impl AppState {
             custodian,
             verification,
             orchestrator: None,
+            app_cache: Arc::new(AppCache::new(100)), // 100MB default cache
+            resolver,
+            write_buffer: None, // No write buffer without worker pool
         }
     }
 
@@ -138,6 +151,10 @@ impl AppState {
         let tiered_cache = Arc::new(TieredBlobCache::new(TieredCacheConfig::from_env()));
         let custodian = Arc::new(CustodianService::new(CustodianServiceConfig::default()));
         let verification = Arc::new(VerificationService::default());
+
+        // Create resolver with projection only (no pool in this mode)
+        let resolver = Arc::new(DoorwayResolver::new(projection.clone(), None, None));
+
         Self {
             args,
             mongo,
@@ -154,6 +171,9 @@ impl AppState {
             custodian,
             verification,
             orchestrator: None,
+            app_cache: Arc::new(AppCache::new(100)),
+            resolver,
+            write_buffer: None, // No write buffer without worker pool
         }
     }
 
@@ -187,6 +207,14 @@ impl AppState {
         let tiered_cache = Arc::new(TieredBlobCache::new(TieredCacheConfig::from_env()));
         let custodian = Arc::new(CustodianService::new(CustodianServiceConfig::default()));
         let verification = Arc::new(VerificationService::default());
+
+        // Create resolver with both projection and conductor fallback
+        // Note: zome_config is discovered at runtime when conductor connection is established
+        let resolver = Arc::new(DoorwayResolver::new(projection.clone(), Some(Arc::clone(&pool)), None));
+
+        // Create write buffer for batched conductor writes
+        let write_buffer = Arc::new(DoorwayWriteBuffer::with_defaults(Arc::clone(&pool)));
+
         Self {
             args,
             mongo,
@@ -203,6 +231,9 @@ impl AppState {
             custodian,
             verification,
             orchestrator: None,
+            app_cache: Arc::new(AppCache::new(100)),
+            resolver,
+            write_buffer: Some(write_buffer),
         }
     }
 
@@ -236,11 +267,21 @@ impl AppState {
             mongo.clone(),
             ProjectionConfig::default(),
         ).await?;
+        let projection = Some(Arc::new(projection_store));
 
         let signing = Arc::new(SigningService::new(SigningConfig::default()));
         let tiered_cache = Arc::new(TieredBlobCache::new(TieredCacheConfig::from_env()));
         let custodian = Arc::new(CustodianService::new(CustodianServiceConfig::default()));
         let verification = Arc::new(VerificationService::default());
+
+        // Create resolver with projection and optional conductor fallback
+        // Note: zome_config is discovered at runtime when conductor connection is established
+        let resolver = Arc::new(DoorwayResolver::new(projection.clone(), pool.clone(), None));
+
+        // Create write buffer if pool is available
+        let write_buffer = pool.as_ref().map(|p| {
+            Arc::new(DoorwayWriteBuffer::with_defaults(Arc::clone(p)))
+        });
 
         Ok(Self {
             args,
@@ -252,12 +293,15 @@ impl AppState {
             signal,
             cache,
             cache_rules,
-            projection: Some(Arc::new(projection_store)),
+            projection,
             signing,
             tiered_cache,
             custodian,
             verification,
             orchestrator: None,
+            app_cache: Arc::new(AppCache::new(100)),
+            resolver,
+            write_buffer,
         })
     }
 
@@ -534,6 +578,12 @@ async fn handle_request(
             to_boxed(routes::handle_api_request(state, p, query, Some(remote_ip), auth_header).await)
         }
 
+        // HTML5 App routes: GET /apps/{app-id}/{path}
+        // Serves HTML5 applications from zip bundles via P2P content publishers
+        (Method::GET, p) | (Method::HEAD, p) if p.starts_with("/apps/") => {
+            handle_apps_request(state, req).await
+        }
+
         // Not found
         _ => to_boxed(not_found_response(&path)),
     };
@@ -757,6 +807,75 @@ async fn handle_blob_verify(
             .body(Full::new(Bytes::from(json_body)))
             .unwrap(),
     )
+}
+
+/// Handle HTML5 app requests (GET/HEAD /apps/{app-id}/{path})
+///
+/// This serves HTML5 applications from zip bundles stored by content publishers.
+/// Currently returns 501 Not Implemented until the full integration is complete.
+///
+/// TODO (Phase 4-5):
+/// - Wire up content_lookup to projection store
+/// - Implement publisher_fetch via DHT queries
+async fn handle_apps_request(
+    state: Arc<AppState>,
+    req: Request<Incoming>,
+) -> Response<BoxBody> {
+    // For now, create a stub that returns helpful error
+    // The full implementation will:
+    // 1. Look up app metadata from projection store
+    // 2. Find publishers from DHT
+    // 3. Fetch zip and extract files
+    // 4. Serve with appropriate Content-Type
+
+    let path = req.uri().path().to_string();
+
+    // Stub content_lookup: returns None (not found)
+    let content_lookup = |_app_id: &str| -> Option<AppMetadata> {
+        None
+    };
+
+    // Stub publisher_fetch: always returns error
+    struct StubFetcher;
+    #[async_trait::async_trait]
+    impl routes::apps::AsyncPublisherFetch for StubFetcher {
+        async fn fetch(&self, _hash: &str) -> Result<Vec<u8>, String> {
+            Err("Publisher discovery not yet implemented".to_string())
+        }
+    }
+
+    match routes::apps::handle_app_request(
+        req,
+        Arc::clone(&state.app_cache),
+        content_lookup,
+        StubFetcher,
+    ).await {
+        Ok(resp) => to_boxed(resp),
+        Err(err) => {
+            let (status, message) = match err {
+                AppsError::AppNotFound(id) => (StatusCode::NOT_FOUND, format!("App not found: {}. HTML5 app serving is not yet fully implemented.", id)),
+                AppsError::FileNotFound(p) => (StatusCode::NOT_FOUND, format!("File not found: {}", p)),
+                AppsError::FetchFailed(m) => (StatusCode::SERVICE_UNAVAILABLE, format!("Fetch failed: {}", m)),
+                AppsError::ExtractionFailed(m) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Extraction failed: {}", m)),
+                AppsError::MethodNotAllowed => (StatusCode::METHOD_NOT_ALLOWED, "Method not allowed".to_string()),
+                AppsError::InternalError(m) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Internal error: {}", m)),
+            };
+
+            warn!(path = %path, error = %message, "App request failed");
+
+            to_boxed(
+                Response::builder()
+                    .status(status)
+                    .header("Content-Type", "application/json")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .body(Full::new(Bytes::from(serde_json::json!({
+                        "error": message,
+                        "hint": "HTML5 app serving requires content publishers in the DHT"
+                    }).to_string())))
+                    .unwrap(),
+            )
+        }
+    }
 }
 
 /// Convert a Full<Bytes> body to BoxBody

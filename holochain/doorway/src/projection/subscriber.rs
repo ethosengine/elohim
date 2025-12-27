@@ -466,12 +466,12 @@ impl SignalSubscriber {
         }
     }
 
-    /// Process a signal value from the conductor
+    /// Process a signal value from the conductor.
+    ///
+    /// Attempts to parse the generic ProjectionSignal format from various
+    /// Holochain wrapper formats.
     fn process_signal_value(&self, value: &JsonValue) {
-        // Holochain signals come in different formats depending on version
-        // Try to extract the actual signal payload
-
-        // Format 1: Direct signal object
+        // Format 1: Direct generic signal object
         if let Ok(signal) = serde_json::from_value::<ProjectionSignal>(value.clone()) {
             self.emit_signal(signal);
             return;
@@ -479,21 +479,11 @@ impl SignalSubscriber {
 
         // Format 2: Wrapped in { "signal": ... }
         if let Some(signal_data) = value.get("signal") {
-            if let Ok(signal) = serde_json::from_value::<ProjectionSignal>(signal_data.clone()) {
-                self.emit_signal(signal);
-                return;
-            }
-
-            // Format 3: Double-wrapped { "signal": { "payload": ... } }
-            if let Some(payload) = signal_data.get("payload") {
-                if let Ok(signal) = serde_json::from_value::<ProjectionSignal>(payload.clone()) {
-                    self.emit_signal(signal);
-                    return;
-                }
-            }
+            self.process_signal_value(signal_data);
+            return;
         }
 
-        // Format 4: App signal wrapper { "type": "Signal", "data": ... }
+        // Format 3: App signal wrapper { "type": "Signal", "data": ... }
         if value.get("type").and_then(|t| t.as_str()) == Some("Signal") {
             if let Some(data) = value.get("data") {
                 self.process_signal_value(data);
@@ -501,7 +491,7 @@ impl SignalSubscriber {
             }
         }
 
-        // Format 5: Holochain client signal format
+        // Format 4: Holochain client format { "App": ... }
         if let Some(app) = value.get("App") {
             self.process_signal_value(app);
             return;
@@ -510,28 +500,16 @@ impl SignalSubscriber {
         debug!("Unrecognized signal format: {:?}", value);
     }
 
-    /// Emit a parsed signal to the engine
+    /// Emit a parsed signal to the engine.
+    ///
+    /// Type-agnostic logging - just logs doc_type, action, id.
     fn emit_signal(&self, signal: ProjectionSignal) {
-        match &signal {
-            ProjectionSignal::ContentCommitted { content, .. } => {
-                info!("Received content signal: {}", content.title);
-            }
-            ProjectionSignal::PathCommitted { path, .. } => {
-                info!("Received path signal: {}", path.title);
-            }
-            ProjectionSignal::StepCommitted { step, .. } => {
-                debug!("Received step signal: {}", step.id);
-            }
-            ProjectionSignal::ChapterCommitted { chapter, .. } => {
-                debug!("Received chapter signal: {}", chapter.id);
-            }
-            ProjectionSignal::RelationshipCommitted { relationship, .. } => {
-                debug!("Received relationship signal: {}", relationship.id);
-            }
-            _ => {
-                debug!("Received signal: {:?}", std::mem::discriminant(&signal));
-            }
-        }
+        info!(
+            doc_type = signal.doc_type,
+            action = signal.action,
+            id = signal.id,
+            "Received projection signal"
+        );
 
         if let Err(e) = self.signal_tx.send(signal) {
             warn!("Failed to send signal to engine (no receivers?): {}", e);
@@ -570,37 +548,41 @@ mod tests {
     fn test_signal_parsing() {
         let subscriber = SignalSubscriber::new(SubscriberConfig::default());
 
-        // Test direct format
+        // Test generic signal format (new format)
         let json = serde_json::json!({
-            "type": "ContentCommitted",
-            "payload": {
+            "doc_type": "Content",
+            "action": "commit",
+            "id": "test-content",
+            "data": {
+                "title": "Test Content",
+                "description": "A test document"
+            },
+            "action_hash": "uhCkk...",
+            "entry_hash": "uhCEk...",
+            "author": "uhCAk...",
+            "search_tokens": ["test", "content"]
+        });
+
+        // Just test that parsing doesn't panic
+        subscriber.process_signal_value(&json);
+    }
+
+    #[test]
+    fn test_wrapped_signal_parsing() {
+        let subscriber = SignalSubscriber::new(SubscriberConfig::default());
+
+        // Test wrapped format { "signal": ... }
+        let json = serde_json::json!({
+            "signal": {
+                "doc_type": "LearningPath",
+                "action": "commit",
+                "id": "test-path",
+                "data": {"title": "Test Path"},
                 "action_hash": "uhCkk...",
-                "entry_hash": "uhCEk...",
-                "content": {
-                    "id": "test",
-                    "content_type": "concept",
-                    "title": "Test Content",
-                    "description": "",
-                    "summary": null,
-                    "content": "",
-                    "content_format": "markdown",
-                    "tags": [],
-                    "source_path": null,
-                    "related_node_ids": [],
-                    "author_id": null,
-                    "reach": "public",
-                    "trust_score": 1.0,
-                    "estimated_minutes": null,
-                    "thumbnail_url": null,
-                    "metadata_json": "{}",
-                    "created_at": "",
-                    "updated_at": ""
-                },
                 "author": "uhCAk..."
             }
         });
 
-        // Just test that parsing doesn't panic
         subscriber.process_signal_value(&json);
     }
 }
