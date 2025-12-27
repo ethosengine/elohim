@@ -172,13 +172,10 @@ spec:
             defaultValue: false,
             description: 'Skip BDD tests (useful for seed-only runs)'
         )
-        extendedChoice(
+        choice(
             name: 'FEATURE_AREAS',
-            type: 'PT_CHECKBOX',
-            value: 'all,doorway,imagodei,lamad,shefa,qahal',
-            description: 'Feature areas to include. Select none to skip tests. Select "all" for everything.',
-            multiSelectDelimiter: ',',
-            visibleItemCount: 6
+            choices: ['all', 'doorway', 'imagodei', 'lamad', 'shefa', 'qahal', ''],
+            description: 'Feature area to test. Select "all" for everything, or empty to skip tests.'
         )
         booleanParam(
             name: 'ANALYZE_DRIFT',
