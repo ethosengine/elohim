@@ -999,8 +999,8 @@ async function seed() {
 
   // Detect if we're running against a remote conductor (needs gentler approach)
   const isRemote = !ADMIN_WS_URL.includes('localhost') && !ADMIN_WS_URL.includes('127.0.0.1');
-  const BATCH_CREATE_SIZE = isRemote ? 10 : 50;  // Smaller batches for remote
-  const BATCH_DELAY_MS = isRemote ? 2000 : 0;    // 2s delay between batches for remote
+  const BATCH_CREATE_SIZE = isRemote ? 20 : 50;  // 20 for remote, 50 for local
+  const BATCH_DELAY_MS = isRemote ? 1000 : 0;    // 1s delay between batches for remote
 
   if (isRemote) {
     console.log(`   🌐 Remote mode: batch size=${BATCH_CREATE_SIZE}, delay=${BATCH_DELAY_MS}ms`);
@@ -1266,7 +1266,7 @@ async function seed() {
       // OPTIMIZATION: Batch add steps for this path (in chunks to avoid timeouts)
       const steps = collectSteps(pathJson);
       if (steps.length > 0) {
-        const STEP_BATCH_SIZE = isRemote ? 5 : 20; // Even smaller for remote
+        const STEP_BATCH_SIZE = isRemote ? 10 : 20; // 10 for remote, 20 for local
         let totalCreated = 0;
         let totalErrors: string[] = [];
 
