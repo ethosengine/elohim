@@ -57,6 +57,58 @@ pub struct RecordSummaryInput {
 }
 
 // =============================================================================
+// ContentServer Input/Output Types
+// =============================================================================
+
+/// Input for registering a content server
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisterContentServerInput {
+    /// Content hash this server can provide (e.g., "sha256-abc123")
+    pub content_hash: String,
+    /// Capability: blob, html5_app, media_stream, learning_package, custom
+    pub capability: String,
+    /// URL where this server accepts content requests
+    pub serve_url: Option<String>,
+    /// Server priority (0-100, higher = preferred)
+    pub priority: Option<u8>,
+    /// Geographic region for latency-based routing
+    pub region: Option<String>,
+    /// Bandwidth capacity in Mbps
+    pub bandwidth_mbps: Option<u32>,
+}
+
+/// Output from content server operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContentServerOutput {
+    pub action_hash: ActionHash,
+    pub server: ContentServer,
+}
+
+/// Input for finding content publishers
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FindPublishersInput {
+    /// Content hash to find publishers for
+    pub content_hash: String,
+    /// Optional: filter by capability
+    pub capability: Option<String>,
+    /// Optional: prefer publishers in this region
+    pub prefer_region: Option<String>,
+    /// Maximum number of publishers to return (default: 10)
+    pub limit: Option<usize>,
+    /// Only return online publishers (default: true)
+    pub online_only: Option<bool>,
+}
+
+/// Output from finding publishers
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FindPublishersOutput {
+    /// Content hash queried
+    pub content_hash: String,
+    /// Found publishers, sorted by priority
+    pub publishers: Vec<ContentServerOutput>,
+}
+
+// =============================================================================
 // Signals for Projection
 // =============================================================================
 
@@ -83,6 +135,13 @@ pub enum InfrastructureSignal {
         action_hash: ActionHash,
         entry_hash: EntryHash,
         summary: DoorwayHeartbeatSummary,
+        author: AgentPubKey,
+    },
+    /// ContentServer was registered or updated
+    ContentServerCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        server: ContentServer,
         author: AgentPubKey,
     },
 }
@@ -130,6 +189,13 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 action_hash,
                 entry_hash,
                 summary,
+                author,
+            })?;
+        } else if let Some(server) = record.entry().to_app_option::<ContentServer>().ok().flatten() {
+            emit_signal(InfrastructureSignal::ContentServerCommitted {
+                action_hash,
+                entry_hash,
+                server,
                 author,
             })?;
         }
@@ -510,6 +576,230 @@ pub fn update_doorway_tier(doorway_id: String) -> ExternResult<DoorwayOutput> {
         action_hash,
         doorway,
     })
+}
+
+// =============================================================================
+// ContentServer Functions (P2P Content Publishing)
+// =============================================================================
+
+/// Register as a content server for a specific content hash.
+///
+/// Creates a ContentServer entry and links for discovery by doorways.
+/// Any agent can register to serve content they have stored.
+#[hdk_extern]
+pub fn register_content_server(input: RegisterContentServerInput) -> ExternResult<ContentServerOutput> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let now_secs = now.as_seconds_and_nanos().0 as u64;
+
+    let server = ContentServer {
+        content_hash: input.content_hash.clone(),
+        capability: input.capability.clone(),
+        serve_url: input.serve_url,
+        online: true,
+        priority: input.priority.unwrap_or(50),
+        region: input.region.clone(),
+        bandwidth_mbps: input.bandwidth_mbps,
+        registered_at: now_secs,
+        last_heartbeat: now_secs,
+    };
+
+    let action_hash = create_entry(&EntryTypes::ContentServer(server.clone()))?;
+
+    // Create content hash lookup link (primary discovery path)
+    let hash_anchor = StringAnchor::new("content_hash", &input.content_hash);
+    let hash_anchor_hash = hash_entry(&EntryTypes::StringAnchor(hash_anchor))?;
+    create_link(hash_anchor_hash, action_hash.clone(), LinkTypes::HashToContentServer, ())?;
+
+    // Create agent lookup link (for finding all servers an agent operates)
+    let agent_anchor = StringAnchor::new("content_server_agent", &agent_info.agent_initial_pubkey.to_string());
+    let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
+    create_link(agent_anchor_hash, action_hash.clone(), LinkTypes::AgentToContentServer, ())?;
+
+    // Create capability lookup link
+    let cap_anchor = StringAnchor::new("content_server_capability", &input.capability);
+    let cap_anchor_hash = hash_entry(&EntryTypes::StringAnchor(cap_anchor))?;
+    create_link(cap_anchor_hash, action_hash.clone(), LinkTypes::CapabilityToContentServer, ())?;
+
+    // Create region lookup link if specified
+    if let Some(ref region) = input.region {
+        let region_anchor = StringAnchor::new("content_server_region", region);
+        let region_anchor_hash = hash_entry(&EntryTypes::StringAnchor(region_anchor))?;
+        create_link(region_anchor_hash, action_hash.clone(), LinkTypes::RegionToContentServer, ())?;
+    }
+
+    Ok(ContentServerOutput {
+        action_hash,
+        server,
+    })
+}
+
+/// Update content server heartbeat (marks as online and updates timestamp).
+///
+/// Call periodically to indicate this server is still alive and serving.
+#[hdk_extern]
+pub fn update_content_server_heartbeat(action_hash: ActionHash) -> ExternResult<ContentServerOutput> {
+    let now = sys_time()?;
+    let now_secs = now.as_seconds_and_nanos().0 as u64;
+
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+            "ContentServer not found".to_string()
+        )))?;
+
+    let mut server = record.entry().to_app_option::<ContentServer>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialization error: {:?}", e))))?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid ContentServer entry".to_string())))?;
+
+    server.last_heartbeat = now_secs;
+    server.online = true;
+
+    let new_action_hash = update_entry(action_hash, &EntryTypes::ContentServer(server.clone()))?;
+
+    Ok(ContentServerOutput {
+        action_hash: new_action_hash,
+        server,
+    })
+}
+
+/// Mark content server as offline.
+///
+/// Call when stopping content serving for this hash.
+#[hdk_extern]
+pub fn mark_content_server_offline(action_hash: ActionHash) -> ExternResult<ContentServerOutput> {
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+            "ContentServer not found".to_string()
+        )))?;
+
+    let mut server = record.entry().to_app_option::<ContentServer>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialization error: {:?}", e))))?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid ContentServer entry".to_string())))?;
+
+    server.online = false;
+
+    let new_action_hash = update_entry(action_hash, &EntryTypes::ContentServer(server.clone()))?;
+
+    Ok(ContentServerOutput {
+        action_hash: new_action_hash,
+        server,
+    })
+}
+
+/// Find publishers for a content hash.
+///
+/// This is the primary discovery function used by doorways to find
+/// which agents can serve a particular piece of content.
+#[hdk_extern]
+pub fn find_publishers(input: FindPublishersInput) -> ExternResult<FindPublishersOutput> {
+    let limit = input.limit.unwrap_or(10);
+    let online_only = input.online_only.unwrap_or(true);
+
+    let hash_anchor = StringAnchor::new("content_hash", &input.content_hash);
+    let hash_anchor_hash = hash_entry(&EntryTypes::StringAnchor(hash_anchor))?;
+
+    let query = LinkQuery::try_new(hash_anchor_hash, LinkTypes::HashToContentServer)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut publishers = Vec::new();
+
+    for link in links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(server) = record.entry().to_app_option::<ContentServer>().ok().flatten() {
+                    // Apply filters
+                    if online_only && !server.online {
+                        continue;
+                    }
+
+                    if let Some(ref cap) = input.capability {
+                        if &server.capability != cap {
+                            continue;
+                        }
+                    }
+
+                    publishers.push(ContentServerOutput {
+                        action_hash,
+                        server,
+                    });
+                }
+            }
+        }
+    }
+
+    // Sort by priority (higher first), then by region preference
+    publishers.sort_by(|a, b| {
+        // Prefer region match
+        if let Some(ref preferred) = input.prefer_region {
+            let a_matches = a.server.region.as_ref() == Some(preferred);
+            let b_matches = b.server.region.as_ref() == Some(preferred);
+            if a_matches != b_matches {
+                return if a_matches { std::cmp::Ordering::Less } else { std::cmp::Ordering::Greater };
+            }
+        }
+        // Then by priority (higher is better)
+        b.server.priority.cmp(&a.server.priority)
+    });
+
+    // Apply limit
+    publishers.truncate(limit);
+
+    Ok(FindPublishersOutput {
+        content_hash: input.content_hash,
+        publishers,
+    })
+}
+
+/// Get all content servers operated by an agent.
+#[hdk_extern]
+pub fn get_content_servers_by_agent(agent_pubkey: String) -> ExternResult<Vec<ContentServerOutput>> {
+    let agent_anchor = StringAnchor::new("content_server_agent", &agent_pubkey);
+    let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
+
+    let query = LinkQuery::try_new(agent_anchor_hash, LinkTypes::AgentToContentServer)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut servers = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(server) = record.entry().to_app_option::<ContentServer>().ok().flatten() {
+                    servers.push(ContentServerOutput {
+                        action_hash,
+                        server,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(servers)
+}
+
+/// Get all content servers with a specific capability.
+#[hdk_extern]
+pub fn get_content_servers_by_capability(capability: String) -> ExternResult<Vec<ContentServerOutput>> {
+    let cap_anchor = StringAnchor::new("content_server_capability", &capability);
+    let cap_anchor_hash = hash_entry(&EntryTypes::StringAnchor(cap_anchor))?;
+
+    let query = LinkQuery::try_new(cap_anchor_hash, LinkTypes::CapabilityToContentServer)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut servers = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(server) = record.entry().to_app_option::<ContentServer>().ok().flatten() {
+                    servers.push(ContentServerOutput {
+                        action_hash,
+                        server,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(servers)
 }
 
 // =============================================================================

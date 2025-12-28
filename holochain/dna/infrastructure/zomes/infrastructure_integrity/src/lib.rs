@@ -130,6 +130,66 @@ pub struct DoorwayHeartbeatSummary {
 }
 
 // =============================================================================
+// Content Server Types (P2P Content Publishing)
+// =============================================================================
+
+/// Content serving capabilities - what type of content an agent can serve.
+/// Used by doorways to route requests to appropriate publishers.
+pub const CONTENT_SERVER_CAPABILITIES: [&str; 5] = [
+    "blob",             // Raw blob serving (GET /store/{hash})
+    "html5_app",        // Zip extraction + file serving (GET /apps/{id}/{path})
+    "media_stream",     // Range request support for video/audio
+    "learning_package", // SCORM/xAPI packages
+    "custom",           // Custom capability
+];
+
+/// ContentServer - Registers an agent as content publisher in the DHT.
+///
+/// When an agent stores content (e.g., HTML5 app zip), they create a ContentServer
+/// entry to announce their ability to serve it. Doorways discover publishers by
+/// querying these entries and route requests to the nearest available publisher.
+///
+/// This enables true P2P content delivery: any agent can publish, any doorway
+/// can serve, and users get content from the best available source.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ContentServer {
+    /// Content hash this server can provide (e.g., "sha256-abc123")
+    pub content_hash: String,
+
+    /// What type of content serving this server supports (from CONTENT_SERVER_CAPABILITIES)
+    pub capability: String,
+
+    /// URL where this server accepts content requests (doorway URL or direct URL)
+    pub serve_url: Option<String>,
+
+    /// Whether this server is currently online and serving
+    pub online: bool,
+
+    /// Server priority (0-100, higher = preferred)
+    pub priority: u8,
+
+    /// Geographic region for latency-based routing
+    pub region: Option<String>,
+
+    /// Bandwidth capacity in Mbps (self-reported)
+    pub bandwidth_mbps: Option<u32>,
+
+    /// Unix timestamp when this registration was created
+    pub registered_at: u64,
+
+    /// Unix timestamp of last heartbeat (updated periodically)
+    pub last_heartbeat: u64,
+}
+
+impl ContentServer {
+    /// Check if this server is stale (no heartbeat for given seconds)
+    pub fn is_stale(&self, max_age_secs: u64, now: u64) -> bool {
+        now.saturating_sub(self.last_heartbeat) > max_age_secs
+    }
+}
+
+// =============================================================================
 // Anchor Entry (for link indexing)
 // =============================================================================
 
@@ -160,6 +220,7 @@ pub enum EntryTypes {
     DoorwayRegistration(DoorwayRegistration),
     DoorwayHeartbeat(DoorwayHeartbeat),
     DoorwayHeartbeatSummary(DoorwayHeartbeatSummary),
+    ContentServer(ContentServer),
     StringAnchor(StringAnchor),
 }
 
@@ -182,6 +243,12 @@ pub enum LinkTypes {
     // DoorwayHeartbeatSummary links (kept forever)
     DoorwayToSummary,           // DoorwayRegistration -> DoorwayHeartbeatSummary
     SummaryByDate,              // Anchor(date) -> DoorwayHeartbeatSummary
+
+    // ContentServer links (P2P content publishing)
+    HashToContentServer,        // Anchor(content_hash) -> ContentServer
+    AgentToContentServer,       // Anchor(agent_pubkey) -> ContentServer
+    CapabilityToContentServer,  // Anchor(capability) -> ContentServer
+    RegionToContentServer,      // Anchor(region) -> ContentServer (for geo-routing)
 }
 
 // =============================================================================
@@ -207,6 +274,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     EntryTypes::DoorwayHeartbeatSummary(summary) => {
                         validate_doorway_summary(&summary)
+                    }
+                    EntryTypes::ContentServer(server) => {
+                        validate_content_server(&server)
                     }
                     EntryTypes::StringAnchor(_) => Ok(ValidateCallbackResult::Valid),
                 }
@@ -329,6 +399,44 @@ fn validate_doorway_summary(summary: &DoorwayHeartbeatSummary) -> ExternResult<V
         return Ok(ValidateCallbackResult::Invalid(
             "date must be in YYYY-MM-DD format".to_string(),
         ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate ContentServer registration
+fn validate_content_server(server: &ContentServer) -> ExternResult<ValidateCallbackResult> {
+    // Validate content_hash is not empty
+    if server.content_hash.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "content_hash cannot be empty".to_string(),
+        ));
+    }
+
+    // Validate capability is valid
+    if !CONTENT_SERVER_CAPABILITIES.contains(&server.capability.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!(
+                "Invalid capability '{}'. Must be one of: {:?}",
+                server.capability, CONTENT_SERVER_CAPABILITIES
+            ),
+        ));
+    }
+
+    // Validate priority is in valid range (0-100)
+    if server.priority > 100 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "priority must be between 0 and 100".to_string(),
+        ));
+    }
+
+    // Validate serve_url format if provided
+    if let Some(url) = &server.serve_url {
+        if !url.starts_with("http://") && !url.starts_with("https://") {
+            return Ok(ValidateCallbackResult::Invalid(
+                "serve_url must start with http:// or https://".to_string(),
+            ));
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
