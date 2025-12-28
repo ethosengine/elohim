@@ -765,13 +765,14 @@ async function seed() {
   let supportedFormats: string[] = [];
   try {
     // Try to create a dummy content with an invalid format to get the error message with valid formats
+    // NOTE: content_type must be valid (e.g., 'concept') so validation proceeds to content_format check
     await appWs.callZome({
       cell_id: cellId,
       zome_name: ZOME_NAME,
       fn_name: 'create_content',
       payload: {
         id: '__preflight_format_test__',
-        content_type: 'test',
+        content_type: 'concept',  // Must be valid so we get content_format error, not content_type error
         title: 'Format Detection Test',
         description: '',
         summary: null,
