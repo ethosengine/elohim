@@ -809,8 +809,8 @@ async function seed() {
 
   // 3. Scan content files and check for format mismatches
   console.log('   Scanning content files for format compatibility...');
-  const contentDir = path.join(DATA_DIR, 'content');
-  const allConceptFiles = findJsonFiles(contentDir);
+  const preflightContentDir = path.join(DATA_DIR, 'content');
+  const allConceptFiles = findJsonFiles(preflightContentDir);
 
   const formatIssues: { file: string; format: string; id: string }[] = [];
   const formatCounts: Map<string, number> = new Map();
