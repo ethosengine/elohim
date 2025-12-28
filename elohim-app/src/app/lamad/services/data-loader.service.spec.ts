@@ -52,7 +52,10 @@ describe('DataLoaderService', () => {
       'isAvailable',
       'getPathIndex',
       'getPathWithSteps'
-    ]);
+    ], {
+      // Signal property - callable function that returns availability
+      available: jasmine.createSpy('available').and.returnValue(true)
+    });
 
     mockIndexedDBCache = jasmine.createSpyObj('IndexedDBCacheService', [
       'init',
@@ -84,8 +87,11 @@ describe('DataLoaderService', () => {
       'initialize',
       'resolveContent',
       'resolvePath',
+      'batchResolveContent',
       'cacheContent',
-      'cachePath'
+      'cachePath',
+      'registerStandardSource',
+      'setSourceAvailable'
     ], {
       isReady: true,
       state$: new BehaviorSubject('ready').asObservable()
@@ -123,8 +129,12 @@ describe('DataLoaderService', () => {
     mockContentResolver.initialize.and.returnValue(Promise.resolve({ success: true, implementation: 'typescript' }));
     mockContentResolver.resolveContent.and.returnValue(Promise.resolve(null));
     mockContentResolver.resolvePath.and.returnValue(Promise.resolve(null));
+    mockContentResolver.batchResolveContent.and.returnValue(Promise.resolve(new Map()));
     mockContentResolver.cacheContent.and.returnValue(Promise.resolve());
     mockContentResolver.cachePath.and.returnValue(Promise.resolve());
+    // These methods are called during initialization - they don't return anything
+    mockContentResolver.registerStandardSource.and.returnValue(undefined);
+    mockContentResolver.setSourceAvailable.and.returnValue(undefined);
 
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
