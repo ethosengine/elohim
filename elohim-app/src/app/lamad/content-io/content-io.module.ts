@@ -16,6 +16,7 @@ import { GherkinFormatPlugin } from './plugins/gherkin/gherkin-format.plugin';
 // Perseus enabled for build (npm run build passes)
 // Note: Tests run with Perseus disabled (Karma needs separate SVG loader config)
 import { PerseusFormatPlugin } from './plugins/perseus/perseus-format.plugin';
+import { Html5AppFormatPlugin } from './plugins/html5-app/html5-app-format.plugin';
 
 /**
  * Initializer function to register unified format plugins.
@@ -31,6 +32,7 @@ function initializeFormatPlugins(): void {
   registry.register(new MarkdownFormatPlugin());
   registry.register(new GherkinFormatPlugin());
   registry.register(new PerseusFormatPlugin());
+  registry.register(new Html5AppFormatPlugin());
 
   // Register format aliases: map data formats to their renderers
   // This keeps content storage format-agnostic while providing flexible rendering

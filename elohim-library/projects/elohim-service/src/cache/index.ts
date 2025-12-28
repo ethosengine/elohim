@@ -83,3 +83,48 @@ export {
   TsReachAwareCache,
   TsCacheStats,
 } from './reach-aware-cache';
+
+// Content Resolver - Unified tiered source resolution
+export {
+  // Types
+  SourceTier,
+  type IContentResolver,
+  type ResolutionResult,
+  type ResolutionError,
+  type AppResolutionResult,
+  type ResolverStats,
+  type SourceInfo,
+  type ResolverConfig,
+  type ResolverInitResult,
+
+  // Factory functions
+  createContentResolver,
+  isWasmResolverAvailable,
+
+  // TypeScript implementation
+  TsContentResolver,
+} from './content-resolver';
+
+// Write Buffer - Batched write operations with priority queues
+export {
+  // Types
+  WritePriority,
+  WriteOpType,
+  type IWriteBuffer,
+  type WriteOperation,
+  type WriteBatch,
+  type BatchResult,
+  type WriteBufferStats,
+  type WriteBufferConfig,
+  type WriteBufferInitResult,
+
+  // Factory functions
+  createWriteBuffer,
+  createSeedingBuffer,
+  createInteractiveBuffer,
+  createRecoveryBuffer,
+  isWasmBufferAvailable,
+
+  // TypeScript implementation
+  TsWriteBuffer,
+} from './write-buffer';
