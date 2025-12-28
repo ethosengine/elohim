@@ -289,7 +289,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
             steps {
                 container('builder') {
-                    dir('holochain/holochain-cache-core') {
+                    dir('holochain/dna/elohim') {
                         script {
                             echo 'Building holochain-cache-core WASM module...'
 
@@ -302,25 +302,37 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 echo "    directory = *" >> "$HOME/.gitconfig"
                                 export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 
-                                # Install wasm-pack if not available
-                                if ! command -v wasm-pack &> /dev/null; then
-                                    echo "Installing wasm-pack..."
-                                    curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-                                fi
+                                echo "=== Entering Nix development shell for WASM build ==="
 
-                                echo "=== Building WASM module ==="
-                                wasm-pack build --target web --release
+                                nix develop --accept-flake-config --command bash -c '
+                                    set -euo pipefail
 
-                                echo ""
-                                echo "=== WASM Build artifacts ==="
-                                ls -lh pkg/
+                                    echo "=== Rust toolchain ready ==="
+                                    rustc --version
+                                    cargo --version
+
+                                    # Install wasm-pack if not available
+                                    if ! command -v wasm-pack &> /dev/null; then
+                                        echo "Installing wasm-pack..."
+                                        cargo install wasm-pack
+                                    fi
+
+                                    echo ""
+                                    echo "=== Building holochain-cache-core WASM ==="
+                                    cd ../../holochain-cache-core
+                                    wasm-pack build --target web --release
+
+                                    echo ""
+                                    echo "=== WASM Build artifacts ==="
+                                    ls -lh pkg/
+                                '
                             '''
-
-                            archiveArtifacts artifacts: 'pkg/**', allowEmptyArchive: false
-                            stash name: 'wasm-cache-core', includes: 'pkg/**'
-
-                            echo "holochain-cache-core WASM module built and archived"
                         }
+                    }
+                    dir('holochain/holochain-cache-core') {
+                        archiveArtifacts artifacts: 'pkg/**', allowEmptyArchive: false
+                        stash name: 'wasm-cache-core', includes: 'pkg/**'
+                        echo "holochain-cache-core WASM module built and archived"
                     }
                 }
             }
