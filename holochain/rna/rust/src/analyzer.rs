@@ -205,12 +205,19 @@ impl DNAAnalyzer {
 
     /// Parse a single field definition
     fn parse_field(&self, line: &str) -> Option<Field> {
+        // Strip comments before parsing
+        let line_without_comment = if let Some(comment_pos) = line.find("//") {
+            &line[..comment_pos]
+        } else {
+            line
+        };
+
         // Match: pub name: Type,
         let field_regex = Regex::new(r"pub\s+(\w+)\s*:\s*(.*),?\s*$").ok()?;
 
-        if let Some(caps) = field_regex.captures(line.trim()) {
+        if let Some(caps) = field_regex.captures(line_without_comment.trim()) {
             let name = caps.get(1)?.as_str().to_string();
-            let type_str = caps.get(2)?.as_str().trim().to_string();
+            let type_str = caps.get(2)?.as_str().trim().trim_end_matches(',').to_string();
 
             let field_type = self.parse_type(&type_str);
             let is_required = !matches!(field_type, FieldType::Option(_));

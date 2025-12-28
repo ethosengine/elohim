@@ -72,6 +72,8 @@ pub mod healing_strategy;
 pub mod flexible_orchestrator;
 pub mod analyzer;
 pub mod generator;
+pub mod schema_export;
+pub mod fixtures;
 
 // Re-export commonly used items
 pub use bridge::bridge_call;
@@ -104,3 +106,10 @@ pub use flexible_orchestrator::{OrchestratorConfig as FlexibleOrchestratorConfig
 // Re-export schema analysis and generation
 pub use analyzer::{DNAAnalyzer, EntryTypeSchema, FieldType, Field};
 pub use generator::ProviderGenerator;
+pub use schema_export::{generate_schemas, generate_combined_schema, export_schemas_to_json};
+pub use fixtures::{
+    validate_fixture, generate_fixtures_module, default_field_mappings,
+    FixtureValidation, ValidationMode, FixtureAnalysis, FixtureFileAnalysis,
+    analyze_fixture, analyze_fixtures_directory,
+    truly_required_fields, client_hint_fields, blob_resolution_fields,
+};

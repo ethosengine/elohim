@@ -21,6 +21,16 @@ name = "generate"
 path = "src/bin/generate.rs"
 required-features = ["cli"]
 
+[[bin]]
+name = "hc-rna-schema"
+path = "src/bin/schema.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "hc-rna-fixtures"
+path = "src/bin/fixtures.rs"
+required-features = ["cli"]
+
 [dependencies]
 hdk = "0.6"
 serde = { version = "1.0", features = ["derive"] }
