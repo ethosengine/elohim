@@ -5,9 +5,13 @@
   "name": "Evolution of Trust",
   "description": "An interactive guide to the game theory of trust. Through playable simulations, explore why and how trust evolves - or breaks down - between individuals and in societies. A masterpiece of explorable explanation by Nicky Case.",
   "url": "https://ncase.me/trust/",
-  "content": "https://ncase.me/trust/",
+  "content": {
+    "appId": "evolution-of-trust",
+    "entryPoint": "index.html",
+    "fallbackUrl": "https://ncase.me/trust/"
+  },
   "contentFormat": "html5-app",
-  "sourcePath": "external/ncase/trust",
+  "sourcePath": "docs/content/fct/evolution-of-trust",
   "tags": [
     "game-theory",
     "trust",
@@ -21,7 +25,8 @@
   "relatedNodeIds": [
     "concept-bidirectional-trust",
     "governance-epic",
-    "concept-trust-attestations"
+    "concept-trust-attestations",
+    "fct-module-04-scaling-wisdom"
   ],
   "metadata": {
     "category": "interactive-simulation",
@@ -30,6 +35,8 @@
     "license": "CC0 Public Domain",
     "estimatedTime": "30 minutes",
     "embedStrategy": "iframe",
+    "localZipPath": "docs/content/fct/evolution-of-trust.zip",
+    "localIndexPath": "docs/content/fct/evolution-of-trust/index.html",
     "requiredCapabilities": [
       "javascript"
     ],
@@ -80,5 +87,5 @@
     "license": "https://creativecommons.org/publicdomain/zero/1.0/"
   },
   "createdAt": "2025-12-24T00:00:00.000000",
-  "updatedAt": "2025-12-24T00:00:00.000000"
+  "updatedAt": "2025-12-27T05:26:00.000000"
 }
