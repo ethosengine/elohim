@@ -128,6 +128,12 @@ def orchestrateMonoRepo() {
     """
 }
 
+def buildPerseusPlugin() {
+    dir('elohim-library/projects/perseus-plugin') {
+        sh 'npm ci && npm run build && ls -la dist/'
+    }
+}
+
 def runE2ETests(String environment, String baseUrl, String gitCommitHash) {
     echo "Running E2E tests against ${environment}"
     env.E2E_TESTS_RAN = 'true'
@@ -511,6 +517,17 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        stage('Build Perseus Plugin') {
+            when {
+                anyOf {
+                    branch 'main'; branch 'staging'; branch 'dev'
+                    changeset "elohim-app/**"; changeset "elohim-library/**"
+                    changeset "Jenkinsfile"; changeset "VERSION"
+                }
+            }
+            steps { container('builder') { script { buildPerseusPlugin() } } }
+        }
+
         stage('Build App') {
             when {
                 anyOf {
@@ -528,7 +545,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     dir('elohim-app') {
                         script {
                             def props = loadBuildVars()
-                            
+
                             withBuildVars(props) {
                                 echo 'Building Angular application'
                                 echo "Using git hash: ${GIT_COMMIT_HASH}"
