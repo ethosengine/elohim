@@ -6,6 +6,8 @@ import {
   ViewChild,
   OnInit,
   OnDestroy,
+  OnChanges,
+  SimpleChanges,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   inject
@@ -305,7 +307,7 @@ import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
   `],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class PerseusRendererComponent implements ContentRenderer, InteractiveRenderer, OnInit, OnDestroy {
+export class PerseusRendererComponent implements ContentRenderer, InteractiveRenderer, OnInit, OnChanges, OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly destroy$ = new Subject<void>();
 
@@ -406,8 +408,15 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
   // ─────────────────────────────────────────────────────────────────────────
 
   ngOnInit(): void {
-    this.loadQuestions();
     this.initializeStreakTracking();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // Load questions when node is set or changes
+    if (changes['node'] && this.node) {
+      this.loadQuestions();
+      this.cdr.markForCheck();
+    }
   }
 
   ngOnDestroy(): void {
