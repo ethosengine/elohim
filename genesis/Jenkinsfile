@@ -190,7 +190,7 @@ spec:
 
     options {
         skipDefaultCheckout(true)
-        timeout(time: 45, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')  // Increased from 45 for large seed datasets
         buildDiscarder(logRotator(numToKeepStr: '20'))
     }
 
