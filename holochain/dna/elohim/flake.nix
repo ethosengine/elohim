@@ -13,7 +13,10 @@
         devShells.default = pkgs.mkShell {
           inputsFrom = [ inputs'.holonix.devShells.default ];
           packages = with pkgs; [
-            # Add any additional dev tools here
+            # wasm-pack for building WASM modules
+            wasm-pack
+            # liblzma (required by wasm-pack)
+            xz
           ];
           # Required for getrandom 0.3.x on wasm32-unknown-unknown
           # Holochain provides a custom random implementation via host functions
