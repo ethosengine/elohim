@@ -19,7 +19,7 @@ This skill provides domain expertise for transforming raw Elohim Protocol conten
 ```
 Holochain DNA (Rust)       [Source of truth - entry types, relationships]
       ↓
-MCP Schemas (TypeScript)   [Aligned with DNA structs]
+hc-rna (Rust)              [Schema analyzer → JSON Schema + validation]
       ↓
 genesis/docs/content/      [Raw markdown, Gherkin - human authored]
       ↓
@@ -27,10 +27,36 @@ genesis/docs/content/      [Raw markdown, Gherkin - human authored]
       ↓
 genesis/data/lamad/        [Structured JSON - schema-aligned seed data]
       ↓
+hc-rna-fixtures --analyze  [Validate metadata before seeding]
+      ↓
    genesis/seeder          [Deterministic script - loads JSON to DHT]
       ↓
 Holochain DHT              [Production data]
 ```
+
+### Content Architecture Philosophy
+
+The DNA validates **metadata**, not **content**:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  DNA (Holochain)          Cache Layer           Client          │
+│  ────────────────         ───────────           ──────          │
+│                                                                 │
+│  Metadata:                Blobs:                Rendering:      │
+│  - id (required)          - video.mp4           - format hint   │
+│  - title (required)       - app.zip             - graceful deg  │
+│  - format_hint (any)      - quiz.json           - fallbacks     │
+│  - blob_hash (optional)   - feature.gherkin                     │
+│  - provenance (signed)                                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+This means:
+- `contentFormat` accepts ANY string (client hint, not DNA validation)
+- New formats don't require DNA upgrades
+- Blobs are stored in cache layer, not DHT
+- DNA focuses on provenance and metadata, not content rendering
 
 ---
 
@@ -710,6 +736,123 @@ npx ts-node src/cli/import.ts explore --epic governance
 # List user types
 npx ts-node src/cli/import.ts list-user-types
 ```
+
+---
+
+## Seed Data Validation (hc-rna-fixtures)
+
+The `hc-rna-fixtures` CLI validates JSON seed data against the DNA schema before seeding. This catches errors at build time rather than runtime.
+
+### Quick Start
+
+```bash
+# Navigate to the rna directory
+cd /projects/elohim/holochain/rna/rust
+
+# Build the CLI
+RUSTFLAGS="" cargo build --features cli --bin hc-rna-fixtures
+
+# Analyze all seed data (metadata validation)
+RUSTFLAGS="" cargo run --features cli --bin hc-rna-fixtures -- \
+  -f /projects/elohim/genesis/data/lamad/content --analyze -v
+```
+
+### Validation Modes
+
+| Mode | Required Fields | Description |
+|------|-----------------|-------------|
+| `metadata` (default) | `id`, `title` | Validates only truly required fields. Content format is a hint. |
+| `strict` | All DNA fields | Full schema validation against integrity zome |
+| `loose` | `id` only | Minimal validation for exploratory work |
+
+```bash
+# Metadata mode (recommended for seed data)
+hc-rna-fixtures -f fixtures/ --mode metadata --analyze
+
+# Strict mode (requires integrity zome path)
+hc-rna-fixtures -f fixtures/ --mode strict -i path/to/integrity/src/lib.rs
+
+# Loose mode (development only)
+hc-rna-fixtures -f fixtures/ --mode loose --analyze
+```
+
+### Understanding the Output
+
+```
+======================================================================
+FIXTURE ANALYSIS (Metadata-Focused)
+======================================================================
+
+Total files:         3525
+Valid metadata:      3525 ✅
+With blob refs:      1 📦
+Missing required:    0 ❌
+
+--- Content Formats (client hints) ---
+   gherkin: 2946 files
+   markdown: 528 files
+   plaintext: 38 files
+   perseus-quiz-json: 12 files
+   html5-app: 1 file
+```
+
+- **Valid metadata**: Files with required `id` and `title` fields
+- **With blob refs**: Files that reference external blobs (need cache resolution)
+- **Content Formats**: Distribution of `contentFormat` values (hints, not validated)
+
+### Field Categories
+
+The validator understands different field categories:
+
+| Category | Fields | Validation |
+|----------|--------|------------|
+| **Required** | `id`, `title` | Must be present, correct type |
+| **Client Hints** | `contentFormat`, `contentType` | Any string value accepted |
+| **Blob Resolution** | `blob_hash`, `entry_point`, `blob_url` | Indicates cache layer content |
+| **Auto-Defaulted** | `reach`, `trust_score`, `schema_version` | Seeder/zome provides defaults |
+
+### Pre-Seed Validation Workflow
+
+Before running the seeder, always validate:
+
+```bash
+# 1. Validate content files
+cd /projects/elohim/holochain/rna/rust
+RUSTFLAGS="" cargo run --features cli --bin hc-rna-fixtures -- \
+  -f /projects/elohim/genesis/data/lamad/content --analyze -v
+
+# 2. Check for any missing required fields
+# Output will show "Missing required: X ❌" if issues exist
+
+# 3. If all valid, proceed with seeding
+cd /projects/elohim/genesis
+npm run seed
+```
+
+### Common Validation Issues
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| `Missing required field 'id'` | JSON lacks `id` field | Add unique identifier |
+| `Missing required field 'title'` | JSON lacks `title` field | Add human-readable title |
+| `Invalid JSON` | Malformed JSON syntax | Check for trailing commas, unclosed braces |
+| `Fixture must be a JSON object` | Array at root level | Wrap in object or split into files |
+
+### Generating Rust Fixtures (Future)
+
+The tool can also generate a Rust module with embedded fixtures for compile-time validation:
+
+```bash
+# Generate fixtures.rs module
+hc-rna-fixtures -f fixtures/ -o src/fixtures.rs --module-name seed_data
+
+# This creates:
+# - Embedded JSON constants (include_str!)
+# - Lazy-parsed fixture collections
+# - Idempotent seed_fixtures() function
+```
+
+---
 
 ## Troubleshooting
 

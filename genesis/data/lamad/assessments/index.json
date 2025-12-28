@@ -1,4 +1,8 @@
 {
+  "id": "assessments-index",
+  "title": "Assessments Index",
+  "contentType": "index",
+  "description": "Manifest of all discovery assessments in the Lamad system",
   "lastUpdated": "2025-11-28T00:09:03.481487",
   "totalCount": 5,
   "assessments": [

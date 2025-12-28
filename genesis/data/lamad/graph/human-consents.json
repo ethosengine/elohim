@@ -1,4 +1,8 @@
 {
+  "id": "graph-human-consents",
+  "title": "Human Consent Records",
+  "contentType": "graph",
+  "description": "Consent relationships between humans in the network",
   "lastUpdated": "2025-12-01T20:29:49.320609Z",
   "count": 23,
   "consents": [

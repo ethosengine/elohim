@@ -1,4 +1,8 @@
 {
+  "id": "graph-epic-governance",
+  "title": "AI Governance Epic Graph",
+  "contentType": "graph",
+  "description": "Graph visualization of the Governance epic",
   "lastUpdated": "2025-11-28T21:09:48.302024",
   "zoomLevel": 1,
   "parentId": "governance-epic",

@@ -1,4 +1,7 @@
 {
+  "id": "graph-human-overview",
+  "title": "Human Relationship Graph Overview",
+  "contentType": "graph",
   "lastUpdated": "2025-12-01T20:29:49.320609Z",
   "graphType": "human",
   "description": "Human relationship graph",

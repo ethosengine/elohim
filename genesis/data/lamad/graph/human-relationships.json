@@ -1,4 +1,8 @@
 {
+  "id": "graph-human-relationships",
+  "title": "Human Relationships",
+  "contentType": "graph",
+  "description": "All relationships between humans in the network",
   "lastUpdated": "2025-12-01T20:29:49.320609Z",
   "count": 23,
   "relationships": [

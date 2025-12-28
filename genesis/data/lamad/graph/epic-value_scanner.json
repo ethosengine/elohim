@@ -1,4 +1,8 @@
 {
+  "id": "graph-epic-value-scanner",
+  "title": "Value Scanner Epic Graph",
+  "contentType": "graph",
+  "description": "Graph visualization of the Value Scanner epic",
   "lastUpdated": "2025-11-28T21:09:48.309202",
   "zoomLevel": 1,
   "parentId": "value-scanner-epic",

@@ -1,4 +1,8 @@
 {
+  "id": "graph-epic-public-observer",
+  "title": "Public Observer Epic Graph",
+  "contentType": "graph",
+  "description": "Graph visualization of the Public Observer epic",
   "lastUpdated": "2025-11-28T21:09:48.343247",
   "zoomLevel": 1,
   "parentId": "public-observer-epic",

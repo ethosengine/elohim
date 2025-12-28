@@ -1,4 +1,8 @@
 {
+  "id": "graph-relationships",
+  "title": "Content Relationships",
+  "contentType": "graph",
+  "description": "All relationships between content nodes in the graph",
   "lastUpdated": "2025-12-01T20:08:11.384596",
   "totalCount": 3193,
   "relationships": [

@@ -1,4 +1,8 @@
 {
+  "id": "graph-epic-autonomous-entity",
+  "title": "Autonomous Entity Epic Graph",
+  "contentType": "graph",
+  "description": "Graph visualization of the Autonomous Entity epic",
   "lastUpdated": "2025-11-28T21:09:48.357670",
   "zoomLevel": 1,
   "parentId": "autonomous-entity-epic",

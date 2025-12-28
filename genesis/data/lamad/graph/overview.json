@@ -1,4 +1,8 @@
 {
+  "id": "graph-overview",
+  "title": "Content Graph Overview",
+  "contentType": "graph",
+  "description": "Root-level visualization of the Elohim Protocol content graph",
   "lastUpdated": "2025-11-28T21:09:48.300962",
   "zoomLevel": 0,
   "nodes": [

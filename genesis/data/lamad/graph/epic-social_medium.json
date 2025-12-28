@@ -1,4 +1,8 @@
 {
+  "id": "graph-epic-social-medium",
+  "title": "Social Medium Epic Graph",
+  "contentType": "graph",
+  "description": "Graph visualization of the Social Medium epic",
   "lastUpdated": "2025-11-28T21:09:48.364606",
   "zoomLevel": 1,
   "parentId": "social-medium-epic",
