@@ -296,6 +296,7 @@ const LIMIT_ARG = args.find(a => a.startsWith('--limit'));
 const LIMIT = LIMIT_ARG ? parseInt(LIMIT_ARG.split('=')[1] || args[args.indexOf(LIMIT_ARG) + 1] || '0', 10) : 0;
 const IDS_ARG = args.find(a => a.startsWith('--ids'));
 const IDS = IDS_ARG ? (IDS_ARG.split('=')[1] || args[args.indexOf(IDS_ARG) + 1] || '').split(',').filter(Boolean) : [];
+const FORCE_SEED = args.includes('--force') || process.env.FORCE_SEED === 'true';
 const LOCAL_DEV_DIR = process.env.LOCAL_DEV_DIR || '/projects/elohim/holochain/local-dev';
 const HC_PORTS_FILE = process.env.HC_PORTS_FILE || path.join(LOCAL_DEV_DIR, '.hc_ports');
 const APP_ID = 'elohim';
@@ -744,20 +745,62 @@ async function seed() {
   timer.startPhase('Pre-flight Validation');
   console.log('\n🔍 Running pre-flight validation...');
 
-  // 1. Test websocket stability with a simple call
-  console.log('   Testing websocket stability...');
+  // 1. Test websocket stability and check existing data
+  console.log('   Testing websocket stability and checking existing data...');
   let wsHealthy = true;
+  let existingContentCount = 0;
+  let alreadySeeded = false;
+
   try {
-    await appWs.callZome({
+    const stats = await appWs.callZome({
       cell_id: cellId,
       zome_name: ZOME_NAME,
       fn_name: 'get_content_stats',
       payload: null,
-    });
+    }) as { total_count: number; by_type: Record<string, number> };
+
     console.log('   ✅ Websocket connection stable');
+    existingContentCount = stats.total_count;
+
+    if (existingContentCount > 0) {
+      console.log(`   📊 Remote already has ${existingContentCount} content entries`);
+
+      // Show breakdown by type
+      const types = Object.entries(stats.by_type || {})
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+      for (const [type, count] of types) {
+        console.log(`      • ${type}: ${count}`);
+      }
+
+      alreadySeeded = true;
+    } else {
+      console.log('   📊 Remote database is empty');
+    }
   } catch (wsError: any) {
     wsHealthy = false;
     console.error('   ❌ Websocket connection unstable:', cleanErrorMessage(wsError));
+  }
+
+  // If already seeded and not forcing, skip seeding
+  if (alreadySeeded && !FORCE_SEED) {
+    console.log('\n' + '='.repeat(70));
+    console.log('⏭️  SKIPPING SEED - Remote already has data');
+    console.log('='.repeat(70));
+    console.log(`   Content entries: ${existingContentCount}`);
+    console.log('');
+    console.log('   To force re-seeding, use one of:');
+    console.log('     --force              (command line)');
+    console.log('     FORCE_SEED=true      (environment variable)');
+    console.log('='.repeat(70));
+
+    await adminWs.client.close();
+    await appWs.client.close();
+    process.exit(0);  // Success exit - this is expected behavior
+  }
+
+  if (alreadySeeded && FORCE_SEED) {
+    console.log('   ⚠️  --force specified, will seed anyway (may create duplicates!)');
   }
 
   // 2. Detect supported content formats by attempting a test create

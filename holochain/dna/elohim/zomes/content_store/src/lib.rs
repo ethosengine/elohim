@@ -1561,9 +1561,18 @@ pub struct PrivilegeCheckResult {
 // Content CRUD Operations
 // =============================================================================
 
-/// Create a single content entry with all index links
+/// Create a single content entry with all index links.
+/// Returns an error if content with the same ID already exists.
 #[hdk_extern]
 pub fn create_content(input: CreateContentInput) -> ExternResult<ContentOutput> {
+    // Check for existing content with this ID to prevent duplicates
+    if content_exists_by_id(&input.id)? {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Content with id '{}' already exists. Use update_content to modify existing entries.",
+            input.id
+        ))));
+    }
+
     let agent_info = agent_info()?;
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
@@ -2110,6 +2119,14 @@ pub fn get_blob_captions(input: QueryBlobVariantsInput) -> ExternResult<Vec<Blob
 /// Create a learning path
 #[hdk_extern]
 pub fn create_path(input: CreatePathInput) -> ExternResult<ActionHash> {
+    // Check for existing path with this ID to prevent duplicates
+    if path_exists_by_id(&input.id)? {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Path with id '{}' already exists. Use update_path to modify existing paths.",
+            input.id
+        ))));
+    }
+
     let agent_info = agent_info()?;
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
@@ -3246,6 +3263,29 @@ pub fn get_content_graph(input: QueryRelatedContentInput) -> ExternResult<Conten
 
 // =============================================================================
 // Human CRUD operations moved to: holochain/dna/imagodei/zomes/imagodei/
+
+// =============================================================================
+// Existence Check Helpers
+// =============================================================================
+
+/// Check if content with the given ID already exists.
+/// Used to prevent duplicate entries during create operations.
+fn content_exists_by_id(id: &str) -> ExternResult<bool> {
+    let anchor = StringAnchor::new("content_id", id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToContent)?;
+    let links = get_links(query, GetStrategy::default())?;
+    Ok(!links.is_empty())
+}
+
+/// Check if a learning path with the given ID already exists.
+fn path_exists_by_id(id: &str) -> ExternResult<bool> {
+    let anchor = StringAnchor::new("path_id", id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::IdToPath)?;
+    let links = get_links(query, GetStrategy::default())?;
+    Ok(!links.is_empty())
+}
 
 // =============================================================================
 // Link Helper Functions
