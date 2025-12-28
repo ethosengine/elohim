@@ -739,6 +739,168 @@ async function seed() {
   timer.endPhase('Connection Setup');
 
   // ========================================
+  // PRE-FLIGHT VALIDATION
+  // ========================================
+  timer.startPhase('Pre-flight Validation');
+  console.log('\n🔍 Running pre-flight validation...');
+
+  // 1. Test websocket stability with a simple call
+  console.log('   Testing websocket stability...');
+  let wsHealthy = true;
+  try {
+    await appWs.callZome({
+      cell_id: cellId,
+      zome_name: ZOME_NAME,
+      fn_name: 'get_content_stats',
+      payload: null,
+    });
+    console.log('   ✅ Websocket connection stable');
+  } catch (wsError: any) {
+    wsHealthy = false;
+    console.error('   ❌ Websocket connection unstable:', cleanErrorMessage(wsError));
+  }
+
+  // 2. Detect supported content formats by attempting a test create
+  console.log('   Detecting supported content formats...');
+  let supportedFormats: string[] = [];
+  try {
+    // Try to create a dummy content with an invalid format to get the error message with valid formats
+    await appWs.callZome({
+      cell_id: cellId,
+      zome_name: ZOME_NAME,
+      fn_name: 'create_content',
+      payload: {
+        id: '__preflight_format_test__',
+        content_type: 'test',
+        title: 'Format Detection Test',
+        description: '',
+        summary: null,
+        content: 'test',
+        content_format: '__invalid_format_to_detect_supported__',
+        tags: [],
+        source_path: null,
+        related_node_ids: [],
+        reach: 'private',
+        estimated_minutes: null,
+        thumbnail_url: null,
+        metadata_json: '{}',
+      },
+    });
+    // If it succeeded (unlikely), clean up
+    console.log('   ⚠️ Could not detect formats (test succeeded unexpectedly)');
+  } catch (formatError: any) {
+    const errorMsg = formatError?.message || String(formatError);
+    // Parse the supported formats from error like: "Must be one of: [\"markdown\", \"html\", ...]"
+    const formatMatch = errorMsg.match(/Must be one of: \[(.*?)\]/);
+    if (formatMatch) {
+      supportedFormats = formatMatch[1]
+        .replace(/\\\"/g, '"')
+        .replace(/"/g, '')
+        .split(',')
+        .map((f: string) => f.trim());
+      console.log(`   ✅ DNA supports ${supportedFormats.length} formats: ${supportedFormats.join(', ')}`);
+    } else if (errorMsg.includes('already exists')) {
+      // Format was accepted, so we can't detect - use a reasonable default
+      console.log('   ⚠️ Could not detect formats (test ID already exists)');
+    } else {
+      console.log(`   ⚠️ Could not detect formats: ${cleanErrorMessage(formatError)}`);
+    }
+  }
+
+  // 3. Scan content files and check for format mismatches
+  console.log('   Scanning content files for format compatibility...');
+  const contentDir = path.join(DATA_DIR, 'content');
+  const allConceptFiles = findJsonFiles(contentDir);
+
+  const formatIssues: { file: string; format: string; id: string }[] = [];
+  const formatCounts: Map<string, number> = new Map();
+
+  for (const file of allConceptFiles) {
+    try {
+      const content = fs.readFileSync(file, 'utf-8');
+      const json = JSON.parse(content) as ConceptJson;
+      const format = json.contentFormat || 'markdown';
+
+      formatCounts.set(format, (formatCounts.get(format) || 0) + 1);
+
+      if (supportedFormats.length > 0 && !supportedFormats.includes(format)) {
+        formatIssues.push({
+          file: path.basename(file),
+          format,
+          id: json.id || path.basename(file, '.json')
+        });
+      }
+    } catch {
+      // Skip parse errors, they'll be caught during seeding
+    }
+  }
+
+  console.log('   📊 Content format distribution:');
+  for (const [format, count] of [...formatCounts.entries()].sort((a, b) => b[1] - a[1])) {
+    const supported = supportedFormats.length === 0 || supportedFormats.includes(format);
+    const status = supported ? '✅' : '❌';
+    console.log(`      ${status} ${format}: ${count} files`);
+  }
+
+  // 4. Report pre-flight results and decide whether to proceed
+  let preflightPassed = true;
+  const preflightIssues: string[] = [];
+
+  if (!wsHealthy) {
+    preflightPassed = false;
+    preflightIssues.push('Websocket connection is unstable');
+  }
+
+  if (formatIssues.length > 0) {
+    preflightPassed = false;
+    preflightIssues.push(`${formatIssues.length} files use unsupported content formats`);
+
+    // Group by format
+    const byFormat = new Map<string, string[]>();
+    for (const issue of formatIssues) {
+      const list = byFormat.get(issue.format) || [];
+      list.push(issue.id);
+      byFormat.set(issue.format, list);
+    }
+
+    console.log('\n   ⚠️ UNSUPPORTED FORMATS DETECTED:');
+    for (const [format, ids] of byFormat) {
+      console.log(`      Format "${format}" not in DNA (${ids.length} files):`);
+      for (const id of ids.slice(0, 5)) {
+        console.log(`         • ${id}`);
+      }
+      if (ids.length > 5) {
+        console.log(`         ... and ${ids.length - 5} more`);
+      }
+    }
+    console.log('\n   💡 FIX: Either redeploy the DNA with the missing format, or');
+    console.log('         change the contentFormat in these files to a supported format.');
+  }
+
+  timer.endPhase('Pre-flight Validation');
+
+  if (!preflightPassed) {
+    console.log('\n' + '='.repeat(70));
+    console.log('❌ PRE-FLIGHT VALIDATION FAILED');
+    console.log('='.repeat(70));
+    for (const issue of preflightIssues) {
+      console.log(`   • ${issue}`);
+    }
+    console.log('\n   Seeding would likely fail. Please fix the issues above first.');
+    console.log('   To force seeding anyway, set SKIP_PREFLIGHT=true');
+    console.log('='.repeat(70));
+
+    if (process.env.SKIP_PREFLIGHT !== 'true') {
+      await adminWs.client.close();
+      await appWs.client.close();
+      process.exit(1);
+    }
+    console.log('\n   ⚠️ SKIP_PREFLIGHT=true set, continuing despite failures...\n');
+  } else {
+    console.log('\n   ✅ Pre-flight validation passed\n');
+  }
+
+  // ========================================
   // SEED CONCEPTS (from content/ directory)
   // ========================================
   timer.startPhase('Concept Seeding');
