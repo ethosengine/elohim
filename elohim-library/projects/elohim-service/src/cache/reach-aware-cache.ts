@@ -719,12 +719,16 @@ async function loadWasmModule(wasmPath?: string): Promise<WasmModule | null> {
 
   wasmInitPromise = (async () => {
     try {
-      // Dynamic import - works in Node.js, browser, Deno, etc.
-      const path = wasmPath || 'holochain-cache-core';
-      const module = await import(/* webpackIgnore: true */ path) as WasmModule;
+      // Dynamic import of WASM module from assets path
+      // In browser: loads from /wasm/holochain-cache-core/
+      // Falls back to TypeScript if WASM not available
+      const path = wasmPath || '/wasm/holochain-cache-core/holochain_cache_core.js';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const module: any = await import(/* webpackIgnore: true */ path);
       await module.default();
-      wasmModule = module;
-      return module;
+      wasmModule = module as WasmModule;
+      console.log('[elohim-cache] WASM module loaded successfully');
+      return wasmModule;
     } catch (error) {
       console.warn('[elohim-cache] WASM module not available, using TypeScript fallback:', error);
       wasmInitPromise = null;
