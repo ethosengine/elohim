@@ -1,12 +1,18 @@
 //! Doorway Client Library
 //!
-//! Caching traits and signals for Holochain DNAs to integrate with Doorway gateway.
+//! Caching and publishing traits for Holochain DNAs to integrate with Doorway gateway.
 //!
 //! ## Core Concepts
 //!
+//! ### Caching (API responses)
 //! 1. **Cacheable trait** - Entry types implement this to declare caching behavior
 //! 2. **CacheSignal** - Signal type for post_commit to notify doorway of changes
 //! 3. **CacheRule** - Declarative caching rules for zome functions
+//!
+//! ### Publishing (raw content serving)
+//! 4. **Publishable trait** - Content types that can be served as raw bytes
+//! 5. **ContentServer** - DHT entry registering an agent as content publisher
+//! 6. **PublishSignal** - Signal to announce publishing availability
 //!
 //! ## Usage in DNAs
 //!
@@ -34,6 +40,23 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+
+// Publishing module - content serving capabilities
+pub mod publish;
+
+// Re-export publishing types at crate root
+pub use publish::{
+    Publishable,
+    ContentServer,
+    ContentServerCapability,
+    PublishSignal,
+    PublishSignalType,
+    DoorwayPublishSignal,
+    Html5AppBundle,
+    Html5AppManifest,
+    FindPublishersInput,
+    FindPublishersOutput,
+};
 
 // =============================================================================
 // Cacheable Trait - Entry types implement this
