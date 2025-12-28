@@ -1,0 +1,382 @@
+/**
+ * Doorway Client - HTTP client for projection cache operations
+ *
+ * Provides APIs for:
+ * - Pushing blobs to projection cache
+ * - Checking blob existence
+ * - Validating cache availability
+ *
+ * Architecture:
+ * - Doorway exposes /store/{hash} for blob serving
+ * - Seeding uses admin API to push blobs
+ * - Cache is eventually consistent with DHT
+ *
+ * Usage:
+ *   const client = new DoorwayClient({ baseUrl: 'https://doorway.example.com', apiKey: 'xxx' });
+ *   await client.checkHealth();
+ *   await client.pushBlob(hash, blob, mimeType);
+ */
+
+import { BlobMetadata } from './blob-manager';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface DoorwayClientConfig {
+  /** Base URL of the doorway (e.g., https://doorway.example.com) */
+  baseUrl: string;
+  /** API key for admin operations */
+  apiKey?: string;
+  /** Request timeout in ms (default: 30000) */
+  timeout?: number;
+  /** Retry attempts for failed requests (default: 3) */
+  retries?: number;
+  /** Dry run mode - log but don't actually push */
+  dryRun?: boolean;
+}
+
+export interface HealthStatus {
+  healthy: boolean;
+  version?: string;
+  cacheEnabled: boolean;
+  error?: string;
+}
+
+export interface PushResult {
+  success: boolean;
+  hash: string;
+  cached: boolean;
+  error?: string;
+}
+
+export interface BatchPushResult {
+  success: number;
+  failed: number;
+  errors: Array<{ hash: string; error: string }>;
+}
+
+// =============================================================================
+// Doorway Client
+// =============================================================================
+
+export class DoorwayClient {
+  private config: Required<DoorwayClientConfig>;
+
+  constructor(config: DoorwayClientConfig) {
+    this.config = {
+      baseUrl: config.baseUrl.replace(/\/$/, ''), // Remove trailing slash
+      apiKey: config.apiKey || '',
+      timeout: config.timeout || 30000,
+      retries: config.retries || 3,
+      dryRun: config.dryRun || false,
+    };
+  }
+
+  /**
+   * Check doorway health and cache availability.
+   */
+  async checkHealth(): Promise<HealthStatus> {
+    try {
+      const response = await this.fetch('/health', {
+        method: 'GET',
+        timeout: 5000, // Quick timeout for health check
+      });
+
+      if (!response.ok) {
+        return {
+          healthy: false,
+          cacheEnabled: false,
+          error: `HTTP ${response.status}: ${response.statusText}`,
+        };
+      }
+
+      const data = await response.json();
+      return {
+        healthy: true,
+        version: data.version,
+        cacheEnabled: data.cache?.enabled ?? true,
+      };
+    } catch (error) {
+      return {
+        healthy: false,
+        cacheEnabled: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Check if a blob exists in the cache.
+   */
+  async blobExists(hash: string): Promise<boolean> {
+    try {
+      const response = await this.fetch(`/store/${hash}`, {
+        method: 'HEAD',
+      });
+      return response.status === 200;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Push a blob to the projection cache.
+   *
+   * Uses the admin seed endpoint which accepts blobs for caching.
+   */
+  async pushBlob(
+    hash: string,
+    data: Buffer,
+    metadata: BlobMetadata
+  ): Promise<PushResult> {
+    if (this.config.dryRun) {
+      console.log(`[DRY RUN] Would push blob: ${hash} (${data.length} bytes)`);
+      return { success: true, hash, cached: false };
+    }
+
+    // Check if already cached
+    const exists = await this.blobExists(hash);
+    if (exists) {
+      return { success: true, hash, cached: true };
+    }
+
+    try {
+      const response = await this.fetch('/admin/seed/blob', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': metadata.mimeType,
+          'X-Blob-Hash': hash,
+          'X-Blob-Size': String(metadata.sizeBytes),
+          ...(metadata.entryPoint && { 'X-Entry-Point': metadata.entryPoint }),
+          ...(metadata.fallbackUrl && { 'X-Fallback-Url': metadata.fallbackUrl }),
+        },
+        body: data,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          hash,
+          cached: false,
+          error: `HTTP ${response.status}: ${errorText}`,
+        };
+      }
+
+      return { success: true, hash, cached: false };
+    } catch (error) {
+      return {
+        success: false,
+        hash,
+        cached: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Push multiple blobs in batch.
+   *
+   * Processes blobs sequentially to avoid overwhelming the cache.
+   */
+  async pushBlobs(
+    blobs: Array<{ hash: string; data: Buffer; metadata: BlobMetadata }>
+  ): Promise<BatchPushResult> {
+    let success = 0;
+    let failed = 0;
+    const errors: Array<{ hash: string; error: string }> = [];
+
+    for (const blob of blobs) {
+      const result = await this.pushBlob(blob.hash, blob.data, blob.metadata);
+
+      if (result.success) {
+        success++;
+        if (result.cached) {
+          console.log(`  ✓ ${blob.hash} (already cached)`);
+        } else {
+          console.log(`  ✓ ${blob.hash} (pushed ${blob.data.length} bytes)`);
+        }
+      } else {
+        failed++;
+        errors.push({ hash: blob.hash, error: result.error || 'Unknown error' });
+        console.error(`  ✗ ${blob.hash}: ${result.error}`);
+      }
+    }
+
+    return { success, failed, errors };
+  }
+
+  /**
+   * Register an HTML5 app with the cache.
+   *
+   * This tells the cache about the app so it can serve files from the zip.
+   */
+  async registerApp(
+    appId: string,
+    blobHash: string,
+    entryPoint: string = 'index.html',
+    fallbackUrl?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (this.config.dryRun) {
+      console.log(`[DRY RUN] Would register app: ${appId} -> ${blobHash}`);
+      return { success: true };
+    }
+
+    try {
+      const response = await this.fetch('/admin/apps/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          app_id: appId,
+          blob_hash: blobHash,
+          entry_point: entryPoint,
+          fallback_url: fallbackUrl,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${errorText}`,
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Get cache statistics.
+   */
+  async getStats(): Promise<{
+    entries: number;
+    sizeBytes: number;
+    hitRate: number;
+  } | null> {
+    try {
+      const response = await this.fetch('/admin/cache/stats');
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Internal fetch wrapper with auth, timeout, and retry logic.
+   */
+  private async fetch(
+    path: string,
+    options: {
+      method?: string;
+      headers?: Record<string, string>;
+      body?: Buffer | string;
+      timeout?: number;
+    } = {}
+  ): Promise<Response> {
+    const url = `${this.config.baseUrl}${path}`;
+    const timeout = options.timeout || this.config.timeout;
+
+    const headers: Record<string, string> = {
+      ...options.headers,
+    };
+
+    if (this.config.apiKey) {
+      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+    }
+
+    // Convert Buffer to Uint8Array for fetch compatibility
+    let body: BodyInit | undefined;
+    if (options.body) {
+      if (Buffer.isBuffer(options.body)) {
+        body = new Uint8Array(options.body);
+      } else {
+        body = options.body;
+      }
+    }
+
+    let lastError: Error | null = null;
+    for (let attempt = 1; attempt <= this.config.retries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+        const response = await fetch(url, {
+          method: options.method || 'GET',
+          headers,
+          body,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+        return response;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (attempt < this.config.retries) {
+          // Exponential backoff
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    throw lastError || new Error('Request failed after retries');
+  }
+}
+
+// =============================================================================
+// Pre-flight Validation
+// =============================================================================
+
+/**
+ * Pre-flight check for seeding readiness.
+ *
+ * Validates:
+ * - Doorway is reachable
+ * - Cache is enabled
+ * - Admin API is accessible
+ */
+export async function validateSeedingPrerequisites(
+  doorwayUrl: string,
+  apiKey?: string
+): Promise<{
+  ready: boolean;
+  issues: string[];
+}> {
+  const issues: string[] = [];
+  const client = new DoorwayClient({ baseUrl: doorwayUrl, apiKey });
+
+  // Check doorway health
+  const health = await client.checkHealth();
+  if (!health.healthy) {
+    issues.push(`Doorway not reachable: ${health.error}`);
+    return { ready: false, issues };
+  }
+
+  if (!health.cacheEnabled) {
+    issues.push('Doorway cache is disabled');
+  }
+
+  // Try to get cache stats (validates admin access)
+  const stats = await client.getStats();
+  if (stats === null) {
+    issues.push('Cannot access admin API (check API key)');
+  }
+
+  return {
+    ready: issues.length === 0,
+    issues,
+  };
+}
+
+export default DoorwayClient;
