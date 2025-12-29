@@ -9771,6 +9771,106 @@ pub fn create_recurring_pattern(recurring_pattern: RecurringPattern) -> ExternRe
 }
 
 // =============================================================================
+// CACHE WARMING - Pre-populate doorway cache with existing content
+// =============================================================================
+
+/// Input for warming doorway cache
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WarmCacheInput {
+    /// Content IDs to warm (seeder passes what it seeded)
+    pub content_ids: Vec<String>,
+    /// Path IDs to warm (if None, warms all paths from get_all_paths)
+    pub path_ids: Option<Vec<String>>,
+}
+
+/// Output from cache warming operation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WarmCacheOutput {
+    /// Number of content items successfully warmed
+    pub content_warmed: u32,
+    /// Number of paths successfully warmed
+    pub paths_warmed: u32,
+    /// Errors encountered (id: message)
+    pub errors: Vec<String>,
+}
+
+/// Warm doorway cache by emitting signals for existing content.
+///
+/// Called by seeder after bulk content creation to pre-populate
+/// doorway's projection store before users arrive. This ensures
+/// instant cache hits instead of slow conductor fallback.
+///
+/// The DNA is the authoritative source - doorway just listens to signals.
+#[hdk_extern]
+pub fn warm_cache(input: WarmCacheInput) -> ExternResult<WarmCacheOutput> {
+    let mut content_warmed = 0u32;
+    let mut paths_warmed = 0u32;
+    let mut errors: Vec<String> = Vec::new();
+
+    // Warm content by ID
+    for id in &input.content_ids {
+        match get_content_by_id(QueryByIdInput { id: id.clone() }) {
+            Ok(Some(output)) => {
+                // Emit cache signal - doorway's SignalSubscriber picks this up
+                if let Err(e) = emit_signal(DoorwaySignal::new(CacheSignal::upsert(&output.content))) {
+                    errors.push(format!("{}: signal error: {:?}", id, e));
+                } else {
+                    content_warmed += 1;
+                }
+            }
+            Ok(None) => {
+                errors.push(format!("{}: not found", id));
+            }
+            Err(e) => {
+                errors.push(format!("{}: {:?}", id, e));
+            }
+        }
+    }
+
+    // Determine which path IDs to warm
+    let path_ids_to_warm: Vec<String> = match input.path_ids {
+        Some(ids) => ids,
+        None => {
+            // Get all paths if no specific IDs provided
+            match get_all_paths(()) {
+                Ok(index) => index.paths.into_iter().map(|p| p.id).collect(),
+                Err(e) => {
+                    errors.push(format!("get_all_paths failed: {:?}", e));
+                    Vec::new()
+                }
+            }
+        }
+    };
+
+    // Warm paths
+    for id in path_ids_to_warm {
+        // Use get_path_overview for efficiency (doesn't load all steps)
+        match get_path_overview(id.clone()) {
+            Ok(Some(overview)) => {
+                // Emit cache signal for the path
+                if let Err(e) = emit_signal(DoorwaySignal::new(CacheSignal::upsert(&overview.path))) {
+                    errors.push(format!("path/{}: signal error: {:?}", id, e));
+                } else {
+                    paths_warmed += 1;
+                }
+            }
+            Ok(None) => {
+                errors.push(format!("path/{}: not found", id));
+            }
+            Err(e) => {
+                errors.push(format!("path/{}: {:?}", id, e));
+            }
+        }
+    }
+
+    Ok(WarmCacheOutput {
+        content_warmed,
+        paths_warmed,
+        errors,
+    })
+}
+
+// =============================================================================
 // NOTE: Plaid/Banking Integration REMOVED from Holochain
 // =============================================================================
 // All Plaid/banking zome functions have been moved to the banking-bridge module

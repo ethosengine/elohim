@@ -1345,10 +1345,55 @@ async function seed() {
     console.log(`   Could not fetch stats: ${cleanErrorMessage(error)}`);
   }
 
+  timer.endPhase('Final Stats');
+
+  // ========================================
+  // WARM DOORWAY CACHE
+  // ========================================
+  timer.startPhase('Cache Warming');
+  console.log('\n🔥 Warming doorway cache...');
+
+  // Collect IDs from what we seeded
+  const seededContentIds = newConcepts.map(({ concept }) => concept.id);
+  const seededPathIds = newPaths.map(p => p.id);
+
+  console.log(`   Content IDs to warm: ${seededContentIds.length}`);
+  console.log(`   Path IDs to warm: ${seededPathIds.length} (plus any existing)`);
+
+  try {
+    const warmResult = await timer.timeOperation('warm_cache', () =>
+      appWs.callZome({
+        cell_id: cellId,
+        zome_name: ZOME_NAME,
+        fn_name: 'warm_cache',
+        payload: {
+          content_ids: seededContentIds,
+          path_ids: null, // null = warm all paths (includes any pre-existing)
+        },
+      })
+    ) as { content_warmed: number; paths_warmed: number; errors: string[] };
+
+    console.log(`   ✅ Cache warmed: ${warmResult.content_warmed} content, ${warmResult.paths_warmed} paths`);
+
+    if (warmResult.errors.length > 0) {
+      console.log(`   ⚠️ ${warmResult.errors.length} warmup errors:`);
+      for (const err of warmResult.errors.slice(0, 5)) {
+        console.log(`      • ${err}`);
+      }
+      if (warmResult.errors.length > 5) {
+        console.log(`      ... and ${warmResult.errors.length - 5} more`);
+      }
+    }
+  } catch (warmError: any) {
+    console.error(`   ❌ Cache warming failed: ${cleanErrorMessage(warmError)}`);
+    console.log('   (This is non-fatal - cache will warm on first access)');
+  }
+
+  timer.endPhase('Cache Warming');
+
+  // Close connections
   await adminWs.client.close();
   await appWs.client.close();
-
-  timer.endPhase('Final Stats');
 
   // Set seed results for the report
   timer.setSeedResults({
