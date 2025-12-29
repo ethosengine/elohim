@@ -6,6 +6,14 @@
 //! - Returns `206 Partial Content` for range requests
 //! - Returns `200 OK` for full content requests
 //!
+//! ## Shard Resolution Fallback
+//!
+//! When content is not in the local cache, the handler can optionally use
+//! a ShardResolver to fetch from elohim-storage nodes:
+//! 1. Query projection store for ShardManifest by blob_hash
+//! 2. Fetch shards from elohim-storage endpoints
+//! 3. Reassemble and cache for future requests
+//!
 //! ## Example Usage
 //!
 //! ```bash
@@ -17,9 +25,12 @@
 //! ```
 
 use crate::cache::ContentCache;
+use crate::projection::ProjectionStore;
+use crate::services::{BlobResolution, ShardLocation, ShardManifest, ShardResolver};
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{header, Method, Request, Response, StatusCode};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
@@ -258,6 +269,243 @@ pub fn error_response(err: BlobError) -> Response<Full<Bytes>> {
         .header(header::CONTENT_TYPE, "text/plain")
         .body(Full::new(Bytes::from(message)))
         .unwrap()
+}
+
+// ============================================================================
+// Shard Resolution Fallback
+// ============================================================================
+
+/// Context for blob resolution with shard fallback
+pub struct BlobContext {
+    /// Content cache for hot path
+    pub cache: Arc<ContentCache>,
+    /// Shard resolver for cache misses
+    pub resolver: Option<Arc<ShardResolver>>,
+    /// Projection store for manifest lookups
+    pub projection: Option<Arc<ProjectionStore>>,
+}
+
+impl BlobContext {
+    /// Create context with just cache (no shard fallback)
+    pub fn cache_only(cache: Arc<ContentCache>) -> Self {
+        Self {
+            cache,
+            resolver: None,
+            projection: None,
+        }
+    }
+
+    /// Create context with full shard resolution support
+    pub fn with_resolver(
+        cache: Arc<ContentCache>,
+        resolver: Arc<ShardResolver>,
+        projection: Arc<ProjectionStore>,
+    ) -> Self {
+        Self {
+            cache,
+            resolver: Some(resolver),
+            projection: Some(projection),
+        }
+    }
+}
+
+/// Handle content store requests with shard resolution fallback.
+///
+/// This is the enhanced handler that tries shard resolution when
+/// content is not in the local cache.
+///
+/// # Resolution Order
+/// 1. Check local ContentCache (hot path)
+/// 2. If miss and resolver available, try shard resolution:
+///    a. Query projection store for ShardManifest
+///    b. Get shard locations
+///    c. Fetch shards from elohim-storage
+///    d. Reassemble and cache
+/// 3. Return 404 if all methods fail
+pub async fn handle_blob_request_with_fallback(
+    req: Request<hyper::body::Incoming>,
+    ctx: Arc<BlobContext>,
+) -> Result<Response<Full<Bytes>>, BlobError> {
+    // Extract hash from path: /store/{hash}
+    let path = req.uri().path();
+    let hash = path
+        .strip_prefix("/store/")
+        .ok_or(BlobError::NotFound)?
+        .to_string();
+
+    if hash.is_empty() {
+        return Err(BlobError::NotFound);
+    }
+
+    debug!(hash = %hash, method = %req.method(), "Blob request with fallback");
+
+    match *req.method() {
+        Method::GET => handle_get_blob_with_fallback(req, ctx, &hash).await,
+        Method::HEAD => handle_head_blob_with_fallback(ctx, &hash).await,
+        _ => Err(BlobError::MethodNotAllowed),
+    }
+}
+
+/// Handle GET with shard resolution fallback
+async fn handle_get_blob_with_fallback(
+    req: Request<hyper::body::Incoming>,
+    ctx: Arc<BlobContext>,
+    hash: &str,
+) -> Result<Response<Full<Bytes>>, BlobError> {
+    // Check If-None-Match first (works even if we need to resolve)
+    if let Some(if_none_match) = req.headers().get(header::IF_NONE_MATCH) {
+        if let Ok(etag_str) = if_none_match.to_str() {
+            if let Some(true) = ctx.cache.check_etag(hash, etag_str) {
+                debug!(hash = %hash, "ETag match, returning 304");
+                return Ok(Response::builder()
+                    .status(StatusCode::NOT_MODIFIED)
+                    .body(Full::new(Bytes::new()))
+                    .unwrap());
+            }
+        }
+    }
+
+    // Try cache first (hot path)
+    if let Some(size) = ctx.cache.blob_size(hash) {
+        // Check for Range header
+        if let Some(range_header) = req.headers().get(header::RANGE) {
+            if let Ok(range_str) = range_header.to_str() {
+                return handle_range_request(ctx.cache.clone(), hash, range_str, size).await;
+            }
+        }
+        return handle_full_content(ctx.cache.clone(), hash).await;
+    }
+
+    // Cache miss - try shard resolution if available
+    if let (Some(ref resolver), Some(ref projection)) = (&ctx.resolver, &ctx.projection) {
+        debug!(hash = %hash, "Cache miss, trying shard resolution");
+
+        // Try to resolve from shards
+        match try_resolve_from_shards(hash, resolver, projection).await {
+            Ok(()) => {
+                // Successfully resolved and cached, now serve from cache
+                if let Some(size) = ctx.cache.blob_size(hash) {
+                    if let Some(range_header) = req.headers().get(header::RANGE) {
+                        if let Ok(range_str) = range_header.to_str() {
+                            return handle_range_request(ctx.cache.clone(), hash, range_str, size).await;
+                        }
+                    }
+                    return handle_full_content(ctx.cache.clone(), hash).await;
+                }
+            }
+            Err(e) => {
+                warn!(hash = %hash, error = %e, "Shard resolution failed");
+            }
+        }
+    }
+
+    // All resolution methods failed
+    Err(BlobError::NotFound)
+}
+
+/// Handle HEAD with shard resolution fallback
+async fn handle_head_blob_with_fallback(
+    ctx: Arc<BlobContext>,
+    hash: &str,
+) -> Result<Response<Full<Bytes>>, BlobError> {
+    // Try cache first
+    if let Some(entry) = ctx.cache.get(hash) {
+        debug!(hash = %hash, size = entry.data.len(), "HEAD request (cached)");
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, &entry.content_type)
+            .header(header::CONTENT_LENGTH, entry.data.len())
+            .header(header::ETAG, &entry.etag)
+            .header(header::ACCEPT_RANGES, "bytes")
+            .body(Full::new(Bytes::new()))
+            .unwrap());
+    }
+
+    // For HEAD, we can query projection for manifest metadata without fetching shards
+    if let Some(ref projection) = ctx.projection {
+        if let Some(manifest) = get_manifest_from_projection(hash, projection).await {
+            debug!(hash = %hash, size = manifest.total_size, "HEAD request (from manifest)");
+            return Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, &manifest.mime_type)
+                .header(header::CONTENT_LENGTH, manifest.total_size as usize)
+                .header(header::ACCEPT_RANGES, "bytes")
+                .body(Full::new(Bytes::new()))
+                .unwrap());
+        }
+    }
+
+    Err(BlobError::NotFound)
+}
+
+/// Try to resolve a blob from shards
+async fn try_resolve_from_shards(
+    blob_hash: &str,
+    resolver: &Arc<ShardResolver>,
+    projection: &Arc<ProjectionStore>,
+) -> Result<(), String> {
+    // Get manifest from projection store
+    let manifest = get_manifest_from_projection(blob_hash, projection)
+        .await
+        .ok_or_else(|| "Manifest not found in projection".to_string())?;
+
+    // Get shard locations from projection
+    let shard_locations = get_shard_locations_from_projection(&manifest.shard_hashes, projection).await;
+
+    // Build BlobResolution
+    let resolution = BlobResolution {
+        manifest,
+        shard_locations,
+    };
+
+    // Resolve via shard resolver (fetches shards and caches result)
+    resolver
+        .resolve(resolution)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Get ShardManifest from projection store
+async fn get_manifest_from_projection(
+    blob_hash: &str,
+    projection: &Arc<ProjectionStore>,
+) -> Option<ShardManifest> {
+    // Query projection for ShardManifest by blob_hash
+    let doc = projection.get("ShardManifest", blob_hash).await?;
+
+    // Parse the projected document data into ShardManifest
+    // doc.data is JsonValue, check if it's null
+    if doc.data.is_null() {
+        return None;
+    }
+    serde_json::from_value(doc.data).ok()
+}
+
+/// Get shard locations from projection store
+async fn get_shard_locations_from_projection(
+    shard_hashes: &[String],
+    projection: &Arc<ProjectionStore>,
+) -> HashMap<String, Vec<ShardLocation>> {
+    let mut locations = HashMap::new();
+
+    for shard_hash in shard_hashes {
+        // Query for ShardLocation entries
+        if let Some(doc) = projection.get("ShardLocation", shard_hash).await {
+            // doc.data is JsonValue, check if it's null before parsing
+            if !doc.data.is_null() {
+                // The projection may store an array of locations
+                if let Ok(locs) = serde_json::from_value::<Vec<ShardLocation>>(doc.data.clone()) {
+                    locations.insert(shard_hash.clone(), locs);
+                } else if let Ok(loc) = serde_json::from_value::<ShardLocation>(doc.data) {
+                    locations.insert(shard_hash.clone(), vec![loc]);
+                }
+            }
+        }
+    }
+
+    locations
 }
 
 #[cfg(test)]

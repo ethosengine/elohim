@@ -8,7 +8,7 @@
 
 use hdk::prelude::*;
 use content_store_integrity::*;
-use doorway_client::{CacheRule, CacheRuleBuilder, CacheSignal, DoorwaySignal, Cacheable};
+use doorway_client::{CacheRule, CacheRuleBuilder, CacheSignal, CacheSignalType, DoorwaySignal, Cacheable};
 use std::collections::HashMap;
 
 // Migration module for DNA version upgrades
@@ -9888,5 +9888,334 @@ pub fn warm_cache(input: WarmCacheInput) -> ExternResult<WarmCacheOutput> {
 //
 // The ONLY network signal from banking is the final EconomicEvent.
 // =============================================================================
+
+// =============================================================================
+// Shard Manifest Management - Unified Blob Storage Model
+// =============================================================================
+// These functions manage the distributed shard system for blob storage.
+// Every blob has a ShardManifest (even single-shard blobs) and ShardLocations
+// track which nodes hold which shards.
+
+/// Input for registering a shard manifest
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisterShardManifestInput {
+    pub blob_hash: String,
+    pub total_size: u64,
+    pub mime_type: String,
+    pub encoding: String,
+    pub data_shards: u8,
+    pub total_shards: u8,
+    pub shard_size: u64,
+    pub shard_hashes: Vec<String>,
+    pub reach: String,
+    pub author_id: Option<String>,
+}
+
+/// Output from registering a shard manifest
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisterShardManifestOutput {
+    pub action_hash: ActionHash,
+    pub manifest: ShardManifest,
+}
+
+/// Register a new shard manifest for a blob
+///
+/// Creates the ShardManifest entry and establishes links:
+/// - Anchor(blob_hash) -> ShardManifest (for lookup by blob hash)
+/// - Anchor(author_id) -> ShardManifest (for author's manifests)
+#[hdk_extern]
+pub fn register_shard_manifest(input: RegisterShardManifestInput) -> ExternResult<RegisterShardManifestOutput> {
+    // Validate encoding type
+    if !SHARD_ENCODINGS.contains(&input.encoding.as_str()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Invalid encoding type: {}. Valid: {:?}", input.encoding, SHARD_ENCODINGS)
+        )));
+    }
+
+    // Validate shard counts
+    if input.shard_hashes.len() != input.total_shards as usize {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Shard hash count ({}) must match total_shards ({})",
+                    input.shard_hashes.len(), input.total_shards)
+        )));
+    }
+
+    let now = format!("{:?}", sys_time()?);
+
+    let manifest = ShardManifest {
+        blob_hash: input.blob_hash.clone(),
+        total_size: input.total_size,
+        mime_type: input.mime_type,
+        encoding: input.encoding,
+        data_shards: input.data_shards,
+        total_shards: input.total_shards,
+        shard_size: input.shard_size,
+        shard_hashes: input.shard_hashes,
+        reach: input.reach,
+        author_id: input.author_id.clone(),
+        created_at: now.clone(),
+        verified_at: Some(now),
+    };
+
+    let action_hash = create_entry(EntryTypes::ShardManifest(manifest.clone()))?;
+
+    // Create blob_hash -> ShardManifest link
+    let blob_anchor = StringAnchor::new("blob_hash", &input.blob_hash);
+    let blob_anchor_hash = hash_entry(&EntryTypes::StringAnchor(blob_anchor.clone()))?;
+    create_entry(EntryTypes::StringAnchor(blob_anchor))?;
+    create_link(
+        blob_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::BlobToManifest,
+        (),
+    )?;
+
+    // Create author_id -> ShardManifest link (if author specified)
+    if let Some(author_id) = &input.author_id {
+        let author_anchor = StringAnchor::new("author_manifests", author_id);
+        let author_anchor_hash = hash_entry(&EntryTypes::StringAnchor(author_anchor.clone()))?;
+        create_entry(EntryTypes::StringAnchor(author_anchor))?;
+        create_link(
+            author_anchor_hash,
+            action_hash.clone(),
+            LinkTypes::AuthorToManifests,
+            (),
+        )?;
+    }
+
+    // Emit signal for doorway cache
+    let _ = emit_signal(DoorwaySignal::new(CacheSignal {
+        signal_type: CacheSignalType::Upsert,
+        doc_type: "ShardManifest".to_string(),
+        doc_id: input.blob_hash,
+        data: serde_json::to_value(&manifest).ok(),
+        ttl_secs: Some(86400), // 24 hours
+        public: manifest.reach == "commons",
+        reach: Some(manifest.reach.clone()),
+    }));
+
+    Ok(RegisterShardManifestOutput { action_hash, manifest })
+}
+
+/// Get shard manifest by blob hash
+#[hdk_extern]
+pub fn get_shard_manifest(blob_hash: String) -> ExternResult<Option<ShardManifest>> {
+    let blob_anchor = StringAnchor::new("blob_hash", &blob_hash);
+    let blob_anchor_hash = hash_entry(&EntryTypes::StringAnchor(blob_anchor))?;
+
+    let query = LinkQuery::try_new(blob_anchor_hash, LinkTypes::BlobToManifest)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    // Get the most recent manifest
+    let action_hash = ActionHash::try_from(links[0].target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid manifest hash".to_string())))?;
+
+    let record = get(action_hash, GetOptions::default())?;
+
+    match record {
+        Some(r) => {
+            let manifest: ShardManifest = r.entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode manifest: {:?}", e))))?
+                .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Manifest entry not found".to_string())))?;
+            Ok(Some(manifest))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Input for registering a shard location
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisterShardLocationInput {
+    pub shard_hash: String,
+    pub shard_index: u8,
+    pub holder: String,
+    pub endpoint: Option<String>,
+    pub storage_tier: Option<String>,
+}
+
+/// Output from registering a shard location
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisterShardLocationOutput {
+    pub action_hash: ActionHash,
+    pub location: ShardLocation,
+}
+
+/// Register that this node holds a shard
+///
+/// Creates a ShardLocation entry and links:
+/// - Anchor(shard_hash) -> ShardLocation (find holders by shard)
+/// - Anchor(holder) -> ShardLocation (find shards by holder)
+#[hdk_extern]
+pub fn register_shard_location(input: RegisterShardLocationInput) -> ExternResult<RegisterShardLocationOutput> {
+    let now = format!("{:?}", sys_time()?);
+
+    let location = ShardLocation {
+        shard_hash: input.shard_hash.clone(),
+        shard_index: input.shard_index,
+        holder: input.holder.clone(),
+        endpoint: input.endpoint,
+        storage_tier: input.storage_tier,
+        verified_at: now,
+        is_active: true,
+    };
+
+    let action_hash = create_entry(EntryTypes::ShardLocation(location.clone()))?;
+
+    // Create shard_hash -> ShardLocation link
+    let shard_anchor = StringAnchor::new("shard_hash", &input.shard_hash);
+    let shard_anchor_hash = hash_entry(&EntryTypes::StringAnchor(shard_anchor.clone()))?;
+    create_entry(EntryTypes::StringAnchor(shard_anchor))?;
+    create_link(
+        shard_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ShardToLocations,
+        (),
+    )?;
+
+    // Create holder -> ShardLocation link
+    let holder_anchor = StringAnchor::new("holder_shards", &input.holder);
+    let holder_anchor_hash = hash_entry(&EntryTypes::StringAnchor(holder_anchor.clone()))?;
+    create_entry(EntryTypes::StringAnchor(holder_anchor))?;
+    create_link(
+        holder_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::HolderToShards,
+        (),
+    )?;
+
+    Ok(RegisterShardLocationOutput { action_hash, location })
+}
+
+/// Get all locations for a shard
+#[hdk_extern]
+pub fn get_shard_locations(shard_hash: String) -> ExternResult<Vec<ShardLocation>> {
+    let shard_anchor = StringAnchor::new("shard_hash", &shard_hash);
+    let shard_anchor_hash = hash_entry(&EntryTypes::StringAnchor(shard_anchor))?;
+
+    let query = LinkQuery::try_new(shard_anchor_hash, LinkTypes::ShardToLocations)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut locations = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid location hash".to_string())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(Some(loc)) = record.entry().to_app_option::<ShardLocation>() {
+                if loc.is_active {
+                    locations.push(loc);
+                }
+            }
+        }
+    }
+
+    Ok(locations)
+}
+
+/// Get all shards held by a specific agent
+#[hdk_extern]
+pub fn get_holder_shards(holder: String) -> ExternResult<Vec<ShardLocation>> {
+    let holder_anchor = StringAnchor::new("holder_shards", &holder);
+    let holder_anchor_hash = hash_entry(&EntryTypes::StringAnchor(holder_anchor))?;
+
+    let query = LinkQuery::try_new(holder_anchor_hash, LinkTypes::HolderToShards)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut locations = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid location hash".to_string())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(Some(loc)) = record.entry().to_app_option::<ShardLocation>() {
+                if loc.is_active {
+                    locations.push(loc);
+                }
+            }
+        }
+    }
+
+    Ok(locations)
+}
+
+/// Mark a shard location as inactive (shard no longer available)
+#[hdk_extern]
+pub fn deactivate_shard_location(action_hash: ActionHash) -> ExternResult<()> {
+    let record = get(action_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Shard location not found".to_string())))?;
+
+    let mut location: ShardLocation = record.entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode location: {:?}", e))))?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Location entry not found".to_string())))?;
+
+    location.is_active = false;
+    location.verified_at = format!("{:?}", sys_time()?);
+
+    update_entry(action_hash, &location)?;
+
+    Ok(())
+}
+
+/// Get all manifests for a specific author
+#[hdk_extern]
+pub fn get_author_manifests(author_id: String) -> ExternResult<Vec<ShardManifest>> {
+    let author_anchor = StringAnchor::new("author_manifests", &author_id);
+    let author_anchor_hash = hash_entry(&EntryTypes::StringAnchor(author_anchor))?;
+
+    let query = LinkQuery::try_new(author_anchor_hash, LinkTypes::AuthorToManifests)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut manifests = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid manifest hash".to_string())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(Some(manifest)) = record.entry().to_app_option::<ShardManifest>() {
+                manifests.push(manifest);
+            }
+        }
+    }
+
+    Ok(manifests)
+}
+
+/// Resolve a blob - get manifest and all available shard locations
+///
+/// This is the main query for clients wanting to fetch a blob.
+/// Returns the manifest and locations for each shard so the client
+/// can decide where to fetch from.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlobResolutionOutput {
+    pub manifest: ShardManifest,
+    pub shard_locations: Vec<Vec<ShardLocation>>, // One vec per shard in order
+}
+
+#[hdk_extern]
+pub fn resolve_blob(blob_hash: String) -> ExternResult<Option<BlobResolutionOutput>> {
+    // Get manifest
+    let manifest = match get_shard_manifest(blob_hash)? {
+        Some(m) => m,
+        None => return Ok(None),
+    };
+
+    // Get locations for each shard
+    let mut shard_locations = Vec::with_capacity(manifest.shard_hashes.len());
+    for shard_hash in &manifest.shard_hashes {
+        let locations = get_shard_locations(shard_hash.clone())?;
+        shard_locations.push(locations);
+    }
+
+    Ok(Some(BlobResolutionOutput {
+        manifest,
+        shard_locations,
+    }))
+}
 
 // Qahal relationship functions moved to: holochain/dna/imagodei/zomes/imagodei/

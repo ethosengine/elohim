@@ -15,7 +15,10 @@ pub use admin::{
 };
 pub use api::handle_api_request;
 pub use auth_routes::handle_auth_request;
-pub use blob::{handle_blob_request, error_response as blob_error_response, BlobError};
+pub use blob::{
+    handle_blob_request, handle_blob_request_with_fallback,
+    error_response as blob_error_response, BlobContext, BlobError,
+};
 pub use dashboard_ws::handle_dashboard_ws;
 pub use health::health_check;
 pub use status::status_check;

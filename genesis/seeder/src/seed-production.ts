@@ -46,9 +46,10 @@ import { fileURLToPath } from 'url';
 // ES module compatibility for __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-import { BlobManager, validateBlobReferences, ContentFile } from './blob-manager';
-import { DoorwayClient, validateSeedingPrerequisites } from './doorway-client';
-import { validateContentFile, validateAllContent, printValidationReport } from './schema-validation';
+import { BlobManager, validateBlobReferences, ContentFile } from './blob-manager.js';
+import { DoorwayClient, validateSeedingPrerequisites } from './doorway-client.js';
+import { StorageClient, validateStorageNode, ShardManifest } from './storage-client.js';
+import { validateContentFile, validateAllContent, printValidationReport } from './schema-validation.js';
 
 // =============================================================================
 // Configuration
@@ -63,6 +64,9 @@ interface SeedConfig {
   doorwayUrl: string;
   doorwayApiKey?: string;
 
+  // Elohim Storage (optional - for unified shard model)
+  storageUrl?: string;
+
   // Content
   contentDir: string;
   pathsDir: string;
@@ -73,12 +77,14 @@ interface SeedConfig {
   validateOnly: boolean;
   skipBlobs: boolean;
   skipDna: boolean;
+  skipShardRegistration: boolean;
 }
 
 interface SeedResults {
   // Pre-flight
   validationPassed: boolean;
   doorwayReady: boolean;
+  storageReady: boolean;
 
   // DNA seeding
   contentSeeded: number;
@@ -86,11 +92,17 @@ interface SeedResults {
   pathsSeeded: number;
   pathErrors: number;
 
-  // Blob seeding
+  // Blob seeding (doorway)
   blobsExtracted: number;
   blobsPushed: number;
   blobsCached: number;
   blobErrors: number;
+
+  // Shard seeding (elohim-storage + DNA registration)
+  shardsPushed: number;
+  shardErrors: number;
+  manifestsRegistered: number;
+  manifestErrors: number;
 
   // Timing
   startTime: number;
@@ -105,6 +117,7 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
   const results: SeedResults = {
     validationPassed: false,
     doorwayReady: false,
+    storageReady: false,
     contentSeeded: 0,
     contentErrors: 0,
     pathsSeeded: 0,
@@ -113,6 +126,10 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
     blobsPushed: 0,
     blobsCached: 0,
     blobErrors: 0,
+    shardsPushed: 0,
+    shardErrors: 0,
+    manifestsRegistered: 0,
+    manifestErrors: 0,
     startTime: Date.now(),
     endTime: 0,
   };
@@ -286,6 +303,57 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
   }
 
   // =========================================================================
+  // Phase 3.5: Push Blobs to Elohim Storage (Unified Shard Model)
+  // =========================================================================
+  // Track manifests to register in DNA later
+  const manifestsToRegister: Array<{ manifest: ShardManifest; reach: string }> = [];
+
+  if (config.storageUrl && !config.skipBlobs && blobsToPush.length > 0) {
+    console.log('\n' + '─'.repeat(70));
+    console.log('PHASE 3.5: Push Blobs to Elohim Storage (Native Holochain)');
+    console.log('─'.repeat(70));
+
+    // Validate storage node
+    const storageValidation = await validateStorageNode(config.storageUrl);
+    if (!storageValidation.ready) {
+      console.warn(`⚠️  Storage node not ready: ${storageValidation.issues.join(', ')}`);
+      console.log('   Continuing with doorway-only seeding');
+    } else {
+      results.storageReady = true;
+      console.log(`✅ Storage node ready (${storageValidation.stats?.blobs} blobs, ${storageValidation.stats?.bytes} bytes)`);
+
+      const storageClient = new StorageClient({
+        baseUrl: config.storageUrl,
+        dryRun: config.dryRun,
+      });
+
+      console.log(`\nPushing ${blobsToPush.length} blobs to elohim-storage...`);
+
+      for (const blob of blobsToPush) {
+        // Determine reach based on content metadata
+        const content = processedContents.find(c => c.metadata.blob_hash === blob.hash);
+        const reach = content?.metadata.reach || 'commons';
+
+        const result = await storageClient.pushBlob(blob.data, blob.metadata.mimeType, reach);
+
+        if (result.success && result.manifest) {
+          results.shardsPushed++;
+          manifestsToRegister.push({ manifest: result.manifest, reach });
+
+          if (config.verbose) {
+            console.log(`  ✓ ${blob.hash} → ${result.manifest.total_shards} shards`);
+          }
+        } else {
+          results.shardErrors++;
+          console.error(`  ✗ ${blob.hash}: ${result.error}`);
+        }
+      }
+
+      console.log(`\nStorage push: ${results.shardsPushed} success, ${results.shardErrors} failed`);
+    }
+  }
+
+  // =========================================================================
   // Phase 4: Seed DNA
   // =========================================================================
   if (!config.skipDna) {
@@ -452,6 +520,50 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
           }
         }
 
+        // Register shard manifests (if any were created in Phase 3.5)
+        if (manifestsToRegister.length > 0 && !config.skipShardRegistration) {
+          console.log(`\nRegistering ${manifestsToRegister.length} shard manifests...`);
+
+          for (const { manifest, reach } of manifestsToRegister) {
+            try {
+              await appWs.callZome({
+                cell_id: cellId,
+                zome_name: 'content_store',
+                fn_name: 'register_shard_manifest',
+                payload: {
+                  blob_hash: manifest.blob_hash,
+                  total_size: manifest.total_size,
+                  mime_type: manifest.mime_type,
+                  encoding: manifest.encoding,
+                  data_shards: manifest.data_shards,
+                  total_shards: manifest.total_shards,
+                  shard_size: manifest.shard_size,
+                  shard_hashes: manifest.shard_hashes,
+                  reach: reach,
+                  author_id: null, // Seeder doesn't have author info
+                },
+              });
+              results.manifestsRegistered++;
+
+              if (config.verbose) {
+                console.log(`  ✓ ${manifest.blob_hash.slice(0, 20)}... (${manifest.total_shards} shards)`);
+              }
+            } catch (e) {
+              results.manifestErrors++;
+              const error = e instanceof Error ? e.message : 'Unknown error';
+              if (error.includes('already exists')) {
+                if (config.verbose) {
+                  console.log(`  ⏭️  ${manifest.blob_hash.slice(0, 20)}... (already registered)`);
+                }
+              } else {
+                console.error(`  ❌ ${manifest.blob_hash.slice(0, 20)}...: ${error}`);
+              }
+            }
+          }
+
+          console.log(`\nManifest registration: ${results.manifestsRegistered} success, ${results.manifestErrors} errors`);
+        }
+
         await appWs.client.close();
         await adminWs.client.close();
       } catch (e) {
@@ -475,10 +587,17 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
   console.log(`\nDNA Results:`);
   console.log(`  Content: ${results.contentSeeded} seeded, ${results.contentErrors} errors`);
   console.log(`  Paths:   ${results.pathsSeeded} seeded, ${results.pathErrors} errors`);
-  console.log(`\nBlob Results:`);
+  console.log(`\nBlob Results (Doorway):`);
   console.log(`  Extracted: ${results.blobsExtracted}`);
   console.log(`  Pushed:    ${results.blobsPushed}`);
   console.log(`  Errors:    ${results.blobErrors}`);
+  if (results.storageReady || results.shardsPushed > 0) {
+    console.log(`\nShard Results (Native Holochain):`);
+    console.log(`  Shards Pushed:       ${results.shardsPushed}`);
+    console.log(`  Shard Errors:        ${results.shardErrors}`);
+    console.log(`  Manifests Registered: ${results.manifestsRegistered}`);
+    console.log(`  Manifest Errors:     ${results.manifestErrors}`);
+  }
   console.log('═'.repeat(70));
 
   return results;
@@ -496,6 +615,7 @@ async function main() {
     appId: process.env.HOLOCHAIN_APP_ID || 'elohim',
     doorwayUrl: process.env.DOORWAY_URL || 'http://localhost:3000',
     doorwayApiKey: process.env.DOORWAY_API_KEY,
+    storageUrl: process.env.STORAGE_URL, // Optional - enables unified shard model
     contentDir: process.env.CONTENT_DIR || path.join(__dirname, '../../data/lamad/content'),
     pathsDir: process.env.PATHS_DIR || path.join(__dirname, '../../data/lamad/paths'),
     dryRun: process.env.DRY_RUN === 'true' || args.includes('--dry-run'),
@@ -503,31 +623,41 @@ async function main() {
     validateOnly: args.includes('--validate-only'),
     skipBlobs: args.includes('--skip-blobs'),
     skipDna: args.includes('--skip-dna'),
+    skipShardRegistration: args.includes('--skip-shard-registration'),
   };
 
   if (args.includes('--help') || args.includes('-h')) {
     console.log(`
-Production Seeder - Dual-path seeding for DNA + Projection Cache
+Production Seeder - Dual-path seeding for DNA + Projection Cache + Native Storage
 
 Usage:
   npx tsx src/seed-production.ts [options]
 
 Options:
-  --dry-run        Validate and log without actually seeding
-  --validate-only  Only run validation, don't seed
-  --skip-blobs     Skip blob extraction and cache seeding
-  --skip-dna       Skip DNA seeding (blobs only)
-  -v, --verbose    Verbose output
-  -h, --help       Show this help
+  --dry-run              Validate and log without actually seeding
+  --validate-only        Only run validation, don't seed
+  --skip-blobs           Skip blob extraction and cache seeding
+  --skip-dna             Skip DNA seeding (blobs only)
+  --skip-shard-registration  Skip registering shard manifests in DNA
+  -v, --verbose          Verbose output
+  -h, --help             Show this help
 
 Environment:
   HOLOCHAIN_ADMIN_URL  Holochain admin websocket URL (default: ws://localhost:8888)
   HOLOCHAIN_APP_ID     Holochain app ID (default: elohim)
   DOORWAY_URL          Doorway base URL (default: http://localhost:3000)
   DOORWAY_API_KEY      API key for doorway admin operations
+  STORAGE_URL          elohim-storage URL for unified shard model (optional)
   CONTENT_DIR          Content directory (default: ../data/lamad/content)
   PATHS_DIR            Paths directory (default: ../data/lamad/paths)
   DRY_RUN              Set to 'true' for dry run mode
+
+Unified Shard Model:
+  When STORAGE_URL is set, blobs are also pushed to elohim-storage and
+  ShardManifest entries are registered in the DNA. This enables native
+  Holochain participants to fetch blobs without using doorway.
+
+  Example: STORAGE_URL=http://localhost:8090 npx tsx src/seed-production.ts
 `);
     process.exit(0);
   }
@@ -537,7 +667,9 @@ Environment:
 
     const hasErrors = results.contentErrors > 0 ||
                      results.pathErrors > 0 ||
-                     results.blobErrors > 0;
+                     results.blobErrors > 0 ||
+                     results.shardErrors > 0 ||
+                     results.manifestErrors > 0;
 
     process.exit(hasErrors ? 1 : 0);
   } catch (e) {

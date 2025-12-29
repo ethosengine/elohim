@@ -557,6 +557,105 @@ pub struct BlobEntry {
 }
 
 // =============================================================================
+// Shard Management - Unified Model for Single/Distributed Storage
+// =============================================================================
+
+/// Encoding types for shard manifests
+pub const SHARD_ENCODINGS: [&str; 4] = [
+    "none",       // Single shard, no encoding
+    "chunked",    // Split into sequential chunks (no redundancy)
+    "rs-4-7",     // Reed-Solomon 4 data + 3 parity (can lose 3 shards)
+    "rs-8-12",    // Reed-Solomon 8 data + 4 parity (large files)
+];
+
+/// ShardManifest - Describes how a blob is split into shards.
+///
+/// This is the unified model where:
+/// - Single blob on single host = 1 shard, encoding="none"
+/// - Chunked blob = N sequential shards, encoding="chunked"
+/// - Reed-Solomon distributed = N+M shards, encoding="rs-N-M"
+///
+/// The manifest is stored in DHT and can be queried by any participant
+/// to discover where to fetch shards from. This enables CDN-like distribution
+/// from native Holochain participants without requiring doorway.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ShardManifest {
+    /// Original blob hash (sha256-xxx) - used to identify the complete content
+    pub blob_hash: String,
+
+    /// Total size of the original blob in bytes
+    pub total_size: u64,
+
+    /// MIME type (video/mp4, audio/mpeg, etc.)
+    pub mime_type: String,
+
+    /// Encoding type (none, chunked, rs-4-7, rs-8-12)
+    pub encoding: String,
+
+    /// Number of data shards (for RS encoding, this is the minimum needed)
+    pub data_shards: u8,
+
+    /// Total number of shards (data + parity for RS encoding)
+    pub total_shards: u8,
+
+    /// Size of each shard in bytes (last shard may be smaller)
+    pub shard_size: u64,
+
+    /// Ordered list of shard hashes (sha256-xxx)
+    /// For RS encoding: first `data_shards` are data, rest are parity
+    pub shard_hashes: Vec<String>,
+
+    /// Visibility level (private, family, community, commons)
+    pub reach: String,
+
+    /// Author/creator agent ID
+    pub author_id: Option<String>,
+
+    /// When manifest was created
+    pub created_at: String,
+
+    /// When manifest was last verified (all shards accessible)
+    pub verified_at: Option<String>,
+}
+
+/// ShardLocation - Where a specific shard is stored.
+///
+/// Multiple ShardLocation entries can exist for the same shard_hash,
+/// indicating redundant copies across the network. Clients can try
+/// multiple locations for resilience.
+///
+/// This enables:
+/// - P2P shard discovery without doorway
+/// - Geographic affinity routing
+/// - Load balancing across holders
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ShardLocation {
+    /// Hash of this shard (sha256-xxx)
+    pub shard_hash: String,
+
+    /// Index within the parent manifest (0-based)
+    pub shard_index: u8,
+
+    /// Agent holding this shard (their Holochain pubkey)
+    pub holder: String,
+
+    /// Optional HTTP endpoint for direct fetch (e.g., "https://node.example.com/shard/sha256-xxx")
+    /// If None, use Holochain signals to request shard
+    pub endpoint: Option<String>,
+
+    /// Optional storage tier: "hot" (SSD, fast), "warm" (HDD), "cold" (archive)
+    pub storage_tier: Option<String>,
+
+    /// When this location was last verified accessible
+    pub verified_at: String,
+
+    /// Whether this holder is still advertising availability
+    pub is_active: bool,
+}
+
+// =============================================================================
 // Learning Path Entries
 // =============================================================================
 
@@ -3759,7 +3858,9 @@ impl StringAnchor {
 pub enum EntryTypes {
     // Lamad: Content & Learning
     Content(Content),
-    BlobEntry(BlobEntry),              // NEW: Large media (video, audio, podcasts)
+    BlobEntry(BlobEntry),              // Large media metadata (video, audio, podcasts)
+    ShardManifest(ShardManifest),      // Unified shard model - how blobs are split
+    ShardLocation(ShardLocation),       // Where shards are stored in the network
     LearningPath(LearningPath),
     PathChapter(PathChapter),
     PathStep(PathStep),
@@ -3893,6 +3994,15 @@ pub enum LinkTypes {
     BlobToCaptions,                    // BlobEntry -> BlobCaption entries (subtitles)
     BlobToReplicas,                    // BlobEntry -> CustodianCommitment (replication)
     AuthorToBlobs,                     // Anchor(author_id) -> BlobEntry (author's blobs)
+
+    // =========================================================================
+    // Lamad: Shard Management links - Unified Storage Model
+    // =========================================================================
+    BlobToManifest,                    // Anchor(blob_hash) -> ShardManifest (lookup manifest)
+    ManifestToShardLocations,          // ShardManifest -> ShardLocation (all shard locations)
+    ShardToLocations,                  // Anchor(shard_hash) -> ShardLocation (find holders)
+    HolderToShards,                    // Anchor(holder_agent) -> ShardLocation (agent's shards)
+    AuthorToManifests,                 // Anchor(author_id) -> ShardManifest (author's manifests)
 
     // =========================================================================
     // Lamad: Learning path links
