@@ -9,6 +9,20 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Process shim for browser environment
+// Injected at the top of the bundle to prevent "process is not defined" errors
+const processShim = `
+if (typeof globalThis !== 'undefined' && typeof globalThis.process === 'undefined') {
+  globalThis.process = {
+    env: { NODE_ENV: 'production' },
+    cwd: function() { return '/'; },
+    platform: 'browser',
+    version: '',
+    nextTick: function(fn) { setTimeout(fn, 0); }
+  };
+}
+`;
+
 export default {
   input: 'src/index.ts',
   output: [
@@ -17,13 +31,15 @@ export default {
       format: 'umd',
       name: 'PerseusPlugin',
       sourcemap: true,
-      inlineDynamicImports: true
+      inlineDynamicImports: true,
+      intro: processShim
     },
     {
       file: 'dist/index.esm.js',
       format: 'es',
       sourcemap: true,
-      inlineDynamicImports: true
+      inlineDynamicImports: true,
+      intro: processShim
     }
   ],
   plugins: [
@@ -38,7 +54,7 @@ export default {
         {
           find: /^\.\/raw$/,
           replacement: path.resolve(__dirname, 'node_modules/asap/browser-raw.js'),
-          customResolver: (source, importer) => {
+          customResolver: (_source, importer) => {
             // Only apply this alias when the importer is from the asap package
             if (importer && importer.includes('asap')) {
               return path.resolve(__dirname, 'node_modules/asap/browser-raw.js');
@@ -63,6 +79,8 @@ export default {
       jsxImportSource: 'react',
       tsconfig: './tsconfig.json'
     }),
+    // Replace process.env.NODE_ENV for production optimization
+    // This runs after the intro shim, so any remaining references work
     replace({
       'process.env.NODE_ENV': JSON.stringify('production'),
       preventAssignment: true
