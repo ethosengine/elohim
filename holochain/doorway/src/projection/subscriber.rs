@@ -28,6 +28,73 @@ use tracing::{debug, error, info, warn};
 use super::app_auth::{issue_app_token, AppAuthToken};
 use super::engine::ProjectionSignal;
 
+// =============================================================================
+// CacheSignal Support - for warm_cache and doorway-client signals
+// =============================================================================
+
+/// CacheSignal from doorway-client crate
+/// Used by warm_cache to pre-populate doorway cache
+#[derive(Debug, Clone, Deserialize)]
+pub struct CacheSignal {
+    pub signal_type: CacheSignalType,
+    pub doc_type: String,
+    pub doc_id: String,
+    #[serde(default)]
+    pub data: Option<serde_json::Value>,
+    #[serde(default)]
+    pub ttl_secs: Option<u64>,
+    #[serde(default)]
+    pub public: bool,
+    #[serde(default)]
+    pub reach: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum CacheSignalType {
+    Upsert,
+    Delete,
+    Invalidate,
+}
+
+/// DoorwaySignal wrapper from doorway-client crate
+#[derive(Debug, Clone, Deserialize)]
+pub struct DoorwaySignal {
+    pub namespace: String,
+    pub payload: CacheSignal,
+}
+
+impl CacheSignal {
+    /// Convert CacheSignal to ProjectionSignal format
+    ///
+    /// For cache warming, we don't have action_hash/author from the original
+    /// commit, so we use placeholder values. The data is still valid and
+    /// comes from the authoritative Holochain DHT.
+    pub fn to_projection_signal(self) -> ProjectionSignal {
+        let action = match self.signal_type {
+            CacheSignalType::Upsert => "commit".to_string(),
+            CacheSignalType::Delete => "delete".to_string(),
+            CacheSignalType::Invalidate => "invalidate".to_string(),
+        };
+
+        ProjectionSignal {
+            doc_type: self.doc_type,
+            action,
+            id: self.doc_id,
+            data: self.data.unwrap_or(serde_json::Value::Null),
+            // Placeholder values for cache-only signals
+            // These signals come from warm_cache which reads from DHT
+            // but doesn't have the original action metadata
+            action_hash: "cache-warm".to_string(),
+            entry_hash: None,
+            author: "cache-warm".to_string(),
+            search_tokens: vec![],
+            invalidates: vec![],
+            ttl_secs: self.ttl_secs,
+        }
+    }
+}
+
 /// Holochain WebSocket message types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -477,13 +544,28 @@ impl SignalSubscriber {
             return;
         }
 
-        // Format 2: Wrapped in { "signal": ... }
+        // Format 2: DoorwaySignal (from warm_cache / doorway-client)
+        // { "namespace": "doorway", "payload": { CacheSignal } }
+        if let Ok(doorway_signal) = serde_json::from_value::<DoorwaySignal>(value.clone()) {
+            if doorway_signal.namespace == "doorway" {
+                let signal = doorway_signal.payload.to_projection_signal();
+                info!(
+                    doc_type = signal.doc_type,
+                    id = signal.id,
+                    "Received cache signal from warm_cache"
+                );
+                self.emit_signal(signal);
+                return;
+            }
+        }
+
+        // Format 3: Wrapped in { "signal": ... }
         if let Some(signal_data) = value.get("signal") {
             self.process_signal_value(signal_data);
             return;
         }
 
-        // Format 3: App signal wrapper { "type": "Signal", "data": ... }
+        // Format 4: App signal wrapper { "type": "Signal", "data": ... }
         if value.get("type").and_then(|t| t.as_str()) == Some("Signal") {
             if let Some(data) = value.get("data") {
                 self.process_signal_value(data);
@@ -491,7 +573,7 @@ impl SignalSubscriber {
             }
         }
 
-        // Format 4: Holochain client format { "App": ... }
+        // Format 5: Holochain client format { "App": ... }
         if let Some(app) = value.get("App") {
             self.process_signal_value(app);
             return;
@@ -584,5 +666,74 @@ mod tests {
         });
 
         subscriber.process_signal_value(&json);
+    }
+
+    #[test]
+    fn test_doorway_cache_signal_parsing() {
+        let subscriber = SignalSubscriber::new(SubscriberConfig::default());
+
+        // Test DoorwaySignal format (from warm_cache / doorway-client)
+        let json = serde_json::json!({
+            "namespace": "doorway",
+            "payload": {
+                "signal_type": "upsert",
+                "doc_type": "Content",
+                "doc_id": "manifesto",
+                "data": {
+                    "id": "manifesto",
+                    "title": "Elohim Protocol Manifesto",
+                    "contentType": "manifesto"
+                },
+                "ttl_secs": 3600,
+                "public": true,
+                "reach": "commons"
+            }
+        });
+
+        // Test that parsing doesn't panic
+        subscriber.process_signal_value(&json);
+    }
+
+    #[test]
+    fn test_cache_signal_to_projection_signal() {
+        let cache_signal = CacheSignal {
+            signal_type: CacheSignalType::Upsert,
+            doc_type: "Content".to_string(),
+            doc_id: "test-content".to_string(),
+            data: Some(serde_json::json!({
+                "title": "Test Content"
+            })),
+            ttl_secs: Some(3600),
+            public: true,
+            reach: Some("commons".to_string()),
+        };
+
+        let projection_signal = cache_signal.to_projection_signal();
+
+        assert_eq!(projection_signal.doc_type, "Content");
+        assert_eq!(projection_signal.action, "commit");
+        assert_eq!(projection_signal.id, "test-content");
+        assert_eq!(projection_signal.ttl_secs, Some(3600));
+        assert_eq!(projection_signal.action_hash, "cache-warm");
+        assert_eq!(projection_signal.author, "cache-warm");
+    }
+
+    #[test]
+    fn test_cache_signal_delete_to_projection_signal() {
+        let cache_signal = CacheSignal {
+            signal_type: CacheSignalType::Delete,
+            doc_type: "Content".to_string(),
+            doc_id: "deleted-content".to_string(),
+            data: None,
+            ttl_secs: None,
+            public: false,
+            reach: None,
+        };
+
+        let projection_signal = cache_signal.to_projection_signal();
+
+        assert_eq!(projection_signal.action, "delete");
+        assert_eq!(projection_signal.id, "deleted-content");
+        assert_eq!(projection_signal.data, serde_json::Value::Null);
     }
 }
