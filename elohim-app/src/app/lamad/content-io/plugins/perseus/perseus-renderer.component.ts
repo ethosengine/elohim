@@ -504,25 +504,36 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
 
   private loadQuestions(): void {
     if (!this.node?.content) {
-      console.warn('No content in node for Perseus renderer');
+      console.warn('[PerseusRenderer] No content in node');
       return;
     }
 
-    // Content can be a single item or array
-    const content = this.node.content;
-    if (Array.isArray(content)) {
-      this.questions = content as PerseusItem[];
-    } else if (typeof content === 'object') {
-      this.questions = [content as PerseusItem];
-    } else if (typeof content === 'string') {
-      // Try to parse as JSON
+    // ContentNode.content should be PerseusItem[] (array of Perseus items)
+    // Handle: array, single item, or JSON string
+    let content = this.node.content;
+
+    // Parse JSON string if needed
+    if (typeof content === 'string') {
       try {
-        const parsed = JSON.parse(content);
-        this.questions = Array.isArray(parsed) ? parsed : [parsed];
+        content = JSON.parse(content);
       } catch {
-        console.error('Failed to parse Perseus content as JSON');
+        console.error('[PerseusRenderer] Failed to parse content as JSON');
+        return;
       }
     }
+
+    // Extract questions
+    if (Array.isArray(content)) {
+      this.questions = content as PerseusItem[];
+    } else if (typeof content === 'object' && content !== null) {
+      // Single Perseus item (has question.widgets)
+      this.questions = [content as PerseusItem];
+    } else {
+      console.error('[PerseusRenderer] Invalid content format:', typeof content);
+      return;
+    }
+
+    console.log(`[PerseusRenderer] Loaded ${this.questions.length} question(s)`);
   }
 
   private initializeStreakTracking(): void {

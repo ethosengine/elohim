@@ -12,15 +12,45 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Process shim for browser environment
 // Injected at the top of the bundle to prevent "process is not defined" errors
 const processShim = `
-if (typeof globalThis !== 'undefined' && typeof globalThis.process === 'undefined') {
-  globalThis.process = {
-    env: { NODE_ENV: 'production' },
-    cwd: function() { return '/'; },
-    platform: 'browser',
-    version: '',
-    nextTick: function(fn) { setTimeout(fn, 0); }
-  };
-}
+(function() {
+  // Process shim
+  if (typeof globalThis !== 'undefined' && typeof globalThis.process === 'undefined') {
+    globalThis.process = {
+      env: { NODE_ENV: 'production' },
+      cwd: function() { return '/'; },
+      platform: 'browser',
+      version: '',
+      nextTick: function(fn) { setTimeout(fn, 0); }
+    };
+  }
+
+  // Global polyfill - ensure Array.from is available (needed by some React internals)
+  if (typeof Array.from !== 'function') {
+    Array.from = function(arrayLike, mapFn, thisArg) {
+      var arr = [];
+      var len = arrayLike.length >>> 0;
+      for (var i = 0; i < len; i++) {
+        if (i in arrayLike) {
+          arr.push(mapFn ? mapFn.call(thisArg, arrayLike[i], i) : arrayLike[i]);
+        }
+      }
+      return arr;
+    };
+  }
+
+  // Ensure Set constructor accepts an iterable (used by React DOM event system)
+  // Some environments have incomplete Set implementations
+  var _OriginalSet = typeof Set !== 'undefined' ? Set : undefined;
+  if (_OriginalSet) {
+    try {
+      // Test if Set properly handles concat'd arrays in constructor
+      new _OriginalSet([].concat(['test']));
+    } catch (e) {
+      // Set constructor doesn't work as expected, polyfill won't help here
+      console.warn('[Perseus] Set polyfill test failed, may have initialization issues');
+    }
+  }
+})();
 `;
 
 export default {
