@@ -14,8 +14,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@phosphor-icons/core": "^2.1.1",
-    "@popperjs/core": "^2.11.8",
     "@khanacademy/kas": "^0.3.11",
     "@khanacademy/kmath": "^2.2.25",
     "@khanacademy/math-input": "^26.3.5",
@@ -44,6 +42,8 @@
     "@khanacademy/wonder-blocks-tooltip": "^4.1.61",
     "@khanacademy/wonder-blocks-typography": "^4.2.27",
     "@khanacademy/wonder-stuff-core": "^3.0.0",
+    "@phosphor-icons/core": "^2.1.1",
+    "@popperjs/core": "^2.11.8",
     "aphrodite": "^2.4.0",
     "classnames": "^2.5.1",
     "jquery": "^3.7.1",
@@ -58,6 +58,7 @@
     "underscore": "^1.13.7"
   },
   "devDependencies": {
+    "@rollup/plugin-alias": "^6.0.0",
     "@rollup/plugin-commonjs": "^28.0.0",
     "@rollup/plugin-node-resolve": "^16.0.0",
     "@rollup/plugin-replace": "^6.0.0",
