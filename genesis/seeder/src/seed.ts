@@ -12,6 +12,8 @@
 import { AdminWebsocket, AppWebsocket, encodeHashToBase64, CellId } from '@holochain/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import DoorwayClient, { ImportStatusResponse } from './doorway-client.js';
+import StorageClient from './storage-client.js';
 
 // ========================================
 // PERFORMANCE TIMING UTILITIES
@@ -302,6 +304,17 @@ const HC_PORTS_FILE = process.env.HC_PORTS_FILE || path.join(LOCAL_DEV_DIR, '.hc
 const APP_ID = 'elohim';
 // Role name is auto-detected from app's cell_info to support both 'elohim' and legacy 'lamad'
 const ZOME_NAME = 'content_store';
+
+// Doorway mode: POST to doorway HTTP routes instead of direct WebSocket calls
+// When set, seeder hammers doorway with HTTP calls which then orchestrates conductor writes
+const DOORWAY_URL = process.env.DOORWAY_URL; // e.g., 'https://doorway.elohim.host' or 'http://localhost:8080'
+const DOORWAY_API_KEY = process.env.DOORWAY_API_KEY;
+const USE_DOORWAY = !!DOORWAY_URL;
+
+// Elohim-storage: Blob storage for large import payloads
+// When set, seeder uploads blob first, then passes blob_hash to zome
+const STORAGE_URL = process.env.STORAGE_URL; // e.g., 'http://localhost:8090' or 'https://storage.elohim.host'
+const USE_STORAGE = !!STORAGE_URL;
 
 /**
  * Read Holochain ports from .hc_ports file
@@ -997,93 +1010,218 @@ async function seed() {
   const newConcepts = filteredConcepts;
   console.log(`   ${newConcepts.length} concepts to process`);
 
-  // Detect if we're running against a remote conductor (needs gentler approach)
+  // Detect if we're running against a remote conductor
   const isRemote = !ADMIN_WS_URL.includes('localhost') && !ADMIN_WS_URL.includes('127.0.0.1');
-  const BATCH_CREATE_SIZE = isRemote ? 20 : 50;  // 20 for remote, 50 for local
-  const BATCH_DELAY_MS = isRemote ? 1000 : 0;    // 1s delay between batches for remote
 
-  if (isRemote) {
-    console.log(`   🌐 Remote mode: batch size=${BATCH_CREATE_SIZE}, delay=${BATCH_DELAY_MS}ms`);
-  }
+  // ========================================
+  // BATCH IMPORT: Blob-based import via storage + zome
+  // ========================================
+  // Architecture:
+  // 1. Upload items JSON to elohim-storage → get blob_hash
+  // 2. Call queue_import(blob_hash) → zome stores manifest, emits signal
+  // 3. Storage receives signal, sends chunks via process_import_chunk()
+  // 4. Poll get_import_status() for completion
+  //
+  // Fallback: If no storage available, use legacy bulk_create_content
+  const POLL_STATUS = process.env.SEED_POLL_STATUS !== 'false';  // Default: poll for completion
+  const POLL_INTERVAL_MS = parseInt(process.env.SEED_POLL_INTERVAL || '5000', 10);
+  const POLL_TIMEOUT_MS = parseInt(process.env.SEED_POLL_TIMEOUT || '300000', 10);  // 5 min default
+
+  // Prepare all content inputs
+  const allInputs = newConcepts.map(({ concept, file }) => {
+    const relativePath = file.replace(DATA_DIR + '/', '');
+    return conceptToInput(concept, relativePath);
+  });
+
+  const batchId = `seed-${Date.now()}`;
   let conceptSuccessCount = 0;
   let conceptErrorCount = loadErrorCount;
+  let blobImportSucceeded = false;
 
-  for (let i = 0; i < newConcepts.length; i += BATCH_CREATE_SIZE) {
-    const batch = newConcepts.slice(i, i + BATCH_CREATE_SIZE);
-    const batchInputs = batch.map(({ concept, file }) => {
-      const relativePath = file.replace(DATA_DIR + '/', '');
-      return conceptToInput(concept, relativePath);
+  // ==============================================
+  // DOORWAY IMPORT: All traffic through doorway
+  // ==============================================
+  // Architecture: Doorway is the single entry point for all external traffic
+  // 1. Upload blob to doorway → doorway proxies to storage/peer-shards
+  // 2. Call doorway /import/content with blob_hash → doorway calls zome
+  // 3. Poll doorway for status → doorway calls zome
+  //
+  // Requires: DOORWAY_URL only (doorway knows where storage is)
+  const USE_DOORWAY_IMPORT = !!DOORWAY_URL;
+
+  if (USE_DOORWAY_IMPORT) {
+    console.log(`   🚀 DOORWAY import mode: ${newConcepts.length} concepts`);
+    console.log(`      Doorway: ${DOORWAY_URL}`);
+
+    const doorwayClient = new DoorwayClient({
+      baseUrl: DOORWAY_URL!,
+      apiKey: DOORWAY_API_KEY,
+      timeout: 120000, // 2 min for large blob uploads
+      retries: 3,
     });
 
-    const batchNum = Math.floor(i / BATCH_CREATE_SIZE) + 1;
-    const totalBatches = Math.ceil(newConcepts.length / BATCH_CREATE_SIZE);
-    console.log(`   Creating batch ${batchNum}/${totalBatches} (${batchInputs.length} concepts)...`);
+    // Check doorway health (doorway checks storage internally)
+    const doorwayHealth = await doorwayClient.checkHealth();
+    if (!doorwayHealth.healthy) {
+      console.error(`   ❌ Doorway not healthy: ${doorwayHealth.error}`);
+      console.log('   Falling back to legacy bulk_create_content...');
+    } else {
+      console.log(`   ✅ Doorway healthy (v${doorwayHealth.version || 'unknown'}, cache=${doorwayHealth.cacheEnabled ? 'on' : 'off'})`);
 
-    try {
-      const result = await timer.timeOperation('bulk_create_content', () =>
-        appWs.callZome({
-          cell_id: cellId,
-          zome_name: ZOME_NAME,
-          fn_name: 'bulk_create_content',
-          payload: {
-            import_id: `seed-${Date.now()}`,
-            contents: batchInputs,
-          },
-        })
-      ) as { created_count: number; errors: string[] };
+      try {
+        // Step 1: Upload items JSON blob via doorway (doorway proxies to storage)
+        const itemsJson = JSON.stringify(allInputs);
+        const itemsBuffer = Buffer.from(itemsJson, 'utf-8');
+        console.log(`   📦 Uploading blob via doorway: ${(itemsBuffer.length / 1024 / 1024).toFixed(2)} MB`);
 
-      conceptSuccessCount += result.created_count;
-      if (result.errors.length > 0) {
-        conceptErrorCount += result.errors.length;
-        for (const err of result.errors.slice(0, 3)) {
-          console.error(`      ❌ ${err}`);
+        const blobHashForUpload = StorageClient.computeHash(itemsBuffer);
+        const uploadResult = await timer.timeOperation('blob_upload', () =>
+          doorwayClient.pushBlob(
+            blobHashForUpload,
+            itemsBuffer,
+            { hash: blobHashForUpload, mimeType: 'application/json', sizeBytes: itemsBuffer.length }
+          )
+        );
+
+        if (!uploadResult.success) {
+          throw new Error(`Blob upload failed: ${uploadResult.error}`);
         }
-        if (result.errors.length > 3) {
-          console.error(`      ... and ${result.errors.length - 3} more errors`);
+
+        const blobHash = uploadResult.hash;
+        console.log(`   ✅ Blob uploaded: ${blobHash.slice(0, 30)}...${uploadResult.cached ? ' (cached)' : ''}`);
+
+        // Step 2: Queue import via doorway (not direct WebSocket)
+        console.log(`   📤 Queuing import via doorway "${batchId}"...`);
+        const queueResult = await timer.timeOperation('queue_import', () =>
+          doorwayClient.queueImport('content', {
+            batch_id: batchId,
+            blob_hash: blobHash,
+            total_items: allInputs.length,
+            schema_version: 1,
+          })
+        ) as ImportStatusResponse & { batch_id: string; queued_count: number; processing: boolean };
+
+        console.log(`   ✅ Import queued: ${queueResult.batch_id}`);
+        console.log(`      Queued: ${queueResult.queued_count} items`);
+
+        // Step 3: Poll for completion via doorway
+        // Note: elohim-storage should be listening for ImportBatchQueued signal
+        // and will call process_import_chunk() with the actual items
+        if (POLL_STATUS) {
+          console.log(`   ⏳ Waiting for storage to process chunks...`);
+          console.log(`      (Polling interval=${POLL_INTERVAL_MS}ms, timeout=${POLL_TIMEOUT_MS}ms)`);
+
+          const startTime = Date.now();
+          let lastProcessed = 0;
+
+          while (Date.now() - startTime < POLL_TIMEOUT_MS) {
+            await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+
+            try {
+              const status = await doorwayClient.getImportStatus('content', batchId);
+
+              if (!status) {
+                console.error(`   ❌ Batch ${batchId} not found`);
+                break;
+              }
+
+              // Show progress if changed
+              if (status.processed_count !== lastProcessed) {
+                const pct = ((status.processed_count / status.total_items) * 100).toFixed(1);
+                console.log(`      Progress: ${status.processed_count}/${status.total_items} (${pct}%) - ${status.status}`);
+                lastProcessed = status.processed_count;
+              }
+
+              if (status.status === 'completed' || status.status === 'failed') {
+                conceptSuccessCount = status.processed_count - status.error_count;
+                conceptErrorCount = loadErrorCount + status.error_count;
+                blobImportSucceeded = true;
+
+                if (status.error_count > 0 && status.errors.length > 0) {
+                  console.log(`   ⚠️ ${status.errors.length} errors during import:`);
+                  for (const err of status.errors.slice(0, 5)) {
+                    console.error(`      • ${err}`);
+                  }
+                  if (status.errors.length > 5) {
+                    console.error(`      ... and ${status.errors.length - 5} more`);
+                  }
+                }
+                break;
+              }
+            } catch (pollError: any) {
+              console.warn(`      ⚠️ Poll failed: ${cleanErrorMessage(pollError)}`);
+            }
+          }
+
+          if (!blobImportSucceeded && Date.now() - startTime >= POLL_TIMEOUT_MS) {
+            console.warn(`   ⚠️ Poll timeout reached, batch may still be processing`);
+            console.log(`      Check status via doorway: GET /import/content/${batchId}`);
+            conceptSuccessCount = lastProcessed;
+          }
+        } else {
+          console.log(`   ℹ️ Batch queued for background processing (not polling)`);
+          console.log(`      Check status via doorway: GET /import/content/${batchId}`);
+          blobImportSucceeded = true; // Consider it a success if queued
         }
+      } catch (blobError: any) {
+        console.error(`   ❌ Doorway import failed: ${cleanErrorMessage(blobError)}`);
+        console.log('   Falling back to legacy bulk_create_content...');
       }
-      console.log(`      ✅ Created ${result.created_count} concepts`);
+    }
+  }
 
-      // Delay between batches for remote to let conductor catch up
-      if (BATCH_DELAY_MS > 0 && i + BATCH_CREATE_SIZE < newConcepts.length) {
-        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
-      }
-    } catch (error: any) {
-      // Batch failed - fall back to individual creates to identify problematic concepts
-      console.error(`      ⚠️ Batch failed, trying individual creates to find problematic concepts...`);
+  // ==============================================
+  // LEGACY MODE: bulk_create_content (inline items)
+  // ==============================================
+  // Used when:
+  // - No DOORWAY_URL configured
+  // - Doorway health check failed
+  // - Doorway import failed
+  if (!blobImportSucceeded) {
+    console.log(`   🚀 LEGACY import mode: ${newConcepts.length} concepts via bulk_create_content`);
+    if (isRemote) {
+      console.log(`   🌐 Remote conductor detected (adding delays between batches)`);
+    }
 
-      for (let j = 0; j < batch.length; j++) {
-        const { concept, file } = batch[j];
+    const BATCH_CREATE_SIZE = 100;
+    const BATCH_DELAY_MS = isRemote ? 200 : 0;
+
+    for (let i = 0; i < newConcepts.length; i += BATCH_CREATE_SIZE) {
+      const batch = newConcepts.slice(i, i + BATCH_CREATE_SIZE);
+      const batchInputs = batch.map(({ concept, file }) => {
         const relativePath = file.replace(DATA_DIR + '/', '');
-        const input = conceptToInput(concept, relativePath);
+        return conceptToInput(concept, relativePath);
+      });
 
-        try {
-          await timer.timeOperation('individual_create', () =>
-            appWs.callZome({
-              cell_id: cellId,
-              zome_name: ZOME_NAME,
-              fn_name: 'create_content',
-              payload: input,
-            })
-          );
-          conceptSuccessCount++;
-        } catch (indivError: any) {
-          conceptErrorCount++;
-          // Log detailed info about the failing concept
-          console.error(`      ❌ FAILED: ${concept.id}`);
-          console.error(`         File: ${file}`);
-          console.error(`         Title: ${concept.title?.slice(0, 50) || 'N/A'}...`);
-          console.error(`         Content type: ${typeof concept.content}`);
-          console.error(`         Content length: ${typeof concept.content === 'string' ? concept.content.length : JSON.stringify(concept.content).length}`);
-          console.error(`         Error: ${cleanErrorMessage(indivError)}`);
+      const batchNum = Math.floor(i / BATCH_CREATE_SIZE) + 1;
+      const totalBatches = Math.ceil(newConcepts.length / BATCH_CREATE_SIZE);
+      console.log(`   Creating batch ${batchNum}/${totalBatches} (${batchInputs.length} concepts)...`);
 
-          // Check for problematic characters
-          const contentStr = typeof concept.content === 'string' ? concept.content : JSON.stringify(concept.content);
-          const hasNullBytes = contentStr.includes('\0');
-          const hasInvalidUtf8 = /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(contentStr);
-          if (hasNullBytes) console.error(`         ⚠️ Contains NULL bytes!`);
-          if (hasInvalidUtf8) console.error(`         ⚠️ Contains invalid control characters!`);
+      try {
+        const result = await timer.timeOperation('bulk_create_content', () =>
+          appWs.callZome({
+            cell_id: cellId,
+            zome_name: ZOME_NAME,
+            fn_name: 'bulk_create_content',
+            payload: {
+              import_id: `seed-${Date.now()}`,
+              contents: batchInputs,
+            },
+          })
+        ) as { created_count: number; errors: string[] };
+
+        conceptSuccessCount += result.created_count;
+        if (result.errors.length > 0) {
+          conceptErrorCount += result.errors.length;
         }
+        console.log(`      ✅ Created ${result.created_count} concepts`);
+
+        if (BATCH_DELAY_MS > 0 && i + BATCH_CREATE_SIZE < newConcepts.length) {
+          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+        }
+      } catch (legacyError: any) {
+        console.error(`      ❌ Legacy batch failed: ${cleanErrorMessage(legacyError)}`);
+        conceptErrorCount += batch.length;
       }
     }
   }
@@ -1266,7 +1404,8 @@ async function seed() {
       // OPTIMIZATION: Batch add steps for this path (in chunks to avoid timeouts)
       const steps = collectSteps(pathJson);
       if (steps.length > 0) {
-        const STEP_BATCH_SIZE = isRemote ? 10 : 20; // 10 for remote, 20 for local
+        // Paths are few and steps are light - use small batches without delays
+        const STEP_BATCH_SIZE = parseInt(process.env.SEED_STEP_BATCH_SIZE || '50', 10);
         let totalCreated = 0;
         let totalErrors: string[] = [];
 
@@ -1284,11 +1423,6 @@ async function seed() {
 
             totalCreated += stepResult.created_count;
             totalErrors.push(...stepResult.errors);
-
-            // Delay between step batches for remote
-            if (BATCH_DELAY_MS > 0 && i + STEP_BATCH_SIZE < steps.length) {
-              await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS / 2));
-            }
           } catch (batchError: any) {
             console.error(`         ⚠️ Step batch ${Math.floor(i / STEP_BATCH_SIZE) + 1} failed: ${cleanErrorMessage(batchError)}`);
           }
@@ -1303,11 +1437,6 @@ async function seed() {
       }
 
       pathSuccessCount++;
-
-      // Delay between paths for remote
-      if (BATCH_DELAY_MS > 0) {
-        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
-      }
     } catch (error: any) {
       pathErrorCount++;
       console.error(`      ❌ ${cleanErrorMessage(error)}`);

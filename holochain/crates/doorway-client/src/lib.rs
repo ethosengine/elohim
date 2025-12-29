@@ -438,6 +438,250 @@ pub fn stats_rule(fn_name: &str, invalidators: Vec<&str>) -> CacheRule {
 }
 
 // =============================================================================
+// Import Config - Zome-declared batch import configuration
+// =============================================================================
+
+/// The standard function name for import config introspection
+pub const IMPORT_CONFIG_FN: &str = "__doorway_import_config";
+
+/// Import configuration declared by a zome.
+///
+/// Doorway calls `__doorway_import_config()` on startup to discover
+/// what batch import capabilities this DNA supports.
+///
+/// ## Example Implementation in DNA
+///
+/// ```ignore
+/// #[hdk_extern]
+/// pub fn __doorway_import_config(_: ()) -> ExternResult<ImportConfig> {
+///     Ok(ImportConfig {
+///         enabled: true,
+///         batch_types: vec![
+///             ImportBatchType::new("content")
+///                 .queue_fn("queue_import")
+///                 .process_fn("process_import_chunk")
+///                 .max_items(5000)
+///                 .chunk_size(50),
+///         ],
+///         require_auth: true,
+///         allowed_agents: None, // Any authenticated agent
+///     })
+/// }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ImportConfig {
+    /// Whether batch import is enabled for this DNA
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Base route for import endpoints (e.g., "/import")
+    /// Doorway will register: POST {base_route}/{batch_type}
+    /// and GET {base_route}/{batch_type}/{batch_id} for status
+    #[serde(default = "default_base_route")]
+    pub base_route: String,
+
+    /// Batch types this DNA supports
+    #[serde(default)]
+    pub batch_types: Vec<ImportBatchType>,
+
+    /// Whether import requires authentication
+    #[serde(default = "default_true")]
+    pub require_auth: bool,
+
+    /// Optional: Restrict to specific agent public keys
+    /// If None, any authenticated agent can import
+    #[serde(default)]
+    pub allowed_agents: Option<Vec<String>>,
+}
+
+fn default_base_route() -> String {
+    "/import".to_string()
+}
+
+impl Default for ImportConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            base_route: default_base_route(),
+            batch_types: Vec::new(),
+            require_auth: true,
+            allowed_agents: None,
+        }
+    }
+}
+
+/// Configuration for a specific batch type (e.g., "content", "paths")
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ImportBatchType {
+    /// Batch type identifier (e.g., "content", "paths", "steps")
+    pub batch_type: String,
+
+    /// Zome function to queue the import (stores manifest)
+    /// Default: "queue_import"
+    #[serde(default = "default_queue_fn")]
+    pub queue_fn: String,
+
+    /// Zome function to process chunks
+    /// Default: "process_import_chunk"
+    #[serde(default = "default_process_fn")]
+    pub process_fn: String,
+
+    /// Zome function to get import status
+    /// Default: "get_import_status"
+    #[serde(default = "default_status_fn")]
+    pub status_fn: String,
+
+    /// Maximum items allowed per batch
+    #[serde(default = "default_max_items")]
+    pub max_items: u32,
+
+    /// Recommended chunk size for processing
+    #[serde(default = "default_chunk_size")]
+    pub chunk_size: u32,
+
+    /// Minimum interval between chunks (milliseconds)
+    #[serde(default = "default_chunk_interval")]
+    pub chunk_interval_ms: u32,
+
+    /// Schema version for this batch type
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+}
+
+fn default_queue_fn() -> String {
+    "queue_import".to_string()
+}
+
+fn default_process_fn() -> String {
+    "process_import_chunk".to_string()
+}
+
+fn default_status_fn() -> String {
+    "get_import_status".to_string()
+}
+
+fn default_max_items() -> u32 {
+    5000
+}
+
+fn default_chunk_size() -> u32 {
+    50
+}
+
+fn default_chunk_interval() -> u32 {
+    100 // 100ms between chunks
+}
+
+fn default_schema_version() -> u32 {
+    1
+}
+
+impl ImportBatchType {
+    /// Create a new batch type configuration
+    pub fn new(batch_type: impl Into<String>) -> Self {
+        Self {
+            batch_type: batch_type.into(),
+            queue_fn: default_queue_fn(),
+            process_fn: default_process_fn(),
+            status_fn: default_status_fn(),
+            max_items: default_max_items(),
+            chunk_size: default_chunk_size(),
+            chunk_interval_ms: default_chunk_interval(),
+            schema_version: default_schema_version(),
+        }
+    }
+
+    /// Set the queue function name
+    pub fn queue_fn(mut self, fn_name: impl Into<String>) -> Self {
+        self.queue_fn = fn_name.into();
+        self
+    }
+
+    /// Set the process function name
+    pub fn process_fn(mut self, fn_name: impl Into<String>) -> Self {
+        self.process_fn = fn_name.into();
+        self
+    }
+
+    /// Set the status function name
+    pub fn status_fn(mut self, fn_name: impl Into<String>) -> Self {
+        self.status_fn = fn_name.into();
+        self
+    }
+
+    /// Set maximum items per batch
+    pub fn max_items(mut self, max: u32) -> Self {
+        self.max_items = max;
+        self
+    }
+
+    /// Set chunk size
+    pub fn chunk_size(mut self, size: u32) -> Self {
+        self.chunk_size = size;
+        self
+    }
+
+    /// Set interval between chunks (milliseconds)
+    pub fn chunk_interval_ms(mut self, ms: u32) -> Self {
+        self.chunk_interval_ms = ms;
+        self
+    }
+
+    /// Set schema version
+    pub fn schema_version(mut self, version: u32) -> Self {
+        self.schema_version = version;
+        self
+    }
+}
+
+/// Builder for ImportConfig with fluent API
+#[derive(Debug, Clone, Default)]
+pub struct ImportConfigBuilder {
+    config: ImportConfig,
+}
+
+impl ImportConfigBuilder {
+    /// Create a new builder with import enabled
+    pub fn new() -> Self {
+        Self {
+            config: ImportConfig {
+                enabled: true,
+                ..Default::default()
+            },
+        }
+    }
+
+    /// Set the base route for import endpoints
+    pub fn base_route(mut self, route: impl Into<String>) -> Self {
+        self.config.base_route = route.into();
+        self
+    }
+
+    /// Add a batch type
+    pub fn batch_type(mut self, batch_type: ImportBatchType) -> Self {
+        self.config.batch_types.push(batch_type);
+        self
+    }
+
+    /// Set authentication requirement
+    pub fn require_auth(mut self, required: bool) -> Self {
+        self.config.require_auth = required;
+        self
+    }
+
+    /// Restrict to specific agents
+    pub fn allowed_agents(mut self, agents: Vec<String>) -> Self {
+        self.config.allowed_agents = Some(agents);
+        self
+    }
+
+    /// Build the config
+    pub fn build(self) -> ImportConfig {
+        self.config
+    }
+}
+
+// =============================================================================
 // Tests
 // =============================================================================
 

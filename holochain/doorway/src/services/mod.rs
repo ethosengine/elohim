@@ -9,8 +9,12 @@
 //! - **Verification**: SHA256 blob integrity verification
 //! - **Recording**: WebRTC to blob recording pipeline
 //! - **ShardResolver**: Native Holochain blob resolution via elohim-storage
+//! - **ImportOrchestrator**: Batch import processing (elohim-store → zome)
+//! - **ImportConfig**: Zome-declared import capability discovery
 
 pub mod custodian;
+pub mod import_config;
+pub mod import_orchestrator;
 pub mod recording;
 pub mod shard_resolver;
 pub mod verification;
@@ -32,4 +36,13 @@ pub use shard_resolver::{
 pub use verification::{
     compute_sha256, StreamingHasher, VerificationConfig, VerificationService, VerifyBlobRequest,
     VerifyBlobResponse,
+};
+pub use import_config::{
+    DnaImportConfig, ImportConfigDiscovery, ImportConfigStore,
+    ImportConfig, ImportBatchType, IMPORT_CONFIG_FN,
+};
+pub use import_orchestrator::{
+    BlobStore, ChunkResult, ImportError, ImportOrchestrator, ImportOrchestratorConfig,
+    ImportProgress, ImportStatus, InMemoryBlobStore, StartImportInput, StartImportOutput,
+    ZomeClient,
 };

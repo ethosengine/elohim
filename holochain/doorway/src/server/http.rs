@@ -34,7 +34,7 @@ use crate::server::websocket;
 use crate::signal::{self, SignalStore, DEFAULT_MAX_CLIENTS};
 use crate::signing::{SigningConfig, SigningService};
 use crate::types::DoorwayError;
-use crate::worker::WorkerPool;
+use crate::worker::{WorkerPool, ZomeCallConfig};
 
 type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
 
@@ -70,6 +70,10 @@ pub struct AppState {
     pub resolver: Arc<DoorwayResolver>,
     /// Write buffer for batched conductor writes
     pub write_buffer: Option<Arc<DoorwayWriteBuffer>>,
+    /// Import config discovered from DNAs (zome-declared routes)
+    pub import_config_store: Option<Arc<crate::services::ImportConfigStore>>,
+    /// Zome call configs by DNA hash (discovered from conductor)
+    pub zome_configs: Arc<dashmap::DashMap<String, ZomeCallConfig>>,
 }
 
 impl AppState {
@@ -116,6 +120,8 @@ impl AppState {
             orchestrator: None,
             resolver,
             write_buffer: None, // No write buffer without worker pool
+            import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
+            zome_configs: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -170,6 +176,8 @@ impl AppState {
             orchestrator: None,
             resolver,
             write_buffer: None, // No write buffer without worker pool
+            import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
+            zome_configs: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -229,6 +237,8 @@ impl AppState {
             orchestrator: None,
             resolver,
             write_buffer: Some(write_buffer),
+            import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
+            zome_configs: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -296,6 +306,8 @@ impl AppState {
             orchestrator: None,
             resolver,
             write_buffer,
+            import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
+            zome_configs: Arc::new(dashmap::DashMap::new()),
         })
     }
 
@@ -570,6 +582,70 @@ async fn handle_request(
                 .map(|s| s.to_string());
             let remote_ip = addr.ip();
             to_boxed(routes::handle_api_request(state, p, query, Some(remote_ip), auth_header).await)
+        }
+
+        // Dynamic import routes (zome-declared via __doorway_import_config)
+        // POST /{base_route}/{batch_type} - queue import
+        // GET /{base_route}/{batch_type}/{batch_id} - get status
+        (method, p) if matches!(method, Method::POST | Method::GET) => {
+            // Try to match against discovered import routes
+            if let Some(ref import_store) = state.import_config_store {
+                if let Some((dna_hash, batch_type, batch_id)) = routes::match_import_route(p, import_store) {
+                    // Need worker pool and zome config to make the call
+                    if let Some(ref pool) = state.pool {
+                        // Get ZomeCallConfig for this DNA
+                        if let Some(zome_config) = state.zome_configs.get(&dna_hash) {
+                            info!(
+                                dna = %dna_hash,
+                                batch_type = %batch_type,
+                                batch_id = ?batch_id,
+                                "Handling import request"
+                            );
+
+                            return Ok(to_boxed(
+                                routes::handle_import_request(
+                                    req,
+                                    Arc::clone(import_store),
+                                    Arc::clone(pool),
+                                    zome_config.clone(),
+                                    dna_hash,
+                                    batch_type,
+                                    batch_id,
+                                ).await
+                            ));
+                        } else {
+                            // Config discovered but zome connection not established yet
+                            debug!(
+                                dna = %dna_hash,
+                                "Import route matched but ZomeCallConfig not yet available"
+                            );
+                            return Ok(to_boxed(
+                                Response::builder()
+                                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                                    .header("Content-Type", "application/json")
+                                    .header("Retry-After", "5")
+                                    .body(Full::new(Bytes::from(format!(
+                                        r#"{{"error": "Import route discovered but conductor connection for DNA {} pending. Retry after connection is established."}}"#,
+                                        dna_hash
+                                    ))))
+                                    .unwrap(),
+                            ));
+                        }
+                    } else {
+                        return Ok(to_boxed(
+                            Response::builder()
+                                .status(StatusCode::SERVICE_UNAVAILABLE)
+                                .header("Content-Type", "application/json")
+                                .body(Full::new(Bytes::from(
+                                    r#"{"error": "Worker pool not available"}"#,
+                                )))
+                                .unwrap(),
+                        ));
+                    }
+                }
+            }
+            // Not an import route, fall through to not found
+            to_boxed(not_found_response(&path))
         }
 
         // Not found

@@ -17,7 +17,7 @@
  *   await client.pushBlob(hash, blob, mimeType);
  */
 
-import { BlobMetadata } from './blob-manager';
+import { BlobMetadata } from './blob-manager.js';
 
 // =============================================================================
 // Types
@@ -54,6 +54,39 @@ export interface BatchPushResult {
   success: number;
   failed: number;
   errors: Array<{ hash: string; error: string }>;
+}
+
+// =============================================================================
+// Import API Types
+// =============================================================================
+
+export interface ImportQueueRequest {
+  /** Optional batch ID (generated if not provided) */
+  batch_id?: string;
+  /** Hash of the blob in elohim-storage containing the items JSON
+   *  REQUIRED - upload to storage first, then queue import */
+  blob_hash: string;
+  /** Total number of items in the blob */
+  total_items: number;
+  /** Schema version for the import data */
+  schema_version?: number;
+}
+
+export interface ImportQueueResponse {
+  batch_id: string;
+  queued_count: number;
+  processing: boolean;
+  message?: string;
+}
+
+export interface ImportStatusResponse {
+  batch_id: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  total_items: number;
+  processed_count: number;
+  error_count: number;
+  errors: string[];
+  completed_at?: string;
 }
 
 // =============================================================================
@@ -269,6 +302,139 @@ export class DoorwayClient {
     } catch {
       return null;
     }
+  }
+
+  // ===========================================================================
+  // Import API - Queue content for batch import
+  // ===========================================================================
+
+  /**
+   * Queue content items for import via doorway.
+   *
+   * @param batchType - Type of content to import (e.g., 'content', 'paths')
+   * @param request - Import request with items or blob_hash
+   * @returns Import queue response with batch_id
+   */
+  async queueImport(
+    batchType: string,
+    request: ImportQueueRequest
+  ): Promise<ImportQueueResponse> {
+    if (this.config.dryRun) {
+      console.log(`[DRY RUN] Would queue import: ${batchType} (${request.total_items} items, blob: ${request.blob_hash.slice(0, 20)}...)`);
+      return {
+        batch_id: `dry-run-${Date.now()}`,
+        queued_count: request.total_items,
+        processing: false,
+        message: 'Dry run - not actually queued',
+      };
+    }
+
+    const response = await this.fetch(`/import/${batchType}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Import queue failed: HTTP ${response.status}: ${errorText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Get import batch status.
+   *
+   * @param batchType - Type of content being imported
+   * @param batchId - Batch ID returned from queueImport
+   * @returns Import status with progress and errors
+   */
+  async getImportStatus(
+    batchType: string,
+    batchId: string
+  ): Promise<ImportStatusResponse | null> {
+    try {
+      const response = await this.fetch(`/import/${batchType}/${batchId}`);
+
+      if (response.status === 404) {
+        return null;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Get import status failed: HTTP ${response.status}: ${errorText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('404')) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Queue import and poll until completion.
+   *
+   * @param batchType - Type of content to import
+   * @param request - Import request with items
+   * @param options - Polling options
+   * @returns Final import status
+   */
+  async queueImportAndWait(
+    batchType: string,
+    request: ImportQueueRequest,
+    options: {
+      pollIntervalMs?: number;
+      timeoutMs?: number;
+      onProgress?: (status: ImportStatusResponse) => void;
+    } = {}
+  ): Promise<ImportStatusResponse> {
+    const pollInterval = options.pollIntervalMs || 5000;
+    const timeout = options.timeoutMs || 300000; // 5 min default
+
+    // Queue the import
+    const queueResult = await this.queueImport(batchType, request);
+    console.log(`📤 Import queued: ${queueResult.batch_id} (${queueResult.queued_count} items)`);
+
+    // If already completed (synchronous processing)
+    if (queueResult.processing === false && queueResult.queued_count === 0) {
+      // Might be an error or already processed
+      const status = await this.getImportStatus(batchType, queueResult.batch_id);
+      if (status) return status;
+    }
+
+    // Poll for completion
+    const startTime = Date.now();
+    let lastProcessed = 0;
+
+    while (Date.now() - startTime < timeout) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+      const status = await this.getImportStatus(batchType, queueResult.batch_id);
+      if (!status) {
+        throw new Error(`Batch ${queueResult.batch_id} not found during polling`);
+      }
+
+      // Report progress
+      if (status.processed_count !== lastProcessed) {
+        if (options.onProgress) {
+          options.onProgress(status);
+        }
+        lastProcessed = status.processed_count;
+      }
+
+      // Check for completion
+      if (status.status === 'completed' || status.status === 'failed') {
+        return status;
+      }
+    }
+
+    throw new Error(`Import timed out after ${timeout}ms`);
   }
 
   /**

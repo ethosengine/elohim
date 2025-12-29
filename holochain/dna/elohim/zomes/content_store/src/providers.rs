@@ -3,12 +3,12 @@
 //! This module provides implementations of the EntryTypeProvider trait for all
 //! Lamad entry types. Each provider composes:
 //! - Validator: schema validation rules
-//! - Transformer: v1→v2 field mapping
+//! - Transcriber: v1→v2 field mapping
 //! - ReferenceResolver: check if referenced entries exist
 //! - DegradationHandler: policy for handling healing failures
 
 use hc_rna::{
-    Validator, Transformer, ReferenceResolver, DegradationHandler, DegradationDecision,
+    Validator, Transcriber, ReferenceResolver, DegradationHandler, DegradationDecision,
     EntryTypeProvider,
 };
 use serde_json::Value;
@@ -172,10 +172,10 @@ impl Validator for ContentMasteryValidator {
 // ============================================================================
 
 /// Transforms Content from v1 to v2 schema
-pub struct ContentTransformer;
+pub struct ContentTranscriber;
 
-impl Transformer for ContentTransformer {
-    fn transform_v1_to_v2(&self, v1_data: &Value) -> Result<Value, String> {
+impl Transcriber for ContentTranscriber {
+    fn transcribe_from_prev(&self, v1_data: &Value) -> Result<Value, String> {
         // Extract v1 fields
         let id = v1_data["id"].as_str().ok_or("v1 Content missing id")?;
         let title = v1_data["title"].as_str().ok_or("v1 Content missing title")?;
@@ -215,10 +215,10 @@ impl Transformer for ContentTransformer {
 }
 
 /// Transforms LearningPath from v1 to v2
-pub struct LearningPathTransformer;
+pub struct LearningPathTranscriber;
 
-impl Transformer for LearningPathTransformer {
-    fn transform_v1_to_v2(&self, v1_data: &Value) -> Result<Value, String> {
+impl Transcriber for LearningPathTranscriber {
+    fn transcribe_from_prev(&self, v1_data: &Value) -> Result<Value, String> {
         let id = v1_data["id"].as_str().ok_or("v1 LearningPath missing id")?;
         let title = v1_data["title"].as_str().ok_or("v1 LearningPath missing title")?;
         let description = v1_data["description"].as_str().unwrap_or("");
@@ -245,10 +245,10 @@ impl Transformer for LearningPathTransformer {
 }
 
 /// Transforms PathStep from v1 to v2
-pub struct PathStepTransformer;
+pub struct PathStepTranscriber;
 
-impl Transformer for PathStepTransformer {
-    fn transform_v1_to_v2(&self, v1_data: &Value) -> Result<Value, String> {
+impl Transcriber for PathStepTranscriber {
+    fn transcribe_from_prev(&self, v1_data: &Value) -> Result<Value, String> {
         let id = v1_data["id"].as_str().ok_or("v1 PathStep missing id")?;
         let path_id = v1_data["path_id"].as_str().ok_or("v1 PathStep missing path_id")?;
         let content_id = v1_data["content_id"].as_str().unwrap_or("");
@@ -272,10 +272,10 @@ impl Transformer for PathStepTransformer {
 }
 
 /// Transforms ContentMastery from v1 to v2
-pub struct ContentMasteryTransformer;
+pub struct ContentMasteryTranscriber;
 
-impl Transformer for ContentMasteryTransformer {
-    fn transform_v1_to_v2(&self, v1_data: &Value) -> Result<Value, String> {
+impl Transcriber for ContentMasteryTranscriber {
+    fn transcribe_from_prev(&self, v1_data: &Value) -> Result<Value, String> {
         let id = v1_data["id"].as_str().ok_or("v1 ContentMastery missing id")?;
         let human_id = v1_data["human_id"].as_str().ok_or("v1 ContentMastery missing human_id")?;
         let content_id = v1_data["content_id"].as_str().ok_or("v1 ContentMastery missing content_id")?;
@@ -433,8 +433,8 @@ impl EntryTypeProvider for ContentProvider {
         &ContentValidator
     }
 
-    fn transformer(&self) -> &dyn Transformer {
-        &ContentTransformer
+    fn transcriber(&self) -> &dyn Transcriber {
+        &ContentTranscriber
     }
 
     fn reference_resolver(&self) -> &dyn ReferenceResolver {
@@ -447,7 +447,7 @@ impl EntryTypeProvider for ContentProvider {
 
     fn create_healing_instance(&self, id: &str, v1_data: &Value) -> Result<Vec<u8>, String> {
         // Transform v1 to v2 JSON
-        let v2_json = self.transformer().transform_v1_to_v2(v1_data)?;
+        let v2_json = self.transcriber().transcribe_from_prev(v1_data)?;
 
         // Validate the transformed entry
         self.validator().validate_json(&v2_json)?;
@@ -470,8 +470,8 @@ impl EntryTypeProvider for LearningPathProvider {
         &LearningPathValidator
     }
 
-    fn transformer(&self) -> &dyn Transformer {
-        &LearningPathTransformer
+    fn transcriber(&self) -> &dyn Transcriber {
+        &LearningPathTranscriber
     }
 
     fn reference_resolver(&self) -> &dyn ReferenceResolver {
@@ -483,7 +483,7 @@ impl EntryTypeProvider for LearningPathProvider {
     }
 
     fn create_healing_instance(&self, _id: &str, v1_data: &Value) -> Result<Vec<u8>, String> {
-        let v2_json = self.transformer().transform_v1_to_v2(v1_data)?;
+        let v2_json = self.transcriber().transcribe_from_prev(v1_data)?;
         self.validator().validate_json(&v2_json)?;
         Ok(serde_json::to_vec(&v2_json)
             .map_err(|e| format!("Failed to serialize healed LearningPath: {}", e))?)
@@ -502,8 +502,8 @@ impl EntryTypeProvider for PathStepProvider {
         &PathStepValidator
     }
 
-    fn transformer(&self) -> &dyn Transformer {
-        &PathStepTransformer
+    fn transcriber(&self) -> &dyn Transcriber {
+        &PathStepTranscriber
     }
 
     fn reference_resolver(&self) -> &dyn ReferenceResolver {
@@ -515,7 +515,7 @@ impl EntryTypeProvider for PathStepProvider {
     }
 
     fn create_healing_instance(&self, _id: &str, v1_data: &Value) -> Result<Vec<u8>, String> {
-        let v2_json = self.transformer().transform_v1_to_v2(v1_data)?;
+        let v2_json = self.transcriber().transcribe_from_prev(v1_data)?;
         self.validator().validate_json(&v2_json)?;
         Ok(serde_json::to_vec(&v2_json)
             .map_err(|e| format!("Failed to serialize healed PathStep: {}", e))?)
@@ -534,8 +534,8 @@ impl EntryTypeProvider for ContentMasteryProvider {
         &ContentMasteryValidator
     }
 
-    fn transformer(&self) -> &dyn Transformer {
-        &ContentMasteryTransformer
+    fn transcriber(&self) -> &dyn Transcriber {
+        &ContentMasteryTranscriber
     }
 
     fn reference_resolver(&self) -> &dyn ReferenceResolver {
@@ -547,7 +547,7 @@ impl EntryTypeProvider for ContentMasteryProvider {
     }
 
     fn create_healing_instance(&self, _id: &str, v1_data: &Value) -> Result<Vec<u8>, String> {
-        let v2_json = self.transformer().transform_v1_to_v2(v1_data)?;
+        let v2_json = self.transcriber().transcribe_from_prev(v1_data)?;
         self.validator().validate_json(&v2_json)?;
         Ok(serde_json::to_vec(&v2_json)
             .map_err(|e| format!("Failed to serialize healed ContentMastery: {}", e))?)
@@ -593,7 +593,7 @@ mod tests {
 
     #[test]
     fn test_content_transformer() {
-        let transformer = ContentTransformer;
+        let transcriber = ContentTranscriber;
         let v1_data = serde_json::json!({
             "id": "old-content-1",
             "title": "Old Title",
@@ -606,7 +606,7 @@ mod tests {
             "related_node_ids": ["related-1"]
         });
 
-        let result = transformer.transform_v1_to_v2(&v1_data);
+        let result = transcriber.transcribe_from_prev(&v1_data);
         assert!(result.is_ok());
 
         let v2_data = result.unwrap();

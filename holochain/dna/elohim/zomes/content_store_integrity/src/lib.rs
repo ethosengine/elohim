@@ -3829,6 +3829,100 @@ pub struct DoorwayHeartbeatSummary {
 }
 
 // =============================================================================
+// Import Batch Processing (Spring Integration-style queue)
+// =============================================================================
+
+/// ImportBatch - Queued batch of content items for conductor-paced processing.
+///
+/// Like Spring Integration patterns, clients submit a batch message and the
+/// conductor processes at its own pace, protecting threads from exhaustion.
+///
+/// ImportBatch - Queued batch of content for conductor-paced DHT processing.
+///
+/// Architecture: Elohim-Store orchestrates, Zome processes
+/// ─────────────────────────────────────────────────────────
+///
+/// ```text
+/// Client → Doorway → Elohim-Store → Zome
+///                         │            │
+///                    (blob write)  (queue_import)
+///                         │            │
+///                         │      ┌─────▼─────┐
+///                         │      │ ImportBatch│ (manifest only)
+///                         │      │ blob_hash ─┼──┐
+///                         │      └───────────┘  │
+///                         │                     │
+///                         │<────────────────────┘ (read_blob for processing)
+///                         │
+///                    signals back to doorway for progress
+/// ```
+///
+/// Flow:
+/// 1. Client POSTs items to Doorway
+/// 2. Doorway writes blob to Elohim-Store (blazing fast)
+/// 3. Elohim-Store calls `queue_import(blob_hash, manifest)` on Zome
+/// 4. Zome stores ImportBatch entry (manifest only, no payload)
+/// 5. Zome processes at conductor pace, reading chunks from store
+/// 6. Zome emits signals: ImportBatchProgress, ImportBatchCompleted
+/// 7. Store/Doorway relay signals back to client
+///
+/// Key insight: Elohim-Store gives Holochain web 2.0 performance.
+/// Doorway just extends that to HTTP clients.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ImportBatch {
+    /// Unique batch identifier (e.g., "import-2024-12-29-001")
+    pub id: String,
+
+    /// Type of items in batch ("content", "paths", "steps", "full")
+    pub batch_type: String,
+
+    /// Hash of the blob in elohim-store containing the items JSON
+    /// The actual payload lives in the store, not in this entry.
+    /// Format: "sha256-xxxx" or store-specific hash
+    pub blob_hash: String,
+
+    /// Total number of items in the blob (from manifest)
+    pub total_items: u32,
+
+    /// Processing status: "queued" | "processing" | "completed" | "failed"
+    pub status: String,
+
+    /// Number of items successfully processed so far
+    pub processed_count: u32,
+
+    /// Number of items that failed to process
+    pub error_count: u32,
+
+    /// JSON array of error messages ["Failed to create 'foo': reason", ...]
+    /// Only errors are stored here (small), not the full payload
+    pub errors_json: String,
+
+    /// When batch was queued
+    pub created_at: String,
+
+    /// When processing started (None if still queued)
+    pub started_at: Option<String>,
+
+    /// When processing completed (None if still processing)
+    pub completed_at: Option<String>,
+
+    /// Agent who submitted the batch (from store auth)
+    pub author_id: Option<String>,
+
+    /// Schema version for items in this batch
+    pub schema_version: u32,
+}
+
+/// Import batch statuses
+pub const IMPORT_BATCH_STATUSES: [&str; 4] = [
+    "queued",      // Received, not yet processing
+    "processing",  // Currently being processed
+    "completed",   // All items processed (may have errors)
+    "failed",      // Processing halted due to critical error
+];
+
+// =============================================================================
 // Anchor Entries (for link indexing)
 // =============================================================================
 
@@ -3965,6 +4059,9 @@ pub enum EntryTypes {
     DoorwayRegistration(DoorwayRegistration),
     DoorwayHeartbeat(DoorwayHeartbeat),
     DoorwayHeartbeatSummary(DoorwayHeartbeatSummary),
+
+    // Infrastructure: Import Batch Processing
+    ImportBatch(ImportBatch),
 
     // Infrastructure: Anchors
     StringAnchor(StringAnchor),
@@ -4395,6 +4492,14 @@ pub enum LinkTypes {
     // GovernanceState
     IdToGovernanceState,        // Anchor(entity_type:entity_id) -> GovernanceState
     GovernanceStateByStatus,    // Anchor(status) -> GovernanceState
+
+    // =========================================================================
+    // Infrastructure: Import Batch Processing links
+    // =========================================================================
+    IdToImportBatch,            // Anchor(batch_id) -> ImportBatch
+    AuthorToImportBatches,      // Anchor(author_id) -> ImportBatch
+    ImportBatchByStatus,        // Anchor(status) -> ImportBatch
+    // ImportBatchToContent - already defined in Lamad section (line ~4058)
 
     // =========================================================================
     // REMOVED: Doorway links now in infrastructure DNA

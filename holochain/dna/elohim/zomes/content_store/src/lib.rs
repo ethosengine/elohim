@@ -249,8 +249,8 @@ fn init_flexible_orchestrator() -> ExternResult<()> {
 
     // Create orchestrator config
     let config = FlexibleOrchestratorConfig {
-        v1_role_name: Some("lamad-v1".to_string()),
-        v2_role_name: Some("lamad-v2".to_string()),
+        prev_role_name: Some("lamad-v1".to_string()),
+        current_role_name: Some("lamad-v2".to_string()),
         healing_strategy: Arc::new(BridgeFirstStrategy),
         allow_degradation: true,
         max_attempts: 3,
@@ -639,6 +639,188 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
         // get_my_path_progress, get_my_all_progress, get_my_mastery, etc.
         // All require auth and use 5-minute default TTL
     ])
+}
+
+// =============================================================================
+// Doorway Import Config (zome-declared import capabilities)
+// =============================================================================
+// Like __doorway_cache_rules, this allows the doorway to discover import
+// capabilities from the zome rather than hardcoding them.
+
+/// Import configuration for doorway discovery
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ImportConfig {
+    pub enabled: bool,
+    pub base_route: String,
+    pub batch_types: Vec<ImportBatchType>,
+    pub require_auth: bool,
+    pub allowed_agents: Option<Vec<String>>,
+}
+
+/// Configuration for a specific batch type
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ImportBatchType {
+    pub batch_type: String,
+    pub queue_fn: String,
+    pub process_fn: String,
+    pub status_fn: String,
+    pub max_items: u32,
+    pub chunk_size: u32,
+    pub chunk_interval_ms: u32,
+    pub schema_version: u32,
+}
+
+/// Builder for ImportBatchType
+pub struct ImportBatchTypeBuilder {
+    batch_type: ImportBatchType,
+}
+
+impl ImportBatchTypeBuilder {
+    pub fn new(batch_type: &str) -> Self {
+        Self {
+            batch_type: ImportBatchType {
+                batch_type: batch_type.to_string(),
+                queue_fn: "queue_import".to_string(),
+                process_fn: "process_import_chunk".to_string(),
+                status_fn: "get_import_status".to_string(),
+                max_items: 5000,
+                chunk_size: 50,
+                chunk_interval_ms: 100,
+                schema_version: 1,
+            },
+        }
+    }
+
+    pub fn status_fn(mut self, fn_name: &str) -> Self {
+        self.batch_type.status_fn = fn_name.to_string();
+        self
+    }
+
+    pub fn queue_fn(mut self, fn_name: &str) -> Self {
+        self.batch_type.queue_fn = fn_name.to_string();
+        self
+    }
+
+    pub fn process_fn(mut self, fn_name: &str) -> Self {
+        self.batch_type.process_fn = fn_name.to_string();
+        self
+    }
+
+    pub fn max_items(mut self, max: u32) -> Self {
+        self.batch_type.max_items = max;
+        self
+    }
+
+    pub fn chunk_size(mut self, size: u32) -> Self {
+        self.batch_type.chunk_size = size;
+        self
+    }
+
+    pub fn chunk_interval_ms(mut self, ms: u32) -> Self {
+        self.batch_type.chunk_interval_ms = ms;
+        self
+    }
+
+    pub fn schema_version(mut self, version: u32) -> Self {
+        self.batch_type.schema_version = version;
+        self
+    }
+
+    pub fn build(self) -> ImportBatchType {
+        self.batch_type
+    }
+}
+
+/// Builder for ImportConfig
+pub struct ImportConfigBuilder {
+    config: ImportConfig,
+}
+
+impl ImportConfigBuilder {
+    pub fn new() -> Self {
+        Self {
+            config: ImportConfig {
+                enabled: true,
+                base_route: "/import".to_string(),
+                batch_types: Vec::new(),
+                require_auth: true,
+                allowed_agents: None,
+            },
+        }
+    }
+
+    pub fn base_route(mut self, route: &str) -> Self {
+        self.config.base_route = route.to_string();
+        self
+    }
+
+    pub fn disabled(mut self) -> Self {
+        self.config.enabled = false;
+        self
+    }
+
+    pub fn batch_type(mut self, batch_type: ImportBatchType) -> Self {
+        self.config.batch_types.push(batch_type);
+        self
+    }
+
+    pub fn no_auth(mut self) -> Self {
+        self.config.require_auth = false;
+        self
+    }
+
+    pub fn allowed_agents(mut self, agents: Vec<String>) -> Self {
+        self.config.allowed_agents = Some(agents);
+        self
+    }
+
+    pub fn build(self) -> ImportConfig {
+        self.config
+    }
+}
+
+/// Zome-declared import configuration for doorway discovery.
+/// Doorway calls this on startup to learn what import capabilities exist.
+#[hdk_extern]
+pub fn __doorway_import_config(_: ()) -> ExternResult<ImportConfig> {
+    Ok(ImportConfigBuilder::new()
+        // Content batch (bulk concepts, assessments, quizzes)
+        .batch_type(
+            ImportBatchTypeBuilder::new("content")
+                .max_items(5000)
+                .chunk_size(50)          // 50 items per chunk
+                .chunk_interval_ms(100)  // 100ms between chunks
+                .schema_version(1)
+                .build()
+        )
+        // Path batch (learning paths with steps)
+        .batch_type(
+            ImportBatchTypeBuilder::new("paths")
+                .max_items(1000)
+                .chunk_size(20)          // Paths are heavier, smaller chunks
+                .chunk_interval_ms(200)
+                .schema_version(1)
+                .build()
+        )
+        // Steps batch (path steps, can be large)
+        .batch_type(
+            ImportBatchTypeBuilder::new("steps")
+                .max_items(10000)
+                .chunk_size(100)         // Steps are lightweight
+                .chunk_interval_ms(50)
+                .schema_version(1)
+                .build()
+        )
+        // Relationships batch (content links)
+        .batch_type(
+            ImportBatchTypeBuilder::new("relationships")
+                .max_items(20000)
+                .chunk_size(200)         // Links are very lightweight
+                .chunk_interval_ms(25)
+                .schema_version(1)
+                .build()
+        )
+        .build())
 }
 
 // =============================================================================
@@ -1624,6 +1806,7 @@ pub fn create_content(input: CreateContentInput) -> ExternResult<ContentOutput> 
 }
 
 /// Bulk create content entries (for import operations)
+/// DEPRECATED: Use submit_import_batch() for large imports to avoid conductor thread exhaustion
 #[hdk_extern]
 pub fn bulk_create_content(input: BulkCreateContentInput) -> ExternResult<BulkCreateContentOutput> {
     let mut action_hashes = Vec::new();
@@ -1648,6 +1831,354 @@ pub fn bulk_create_content(input: BulkCreateContentInput) -> ExternResult<BulkCr
         action_hashes,
         errors,
     })
+}
+
+// =============================================================================
+// =============================================================================
+// Import Batch Processing (Elohim-Store Orchestrated)
+// =============================================================================
+//
+// Architecture: Client → Doorway → Elohim-Store → Zome
+//
+// The elohim-store provides web 2.0 performance for the Holochain network.
+// Doorway just extends that to HTTP clients.
+//
+// Flow:
+// 1. Client POSTs items to Doorway
+// 2. Doorway writes blob to Elohim-Store (blazing fast)
+// 3. Elohim-Store calls queue_import(blob_hash, manifest) on Zome
+// 4. Zome stores ImportBatch entry (manifest only) and emits ImportBatchQueued
+// 5. Elohim-Store calls process_import_chunk() with blob data
+// 6. Zome processes items, emits ImportBatchProgress signals
+// 7. Zome emits ImportBatchCompleted when done
+// 8. Store/Doorway relay signals back to client
+
+/// Input for queuing an import batch (called by elohim-store after blob write)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueueImportInput {
+    /// Unique batch identifier (e.g., "import-2024-12-29-001")
+    pub id: String,
+
+    /// Type of items: "content", "paths", "steps", "full"
+    pub batch_type: String,
+
+    /// Hash of the blob in elohim-store containing the items JSON
+    /// Format: "sha256-xxxx" or store-specific hash
+    pub blob_hash: String,
+
+    /// Total number of items in the blob (from manifest)
+    pub total_items: u32,
+
+    /// Schema version for the items
+    pub schema_version: u32,
+}
+
+/// Output from queuing an import batch
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueueImportOutput {
+    /// The batch ID
+    pub batch_id: String,
+
+    /// ActionHash of the stored ImportBatch entry
+    pub action_hash: ActionHash,
+
+    /// Number of items queued for processing
+    pub queued_count: u32,
+
+    /// Processing status (always "queued" from this call)
+    pub status: String,
+}
+
+/// Queue an import batch for processing.
+///
+/// Called by elohim-store after writing the blob. This stores a lightweight
+/// manifest entry (no payload) and emits ImportBatchQueued signal.
+/// The store then calls process_import_chunk() with the actual data.
+#[hdk_extern]
+pub fn queue_import(input: QueueImportInput) -> ExternResult<QueueImportOutput> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    if input.total_items == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cannot queue empty batch".to_string()
+        )));
+    }
+
+    // Create the batch entry with status="queued" (manifest only, no payload)
+    let batch = ImportBatch {
+        id: input.id.clone(),
+        batch_type: input.batch_type.clone(),
+        blob_hash: input.blob_hash.clone(),
+        total_items: input.total_items,
+        status: "queued".to_string(),
+        processed_count: 0,
+        error_count: 0,
+        errors_json: "[]".to_string(),
+        created_at: timestamp.clone(),
+        started_at: None,
+        completed_at: None,
+        author_id: Some(agent_info.agent_initial_pubkey.to_string()),
+        schema_version: input.schema_version,
+    };
+
+    // Store the batch entry (fast - single DHT write, no payload)
+    let action_hash = create_entry(&EntryTypes::ImportBatch(batch.clone()))?;
+
+    // Create index links
+    create_import_batch_index_links(&input.id, &action_hash, &batch.status, &agent_info.agent_initial_pubkey.to_string())?;
+
+    // Emit signal so elohim-store knows to start sending chunks
+    emit_signal(ProjectionSignal::ImportBatchQueued {
+        batch_id: input.id.clone(),
+        blob_hash: input.blob_hash.clone(),
+        total_items: input.total_items,
+        batch_type: input.batch_type.clone(),
+    })?;
+
+    Ok(QueueImportOutput {
+        batch_id: input.id,
+        action_hash,
+        queued_count: input.total_items,
+        status: "queued".to_string(),
+    })
+}
+
+/// Input for processing a chunk of import data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessImportChunkInput {
+    /// Batch ID this chunk belongs to
+    pub batch_id: String,
+
+    /// Chunk index (0-based, for ordering)
+    pub chunk_index: u32,
+
+    /// Whether this is the last chunk
+    pub is_final: bool,
+
+    /// JSON array of items to process (partial batch)
+    pub items_json: String,
+}
+
+/// Output from processing a chunk
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessImportChunkOutput {
+    /// Batch ID
+    pub batch_id: String,
+
+    /// Items processed in this chunk
+    pub chunk_processed: u32,
+
+    /// Errors in this chunk
+    pub chunk_errors: u32,
+
+    /// Total processed so far (across all chunks)
+    pub total_processed: u32,
+
+    /// Total errors so far
+    pub total_errors: u32,
+
+    /// Current batch status
+    pub status: String,
+}
+
+/// Process a chunk of import data.
+///
+/// Called by elohim-store with blob data in chunks. Processes items,
+/// updates the ImportBatch entry, and emits progress signals.
+#[hdk_extern]
+pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<ProcessImportChunkOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Look up the batch entry
+    let id_anchor = StringAnchor::new("import_batch", &input.batch_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToImportBatch)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Batch '{}' not found", input.batch_id)
+        )));
+    }
+
+    let batch_action_hash = links.last().unwrap().target.clone().into_action_hash()
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
+
+    let record = get(batch_action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Batch record not found".to_string())))?;
+
+    let mut batch: ImportBatch = record.entry().to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize ImportBatch".to_string())))?;
+
+    // Update status to processing if this is the first chunk
+    if batch.status == "queued" {
+        batch.status = "processing".to_string();
+        batch.started_at = Some(timestamp.clone());
+    }
+
+    // Parse and process items
+    let items: Vec<CreateContentInput> = serde_json::from_str(&input.items_json)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to parse items_json: {}", e
+        ))))?;
+
+    let mut chunk_processed: u32 = 0;
+    let mut chunk_errors: u32 = 0;
+    let mut errors: Vec<String> = serde_json::from_str(&batch.errors_json).unwrap_or_default();
+
+    // Process items one at a time
+    for content_input in items {
+        match create_content(content_input.clone()) {
+            Ok(output) => {
+                // Link content to this batch for traceability
+                create_import_batch_link(&input.batch_id, &output.action_hash)?;
+                chunk_processed += 1;
+            }
+            Err(e) => {
+                chunk_errors += 1;
+                let error_msg = format!("Failed to create '{}': {:?}", content_input.id, e);
+                if errors.len() < 100 {
+                    errors.push(error_msg);
+                }
+            }
+        }
+    }
+
+    // Update batch progress
+    batch.processed_count += chunk_processed;
+    batch.error_count += chunk_errors;
+    batch.errors_json = serde_json::to_string(&errors).unwrap_or_default();
+
+    // Determine final status if this is the last chunk
+    if input.is_final {
+        batch.status = if batch.error_count == 0 {
+            "completed".to_string()
+        } else if batch.processed_count == 0 {
+            "failed".to_string()
+        } else {
+            "completed".to_string() // Completed with some errors
+        };
+        batch.completed_at = Some(timestamp);
+    }
+
+    // Update the batch entry
+    update_entry(batch_action_hash.clone(), &EntryTypes::ImportBatch(batch.clone()))?;
+
+    // Emit progress signal
+    if input.is_final {
+        emit_signal(ProjectionSignal::ImportBatchCompleted {
+            batch_id: input.batch_id.clone(),
+            processed_count: batch.processed_count,
+            error_count: batch.error_count,
+            total_items: batch.total_items,
+            errors: errors.clone(),
+        })?;
+    } else {
+        emit_signal(ProjectionSignal::ImportBatchProgress {
+            batch_id: input.batch_id.clone(),
+            processed_count: batch.processed_count,
+            error_count: batch.error_count,
+            total_items: batch.total_items,
+        })?;
+    }
+
+    Ok(ProcessImportChunkOutput {
+        batch_id: input.batch_id,
+        chunk_processed,
+        chunk_errors,
+        total_processed: batch.processed_count,
+        total_errors: batch.error_count,
+        status: batch.status,
+    })
+}
+
+/// Create index links for an ImportBatch entry
+fn create_import_batch_index_links(
+    batch_id: &str,
+    action_hash: &ActionHash,
+    status: &str,
+    author_id: &str,
+) -> ExternResult<()> {
+    // IdToImportBatch
+    let id_anchor = StringAnchor::new("import_batch", batch_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToImportBatch, ())?;
+
+    // AuthorToImportBatches
+    let author_anchor = StringAnchor::new("import_batch_author", author_id);
+    let author_anchor_hash = hash_entry(&EntryTypes::StringAnchor(author_anchor))?;
+    create_link(author_anchor_hash, action_hash.clone(), LinkTypes::AuthorToImportBatches, ())?;
+
+    // ImportBatchByStatus
+    let status_anchor = StringAnchor::new("import_batch_status", status);
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::ImportBatchByStatus, ())?;
+
+    Ok(())
+}
+
+/// Get the status of an import batch by ID
+#[hdk_extern]
+pub fn get_import_status(batch_id: String) -> ExternResult<Option<ImportBatch>> {
+    // Look up via IdToImportBatch link
+    let id_anchor = StringAnchor::new("import_batch", &batch_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToImportBatch)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    // Get the most recent batch (by creation order)
+    let action_hash = links.last().unwrap().target.clone().into_action_hash()
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
+
+    let record = get(action_hash, GetOptions::default())?;
+    match record {
+        Some(record) => {
+            let batch: ImportBatch = record.entry().to_app_option()
+                .map_err(|e| wasm_error!(e))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize ImportBatch".to_string())))?;
+            Ok(Some(batch))
+        }
+        None => Ok(None),
+    }
+}
+
+/// List all import batches (for admin monitoring)
+#[hdk_extern]
+pub fn list_import_batches(_: ()) -> ExternResult<Vec<ImportBatch>> {
+    let agent_info = agent_info()?;
+
+    // Get batches by this author
+    let author_anchor = StringAnchor::new("import_batch_author", &agent_info.agent_initial_pubkey.to_string());
+    let author_anchor_hash = hash_entry(&EntryTypes::StringAnchor(author_anchor))?;
+
+    let query = LinkQuery::try_new(author_anchor_hash, LinkTypes::AuthorToImportBatches)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut batches: Vec<ImportBatch> = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Ok(Some(batch)) = record.entry().to_app_option::<ImportBatch>() {
+                    batches.push(batch);
+                }
+            }
+        }
+    }
+
+    // Sort by created_at descending (most recent first)
+    batches.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    Ok(batches)
 }
 
 /// Get content by ActionHash
@@ -9458,6 +9989,44 @@ pub enum ProjectionSignal {
         entry_hash: EntryHash,
         entry_type: String,
         author: AgentPubKey,
+    },
+
+    // =========================================================================
+    // Import Batch Signals - for Elohim-Store orchestration
+    // =========================================================================
+
+    /// ImportBatch was queued (store can start processing)
+    ImportBatchQueued {
+        batch_id: String,
+        blob_hash: String,
+        total_items: u32,
+        batch_type: String,
+    },
+
+    /// ImportBatch progress update (periodic during processing)
+    ImportBatchProgress {
+        batch_id: String,
+        processed_count: u32,
+        error_count: u32,
+        total_items: u32,
+    },
+
+    /// ImportBatch processing completed (success or with errors)
+    ImportBatchCompleted {
+        batch_id: String,
+        processed_count: u32,
+        error_count: u32,
+        total_items: u32,
+        errors: Vec<String>,
+    },
+
+    /// ImportBatch failed critically (halted processing)
+    ImportBatchFailed {
+        batch_id: String,
+        processed_count: u32,
+        error_count: u32,
+        total_items: u32,
+        fatal_error: String,
     },
 }
 
