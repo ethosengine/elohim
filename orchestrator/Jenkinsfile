@@ -1,0 +1,402 @@
+/**
+ * Elohim Orchestrator Pipeline
+ *
+ * Observability and coordination for the Elohim mono-repo pipelines.
+ * Does NOT build anything - only monitors, reports, and recommends actions.
+ *
+ * Responsibilities:
+ *   - Track artifact versions across all pipelines
+ *   - Detect version drift and stale dependencies
+ *   - Monitor health of deployed services
+ *   - Generate actionable recommendations
+ *
+ * Triggers:
+ *   - Cron: Every 15 minutes
+ *   - Manual: On-demand status check
+ *   - Upstream: After any pipeline completes (optional)
+ */
+
+// Pipeline artifact sources
+def PIPELINES = [
+    'elohim-holochain': [
+        path: 'holochain/dna/Jenkinsfile',
+        artifacts: ['elohim.happ', 'holochain-cache-core'],
+        consumers: ['elohim-edge', 'elohim', 'elohim-steward', 'elohim-genesis']
+    ],
+    'elohim-edge': [
+        path: 'holochain/Jenkinsfile',
+        artifacts: ['elohim-doorway', 'elohim-edgenode', 'elohim-happ-installer'],
+        consumers: ['elohim-genesis'],
+        depends: ['elohim-holochain']
+    ],
+    'elohim': [
+        path: 'Jenkinsfile',
+        artifacts: ['elohim-app'],
+        consumers: ['elohim-genesis'],
+        depends: ['elohim-holochain']
+    ],
+    'elohim-genesis': [
+        path: 'genesis/Jenkinsfile',
+        artifacts: [],
+        consumers: [],
+        depends: ['elohim-holochain', 'elohim-edge', 'elohim']
+    ],
+    'elohim-steward': [
+        path: 'steward/Jenkinsfile',
+        artifacts: ['steward-linux', 'steward-macos', 'steward-windows'],
+        consumers: [],
+        depends: ['elohim-holochain'],
+        manualOnly: true
+    ]
+]
+
+// Service health endpoints
+def HEALTH_ENDPOINTS = [
+    'doorway-dev': 'https://doorway-dev.elohim.host/health',
+    'doorway-prod': 'https://doorway.elohim.host/health',
+    'alpha': 'https://alpha.elohim.host',
+    'staging': 'https://staging.elohim.host',
+    'prod': 'https://elohim.host'
+]
+
+def getLastSuccessfulBuild(String jobName, String branch) {
+    def url = "https://jenkins.ethosengine.com/job/${jobName}/job/${branch}/lastSuccessfulBuild/api/json"
+    try {
+        def response = sh(
+            script: "curl -sf '${url}' 2>/dev/null || echo '{}'",
+            returnStdout: true
+        ).trim()
+        return readJSON(text: response)
+    } catch (Exception e) {
+        return [:]
+    }
+}
+
+def checkHealth(String name, String url) {
+    def status = sh(
+        script: "curl -sf -o /dev/null -w '%{http_code}' '${url}' 2>/dev/null || echo '000'",
+        returnStdout: true
+    ).trim()
+    return [
+        name: name,
+        url: url,
+        status: status,
+        healthy: status == '200' || status == '302' || status == '301'
+    ]
+}
+
+def getArtifactVersion(String jobName, String branch, String artifactPath) {
+    def url = "https://jenkins.ethosengine.com/job/${jobName}/job/${branch}/lastSuccessfulBuild/artifact/${artifactPath}"
+    def exists = sh(
+        script: "curl -sf -o /dev/null '${url}' 2>/dev/null && echo 'true' || echo 'false'",
+        returnStdout: true
+    ).trim()
+    return exists == 'true'
+}
+
+pipeline {
+    agent {
+        kubernetes {
+            cloud 'kubernetes'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccount: jenkins-deployer
+  nodeSelector:
+    node-type: edge
+  containers:
+  - name: builder
+    image: harbor.ethosengine.com/ethosengine/ci-builder:latest
+    command: [cat]
+    tty: true
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+'''
+        }
+    }
+
+    parameters {
+        booleanParam(
+            name: 'FULL_REPORT',
+            defaultValue: true,
+            description: 'Generate full status report'
+        )
+        booleanParam(
+            name: 'CHECK_HEALTH',
+            defaultValue: true,
+            description: 'Check health of all endpoints'
+        )
+        string(
+            name: 'BRANCH',
+            defaultValue: 'dev',
+            description: 'Branch to check artifact versions for'
+        )
+    }
+
+    triggers {
+        // Run every 15 minutes during work hours
+        cron('H/15 8-20 * * 1-5')
+    }
+
+    options {
+        timeout(time: 10, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+    }
+
+    stages {
+        stage('Collect Pipeline Status') {
+            steps {
+                container('builder') {
+                    script {
+                        def branch = params.BRANCH ?: 'dev'
+                        def pipelineStatus = [:]
+
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        📊 ELOHIM ORCHESTRATOR - PIPELINE STATUS
+                        ═══════════════════════════════════════════════════════════
+                        Branch: ${branch}
+                        Timestamp: ${new Date().format('yyyy-MM-dd HH:mm:ss')}
+                        ═══════════════════════════════════════════════════════════
+                        """
+
+                        PIPELINES.each { name, config ->
+                            def buildInfo = getLastSuccessfulBuild(name, branch)
+                            def status = [
+                                name: name,
+                                lastBuild: buildInfo.number ?: 'N/A',
+                                lastSuccess: buildInfo.timestamp ? new Date(buildInfo.timestamp).format('yyyy-MM-dd HH:mm') : 'Never',
+                                duration: buildInfo.duration ? "${(buildInfo.duration / 1000 / 60).round(1)} min" : 'N/A',
+                                result: buildInfo.result ?: 'UNKNOWN',
+                                manualOnly: config.manualOnly ?: false
+                            ]
+                            pipelineStatus[name] = status
+                        }
+
+                        echo """
+                        ┌─────────────────────────────────────────────────────────┐
+                        │ PIPELINE BUILDS                                         │
+                        ├─────────────────────────────────────────────────────────┤
+                        """
+
+                        pipelineStatus.each { name, status ->
+                            def icon = status.result == 'SUCCESS' ? '✅' : (status.result == 'FAILURE' ? '❌' : '⚠️')
+                            def manual = status.manualOnly ? ' [MANUAL]' : ''
+                            echo "│ ${icon} ${name}${manual}"
+                            echo "│    Build #${status.lastBuild} | ${status.lastSuccess} | ${status.duration}"
+                        }
+
+                        echo """
+                        └─────────────────────────────────────────────────────────┘
+                        """
+
+                        // Store for later stages
+                        env.PIPELINE_STATUS = writeJSON(returnText: true, json: pipelineStatus)
+                    }
+                }
+            }
+        }
+
+        stage('Check Artifact Versions') {
+            when {
+                expression { params.FULL_REPORT }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def branch = params.BRANCH ?: 'dev'
+
+                        echo """
+                        ┌─────────────────────────────────────────────────────────┐
+                        │ ARTIFACT INVENTORY                                      │
+                        ├─────────────────────────────────────────────────────────┤
+                        """
+
+                        // Check elohim-holochain artifacts
+                        def happExists = getArtifactVersion('elohim-holochain', branch, 'holochain/dna/elohim/elohim.happ')
+                        def wasmExists = getArtifactVersion('elohim-holochain', branch, 'holochain/holochain-cache-core/pkg/holochain_cache_core.js')
+
+                        echo "│ elohim-holochain:"
+                        echo "│   ${happExists ? '✅' : '❌'} elohim.happ"
+                        echo "│   ${wasmExists ? '✅' : '❌'} holochain-cache-core WASM"
+
+                        // Check container images in Harbor
+                        echo "│"
+                        echo "│ Container Images (Harbor):"
+                        ['elohim-doorway', 'elohim-edgenode', 'elohim-happ-installer', 'elohim-app'].each { image ->
+                            // Note: Would need Harbor API access to check actual tags
+                            echo "│   📦 ${image}:${branch}-latest"
+                        }
+
+                        echo """
+                        └─────────────────────────────────────────────────────────┘
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Check Service Health') {
+            when {
+                expression { params.CHECK_HEALTH }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        echo """
+                        ┌─────────────────────────────────────────────────────────┐
+                        │ SERVICE HEALTH                                          │
+                        ├─────────────────────────────────────────────────────────┤
+                        """
+
+                        def healthResults = [:]
+                        def anyUnhealthy = false
+
+                        HEALTH_ENDPOINTS.each { name, url ->
+                            def result = checkHealth(name, url)
+                            healthResults[name] = result
+                            def icon = result.healthy ? '✅' : '❌'
+                            echo "│ ${icon} ${name}: HTTP ${result.status}"
+                            if (!result.healthy) {
+                                anyUnhealthy = true
+                            }
+                        }
+
+                        echo """
+                        └─────────────────────────────────────────────────────────┘
+                        """
+
+                        if (anyUnhealthy) {
+                            unstable('One or more services are unhealthy')
+                        }
+
+                        env.HEALTH_STATUS = writeJSON(returnText: true, json: healthResults)
+                    }
+                }
+            }
+        }
+
+        stage('Dependency Analysis') {
+            when {
+                expression { params.FULL_REPORT }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        echo """
+                        ┌─────────────────────────────────────────────────────────┐
+                        │ DEPENDENCY GRAPH                                        │
+                        ├─────────────────────────────────────────────────────────┤
+                        │                                                         │
+                        │  elohim-holochain (DNA/hApp)                            │
+                        │       │                                                 │
+                        │       ├──► elohim-edge (infrastructure)                 │
+                        │       │         │                                       │
+                        │       ├──► elohim (Angular app)                         │
+                        │       │         │                                       │
+                        │       │         └──────┬──────┘                         │
+                        │       │                │                                │
+                        │       │                ▼                                │
+                        │       │         elohim-genesis (seed + test)            │
+                        │       │                                                 │
+                        │       └──► elohim-steward (desktop, manual)             │
+                        │                                                         │
+                        └─────────────────────────────────────────────────────────┘
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Generate Recommendations') {
+            steps {
+                container('builder') {
+                    script {
+                        def recommendations = []
+                        def branch = params.BRANCH ?: 'dev'
+
+                        // Parse stored status
+                        def pipelineStatus = readJSON(text: env.PIPELINE_STATUS ?: '{}')
+                        def healthStatus = readJSON(text: env.HEALTH_STATUS ?: '{}')
+
+                        // Check for stale builds (older than 24 hours on dev)
+                        def now = System.currentTimeMillis()
+                        def staleThreshold = 24 * 60 * 60 * 1000 // 24 hours
+
+                        pipelineStatus.each { name, status ->
+                            if (status.lastSuccess && status.lastSuccess != 'Never') {
+                                // Would need actual timestamp comparison
+                            }
+                        }
+
+                        // Check for unhealthy services
+                        healthStatus.each { name, result ->
+                            if (result && !result.healthy) {
+                                if (name.contains('doorway')) {
+                                    recommendations.add("⚠️ ${name} is unhealthy - run elohim-edge with FORCE_DEPLOY=true")
+                                } else {
+                                    recommendations.add("⚠️ ${name} is unhealthy - check deployment status")
+                                }
+                            }
+                        }
+
+                        // Check for missing artifacts
+                        def happExists = getArtifactVersion('elohim-holochain', branch, 'holochain/dna/elohim/elohim.happ')
+                        if (!happExists) {
+                            recommendations.add("❌ No hApp artifact for ${branch} - run elohim-holochain pipeline")
+                        }
+
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        📋 RECOMMENDATIONS
+                        ═══════════════════════════════════════════════════════════
+                        """
+
+                        if (recommendations.isEmpty()) {
+                            echo "✅ All systems nominal - no actions required"
+                        } else {
+                            recommendations.each { rec ->
+                                echo rec
+                            }
+                        }
+
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        """
+
+                        // Set build description
+                        def healthyCount = healthStatus.findAll { k, v -> v?.healthy }.size()
+                        def totalHealth = healthStatus.size()
+                        currentBuild.description = "Health: ${healthyCount}/${totalHealth} | Recommendations: ${recommendations.size()}"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo """
+            ═══════════════════════════════════════════════════════════
+            📊 ORCHESTRATOR COMPLETE
+            ═══════════════════════════════════════════════════════════
+            Next scheduled run: ~15 minutes
+            Manual trigger: Build with Parameters
+            ═══════════════════════════════════════════════════════════
+            """
+        }
+        unstable {
+            echo """
+            ⚠️ ATTENTION REQUIRED
+            One or more services need attention. Check recommendations above.
+            """
+        }
+    }
+}
