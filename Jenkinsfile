@@ -208,38 +208,23 @@ spec:
         stage('Check Trigger') {
             steps {
                 script {
-                    // Only allow manual triggers or orchestrator triggers
                     def validTrigger = currentBuild.getBuildCauses().any { cause ->
-                        cause._class.contains('UserIdCause') ||      // Manual trigger
-                        cause._class.contains('UpstreamCause')       // Triggered by orchestrator
+                        cause._class.contains('UserIdCause') || cause._class.contains('UpstreamCause')
                     }
-
                     if (!validTrigger) {
-                        echo """
-                        ═══════════════════════════════════════════════════════════
-                        ⏭️ PIPELINE BLOCKED - USE ORCHESTRATOR
-                        ═══════════════════════════════════════════════════════════
-                        This pipeline is managed by elohim-orchestrator.
-                        Direct webhook triggers are disabled.
-
-                        To trigger this pipeline:
-                        1. Push to GitHub → orchestrator analyzes → triggers this
-                        2. Or manually: Build with Parameters
-
-                        Triggered by: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}
-                        ═══════════════════════════════════════════════════════════
-                        """
+                        echo "⏭️ PIPELINE SKIPPED - Use orchestrator or manual trigger"
                         currentBuild.result = 'NOT_BUILT'
-                        error('Use orchestrator or manual trigger')
+                        currentBuild.displayName = "#${env.BUILD_NUMBER} SKIPPED"
+                        env.PIPELINE_SKIPPED = 'true'
+                    } else {
+                        echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
                     }
-
-                    echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
                 }
             }
         }
 
         stage('Checkout') {
-            // Always checkout - other stages have their own when conditions
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     script {
@@ -272,10 +257,10 @@ spec:
         }
 
         stage('Setup Version') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     script {
-                        // Configure git safe directory before any git operations
                         sh 'git config --global --add safe.directory "*"'
 
                         echo "DEBUG - Setup Version: Starting"
@@ -338,18 +323,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
         
         stage('Fetch WASM Cache Core') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'staging'
-                    branch 'dev'
-                    changeset "elohim-app/**"
-                    changeset "elohim-library/**"
-                    changeset "holochain/holochain-cache-core/**"
-                    changeset "Jenkinsfile"
-                    changeset "VERSION"
-                }
-            }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -424,19 +398,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Install Dependencies') {
-            when {
-                anyOf {
-                    // Run for main branches (full build)
-                    branch 'main'
-                    branch 'staging'
-                    branch 'dev'
-                    // Run when app-related files change
-                    changeset "elohim-app/**"
-                    changeset "elohim-library/**"
-                    changeset "Jenkinsfile"
-                    changeset "VERSION"
-                }
-            }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     dir('elohim-app') {
@@ -450,28 +412,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Perseus Plugin') {
-            when {
-                anyOf {
-                    branch 'main'; branch 'staging'; branch 'dev'
-                    changeset "elohim-app/**"; changeset "elohim-library/**"
-                    changeset "Jenkinsfile"; changeset "VERSION"
-                }
-            }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps { container('builder') { script { buildPerseusPlugin() } } }
         }
 
         stage('Build App') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'staging'
-                    branch 'dev'
-                    changeset "elohim-app/**"
-                    changeset "elohim-library/**"
-                    changeset "Jenkinsfile"
-                    changeset "VERSION"
-                }
-            }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     dir('elohim-app') {
@@ -516,15 +462,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Unit Test') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'staging'
-                    branch 'dev'
-                    changeset "elohim-app/**"
-                    changeset "elohim-library/**"
-                }
-            }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     dir('elohim-app') {
@@ -539,12 +477,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('SonarQube Analysis') {
             when {
-                anyOf {
-                    branch 'main'
-                    branch 'staging'
-                    // Run on PRs targeting staging or main (regardless of source branch)
-                    changeRequest target: 'staging'
-                    changeRequest target: 'main'
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf { branch 'main'; branch 'staging'; changeRequest target: 'staging'; changeRequest target: 'main' }
                 }
             }
             steps {
@@ -584,14 +519,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Image') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-                        
-                        // Validate required variables
                         if (!props.IMAGE_TAG || !props.GIT_COMMIT_HASH || !props.BASE_VERSION) {
-                            error "Missing required build variables: IMAGE_TAG='${props.IMAGE_TAG}', GIT_COMMIT_HASH='${props.GIT_COMMIT_HASH}', BASE_VERSION='${props.BASE_VERSION}'"
+                            error "Missing required build variables"
                         }
                         
                         withBuildVars(props) {
@@ -634,11 +568,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Push to Harbor Registry') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-                        
                         withBuildVars(props) {
                             withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                                 echo 'Logging into Harbor registry'
@@ -669,11 +603,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Harbor Security Scan') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-
                         withBuildVars(props) {
                             withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                                 echo "Triggering Harbor scan for: ${IMAGE_TAG}"
@@ -723,16 +657,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Install UI Playground Dependencies') {
             when {
                 allOf {
-                    not { branch 'main' }
-                    not { branch 'staging' }
-                    not { expression { return env.BRANCH_NAME ==~ /staging-.+/ } }
-                    not { expression { return env.BRANCH_NAME ==~ /review-.+/ } }
-                    anyOf {
-                        changeset "elohim-library/**"
-                        changeset "elohim-ui-playground/**"
-                        changeset "elohim-ui-playground/images/Dockerfile.ui-playground"
-                        changeset "elohim-ui-playground/images/nginx-ui-playground.conf"
-                    }
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    not { branch 'main' }; not { branch 'staging' }
                 }
             }
             steps {
@@ -750,16 +676,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build UI Playground') {
             when {
                 allOf {
-                    not { branch 'main' }
-                    not { branch 'staging' }
-                    not { expression { return env.BRANCH_NAME ==~ /staging-.+/ } }
-                    not { expression { return env.BRANCH_NAME ==~ /review-.+/ } }
-                    anyOf {
-                        changeset "elohim-library/**"
-                        changeset "elohim-ui-playground/**"
-                        changeset "elohim-ui-playground/images/Dockerfile.ui-playground"
-                        changeset "elohim-ui-playground/images/nginx-ui-playground.conf"
-                    }
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    not { branch 'main' }; not { branch 'staging' }
                 }
             }
             steps {
@@ -781,16 +699,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build UI Playground Image') {
             when {
                 allOf {
-                    not { branch 'main' }
-                    not { branch 'staging' }
-                    not { expression { return env.BRANCH_NAME ==~ /staging-.+/ } }
-                    not { expression { return env.BRANCH_NAME ==~ /review-.+/ } }
-                    anyOf {
-                        changeset "elohim-library/**"
-                        changeset "elohim-ui-playground/**"
-                        changeset "elohim-ui-playground/images/Dockerfile.ui-playground"
-                        changeset "elohim-ui-playground/images/nginx-ui-playground.conf"
-                    }
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    not { branch 'main' }; not { branch 'staging' }
                 }
             }
             steps {
@@ -837,16 +747,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Push UI Playground to Harbor Registry') {
             when {
                 allOf {
-                    not { branch 'main' }
-                    not { branch 'staging' }
-                    not { expression { return env.BRANCH_NAME ==~ /staging-.+/ } }
-                    not { expression { return env.BRANCH_NAME ==~ /review-.+/ } }
-                    anyOf {
-                        changeset "elohim-library/**"
-                        changeset "elohim-ui-playground/**"
-                        changeset "elohim-ui-playground/images/Dockerfile.ui-playground"
-                        changeset "elohim-ui-playground/images/nginx-ui-playground.conf"
-                    }
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    not { branch 'main' }; not { branch 'staging' }
                 }
             }
             steps {
@@ -889,10 +791,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Deploy to Staging') {
             when {
-                anyOf {
-                    branch 'staging'
-                    expression { return env.BRANCH_NAME ==~ /staging-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf { branch 'staging'; expression { env.BRANCH_NAME ==~ /staging-.+/ } }
                 }
             }
             steps {
@@ -943,15 +844,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('🚀 Deploy to Alpha') {
             when {
-                anyOf {
-                    branch 'dev'
-                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                    expression { return env.BRANCH_NAME.contains('alpha') }
-                    // Also check CHANGE_BRANCH for PR builds
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
                 }
             }
             steps {
@@ -1017,11 +912,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Verify Holochain Health') {
             when {
-                anyOf {
-                    branch 'dev'
-                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                    expression { return env.BRANCH_NAME.contains('alpha') }
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
                 }
             }
             steps {
@@ -1095,23 +988,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Deploy UI Playground to Alpha') {
             when {
                 allOf {
-                    anyOf {
-                        branch 'dev'
-                        expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                        expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                        expression { return env.BRANCH_NAME.contains('alpha') }
-                        // Also check CHANGE_BRANCH for PR builds
-                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
-                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
-                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
-                    }
-                    anyOf {
-                        changeset "elohim-library/**"
-                        changeset "elohim-ui-playground/**"
-                        changeset "elohim-ui-playground/images/Dockerfile.ui-playground"
-                        changeset "elohim-ui-playground/images/nginx-ui-playground.conf"
-                        changeset "elohim-ui-playground/manifests/alpha-deployment-ui-playground.yaml"
-                    }
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
                 }
             }
             steps {
@@ -1139,17 +1017,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('E2E Testing - Alpha Validation') {
             when {
-                anyOf {
-                    branch 'dev'
-                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                    expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
-                    expression { return env.BRANCH_NAME.contains('alpha') }
-                    // Also check CHANGE_BRANCH for PR builds
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /alpha-.+/ }
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
                 }
             }
             steps {
@@ -1184,10 +1054,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('E2E Testing - Staging Validation') {
             when {
-                anyOf {
-                    branch 'staging'
-                    expression { return env.BRANCH_NAME ==~ /staging-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf { branch 'staging'; expression { env.BRANCH_NAME ==~ /staging-.+/ } }
                 }
             }
             steps {
@@ -1221,9 +1090,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Deploy to Prod') {
-            when {
-                branch 'main'
-            }
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; branch 'main' } }
             steps {
                 container('builder'){
                     script {
@@ -1256,13 +1123,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Cleanup') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     script {
-                        echo 'Cleaning up workspace'
-                        dir('elohim-app') {
-                            sh 'rm -rf node_modules || true'
-                        }
+                        dir('elohim-app') { sh 'rm -rf node_modules || true' }
                     }
                 }
             }
