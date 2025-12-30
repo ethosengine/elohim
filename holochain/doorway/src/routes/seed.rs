@@ -261,16 +261,14 @@ pub async fn handle_check_blob(
 // Helpers
 // =============================================================================
 
-/// Compute SHA256 hash of data
+/// Compute SHA256 hash of data (hex-encoded to match seeder convention)
 fn compute_sha256(data: &[u8]) -> String {
     use sha2::{Sha256, Digest};
     let mut hasher = Sha256::new();
     hasher.update(data);
     let result = hasher.finalize();
-    format!("sha256-{}", base64::Engine::encode(
-        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-        result
-    ))
+    // Use hex encoding to match seeder (blob-manager.ts) convention
+    format!("sha256-{:x}", result)
 }
 
 /// Create JSON response

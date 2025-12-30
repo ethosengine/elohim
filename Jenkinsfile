@@ -1,4 +1,33 @@
-// Best practice: Return values instead of setting env directly
+/**
+ * Elohim App Pipeline
+ *
+ * Builds and deploys the Angular web application to alpha/staging/production.
+ * Triggered by orchestrator when elohim-app/ or elohim-library/ files change.
+ *
+ * What this pipeline builds:
+ *   - elohim-app Angular application
+ *   - UI Playground (dev branches only, when elohim-ui-playground/** changes)
+ *   - Docker images pushed to Harbor registry
+ *
+ * Environment Architecture:
+ *   - dev/feat-*/claude/* → alpha.elohim.host
+ *   - staging* → staging.elohim.host
+ *   - main → elohim.host (production)
+ *
+ * Trigger behavior:
+ *   - Only runs when triggered by orchestrator or manual
+ *   - Shows NOT_BUILT when triggered directly by webhook
+ *
+ * Artifact dependency:
+ *   - Fetches holochain-cache-core WASM from elohim-holochain pipeline
+ *
+ * @see orchestrator/Jenkinsfile for central trigger logic
+ */
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
 def loadBuildVars() {
     def rootEnv = "${env.WORKSPACE}/build.env"
     def path = fileExists(rootEnv) ? rootEnv : 'build.env'

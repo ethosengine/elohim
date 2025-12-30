@@ -1,8 +1,8 @@
 /**
- * Elohim DNA Pipeline
+ * Elohim DNA Pipeline (elohim-holochain)
  *
  * Builds DNA/hApp artifacts only - NO container images, NO deployments.
- * Infrastructure (doorway, edgenode, happ-installer) is built by holochain/Jenkinsfile.
+ * Triggered by orchestrator when holochain/dna/ or holochain/holochain-cache-core/ change.
  *
  * Artifacts produced:
  *   - elohim.happ (multi-DNA bundle: lamad + imagodei + infrastructure)
@@ -13,6 +13,8 @@
  *   - elohim-app (fetches holochain-cache-core WASM)
  *   - genesis (requires hApp to be deployed before seeding)
  *   - steward (fetches hApp for desktop builds)
+ *
+ * Direct webhook triggers are ignored - use orchestrator or manual trigger.
  */
 
 // ============================================================================

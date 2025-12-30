@@ -1,8 +1,8 @@
 /**
- * Holochain Infrastructure Pipeline
+ * Elohim Edge Infrastructure Pipeline (elohim-edge)
  *
  * Builds container images and deploys Edge Node to dev/prod environments.
- * NOTE: DNA/hApp is built by holochain/dna/Jenkinsfile (elohim-holochain pipeline).
+ * Triggered by orchestrator when holochain/doorway/, edgenode/, or manifests/ change.
  *
  * What this pipeline builds:
  *   - elohim-doorway (HTTP gateway)
@@ -10,20 +10,18 @@
  *   - elohim-happ-installer (bootstrap sidecar)
  *
  * Environment Architecture:
- *   - dev: doorway-dev.elohim.host (serves alpha + staging apps)
- *   - prod: doorway.elohim.host (serves production app only)
+ *   - dev branch → doorway-dev.elohim.host (serves alpha + staging apps)
+ *   - main branch → doorway.elohim.host (serves production app only)
  *
- * Triggers:
- *   - holochain/doorway/** - Doorway gateway changes
- *   - holochain/edgenode/** - Conductor config changes
- *   - holochain/manifests/** - K8s deployment changes
- *   - NOT holochain/dna/** (handled by elohim-holochain pipeline)
- *   - NOT holochain/holochain-cache-core/** (handled by elohim-holochain pipeline)
+ * Trigger behavior:
+ *   - Only runs when triggered by orchestrator or manual
+ *   - Shows NOT_BUILT when triggered directly by webhook
  *
  * Artifact dependency:
- *   - Fetches elohim.happ from elohim-holochain pipeline artifacts
+ *   - Fetches elohim.happ from elohim-holochain pipeline
  *   - Fallback: current branch → dev → main
  *
+ * @see orchestrator/Jenkinsfile for central trigger logic
  * @see holochain/dna/Jenkinsfile for DNA builds
  */
 

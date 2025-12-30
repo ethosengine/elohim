@@ -52,11 +52,7 @@ import groovy.transform.Field
         changePatterns: ['elohim-app/', 'elohim-library/', 'VERSION'],
         artifacts: ['elohim-app'],
         dependsOn: ['elohim-holochain'],
-        triggersGenesis: true,
-        // DISABLED: Root Jenkinsfile causes "Method too large" error (1330 lines).
-        // The pipeline needs refactoring into shared library before re-enabling.
-        // For now, trigger manually or wait for refactor.
-        manualOnly: true
+        triggersGenesis: true
     ],
     'elohim-genesis': [
         jenkinsPath: 'genesis/Jenkinsfile',

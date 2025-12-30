@@ -78,7 +78,7 @@ Holochain DHT              [Production data]
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `TARGET_HOST` | Host to test against | `https://staging.elohim.host` |
+| `TARGET_HOST` | Host to test against | Auto-detected from branch |
 | `DOORWAY_HOST` | Doorway API (auto-detected) | - |
 | `SEED_DATA` | Run seeding before tests | `true` |
 | `SEED_IDS` | Specific IDs to seed (comma-separated) | (all) |
@@ -87,6 +87,16 @@ Holochain DHT              [Production data]
 | `TEST_TAGS` | Filter tests by tag | (all) |
 | `SKIP_TESTS` | Seed only, no tests | `false` |
 | `ANALYZE_DRIFT` | Analyze schema drift | `true` |
+
+### Auto-Detection
+
+When triggered by the orchestrator, `TARGET_HOST` is auto-detected from branch:
+
+| Branch | Target Host | Doorway |
+|--------|-------------|---------|
+| `dev`, `feat-*`, `claude/*` | alpha.elohim.host | doorway-dev.elohim.host |
+| `staging*` | staging.elohim.host | doorway-dev.elohim.host |
+| `main` | elohim.host | doorway.elohim.host |
 
 ### Feature Areas
 

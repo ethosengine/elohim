@@ -1,9 +1,18 @@
-// ============================================================================
-// GENESIS PIPELINE
-// ============================================================================
-// Standalone pipeline for the Genesis project: source → seed → validate → feedback
-// Handles the full cycle of seeding content and validating it works.  
-// ============================================================================
+/**
+ * Genesis Pipeline (elohim-genesis)
+ *
+ * Seeds content to Holochain and validates it works.
+ * Triggered by orchestrator after successful holochain/edge/app builds.
+ *
+ * Pipeline: source → seed → validate → feedback
+ *
+ * Auto-detects target environment from branch:
+ *   - dev/feat-*/claude-* → alpha.elohim.host (doorway-dev)
+ *   - staging*           → staging.elohim.host (doorway-dev)
+ *   - main               → elohim.host (doorway)
+ *
+ * Direct webhook triggers are ignored - use orchestrator or manual trigger.
+ */
 
 def resolveDoorwayHost(String targetHost, String explicitDoorway) {
     if (explicitDoorway) {
