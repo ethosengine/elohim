@@ -34,100 +34,6 @@ def withBuildVars(props, Closure body) {
 // STAGE HELPER METHODS (to reduce bytecode size)
 // ============================================================================
 
-def orchestrateMonoRepo() {
-    echo """
-    ═══════════════════════════════════════════════════════════
-    📋 ELOHIM MONO-REPO BUILD ORCHESTRATION
-    ═══════════════════════════════════════════════════════════
-    Branch: ${env.BRANCH_NAME}
-    Commit: ${env.GIT_COMMIT ?: 'unknown'}
-    Build: ${env.BUILD_NUMBER}
-    ═══════════════════════════════════════════════════════════
-    """
-
-    // Detect changesets
-    def changesetElohimApp = sh(
-        script: '''
-            git diff --name-only HEAD~1 2>/dev/null | \
-            grep -E "^(elohim-app/|elohim-library/|Jenkinsfile|VERSION)" || echo ""
-        ''',
-        returnStdout: true
-    ).trim()
-
-    def changesetHolochain = sh(
-        script: '''
-            git diff --name-only HEAD~1 2>/dev/null | \
-            grep -E "^holochain/" || echo ""
-        ''',
-        returnStdout: true
-    ).trim()
-
-    def changesetSteward = sh(
-        script: '''
-            git diff --name-only HEAD~1 2>/dev/null | \
-            grep -E "^(steward/|holochain/dna/|elohim-app/src/|VERSION)" || echo ""
-        ''',
-        returnStdout: true
-    ).trim()
-
-    // Build matrix
-    def buildMatrix = [
-        'elohim-app': !changesetElohimApp.isEmpty() ||
-            env.BRANCH_NAME == 'main' ||
-            env.BRANCH_NAME == 'staging' ||
-            env.BRANCH_NAME == 'dev',
-        'holochain': !changesetHolochain.isEmpty(),
-        'steward': !changesetSteward.isEmpty()
-    ]
-
-    echo """
-    📊 CHANGESET ANALYSIS
-    ─────────────────────────────────────────────────────────────
-    """
-
-    if (!changesetElohimApp.isEmpty()) {
-        echo "  elohim-app changes detected:"
-        changesetElohimApp.split('\n').each { echo "    - \$it" }
-    }
-
-    if (!changesetHolochain.isEmpty()) {
-        echo "  holochain changes detected:"
-        changesetHolochain.split('\n').each { echo "    - \$it" }
-    }
-
-    if (!changesetSteward.isEmpty()) {
-        echo "  steward changes detected:"
-        changesetSteward.split('\n').each { echo "    - \$it" }
-    }
-
-    echo """
-    🎯 BUILD MATRIX
-    ─────────────────────────────────────────────────────────────
-    ${buildMatrix.collect { k, v ->
-        "  ${v ? '✅ BUILD' : '⏭️  SKIP'} ${k}"
-    }.join('\n')}
-    ═══════════════════════════════════════════════════════════
-    """
-
-    currentBuild.description = buildMatrix.collect { k, v ->
-        "${v ? '✅' : '⏭️'} ${k}"
-    }.join(' | ')
-
-    echo """
-    📡 ORCHESTRATION PLAN
-    ─────────────────────────────────────────────────────────────
-    Webhook will trigger these pipelines based on changesets:
-    ${buildMatrix.collect { k, v ->
-        "  ${v ? '✅ WILL RUN' : '⏭️  SKIP'} ${k} pipeline"
-    }.join('\n')}
-
-    Each pipeline respects its own when{} conditions and
-    changeset filters. This orchestrator provides visibility
-    into what's expected to run and why.
-    ═══════════════════════════════════════════════════════════
-    """
-}
-
 def buildPerseusPlugin() {
     dir('elohim-library/projects/perseus-plugin') {
         sh 'npm ci && npm run build && ls -la dist/'
@@ -324,16 +230,6 @@ spec:
                         // Verify git state
                         sh 'git rev-parse --short HEAD'
                         sh 'git status'
-                    }
-                }
-            }
-        }
-
-        stage('🚀 Orchestrate Mono-Repo Builds') {
-            steps {
-                container('builder') {
-                    script {
-                        orchestrateMonoRepo()
                     }
                 }
             }
