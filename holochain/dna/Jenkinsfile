@@ -211,13 +211,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build WASM Cache Core') {
-            when {
-                anyOf {
-                    changeset "holochain/holochain-cache-core/**"
-                    changeset "holochain/dna/**"
-                    expression { return params.FORCE_BUILD == true }
-                }
-            }
+            // Orchestrator decides when to trigger - no changeset checks here
             steps {
                 container('builder') {
                     dir('holochain/dna/elohim') {
@@ -265,12 +259,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build DNA') {
-            when {
-                anyOf {
-                    changeset "holochain/dna/**"
-                    expression { return params.FORCE_BUILD == true }
-                }
-            }
+            // Orchestrator decides when to trigger - no changeset checks here
             steps {
                 container('builder') {
                     dir('holochain/dna/elohim') {

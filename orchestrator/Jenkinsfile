@@ -155,14 +155,17 @@ def orderByDependencies(pipelineList) {
 }
 
 def triggerPipeline(String name, String branch, boolean wait = true) {
-    echo "▶️ Triggering ${name}/${branch}..."
+    echo "▶️ Triggering ${name}/${branch} with FORCE_BUILD=true..."
 
     try {
         def result = build(
             job: "${name}/${branch}",
             wait: wait,
             propagate: false,
-            parameters: []
+            parameters: [
+                booleanParam(name: 'FORCE_BUILD', value: true),
+                booleanParam(name: 'FORCE_DEPLOY', value: true)
+            ]
         )
 
         if (result.result == 'SUCCESS') {

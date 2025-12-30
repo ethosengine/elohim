@@ -318,13 +318,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         // This pipeline now only builds infrastructure (container images)
 
         stage('Build Doorway') {
-            when {
-                anyOf {
-                    changeset "holochain/doorway/**"
-                    changeset "holochain/manifests/edgenode-*.yaml"
-                    expression { return params.FORCE_BUILD == true }
-                }
-            }
+            // Orchestrator decides when to trigger - no changeset checks here
             steps {
                 container('builder') {
                     script {
@@ -354,14 +348,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Edge Node Image') {
-            when {
-                anyOf {
-                    changeset "holochain/edgenode/**"
-                    changeset "holochain/doorway/**"
-                    changeset "holochain/manifests/**"
-                    expression { return params.FORCE_BUILD == true }
-                }
-            }
+            // Orchestrator decides when to trigger - no changeset checks here
             steps {
                 container('builder') {
                     script {
@@ -402,13 +389,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build hApp Installer') {
-            when {
-                anyOf {
-                    changeset "holochain/edgenode/**"
-                    changeset "holochain/manifests/**"
-                    expression { return params.FORCE_BUILD == true }
-                }
-            }
+            // Orchestrator decides when to trigger - no changeset checks here
             steps {
                 container('builder') {
                     script {
@@ -457,14 +438,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Push to Harbor') {
-            when {
-                anyOf {
-                    changeset "holochain/doorway/**"
-                    changeset "holochain/edgenode/**"
-                    changeset "holochain/manifests/**"
-                    expression { return params.FORCE_BUILD == true }
-                }
-            }
+            // Orchestrator decides when to trigger - no changeset checks here
             steps {
                 container('builder') {
                     script {
@@ -731,14 +705,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Cleanup') {
-            when {
-                anyOf {
-                    changeset "holochain/doorway/**"
-                    changeset "holochain/edgenode/**"
-                    changeset "holochain/manifests/**"
-                    expression { return params.FORCE_BUILD == true }
-                }
-            }
+            // Orchestrator decides when to trigger - no changeset checks here
             steps {
                 container('builder') {
                     script {
