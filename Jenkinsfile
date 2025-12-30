@@ -659,6 +659,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
                     not { branch 'main' }; not { branch 'staging' }
+                    changeset "elohim-ui-playground/**"
                 }
             }
             steps {
@@ -678,6 +679,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
                     not { branch 'main' }; not { branch 'staging' }
+                    changeset "elohim-ui-playground/**"
                 }
             }
             steps {
@@ -701,6 +703,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
                     not { branch 'main' }; not { branch 'staging' }
+                    changeset "elohim-ui-playground/**"
                 }
             }
             steps {
@@ -749,6 +752,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
                     not { branch 'main' }; not { branch 'staging' }
+                    changeset "elohim-ui-playground/**"
                 }
             }
             steps {
@@ -990,6 +994,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
                     expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
+                    changeset "elohim-ui-playground/**"
                 }
             }
             steps {
