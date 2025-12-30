@@ -17,19 +17,19 @@
 //! ## Quick Start
 //!
 //! ```rust,ignore
-//! use hc_rna::{bridge_call, MigrationReport, Transformer};
+//! use hc_rna::{bridge_call, MigrationReport, Transcriber};
 //!
 //! // 1. Export from source DNA via bridge call
-//! let data: Vec<OldEntry> = bridge_call("my-dna-v1", "coordinator", "export_all", ())?;
+//! let data: Vec<OldEntry> = bridge_call("my-dna-prev", "coordinator", "export_all", ())?;
 //!
-//! // 2. Transform to new schema
-//! let transformed: Vec<NewEntry> = data.into_iter()
-//!     .map(|e| MyTransformer.transform(e))
+//! // 2. Transcribe from previous to current schema
+//! let transcribed: Vec<NewEntry> = data.into_iter()
+//!     .map(|e| MyTranscriber.transcribe_from_prev(e))
 //!     .collect();
 //!
 //! // 3. Import into current DNA
-//! let mut report = MigrationReport::new("v1", "v2");
-//! for entry in transformed {
+//! let mut report = MigrationReport::new("prev", "current");
+//! for entry in transcribed {
 //!     match create_entry(&entry) {
 //!         Ok(_) => report.record_success("MyEntry"),
 //!         Err(e) => report.record_failure("MyEntry", None, e.to_string()),
@@ -94,12 +94,13 @@ pub use healing_orchestrator::{HealingOrchestrator, emit_healing_signal};
 
 // Re-export flexible architecture types
 pub use entry_type_provider::{
-    HealableEntry, Validator, Transformer, ReferenceResolver,
+    HealableEntry, Validator, Transcriber, ReferenceResolver,
     DegradationHandler, DegradationDecision, EntryTypeProvider, EntryTypeRegistry,
 };
 pub use healing_strategy::{
     HealingResult as HealingStrategyResult, HealingStrategy, HealingContext,
     BridgeFirstStrategy, SelfRepairFirstStrategy, LocalRepairOnlyStrategy, NoHealingStrategy,
+    TranscriptionProvider,
 };
 pub use flexible_orchestrator::{OrchestratorConfig as FlexibleOrchestratorConfig, FlexibleOrchestrator, HealingOutcome};
 

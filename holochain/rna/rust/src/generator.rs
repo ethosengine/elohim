@@ -28,8 +28,8 @@ impl ProviderGenerator {
         // Validators section
         writeln!(output, "\n{}", self.generate_validators_section()).unwrap();
 
-        // Transformers section
-        writeln!(output, "\n{}", self.generate_transformers_section()).unwrap();
+        // Transcribers section
+        writeln!(output, "\n{}", self.generate_transcribers_section()).unwrap();
 
         // Reference resolvers section
         writeln!(output, "\n{}", self.generate_resolvers_section()).unwrap();
@@ -53,7 +53,7 @@ impl ProviderGenerator {
 //! This file was auto-generated from DNA schema analysis.
 //! Review and customize the implementations as needed.
 //!
-//! Generated validators, transformers, resolvers, handlers, and providers
+//! Generated validators, transcribers, resolvers, handlers, and providers
 //! for all entry types in this DNA.
 "#
         )
@@ -61,7 +61,7 @@ impl ProviderGenerator {
 
     fn generate_imports(&self) -> String {
         r#"use hc_rna::{
-    Validator, Transformer, ReferenceResolver, DegradationHandler, DegradationDecision,
+    Validator, Transcriber, ReferenceResolver, DegradationHandler, DegradationDecision,
     EntryTypeProvider,
 };
 use serde_json::Value;"#.to_string()
@@ -163,23 +163,23 @@ impl Validator for {validator_name} {{
         )
     }
 
-    fn generate_transformers_section(&self) -> String {
+    fn generate_transcribers_section(&self) -> String {
         let mut output = String::from(
             "// ============================================================================\n\
-             // TRANSFORMERS - V1 to V2 Schema Transformation\n\
+             // TRANSCRIBERS - Schema Transcription Between DNA Versions\n\
              // ============================================================================\n"
         );
 
         for entry_type in self.analyzer.entry_types() {
             output.push_str("\n");
-            output.push_str(&self.generate_transformer(entry_type));
+            output.push_str(&self.generate_transcriber(entry_type));
         }
 
         output
     }
 
-    fn generate_transformer(&self, schema: &EntryTypeSchema) -> String {
-        let transformer_name = format!("{}Transformer", schema.name);
+    fn generate_transcriber(&self, schema: &EntryTypeSchema) -> String {
+        let transcriber_name = format!("{}Transcriber", schema.name);
 
         // Generate field extraction code
         let mut extractions = String::new();
@@ -187,25 +187,25 @@ impl Validator for {validator_name} {{
             let extract = match &field.field_type {
                 FieldType::String => {
                     format!(
-                        "let {} = v1_data[\"{}\"].as_str().unwrap_or(\"\");",
+                        "let {} = prev_data[\"{}\"].as_str().unwrap_or(\"\");",
                         field.name, field.name
                     )
                 }
                 FieldType::U32 | FieldType::U64 => {
                     format!(
-                        "let {} = v1_data[\"{}\"].as_u64().unwrap_or(0);",
+                        "let {} = prev_data[\"{}\"].as_u64().unwrap_or(0);",
                         field.name, field.name
                     )
                 }
                 FieldType::F64 => {
                     format!(
-                        "let {} = v1_data[\"{}\"].as_f64().unwrap_or(0.0);",
+                        "let {} = prev_data[\"{}\"].as_f64().unwrap_or(0.0);",
                         field.name, field.name
                     )
                 }
                 FieldType::Vec(inner) if matches!(**inner, FieldType::String) => {
                     format!(
-                        "let {}: Vec<String> = v1_data[\"{}\"].as_array()\n            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())\n            .unwrap_or_default();",
+                        "let {}: Vec<String> = prev_data[\"{}\"].as_array()\n            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())\n            .unwrap_or_default();",
                         field.name, field.name
                     )
                 }
@@ -232,27 +232,27 @@ impl Validator for {validator_name} {{
         .unwrap();
 
         format!(
-            r#"/// Transforms {struct_name} from v1 to v2 schema
-pub struct {transformer_name};
+            r#"/// Transcribes {struct_name} from previous DNA to current
+pub struct {transcriber_name};
 
-impl Transformer for {transformer_name} {{
-    fn transform_v1_to_v2(&self, v1_data: &Value) -> Result<Value, String> {{
-        // Extract v1 fields
+impl Transcriber for {transcriber_name} {{
+    fn transcribe_from_prev(&self, prev_data: &Value) -> Result<Value, String> {{
+        // Extract fields from previous DNA version
 {extractions}
 
-        // Build v2 entry with current schema
+        // Build current entry
         Ok(serde_json::json!({{
 {json_fields}
         }}))
     }}
 
     fn description(&self) -> &str {{
-        "Transform {struct_name} from v1 to v2 schema"
+        "Transcribe {struct_name} from previous DNA to current"
     }}
 }}
 "#,
             struct_name = schema.name,
-            transformer_name = transformer_name,
+            transcriber_name = transcriber_name,
             json_fields = json_fields
         )
     }
@@ -385,7 +385,7 @@ impl DegradationHandler for {handler_name} {{
         let struct_name = &schema.name;
         let provider_name = format!("{}Provider", schema.name);
         let validator_name = format!("{}Validator", schema.name);
-        let transformer_name = format!("{}Transformer", schema.name);
+        let transcriber_name = format!("{}Transcriber", schema.name);
         let resolver_name = format!("{}ReferenceResolver", schema.name);
         let handler_name = format!("{}DegradationHandler", schema.name);
         let entry_type_name = schema.to_entry_type_name();
@@ -403,8 +403,8 @@ impl EntryTypeProvider for {provider_name} {{
         &{validator_name}
     }}
 
-    fn transformer(&self) -> &dyn Transformer {{
-        &{transformer_name}
+    fn transcriber(&self) -> &dyn Transcriber {{
+        &{transcriber_name}
     }}
 
     fn reference_resolver(&self) -> &dyn ReferenceResolver {{
@@ -415,15 +415,15 @@ impl EntryTypeProvider for {provider_name} {{
         &{handler_name}
     }}
 
-    fn create_healing_instance(&self, _id: &str, v1_data: &Value) -> Result<Vec<u8>, String> {{
-        // Transform v1 to v2 JSON
-        let v2_json = self.transformer().transform_v1_to_v2(v1_data)?;
+    fn create_healing_instance(&self, _id: &str, prev_data: &Value) -> Result<Vec<u8>, String> {{
+        // Transcribe from previous DNA to current
+        let current_json = self.transcriber().transcribe_from_prev(prev_data)?;
 
-        // Validate the transformed entry
-        self.validator().validate_json(&v2_json)?;
+        // Validate the transcribed entry
+        self.validator().validate_json(&current_json)?;
 
         // Serialize to bytes
-        Ok(serde_json::to_vec(&v2_json)
+        Ok(serde_json::to_vec(&current_json)
             .map_err(|e| format!("Failed to serialize healed {{}}: {{}}", e))?)
     }}
 }}
@@ -439,7 +439,7 @@ impl EntryTypeProvider for {provider_name} {{
         for entry_type in self.analyzer.entry_types() {
             let provider_name = format!("{}Provider", entry_type.name);
             let validator_name = format!("{}Validator", entry_type.name);
-            let transformer_name = format!("{}Transformer", entry_type.name);
+            let transcriber_name = format!("{}Transcriber", entry_type.name);
 
             writeln!(
                 output,
@@ -460,9 +460,9 @@ impl EntryTypeProvider for {provider_name} {{
 
             writeln!(
                 output,
-                "    #[test]\n    fn test_{}_transformer() {{\n        let transformer = {};\n        let v1_data = serde_json::json!({{ }});\n        // TODO: Add v1 data fields\n        let result = transformer.transform_v1_to_v2(&v1_data);\n        // TODO: Assert transformation worked correctly\n    }}\n",
+                "    #[test]\n    fn test_{}_transcriber() {{\n        let transcriber = {};\n        let prev_data = serde_json::json!({{ }});\n        // TODO: Add prev data fields\n        let result = transcriber.transcribe_from_prev(&prev_data);\n        // TODO: Assert transcription worked correctly\n    }}\n",
                 entry_type.to_entry_type_name(),
-                transformer_name
+                transcriber_name
             )
             .unwrap();
         }
@@ -494,8 +494,9 @@ pub struct Content {
         let output = generator.generate_providers_file();
 
         assert!(output.contains("ContentValidator"));
-        assert!(output.contains("ContentTransformer"));
+        assert!(output.contains("ContentTranscriber"));
         assert!(output.contains("ContentProvider"));
         assert!(output.contains("impl Validator for ContentValidator"));
+        assert!(output.contains("impl Transcriber for ContentTranscriber"));
     }
 }

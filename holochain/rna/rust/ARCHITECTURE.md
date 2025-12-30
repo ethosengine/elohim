@@ -39,7 +39,7 @@ Defines what each entry type needs to support healing:
 pub trait EntryTypeProvider {
     fn entry_type(&self) -> &str;
     fn validator(&self) -> &dyn Validator;
-    fn transformer(&self) -> &dyn Transformer;
+    fn transcriber(&self) -> &dyn Transcriber;
     fn reference_resolver(&self) -> &dyn ReferenceResolver;
     fn degradation_handler(&self) -> &dyn DegradationHandler;
 }
@@ -47,7 +47,7 @@ pub trait EntryTypeProvider {
 
 **This is where you implement:**
 - Schema validation (required fields, enums, constraints)
-- V1→V2 transformation
+- Prev→Current transcription
 - Reference resolution (are linked entries available?)
 - Degradation policy (fail or mark as Degraded?)
 
@@ -61,16 +61,16 @@ pub trait HealingStrategy {
         &self,
         entry_type: &str,
         entry_id: &str,
-        v2_entry: Option<Vec<u8>>,
+        current_entry: Option<Vec<u8>>,
         context: &HealingContext,
     ) -> Result<Option<HealingResult<Vec<u8>>>, String>;
 }
 ```
 
 **Built-in strategies:**
-- `BridgeFirstStrategy` - Try v1 bridge, fall back to self-repair
-- `SelfRepairFirstStrategy` - Try local repair first, use v1 as fallback
-- `LocalRepairOnlyStrategy` - Never use v1 bridge
+- `BridgeFirstStrategy` - Try previous DNA bridge, fall back to self-repair
+- `SelfRepairFirstStrategy` - Try local repair first, use previous DNA as fallback
+- `LocalRepairOnlyStrategy` - Never use previous DNA bridge
 - `NoHealingStrategy` - Accept entries as-is
 
 **Extend it:**
@@ -90,17 +90,17 @@ pub struct FlexibleOrchestrator {
 }
 
 impl FlexibleOrchestrator {
-    pub fn heal_by_id(&self, entry_type: &str, id: &str, v2_entry: Option<Vec<u8>>)
+    pub fn heal_by_id(&self, entry_type: &str, id: &str, current_entry: Option<Vec<u8>>)
         -> Result<Option<HealingOutcome>, String>
     {
         // 1. Look up provider in registry
         let provider = self.registry.get(entry_type)?;
 
-        // 2. Create context with provider's validators/transformers
+        // 2. Create context with provider's validators/transcribers
         let context = create_context(provider);
 
         // 3. Use strategy to heal
-        self.config.healing_strategy.heal(entry_type, id, v2_entry, &context)?
+        self.config.healing_strategy.heal(entry_type, id, current_entry, &context)?
 
         // 4. Return outcome with metadata
     }
@@ -126,8 +126,8 @@ impl EntryTypeProvider for ContentProvider {
         &ContentValidator
     }
 
-    fn transformer(&self) -> &dyn Transformer {
-        &ContentTransformer
+    fn transcriber(&self) -> &dyn Transcriber {
+        &ContentTranscriber
     }
 
     // ... implement other traits
@@ -209,9 +209,9 @@ let config = FlexibleOrchestratorConfig {
 ### 3. **Isolated Concerns**
 
 - **Validators** - Only validate, don't heal
-- **Transformers** - Only transform, don't validate
-- **Strategies** - Only orchestrate, don't validate/transform
-- **Providers** - Plug validators/transformers together
+- **Transcribers** - Only transcribe between versions, don't validate
+- **Strategies** - Only orchestrate, don't validate/transcribe
+- **Providers** - Plug validators/transcribers together
 
 Change one, others unaffected.
 
@@ -278,11 +278,12 @@ Implement once per entry type. Examples:
 - Validate field constraints
 - Never: resolve references (that's ReferenceResolver's job)
 
-### Transformer
+### Transcriber
 
 ```rust
-pub trait Transformer: Send + Sync {
-    fn transform_v1_to_v2(&self, v1_data: &Value) -> Result<Value, String>;
+pub trait Transcriber: Send + Sync {
+    fn transcribe_from_prev(&self, prev_data: &Value) -> Result<Value, String>;
+    fn transcribe_to_prev(&self, self_data: &Value) -> Result<Value, String>; // optional
 }
 ```
 
@@ -329,10 +330,10 @@ fn test_content_provider() {
     // Test validator
     assert!(provider.validator().validate_json(&invalid_data).is_err());
 
-    // Test transformer
-    let v1 = serde_json::json!({ "old_field": "value" });
-    let v2 = provider.transformer().transform_v1_to_v2(&v1)?;
-    assert_eq!(v2["new_field"], "value");
+    // Test transcriber
+    let prev = serde_json::json!({ "old_field": "value" });
+    let current = provider.transcriber().transcribe_from_prev(&prev)?;
+    assert_eq!(current["new_field"], "value");
 
     // Test resolver
     assert!(provider.reference_resolver().resolve_reference("content", "id")?);

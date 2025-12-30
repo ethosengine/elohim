@@ -55,12 +55,24 @@ pub trait Validator: Send + Sync {
     }
 }
 
-/// Transforms entries from v1 schema to v2 schema
-pub trait Transformer: Send + Sync {
-    /// Transform v1 JSON data to v2 JSON data
-    fn transform_v1_to_v2(&self, v1_data: &Value) -> Result<Value, String>;
+/// Transcribes entries between DNA versions
+///
+/// Like biological RNA transcribing genetic information, this trait
+/// handles the translation of data between DNA versions in either direction.
+pub trait Transcriber: Send + Sync {
+    /// Transcribe data from previous DNA version into self (this DNA)
+    fn transcribe_from_prev(&self, prev_data: &Value) -> Result<Value, String>;
 
-    /// Description of what this transformer does (for logging/debugging)
+    /// Transcribe data from self (this DNA) back to previous DNA version
+    ///
+    /// Used for export, rollback, or compatibility with nodes
+    /// that haven't yet upgraded.
+    fn transcribe_to_prev(&self, _self_data: &Value) -> Result<Value, String> {
+        // Default: not supported (one-way migration)
+        Err("Transcription to previous DNA not implemented for this entry type".to_string())
+    }
+
+    /// Description of what this transcriber does (for logging/debugging)
     fn description(&self) -> &str;
 }
 
@@ -113,8 +125,8 @@ pub trait EntryTypeProvider: Send + Sync {
     /// Get the validator for this entry type
     fn validator(&self) -> &dyn Validator;
 
-    /// Get the transformer for this entry type
-    fn transformer(&self) -> &dyn Transformer;
+    /// Get the transcriber for this entry type
+    fn transcriber(&self) -> &dyn Transcriber;
 
     /// Get the reference resolver for this entry type
     fn reference_resolver(&self) -> &dyn ReferenceResolver;
@@ -194,14 +206,14 @@ mod tests {
         }
     }
 
-    struct MockTransformer;
-    impl Transformer for MockTransformer {
-        fn transform_v1_to_v2(&self, data: &Value) -> Result<Value, String> {
+    struct MockTranscriber;
+    impl Transcriber for MockTranscriber {
+        fn transcribe_from_prev(&self, data: &Value) -> Result<Value, String> {
             Ok(data.clone())
         }
 
         fn description(&self) -> &str {
-            "Mock transformer"
+            "Mock transcriber"
         }
     }
 
@@ -243,8 +255,8 @@ mod tests {
             &MockValidator
         }
 
-        fn transformer(&self) -> &dyn Transformer {
-            &MockTransformer
+        fn transcriber(&self) -> &dyn Transcriber {
+            &MockTranscriber
         }
 
         fn reference_resolver(&self) -> &dyn ReferenceResolver {

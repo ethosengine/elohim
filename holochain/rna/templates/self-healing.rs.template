@@ -7,7 +7,7 @@
 //!
 //! 1. Defines {{ENTRY_TYPE}} as a self-healing entry
 //! 2. Implements validation rules
-//! 3. Provides v1 fallback healing
+//! 3. Provides previous DNA fallback healing
 //! 4. Integrates with healing orchestrator
 //! 5. Emits healing signals for UI awareness
 //!
@@ -17,7 +17,7 @@
 //! 2. Replace all {{PLACEHOLDERS}} with your values
 //! 3. Add `mod self_healing;` to your zome's lib.rs
 //! 4. Implement the hooks in your read/write paths
-//! 5. Update your happ.yaml to include both v1 and v2 DNA roles
+//! 5. Update your happ.yaml to include both prev and current DNA roles
 
 use hdk::prelude::*;
 use hc_rna::{
@@ -143,12 +143,12 @@ impl SelfHealingEntry for {{ENTRY_TYPE}} {
 }
 
 // ============================================================================
-// EXPORT FOR V1 FALLBACK
+// EXPORT FOR PREVIOUS DNA FALLBACK
 // ============================================================================
 
-/// Export entry format compatible with v1 DNA
+/// Export entry format compatible with previous DNA
 #[derive(Serialize, Deserialize, Clone)]
-pub struct {{ENTRY_TYPE}}V1Export {
+pub struct {{ENTRY_TYPE}}PrevExport {
     pub id: String,
     pub {{field_name_1}}: {{FieldType1}},
     pub {{field_name_2}}: {{FieldType2}},
@@ -156,19 +156,19 @@ pub struct {{ENTRY_TYPE}}V1Export {
     {{#if HAS_REFERENCES}}pub related_ids: Vec<String>,{{/if}}
 }
 
-/// Transform v1 data to v2
+/// Transcribe data from previous DNA into current
 ///
-/// This is called when healing from v1 bridge.
+/// This is called when healing from the previous DNA bridge.
 /// Update the schema_version and adapt field names/types as needed.
-pub fn transform_v1_to_v2(v1: {{ENTRY_TYPE}}V1Export) -> {{ENTRY_TYPE}} {
+pub fn transcribe_from_prev(prev: {{ENTRY_TYPE}}PrevExport) -> {{ENTRY_TYPE}} {
     {{ENTRY_TYPE}} {
-        id: v1.id,
-        {{field_name_1}}: v1.{{field_name_1}},
-        {{field_name_2}}: v1.{{field_name_2}},
+        id: prev.id,
+        {{field_name_1}}: prev.{{field_name_1}},
+        {{field_name_2}}: prev.{{field_name_2}},
         schema_version: {{SCHEMA_VERSION}},
         validation_status: ValidationStatus::Migrated,
-        {{#if HAS_PARENT}}parent_id: v1.parent_id,{{/if}}
-        {{#if HAS_REFERENCES}}related_ids: v1.related_ids,{{/if}}
+        {{#if HAS_PARENT}}parent_id: prev.parent_id,{{/if}}
+        {{#if HAS_REFERENCES}}related_ids: prev.related_ids,{{/if}}
     }
 }
 
@@ -179,16 +179,16 @@ pub fn transform_v1_to_v2(v1: {{ENTRY_TYPE}}V1Export) -> {{ENTRY_TYPE}} {
 /// Get {{ENTRY_TYPE}} by ID with automatic healing
 ///
 /// This implements the healing pattern:
-/// 1. Try to get from v2 (current DNA)
-/// 2. If not found or invalid, try v1 via bridge
+/// 1. Try to get from current DNA
+/// 2. If not found or invalid, try previous DNA via bridge
 /// 3. Return healed entry or error
 pub fn get_{{entry_type_lowercase}}_with_healing(
     id: String,
 ) -> ExternResult<{{ENTRY_TYPE}}> {
-    // Try v2 first
+    // Try current DNA first
     match get_{{entry_type_lowercase}}_by_id(&id)? {
         Some(mut entry) => {
-            // Entry exists in v2, validate it
+            // Entry exists in current DNA, validate it
             match entry.validate() {
                 Ok(_) => return Ok(entry),
                 Err(_) => {
@@ -202,49 +202,49 @@ pub fn get_{{entry_type_lowercase}}_with_healing(
             }
         }
         None => {
-            // Not in v2, will try v1
+            // Not in current DNA, will try previous
         }
     }
 
-    // Entry not in v2 or failed validation, try v1 bridge
-    heal_{{entry_type_lowercase}}_from_v1(&id)
+    // Entry not in current DNA or failed validation, try previous DNA bridge
+    heal_{{entry_type_lowercase}}_from_prev(&id)
 }
 
-/// Attempt to heal {{ENTRY_TYPE}} from v1
-fn heal_{{entry_type_lowercase}}_from_v1(
+/// Attempt to heal {{ENTRY_TYPE}} from previous DNA
+fn heal_{{entry_type_lowercase}}_from_prev(
     id: &str,
 ) -> ExternResult<{{ENTRY_TYPE}}> {
     let orchestrator = HealingOrchestrator::new(
-        "{{DNA_V1_ROLE}}", // e.g., "lamad-v1"
-        "{{DNA_V2_ROLE}}", // e.g., "lamad-v2"
+        "{{DNA_PREV_ROLE}}", // e.g., "lamad-prev"
+        "{{DNA_CURRENT_ROLE}}", // e.g., "lamad"
     );
 
-    // Call v1 to get this entry
-    let v1_entry: {{ENTRY_TYPE}}V1Export = hc_rna::bridge_call(
-        orchestrator.v1_role_name(),
+    // Call previous DNA to get this entry
+    let prev_entry: {{ENTRY_TYPE}}PrevExport = hc_rna::bridge_call(
+        orchestrator.prev_role_name(),
         "{{ZOME_NAME}}",
         "export_{{entry_type_lowercase}}_by_id",
         serde_json::json!({ "id": id }),
     )
     .map_err(|_| {
         wasm_error!(WasmErrorInner::Guest(
-            format!("{{ENTRY_TYPE}} {} not found in v1", id)
+            format!("{{ENTRY_TYPE}} {} not found in previous DNA", id)
         ))
     })?;
 
-    // Transform to v2
-    let mut healed = transform_v1_to_v2(v1_entry);
+    // Transcribe to current
+    let mut healed = transcribe_from_prev(prev_entry);
 
     // Validate
     healed.validate()?;
 
-    // Store in v2 for next time (optional, depends on your design)
+    // Store in current DNA for next time (optional, depends on your design)
     // create_entry(&healed)?;
 
     emit_healing_signal(HealingSignal::HealingSucceeded {
         entry_id: id.to_string(),
         entry_type: "{{ENTRY_TYPE}}".to_string(),
-        was_migrated_from_v1: true,
+        was_migrated_from_prev: true,
     })?;
 
     Ok(healed)
@@ -281,25 +281,25 @@ pub fn create_{{entry_type_lowercase}}(
 /// Call this from your DNA's init() function
 pub fn init_healing() -> ExternResult<()> {
     let orchestrator = HealingOrchestrator::new(
-        "{{DNA_V1_ROLE}}",
-        "{{DNA_V2_ROLE}}",
+        "{{DNA_PREV_ROLE}}",
+        "{{DNA_CURRENT_ROLE}}",
     );
 
-    // Check if v1 has data
-    match orchestrator.check_v1_on_startup()? {
+    // Check if previous DNA has data
+    match orchestrator.check_prev_on_startup()? {
         Some(has_data) => {
             if has_data {
-                // V1 has data, healing will happen on first query
-                debug_log("Init: v1 DNA available with data, will heal on demand")?;
+                // Previous DNA has data, healing will happen on first query
+                debug_log("Init: previous DNA available with data, will heal on demand")?;
                 // Optionally set a flag to trigger background healing later
             } else {
-                // V1 exists but is empty
-                debug_log("Init: v1 DNA available but empty, fresh start")?;
+                // Previous DNA exists but is empty
+                debug_log("Init: previous DNA available but empty, fresh start")?;
             }
         }
         None => {
-            // No v1 bridge, this is a fresh DNA
-            debug_log("Init: no v1 bridge, fresh start")?;
+            // No previous DNA bridge, this is a fresh DNA
+            debug_log("Init: no previous DNA bridge, fresh start")?;
         }
     }
 
@@ -327,7 +327,7 @@ pub fn heal_all_{{entry_type_lowercase}}() -> ExternResult<u32> {
     // for record in records {
     //     if let Ok(entry) = record.entry().clone().into_sb_single::<{{ENTRY_TYPE}}>() {
     //         if entry.validation_status == ValidationStatus::Degraded {
-    //             match heal_{{entry_type_lowercase}}_from_v1(&entry.id) {
+    //             match heal_{{entry_type_lowercase}}_from_prev(&entry.id) {
     //                 Ok(_) => healed_count += 1,
     //                 Err(_) => {}
     //             }
@@ -391,8 +391,8 @@ mod tests {
     }
 
     #[test]
-    fn test_v1_transformation() {
-        let v1 = {{ENTRY_TYPE}}V1Export {
+    fn test_transcribe_from_prev() {
+        let prev = {{ENTRY_TYPE}}PrevExport {
             id: "test".to_string(),
             {{field_name_1}}: "value".to_string(),
             {{field_name_2}}: "another".to_string(),
@@ -400,9 +400,9 @@ mod tests {
             {{#if HAS_REFERENCES}}related_ids: vec![],{{/if}}
         };
 
-        let v2 = transform_v1_to_v2(v1);
-        assert_eq!(v2.schema_version, {{SCHEMA_VERSION}});
-        assert_eq!(v2.validation_status, ValidationStatus::Migrated);
+        let current = transcribe_from_prev(prev);
+        assert_eq!(current.schema_version, {{SCHEMA_VERSION}});
+        assert_eq!(current.validation_status, ValidationStatus::Migrated);
     }
 
     #[test]

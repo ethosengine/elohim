@@ -370,7 +370,7 @@ User → Browser → Node
                    │      └─ import ◄─────┘
                    │
                    └─► Migration happens server-side
-                       User never notices
+                       User never noticesy
 ```
 
 ### For Independent Users (CLI)

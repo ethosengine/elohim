@@ -175,8 +175,9 @@ impl<T: SelfHealingEntry> HealedEntry<T> {
 
     /// Mark this entry as healed
     pub fn mark_healed(&mut self) {
-        let now = sys_time().ok().map(|t| t.as_millis() as u64);
-        self.healed_at = now;
+        // Use sys_time() in Holochain context, fall back to 0 in tests
+        let now = sys_time().ok().map(|t| t.as_millis() as u64).unwrap_or(0);
+        self.healed_at = Some(now);
         self.final_status = self.entry.validation_status();
     }
 

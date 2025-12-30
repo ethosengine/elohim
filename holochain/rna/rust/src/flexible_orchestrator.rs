@@ -10,15 +10,15 @@
 
 use std::sync::Arc;
 use crate::entry_type_provider::EntryTypeRegistry;
-use crate::healing_strategy::{HealingStrategy, HealingContext, ValidationProvider, TransformationProvider, ReferenceResolutionProvider};
+use crate::healing_strategy::{HealingStrategy, HealingContext, ValidationProvider, TranscriptionProvider, ReferenceResolutionProvider};
 
 /// Configuration for the healing orchestrator
 pub struct OrchestratorConfig {
-    /// V1 DNA role name (if different from default "lamad-v1")
-    pub v1_role_name: Option<String>,
+    /// Previous DNA role name (for backward traversal)
+    pub prev_role_name: Option<String>,
 
-    /// V2 DNA role name (if different from default "lamad-v2")
-    pub v2_role_name: Option<String>,
+    /// Current DNA role name
+    pub current_role_name: Option<String>,
 
     /// Healing strategy to use
     pub healing_strategy: Arc<dyn HealingStrategy>,
@@ -36,8 +36,8 @@ pub struct OrchestratorConfig {
 impl Default for OrchestratorConfig {
     fn default() -> Self {
         Self {
-            v1_role_name: Some("lamad-v1".to_string()),
-            v2_role_name: Some("lamad-v2".to_string()),
+            prev_role_name: Some("lamad-prev".to_string()),
+            current_role_name: Some("lamad".to_string()),
             healing_strategy: Arc::new(crate::healing_strategy::BridgeFirstStrategy),
             allow_degradation: true,
             max_attempts: 3,
@@ -57,14 +57,14 @@ impl<'a> ValidationProvider for ProviderValidationAdapter<'a> {
     }
 }
 
-/// Adapter that implements TransformationProvider using provider traits
-struct ProviderTransformationAdapter<'a> {
-    transformer: &'a dyn crate::entry_type_provider::Transformer,
+/// Adapter that implements TranscriptionProvider using provider traits
+struct ProviderTranscriptionAdapter<'a> {
+    transcriber: &'a dyn crate::entry_type_provider::Transcriber,
 }
 
-impl<'a> TransformationProvider for ProviderTransformationAdapter<'a> {
-    fn transform_v1_to_v2(&self, _entry_type: &str, data: &serde_json::Value) -> Result<serde_json::Value, String> {
-        self.transformer.transform_v1_to_v2(data)
+impl<'a> TranscriptionProvider for ProviderTranscriptionAdapter<'a> {
+    fn transcribe_from_prev(&self, _entry_type: &str, data: &serde_json::Value) -> Result<serde_json::Value, String> {
+        self.transcriber.transcribe_from_prev(data)
     }
 }
 
@@ -96,13 +96,13 @@ impl FlexibleOrchestrator {
         Self { config, registry }
     }
 
-    /// Check if v1 DNA is available on startup
+    /// Check if previous DNA is available on startup
     ///
-    /// Returns Ok(Some(true)) if v1 is available with data
-    /// Returns Ok(Some(false)) if v1 is available but empty
-    /// Returns Ok(None) if v1 is not available
-    pub fn check_v1_availability(&self) -> Result<Option<bool>, String> {
-        // In a real implementation, this would try to call v1's is_data_present() function
+    /// Returns Ok(Some(true)) if prev is available with data
+    /// Returns Ok(Some(false)) if prev is available but empty
+    /// Returns Ok(None) if prev is not available
+    pub fn check_prev_availability(&self) -> Result<Option<bool>, String> {
+        // In a real implementation, this would try to call prev's is_data_present() function
         // For now, this is a placeholder
         Ok(None)
     }
@@ -114,7 +114,7 @@ impl FlexibleOrchestrator {
         &self,
         entry_type: &str,
         entry_id: &str,
-        v2_entry: Option<Vec<u8>>,
+        current_entry: Option<Vec<u8>>,
     ) -> Result<Option<HealingOutcome>, String> {
         // 1. Check if we have a provider for this entry type
         let provider = self
@@ -124,18 +124,18 @@ impl FlexibleOrchestrator {
 
         // 2. Create healing context with provider's tools
         let validator = provider.validator();
-        let transformer = provider.transformer();
+        let transcriber = provider.transcriber();
         let resolver = provider.reference_resolver();
 
         let validation_adapter = ProviderValidationAdapter { validator };
-        let transformation_adapter = ProviderTransformationAdapter { transformer };
+        let transcription_adapter = ProviderTranscriptionAdapter { transcriber };
         let reference_adapter = ProviderReferenceAdapter { resolver };
 
         let context = HealingContext {
             validator: &validation_adapter,
-            transformer: &transformation_adapter,
+            transcriber: &transcription_adapter,
             reference_resolver: &reference_adapter,
-            v1_bridge_caller: None, // Would be populated from v1 bridge if available
+            prev_bridge_caller: None, // Would be populated from prev DNA bridge if available
             max_attempts: self.config.max_attempts,
             allow_degradation: self.config.allow_degradation,
         };
@@ -144,7 +144,7 @@ impl FlexibleOrchestrator {
         let healing_result = self
             .config
             .healing_strategy
-            .heal(entry_type, entry_id, v2_entry, &context)?;
+            .heal(entry_type, entry_id, current_entry, &context)?;
 
         // 4. Convert strategy result to outcome
         let outcome = healing_result.map(|result| HealingOutcome {
