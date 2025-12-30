@@ -276,7 +276,7 @@ The steward pipeline uses a **three-tier fallback** to fetch the hApp:
 
 **URL Pattern:**
 ```
-https://jenkins.ethosengine.com/job/elohim-dna/job/{BRANCH}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ
+https://jenkins.ethosengine.com/job/elohim-holochain/job/{BRANCH}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ
 ```
 
 ### Build Time Impact
@@ -351,7 +351,7 @@ The build description shows a quick summary:
 
 **Q: Steward building hApp locally instead of fetching?**
 - This is expected if the holochain pipeline hasn't run yet
-- Check Jenkins artifact URL: `https://jenkins.ethosengine.com/job/elohim-dna/job/{BRANCH}/lastSuccessfulBuild/artifact/...`
+- Check Jenkins artifact URL: `https://jenkins.ethosengine.com/job/elohim-holochain/job/{BRANCH}/lastSuccessfulBuild/artifact/...`
 - Holochain pipeline might have failed; check its logs
 
 **Q: Why is my build much slower than expected?**

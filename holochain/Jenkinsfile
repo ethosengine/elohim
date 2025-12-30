@@ -2,7 +2,7 @@
  * Holochain Infrastructure Pipeline
  *
  * Builds container images and deploys Edge Node to dev/prod environments.
- * NOTE: DNA/hApp is built by holochain/dna/Jenkinsfile (elohim-dna pipeline).
+ * NOTE: DNA/hApp is built by holochain/dna/Jenkinsfile (elohim-holochain pipeline).
  *
  * What this pipeline builds:
  *   - elohim-doorway (HTTP gateway)
@@ -17,11 +17,11 @@
  *   - holochain/doorway/** - Doorway gateway changes
  *   - holochain/edgenode/** - Conductor config changes
  *   - holochain/manifests/** - K8s deployment changes
- *   - NOT holochain/dna/** (handled by elohim-dna pipeline)
- *   - NOT holochain/holochain-cache-core/** (handled by elohim-dna pipeline)
+ *   - NOT holochain/dna/** (handled by elohim-holochain pipeline)
+ *   - NOT holochain/holochain-cache-core/** (handled by elohim-holochain pipeline)
  *
  * Artifact dependency:
- *   - Fetches elohim.happ from elohim-dna pipeline artifacts
+ *   - Fetches elohim.happ from elohim-holochain pipeline artifacts
  *   - Fallback: current branch → dev → main
  *
  * @see holochain/dna/Jenkinsfile for DNA builds
@@ -62,43 +62,43 @@ def withBuildVars(props, Closure body) {
 }
 
 /**
- * Fetch hApp artifact from elohim-dna pipeline with fallback to dev/main branches
+ * Fetch hApp artifact from elohim-holochain pipeline with fallback to dev/main branches
  * Returns true if hApp was successfully fetched, false otherwise
  */
 def fetchHappArtifact(String destPath) {
-    // Try 1: Current branch from elohim-dna pipeline
-    def branchUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
-    echo "Attempting to fetch hApp from elohim-dna/${env.BRANCH_NAME}..."
+    // Try 1: Current branch from elohim-holochain pipeline
+    def branchUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
+    echo "Attempting to fetch hApp from elohim-holochain/${env.BRANCH_NAME}..."
 
     def result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${branchUrl}' 2>&1", returnStatus: true)
     if (result == 0 && fileExists(destPath)) {
-        echo "hApp fetched from elohim-dna/${env.BRANCH_NAME} artifacts"
+        echo "hApp fetched from elohim-holochain/${env.BRANCH_NAME} artifacts"
         return true
     }
 
     // Try 2: Dev branch (fallback)
     if (env.BRANCH_NAME != 'dev') {
-        echo "Branch artifact not found, trying elohim-dna/dev..."
-        def devUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/dev/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
+        echo "Branch artifact not found, trying elohim-holochain/dev..."
+        def devUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
         result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${devUrl}' 2>&1", returnStatus: true)
         if (result == 0 && fileExists(destPath)) {
-            echo "hApp fetched from elohim-dna/dev artifacts (fallback)"
+            echo "hApp fetched from elohim-holochain/dev artifacts (fallback)"
             return true
         }
     }
 
     // Try 3: Main branch (last resort)
     if (env.BRANCH_NAME != 'main') {
-        echo "Dev artifact not found, trying elohim-dna/main..."
-        def mainUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/main/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
+        echo "Dev artifact not found, trying elohim-holochain/main..."
+        def mainUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
         result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${mainUrl}' 2>&1", returnStatus: true)
         if (result == 0 && fileExists(destPath)) {
-            echo "hApp fetched from elohim-dna/main artifacts (fallback)"
+            echo "hApp fetched from elohim-holochain/main artifacts (fallback)"
             return true
         }
     }
 
-    echo "Could not fetch hApp from elohim-dna pipeline (any branch)"
+    echo "Could not fetch hApp from elohim-holochain pipeline (any branch)"
     return false
 }
 
@@ -335,8 +335,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             echo "Building Edge Node image: ${IMAGE_TAG}"
 
-                            // Fetch hApp from elohim-dna pipeline (DNA is built separately)
-                            echo "Fetching hApp from elohim-dna pipeline..."
+                            // Fetch hApp from elohim-holochain pipeline (DNA is built separately)
+                            echo "Fetching hApp from elohim-holochain pipeline..."
                             def haveHapp = fetchHappArtifact('holochain/edgenode/elohim.happ')
 
                             if (haveHapp) {
@@ -382,8 +382,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             echo "Building hApp Installer image: ${IMAGE_TAG}"
 
-                            // Fetch hApp from elohim-dna pipeline (DNA is built separately)
-                            echo "Fetching hApp from elohim-dna pipeline..."
+                            // Fetch hApp from elohim-holochain pipeline (DNA is built separately)
+                            echo "Fetching hApp from elohim-holochain pipeline..."
                             def haveHapp = fetchHappArtifact('holochain/edgenode/scripts/elohim.happ')
 
                             if (haveHapp) {
@@ -408,10 +408,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 ═══════════════════════════════════════════════════════════
                                 CANNOT BUILD HAPP INSTALLER: No hApp artifact available
                                 ═══════════════════════════════════════════════════════════
-                                Could not fetch hApp from elohim-dna pipeline.
+                                Could not fetch hApp from elohim-holochain pipeline.
 
-                                Ensure elohim-dna pipeline has run successfully first.
-                                Check: https://jenkins.ethosengine.com/job/elohim-dna/
+                                Ensure elohim-holochain pipeline has run successfully first.
+                                Check: https://jenkins.ethosengine.com/job/elohim-holochain/
                                 ═══════════════════════════════════════════════════════════
                                 """
                             }

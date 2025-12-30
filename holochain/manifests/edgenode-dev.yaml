@@ -86,12 +86,12 @@ spec:
             - -c
             - |
               set -e
-              echo "Fetching hApp from elohim-dna pipeline..."
+              echo "Fetching hApp from elohim-holochain pipeline..."
 
               # Try branch-specific build first, then dev, then main
               HAPP_URLS="
-                https://jenkins.ethosengine.com/job/elohim-dna/job/dev/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ
-                https://jenkins.ethosengine.com/job/elohim-dna/job/main/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ
+                https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ
+                https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ
               "
 
               for url in $HAPP_URLS; do

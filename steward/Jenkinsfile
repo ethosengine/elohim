@@ -174,7 +174,7 @@ spec:
                             // 2. Fall back to local build (slow, ~20-40 min)
                             // 3. Error if neither works
 
-                            def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
+                            def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
 
                             // Ensure workdir exists
                             sh 'mkdir -p workdir'

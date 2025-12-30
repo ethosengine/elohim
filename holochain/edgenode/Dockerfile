@@ -13,7 +13,7 @@ FROM ghcr.io/holo-host/edgenode:v0.0.8-alpha31-hc0.6.0-go-pion-custom
 COPY conductor-config.yaml /etc/holochain/conductor-config.yaml
 
 # hApp will be mounted at /opt/holochain via Kubernetes volume
-# (fetched by init container from elohim-dna pipeline artifacts)
+# (fetched by init container from elohim-holochain pipeline artifacts)
 
 # Expose WebSocket ports
 EXPOSE 4444 4445

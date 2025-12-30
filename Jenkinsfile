@@ -427,7 +427,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         def wasmDir = 'holochain/holochain-cache-core/pkg'
 
                         // First, try current branch
-                        def branchUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
+                        def branchUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
                         def fetchedFromBranch = sh(
                             script: """
                                 mkdir -p '${wasmDir}'
@@ -442,7 +442,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                         if (!fetchedFromBranch) {
                             echo "WASM not found for branch ${env.BRANCH_NAME}, trying dev..."
-                            def devUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/dev/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
+                            def devUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
                             def fetchedFromDev = sh(
                                 script: """
                                     mkdir -p '${wasmDir}'
@@ -457,7 +457,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             if (!fetchedFromDev) {
                                 echo "WASM not found in dev, trying main..."
-                                def mainUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/main/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
+                                def mainUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
                                 def fetchedFromMain = sh(
                                     script: """
                                         mkdir -p '${wasmDir}'

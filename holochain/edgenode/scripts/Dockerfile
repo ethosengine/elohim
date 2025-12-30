@@ -19,7 +19,7 @@ RUN npm install --production
 COPY install-happ.cjs ./
 
 # hApp will be mounted at /opt/holochain via Kubernetes volume
-# (fetched by init container from elohim-dna pipeline artifacts)
+# (fetched by init container from elohim-holochain pipeline artifacts)
 RUN mkdir -p /opt/holochain
 
 # Run installer, then sleep to keep container alive
