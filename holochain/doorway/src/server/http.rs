@@ -507,6 +507,17 @@ async fn handle_request(
             }
         }
 
+        // Admin seed routes for bulk upload
+        // PUT /admin/seed/blob - Upload blob to projection cache
+        (Method::PUT, "/admin/seed/blob") => {
+            to_boxed(routes::handle_seed_blob(req, Arc::clone(&state)).await)
+        }
+        // HEAD /admin/seed/blob/{hash} - Check if blob exists
+        (Method::HEAD, p) if p.starts_with("/admin/seed/blob/") => {
+            let hash = p.strip_prefix("/admin/seed/blob/").unwrap_or("");
+            to_boxed(routes::handle_check_blob(hash, Arc::clone(&state)).await)
+        }
+
         // Bootstrap service routes (X-Op header protocol)
         // POST /bootstrap with X-Op header, or legacy path-based routing
         (Method::POST, p) if p == "/bootstrap" || p.starts_with("/bootstrap/") => {

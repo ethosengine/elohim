@@ -140,7 +140,12 @@ pub fn match_import_route(
 
 /// Handle import route request
 ///
-/// Dispatches to queue_fn or status_fn based on HTTP method and path
+/// Doorway acts as a relay:
+/// - POST /{base_route}/{batch_type} → queue_import on zome
+/// - GET /{base_route}/{batch_type}/{batch_id} → get_import_status on zome
+///
+/// Chunk processing happens in elohim-storage, which listens for
+/// ImportBatchQueued signals and calls process_import_chunk.
 pub async fn handle_import_request(
     req: Request<Incoming>,
     import_store: Arc<ImportConfigStore>,
@@ -170,7 +175,10 @@ pub async fn handle_import_request(
     }
 }
 
-/// Handle POST - queue new import
+/// Handle POST - queue new import (relay to zome)
+///
+/// Doorway just relays the queue_import call to the zome.
+/// elohim-storage listens for ImportBatchQueued signal and processes chunks.
 async fn handle_queue_import(
     req: Request<Incoming>,
     import_store: Arc<ImportConfigStore>,
@@ -219,7 +227,7 @@ async fn handle_queue_import(
         blob_hash = %import_req.blob_hash,
         total_items = import_req.total_items,
         queue_fn = batch_config.queue_fn,
-        "Processing import queue request"
+        "Relaying import queue request to zome"
     );
 
     // Generate batch ID if not provided
@@ -228,7 +236,6 @@ async fn handle_queue_import(
     });
 
     // Build zome call for queue_fn
-    // Note: items_json comes from elohim-storage via blob_hash, not from this request
     // The zome expects "id" (not "batch_id") to match QueueImportInput struct
     let payload = serde_json::json!({
         "id": batch_id,
@@ -249,7 +256,7 @@ async fn handle_queue_import(
         }
     };
 
-    // Send to conductor
+    // Relay to conductor
     match worker_pool.request(call_payload).await {
         Ok(response) => {
             // Parse response
@@ -258,7 +265,7 @@ async fn handle_queue_import(
                     info!(
                         batch_id = %result.batch_id,
                         queued_count = result.queued_count,
-                        "Import queued successfully"
+                        "Import queued - elohim-storage will process chunks"
                     );
                     import_json_response(StatusCode::ACCEPTED, &result)
                 }

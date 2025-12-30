@@ -35,6 +35,7 @@ pub mod signals;
 pub mod error;
 pub mod sharding;
 pub mod http;
+pub mod import_handler;
 
 pub use blob_store::BlobStore;
 pub use metadata::MetadataDb;
@@ -42,3 +43,4 @@ pub use config::Config;
 pub use error::StorageError;
 pub use sharding::{ShardEncoder, ShardManifest, ShardConfig};
 pub use http::HttpServer;
+pub use import_handler::{ImportHandler, ImportHandlerConfig, ImportProgress};

@@ -50,6 +50,17 @@ impl BlobStore {
         Ok(Self { root_dir })
     }
 
+    /// Create an in-memory blob store (for tests)
+    ///
+    /// Uses a temporary directory that will be cleaned up when dropped.
+    /// Note: This creates a real temp directory, not truly in-memory,
+    /// but is suitable for unit tests.
+    pub fn new_memory() -> Self {
+        let temp_dir = std::env::temp_dir().join(format!("elohim-blobs-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&temp_dir).ok();
+        Self { root_dir: temp_dir }
+    }
+
     /// Compute SHA256 hash of data
     pub fn compute_hash(data: &[u8]) -> String {
         let mut hasher = Sha256::new();

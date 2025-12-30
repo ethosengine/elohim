@@ -116,6 +116,12 @@ pub struct Args {
     #[arg(long, env = "DOORWAY_URL")]
     pub doorway_url: Option<String>,
 
+    /// URL of elohim-storage for blob storage
+    /// (e.g., "http://localhost:8091")
+    /// Doorway forwards blobs here for authoritative storage
+    #[arg(long, env = "STORAGE_URL")]
+    pub storage_url: Option<String>,
+
     /// Holochain installed app ID for projections and signal subscriptions
     #[arg(long, env = "INSTALLED_APP_ID", default_value = "elohim")]
     pub installed_app_id: String,

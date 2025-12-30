@@ -1,11 +1,11 @@
 //! Elohim Storage Daemon
 //!
-//! Runs alongside Holochain conductor to provide blob storage.
+//! Runs alongside Holochain conductor to provide blob storage and import processing.
 //!
 //! ## Usage
 //!
 //! ```bash
-//! # Start with defaults (HTTP server only)
+//! # Start with defaults (HTTP server + import handler)
 //! elohim-storage
 //!
 //! # Start with custom config
@@ -16,6 +16,9 @@
 //!
 //! # Start with custom storage directory
 //! elohim-storage --storage-dir /data/blobs
+//!
+//! # Connect to specific conductor
+//! elohim-storage --admin-url ws://localhost:4444 --app-id elohim
 //! ```
 //!
 //! ## HTTP API
@@ -27,13 +30,21 @@
 //! - `PUT /blob/{hash}` - Store blob (auto-creates manifest)
 //! - `GET /blob/{hash}` - Reassemble blob from shards
 //! - `GET /manifest/{hash}` - Get shard manifest
+//!
+//! ## Import Processing
+//!
+//! Listens for ImportBatchQueued signals and processes batches by:
+//! 1. Reading blob from local storage
+//! 2. Parsing items JSON
+//! 3. Sending chunks to zome via process_import_chunk
 
 use clap::Parser;
-use elohim_storage::{BlobStore, Config, HttpServer};
+use elohim_storage::{BlobStore, Config, HttpServer, ImportHandler, ImportHandlerConfig};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{error, info};
+use tokio::sync::broadcast;
+use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
@@ -51,6 +62,22 @@ struct Args {
     /// HTTP API port for shard storage
     #[arg(long)]
     http_port: Option<u16>,
+
+    /// Holochain conductor admin WebSocket URL
+    #[arg(long, env = "HOLOCHAIN_ADMIN_URL")]
+    admin_url: Option<String>,
+
+    /// Installed Holochain app ID
+    #[arg(long, env = "HOLOCHAIN_APP_ID", default_value = "elohim")]
+    app_id: String,
+
+    /// Zome name for import calls
+    #[arg(long, default_value = "content_store")]
+    zome_name: String,
+
+    /// Disable import handler (HTTP only mode)
+    #[arg(long)]
+    no_import: bool,
 }
 
 #[tokio::main]
@@ -111,6 +138,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("  PUT  /blob/{{hash}}      - Store blob (auto-sharding)");
     info!("  GET  /blob/{{hash}}      - Reassemble blob from shards");
     info!("  GET  /manifest/{{hash}}  - Get shard manifest");
+
+    // Start import handler if enabled
+    let import_handle = if !args.no_import {
+        if let Some(admin_url) = args.admin_url {
+            let import_config = ImportHandlerConfig {
+                admin_url,
+                installed_app_id: args.app_id.clone(),
+                zome_name: args.zome_name.clone(),
+                ..ImportHandlerConfig::default()
+            };
+
+            let mut import_handler = ImportHandler::new(import_config, blob_store.clone());
+
+            // Create shutdown channel
+            let (shutdown_tx, shutdown_rx) = broadcast::channel::<()>(1);
+            import_handler.set_shutdown(shutdown_rx);
+
+            info!("Import handler enabled");
+            info!("  App ID: {}", args.app_id);
+            info!("  Zome: {}", args.zome_name);
+
+            let handle = tokio::spawn(async move {
+                if let Err(e) = import_handler.run().await {
+                    error!(error = %e, "Import handler failed");
+                }
+            });
+
+            Some((handle, shutdown_tx))
+        } else {
+            warn!("Import handler disabled: no --admin-url or HOLOCHAIN_ADMIN_URL set");
+            info!("  To enable import processing, set HOLOCHAIN_ADMIN_URL or use --admin-url");
+            None
+        }
+    } else {
+        info!("Import handler disabled via --no-import");
+        None
+    };
+
     info!("Press Ctrl+C to stop.");
 
     // Handle shutdown signal
@@ -127,6 +192,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             }
         }
         _ = shutdown => {}
+    }
+
+    // Signal import handler to stop
+    if let Some((handle, shutdown_tx)) = import_handle {
+        let _ = shutdown_tx.send(());
+        let _ = handle.await;
     }
 
     // Print stats before exit
