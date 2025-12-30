@@ -79,6 +79,45 @@ spec:
     spec:
       nodeSelector:
         node-type: operations
+      # Init container fetches hApp from DNA pipeline artifacts
+      initContainers:
+        - name: happ-fetcher
+          image: curlimages/curl:latest
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "Fetching hApp from elohim-dna pipeline..."
+
+              # Production: try main branch first, then dev as fallback
+              HAPP_URLS="
+                https://jenkins.ethosengine.com/job/elohim-dna/job/main/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ
+                https://jenkins.ethosengine.com/job/elohim-dna/job/dev/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ
+              "
+
+              for url in $HAPP_URLS; do
+                echo "Trying: $url"
+                if curl -sfL -o /happ/elohim.happ "$url"; then
+                  echo "✅ hApp downloaded successfully"
+                  ls -lh /happ/elohim.happ
+                  exit 0
+                fi
+                echo "Failed, trying next..."
+              done
+
+              echo "❌ Could not download hApp from any source"
+              exit 1
+          volumeMounts:
+            - name: happ-volume
+              mountPath: /happ
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
       containers:
         # Main Holochain conductor
         - name: edgenode
@@ -195,6 +234,7 @@ spec:
             periodSeconds: 30
         # hApp Installer - installs the hApp on conductor startup
         # Production uses versioned tags for stability
+        # hApp is fetched by init container, not baked into image
         - name: happ-installer
           image: harbor.ethosengine.com/ethosengine/elohim-happ-installer:BUILD_NUMBER_PLACEHOLDER
           imagePullPolicy: IfNotPresent
@@ -207,6 +247,11 @@ spec:
               value: "60"
             - name: RETRY_DELAY_MS
               value: "2000"
+            - name: HAPP_PATH
+              value: "/opt/holochain/elohim.happ"
+          volumeMounts:
+            - name: happ-volume
+              mountPath: /opt/holochain
           resources:
             requests:
               memory: "64Mi"
@@ -215,6 +260,9 @@ spec:
               memory: "256Mi"
               cpu: "200m"
       volumes:
+        # Shared volume for hApp (fetched by init container)
+        - name: happ-volume
+          emptyDir: {}
         - name: holochain-data
           emptyDir:
             sizeLimit: 10Gi

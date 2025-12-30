@@ -1,5 +1,9 @@
 # hApp Installer Container
 # Installs the hApp on conductor startup as a sidecar
+#
+# NOTE: hApp is NOT baked into this image. It is fetched at runtime
+# by an init container and mounted via a shared volume at /opt/holochain.
+# See: holochain/manifests/edgenode-*.yaml
 
 # Use slim instead of alpine for better ESM module compatibility
 # (libsodium-wrappers has ESM resolution issues on Alpine)
@@ -14,10 +18,9 @@ RUN npm install --production
 # Copy installer script
 COPY install-happ.cjs ./
 
-# Copy hApp bundle (passed in during build via --build-arg or COPY)
-# Default location matches script's default HAPP_PATH
+# hApp will be mounted at /opt/holochain via Kubernetes volume
+# (fetched by init container from elohim-dna pipeline artifacts)
 RUN mkdir -p /opt/holochain
-COPY elohim.happ /opt/holochain/elohim.happ
 
 # Run installer, then sleep to keep container alive
 # (Kubernetes restarts containers that exit)

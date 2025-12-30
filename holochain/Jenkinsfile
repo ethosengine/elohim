@@ -1,29 +1,30 @@
 /**
  * Holochain Infrastructure Pipeline
  *
- * Builds DNA/hApp and deploys Edge Node to dev/prod environments.
+ * Builds container images and deploys Edge Node to dev/prod environments.
+ * NOTE: DNA/hApp is built by holochain/dna/Jenkinsfile (elohim-dna pipeline).
+ *
+ * What this pipeline builds:
+ *   - elohim-doorway (HTTP gateway)
+ *   - elohim-edgenode (Holochain conductor)
+ *   - elohim-happ-installer (bootstrap sidecar)
  *
  * Environment Architecture:
  *   - dev: doorway-dev.elohim.host (serves alpha + staging apps)
  *   - prod: doorway.elohim.host (serves production app only)
  *
- * IMPORTANT: This pipeline triggers from the same webhook as elohim and elohim-steward.
- * To avoid wasteful builds, stages are gated appropriately:
+ * Triggers:
+ *   - holochain/doorway/** - Doorway gateway changes
+ *   - holochain/edgenode/** - Conductor config changes
+ *   - holochain/manifests/** - K8s deployment changes
+ *   - NOT holochain/dna/** (handled by elohim-dna pipeline)
+ *   - NOT holochain/holochain-cache-core/** (handled by elohim-dna pipeline)
  *
- *   BUILD stages (DNA, Edge Node, hApp Installer, Push):
- *     - Only run when holochain/** files change OR FORCE_BUILD=true
- *     - This prevents rebuilding on every app-only commit
+ * Artifact dependency:
+ *   - Fetches elohim.happ from elohim-dna pipeline artifacts
+ *   - Fallback: current branch → dev → main
  *
- *   DEPLOY stages:
- *     - Run on dev/main branches to auto-heal unhealthy edge nodes
- *     - Skip deployment if edge node is already healthy AND no new images
- *     - Use FORCE_DEPLOY to restart even when healthy
- *
- *   NOTE: Seeding is now handled by genesis/Jenkinsfile (separate pipeline)
- *
- * Artifact fallback: Tries current branch, then dev, then main for hApp
- *
- * @see https://github.com/holochain/holonix
+ * @see holochain/dna/Jenkinsfile for DNA builds
  */
 
 // ============================================================================
@@ -61,43 +62,43 @@ def withBuildVars(props, Closure body) {
 }
 
 /**
- * Fetch hApp artifact with fallback to dev branch
+ * Fetch hApp artifact from elohim-dna pipeline with fallback to dev/main branches
  * Returns true if hApp was successfully fetched, false otherwise
  */
 def fetchHappArtifact(String destPath) {
-    // Try 1: Current branch
-    def branchUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
-    echo "Attempting to fetch hApp from current branch: ${env.BRANCH_NAME}"
+    // Try 1: Current branch from elohim-dna pipeline
+    def branchUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
+    echo "Attempting to fetch hApp from elohim-dna/${env.BRANCH_NAME}..."
 
     def result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${branchUrl}' 2>&1", returnStatus: true)
     if (result == 0 && fileExists(destPath)) {
-        echo "hApp fetched from ${env.BRANCH_NAME} branch artifacts"
+        echo "hApp fetched from elohim-dna/${env.BRANCH_NAME} artifacts"
         return true
     }
 
     // Try 2: Dev branch (fallback)
     if (env.BRANCH_NAME != 'dev') {
-        echo "Branch artifact not found, trying dev branch..."
-        def devUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
+        echo "Branch artifact not found, trying elohim-dna/dev..."
+        def devUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/dev/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
         result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${devUrl}' 2>&1", returnStatus: true)
         if (result == 0 && fileExists(destPath)) {
-            echo "hApp fetched from dev branch artifacts (fallback)"
+            echo "hApp fetched from elohim-dna/dev artifacts (fallback)"
             return true
         }
     }
 
     // Try 3: Main branch (last resort)
     if (env.BRANCH_NAME != 'main') {
-        echo "Dev artifact not found, trying main branch..."
-        def mainUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
+        echo "Dev artifact not found, trying elohim-dna/main..."
+        def mainUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/main/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
         result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${mainUrl}' 2>&1", returnStatus: true)
         if (result == 0 && fileExists(destPath)) {
-            echo "hApp fetched from main branch artifacts (fallback)"
+            echo "hApp fetched from elohim-dna/main artifacts (fallback)"
             return true
         }
     }
 
-    echo "Could not fetch hApp from any branch"
+    echo "Could not fetch hApp from elohim-dna pipeline (any branch)"
     return false
 }
 
@@ -278,150 +279,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('Build WASM Cache Core') {
-            when {
-                anyOf {
-                    changeset "holochain/holochain-cache-core/**"
-                    changeset "elohim-app/**"
-                    changeset "elohim-library/**"
-                    expression { return params.FORCE_BUILD == true }
-                }
-            }
-            steps {
-                container('builder') {
-                    dir('holochain/dna/elohim') {
-                        script {
-                            echo 'Building holochain-cache-core WASM module...'
-
-                            sh '''#!/usr/bin/env bash
-                                set -euo pipefail
-
-                                export HOME="${HOME:-/root}"
-                                mkdir -p "$HOME"
-                                echo "[safe]" > "$HOME/.gitconfig"
-                                echo "    directory = *" >> "$HOME/.gitconfig"
-                                export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
-
-                                echo "=== Entering Nix development shell for WASM build ==="
-
-                                nix develop --accept-flake-config --command bash -c '
-                                    set -euo pipefail
-
-                                    echo "=== Rust toolchain ready ==="
-                                    rustc --version
-                                    cargo --version
-                                    wasm-pack --version
-
-                                    echo ""
-                                    echo "=== Building holochain-cache-core WASM ==="
-                                    cd ../../holochain-cache-core
-                                    wasm-pack build --target web --release
-
-                                    echo ""
-                                    echo "=== WASM Build artifacts ==="
-                                    ls -lh pkg/
-                                '
-                            '''
-                        }
-                    }
-                    dir('holochain/holochain-cache-core') {
-                        archiveArtifacts artifacts: 'pkg/**', allowEmptyArchive: false
-                        stash name: 'wasm-cache-core', includes: 'pkg/**'
-                        echo "holochain-cache-core WASM module built and archived"
-                    }
-                }
-            }
-        }
-
-        stage('Build DNA') {
-            when {
-                anyOf {
-                    changeset "holochain/dna/**"
-                    expression { return params.FORCE_BUILD == true }
-                }
-            }
-            steps {
-                container('builder') {
-                    dir('holochain/dna/elohim') {
-                        script {
-                            echo 'Building Holochain DNA with Nix...'
-                            echo 'First build may take 20-40 minutes. Subsequent builds use cache.'
-
-                            sh '''#!/usr/bin/env bash
-                                set -euo pipefail
-
-                                export HOME="${HOME:-/root}"
-                                mkdir -p "$HOME"
-                                echo "[safe]" > "$HOME/.gitconfig"
-                                echo "    directory = *" >> "$HOME/.gitconfig"
-                                export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
-
-                                echo "=== Entering Nix development shell ==="
-                                echo "This will download/build Holochain toolchain from Cachix..."
-
-                                nix develop --accept-flake-config --command bash -c '
-                                    set -euo pipefail
-
-                                    echo "=== Holochain toolchain ready ==="
-                                    hc --version
-                                    rustc --version
-                                    cargo --version
-
-                                    echo ""
-                                    echo "=== Building lamad DNA (elohim) ==="
-                                    cargo build --release --target wasm32-unknown-unknown
-                                    hc dna pack . -o workdir/lamad.dna
-                                    echo "   ✅ lamad.dna"
-
-                                    echo ""
-                                    echo "=== Building imagodei DNA ==="
-                                    cd ../imagodei
-                                    cargo build --release --target wasm32-unknown-unknown
-                                    hc dna pack . -o ../elohim/workdir/imagodei.dna
-                                    echo "   ✅ imagodei.dna"
-
-                                    echo ""
-                                    echo "=== Building infrastructure DNA ==="
-                                    cd ../infrastructure
-                                    cargo build --release --target wasm32-unknown-unknown
-                                    hc dna pack . -o ../elohim/workdir/infrastructure.dna
-                                    echo "   ✅ infrastructure.dna"
-
-                                    echo ""
-                                    echo "=== Packaging hApp (all 3 DNAs) ==="
-                                    cd ../elohim
-                                    hc app pack workdir -o elohim.happ
-
-                                    echo ""
-                                    echo "=== Build artifacts ==="
-                                    ls -lh elohim.happ workdir/*.dna
-                                '
-                            '''
-
-                            archiveArtifacts artifacts: 'elohim.happ,workdir/*.dna', allowEmptyArchive: false
-                            stash name: 'happ-bundle', includes: 'elohim.happ'
-
-                            def props = loadBuildVars()
-
-                            echo """
-                            ═══════════════════════════════════════════════════════════
-                            hApp ARTIFACT ARCHIVED
-                            ═══════════════════════════════════════════════════════════
-
-                            Artifact URL (for downstream consumers):
-                            ${env.BUILD_URL}artifact/holochain/dna/elohim/elohim.happ
-
-                            Build Details:
-                            - Image Tag: ${props.IMAGE_TAG ?: 'unknown'}
-                            - Branch: ${env.BRANCH_NAME}
-                            - Commit: ${env.GIT_COMMIT ?: 'unknown'}
-                            ═══════════════════════════════════════════════════════════
-                            """
-                        }
-                    }
-                }
-            }
-        }
+        // NOTE: Build WASM Cache Core and Build DNA stages moved to holochain/dna/Jenkinsfile
+        // This pipeline now only builds infrastructure (container images)
 
         stage('Build Doorway') {
             when {
@@ -462,7 +321,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Edge Node Image') {
             when {
                 anyOf {
-                    changeset "holochain/**"
+                    changeset "holochain/edgenode/**"
+                    changeset "holochain/doorway/**"
+                    changeset "holochain/manifests/**"
                     expression { return params.FORCE_BUILD == true }
                 }
             }
@@ -474,17 +335,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             echo "Building Edge Node image: ${IMAGE_TAG}"
 
-                            def haveHapp = false
-                            try {
-                                dir('holochain/edgenode') {
-                                    unstash 'happ-bundle'
-                                }
-                                echo "hApp bundle from current build (DNA was rebuilt)"
-                                haveHapp = true
-                            } catch (Exception e) {
-                                echo "No hApp stashed - fetching from artifacts with fallback..."
-                                haveHapp = fetchHappArtifact('holochain/edgenode/elohim.happ')
-                            }
+                            // Fetch hApp from elohim-dna pipeline (DNA is built separately)
+                            echo "Fetching hApp from elohim-dna pipeline..."
+                            def haveHapp = fetchHappArtifact('holochain/edgenode/elohim.happ')
 
                             if (haveHapp) {
                                 env.HAPP_AVAILABLE = 'true'
@@ -516,7 +369,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build hApp Installer') {
             when {
                 anyOf {
-                    changeset "holochain/**"
+                    changeset "holochain/edgenode/**"
+                    changeset "holochain/manifests/**"
                     expression { return params.FORCE_BUILD == true }
                 }
             }
@@ -528,17 +382,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             echo "Building hApp Installer image: ${IMAGE_TAG}"
 
-                            def haveHapp = false
-                            try {
-                                dir('holochain/edgenode/scripts') {
-                                    unstash 'happ-bundle'
-                                }
-                                echo "hApp bundle from current build"
-                                haveHapp = true
-                            } catch (Exception e) {
-                                echo "No hApp stashed - fetching from artifacts with fallback..."
-                                haveHapp = fetchHappArtifact('holochain/edgenode/scripts/elohim.happ')
-                            }
+                            // Fetch hApp from elohim-dna pipeline (DNA is built separately)
+                            echo "Fetching hApp from elohim-dna pipeline..."
+                            def haveHapp = fetchHappArtifact('holochain/edgenode/scripts/elohim.happ')
 
                             if (haveHapp) {
                                 sh """#!/bin/bash
@@ -557,7 +403,17 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 """
                                 echo "hApp Installer image built successfully"
                             } else {
-                                echo "Skipping hApp Installer build - no hApp available"
+                                // This stage was triggered but no hApp is available
+                                error """
+                                ═══════════════════════════════════════════════════════════
+                                CANNOT BUILD HAPP INSTALLER: No hApp artifact available
+                                ═══════════════════════════════════════════════════════════
+                                Could not fetch hApp from elohim-dna pipeline.
+
+                                Ensure elohim-dna pipeline has run successfully first.
+                                Check: https://jenkins.ethosengine.com/job/elohim-dna/
+                                ═══════════════════════════════════════════════════════════
+                                """
                             }
                         }
                     }
@@ -568,7 +424,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Push to Harbor') {
             when {
                 anyOf {
-                    changeset "holochain/**"
+                    changeset "holochain/doorway/**"
+                    changeset "holochain/edgenode/**"
+                    changeset "holochain/manifests/**"
                     expression { return params.FORCE_BUILD == true }
                 }
             }
@@ -659,7 +517,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 anyOf {
                     branch 'dev'
                     allOf {
-                        changeset "holochain/**"
+                        anyOf {
+                            changeset "holochain/doorway/**"
+                            changeset "holochain/edgenode/**"
+                            changeset "holochain/manifests/**"
+                        }
                         anyOf {
                             expression { return env.BRANCH_NAME ==~ /feat-.+/ }
                             expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
@@ -836,7 +698,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Cleanup') {
             when {
                 anyOf {
-                    changeset "holochain/**"
+                    changeset "holochain/doorway/**"
+                    changeset "holochain/edgenode/**"
+                    changeset "holochain/manifests/**"
                     expression { return params.FORCE_BUILD == true }
                 }
             }
