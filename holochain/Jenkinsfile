@@ -67,7 +67,7 @@ def withBuildVars(props, Closure body) {
  */
 def fetchHappArtifact(String destPath) {
     // Try 1: Current branch from elohim-holochain pipeline
-    def branchUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
+    def branchUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/elohim.happ"
     echo "Attempting to fetch hApp from elohim-holochain/${env.BRANCH_NAME}..."
 
     def result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${branchUrl}' 2>&1", returnStatus: true)
@@ -79,7 +79,7 @@ def fetchHappArtifact(String destPath) {
     // Try 2: Dev branch (fallback)
     if (env.BRANCH_NAME != 'dev') {
         echo "Branch artifact not found, trying elohim-holochain/dev..."
-        def devUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
+        def devUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/elohim.happ"
         result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${devUrl}' 2>&1", returnStatus: true)
         if (result == 0 && fileExists(destPath)) {
             echo "hApp fetched from elohim-holochain/dev artifacts (fallback)"
@@ -90,7 +90,7 @@ def fetchHappArtifact(String destPath) {
     // Try 3: Main branch (last resort)
     if (env.BRANCH_NAME != 'main') {
         echo "Dev artifact not found, trying elohim-holochain/main..."
-        def mainUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
+        def mainUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/elohim.happ"
         result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${mainUrl}' 2>&1", returnStatus: true)
         if (result == 0 && fileExists(destPath)) {
             echo "hApp fetched from elohim-holochain/main artifacts (fallback)"

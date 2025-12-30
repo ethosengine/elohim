@@ -90,8 +90,8 @@ spec:
 
               # Try branch-specific build first, then dev, then main
               HAPP_URLS="
-                https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ
-                https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ
+                https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/elohim.happ
+                https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/elohim.happ
               "
 
               for url in $HAPP_URLS; do
