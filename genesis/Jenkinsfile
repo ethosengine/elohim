@@ -200,25 +200,23 @@ spec:
         stage('Check Trigger') {
             steps {
                 script {
-                    // Skip pipeline if triggered by SCM/webhook rather than upstream build
                     def validTrigger = currentBuild.getBuildCauses().any { cause ->
-                        cause._class.contains('UpstreamCause') ||
-                        cause._class.contains('UserIdCause')  // Allow manual triggers
+                        cause._class.contains('UpstreamCause') || cause._class.contains('UserIdCause')
                     }
-
                     if (!validTrigger) {
-                        echo "⏭️ Skipping: Genesis pipeline only runs on upstream triggers (elohim-holochain, elohim-edge, elohim) or manual builds"
-                        echo "   Triggered by: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
+                        echo "⏭️ PIPELINE SKIPPED - Use orchestrator or manual trigger"
                         currentBuild.result = 'NOT_BUILT'
-                        error('Pipeline skipped - not triggered by upstream build')
+                        currentBuild.displayName = "#${env.BUILD_NUMBER} SKIPPED"
+                        env.PIPELINE_SKIPPED = 'true'
+                    } else {
+                        echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
                     }
-
-                    echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
                 }
             }
         }
 
         stage('Checkout') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -256,6 +254,7 @@ Skip Tests: ${params.SKIP_TESTS}
         }
 
         stage('Resolve Hosts') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -290,9 +289,7 @@ Skip Tests: ${params.SKIP_TESTS}
         }
 
         stage('Install Seeder') {
-            when {
-                expression { params.SEED_DATA }
-            }
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
             steps {
                 container('builder') {
                     dir('genesis/seeder') {
@@ -307,9 +304,7 @@ Skip Tests: ${params.SKIP_TESTS}
         }
 
         stage('Install Test Dependencies') {
-            when {
-                expression { !params.SKIP_TESTS && params.FEATURE_AREAS }
-            }
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { !params.SKIP_TESTS && params.FEATURE_AREAS } } }
             steps {
                 container('builder') {
                     dir('elohim-app') {
@@ -325,6 +320,7 @@ Skip Tests: ${params.SKIP_TESTS}
         }
 
         stage('Verify Target Health') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -374,9 +370,7 @@ Skip Tests: ${params.SKIP_TESTS}
         }
 
         stage('Seed Database') {
-            when {
-                expression { params.SEED_DATA }
-            }
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
             steps {
                 container('builder') {
                     script {
@@ -432,6 +426,7 @@ IDs: ${seedIds ?: '(all content)'}
         stage('Fetch Dynamic Features') {
             when {
                 allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
                     expression { params.FETCH_DYNAMIC_FEATURES }
                     expression { !params.SKIP_TESTS && params.FEATURE_AREAS }
                 }
@@ -472,9 +467,7 @@ IDs: ${seedIds ?: '(all content)'}
         }
 
         stage('Execute BDD Tests') {
-            when {
-                expression { !params.SKIP_TESTS && params.FEATURE_AREAS }
-            }
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { !params.SKIP_TESTS && params.FEATURE_AREAS } } }
             steps {
                 container('builder') {
                     dir('elohim-app') {
@@ -507,9 +500,7 @@ IDs: ${seedIds ?: '(all content)'}
         }
 
         stage('Publish Reports') {
-            when {
-                expression { !params.SKIP_TESTS && params.FEATURE_AREAS }
-            }
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { !params.SKIP_TESTS && params.FEATURE_AREAS } } }
             steps {
                 container('builder') {
                     dir('elohim-app') {
@@ -522,9 +513,7 @@ IDs: ${seedIds ?: '(all content)'}
         }
 
         stage('Analyze Schema Drift') {
-            when {
-                expression { params.ANALYZE_DRIFT }
-            }
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.ANALYZE_DRIFT } } }
             steps {
                 container('builder') {
                     script {
