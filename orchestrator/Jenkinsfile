@@ -1,56 +1,74 @@
 /**
  * Elohim Orchestrator Pipeline
  *
- * Observability and coordination for the Elohim mono-repo pipelines.
- * Does NOT build anything - only monitors, reports, and recommends actions.
+ * CENTRAL CONTROLLER for all Elohim mono-repo pipelines.
+ * This is the ONLY pipeline that receives GitHub webhooks.
+ * All other pipelines are manual-only and triggered by this orchestrator.
+ *
+ * Architecture:
+ *   GitHub Webhook → Orchestrator → Analyze → Trigger Pipelines → Report
+ *                                      ↓
+ *                              (optional) Claude Agent webhook
+ *                                   for complex decisions
  *
  * Responsibilities:
- *   - Track artifact versions across all pipelines
- *   - Detect version drift and stale dependencies
- *   - Monitor health of deployed services
- *   - Generate actionable recommendations
+ *   1. Receive all GitHub push webhooks
+ *   2. Analyze changesets to determine what needs to build
+ *   3. Trigger pipelines in dependency order
+ *   4. Wait for dependencies before triggering consumers
+ *   5. Report status and trigger Claude agent for issues
  *
- * Triggers:
- *   - Cron: Every 15 minutes
- *   - Manual: On-demand status check
- *   - Upstream: After any pipeline completes (optional)
+ * Dependency Graph:
+ *   elohim-holochain (DNA/hApp, WASM)
+ *       ├──► elohim-edge (infrastructure) ──┐
+ *       ├──► elohim (Angular app) ──────────┼──► elohim-genesis (seed + test)
+ *       └──► elohim-steward (manual only)   │
+ *                                           └───────────────────────────────►
  */
 
-// Pipeline artifact sources
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
+
 def PIPELINES = [
     'elohim-holochain': [
-        path: 'holochain/dna/Jenkinsfile',
-        artifacts: ['elohim.happ', 'holochain-cache-core'],
-        consumers: ['elohim-edge', 'elohim', 'elohim-steward', 'elohim-genesis']
+        jenkinsPath: 'holochain/dna/Jenkinsfile',
+        changePatterns: ['holochain/dna/', 'holochain/holochain-cache-core/'],
+        artifacts: ['elohim.happ', 'holochain-cache-core/pkg'],
+        dependsOn: [],
+        triggersGenesis: true
     ],
     'elohim-edge': [
-        path: 'holochain/Jenkinsfile',
+        jenkinsPath: 'holochain/Jenkinsfile',
+        changePatterns: ['holochain/doorway/', 'holochain/edgenode/', 'holochain/manifests/'],
         artifacts: ['elohim-doorway', 'elohim-edgenode', 'elohim-happ-installer'],
-        consumers: ['elohim-genesis'],
-        depends: ['elohim-holochain']
+        dependsOn: ['elohim-holochain'],
+        triggersGenesis: true
     ],
     'elohim': [
-        path: 'Jenkinsfile',
+        jenkinsPath: 'Jenkinsfile',
+        changePatterns: ['elohim-app/', 'elohim-library/', 'VERSION'],
         artifacts: ['elohim-app'],
-        consumers: ['elohim-genesis'],
-        depends: ['elohim-holochain']
+        dependsOn: ['elohim-holochain'],
+        triggersGenesis: true
     ],
     'elohim-genesis': [
-        path: 'genesis/Jenkinsfile',
+        jenkinsPath: 'genesis/Jenkinsfile',
+        changePatterns: ['genesis/'],
         artifacts: [],
-        consumers: [],
-        depends: ['elohim-holochain', 'elohim-edge', 'elohim']
+        dependsOn: ['elohim-holochain', 'elohim-edge', 'elohim'],
+        triggersGenesis: false
     ],
     'elohim-steward': [
-        path: 'steward/Jenkinsfile',
-        artifacts: ['steward-linux', 'steward-macos', 'steward-windows'],
-        consumers: [],
-        depends: ['elohim-holochain'],
-        manualOnly: true
+        jenkinsPath: 'steward/Jenkinsfile',
+        changePatterns: ['steward/'],
+        artifacts: ['steward-desktop'],
+        dependsOn: ['elohim-holochain'],
+        manualOnly: true,
+        triggersGenesis: false
     ]
 ]
 
-// Service health endpoints
 def HEALTH_ENDPOINTS = [
     'doorway-dev': 'https://doorway-dev.elohim.host/health',
     'doorway-prod': 'https://doorway.elohim.host/health',
@@ -59,16 +77,102 @@ def HEALTH_ENDPOINTS = [
     'prod': 'https://elohim.host'
 ]
 
-def getLastSuccessfulBuild(String jobName, String branch) {
-    def url = "https://jenkins.ethosengine.com/job/${jobName}/job/${branch}/lastSuccessfulBuild/api/json"
+// Claude agent webhook for complex decisions (optional)
+def CLAUDE_AGENT_WEBHOOK = env.CLAUDE_AGENT_WEBHOOK ?: ''
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+def analyzeChangeset() {
+    // Get changed files from the push
+    def changedFiles = sh(
+        script: '''
+            git diff --name-only HEAD~1 2>/dev/null || git diff --name-only HEAD
+        ''',
+        returnStdout: true
+    ).trim().split('\n').findAll { it }
+
+    echo "Changed files: ${changedFiles.size()}"
+    changedFiles.each { echo "  - ${it}" }
+
+    return changedFiles
+}
+
+def determinePipelinesToRun(changedFiles) {
+    def toRun = []
+
+    PIPELINES.each { name, config ->
+        if (config.manualOnly) {
+            echo "⏭️ ${name}: manual-only, skipping"
+            return
+        }
+
+        def matches = changedFiles.any { file ->
+            config.changePatterns.any { pattern ->
+                file.startsWith(pattern)
+            }
+        }
+
+        if (matches) {
+            toRun.add(name)
+            echo "✅ ${name}: changes detected"
+        } else {
+            echo "⏭️ ${name}: no matching changes"
+        }
+    }
+
+    return toRun
+}
+
+def orderByDependencies(pipelineList) {
+    // Topological sort based on dependencies
+    def ordered = []
+    def remaining = pipelineList.collect()
+
+    while (!remaining.isEmpty()) {
+        def ready = remaining.find { name ->
+            def deps = PIPELINES[name].dependsOn ?: []
+            // Ready if all dependencies are either not in the list or already ordered
+            deps.every { dep ->
+                !remaining.contains(dep) || ordered.contains(dep)
+            }
+        }
+
+        if (ready) {
+            ordered.add(ready)
+            remaining.remove(ready)
+        } else {
+            // Circular dependency or missing - just add remaining
+            ordered.addAll(remaining)
+            break
+        }
+    }
+
+    return ordered
+}
+
+def triggerPipeline(String name, String branch, boolean wait = true) {
+    echo "▶️ Triggering ${name}/${branch}..."
+
     try {
-        def response = sh(
-            script: "curl -sf '${url}' 2>/dev/null || echo '{}'",
-            returnStdout: true
-        ).trim()
-        return readJSON(text: response)
+        def result = build(
+            job: "${name}/${branch}",
+            wait: wait,
+            propagate: false,
+            parameters: []
+        )
+
+        if (result.result == 'SUCCESS') {
+            echo "✅ ${name}: SUCCESS"
+            return true
+        } else {
+            echo "❌ ${name}: ${result.result}"
+            return false
+        }
     } catch (Exception e) {
-        return [:]
+        echo "❌ ${name}: Failed to trigger - ${e.message}"
+        return false
     }
 }
 
@@ -77,22 +181,32 @@ def checkHealth(String name, String url) {
         script: "curl -sf -o /dev/null -w '%{http_code}' '${url}' 2>/dev/null || echo '000'",
         returnStdout: true
     ).trim()
-    return [
-        name: name,
-        url: url,
-        status: status,
-        healthy: status == '200' || status == '302' || status == '301'
-    ]
+    return [name: name, url: url, status: status, healthy: status in ['200', '301', '302']]
 }
 
-def getArtifactVersion(String jobName, String branch, String artifactPath) {
-    def url = "https://jenkins.ethosengine.com/job/${jobName}/job/${branch}/lastSuccessfulBuild/artifact/${artifactPath}"
-    def exists = sh(
-        script: "curl -sf -o /dev/null '${url}' 2>/dev/null && echo 'true' || echo 'false'",
-        returnStdout: true
-    ).trim()
-    return exists == 'true'
+def notifyClaudeAgent(Map context) {
+    if (!CLAUDE_AGENT_WEBHOOK) {
+        echo "Claude agent webhook not configured"
+        return
+    }
+
+    def payload = writeJSON(returnText: true, json: context)
+
+    try {
+        sh """
+            curl -sf -X POST '${CLAUDE_AGENT_WEBHOOK}' \
+                -H 'Content-Type: application/json' \
+                -d '${payload}'
+        """
+        echo "📤 Notified Claude agent"
+    } catch (Exception e) {
+        echo "⚠️ Failed to notify Claude agent: ${e.message}"
+    }
 }
+
+// =============================================================================
+// PIPELINE
+// =============================================================================
 
 pipeline {
     agent {
@@ -121,132 +235,197 @@ spec:
         }
     }
 
+    environment {
+        BRANCH_NAME = "${env.BRANCH_NAME ?: 'dev'}"
+    }
+
     parameters {
-        booleanParam(
-            name: 'FULL_REPORT',
-            defaultValue: true,
-            description: 'Generate full status report'
-        )
-        booleanParam(
-            name: 'CHECK_HEALTH',
-            defaultValue: true,
-            description: 'Check health of all endpoints'
+        choice(
+            name: 'MODE',
+            choices: ['auto', 'status', 'trigger-all', 'trigger-specific'],
+            description: 'auto=analyze and trigger, status=report only, trigger-all=force all, trigger-specific=specific pipeline'
         )
         string(
-            name: 'BRANCH',
-            defaultValue: 'dev',
-            description: 'Branch to check artifact versions for'
+            name: 'SPECIFIC_PIPELINE',
+            defaultValue: '',
+            description: 'Pipeline to trigger (for trigger-specific mode)'
+        )
+        booleanParam(
+            name: 'SKIP_GENESIS',
+            defaultValue: false,
+            description: 'Skip triggering genesis after builds complete'
+        )
+        booleanParam(
+            name: 'NOTIFY_CLAUDE',
+            defaultValue: false,
+            description: 'Send results to Claude agent webhook for analysis'
         )
     }
 
     triggers {
-        // Run every 15 minutes during work hours
-        cron('H/15 8-20 * * 1-5')
+        // This is the ONLY pipeline that receives GitHub webhooks
+        githubPush()
     }
 
     options {
-        timeout(time: 10, unit: 'MINUTES')
+        timeout(time: 120, unit: 'MINUTES')
         disableConcurrentBuilds()
-        buildDiscarder(logRotator(numToKeepStr: '50'))
+        buildDiscarder(logRotator(numToKeepStr: '100'))
     }
 
     stages {
-        stage('Collect Pipeline Status') {
+        stage('Checkout') {
             steps {
                 container('builder') {
                     script {
-                        def branch = params.BRANCH ?: 'dev'
-                        def pipelineStatus = [:]
+                        sh 'git config --global --add safe.directory "*"'
+
+                        checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: "*/${env.BRANCH_NAME}"]],
+                            extensions: [
+                                [$class: 'CloneOption', shallow: false, noTags: true],
+                                [$class: 'CleanBeforeCheckout']
+                            ],
+                            userRemoteConfigs: [[
+                                url: 'https://github.com/ethosengine/elohim.git',
+                                credentialsId: 'ee-bot-pat'
+                            ]]
+                        ])
 
                         echo """
                         ═══════════════════════════════════════════════════════════
-                        📊 ELOHIM ORCHESTRATOR - PIPELINE STATUS
+                        🎭 ELOHIM ORCHESTRATOR
                         ═══════════════════════════════════════════════════════════
-                        Branch: ${branch}
-                        Timestamp: ${new Date().format('yyyy-MM-dd HH:mm:ss')}
+                        Branch: ${env.BRANCH_NAME}
+                        Mode: ${params.MODE}
+                        Build: ${env.BUILD_NUMBER}
                         ═══════════════════════════════════════════════════════════
-                        """
-
-                        PIPELINES.each { name, config ->
-                            def buildInfo = getLastSuccessfulBuild(name, branch)
-                            def status = [
-                                name: name,
-                                lastBuild: buildInfo.number ?: 'N/A',
-                                lastSuccess: buildInfo.timestamp ? new Date(buildInfo.timestamp).format('yyyy-MM-dd HH:mm') : 'Never',
-                                duration: buildInfo.duration ? "${(buildInfo.duration / 1000 / 60).round(1)} min" : 'N/A',
-                                result: buildInfo.result ?: 'UNKNOWN',
-                                manualOnly: config.manualOnly ?: false
-                            ]
-                            pipelineStatus[name] = status
-                        }
-
-                        echo """
-                        ┌─────────────────────────────────────────────────────────┐
-                        │ PIPELINE BUILDS                                         │
-                        ├─────────────────────────────────────────────────────────┤
-                        """
-
-                        pipelineStatus.each { name, status ->
-                            def icon = status.result == 'SUCCESS' ? '✅' : (status.result == 'FAILURE' ? '❌' : '⚠️')
-                            def manual = status.manualOnly ? ' [MANUAL]' : ''
-                            echo "│ ${icon} ${name}${manual}"
-                            echo "│    Build #${status.lastBuild} | ${status.lastSuccess} | ${status.duration}"
-                        }
-
-                        echo """
-                        └─────────────────────────────────────────────────────────┘
-                        """
-
-                        // Store for later stages
-                        env.PIPELINE_STATUS = writeJSON(returnText: true, json: pipelineStatus)
-                    }
-                }
-            }
-        }
-
-        stage('Check Artifact Versions') {
-            when {
-                expression { params.FULL_REPORT }
-            }
-            steps {
-                container('builder') {
-                    script {
-                        def branch = params.BRANCH ?: 'dev'
-
-                        echo """
-                        ┌─────────────────────────────────────────────────────────┐
-                        │ ARTIFACT INVENTORY                                      │
-                        ├─────────────────────────────────────────────────────────┤
-                        """
-
-                        // Check elohim-holochain artifacts
-                        def happExists = getArtifactVersion('elohim-holochain', branch, 'holochain/dna/elohim/elohim.happ')
-                        def wasmExists = getArtifactVersion('elohim-holochain', branch, 'holochain/holochain-cache-core/pkg/holochain_cache_core.js')
-
-                        echo "│ elohim-holochain:"
-                        echo "│   ${happExists ? '✅' : '❌'} elohim.happ"
-                        echo "│   ${wasmExists ? '✅' : '❌'} holochain-cache-core WASM"
-
-                        // Check container images in Harbor
-                        echo "│"
-                        echo "│ Container Images (Harbor):"
-                        ['elohim-doorway', 'elohim-edgenode', 'elohim-happ-installer', 'elohim-app'].each { image ->
-                            // Note: Would need Harbor API access to check actual tags
-                            echo "│   📦 ${image}:${branch}-latest"
-                        }
-
-                        echo """
-                        └─────────────────────────────────────────────────────────┘
                         """
                     }
                 }
             }
         }
 
-        stage('Check Service Health') {
+        stage('Analyze Changes') {
             when {
-                expression { params.CHECK_HEALTH }
+                expression { params.MODE == 'auto' || params.MODE == 'status' }
             }
+            steps {
+                container('builder') {
+                    script {
+                        def changedFiles = analyzeChangeset()
+                        def pipelinesToRun = determinePipelinesToRun(changedFiles)
+                        def orderedPipelines = orderByDependencies(pipelinesToRun)
+
+                        env.PIPELINES_TO_RUN = orderedPipelines.join(',')
+                        env.CHANGED_FILES_COUNT = changedFiles.size().toString()
+
+                        echo """
+                        ┌─────────────────────────────────────────────────────────┐
+                        │ ANALYSIS RESULTS                                        │
+                        ├─────────────────────────────────────────────────────────┤
+                        │ Changed files: ${changedFiles.size()}
+                        │ Pipelines to run: ${orderedPipelines.size()}
+                        │ Order: ${orderedPipelines.join(' → ')}
+                        └─────────────────────────────────────────────────────────┘
+                        """
+
+                        if (orderedPipelines.isEmpty() && params.MODE == 'auto') {
+                            echo "No pipelines need to run for these changes"
+                            currentBuild.description = "No changes requiring builds"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Trigger Pipelines') {
+            when {
+                expression {
+                    params.MODE == 'auto' || params.MODE == 'trigger-all' || params.MODE == 'trigger-specific'
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def pipelines = []
+                        def results = [:]
+
+                        if (params.MODE == 'trigger-specific' && params.SPECIFIC_PIPELINE) {
+                            pipelines = [params.SPECIFIC_PIPELINE]
+                        } else if (params.MODE == 'trigger-all') {
+                            pipelines = PIPELINES.findAll { name, config -> !config.manualOnly }.keySet().toList()
+                            pipelines = orderByDependencies(pipelines)
+                        } else {
+                            pipelines = (env.PIPELINES_TO_RUN ?: '').split(',').findAll { it }
+                        }
+
+                        if (pipelines.isEmpty()) {
+                            echo "No pipelines to trigger"
+                            return
+                        }
+
+                        echo """
+                        ┌─────────────────────────────────────────────────────────┐
+                        │ TRIGGERING PIPELINES                                    │
+                        ├─────────────────────────────────────────────────────────┤
+                        │ Order: ${pipelines.join(' → ')}
+                        └─────────────────────────────────────────────────────────┘
+                        """
+
+                        // Group by dependency level for parallel execution
+                        def level0 = pipelines.findAll { name ->
+                            def deps = PIPELINES[name]?.dependsOn ?: []
+                            deps.every { !pipelines.contains(it) }
+                        }
+                        def remaining = pipelines - level0
+
+                        // Trigger level 0 (no dependencies in this run)
+                        if (level0) {
+                            echo "Level 0 (parallel): ${level0.join(', ')}"
+                            def parallelBuilds = [:]
+                            level0.each { name ->
+                                parallelBuilds[name] = {
+                                    results[name] = triggerPipeline(name, env.BRANCH_NAME, true)
+                                }
+                            }
+                            parallel parallelBuilds
+                        }
+
+                        // Trigger remaining in order
+                        remaining.each { name ->
+                            results[name] = triggerPipeline(name, env.BRANCH_NAME, true)
+                        }
+
+                        // Check if we should trigger genesis
+                        def shouldTriggerGenesis = !params.SKIP_GENESIS &&
+                            pipelines.any { PIPELINES[it]?.triggersGenesis } &&
+                            results.every { k, v -> v }
+
+                        if (shouldTriggerGenesis && !pipelines.contains('elohim-genesis')) {
+                            echo "All builds succeeded, triggering genesis..."
+                            results['elohim-genesis'] = triggerPipeline('elohim-genesis', env.BRANCH_NAME, true)
+                        }
+
+                        // Store results
+                        env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
+
+                        // Summary
+                        def successCount = results.count { k, v -> v }
+                        def failCount = results.count { k, v -> !v }
+
+                        currentBuild.description = "✅ ${successCount} | ❌ ${failCount}"
+
+                        if (failCount > 0) {
+                            unstable("${failCount} pipeline(s) failed")
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Health Check') {
             steps {
                 container('builder') {
                     script {
@@ -257,124 +436,47 @@ spec:
                         """
 
                         def healthResults = [:]
-                        def anyUnhealthy = false
-
                         HEALTH_ENDPOINTS.each { name, url ->
                             def result = checkHealth(name, url)
                             healthResults[name] = result
-                            def icon = result.healthy ? '✅' : '❌'
-                            echo "│ ${icon} ${name}: HTTP ${result.status}"
-                            if (!result.healthy) {
-                                anyUnhealthy = true
-                            }
+                            echo "│ ${result.healthy ? '✅' : '❌'} ${name}: HTTP ${result.status}"
                         }
 
                         echo """
                         └─────────────────────────────────────────────────────────┘
                         """
 
-                        if (anyUnhealthy) {
-                            unstable('One or more services are unhealthy')
-                        }
-
-                        env.HEALTH_STATUS = writeJSON(returnText: true, json: healthResults)
+                        env.HEALTH_RESULTS = writeJSON(returnText: true, json: healthResults)
                     }
                 }
             }
         }
 
-        stage('Dependency Analysis') {
+        stage('Notify Claude Agent') {
             when {
-                expression { params.FULL_REPORT }
+                expression { params.NOTIFY_CLAUDE || currentBuild.result == 'UNSTABLE' }
             }
             steps {
                 container('builder') {
                     script {
-                        echo """
-                        ┌─────────────────────────────────────────────────────────┐
-                        │ DEPENDENCY GRAPH                                        │
-                        ├─────────────────────────────────────────────────────────┤
-                        │                                                         │
-                        │  elohim-holochain (DNA/hApp)                            │
-                        │       │                                                 │
-                        │       ├──► elohim-edge (infrastructure)                 │
-                        │       │         │                                       │
-                        │       ├──► elohim (Angular app)                         │
-                        │       │         │                                       │
-                        │       │         └──────┬──────┘                         │
-                        │       │                │                                │
-                        │       │                ▼                                │
-                        │       │         elohim-genesis (seed + test)            │
-                        │       │                                                 │
-                        │       └──► elohim-steward (desktop, manual)             │
-                        │                                                         │
-                        └─────────────────────────────────────────────────────────┘
-                        """
-                    }
-                }
-            }
-        }
+                        def context = [
+                            event: 'orchestrator_complete',
+                            branch: env.BRANCH_NAME,
+                            build: env.BUILD_NUMBER,
+                            mode: params.MODE,
+                            changedFilesCount: env.CHANGED_FILES_COUNT?.toInteger() ?: 0,
+                            pipelinesTriggered: (env.PIPELINES_TO_RUN ?: '').split(',').findAll { it },
+                            buildResults: readJSON(text: env.BUILD_RESULTS ?: '{}'),
+                            healthResults: readJSON(text: env.HEALTH_RESULTS ?: '{}'),
+                            result: currentBuild.result ?: 'SUCCESS',
+                            url: env.BUILD_URL
+                        ]
 
-        stage('Generate Recommendations') {
-            steps {
-                container('builder') {
-                    script {
-                        def recommendations = []
-                        def branch = params.BRANCH ?: 'dev'
-
-                        // Parse stored status
-                        def pipelineStatus = readJSON(text: env.PIPELINE_STATUS ?: '{}')
-                        def healthStatus = readJSON(text: env.HEALTH_STATUS ?: '{}')
-
-                        // Check for stale builds (older than 24 hours on dev)
-                        def now = System.currentTimeMillis()
-                        def staleThreshold = 24 * 60 * 60 * 1000 // 24 hours
-
-                        pipelineStatus.each { name, status ->
-                            if (status.lastSuccess && status.lastSuccess != 'Never') {
-                                // Would need actual timestamp comparison
-                            }
+                        if (currentBuild.result == 'UNSTABLE') {
+                            context.alert = 'Pipeline failures detected - review required'
                         }
 
-                        // Check for unhealthy services
-                        healthStatus.each { name, result ->
-                            if (result && !result.healthy) {
-                                if (name.contains('doorway')) {
-                                    recommendations.add("⚠️ ${name} is unhealthy - run elohim-edge with FORCE_DEPLOY=true")
-                                } else {
-                                    recommendations.add("⚠️ ${name} is unhealthy - check deployment status")
-                                }
-                            }
-                        }
-
-                        // Check for missing artifacts
-                        def happExists = getArtifactVersion('elohim-holochain', branch, 'holochain/dna/elohim/elohim.happ')
-                        if (!happExists) {
-                            recommendations.add("❌ No hApp artifact for ${branch} - run elohim-holochain pipeline")
-                        }
-
-                        echo """
-                        ═══════════════════════════════════════════════════════════
-                        📋 RECOMMENDATIONS
-                        ═══════════════════════════════════════════════════════════
-                        """
-
-                        if (recommendations.isEmpty()) {
-                            echo "✅ All systems nominal - no actions required"
-                        } else {
-                            recommendations.each { rec ->
-                                echo rec
-                            }
-                        }
-
-                        echo """
-                        ═══════════════════════════════════════════════════════════
-                        """
-
-                        // Set build description
-                        def healthyCount = healthStatus.findAll { k, v -> v?.healthy }.size()
-                        def totalHealth = healthStatus.size()
-                        currentBuild.description = "Health: ${healthyCount}/${totalHealth} | Recommendations: ${recommendations.size()}"
+                        notifyClaudeAgent(context)
                     }
                 }
             }
@@ -383,20 +485,39 @@ spec:
 
     post {
         always {
-            echo """
-            ═══════════════════════════════════════════════════════════
-            📊 ORCHESTRATOR COMPLETE
-            ═══════════════════════════════════════════════════════════
-            Next scheduled run: ~15 minutes
-            Manual trigger: Build with Parameters
-            ═══════════════════════════════════════════════════════════
-            """
+            script {
+                def results = readJSON(text: env.BUILD_RESULTS ?: '{}')
+                def health = readJSON(text: env.HEALTH_RESULTS ?: '{}')
+
+                def successCount = results.count { k, v -> v }
+                def failCount = results.count { k, v -> !v }
+                def healthyCount = health.count { k, v -> v?.healthy }
+
+                echo """
+                ═══════════════════════════════════════════════════════════
+                📊 ORCHESTRATOR SUMMARY
+                ═══════════════════════════════════════════════════════════
+                Branch: ${env.BRANCH_NAME}
+                Pipelines: ✅ ${successCount} succeeded, ❌ ${failCount} failed
+                Services: ${healthyCount}/${health.size()} healthy
+
+                ${failCount > 0 ? '⚠️ Review failed pipelines above' : '✅ All systems nominal'}
+                ═══════════════════════════════════════════════════════════
+                """
+            }
         }
-        unstable {
-            echo """
-            ⚠️ ATTENTION REQUIRED
-            One or more services need attention. Check recommendations above.
-            """
+        failure {
+            script {
+                if (CLAUDE_AGENT_WEBHOOK) {
+                    notifyClaudeAgent([
+                        event: 'orchestrator_failed',
+                        branch: env.BRANCH_NAME,
+                        build: env.BUILD_NUMBER,
+                        url: env.BUILD_URL,
+                        alert: 'Orchestrator pipeline itself failed - immediate attention required'
+                    ])
+                }
+            }
         }
     }
 }

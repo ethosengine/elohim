@@ -201,7 +201,43 @@ spec:
         skipDefaultCheckout(true)
     }
 
+    // No triggers - orchestrator handles all webhook events
+    // triggers { }
+
     stages {
+        stage('Check Trigger') {
+            steps {
+                script {
+                    // Only allow manual triggers or orchestrator triggers
+                    def validTrigger = currentBuild.getBuildCauses().any { cause ->
+                        cause._class.contains('UserIdCause') ||      // Manual trigger
+                        cause._class.contains('UpstreamCause')       // Triggered by orchestrator
+                    }
+
+                    if (!validTrigger) {
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        ⏭️ PIPELINE BLOCKED - USE ORCHESTRATOR
+                        ═══════════════════════════════════════════════════════════
+                        This pipeline is managed by elohim-orchestrator.
+                        Direct webhook triggers are disabled.
+
+                        To trigger this pipeline:
+                        1. Push to GitHub → orchestrator analyzes → triggers this
+                        2. Or manually: Build with Parameters
+
+                        Triggered by: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}
+                        ═══════════════════════════════════════════════════════════
+                        """
+                        currentBuild.result = 'NOT_BUILT'
+                        error('Use orchestrator or manual trigger')
+                    }
+
+                    echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
+                }
+            }
+        }
+
         stage('Checkout') {
             // Always checkout - other stages have their own when conditions
             steps {
