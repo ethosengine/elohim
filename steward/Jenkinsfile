@@ -96,6 +96,40 @@ spec:
     }
 
     stages {
+        stage('Check Trigger') {
+            steps {
+                script {
+                    // Steward builds are release artifacts - only run when manually triggered
+                    def isManualTrigger = currentBuild.getBuildCauses().any { cause ->
+                        cause._class.contains('UserIdCause')
+                    }
+
+                    if (!isManualTrigger) {
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        ⏭️ SKIPPING STEWARD BUILD
+                        ═══════════════════════════════════════════════════════════
+                        Steward builds desktop/mobile release artifacts and should
+                        only run when explicitly triggered for a release.
+
+                        To build Steward:
+                        1. Go to Jenkins → elohim-steward → your branch
+                        2. Click "Build with Parameters"
+                        3. Set HAPP_VERSION, UI_VERSION as needed
+                        4. Check PUBLISH_RELEASE if releasing to GitHub
+
+                        Triggered by: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}
+                        ═══════════════════════════════════════════════════════════
+                        """
+                        currentBuild.result = 'NOT_BUILT'
+                        error('Pipeline skipped - Steward only runs on manual trigger')
+                    }
+
+                    echo "✅ Manual trigger detected: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
+                }
+            }
+        }
+
         stage('Checkout') {
             steps {
                 container('builder') {
