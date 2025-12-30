@@ -189,7 +189,7 @@ spec:
 
     options {
         skipDefaultCheckout(true)
-        timeout(time: 60, unit: 'MINUTES')  // Increased from 45 for large seed datasets
+        timeout(time: 90, unit: 'MINUTES')  // Increased for large seed datasets (3500+ concepts)
         buildDiscarder(logRotator(numToKeepStr: '20'))
     }
 
@@ -386,14 +386,22 @@ IDs: ${seedIds ?: '(all content)'}
                             sh """#!/bin/bash
                                 set -euo pipefail
 
-                                echo "Running seeder..."
+                                echo "Running seeder (fast mode)..."
 
                                 SEED_CMD="npx tsx src/seed.ts"
                                 if [ -n "${seedIds}" ]; then
                                     SEED_CMD="\$SEED_CMD --ids ${seedIds}"
                                 fi
 
-                                HOLOCHAIN_ADMIN_URL="ws://${internalDoorway}?apiKey=dev-elohim-auth-2024" \
+                                # CI uses doorway HTTP import: blob upload + queue import
+                                # - DOORWAY_URL: HTTP endpoint for blob uploads and queue_import
+                                # - DOORWAY_API_KEY: Authentication for admin endpoints
+                                # - SEED_FAST_MODE: Skip inter-batch delays (DB starts empty)
+                                # - SEED_BATCH_SIZE: 100 concepts per batch
+                                DOORWAY_URL="http://${internalDoorway}" \
+                                DOORWAY_API_KEY="dev-elohim-auth-2024" \
+                                SEED_FAST_MODE=true \
+                                SEED_BATCH_SIZE=100 \
                                     \$SEED_CMD
 
                                 echo ""
