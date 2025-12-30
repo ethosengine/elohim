@@ -427,7 +427,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         def wasmDir = 'holochain/holochain-cache-core/pkg'
 
                         // First, try current branch
-                        def branchUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
+                        def branchUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
                         def fetchedFromBranch = sh(
                             script: """
                                 mkdir -p '${wasmDir}'
@@ -442,7 +442,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                         if (!fetchedFromBranch) {
                             echo "WASM not found for branch ${env.BRANCH_NAME}, trying dev..."
-                            def devUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
+                            def devUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/dev/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
                             def fetchedFromDev = sh(
                                 script: """
                                     mkdir -p '${wasmDir}'
@@ -457,7 +457,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             if (!fetchedFromDev) {
                                 echo "WASM not found in dev, trying main..."
-                                def mainUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
+                                def mainUrl = "https://jenkins.ethosengine.com/job/elohim-dna/job/main/lastSuccessfulBuild/artifact/holochain/holochain-cache-core/pkg/"
                                 def fetchedFromMain = sh(
                                     script: """
                                         mkdir -p '${wasmDir}'
@@ -952,7 +952,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         // Note: Holochain infrastructure (holochain/**) is built by a separate pipeline
-        // (elohim-holochain) that triggers independently via webhook when holochain files change.
+        // (elohim-edge) that triggers independently via webhook when holochain files change.
         // This avoids duplicate builds and allows parallel execution.
 
         stage('Deploy to Staging') {
@@ -1100,7 +1100,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         VERIFYING HOLOCHAIN INFRASTRUCTURE
                         ═══════════════════════════════════════════════════════════
                         Alpha and Staging apps use: doorway-dev.elohim.host
-                        Seeding is managed by: elohim-holochain pipeline
+                        Seeding is managed by: elohim-genesis pipeline
                         ═══════════════════════════════════════════════════════════
                         """
 
@@ -1116,7 +1116,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             echo "Holochain Edge Node: Running"
                         } else {
                             echo "Holochain Edge Node: Not available (${holochainStatus} replicas)"
-                            echo "Run elohim-holochain pipeline with FORCE_DEPLOY=true"
+                            echo "Run elohim-edge pipeline with FORCE_DEPLOY=true"
                         }
 
                         // Check holochain connectivity with retry
@@ -1141,7 +1141,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         } else {
                             echo "Holochain Gateway: Unhealthy (HTTP ${holochainHealth})"
                             echo "App will work but holochain features may be unavailable"
-                            echo "Run elohim-holochain pipeline with FORCE_DEPLOY=true to fix"
+                            echo "Run elohim-edge pipeline with FORCE_DEPLOY=true to fix"
                         }
 
                         echo """
@@ -1151,7 +1151,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         Edge Node: ${holochainStatus == "1" ? "Running" : "Unavailable"}
                         Gateway: ${holochainHealth == "200" ? "Healthy" : "Unhealthy"}
 
-                        Note: Database seeding is managed by elohim-holochain pipeline.
+                        Note: Database seeding is managed by elohim-genesis pipeline.
                         To force seed, run that pipeline with FORCE_SEED=true.
                         ═══════════════════════════════════════════════════════════
                         """

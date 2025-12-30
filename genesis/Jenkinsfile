@@ -196,10 +196,10 @@ spec:
     triggers {
         // Only run when upstream pipelines succeed:
         // - elohim-dna: provides the hApp artifact for seeding
-        // - elohim-holochain: provides the doorway/edgenode infrastructure
+        // - elohim-edge: provides the doorway/edgenode infrastructure
         // - elohim: provides the app for BDD tests
         upstream(
-            upstreamProjects: "elohim-dna/${env.BRANCH_NAME},elohim-holochain/${env.BRANCH_NAME},elohim/${env.BRANCH_NAME}",
+            upstreamProjects: "elohim-dna/${env.BRANCH_NAME},elohim-edge/${env.BRANCH_NAME},elohim/${env.BRANCH_NAME}",
             threshold: hudson.model.Result.SUCCESS
         )
     }
@@ -215,7 +215,7 @@ spec:
                     }
 
                     if (!validTrigger) {
-                        echo "⏭️ Skipping: Genesis pipeline only runs on upstream triggers (elohim-holochain, elohim) or manual builds"
+                        echo "⏭️ Skipping: Genesis pipeline only runs on upstream triggers (elohim-dna, elohim-edge, elohim) or manual builds"
                         echo "   Triggered by: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
                         currentBuild.result = 'NOT_BUILT'
                         error('Pipeline skipped - not triggered by upstream build')

@@ -9,7 +9,7 @@
  *   - holochain-cache-core WASM module (for elohim-app)
  *
  * Downstream consumers:
- *   - elohim-holochain (fetches hApp for container images)
+ *   - elohim-edge (fetches hApp for container images)
  *   - elohim-app (fetches holochain-cache-core WASM)
  *   - genesis (requires hApp to be deployed before seeding)
  *   - steward (fetches hApp for desktop builds)
@@ -316,7 +316,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             - Commit: ${props.GIT_COMMIT_HASH ?: 'unknown'}
 
                             Downstream pipelines can fetch this artifact:
-                            - elohim-holochain: Container images
+                            - elohim-edge: Container images
                             - elohim-app: WASM cache core
                             - steward: Desktop app builds
                             ═══════════════════════════════════════════════════════════
@@ -342,7 +342,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
             To trigger infrastructure rebuild:
             - Push to holochain/doorway/**, holochain/edgenode/**, or holochain/manifests/**
-            - Or run elohim-holochain with FORCE_BUILD=true
+            - Or run elohim-edge with FORCE_BUILD=true
             ═══════════════════════════════════════════════════════════
             """
         }
