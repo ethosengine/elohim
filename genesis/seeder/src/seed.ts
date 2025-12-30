@@ -633,12 +633,303 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
 }
 
 /**
+ * Doorway-only seeding: All traffic goes through HTTP, no WebSocket needed
+ *
+ * Flow:
+ * 1. Load content files from disk
+ * 2. Upload blob to doorway (doorway forwards to storage)
+ * 3. Queue import with blob_hash (doorway calls zome)
+ * 4. Optionally poll for status
+ * 5. Repeat for paths
+ */
+async function seedViaDoorway() {
+  timer.startPhase('Doorway Import');
+
+  // Create doorway client
+  const doorwayClient = new DoorwayClient({
+    baseUrl: DOORWAY_URL!,
+    apiKey: DOORWAY_API_KEY,
+    timeout: 120000, // 2 min for large blob uploads
+    retries: 3,
+  });
+
+  // Check doorway health
+  console.log('\n🏥 Checking doorway health...');
+  const health = await doorwayClient.checkHealth();
+  if (!health.healthy) {
+    console.error(`❌ Doorway not healthy: ${health.error}`);
+    console.error('   Cannot proceed with doorway import. Exiting.');
+    process.exit(1);
+  }
+  console.log(`✅ Doorway healthy (v${health.version || 'unknown'}, cache=${health.cacheEnabled ? 'on' : 'off'})`);
+
+  // ========================================
+  // LOAD CONTENT
+  // ========================================
+  timer.startPhase('Content Loading');
+  console.log('\n📚 Loading content from data/lamad/content/...');
+  const contentDir = path.join(DATA_DIR, 'content');
+  const conceptFiles = findJsonFiles(contentDir);
+  console.log(`   Found ${conceptFiles.length} concept files`);
+
+  const allConcepts: { concept: ConceptJson; file: string }[] = [];
+  let loadErrorCount = 0;
+
+  for (const file of conceptFiles) {
+    const concept = loadJson<ConceptJson>(file);
+    if (concept) {
+      if (!concept.id || !concept.title) {
+        const reason = !concept.id && !concept.title ? 'missing id and title'
+          : !concept.id ? 'missing id' : 'missing title';
+        console.warn(`   ⚠️ Skipping ${path.basename(file)}: ${reason}`);
+        timer.recordSkipped(path.basename(file), reason);
+        loadErrorCount++;
+        continue;
+      }
+      allConcepts.push({ concept, file });
+    } else {
+      timer.recordSkipped(path.basename(file), 'failed to parse JSON');
+      loadErrorCount++;
+    }
+  }
+  console.log(`   Loaded ${allConcepts.length} concepts (${loadErrorCount} failed)`);
+
+  // Apply filters
+  let filteredConcepts = allConcepts;
+  if (IDS.length > 0) {
+    filteredConcepts = allConcepts.filter(({ concept }) => IDS.includes(concept.id));
+    console.log(`   Filtered to ${filteredConcepts.length} concepts matching IDs`);
+  }
+  if (LIMIT > 0 && filteredConcepts.length > LIMIT) {
+    filteredConcepts = filteredConcepts.slice(0, LIMIT);
+    console.log(`   Limited to ${LIMIT} concepts`);
+  }
+
+  timer.endPhase('Content Loading');
+
+  // ========================================
+  // UPLOAD & IMPORT CONTENT
+  // ========================================
+  if (filteredConcepts.length > 0) {
+    timer.startPhase('Content Import');
+    console.log(`\n🚀 Importing ${filteredConcepts.length} concepts via doorway...`);
+
+    // Convert to zome inputs
+    const allInputs = filteredConcepts.map(({ concept, file }) => {
+      const relativePath = file.replace(DATA_DIR + '/', '');
+      return conceptToInput(concept, relativePath);
+    });
+
+    // Step 1: Upload items as blob
+    const itemsJson = JSON.stringify(allInputs);
+    const itemsBuffer = Buffer.from(itemsJson, 'utf-8');
+    console.log(`   📦 Uploading content blob: ${(itemsBuffer.length / 1024 / 1024).toFixed(2)} MB`);
+
+    const blobHash = StorageClient.computeHash(itemsBuffer);
+    const uploadResult = await timer.timeOperation('content_blob_upload', () =>
+      doorwayClient.pushBlob(blobHash, itemsBuffer, {
+        hash: blobHash,
+        mimeType: 'application/json',
+        sizeBytes: itemsBuffer.length,
+      })
+    );
+
+    if (!uploadResult.success) {
+      console.error(`   ❌ Blob upload failed: ${uploadResult.error}`);
+      process.exit(1);
+    }
+    console.log(`   ✅ Blob uploaded: ${blobHash.slice(0, 30)}...${uploadResult.cached ? ' (cached)' : ''}`);
+
+    // Step 2: Queue import
+    const batchId = `seed-content-${Date.now()}`;
+    console.log(`   📤 Queuing import "${batchId}"...`);
+
+    const queueResult = await timer.timeOperation('content_queue_import', () =>
+      doorwayClient.queueImport('content', {
+        batch_id: batchId,
+        blob_hash: blobHash,
+        total_items: allInputs.length,
+        schema_version: 1,
+      })
+    ) as ImportStatusResponse & { batch_id: string; queued_count: number; processing: boolean };
+
+    console.log(`   ✅ Import queued: ${queueResult.batch_id} (${queueResult.queued_count} items)`);
+
+    // Step 3: Poll for completion (optional)
+    const POLL_STATUS = process.env.SEED_POLL_STATUS !== 'false';
+    const POLL_INTERVAL_MS = parseInt(process.env.SEED_POLL_INTERVAL || '5000', 10);
+    const POLL_TIMEOUT_MS = parseInt(process.env.SEED_POLL_TIMEOUT || '300000', 10);
+
+    if (POLL_STATUS) {
+      console.log(`   ⏳ Waiting for import to complete...`);
+      console.log(`      (Poll interval=${POLL_INTERVAL_MS}ms, timeout=${POLL_TIMEOUT_MS}ms)`);
+
+      const startTime = Date.now();
+      let lastProcessed = 0;
+      let finalStatus: ImportStatusResponse | null = null;
+
+      while (Date.now() - startTime < POLL_TIMEOUT_MS) {
+        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+
+        const status = await doorwayClient.getImportStatus('content', batchId);
+        if (!status) {
+          console.warn(`      ⚠️ Batch ${batchId} not found`);
+          break;
+        }
+
+        if (status.processed_count !== lastProcessed) {
+          const pct = ((status.processed_count / status.total_items) * 100).toFixed(1);
+          console.log(`      Progress: ${status.processed_count}/${status.total_items} (${pct}%) - ${status.status}`);
+          lastProcessed = status.processed_count;
+        }
+
+        if (status.status === 'completed' || status.status === 'failed') {
+          finalStatus = status;
+          break;
+        }
+      }
+
+      if (finalStatus) {
+        if (finalStatus.error_count > 0 && finalStatus.errors.length > 0) {
+          console.log(`   ⚠️ ${finalStatus.errors.length} errors during import:`);
+          for (const err of finalStatus.errors.slice(0, 5)) {
+            console.error(`      • ${err}`);
+          }
+          if (finalStatus.errors.length > 5) {
+            console.error(`      ... and ${finalStatus.errors.length - 5} more`);
+          }
+        }
+        console.log(`   ✅ Content import ${finalStatus.status}: ${finalStatus.processed_count - finalStatus.error_count} succeeded, ${finalStatus.error_count} failed`);
+      } else {
+        console.warn(`   ⚠️ Polling timeout - batch may still be processing`);
+        console.log(`      Check status: GET ${DOORWAY_URL}/import/content/${batchId}`);
+      }
+    } else {
+      console.log(`   ℹ️ Not polling - batch queued for background processing`);
+      console.log(`      Check status: GET ${DOORWAY_URL}/import/content/${batchId}`);
+    }
+
+    timer.endPhase('Content Import');
+  }
+
+  // ========================================
+  // LOAD & IMPORT PATHS
+  // ========================================
+  timer.startPhase('Path Loading');
+  console.log('\n📍 Loading paths from data/lamad/paths/...');
+  const pathsDir = path.join(DATA_DIR, 'paths');
+  const pathFiles = fs.existsSync(pathsDir) ? findJsonFiles(pathsDir) : [];
+  console.log(`   Found ${pathFiles.length} path files`);
+
+  const allPaths: { pathData: any; file: string }[] = [];
+  for (const file of pathFiles) {
+    if (path.basename(file) === 'index.json') continue; // Skip index files
+    const pathData = loadJson<any>(file);
+    if (pathData && pathData.id && pathData.title) {
+      allPaths.push({ pathData, file });
+    }
+  }
+  console.log(`   Loaded ${allPaths.length} valid paths`);
+  timer.endPhase('Path Loading');
+
+  if (allPaths.length > 0) {
+    timer.startPhase('Path Import');
+    console.log(`\n🚀 Importing ${allPaths.length} paths via doorway...`);
+
+    // Convert paths to zome inputs
+    const pathInputs = allPaths.map(({ pathData }) => ({
+      id: pathData.id,
+      version: pathData.version || '1.0.0',
+      title: pathData.title,
+      description: pathData.description || '',
+      purpose: pathData.purpose || null,
+      difficulty: pathData.difficulty || 'beginner',
+      estimated_duration: pathData.estimatedDuration || null,
+      visibility: pathData.visibility || 'public',
+      path_type: pathData.pathType || 'linear',
+      tags: pathData.tags || [],
+      metadata_json: JSON.stringify(pathData.chapters || pathData.metadata || {}),
+      steps: (pathData.steps || pathData.conceptIds?.map((id: string, i: number) => ({
+        step_type: 'content',
+        resource_id: id,
+        order_index: i,
+      })) || []),
+    }));
+
+    // Upload paths blob
+    const pathsJson = JSON.stringify(pathInputs);
+    const pathsBuffer = Buffer.from(pathsJson, 'utf-8');
+    console.log(`   📦 Uploading paths blob: ${(pathsBuffer.length / 1024).toFixed(2)} KB`);
+
+    const pathsBlobHash = StorageClient.computeHash(pathsBuffer);
+    const pathsUploadResult = await doorwayClient.pushBlob(pathsBlobHash, pathsBuffer, {
+      hash: pathsBlobHash,
+      mimeType: 'application/json',
+      sizeBytes: pathsBuffer.length,
+    });
+
+    if (!pathsUploadResult.success) {
+      console.error(`   ❌ Paths blob upload failed: ${pathsUploadResult.error}`);
+    } else {
+      console.log(`   ✅ Paths blob uploaded: ${pathsBlobHash.slice(0, 30)}...`);
+
+      // Queue paths import
+      const pathsBatchId = `seed-paths-${Date.now()}`;
+      console.log(`   📤 Queuing paths import "${pathsBatchId}"...`);
+
+      try {
+        const pathsQueueResult = await doorwayClient.queueImport('paths', {
+          batch_id: pathsBatchId,
+          blob_hash: pathsBlobHash,
+          total_items: pathInputs.length,
+          schema_version: 1,
+        });
+        console.log(`   ✅ Paths import queued: ${pathsQueueResult.batch_id}`);
+      } catch (pathErr: any) {
+        console.warn(`   ⚠️ Paths import queue failed: ${pathErr.message}`);
+        console.log(`      (Paths import may not be implemented yet in the zome)`);
+      }
+    }
+
+    timer.endPhase('Path Import');
+  }
+
+  // ========================================
+  // SUMMARY
+  // ========================================
+  timer.endPhase('Doorway Import');
+  console.log('\n' + '='.repeat(70));
+  console.log('✅ DOORWAY SEEDING COMPLETE');
+  console.log('='.repeat(70));
+  timer.printTimings();
+  console.log('='.repeat(70));
+}
+
+/**
  * Main seeding function
  */
 async function seed() {
   console.log('🌱 Holochain Content Seeder (JSON mode)');
   console.log(`📁 Data directory: ${DATA_DIR}`);
-  console.log(`🔌 Admin WebSocket: ${ADMIN_WS_URL}`);
+
+  // =====================================================
+  // DOORWAY-ONLY MODE: Skip WebSocket, use HTTP entirely
+  // =====================================================
+  // When DOORWAY_URL is set, we use the doorway as the sole entry point.
+  // No WebSocket connection needed - doorway handles everything.
+  if (USE_DOORWAY) {
+    console.log(`🌐 Mode: Doorway HTTP (${DOORWAY_URL})`);
+    if (IDS.length > 0) console.log(`🎯 Filtering to IDs: ${IDS.join(', ')}`);
+    if (LIMIT > 0) console.log(`📊 Limit: ${LIMIT}`);
+
+    await seedViaDoorway();
+    return;
+  }
+
+  // =====================================================
+  // LEGACY MODE: Direct WebSocket to conductor
+  // =====================================================
+  console.log(`🔌 Mode: WebSocket (${ADMIN_WS_URL})`);
   if (IDS.length > 0) console.log(`🎯 Filtering to IDs: ${IDS.join(', ')}`);
   if (LIMIT > 0) console.log(`📊 Limit: ${LIMIT}`);
 
