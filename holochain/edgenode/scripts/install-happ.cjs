@@ -13,7 +13,7 @@
  *   RETRY_DELAY_MS - Delay between retries in ms (default: 2000)
  */
 
-import { AdminWebsocket } from '@holochain/client';
+const { AdminWebsocket } = require('@holochain/client');
 
 const CONDUCTOR_URL = process.env.CONDUCTOR_URL || 'ws://localhost:4444';
 const HAPP_PATH = process.env.HAPP_PATH || '/opt/holochain/elohim.happ';
