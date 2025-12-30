@@ -14,6 +14,7 @@ use doorway::{
     orchestrator::{Orchestrator, OrchestratorConfig, OrchestratorState},
     projection::{EngineConfig, ProjectionEngine, SubscriberConfig, spawn_engine_task, spawn_subscriber},
     server,
+    services::{DiscoveryConfig, spawn_discovery_task},
     worker::{PoolConfig, WorkerPool},
 };
 
@@ -142,6 +143,26 @@ async fn main() -> anyhow::Result<()> {
     };
     state.orchestrator = orchestrator_state.clone();
     let state = Arc::new(state);
+
+    // Start zome capability discovery (import configs, cache rules)
+    // This populates zome_configs and import_config_store for route matching
+    if let Some(ref import_config_store) = state.import_config_store {
+        let discovery_config = DiscoveryConfig {
+            admin_url: args.conductor_url.clone(),
+            installed_app_id: args.installed_app_id.clone(),
+            zome_name: "content_store".to_string(), // TODO: make configurable
+            ..DiscoveryConfig::default()
+        };
+
+        let _discovery_handle = spawn_discovery_task(
+            discovery_config,
+            Arc::clone(&state.zome_configs),
+            Arc::clone(import_config_store),
+        );
+        info!("Zome capability discovery started (import routes will be available after discovery completes)");
+    } else {
+        warn!("Import config store not initialized, skipping zome discovery");
+    }
 
     // Start Projection Engine (if projection store is available)
     // Note: In dev mode, the signal subscriber is disabled because:

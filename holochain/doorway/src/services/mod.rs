@@ -11,8 +11,10 @@
 //! - **ShardResolver**: Native Holochain blob resolution via elohim-storage
 //! - **ImportOrchestrator**: Batch import processing (elohim-store → zome)
 //! - **ImportConfig**: Zome-declared import capability discovery
+//! - **Discovery**: Runtime discovery of zome capabilities from conductor
 
 pub mod custodian;
+pub mod discovery;
 pub mod import_config;
 pub mod import_orchestrator;
 pub mod recording;
@@ -45,4 +47,7 @@ pub use import_orchestrator::{
     BlobStore, ChunkResult, ImportError, ImportOrchestrator, ImportOrchestratorConfig,
     ImportProgress, ImportStatus, InMemoryBlobStore, StartImportInput, StartImportOutput,
     ZomeClient,
+};
+pub use discovery::{
+    CellInfo, DiscoveryConfig, DiscoveryResult, DiscoveryService, spawn_discovery_task,
 };
