@@ -434,7 +434,7 @@ async fn handle_request(
     let response = match (method, path.as_str()) {
         // Health check endpoints
         (Method::GET, "/health") | (Method::GET, "/healthz") => {
-            to_boxed(routes::health_check(&state.args))
+            to_boxed(routes::health_check(Arc::clone(&state)))
         }
 
         // CORS preflight

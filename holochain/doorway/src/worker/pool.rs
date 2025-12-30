@@ -7,6 +7,7 @@
 //!
 //! Use this for single-node deployments. Use NATS for distributed multi-node setups.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot, Semaphore};
@@ -54,6 +55,10 @@ pub struct WorkerPool {
     semaphore: Arc<Semaphore>,
     /// Request timeout
     timeout: Duration,
+    /// Number of workers currently connected to conductor
+    connected_workers: Arc<AtomicUsize>,
+    /// Total number of workers
+    worker_count: usize,
 }
 
 impl WorkerPool {
@@ -64,6 +69,7 @@ impl WorkerPool {
 
         let semaphore = Arc::new(Semaphore::new(config.max_queue_size));
         let timeout = Duration::from_millis(config.request_timeout_ms);
+        let connected_workers = Arc::new(AtomicUsize::new(0));
 
         info!(
             "Starting worker pool with {} workers, connecting to {}",
@@ -75,9 +81,10 @@ impl WorkerPool {
             let conductor_url = config.conductor_url.clone();
             let request_rx = Arc::clone(&request_rx);
             let timeout_ms = config.request_timeout_ms;
+            let connected_workers = Arc::clone(&connected_workers);
 
             tokio::spawn(async move {
-                worker_task(i, conductor_url, request_rx, timeout_ms).await;
+                worker_task(i, conductor_url, request_rx, timeout_ms, connected_workers).await;
             });
         }
 
@@ -87,6 +94,8 @@ impl WorkerPool {
             request_tx,
             semaphore,
             timeout,
+            connected_workers,
+            worker_count: config.worker_count,
         })
     }
 
@@ -121,6 +130,21 @@ impl WorkerPool {
     pub fn queue_depth(&self) -> usize {
         self.semaphore.available_permits()
     }
+
+    /// Check if the worker pool is healthy (at least one worker connected to conductor)
+    pub fn is_healthy(&self) -> bool {
+        self.connected_workers.load(Ordering::Relaxed) > 0
+    }
+
+    /// Get the number of workers currently connected to conductor
+    pub fn connected_count(&self) -> usize {
+        self.connected_workers.load(Ordering::Relaxed)
+    }
+
+    /// Get the total number of workers
+    pub fn worker_count(&self) -> usize {
+        self.worker_count
+    }
 }
 
 /// Worker task that processes requests from the pool
@@ -129,6 +153,7 @@ async fn worker_task(
     conductor_url: String,
     request_rx: Arc<tokio::sync::Mutex<mpsc::Receiver<PoolRequest>>>,
     timeout_ms: u64,
+    connected_workers: Arc<AtomicUsize>,
 ) {
     info!("Worker {} starting, connecting to {}", worker_id, conductor_url);
 
@@ -136,7 +161,13 @@ async fn worker_task(
         // Connect to conductor (with reconnection logic built-in)
         let conductor = match ConductorConnection::connect(&conductor_url).await {
             Ok(c) => {
-                info!("Worker {} connected to conductor", worker_id);
+                // Increment connected counter
+                connected_workers.fetch_add(1, Ordering::Relaxed);
+                info!(
+                    "Worker {} connected to conductor ({} workers now connected)",
+                    worker_id,
+                    connected_workers.load(Ordering::Relaxed)
+                );
                 c
             }
             Err(e) => {
@@ -154,20 +185,34 @@ async fn worker_task(
                 match rx.recv().await {
                     Some(r) => r,
                     None => {
+                        // Channel closed, decrement and shutdown
+                        connected_workers.fetch_sub(1, Ordering::Relaxed);
                         info!("Worker {} shutting down (channel closed)", worker_id);
                         return;
                     }
                 }
             };
 
-            info!("Worker {} processing request ({} bytes)", worker_id, request.payload.len());
+            debug!("Worker {} processing request ({} bytes)", worker_id, request.payload.len());
 
             // Send to conductor
             let result = conductor.request(request.payload, timeout_ms).await;
 
             match &result {
-                Ok(data) => info!("Worker {} got response ({} bytes)", worker_id, data.len()),
-                Err(e) => error!("Worker {} request failed: {}", worker_id, e),
+                Ok(data) => debug!("Worker {} got response ({} bytes)", worker_id, data.len()),
+                Err(e) => {
+                    error!("Worker {} request failed: {}", worker_id, e);
+                    // Connection likely lost, decrement and reconnect
+                    connected_workers.fetch_sub(1, Ordering::Relaxed);
+                    info!(
+                        "Worker {} disconnected ({} workers now connected)",
+                        worker_id,
+                        connected_workers.load(Ordering::Relaxed)
+                    );
+                    // Send error response and break to reconnect
+                    let _ = request.response_tx.send(result);
+                    break;
+                }
             }
 
             // Send response back
