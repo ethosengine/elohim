@@ -329,7 +329,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             ═══════════════════════════════════════════════════════════
 
                             Artifact URL (for downstream consumers):
-                            ${env.BUILD_URL}artifact/holochain/dna/elohim/elohim.happ
+                            ${env.BUILD_URL}artifact/elohim.happ
 
                             Build Details:
                             - Version: ${props.IMAGE_TAG ?: 'unknown'}

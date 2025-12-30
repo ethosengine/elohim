@@ -153,16 +153,7 @@ spec:
         }
 
         stage('Setup Nix Cache') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'dev'
-                    changeset "steward/**"
-                    changeset "holochain/dna/**"
-                    changeset "elohim-app/src/**"
-                    changeset "VERSION"
-                }
-            }
+            // Manual-only pipeline - no changeset conditions needed
             steps {
                 container('builder') {
                     dir('steward') {
@@ -180,16 +171,7 @@ spec:
         }
 
         stage('📦 Fetch hApp Artifact') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'dev'
-                    changeset "steward/**"
-                    changeset "holochain/dna/**"
-                    changeset "elohim-app/src/**"
-                    changeset "VERSION"
-                }
-            }
+            // Manual-only pipeline - no changeset conditions needed
             steps {
                 container('builder') {
                     dir('steward') {
@@ -208,7 +190,7 @@ spec:
                             // 2. Fall back to local build (slow, ~20-40 min)
                             // 3. Error if neither works
 
-                            def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/holochain/dna/elohim/elohim.happ"
+                            def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/elohim.happ"
 
                             // Ensure workdir exists
                             sh 'mkdir -p workdir'
@@ -290,15 +272,7 @@ spec:
         }
 
         stage('📱 Fetch UI') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'dev'
-                    changeset "steward/**"
-                    changeset "elohim-app/src/**"
-                    changeset "VERSION"
-                }
-            }
+            // Manual-only pipeline - no changeset conditions needed
             steps {
                 container('builder') {
                     dir('steward') {
@@ -356,16 +330,7 @@ spec:
         }
 
         stage('Build Steward App - Linux') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'dev'
-                    changeset "steward/**"
-                    changeset "holochain/dna/**"
-                    changeset "elohim-app/src/**"
-                    changeset "VERSION"
-                }
-            }
+            // Manual-only pipeline - no changeset conditions needed
             steps {
                 container('builder') {
                     dir('steward') {
