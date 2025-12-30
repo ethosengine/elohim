@@ -1,7 +1,9 @@
 # hApp Installer Container
 # Installs the hApp on conductor startup as a sidecar
 
-FROM node:20-alpine
+# Use slim instead of alpine for better ESM module compatibility
+# (libsodium-wrappers has ESM resolution issues on Alpine)
+FROM node:20-slim
 
 WORKDIR /app
 
