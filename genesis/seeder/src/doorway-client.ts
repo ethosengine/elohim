@@ -40,6 +40,12 @@ export interface HealthStatus {
   healthy: boolean;
   version?: string;
   cacheEnabled: boolean;
+  /** Conductor connection status - seeder should check this before seeding! */
+  conductor?: {
+    connected: boolean;
+    connected_workers: number;
+    total_workers: number;
+  };
   error?: string;
 }
 
@@ -107,7 +113,11 @@ export class DoorwayClient {
   }
 
   /**
-   * Check doorway health and cache availability.
+   * Check doorway health, conductor connectivity, and cache availability.
+   *
+   * IMPORTANT: The seeder should verify `conductor.connected === true` before
+   * attempting to seed. The doorway's /health endpoint now returns conductor
+   * status in the response body.
    */
   async checkHealth(): Promise<HealthStatus> {
     try {
@@ -125,10 +135,23 @@ export class DoorwayClient {
       }
 
       const data = await response.json();
+
+      // Check conductor connectivity - this is critical for seeding
+      const conductorConnected = data.conductor?.connected ?? false;
+      const conductorWorkers = data.conductor?.connected_workers ?? 0;
+      const totalWorkers = data.conductor?.total_workers ?? 0;
+
+      // Include conductor status in health response
       return {
-        healthy: true,
+        healthy: conductorConnected, // Only healthy if conductor is connected
         version: data.version,
         cacheEnabled: data.cache?.enabled ?? true,
+        conductor: {
+          connected: conductorConnected,
+          connected_workers: conductorWorkers,
+          total_workers: totalWorkers,
+        },
+        error: conductorConnected ? undefined : data.error || `Conductor not connected (${conductorWorkers}/${totalWorkers} workers)`,
       };
     } catch (error) {
       return {
