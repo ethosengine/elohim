@@ -12,12 +12,14 @@
 //! - **ImportOrchestrator**: Batch import processing (elohim-store → zome)
 //! - **ImportConfig**: Zome-declared import capability discovery
 //! - **Discovery**: Runtime discovery of zome capabilities from conductor
+//! - **RouteRegistry**: Dynamic route management from DNAs and external agents
 
 pub mod custodian;
 pub mod discovery;
 pub mod import_config;
 pub mod import_orchestrator;
 pub mod recording;
+pub mod route_registry;
 pub mod shard_resolver;
 pub mod verification;
 
@@ -49,5 +51,10 @@ pub use import_orchestrator::{
     ZomeClient,
 };
 pub use discovery::{
-    CellInfo, DiscoveryConfig, DiscoveryResult, DiscoveryService, spawn_discovery_task,
+    CellInfo, DiscoveryConfig, DiscoveryResult, DiscoveryService,
+    spawn_discovery_task, spawn_discovery_task_with_routes,
+};
+pub use route_registry::{
+    AgentRouteEntry, CompiledRoute, RouteRegistry, RouteRegistryConfig, RouteRegistryStats,
+    RouteSource, RouteTarget, spawn_cleanup_task as spawn_route_cleanup_task,
 };

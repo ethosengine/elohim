@@ -44,6 +44,9 @@ use serde::{Deserialize, Serialize};
 // Publishing module - content serving capabilities
 pub mod publish;
 
+// Route registration module - DNA-declared routes
+pub mod routes;
+
 // Re-export publishing types at crate root
 pub use publish::{
     Publishable,
@@ -56,6 +59,24 @@ pub use publish::{
     Html5AppManifest,
     FindPublishersInput,
     FindPublishersOutput,
+};
+
+// Re-export routes types at crate root
+pub use routes::{
+    ROUTES_FN,
+    ROUTES_PROTOCOL_VERSION,
+    DoorwayRoutes,
+    DoorwayRoutesBuilder,
+    Route,
+    RouteBuilder,
+    HttpMethod,
+    ReachCondition,
+    BlobProxyConfig,
+    StreamProxyConfig,
+    StreamFormat,
+    AgentRegistration,
+    AgentRegistrationResponse,
+    AgentCapability,
 };
 
 // =============================================================================

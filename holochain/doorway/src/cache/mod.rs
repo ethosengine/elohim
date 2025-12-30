@@ -1,7 +1,15 @@
 //! Caching layer for Doorway
 //!
-//! Provides in-memory LRU caching for Holochain zome calls to reduce
-//! conductor load and improve response times.
+//! Doorway is a thin web2 gateway (like Cloudflare) that COMPLEMENTS the P2P
+//! performance layer, not replaces it. Primary caching happens at the agent
+//! level via `holochain-cache-core` and `elohim-storage`.
+//!
+//! ## Doorway's Role
+//!
+//! - **CDN-style read caching**: Cache blob/shard reads for external clients
+//! - **Request coalescing**: Dedupe multiple clients requesting same content
+//! - **DDoS protection**: Rate limiting, auth for external requests
+//! - **NOT write batching**: That's the agent's job via holochain-cache-core
 //!
 //! ## Cache Rule Discovery
 //!
@@ -19,23 +27,26 @@
 //! - Automatic fallback when sources are unavailable
 //! - Learning from successful resolutions
 //!
-//! ## Write Buffer
+//! ## Delivery Relay (CDN Extension)
 //!
-//! The [`write_buffer`] module provides batched conductor writes:
-//! - Priority queues (High → Normal → Bulk)
-//! - Deduplication and retry logic
-//! - Backpressure signaling
+//! The [`delivery_relay`] module provides CDN-style delivery assistance:
+//! - Shard caching for Reed-Solomon P2P delivery
+//! - Request coalescing (dedupe concurrent requests)
+//! - Geographic routing hints
+//!
+//! This COMPLEMENTS agent-side `holochain-cache-core` - it does NOT replace it.
 
 pub mod access_control;
+pub mod delivery_relay;
 pub mod keys;
 pub mod reach_aware_serving;
 pub mod resolution;
 pub mod rules;
 pub mod store;
 pub mod tiered;
-pub mod write_buffer;
 
 pub use access_control::{can_serve_at_reach, geographic_distance, prioritize_sources, CustodianSource, RequesterContext};
+pub use delivery_relay::{DeliveryRelay, DeliveryRelayConfig, CoalescedRequest};
 pub use keys::CacheKey;
 pub use reach_aware_serving::{create_reach_aware_cache_key, extract_reach_from_response, should_serve_response, extract_requester_context};
 pub use resolution::{DoorwayResolver, ResolutionResult, ResolutionStats};
@@ -45,7 +56,6 @@ pub use tiered::{
     BlobMetadata, CaptionMetadata, TieredBlobCache, TieredCacheConfig, TieredCacheStats,
     TierStats, VariantMetadata, spawn_tiered_cleanup_task,
 };
-pub use write_buffer::{DoorwayWriteBuffer, WriteBufferConfig, FlushResult, WritePriority, WriteOpType};
 
 use std::time::Duration;
 

@@ -305,16 +305,30 @@ const APP_ID = 'elohim';
 // Role name is auto-detected from app's cell_info to support both 'elohim' and legacy 'lamad'
 const ZOME_NAME = 'content_store';
 
-// Doorway mode: POST to doorway HTTP routes instead of direct WebSocket calls
-// When set, seeder hammers doorway with HTTP calls which then orchestrates conductor writes
-const DOORWAY_URL = process.env.DOORWAY_URL; // e.g., 'https://doorway.elohim.host' or 'http://localhost:8080'
+// =============================================================================
+// DOORWAY MODE
+// =============================================================================
+// Doorway provides web access to agent services.
+// Primary mode for cloud/remote environments (Eclipse Che, production, etc.)
+//
+// Architecture:
+//   Seeder → Doorway → elohim-storage (blobs)
+//   Seeder → Doorway → Conductor (zome calls)
+//
+// Doorway provides:
+// - Web-accessible endpoints for remote development
+// - Authentication and rate limiting
+// - CDN-style caching for reads (DeliveryRelay)
+// =============================================================================
+
+// Doorway: Primary mode for remote access
+const DOORWAY_URL = process.env.DOORWAY_URL; // e.g., 'https://doorway-dev.elohim.host'
 const DOORWAY_API_KEY = process.env.DOORWAY_API_KEY;
 const USE_DOORWAY = !!DOORWAY_URL;
 
-// Elohim-storage: Blob storage for large import payloads
-// When set, seeder uploads blob first, then passes blob_hash to zome
-const STORAGE_URL = process.env.STORAGE_URL; // e.g., 'http://localhost:8090' or 'https://storage.elohim.host'
-const USE_STORAGE = !!STORAGE_URL;
+// Direct storage: Alternative for local-only development
+const STORAGE_URL = process.env.STORAGE_URL; // e.g., 'http://localhost:8090'
+const USE_STORAGE = !!STORAGE_URL && !USE_DOORWAY;
 
 /**
  * Read Holochain ports from .hc_ports file
@@ -633,14 +647,16 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
 }
 
 /**
- * Doorway-only seeding: All traffic goes through HTTP, no WebSocket needed
+ * Doorway mode seeding
+ *
+ * Routes all traffic through doorway - the primary mode for
+ * remote/cloud environments (Eclipse Che, production, etc.)
  *
  * Flow:
  * 1. Load content files from disk
- * 2. Upload blob to doorway (doorway forwards to storage)
- * 3. Queue import with blob_hash (doorway calls zome)
- * 4. Optionally poll for status
- * 5. Repeat for paths
+ * 2. Upload blob to doorway → doorway forwards to elohim-storage
+ * 3. Queue import with blob_hash → doorway calls zome
+ * 4. Poll for status → doorway calls zome
  */
 async function seedViaDoorway() {
   timer.startPhase('Doorway Import');
@@ -901,35 +917,57 @@ async function seedViaDoorway() {
   console.log('\n' + '='.repeat(70));
   console.log('✅ DOORWAY SEEDING COMPLETE');
   console.log('='.repeat(70));
-  timer.printTimings();
+  timer.printReport();
   console.log('='.repeat(70));
 }
 
 /**
  * Main seeding function
+ *
+ * Modes:
+ * 1. Doorway mode - for remote/cloud environments (Eclipse Che, production)
+ *    DOORWAY_URL=https://doorway-dev.elohim.host npm run seed
+ *
+ * 2. Direct mode - for local development with direct agent access
+ *    STORAGE_URL=http://localhost:8090 npm run seed
+ *
+ * 3. WebSocket-only mode - fallback when no blob storage configured
+ *    npm run seed
  */
 async function seed() {
   console.log('🌱 Holochain Content Seeder (JSON mode)');
   console.log(`📁 Data directory: ${DATA_DIR}`);
 
   // =====================================================
-  // DOORWAY-ONLY MODE: Skip WebSocket, use HTTP entirely
+  // MODE SELECTION (priority order)
   // =====================================================
-  // When DOORWAY_URL is set, we use the doorway as the sole entry point.
-  // No WebSocket connection needed - doorway handles everything.
+  // 1. Doorway mode - remote/cloud access via web gateway
+  // 2. Direct mode - local dev with direct agent access
+  // 3. WebSocket only - fallback without blob storage
+  // =====================================================
+
   if (USE_DOORWAY) {
-    console.log(`🌐 Mode: Doorway HTTP (${DOORWAY_URL})`);
+    console.log(`🌐 Mode: Doorway (remote access)`);
+    console.log(`   Doorway: ${DOORWAY_URL}`);
     if (IDS.length > 0) console.log(`🎯 Filtering to IDs: ${IDS.join(', ')}`);
     if (LIMIT > 0) console.log(`📊 Limit: ${LIMIT}`);
 
     await seedViaDoorway();
     return;
+  } else if (USE_STORAGE) {
+    console.log(`🚀 Mode: Direct Agent Connection`);
+    console.log(`   Storage: ${STORAGE_URL}`);
+    console.log(`   Conductor: ${ADMIN_WS_URL}`);
+    // Fall through to WebSocket mode which now uses STORAGE_URL for blobs
+  } else {
+    console.log(`🔌 Mode: WebSocket Only (no blob storage)`);
+    console.log(`   Conductor: ${ADMIN_WS_URL}`);
   }
 
   // =====================================================
-  // LEGACY MODE: Direct WebSocket to conductor
+  // DIRECT MODE: WebSocket to conductor (+ optional storage)
   // =====================================================
-  console.log(`🔌 Mode: WebSocket (${ADMIN_WS_URL})`);
+  console.log(`🔌 Connecting to: ${ADMIN_WS_URL}`);
   if (IDS.length > 0) console.log(`🎯 Filtering to IDs: ${IDS.join(', ')}`);
   if (LIMIT > 0) console.log(`📊 Limit: ${LIMIT}`);
 
@@ -1330,17 +1368,149 @@ async function seed() {
   let blobImportSucceeded = false;
 
   // ==============================================
-  // DOORWAY IMPORT: All traffic through doorway
+  // DIRECT STORAGE IMPORT (Recommended)
   // ==============================================
-  // Architecture: Doorway is the single entry point for all external traffic
-  // 1. Upload blob to doorway → doorway proxies to storage/peer-shards
-  // 2. Call doorway /import/content with blob_hash → doorway calls zome
-  // 3. Poll doorway for status → doorway calls zome
+  // Architecture: Seeder connects directly to agent services
+  // 1. Upload blob to elohim-storage → get blob_hash
+  // 2. Call zome queue_import with blob_hash via WebSocket
+  // 3. Poll zome for status via WebSocket
   //
-  // Requires: DOORWAY_URL only (doorway knows where storage is)
-  const USE_DOORWAY_IMPORT = !!DOORWAY_URL;
+  // This proves P2P performance: edgenode handles load without doorway
+  // ==============================================
+  const USE_DIRECT_STORAGE = !!STORAGE_URL;
 
-  if (USE_DOORWAY_IMPORT) {
+  // Legacy doorway import (DEPRECATED)
+  const USE_DOORWAY_IMPORT = !!DOORWAY_URL && !USE_DIRECT_STORAGE;
+
+  // ==============================================
+  // DIRECT STORAGE MODE (Recommended)
+  // ==============================================
+  if (USE_DIRECT_STORAGE) {
+    console.log(`   🚀 DIRECT STORAGE import mode: ${newConcepts.length} concepts`);
+    console.log(`      Storage: ${STORAGE_URL}`);
+
+    const storageClient = new StorageClient({
+      baseUrl: STORAGE_URL!,
+      timeout: 120000, // 2 min for large blob uploads
+      retries: 3,
+    });
+
+    // Check storage health
+    const storageHealth = await storageClient.checkHealth();
+    if (!storageHealth.healthy) {
+      console.error(`   ❌ Storage not healthy: ${storageHealth.error}`);
+      console.log('   Falling back to legacy bulk_create_content...');
+    } else {
+      console.log(`   ✅ Storage healthy (${storageHealth.blobs || 0} blobs, ${((storageHealth.bytes || 0) / 1024 / 1024).toFixed(1)} MB)`);
+
+      try {
+        // Step 1: Upload items JSON blob directly to elohim-storage
+        const itemsJson = JSON.stringify(allInputs);
+        const itemsBuffer = Buffer.from(itemsJson, 'utf-8');
+        console.log(`   📦 Uploading blob directly to storage: ${(itemsBuffer.length / 1024 / 1024).toFixed(2)} MB`);
+
+        const blobResult = await timer.timeOperation('direct_blob_upload', () =>
+          storageClient.pushBlob(itemsBuffer, 'application/json', 'private')
+        );
+
+        if (!blobResult.success || !blobResult.manifest) {
+          throw new Error(`Blob upload failed: ${blobResult.error}`);
+        }
+
+        const blobHash = blobResult.manifest.blob_hash;
+        console.log(`   ✅ Blob uploaded: ${blobHash.slice(0, 30)}...`);
+
+        // Step 2: Queue import via zome WebSocket call (not doorway HTTP)
+        console.log(`   📤 Queuing import via WebSocket "${batchId}"...`);
+        const queueResult = await timer.timeOperation('queue_import_ws', () =>
+          appWs.callZome({
+            cell_id: cellId,
+            zome_name: ZOME_NAME,
+            fn_name: 'queue_import',
+            payload: {
+              batch_id: batchId,
+              blob_hash: blobHash,
+              total_items: allInputs.length,
+              schema_version: 1,
+            },
+          })
+        ) as { batch_id: string; queued_count: number; processing: boolean };
+
+        console.log(`   ✅ Import queued: ${queueResult.batch_id}`);
+        console.log(`      Queued: ${queueResult.queued_count} items`);
+
+        // Step 3: Poll for completion via WebSocket (not doorway HTTP)
+        if (POLL_STATUS) {
+          console.log(`   ⏳ Waiting for storage to process chunks...`);
+          console.log(`      (Polling interval=${POLL_INTERVAL_MS}ms, timeout=${POLL_TIMEOUT_MS}ms)`);
+
+          const startTime = Date.now();
+          let lastProcessed = 0;
+
+          while (Date.now() - startTime < POLL_TIMEOUT_MS) {
+            await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+
+            try {
+              const status = await appWs.callZome({
+                cell_id: cellId,
+                zome_name: ZOME_NAME,
+                fn_name: 'get_import_status',
+                payload: { batch_id: batchId },
+              }) as { batch_id: string; status: string; processed_count: number; error_count: number; errors: string[]; total_items: number };
+
+              if (!status) {
+                console.error(`   ❌ Batch ${batchId} not found`);
+                break;
+              }
+
+              // Show progress if changed
+              if (status.processed_count !== lastProcessed) {
+                const pct = ((status.processed_count / status.total_items) * 100).toFixed(1);
+                console.log(`      Progress: ${status.processed_count}/${status.total_items} (${pct}%) - ${status.status}`);
+                lastProcessed = status.processed_count;
+              }
+
+              if (status.status === 'completed' || status.status === 'failed') {
+                conceptSuccessCount = status.processed_count - status.error_count;
+                conceptErrorCount = loadErrorCount + status.error_count;
+                blobImportSucceeded = true;
+
+                if (status.error_count > 0 && status.errors.length > 0) {
+                  console.log(`   ⚠️ ${status.errors.length} errors during import:`);
+                  for (const err of status.errors.slice(0, 5)) {
+                    console.error(`      • ${err}`);
+                  }
+                  if (status.errors.length > 5) {
+                    console.error(`      ... and ${status.errors.length - 5} more`);
+                  }
+                }
+                break;
+              }
+            } catch (pollError: any) {
+              console.warn(`      ⚠️ Poll failed: ${cleanErrorMessage(pollError)}`);
+            }
+          }
+
+          if (!blobImportSucceeded && Date.now() - startTime >= POLL_TIMEOUT_MS) {
+            console.warn(`   ⚠️ Poll timeout reached, batch may still be processing`);
+            console.log(`      Check status via zome: get_import_status({ batch_id: "${batchId}" })`);
+            conceptSuccessCount = lastProcessed;
+          }
+        } else {
+          console.log(`   ℹ️ Batch queued for background processing (not polling)`);
+          blobImportSucceeded = true;
+        }
+      } catch (blobError: any) {
+        console.error(`   ❌ Direct storage import failed: ${cleanErrorMessage(blobError)}`);
+        console.log('   Falling back to legacy bulk_create_content...');
+      }
+    }
+  }
+
+  // ==============================================
+  // DOORWAY IMPORT (DEPRECATED)
+  // ==============================================
+  if (USE_DOORWAY_IMPORT && !blobImportSucceeded) {
     console.log(`   🚀 DOORWAY import mode: ${newConcepts.length} concepts`);
     console.log(`      Doorway: ${DOORWAY_URL}`);
 

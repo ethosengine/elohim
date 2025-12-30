@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
+use doorway_client::DoorwayRoutes;
 use futures_util::{SinkExt, StreamExt};
 use rmpv::Value;
 use tokio_tungstenite::{
@@ -23,7 +24,7 @@ use tokio_tungstenite::{
 };
 use tracing::{debug, error, info, warn};
 
-use super::{ImportConfigStore, ImportConfig};
+use super::{ImportConfigStore, ImportConfig, RouteRegistry};
 use crate::worker::ZomeCallConfig;
 
 // =============================================================================
@@ -67,6 +68,7 @@ pub struct CellInfo {
 pub struct DiscoveryResult {
     pub cells_discovered: usize,
     pub import_configs_found: usize,
+    pub routes_found: usize,
     pub errors: Vec<String>,
 }
 
@@ -79,6 +81,7 @@ pub struct DiscoveryService {
     config: DiscoveryConfig,
     zome_configs: Arc<DashMap<String, ZomeCallConfig>>,
     import_config_store: Arc<ImportConfigStore>,
+    route_registry: Option<Arc<RouteRegistry>>,
 }
 
 impl DiscoveryService {
@@ -92,6 +95,22 @@ impl DiscoveryService {
             config,
             zome_configs,
             import_config_store,
+            route_registry: None,
+        }
+    }
+
+    /// Create with route registry for dynamic route discovery
+    pub fn with_route_registry(
+        config: DiscoveryConfig,
+        zome_configs: Arc<DashMap<String, ZomeCallConfig>>,
+        import_config_store: Arc<ImportConfigStore>,
+        route_registry: Arc<RouteRegistry>,
+    ) -> Self {
+        Self {
+            config,
+            zome_configs,
+            import_config_store,
+            route_registry: Some(route_registry),
         }
     }
 
@@ -100,6 +119,7 @@ impl DiscoveryService {
         let mut result = DiscoveryResult {
             cells_discovered: 0,
             import_configs_found: 0,
+            routes_found: 0,
             errors: vec![],
         };
 
@@ -121,7 +141,7 @@ impl DiscoveryService {
         info!("Found {} cells in app", cells.len());
         result.cells_discovered = cells.len();
 
-        // Step 2: For each cell, store ZomeCallConfig and discover import config
+        // Step 2: For each cell, store ZomeCallConfig and discover configs
         for cell in cells {
             let zome_config = ZomeCallConfig {
                 dna_hash: cell.dna_hash.clone(),
@@ -154,11 +174,38 @@ impl DiscoveryService {
                     result.errors.push(format!("DNA {}: {}", cell.dna_hash, e));
                 }
             }
+
+            // Discover routes (if route registry is configured)
+            if let Some(ref route_registry) = self.route_registry {
+                match self.discover_routes(&cell, &zome_config).await {
+                    Ok(Some(routes)) => {
+                        route_registry.register_dna_routes(
+                            &cell.dna_hash,
+                            &cell.role_name,
+                            &zome_config.zome_name,
+                            routes,
+                        ).await;
+                        result.routes_found += 1;
+                        info!(
+                            dna = %cell.dna_hash,
+                            role = %cell.role_name,
+                            "Discovered and registered routes"
+                        );
+                    }
+                    Ok(None) => {
+                        debug!(dna = %cell.dna_hash, "No routes declared (function not found)");
+                    }
+                    Err(e) => {
+                        warn!(dna = %cell.dna_hash, error = %e, "Failed to discover routes");
+                        result.errors.push(format!("Routes {}: {}", cell.dna_hash, e));
+                    }
+                }
+            }
         }
 
         info!(
-            "Discovery complete: {} cells, {} import configs, {} errors",
-            result.cells_discovered, result.import_configs_found, result.errors.len()
+            "Discovery complete: {} cells, {} import configs, {} routes, {} errors",
+            result.cells_discovered, result.import_configs_found, result.routes_found, result.errors.len()
         );
 
         result
@@ -333,6 +380,69 @@ impl DiscoveryService {
             allowed_agents: None,
         }))
     }
+
+    /// Discover routes from a cell via __doorway_routes
+    async fn discover_routes(
+        &self,
+        _cell: &CellInfo,
+        _zome_config: &ZomeCallConfig,
+    ) -> Result<Option<DoorwayRoutes>, String> {
+        // TODO: Actually call __doorway_routes on the zome
+        // For now, we'll return a default route config that matches what
+        // the elohim DNA would declare.
+        //
+        // The actual implementation would:
+        // 1. Build a zome call for __doorway_routes
+        // 2. Send it via WorkerPool
+        // 3. Parse the DoorwayRoutes response
+        //
+        // For now, return default elohim routes
+
+        use doorway_client::{DoorwayRoutesBuilder, Route};
+
+        Ok(Some(
+            DoorwayRoutesBuilder::new()
+                // Content API routes
+                .route(
+                    Route::get("/api/v1/content/{id}")
+                        .handler("get_content")
+                        .cache_ttl(3600)
+                        .public_if_reach("commons")
+                        .build(),
+                )
+                .route(
+                    Route::get("/api/v1/content")
+                        .handler("list_content")
+                        .cache_ttl(300)
+                        .build(),
+                )
+                .route(
+                    Route::post("/api/v1/content")
+                        .handler("create_content")
+                        .auth_required()
+                        .build(),
+                )
+                // Path API routes
+                .route(
+                    Route::get("/api/v1/paths/{id}")
+                        .handler("get_path")
+                        .cache_ttl(3600)
+                        .public_if_reach("commons")
+                        .build(),
+                )
+                .route(
+                    Route::get("/api/v1/paths")
+                        .handler("list_paths")
+                        .cache_ttl(300)
+                        .build(),
+                )
+                // Blob proxy - doorway caches, agent's elohim-storage is authoritative
+                .with_blobs_at("/store")
+                // Stream proxy for media
+                .with_streaming()
+                .build(),
+        ))
+    }
 }
 
 /// Encode bytes to base64
@@ -352,6 +462,27 @@ pub fn spawn_discovery_task(
         tokio::time::sleep(Duration::from_secs(2)).await;
 
         let service = DiscoveryService::new(config, zome_configs, import_config_store);
+        service.discover().await
+    })
+}
+
+/// Spawn discovery with route registry as a background task
+pub fn spawn_discovery_task_with_routes(
+    config: DiscoveryConfig,
+    zome_configs: Arc<DashMap<String, ZomeCallConfig>>,
+    import_config_store: Arc<ImportConfigStore>,
+    route_registry: Arc<RouteRegistry>,
+) -> tokio::task::JoinHandle<DiscoveryResult> {
+    tokio::spawn(async move {
+        // Wait a bit for conductor to be ready
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        let service = DiscoveryService::with_route_registry(
+            config,
+            zome_configs,
+            import_config_store,
+            route_registry,
+        );
         service.discover().await
     })
 }

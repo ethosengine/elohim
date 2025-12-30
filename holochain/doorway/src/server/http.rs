@@ -18,7 +18,7 @@ use tracing::{debug, error, info, warn};
 use crate::bootstrap::{self, BootstrapStore};
 use crate::cache::{
     self, CacheConfig, CacheRuleStore, ContentCache, TieredBlobCache, TieredCacheConfig,
-    spawn_tiered_cleanup_task, DoorwayResolver, DoorwayWriteBuffer, WriteBufferConfig,
+    spawn_tiered_cleanup_task, DoorwayResolver, DeliveryRelay,
 };
 use crate::orchestrator::OrchestratorState;
 use crate::services::{
@@ -68,8 +68,9 @@ pub struct AppState {
     pub orchestrator: Option<Arc<OrchestratorState>>,
     /// Content resolver with tiered fallback (Projection → Conductor)
     pub resolver: Arc<DoorwayResolver>,
-    /// Write buffer for batched conductor writes
-    pub write_buffer: Option<Arc<DoorwayWriteBuffer>>,
+    /// Delivery relay for CDN-style content delivery (request coalescing, shard caching)
+    /// Note: Write batching is handled by agent-side holochain-cache-core, NOT here
+    pub delivery_relay: Arc<DeliveryRelay>,
     /// Import config discovered from DNAs (zome-declared routes)
     pub import_config_store: Option<Arc<crate::services::ImportConfigStore>>,
     /// Zome call configs by DNA hash (discovered from conductor)
@@ -102,6 +103,9 @@ impl AppState {
         // Create resolver with projection only (no pool in this mode)
         let resolver = Arc::new(DoorwayResolver::new(projection.clone(), None, None));
 
+        // Delivery relay for CDN-style caching (complements agent-side cache-core)
+        let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
+
         Self {
             args,
             mongo: None,
@@ -119,7 +123,7 @@ impl AppState {
             verification,
             orchestrator: None,
             resolver,
-            write_buffer: None, // No write buffer without worker pool
+            delivery_relay,
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
         }
@@ -158,6 +162,9 @@ impl AppState {
         // Create resolver with projection only (no pool in this mode)
         let resolver = Arc::new(DoorwayResolver::new(projection.clone(), None, None));
 
+        // Delivery relay for CDN-style caching (complements agent-side cache-core)
+        let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
+
         Self {
             args,
             mongo,
@@ -175,7 +182,7 @@ impl AppState {
             verification,
             orchestrator: None,
             resolver,
-            write_buffer: None, // No write buffer without worker pool
+            delivery_relay,
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
         }
@@ -216,8 +223,9 @@ impl AppState {
         // Note: zome_config is discovered at runtime when conductor connection is established
         let resolver = Arc::new(DoorwayResolver::new(projection.clone(), Some(Arc::clone(&pool)), None));
 
-        // Create write buffer for batched conductor writes
-        let write_buffer = Arc::new(DoorwayWriteBuffer::with_defaults(Arc::clone(&pool)));
+        // Delivery relay for CDN-style caching (complements agent-side cache-core)
+        // Note: Write batching is handled by agent's holochain-cache-core WriteBuffer, NOT here
+        let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
 
         Self {
             args,
@@ -236,7 +244,7 @@ impl AppState {
             verification,
             orchestrator: None,
             resolver,
-            write_buffer: Some(write_buffer),
+            delivery_relay,
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
         }
@@ -283,10 +291,9 @@ impl AppState {
         // Note: zome_config is discovered at runtime when conductor connection is established
         let resolver = Arc::new(DoorwayResolver::new(projection.clone(), pool.clone(), None));
 
-        // Create write buffer if pool is available
-        let write_buffer = pool.as_ref().map(|p| {
-            Arc::new(DoorwayWriteBuffer::with_defaults(Arc::clone(p)))
-        });
+        // Delivery relay for CDN-style caching (complements agent-side cache-core)
+        // Note: Write batching is handled by agent's holochain-cache-core WriteBuffer, NOT here
+        let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
 
         Ok(Self {
             args,
@@ -305,7 +312,7 @@ impl AppState {
             verification,
             orchestrator: None,
             resolver,
-            write_buffer,
+            delivery_relay,
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
         })
