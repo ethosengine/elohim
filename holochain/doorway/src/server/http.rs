@@ -432,9 +432,15 @@ async fn handle_request(
     }
 
     let response = match (method, path.as_str()) {
-        // Health check endpoints
+        // Liveness probe - returns 200 if doorway is running
         (Method::GET, "/health") | (Method::GET, "/healthz") => {
             to_boxed(routes::health_check(Arc::clone(&state)))
+        }
+
+        // Readiness probe - returns 200 only if conductor is connected
+        // Use this for seeder pre-flight checks
+        (Method::GET, "/ready") | (Method::GET, "/readyz") => {
+            to_boxed(routes::readiness_check(Arc::clone(&state)))
         }
 
         // CORS preflight

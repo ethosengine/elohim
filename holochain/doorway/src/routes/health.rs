@@ -1,12 +1,14 @@
 //! Health check endpoints
 //!
-//! Provides /health and /healthz endpoints for Kubernetes probes.
+//! Provides Kubernetes-style health probes:
+//! - /health, /healthz - Liveness probe (is the service running?)
+//! - /ready, /readyz - Readiness probe (is the service ready for traffic?)
 //!
-//! The health check verifies:
-//! - Doorway service is running
-//! - Worker pool is connected to conductor (if pool exists)
+//! Liveness probes return 200 if doorway is running, regardless of conductor status.
+//! Readiness probes return 200 only if at least one worker is connected to conductor.
 //!
-//! Returns HTTP 200 if healthy, HTTP 503 if not.
+//! The seeder should check the `conductor.connected` field in the response body
+//! to determine if it's safe to begin seeding operations.
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -23,9 +25,10 @@ use crate::server::AppState;
 /// - version: string - service version
 /// - cacheEnabled: boolean - whether projection cache is available
 /// - cache.enabled: boolean - backwards compat for seeder's data.cache?.enabled
+/// - conductor.connected: boolean - whether conductor is available (seeder should check this!)
 #[derive(Serialize)]
 pub struct HealthResponse {
-    /// Overall health status
+    /// Overall health status (true if service is running)
     pub healthy: bool,
     /// Service version
     pub version: &'static str,
@@ -40,9 +43,9 @@ pub struct HealthResponse {
     pub mode: String,
     /// Node identifier
     pub node_id: String,
-    /// Conductor connection status
+    /// Conductor connection status - IMPORTANT: seeder should check conductor.connected!
     pub conductor: ConductorHealth,
-    /// Error message if unhealthy
+    /// Error message if conductor not connected
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -57,7 +60,7 @@ pub struct CacheStatus {
 /// Conductor connection health details
 #[derive(Serialize)]
 pub struct ConductorHealth {
-    /// Whether conductor is connected
+    /// Whether conductor is connected - seeder MUST check this before seeding!
     pub connected: bool,
     /// Number of connected workers
     pub connected_workers: usize,
@@ -65,13 +68,8 @@ pub struct ConductorHealth {
     pub total_workers: usize,
 }
 
-/// Handle health check request
-///
-/// Checks conductor connectivity through the worker pool and returns
-/// appropriate HTTP status code:
-/// - 200 OK: All systems healthy, at least one worker connected to conductor
-/// - 503 Service Unavailable: No workers connected to conductor
-pub fn health_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
+/// Build health response with current state
+fn build_health_response(state: &AppState) -> HealthResponse {
     let args = &state.args;
 
     // Check worker pool health
@@ -91,19 +89,18 @@ pub fn health_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     // Check if projection/cache is enabled
     let cache_enabled = state.projection.is_some();
 
-    // Determine overall health
-    let healthy = conductor_connected;
-    let error = if !healthy {
+    // Include conductor status warning in error field if not connected
+    let error = if !conductor_connected {
         Some(format!(
-            "No workers connected to conductor (0/{} workers)",
+            "No workers connected to conductor (0/{} workers) - seeding will fail",
             total_workers
         ))
     } else {
         None
     };
 
-    let response = HealthResponse {
-        healthy,
+    HealthResponse {
+        healthy: true, // Service is running
         version: env!("CARGO_PKG_VERSION"),
         cache_enabled,
         cache: CacheStatus {
@@ -122,13 +119,42 @@ pub fn health_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
             total_workers,
         },
         error,
-    };
+    }
+}
+
+/// Handle liveness probe (/health, /healthz)
+///
+/// Returns 200 OK if doorway service is running.
+/// The response body includes conductor status for informational purposes.
+/// Callers that need to verify conductor connectivity should check `conductor.connected`.
+pub fn health_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let response = build_health_response(&state);
+
+    let body = serde_json::to_string(&response)
+        .unwrap_or_else(|_| r#"{"healthy":true,"error":"Serialization failed"}"#.to_string());
+
+    // Liveness probe: always return 200 if service is running
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body)))
+        .unwrap()
+}
+
+/// Handle readiness probe (/ready, /readyz)
+///
+/// Returns 200 OK only if doorway can accept traffic (conductor connected).
+/// Returns 503 Service Unavailable if conductor is not connected.
+/// Use this endpoint for load balancer health checks and seeder pre-flight checks.
+pub fn readiness_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let response = build_health_response(&state);
+    let conductor_connected = response.conductor.connected;
 
     let body = serde_json::to_string(&response)
         .unwrap_or_else(|_| r#"{"healthy":false,"error":"Serialization failed"}"#.to_string());
 
-    // Return 503 if not healthy, 200 if healthy
-    let status = if healthy {
+    // Readiness probe: return 503 if conductor not connected
+    let status = if conductor_connected {
         StatusCode::OK
     } else {
         StatusCode::SERVICE_UNAVAILABLE
