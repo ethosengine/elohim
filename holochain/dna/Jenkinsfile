@@ -381,8 +381,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             ═══════════════════════════════════════════════════════════
             """
         }
-        cleanup {
-            cleanWs()
-        }
+        // Note: No cleanWs needed - k8s pod agents are ephemeral
     }
 }
