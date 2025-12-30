@@ -128,7 +128,7 @@ spec:
                     if (!validTrigger) {
                         echo """
                         ═══════════════════════════════════════════════════════════
-                        ⏭️ PIPELINE BLOCKED - USE ORCHESTRATOR
+                        ⏭️ PIPELINE SKIPPED - USE ORCHESTRATOR
                         ═══════════════════════════════════════════════════════════
                         This pipeline is managed by elohim-orchestrator.
                         Direct webhook triggers are disabled.
@@ -141,15 +141,17 @@ spec:
                         ═══════════════════════════════════════════════════════════
                         """
                         currentBuild.result = 'NOT_BUILT'
-                        error('Use orchestrator or manual trigger')
+                        currentBuild.displayName = "#${env.BUILD_NUMBER} SKIPPED"
+                        env.PIPELINE_SKIPPED = 'true'
+                    } else {
+                        echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
                     }
-
-                    echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
                 }
             }
         }
 
         stage('Checkout') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -165,6 +167,7 @@ spec:
         }
 
         stage('Setup Version') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -191,6 +194,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Setup Nix Cache') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -211,7 +215,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build WASM Cache Core') {
-            // Orchestrator decides when to trigger - no changeset checks here
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     dir('holochain/dna/elohim') {
@@ -259,7 +263,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build DNA') {
-            // Orchestrator decides when to trigger - no changeset checks here
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     dir('holochain/dna/elohim') {

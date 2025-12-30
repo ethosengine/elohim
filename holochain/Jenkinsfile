@@ -232,7 +232,7 @@ spec:
                     if (!validTrigger) {
                         echo """
                         ═══════════════════════════════════════════════════════════
-                        ⏭️ PIPELINE BLOCKED - USE ORCHESTRATOR
+                        ⏭️ PIPELINE SKIPPED - USE ORCHESTRATOR
                         ═══════════════════════════════════════════════════════════
                         This pipeline is managed by elohim-orchestrator.
                         Direct webhook triggers are disabled.
@@ -245,15 +245,17 @@ spec:
                         ═══════════════════════════════════════════════════════════
                         """
                         currentBuild.result = 'NOT_BUILT'
-                        error('Use orchestrator or manual trigger')
+                        currentBuild.displayName = "#${env.BUILD_NUMBER} SKIPPED"
+                        env.PIPELINE_SKIPPED = 'true'
+                    } else {
+                        echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
                     }
-
-                    echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
                 }
             }
         }
 
         stage('Checkout') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -269,6 +271,7 @@ spec:
         }
 
         stage('Setup Version') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -295,6 +298,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Setup Nix Cache') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -318,7 +322,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         // This pipeline now only builds infrastructure (container images)
 
         stage('Build Doorway') {
-            // Orchestrator decides when to trigger - no changeset checks here
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -348,7 +352,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Edge Node Image') {
-            // Orchestrator decides when to trigger - no changeset checks here
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -389,7 +393,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build hApp Installer') {
-            // Orchestrator decides when to trigger - no changeset checks here
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -438,7 +442,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Push to Harbor') {
-            // Orchestrator decides when to trigger - no changeset checks here
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -523,21 +527,24 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Deploy Edge Node - Dev') {
             when {
-                anyOf {
-                    branch 'dev'
-                    allOf {
-                        anyOf {
-                            changeset "holochain/doorway/**"
-                            changeset "holochain/edgenode/**"
-                            changeset "holochain/manifests/**"
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf {
+                        branch 'dev'
+                        allOf {
+                            anyOf {
+                                changeset "holochain/doorway/**"
+                                changeset "holochain/edgenode/**"
+                                changeset "holochain/manifests/**"
+                            }
+                            anyOf {
+                                expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                                expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                            }
                         }
-                        anyOf {
-                            expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                            expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                        }
+                        expression { return params.FORCE_DEPLOY == true }
+                        expression { return params.FORCE_BUILD == true }
                     }
-                    expression { return params.FORCE_DEPLOY == true }
-                    expression { return params.FORCE_BUILD == true }
                 }
             }
             steps {
@@ -626,11 +633,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Deploy Edge Node - Prod') {
             when {
-                anyOf {
-                    branch 'main'
-                    allOf {
-                        expression { return params.FORCE_DEPLOY == true }
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf {
                         branch 'main'
+                        allOf {
+                            expression { return params.FORCE_DEPLOY == true }
+                            branch 'main'
+                        }
                     }
                 }
             }
@@ -705,7 +715,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Cleanup') {
-            // Orchestrator decides when to trigger - no changeset checks here
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
