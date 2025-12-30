@@ -139,6 +139,9 @@ spec:
             - name: conductor-config
               mountPath: /usr/local/share/holochain/conductor-config.template.yaml
               subPath: conductor-config.yaml
+            # hApp volume - conductor needs access to install hApp
+            - name: happ-volume
+              mountPath: /opt/holochain
           # Use exec probe since conductor binds to localhost
           # bash supports /dev/tcp, ash/sh does not
           livenessProbe:

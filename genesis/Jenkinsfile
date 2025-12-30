@@ -193,16 +193,8 @@ spec:
         buildDiscarder(logRotator(numToKeepStr: '20'))
     }
 
-    triggers {
-        // Only run when upstream pipelines succeed:
-        // - elohim-holochain: provides the hApp artifact for seeding
-        // - elohim-edge: provides the doorway/edgenode infrastructure
-        // - elohim: provides the app for BDD tests
-        upstream(
-            upstreamProjects: "elohim-holochain/${env.BRANCH_NAME},elohim-edge/${env.BRANCH_NAME},elohim/${env.BRANCH_NAME}",
-            threshold: hudson.model.Result.SUCCESS
-        )
-    }
+    // No triggers - orchestrator handles triggering genesis after all builds complete
+    // triggers { }
 
     stages {
         stage('Check Trigger') {
