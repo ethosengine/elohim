@@ -30,7 +30,9 @@
 // CONFIGURATION
 // =============================================================================
 
-def PIPELINES = [
+import groovy.transform.Field
+
+@Field def PIPELINES = [
     'elohim-holochain': [
         jenkinsPath: 'holochain/dna/Jenkinsfile',
         changePatterns: ['holochain/dna/', 'holochain/holochain-cache-core/'],
@@ -69,7 +71,7 @@ def PIPELINES = [
     ]
 ]
 
-def HEALTH_ENDPOINTS = [
+@Field def HEALTH_ENDPOINTS = [
     'doorway-dev': 'https://doorway-dev.elohim.host/health',
     'doorway-prod': 'https://doorway.elohim.host/health',
     'alpha': 'https://alpha.elohim.host',
@@ -78,7 +80,7 @@ def HEALTH_ENDPOINTS = [
 ]
 
 // Claude agent webhook for complex decisions (optional)
-def CLAUDE_AGENT_WEBHOOK = env.CLAUDE_AGENT_WEBHOOK ?: ''
+@Field def CLAUDE_AGENT_WEBHOOK = ''
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -185,7 +187,8 @@ def checkHealth(String name, String url) {
 }
 
 def notifyClaudeAgent(Map context) {
-    if (!CLAUDE_AGENT_WEBHOOK) {
+    def webhookUrl = env.CLAUDE_AGENT_WEBHOOK ?: CLAUDE_AGENT_WEBHOOK
+    if (!webhookUrl) {
         echo "Claude agent webhook not configured"
         return
     }
@@ -194,7 +197,7 @@ def notifyClaudeAgent(Map context) {
 
     try {
         sh """
-            curl -sf -X POST '${CLAUDE_AGENT_WEBHOOK}' \
+            curl -sf -X POST '${webhookUrl}' \
                 -H 'Content-Type: application/json' \
                 -d '${payload}'
         """
@@ -508,7 +511,7 @@ spec:
         }
         failure {
             script {
-                if (CLAUDE_AGENT_WEBHOOK) {
+                if (env.CLAUDE_AGENT_WEBHOOK || CLAUDE_AGENT_WEBHOOK) {
                     notifyClaudeAgent([
                         event: 'orchestrator_failed',
                         branch: env.BRANCH_NAME,
