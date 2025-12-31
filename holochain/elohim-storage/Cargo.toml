@@ -61,12 +61,38 @@ reed-solomon-erasure = "6"
 # Timestamps
 chrono = { version = "0.4", features = ["serde"] }
 
+# rust-libp2p - same P2P foundation as Holochain (via kitsune_p2p)
+# https://github.com/libp2p/rust-libp2p
+libp2p = { version = "0.54", features = [
+    "tcp",              # TCP transport
+    "noise",            # Noise protocol encryption
+    "yamux",            # Stream multiplexing
+    "kad",              # Kademlia DHT
+    "request-response", # Shard transfer protocol
+    "mdns",             # Local network discovery
+    "relay",            # NAT traversal relay
+    "dcutr",            # Direct Connection Upgrade through Relay
+    "autonat",          # Automatic NAT detection
+    "tokio",            # Async runtime integration
+    "macros",           # NetworkBehaviour derive macro
+    "identify",         # Protocol identification
+    "ed25519",          # Ed25519 key support
+    "serde",            # Serialization for PeerId etc
+], optional = true }
+
+# Futures for async traits (used by libp2p request-response)
+futures = { version = "0.3", optional = true }
+
 # Optional: Compression for blobs
 lz4_flex = { version = "0.11", optional = true }
 
 [features]
 default = []
 compression = ["lz4_flex"]
+p2p = ["libp2p", "futures"]
+
+[dev-dependencies]
+tempfile = "3"
 
 [[bin]]
 name = "elohim-storage"

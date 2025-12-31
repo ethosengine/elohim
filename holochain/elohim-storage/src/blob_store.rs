@@ -2,8 +2,14 @@
 //!
 //! Stores blobs in a local directory structure using SHA256 hashes as filenames.
 //! Supports chunked storage for large files.
+//!
+//! ## P2P Announcement
+//!
+//! When the `p2p` feature is enabled, blobs can be announced to the Holochain
+//! infrastructure DNA for discovery by other nodes using `store_and_announce()`.
 
 use crate::error::StorageError;
+use crate::content_server::{ContentServerBridge, StorageEndpointInput};
 use sha2::{Sha256, Digest};
 use std::path::{Path, PathBuf};
 use tokio::fs;
@@ -29,6 +35,15 @@ pub struct StoreResult {
     pub chunked: bool,
     /// Whether blob already existed
     pub already_existed: bool,
+}
+
+/// Result of storing and announcing a blob
+#[derive(Debug, Clone)]
+pub struct StoreAndAnnounceResult {
+    /// Store result with hash, size, etc.
+    pub store_result: StoreResult,
+    /// Action hash of the ContentServer registration
+    pub action_hash: Vec<u8>,
 }
 
 /// Blob storage manager
@@ -123,6 +138,63 @@ impl BlobStore {
             // Store as chunks
             self.store_chunked(&hash, data).await
         }
+    }
+
+    /// Store a blob and announce it to the P2P network
+    ///
+    /// This method:
+    /// 1. Stores the blob locally
+    /// 2. Registers with the ContentServer in the infrastructure DNA
+    /// 3. Returns the store result and action hash from registration
+    ///
+    /// Use this when you want other nodes to discover and fetch this content.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The blob data to store
+    /// * `content_server` - Bridge to the infrastructure DNA
+    /// * `capability` - Content capability: "blob", "html5_app", "media_stream", etc.
+    /// * `endpoints` - Optional HTTP endpoints where this content can be fetched.
+    ///   If None, uses the default serve_url from ContentServerConfig.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let endpoints = vec![StorageEndpointInput {
+    ///     url: "http://192.168.1.100:8080/store".to_string(),
+    ///     protocol: "http".to_string(),
+    ///     priority: Some(100),
+    /// }];
+    /// let result = blob_store
+    ///     .store_and_announce(data, &mut content_server, "blob", Some(endpoints))
+    ///     .await?;
+    /// ```
+    pub async fn store_and_announce(
+        &self,
+        data: &[u8],
+        content_server: &mut ContentServerBridge,
+        capability: &str,
+        endpoints: Option<Vec<StorageEndpointInput>>,
+    ) -> Result<StoreAndAnnounceResult, StorageError> {
+        // First, store locally
+        let store_result = self.store(data).await?;
+
+        // If already existed, we might already be registered, but register anyway
+        // (idempotent on the zome side)
+        let action_hash = content_server
+            .register_content_with_endpoints(&store_result.hash, capability, endpoints)
+            .await?;
+
+        info!(
+            hash = %store_result.hash,
+            capability = %capability,
+            "Stored and announced blob"
+        );
+
+        Ok(StoreAndAnnounceResult {
+            store_result,
+            action_hash,
+        })
     }
 
     /// Store a large blob as chunks

@@ -53,7 +53,7 @@ pub use resolution::{DoorwayResolver, ResolutionResult, ResolutionStats};
 pub use rules::{CacheRule, CacheRuleStore, DefaultRules, DnaRules, CACHE_RULES_FN};
 pub use store::{CacheEntry, ContentCache};
 pub use tiered::{
-    BlobMetadata, CaptionMetadata, TieredBlobCache, TieredCacheConfig, TieredCacheStats,
+    BlobMetadata, CacheError, CaptionMetadata, TieredBlobCache, TieredCacheConfig, TieredCacheStats,
     TierStats, VariantMetadata, spawn_tiered_cleanup_task,
 };
 

@@ -54,4 +54,23 @@ pub enum StorageError {
 
     #[error("Internal error: {0}")]
     Internal(String),
+
+    // P2P-related errors (feature: p2p)
+    #[error("Peer not found: {0}")]
+    PeerNotFound(String),
+
+    #[error("No providers found for content: {0}")]
+    NoProviders(String),
+
+    #[error("P2P network error: {0}")]
+    P2PNetwork(String),
+
+    #[error("Identity error: {0}")]
+    Identity(String),
+
+    #[error("Cluster error: {0}")]
+    Cluster(String),
+
+    #[error("Replication failed: {0}")]
+    Replication(String),
 }

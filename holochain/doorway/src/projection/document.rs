@@ -15,6 +15,18 @@ use crate::db::mongo::{IntoIndexes, MutMetadata};
 /// This is the generic container for all projected entries from the DHT.
 /// Specific projections (content, paths, etc.) use typed collections but
 /// all share this base structure.
+///
+/// ## Blob Integration
+///
+/// Content with associated blobs stores the blob hash and endpoints here.
+/// This is the single source of truth for blob metadata in doorway -
+/// TieredBlobCache only stores bytes, not metadata.
+///
+/// ```text
+/// Signal Flow:
+///   CacheSignal (content) → ProjectedDocument { blob_hash, ... }
+///   ContentServerCommitted → updates blob_endpoints on existing doc
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectedDocument {
     /// MongoDB document ID (format: "{doc_type}:{id}")
@@ -44,6 +56,20 @@ pub struct ProjectedDocument {
     #[serde(default)]
     pub search_tokens: Vec<String>,
 
+    /// Reach level for access control (e.g., "private", "family", "commons")
+    /// Doorway enforces this when serving content.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reach: Option<String>,
+
+    /// Blob hash if this content has an associated blob (e.g., "sha256-abc123")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blob_hash: Option<String>,
+
+    /// Endpoints where the blob can be fetched (populated by ContentServerCommitted)
+    /// URLs point to elohim-storage instances that have the blob.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub blob_endpoints: Vec<String>,
+
     /// Original entry creation timestamp
     pub created_at: DateTime,
 
@@ -67,6 +93,9 @@ impl Default for ProjectedDocument {
             author: String::new(),
             data: JsonValue::Null,
             search_tokens: Vec::new(),
+            reach: None,
+            blob_hash: None,
+            blob_endpoints: Vec::new(),
             created_at: now,
             projected_at: now,
             metadata: Metadata::default(),
@@ -96,6 +125,9 @@ impl ProjectedDocument {
             author: author.into(),
             data,
             search_tokens: Vec::new(),
+            reach: None,
+            blob_hash: None,
+            blob_endpoints: Vec::new(),
             created_at: now,
             projected_at: now,
             metadata: Metadata::new(),
@@ -112,6 +144,33 @@ impl ProjectedDocument {
     pub fn with_search_tokens(mut self, tokens: Vec<String>) -> Self {
         self.search_tokens = tokens;
         self
+    }
+
+    /// Set the reach level for access control
+    pub fn with_reach(mut self, reach: impl Into<String>) -> Self {
+        self.reach = Some(reach.into());
+        self
+    }
+
+    /// Set the blob hash (for content with associated binary data)
+    pub fn with_blob_hash(mut self, hash: impl Into<String>) -> Self {
+        self.blob_hash = Some(hash.into());
+        self
+    }
+
+    /// Set the blob endpoints (URLs where blob can be fetched)
+    pub fn with_blob_endpoints(mut self, endpoints: Vec<String>) -> Self {
+        self.blob_endpoints = endpoints;
+        self
+    }
+
+    /// Add blob endpoints (appends to existing, deduplicates)
+    pub fn add_blob_endpoints(&mut self, endpoints: Vec<String>) {
+        for endpoint in endpoints {
+            if !self.blob_endpoints.contains(&endpoint) {
+                self.blob_endpoints.push(endpoint);
+            }
+        }
     }
 
     /// Extract search tokens from text content
@@ -134,6 +193,12 @@ impl IntoIndexes for ProjectedDocument {
             (
                 doc! { "search_tokens": 1 },
                 Some(IndexOptions::builder().build()),
+            ),
+            // Index by blob_hash for efficient endpoint lookups
+            // Used by TieredBlobCache.get_or_fetch() to find blob sources
+            (
+                doc! { "blob_hash": 1 },
+                Some(IndexOptions::builder().sparse(true).build()),
             ),
         ]
     }

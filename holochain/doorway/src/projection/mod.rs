@@ -45,4 +45,4 @@ pub mod subscriber;
 pub use document::{ProjectedDocument, ProjectionQuery};
 pub use engine::{EngineConfig, ProjectionEngine, ProjectionSignal, spawn_engine_task};
 pub use store::{ProjectionConfig, ProjectionStore};
-pub use subscriber::{SignalSubscriber, SubscriberConfig, spawn_subscriber};
+pub use subscriber::{ContentServerRegistration, SignalSubscriber, SubscriberConfig, spawn_subscriber};

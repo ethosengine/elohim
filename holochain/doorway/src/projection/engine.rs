@@ -47,15 +47,24 @@ use super::store::ProjectionStore;
 /// - Search indexing (search_tokens)
 /// - Cache invalidation (invalidates)
 /// - TTL/expiry (ttl_secs)
+///
+/// ## Special Actions
+///
+/// - `"commit"` / `"update"`: Store/update a document
+/// - `"delete"`: Soft-delete a document
+/// - `"update_endpoints"`: Update blob_endpoints for documents with matching blob_hash
+///   (used by ContentServerCommitted signals from infrastructure DNA)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectionSignal {
     /// Document type (e.g., "Content", "LearningPath", "MyCustomType")
+    /// For "update_endpoints" action, this is ignored.
     pub doc_type: String,
-    /// Action ("commit", "delete", "update")
+    /// Action ("commit", "delete", "update", "update_endpoints")
     pub action: String,
-    /// Document ID
+    /// Document ID, or blob_hash for "update_endpoints" action
     pub id: String,
     /// Opaque data - doorway never parses this
+    /// For "update_endpoints", this should be a JSON array of endpoint URLs
     pub data: JsonValue,
     /// Holochain action hash
     pub action_hash: String,
@@ -169,6 +178,30 @@ impl ProjectionEngine {
                     id = signal.id,
                     "Document deleted (via invalidation)"
                 );
+            }
+            "update_endpoints" => {
+                // Update blob_endpoints for documents with matching blob_hash
+                // signal.id = blob_hash, signal.data = JSON array of endpoint URLs
+                let blob_hash = &signal.id;
+                let endpoints: Vec<String> = signal
+                    .data
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                if !endpoints.is_empty() {
+                    let count = self.store.update_blob_endpoints(blob_hash, endpoints.clone()).await?;
+                    debug!(
+                        blob_hash = blob_hash,
+                        endpoints = ?endpoints,
+                        updated_count = count,
+                        "Updated blob endpoints in projection store"
+                    );
+                }
             }
             other => {
                 debug!(action = other, "Unknown signal action, ignoring");

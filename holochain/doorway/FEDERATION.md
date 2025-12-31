@@ -395,7 +395,7 @@ The same validation rules that govern content govern infrastructure:
 | Aspect | Traditional Fediverse | Doorway Federation |
 |--------|----------------------|-------------------|
 | Authority | Instances own user data | DHT owns all data |
-| Lock-in | Users tied to home instance | Users use any doorway |
+| Lock-in | Users tied to home instance | People protected and served by doorways |
 | Replication | Instance-to-instance | DHT gossip (automatic) |
 | Validation | Trust between instances | Cryptographic, edge-enforced |
 | Identity | Instance-relative (`@user@host`) | Agent keys (portable) |

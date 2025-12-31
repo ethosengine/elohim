@@ -1,13 +1,11 @@
-//! Tiered Blob Cache - O(1) LRU Multi-Tier Cache for Media Streaming
+//! Tiered Blob Cache - O(1) LRU Bytes-Only Cache for Media Streaming
 //!
-//! Three-tier caching strategy optimized for Elohim Protocol media:
-//! - **Tier 1 (Metadata)**: Unlimited entries, reach-indexed, 30-day TTL
-//!   - BlobMetadata with hash, size, variants, captions, fallback URLs
-//!   - Used for manifest generation and custodian selection
-//! - **Tier 2 (Blobs)**: 1 GB LRU limit, 24h TTL (commons) / 7d TTL (private)
+//! Two-tier caching strategy optimized for Elohim Protocol media:
+//!
+//! - **Blobs**: 1 GB LRU limit, 24h TTL (commons) / 7d TTL (private)
 //!   - Full blob data for small-medium files
 //!   - Reach-isolated eviction (private content never evicts commons)
-//! - **Tier 3 (Chunks)**: 10 GB LRU limit, 7-day TTL
+//! - **Chunks**: 10 GB LRU limit, 7-day TTL
 //!   - Individual chunks for HLS/DASH streaming
 //!   - Keyed by "hash:index" for O(1) lookup
 //!
@@ -16,12 +14,42 @@
 //! All operations are O(1) using DashMap with insertion-order LRU simulation.
 //! Large blobs won't evict many small documents due to tier isolation.
 //!
-//! ## Integration with Custodian Network
+//! ## P2P Integration (CDN-Style Origin Pull)
 //!
-//! When a blob is not in cache:
-//! 1. Check metadata tier for blob info
-//! 2. Use fallback_urls and custodian selection to fetch
-//! 3. Cache result in appropriate tier
+//! Doorway is a **thin CDN proxy**, NOT primary storage. Blobs live on agent
+//! devices via `elohim-storage`. When agents store blobs, they register endpoints
+//! with the infrastructure DNA, which emits `ContentServerCommitted` signals.
+//!
+//! ```text
+//! Agent Device                    Doorway                      Browser
+//! ┌──────────────┐               ┌─────────────────────────┐   ┌────────┐
+//! │elohim-storage│──register────►│ProjectionStore          │   │ Client │
+//! │  (origin)    │  endpoint     │  (blob_endpoints field) │   └────┬───┘
+//! └──────────────┘               └────────────┬────────────┘        │
+//!        ▲                                    │ lookup endpoints    │
+//!        │                       ┌────────────▼────────────┐        │
+//!        │                       │TieredBlobCache          │◄───────┘
+//!        │                       │  (bytes only)           │   request
+//!        └───── origin pull ─────┴─────────────────────────┘
+//!              (on cache miss)
+//! ```
+//!
+//! ## Architecture
+//!
+//! Blob metadata (including endpoints) lives in `ProjectionStore` (MongoDB).
+//! TieredBlobCache is bytes-only:
+//!
+//! - `ProjectionStore.get_blob_endpoints()` - lookup where to fetch a blob
+//! - `TieredBlobCache.get_or_fetch_from()` - cache lookup + origin pull
+//!
+//! **Recommended usage:**
+//! ```ignore
+//! // Get endpoints from ProjectionStore
+//! let endpoints = projection_store.get_blob_endpoints(&hash).await?;
+//!
+//! // Fetch blob with those endpoints
+//! let blob = blob_cache.get_or_fetch_from(&hash, &endpoints, &reach, &http_client).await?;
+//! ```
 
 use bytes::Bytes;
 use dashmap::DashMap;
@@ -29,41 +57,58 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
-use tracing::{debug, info, warn};
+use thiserror::Error;
+use tracing::{debug, error, info, warn};
+
+// ============================================================================
+// Errors
+// ============================================================================
+
+/// Error types for cache operations
+#[derive(Debug, Error)]
+pub enum CacheError {
+    /// Blob not found in cache or from fallback sources
+    #[error("Blob not found: {0}")]
+    NotFound(String),
+
+    /// No fallback URLs available
+    #[error("No fallback URLs for blob: {0}")]
+    NoFallbackUrls(String),
+
+    /// HTTP fetch failed
+    #[error("HTTP fetch failed: {0}")]
+    FetchFailed(String),
+
+    /// Verification failed (hash mismatch)
+    #[error("Hash mismatch: expected {expected}, got {actual}")]
+    HashMismatch { expected: String, actual: String },
+}
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
-/// Configuration for tiered cache
+/// Configuration for tiered cache (blobs and chunks)
 #[derive(Debug, Clone)]
 pub struct TieredCacheConfig {
-    /// Tier 1: Metadata cache max entries (default: 100,000 - essentially unlimited)
-    pub metadata_max_entries: usize,
-    /// Tier 1: Metadata TTL (default: 30 days)
-    pub metadata_ttl: Duration,
-
-    /// Tier 2: Full blob cache max bytes (default: 1 GB)
+    /// Blob cache max bytes (default: 1 GB)
     pub blob_max_bytes: u64,
-    /// Tier 2: Blob TTL for commons reach (default: 24 hours)
+    /// Blob TTL for commons reach (default: 24 hours)
     pub blob_commons_ttl: Duration,
-    /// Tier 2: Blob TTL for private reach (default: 7 days)
+    /// Blob TTL for private reach (default: 7 days)
     pub blob_private_ttl: Duration,
 
-    /// Tier 3: Chunk cache max bytes (default: 10 GB)
+    /// Chunk cache max bytes (default: 10 GB)
     pub chunk_max_bytes: u64,
-    /// Tier 3: Chunk TTL (default: 7 days)
+    /// Chunk TTL (default: 7 days)
     pub chunk_ttl: Duration,
-    /// Tier 3: Default chunk size (default: 5 MB)
+    /// Default chunk size (default: 5 MB)
     pub default_chunk_size: usize,
 }
 
 impl Default for TieredCacheConfig {
     fn default() -> Self {
         Self {
-            metadata_max_entries: 100_000,
-            metadata_ttl: Duration::from_secs(30 * 24 * 60 * 60), // 30 days
-
             blob_max_bytes: 1024 * 1024 * 1024, // 1 GB
             blob_commons_ttl: Duration::from_secs(24 * 60 * 60), // 24 hours
             blob_private_ttl: Duration::from_secs(7 * 24 * 60 * 60), // 7 days
@@ -204,13 +249,6 @@ pub struct CaptionMetadata {
 // Cache Entry Wrappers
 // ============================================================================
 
-/// Metadata entry with timestamp
-struct MetadataEntry {
-    metadata: BlobMetadata,
-    cached_at: Instant,
-    expires_at: Instant,
-}
-
 /// Blob entry with reach-aware TTL
 struct BlobEntry {
     data: Vec<u8>,
@@ -263,10 +301,9 @@ impl TierStats {
     }
 }
 
-/// Combined statistics for all tiers
+/// Combined statistics for blob and chunk tiers
 #[derive(Debug, Clone)]
 pub struct TieredCacheStats {
-    pub metadata: TierStats,
     pub blob: TierStats,
     pub chunk: TierStats,
 }
@@ -275,15 +312,14 @@ pub struct TieredCacheStats {
 // Tiered Blob Cache Implementation
 // ============================================================================
 
-/// Three-tier blob cache for media streaming
+/// Two-tier blob cache for media streaming (bytes-only)
 ///
 /// Thread-safe with O(1) operations using DashMap.
+///
+/// Note: Tier 1 (Metadata) was removed. Blob metadata including endpoints
+/// now lives in ProjectionStore. Use `get_or_fetch_from()` with endpoints
+/// from `ProjectionStore.get_blob_endpoints()`.
 pub struct TieredBlobCache {
-    // Tier 1: Metadata (unlimited, long TTL)
-    metadata: DashMap<String, MetadataEntry>,
-    metadata_hits: AtomicU64,
-    metadata_misses: AtomicU64,
-
     // Tier 2: Full blobs (size-limited, reach-aware TTL)
     blobs: DashMap<String, BlobEntry>,
     blob_total_bytes: AtomicU64,
@@ -308,14 +344,10 @@ impl TieredBlobCache {
             blob_max_gb = config.blob_max_bytes / (1024 * 1024 * 1024),
             chunk_max_gb = config.chunk_max_bytes / (1024 * 1024 * 1024),
             chunk_size_mb = config.default_chunk_size / (1024 * 1024),
-            "TieredBlobCache initialized"
+            "TieredBlobCache initialized (bytes-only, metadata in ProjectionStore)"
         );
 
         Self {
-            metadata: DashMap::new(),
-            metadata_hits: AtomicU64::new(0),
-            metadata_misses: AtomicU64::new(0),
-
             blobs: DashMap::new(),
             blob_total_bytes: AtomicU64::new(0),
             blob_hits: AtomicU64::new(0),
@@ -340,59 +372,6 @@ impl TieredBlobCache {
     /// Get configuration
     pub fn config(&self) -> &TieredCacheConfig {
         &self.config
-    }
-
-    // ========================================================================
-    // Tier 1: Metadata Operations
-    // ========================================================================
-
-    /// Get blob metadata by hash. O(1).
-    pub fn get_metadata(&self, hash: &str) -> Option<BlobMetadata> {
-        if let Some(entry) = self.metadata.get(hash) {
-            if Instant::now() < entry.expires_at {
-                self.metadata_hits.fetch_add(1, Ordering::Relaxed);
-                debug!(hash = hash, "Metadata cache hit");
-                return Some(entry.metadata.clone());
-            }
-            // Expired
-            drop(entry);
-            self.metadata.remove(hash);
-        }
-
-        self.metadata_misses.fetch_add(1, Ordering::Relaxed);
-        debug!(hash = hash, "Metadata cache miss");
-        None
-    }
-
-    /// Store blob metadata. O(1).
-    pub fn set_metadata(&self, hash: &str, metadata: BlobMetadata) {
-        let now = Instant::now();
-        let entry = MetadataEntry {
-            metadata,
-            cached_at: now,
-            expires_at: now + self.config.metadata_ttl,
-        };
-
-        debug!(hash = hash, "Metadata cached");
-        self.metadata.insert(hash.to_string(), entry);
-
-        // Evict if over limit (rare for metadata)
-        if self.metadata.len() > self.config.metadata_max_entries {
-            self.evict_oldest_metadata();
-        }
-    }
-
-    /// Check if metadata exists. O(1).
-    pub fn has_metadata(&self, hash: &str) -> bool {
-        self.metadata
-            .get(hash)
-            .map(|e| Instant::now() < e.expires_at)
-            .unwrap_or(false)
-    }
-
-    /// Remove metadata. O(1).
-    pub fn remove_metadata(&self, hash: &str) -> bool {
-        self.metadata.remove(hash).is_some()
     }
 
     // ========================================================================
@@ -488,6 +467,120 @@ impl TieredBlobCache {
         }
         self.blob_misses.fetch_add(1, Ordering::Relaxed);
         None
+    }
+
+    // ========================================================================
+    // Tier 2: Fallback Fetching
+    // ========================================================================
+
+    /// Get blob from cache, or fetch from provided endpoints.
+    ///
+    /// **This is the recommended method** after the metadata layer merge.
+    /// Caller provides endpoints from ProjectionStore.
+    ///
+    /// # Arguments
+    ///
+    /// * `hash` - The blob hash (e.g., "abc123def456" - without "sha256-" prefix)
+    /// * `endpoints` - List of endpoint URLs to try (from ProjectionStore.get_blob_endpoints())
+    /// * `reach` - Reach level for TTL selection ("commons", "private", etc.)
+    /// * `http_client` - reqwest client for fetching from endpoints
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let client = reqwest::Client::new();
+    /// let endpoints = projection_store.get_blob_endpoints(&hash).await.unwrap_or_default();
+    /// let blob = cache.get_or_fetch_from("abc123", &endpoints, "commons", &client).await?;
+    /// ```
+    pub async fn get_or_fetch_from(
+        &self,
+        hash: &str,
+        endpoints: &[String],
+        reach: &str,
+        http_client: &reqwest::Client,
+    ) -> Result<Bytes, CacheError> {
+        // 1. Check Tier 2 blob cache
+        if let Some(blob) = self.get_blob(hash) {
+            return Ok(Bytes::from(blob));
+        }
+
+        // 2. No endpoints available
+        if endpoints.is_empty() {
+            return Err(CacheError::NoFallbackUrls(hash.to_string()));
+        }
+
+        // 3. Try each endpoint in order
+        let mut last_error = None;
+        for url in endpoints {
+            match self.fetch_from_url(http_client, url).await {
+                Ok(data) => {
+                    // 4. Verify hash matches
+                    let computed_hash = BlobMetadata::compute_hash(&data);
+                    if computed_hash != hash {
+                        warn!(
+                            expected = hash,
+                            actual = computed_hash,
+                            url = url,
+                            "Hash mismatch from endpoint"
+                        );
+                        last_error = Some(CacheError::HashMismatch {
+                            expected: hash.to_string(),
+                            actual: computed_hash,
+                        });
+                        continue;
+                    }
+
+                    // 5. Cache in Tier 2
+                    self.set_blob(hash, data.to_vec(), reach);
+
+                    info!(
+                        hash = hash,
+                        url = url,
+                        size = data.len(),
+                        reach = reach,
+                        "Fetched and cached blob from endpoint"
+                    );
+
+                    return Ok(Bytes::from(data));
+                }
+                Err(e) => {
+                    warn!(url = url, error = %e, "Endpoint fetch failed");
+                    last_error = Some(e);
+                    continue;
+                }
+            }
+        }
+
+        // All endpoints failed
+        Err(last_error.unwrap_or_else(|| CacheError::NotFound(hash.to_string())))
+    }
+
+    /// Fetch blob data from a URL
+    async fn fetch_from_url(
+        &self,
+        http_client: &reqwest::Client,
+        url: &str,
+    ) -> Result<Vec<u8>, CacheError> {
+        let response = http_client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| CacheError::FetchFailed(format!("Request failed: {}", e)))?;
+
+        if !response.status().is_success() {
+            return Err(CacheError::FetchFailed(format!(
+                "HTTP {} from {}",
+                response.status(),
+                url
+            )));
+        }
+
+        let data = response
+            .bytes()
+            .await
+            .map_err(|e| CacheError::FetchFailed(format!("Body read failed: {}", e)))?;
+
+        Ok(data.to_vec())
     }
 
     // ========================================================================
@@ -621,25 +714,6 @@ impl TieredBlobCache {
     // Eviction
     // ========================================================================
 
-    /// Evict oldest metadata entries until under limit
-    fn evict_oldest_metadata(&self) {
-        let to_evict = self.metadata.len().saturating_sub(self.config.metadata_max_entries) + 10;
-
-        let mut entries: Vec<(String, Instant)> = self
-            .metadata
-            .iter()
-            .map(|e| (e.key().clone(), e.cached_at))
-            .collect();
-
-        entries.sort_by_key(|(_, cached_at)| *cached_at);
-
-        for (key, _) in entries.into_iter().take(to_evict) {
-            self.metadata.remove(&key);
-        }
-
-        debug!(evicted = to_evict, "Evicted metadata entries");
-    }
-
     /// Evict blobs until we have space for new_size
     fn evict_blobs_until_fits(&self, new_size: u64) {
         let current = self.blob_total_bytes.load(Ordering::Relaxed);
@@ -710,20 +784,11 @@ impl TieredBlobCache {
     // Cleanup & Maintenance
     // ========================================================================
 
-    /// Remove all expired entries from all tiers
-    pub fn cleanup_expired(&self) -> (usize, usize, usize) {
+    /// Remove all expired entries from both tiers
+    ///
+    /// Returns (expired_blobs, expired_chunks)
+    pub fn cleanup_expired(&self) -> (usize, usize) {
         let now = Instant::now();
-
-        // Metadata
-        let expired_meta: Vec<String> = self
-            .metadata
-            .iter()
-            .filter(|e| now >= e.expires_at)
-            .map(|e| e.key().clone())
-            .collect();
-        for key in &expired_meta {
-            self.metadata.remove(key);
-        }
 
         // Blobs
         let expired_blobs: Vec<(String, u64)> = self
@@ -756,21 +821,19 @@ impl TieredBlobCache {
         self.chunk_total_bytes
             .fetch_sub(chunk_freed, Ordering::Relaxed);
 
-        if !expired_meta.is_empty() || !expired_blobs.is_empty() || !expired_chunks.is_empty() {
+        if !expired_blobs.is_empty() || !expired_chunks.is_empty() {
             debug!(
-                metadata = expired_meta.len(),
                 blobs = expired_blobs.len(),
                 chunks = expired_chunks.len(),
                 "Cleaned up expired entries"
             );
         }
 
-        (expired_meta.len(), expired_blobs.len(), expired_chunks.len())
+        (expired_blobs.len(), expired_chunks.len())
     }
 
-    /// Clear all entries from all tiers
+    /// Clear all entries from both tiers
     pub fn clear(&self) {
-        self.metadata.clear();
         self.blobs.clear();
         self.chunks.clear();
         self.blob_total_bytes.store(0, Ordering::Relaxed);
@@ -782,22 +845,12 @@ impl TieredBlobCache {
     // Statistics
     // ========================================================================
 
-    /// Get statistics for all tiers
+    /// Get statistics for blob and chunk tiers
     pub fn stats(&self) -> TieredCacheStats {
         let blob_bytes = self.blob_total_bytes.load(Ordering::Relaxed);
         let chunk_bytes = self.chunk_total_bytes.load(Ordering::Relaxed);
 
         TieredCacheStats {
-            metadata: TierStats {
-                item_count: self.metadata.len(),
-                total_bytes: 0, // Not tracked for metadata
-                max_bytes: 0,
-                percent_full: 0.0,
-                hits: self.metadata_hits.load(Ordering::Relaxed),
-                misses: self.metadata_misses.load(Ordering::Relaxed),
-                evictions: 0,
-                expirations: 0,
-            },
             blob: TierStats {
                 item_count: self.blobs.len(),
                 total_bytes: blob_bytes,
@@ -845,12 +898,11 @@ pub fn spawn_tiered_cleanup_task(cache: Arc<TieredBlobCache>, interval: Duration
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(interval).await;
-            let (meta, blobs, chunks) = cache.cleanup_expired();
+            let (expired_blobs, expired_chunks) = cache.cleanup_expired();
             let stats = cache.stats();
             debug!(
-                expired_meta = meta,
-                expired_blobs = blobs,
-                expired_chunks = chunks,
+                expired_blobs = expired_blobs,
+                expired_chunks = expired_chunks,
                 blob_percent = format!("{:.1}%", stats.blob.percent_full),
                 chunk_percent = format!("{:.1}%", stats.chunk.percent_full),
                 "Tiered cache cleanup completed"
@@ -886,28 +938,6 @@ mod tests {
             author_id: None,
             content_id: None,
         }
-    }
-
-    #[test]
-    fn test_metadata_cache() {
-        let cache = TieredBlobCache::with_defaults();
-        let meta = test_metadata();
-        let hash = meta.hash.clone();
-
-        // Miss initially
-        assert!(cache.get_metadata(&hash).is_none());
-
-        // Set and get
-        cache.set_metadata(&hash, meta.clone());
-        let cached = cache.get_metadata(&hash).expect("Should have metadata");
-        assert_eq!(cached.hash, hash);
-        assert_eq!(cached.size_bytes, 1024 * 1024);
-
-        // Stats
-        let stats = cache.stats();
-        assert_eq!(stats.metadata.item_count, 1);
-        assert_eq!(stats.metadata.hits, 1);
-        assert_eq!(stats.metadata.misses, 1);
     }
 
     #[test]

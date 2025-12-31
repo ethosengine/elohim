@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
+use serde_json::{json, Value as JsonValue};
 use tokio::sync::broadcast;
 use tokio::time::sleep;
 use tokio_tungstenite::{
@@ -62,6 +62,50 @@ pub enum CacheSignalType {
 pub struct DoorwaySignal {
     pub namespace: String,
     pub payload: CacheSignal,
+}
+
+// =============================================================================
+// InfrastructureSignal Support - for ContentServer endpoint registration
+// =============================================================================
+
+/// Storage endpoint from infrastructure DNA
+#[derive(Debug, Clone, Deserialize)]
+pub struct StorageEndpointData {
+    pub url: String,
+    pub protocol: String,
+    pub priority: u8,
+}
+
+/// ContentServer data from infrastructure DNA
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContentServerData {
+    pub content_hash: String,
+    pub capability: String,
+    pub serve_url: Option<String>,
+    #[serde(default)]
+    pub endpoints: Vec<StorageEndpointData>,
+    pub online: bool,
+    pub priority: u8,
+    pub region: Option<String>,
+    pub bandwidth_mbps: Option<u32>,
+    pub registered_at: u64,
+    pub last_heartbeat: u64,
+}
+
+/// Infrastructure signals from infrastructure DNA
+/// Used by doorway to register content server endpoints for fallback fetching
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", content = "payload")]
+pub enum InfrastructureSignal {
+    /// ContentServer was registered or updated
+    ContentServerCommitted {
+        action_hash: String,
+        entry_hash: String,
+        server: ContentServerData,
+        author: String,
+    },
+    // Other infrastructure signals (doorway heartbeats, etc.) can be added here
+    // but we only care about ContentServerCommitted for blob routing
 }
 
 impl CacheSignal {
@@ -183,11 +227,24 @@ impl SubscriberConfig {
     }
 }
 
+/// Content server registration event for blob cache
+#[derive(Debug, Clone)]
+pub struct ContentServerRegistration {
+    pub content_hash: String,
+    pub endpoints: Vec<String>,
+    pub capability: String,
+    pub priority: u8,
+    pub region: Option<String>,
+    pub online: bool,
+}
+
 /// Signal Subscriber - receives signals from Holochain conductor
 pub struct SignalSubscriber {
     config: SubscriberConfig,
-    /// Channel to send parsed signals to the engine
+    /// Channel to send parsed signals to the engine (content projection)
     signal_tx: broadcast::Sender<ProjectionSignal>,
+    /// Channel to send content server registrations (blob routing)
+    blob_registry_tx: broadcast::Sender<ContentServerRegistration>,
     /// Shutdown signal
     shutdown_tx: broadcast::Sender<()>,
 }
@@ -196,18 +253,25 @@ impl SignalSubscriber {
     /// Create a new signal subscriber
     pub fn new(config: SubscriberConfig) -> Self {
         let (signal_tx, _) = broadcast::channel(1000);
+        let (blob_registry_tx, _) = broadcast::channel(1000);
         let (shutdown_tx, _) = broadcast::channel(1);
 
         Self {
             config,
             signal_tx,
+            blob_registry_tx,
             shutdown_tx,
         }
     }
 
-    /// Get a receiver for projection signals
+    /// Get a receiver for projection signals (content metadata → MongoDB)
     pub fn subscribe(&self) -> broadcast::Receiver<ProjectionSignal> {
         self.signal_tx.subscribe()
+    }
+
+    /// Get a receiver for content server registrations (blob endpoints → TieredBlobCache)
+    pub fn subscribe_blob_registry(&self) -> broadcast::Receiver<ContentServerRegistration> {
+        self.blob_registry_tx.subscribe()
     }
 
     /// Get a shutdown receiver
@@ -559,13 +623,20 @@ impl SignalSubscriber {
             }
         }
 
-        // Format 3: Wrapped in { "signal": ... }
+        // Format 3: InfrastructureSignal (from infrastructure DNA)
+        // Used for ContentServer endpoint registration - goes to blob cache, NOT MongoDB
+        if let Ok(infra_signal) = serde_json::from_value::<InfrastructureSignal>(value.clone()) {
+            self.process_infrastructure_signal(infra_signal);
+            return;
+        }
+
+        // Format 5: Wrapped in { "signal": ... }
         if let Some(signal_data) = value.get("signal") {
             self.process_signal_value(signal_data);
             return;
         }
 
-        // Format 4: App signal wrapper { "type": "Signal", "data": ... }
+        // Format 6: App signal wrapper { "type": "Signal", "data": ... }
         if value.get("type").and_then(|t| t.as_str()) == Some("Signal") {
             if let Some(data) = value.get("data") {
                 self.process_signal_value(data);
@@ -573,13 +644,93 @@ impl SignalSubscriber {
             }
         }
 
-        // Format 5: Holochain client format { "App": ... }
+        // Format 7: Holochain client format { "App": ... }
         if let Some(app) = value.get("App") {
             self.process_signal_value(app);
             return;
         }
 
         debug!("Unrecognized signal format: {:?}", value);
+    }
+
+    /// Process an infrastructure signal (ContentServer registrations, etc.)
+    ///
+    /// ContentServerCommitted signals now go to ProjectionStore via signal_tx,
+    /// updating the blob_endpoints field on documents with matching blob_hash.
+    /// This is part of the metadata layer merge (ProjectionStore is single source
+    /// of truth for blob metadata, TieredBlobCache is bytes-only).
+    fn process_infrastructure_signal(&self, signal: InfrastructureSignal) {
+        match signal {
+            InfrastructureSignal::ContentServerCommitted { server, author, action_hash, .. } => {
+                // Build endpoint URLs from endpoints list (preferred) or serve_url (deprecated)
+                let mut endpoint_urls: Vec<String> = server
+                    .endpoints
+                    .iter()
+                    .filter(|e| e.protocol == "http" || e.protocol == "https")
+                    .map(|e| e.url.clone())
+                    .collect();
+
+                // Fallback: add serve_url if endpoints is empty
+                if endpoint_urls.is_empty() {
+                    if let Some(url) = server.serve_url {
+                        endpoint_urls.push(url);
+                    }
+                }
+
+                // Only process if we have endpoints and server is online
+                if !endpoint_urls.is_empty() && server.online {
+                    // Clone content_hash before it's moved
+                    let content_hash = server.content_hash.clone();
+
+                    info!(
+                        content_hash = %content_hash,
+                        endpoints = ?endpoint_urls,
+                        capability = %server.capability,
+                        "ContentServer registered - updating projection store"
+                    );
+
+                    // Convert to ProjectionSignal with "update_endpoints" action
+                    // This routes through the normal signal channel to ProjectionEngine,
+                    // which updates blob_endpoints on documents with matching blob_hash
+                    let signal = ProjectionSignal {
+                        doc_type: "BlobEndpoint".to_string(), // Metadata only, not stored as doc
+                        action: "update_endpoints".to_string(),
+                        id: content_hash.clone(),             // blob_hash
+                        data: json!(endpoint_urls.clone()), // Array of endpoint URLs
+                        action_hash,
+                        entry_hash: None,
+                        author,
+                        search_tokens: vec![],
+                        invalidates: vec![],
+                        ttl_secs: None,
+                    };
+
+                    if let Err(e) = self.signal_tx.send(signal) {
+                        warn!("Failed to send endpoint update signal (no receivers?): {}", e);
+                    }
+
+                    // Also send to blob_registry_tx for backwards compatibility
+                    // (in case any consumers still use it)
+                    let registration = ContentServerRegistration {
+                        content_hash,
+                        endpoints: endpoint_urls,
+                        capability: server.capability,
+                        priority: server.priority,
+                        region: server.region,
+                        online: server.online,
+                    };
+
+                    // Ignore errors - old consumers may not exist
+                    let _ = self.blob_registry_tx.send(registration);
+                } else {
+                    debug!(
+                        content_hash = %server.content_hash,
+                        online = server.online,
+                        "Ignoring ContentServer (offline or no endpoints)"
+                    );
+                }
+            }
+        }
     }
 
     /// Emit a parsed signal to the engine.
@@ -735,5 +886,113 @@ mod tests {
         assert_eq!(projection_signal.action, "delete");
         assert_eq!(projection_signal.id, "deleted-content");
         assert_eq!(projection_signal.data, serde_json::Value::Null);
+    }
+
+    #[test]
+    fn test_infrastructure_signal_parsing() {
+        // Test ContentServerCommitted signal parsing
+        let json = serde_json::json!({
+            "type": "ContentServerCommitted",
+            "payload": {
+                "action_hash": "uhCkkABC123",
+                "entry_hash": "uhCEkDEF456",
+                "server": {
+                    "content_hash": "sha256-abc123def456",
+                    "capability": "blob",
+                    "serve_url": "http://localhost:8080/store",
+                    "endpoints": [
+                        {
+                            "url": "http://192.168.1.100:8080/store",
+                            "protocol": "http",
+                            "priority": 100
+                        },
+                        {
+                            "url": "https://my-node.example.com/api/blob",
+                            "protocol": "https",
+                            "priority": 50
+                        }
+                    ],
+                    "online": true,
+                    "priority": 80,
+                    "region": "us-west",
+                    "bandwidth_mbps": 100,
+                    "registered_at": 1704067200,
+                    "last_heartbeat": 1704067200
+                },
+                "author": "uhCAkXYZ789"
+            }
+        });
+
+        let signal: InfrastructureSignal = serde_json::from_value(json).unwrap();
+
+        match signal {
+            InfrastructureSignal::ContentServerCommitted { server, author, .. } => {
+                assert_eq!(server.content_hash, "sha256-abc123def456");
+                assert_eq!(server.capability, "blob");
+                assert_eq!(server.endpoints.len(), 2);
+                assert_eq!(server.endpoints[0].url, "http://192.168.1.100:8080/store");
+                assert_eq!(server.endpoints[0].priority, 100);
+                assert!(server.online);
+                assert_eq!(author, "uhCAkXYZ789");
+            }
+        }
+    }
+
+    #[test]
+    fn test_infrastructure_signal_with_subscriber() {
+        let subscriber = SignalSubscriber::new(SubscriberConfig::default());
+
+        // Subscribe to both channels before processing
+        let mut signal_rx = subscriber.subscribe();
+        let mut blob_rx = subscriber.subscribe_blob_registry();
+
+        // Test ContentServerCommitted signal
+        let json = serde_json::json!({
+            "type": "ContentServerCommitted",
+            "payload": {
+                "action_hash": "uhCkkABC123",
+                "entry_hash": "uhCEkDEF456",
+                "server": {
+                    "content_hash": "sha256-test",
+                    "capability": "blob",
+                    "endpoints": [{
+                        "url": "http://localhost:8080/store",
+                        "protocol": "http",
+                        "priority": 100
+                    }],
+                    "online": true,
+                    "priority": 50,
+                    "registered_at": 1704067200,
+                    "last_heartbeat": 1704067200
+                },
+                "author": "uhCAk123"
+            }
+        });
+
+        // Process the signal - should emit to both channels
+        subscriber.process_signal_value(&json);
+
+        // Check that projection signal was emitted (new behavior - routes to ProjectionStore)
+        match signal_rx.try_recv() {
+            Ok(signal) => {
+                assert_eq!(signal.action, "update_endpoints");
+                assert_eq!(signal.id, "sha256-test"); // blob_hash
+                assert!(signal.data.as_array().is_some());
+                let endpoints = signal.data.as_array().unwrap();
+                assert_eq!(endpoints.len(), 1);
+                assert_eq!(endpoints[0].as_str().unwrap(), "http://localhost:8080/store");
+            }
+            Err(_) => panic!("Expected ProjectionSignal to be emitted for update_endpoints"),
+        }
+
+        // Check that registration was also emitted to blob registry (backwards compatibility)
+        match blob_rx.try_recv() {
+            Ok(registration) => {
+                assert_eq!(registration.content_hash, "sha256-test");
+                assert_eq!(registration.endpoints.len(), 1);
+                assert_eq!(registration.endpoints[0], "http://localhost:8080/store");
+            }
+            Err(_) => panic!("Expected ContentServerRegistration to be emitted"),
+        }
     }
 }

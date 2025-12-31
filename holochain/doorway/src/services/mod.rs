@@ -22,6 +22,7 @@ pub mod import_orchestrator;
 pub mod recording;
 pub mod route_registry;
 pub mod shard_resolver;
+pub mod storage_registration;
 pub mod verification;
 
 pub use custodian::{
@@ -60,3 +61,6 @@ pub use route_registry::{
     RouteSource, RouteTarget, spawn_cleanup_task as spawn_route_cleanup_task,
 };
 pub use import_client::{ImportClient, ImportClientConfig};
+pub use storage_registration::{
+    StorageRegistrationConfig, StorageRegistrationResult, register_local_storage,
+};

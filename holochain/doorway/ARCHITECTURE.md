@@ -629,3 +629,107 @@ Since `elohim.host` already points to Doorway, both bootstrap and signal are rea
 4. Phase out standalone `holostrap.elohim.host`
 
 No protocol changes needed - same MessagePack/SBD protocols. Same domain, everything.
+
+---
+
+## Two-Path Architecture: Web2 vs P2P
+
+Elohim Protocol has two distinct access paths, each with its own caching layer:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         GOVERNANCE LAYER                             │
+│                                                                      │
+│                    DNA (content_store + infrastructure)              │
+│                    ┌─────────────────────────────────┐              │
+│                    │  Reach enforcement lives HERE   │              │
+│                    │  - Author sets reach            │              │
+│                    │  - Qahal can govern reach       │              │
+│                    │  - Cryptographically enforced   │              │
+│                    └───────────────┬─────────────────┘              │
+│                                    │                                 │
+│                    ┌───────────────┴───────────────┐                │
+│                    ▼                               ▼                │
+│              WEB2 PATH                        P2P PATH              │
+│              (Doorway)                        (Agent)               │
+│                                                                      │
+│         DNA says "reach=X"              DNA says "reach=X"          │
+│         Doorway enforces                Agent enforces              │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Web2 Path (Doorway)
+
+For visitors accessing via browser without a Holochain conductor:
+
+```
+Browser → Doorway → [ProjectionStore] → DHT / elohim-storage
+                          │
+                    MongoDB cache
+                    (content + blob endpoints)
+```
+
+- **ProjectionStore**: Unified metadata cache (content docs + blob endpoints)
+- **TieredBlobCache**: Byte cache only (no metadata duplication)
+- **Governed**: Doorway enforces reach from ProjectionStore
+
+### P2P Path (Agent)
+
+For users running elohim-app with their own conductor:
+
+```
+Agent App → [holochain-cache-core] → Conductor → DHT
+                    │
+Agent App → [elohim-storage] → Local + P2P fetch from peers
+```
+
+- **holochain-cache-core**: Agent-side cache for conductor calls
+- **elohim-storage**: Blob storage + P2P replication based on relationship
+- **Governed**: DNA enforces reach before serving to other agents
+
+### Key Principles
+
+| Principle | Description |
+|-----------|-------------|
+| **DNA is Source of Truth** | Reach decisions live in the DNA, not caches |
+| **Doorway is a Thin Proxy** | Governed gateway, not storage layer |
+| **elohim-storage is Relationship-Based** | "I store my data AND help replicate yours based on our relationship" |
+| **Caches are Enforcement Points** | They enforce DNA decisions, don't make them |
+
+### elohim-storage: Embodied Relationship Resilience
+
+Unlike traditional storage, elohim-storage participates in P2P solidarity:
+
+```rust
+elohim-storage:
+  "I store MY data"
+  "I help YOU replicate/backup/deliver YOURS"
+  "...based on our relationship in the DNA"
+```
+
+This enables:
+- **Recovery**: Family network can restore your data
+- **Resilience**: Content survives individual node failures
+- **Trust**: Replication follows consent-based relationships
+
+### Doorway Cache Simplification
+
+Doorway uses a unified metadata model:
+
+```
+Signal Flow:
+  CacheSignal (content_store DNA)
+       │
+       ▼
+  ProjectionStore ← Single source of truth
+  { id, title, reach,       for all content metadata
+    blobHash, blobEndpoints }
+       │
+       ▼
+  TieredBlobCache (bytes only)
+  { hash → bytes }
+```
+
+- **One metadata store** (ProjectionStore) instead of two
+- **Blob endpoints** stored with content, not separately
+- **Reach** stored once, enforced consistently

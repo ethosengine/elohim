@@ -14,7 +14,7 @@ use doorway::{
     orchestrator::{Orchestrator, OrchestratorConfig, OrchestratorState},
     projection::{EngineConfig, ProjectionEngine, SubscriberConfig, spawn_engine_task, spawn_subscriber},
     server,
-    services::{self, DiscoveryConfig, spawn_discovery_task},
+    services::{self, DiscoveryConfig, StorageRegistrationConfig, register_local_storage, spawn_discovery_task},
     worker::{PoolConfig, WorkerPool},
 };
 
@@ -299,6 +299,31 @@ async fn main() -> anyhow::Result<()> {
     } else {
         None
     };
+
+    // Auto-register local elohim-storage with infrastructure DNA (prototype mode)
+    // This allows doorway operators to announce their local storage to the network
+    let storage_config = StorageRegistrationConfig::from_env();
+    if storage_config.enabled {
+        let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
+        let result = register_local_storage(
+            &storage_config,
+            &app_url,
+            &args.installed_app_id,
+        )
+        .await;
+
+        if result.success {
+            info!(
+                capabilities = ?result.registered_capabilities,
+                "Local storage auto-registration completed"
+            );
+        } else {
+            warn!(
+                errors = ?result.errors,
+                "Local storage auto-registration had failures"
+            );
+        }
+    }
 
     // Run the server
     if let Err(e) = server::run(state).await {

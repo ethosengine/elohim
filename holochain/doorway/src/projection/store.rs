@@ -400,6 +400,100 @@ impl ProjectionStore {
         self.update_tx.subscribe()
     }
 
+    /// Update blob endpoints for documents with matching blob_hash
+    ///
+    /// This is called when ContentServerCommitted signals arrive from the
+    /// infrastructure DNA, indicating a P2P agent is now serving a blob.
+    /// We find all projected documents with that blob_hash and add the
+    /// new endpoints to their `blob_endpoints` list.
+    ///
+    /// Returns the number of documents updated.
+    pub async fn update_blob_endpoints(
+        &self,
+        blob_hash: &str,
+        endpoints: Vec<String>,
+    ) -> Result<usize, DoorwayError> {
+        if endpoints.is_empty() {
+            return Ok(0);
+        }
+
+        let mut count = 0;
+
+        // Update in MongoDB
+        if let Some(ref mongo) = self.mongo {
+            let db = mongo.inner().database(mongo.db_name());
+            let collection = db.collection::<ProjectedDocument>(&self.config.collection_name);
+
+            // Find documents with matching blob_hash and add endpoints
+            // Using $addToSet to avoid duplicates
+            let filter = doc! { "blob_hash": blob_hash };
+            let update = doc! {
+                "$addToSet": {
+                    "blob_endpoints": { "$each": &endpoints }
+                }
+            };
+
+            match collection.update_many(filter, update).await {
+                Ok(result) => {
+                    count = result.modified_count as usize;
+                    if count > 0 {
+                        debug!(
+                            "Updated {} documents with blob_hash {} with {} new endpoints",
+                            count, blob_hash, endpoints.len()
+                        );
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to update blob endpoints in MongoDB: {}", e);
+                }
+            }
+        }
+
+        // Update hot cache entries with matching blob_hash
+        for mut entry in self.hot_cache.iter_mut() {
+            if entry.doc.blob_hash.as_deref() == Some(blob_hash) {
+                entry.doc.add_blob_endpoints(endpoints.clone());
+                count += 1;
+            }
+        }
+
+        Ok(count)
+    }
+
+    /// Get blob endpoints for a given blob_hash
+    ///
+    /// Looks up any projected document with this blob_hash and returns
+    /// its blob_endpoints. Used by TieredBlobCache.get_or_fetch().
+    pub async fn get_blob_endpoints(&self, blob_hash: &str) -> Option<Vec<String>> {
+        // Check hot cache first
+        for entry in self.hot_cache.iter() {
+            if entry.doc.blob_hash.as_deref() == Some(blob_hash) {
+                if !entry.doc.blob_endpoints.is_empty() {
+                    return Some(entry.doc.blob_endpoints.clone());
+                }
+            }
+        }
+
+        // Fall back to MongoDB
+        if let Some(ref mongo) = self.mongo {
+            let db = mongo.inner().database(mongo.db_name());
+            let collection = db.collection::<ProjectedDocument>(&self.config.collection_name);
+
+            let filter = doc! {
+                "blob_hash": blob_hash,
+                "blob_endpoints": { "$exists": true, "$ne": [] }
+            };
+
+            if let Ok(Some(doc)) = collection.find_one(filter).await {
+                if !doc.blob_endpoints.is_empty() {
+                    return Some(doc.blob_endpoints);
+                }
+            }
+        }
+
+        None
+    }
+
     /// Get hot cache statistics
     pub fn hot_cache_stats(&self) -> HotCacheStats {
         let total = self.hot_cache.len();

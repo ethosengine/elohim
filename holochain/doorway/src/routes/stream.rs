@@ -25,9 +25,29 @@ use http_body_util::Full;
 use hyper::{Response, StatusCode};
 use std::sync::Arc;
 
-use crate::cache::{BlobMetadata, TieredBlobCache, VariantMetadata};
+use crate::cache::{BlobMetadata, VariantMetadata};
 use crate::server::AppState;
 use crate::services::CustodianSelectionCriteria;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/// Extract streaming metadata from ProjectionStore
+///
+/// Attempts to get content metadata from ProjectionStore and convert it
+/// to BlobMetadata for HLS/DASH playlist generation.
+async fn get_streaming_metadata(state: &AppState, content_id: &str) -> Option<BlobMetadata> {
+    // Get projection store
+    let projection = state.projection.as_ref()?;
+
+    // Look up the content document (Content type with content_id as doc_id)
+    let doc = projection.get("Content", content_id).await?;
+
+    // Try to deserialize BlobMetadata from the document's data field
+    // The content's data should contain streaming metadata
+    serde_json::from_value::<BlobMetadata>(doc.data.clone()).ok()
+}
 
 // ============================================================================
 // Constants
@@ -51,8 +71,8 @@ pub async fn handle_hls_master(
     content_id: &str,
     base_url: &str,
 ) -> Response<Full<Bytes>> {
-    // Get blob metadata from cache
-    let metadata = match state.tiered_cache.get_metadata(content_id) {
+    // Get streaming metadata from ProjectionStore
+    let metadata = match get_streaming_metadata(&state, content_id).await {
         Some(m) => m,
         None => {
             return error_response(StatusCode::NOT_FOUND, "Content not found");
@@ -79,8 +99,8 @@ pub async fn handle_hls_variant(
     variant_label: &str,
     base_url: &str,
 ) -> Response<Full<Bytes>> {
-    // Get blob metadata from cache
-    let metadata = match state.tiered_cache.get_metadata(content_id) {
+    // Get streaming metadata from ProjectionStore
+    let metadata = match get_streaming_metadata(&state, content_id).await {
         Some(m) => m,
         None => {
             return error_response(StatusCode::NOT_FOUND, "Content not found");
@@ -121,8 +141,8 @@ pub async fn handle_dash_mpd(
     content_id: &str,
     base_url: &str,
 ) -> Response<Full<Bytes>> {
-    // Get blob metadata from cache
-    let metadata = match state.tiered_cache.get_metadata(content_id) {
+    // Get streaming metadata from ProjectionStore
+    let metadata = match get_streaming_metadata(&state, content_id).await {
         Some(m) => m,
         None => {
             return error_response(StatusCode::NOT_FOUND, "Content not found");
