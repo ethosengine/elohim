@@ -666,6 +666,33 @@ async fn handle_request(
                                 .unwrap(),
                         ));
                     }
+                } else if p.starts_with("/import/") {
+                    // Path looks like an import route but no config matched
+                    // Check if discovery is still in progress
+                    let discovered_dnas = import_store.get_import_enabled_dnas();
+                    if discovered_dnas.is_empty() {
+                        // No import configs discovered yet - discovery may still be in progress
+                        debug!(
+                            path = p,
+                            "Import route requested but discovery not complete"
+                        );
+                        return Ok(to_boxed(
+                            Response::builder()
+                                .status(StatusCode::SERVICE_UNAVAILABLE)
+                                .header("Content-Type", "application/json")
+                                .header("Retry-After", "5")
+                                .body(Full::new(Bytes::from(
+                                    r#"{"error": "Import routes not yet discovered. Discovery in progress - retry in a few seconds.", "hint": "The doorway needs to connect to the conductor and discover import configurations before import routes are available."}"#,
+                                )))
+                                .unwrap(),
+                        ));
+                    }
+                    // Discovery complete but route not found - return 404
+                    debug!(
+                        path = p,
+                        discovered_count = discovered_dnas.len(),
+                        "Import route not matched (discovery complete)"
+                    );
                 }
             }
             // Not an import route, fall through to not found

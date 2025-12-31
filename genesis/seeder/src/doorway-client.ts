@@ -352,20 +352,42 @@ export class DoorwayClient {
       };
     }
 
-    const response = await this.fetch(`/import/${batchType}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
-    });
+    // Retry loop for 503 (discovery in progress) errors
+    const maxRetries = 12; // ~60 seconds with 5 second delays
+    const retryDelay = 5000;
 
-    if (!response.ok) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const response = await this.fetch(`/import/${batchType}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+
+      // Handle 503 (discovery in progress) with retry
+      if (response.status === 503) {
+        const errorData = await response.json().catch(() => ({ error: 'Service unavailable' }));
+        const retryAfter = response.headers.get('Retry-After');
+        const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : retryDelay;
+
+        if (attempt < maxRetries) {
+          console.log(`   ⏳ Doorway not ready: ${errorData.error || 'Discovery in progress'}`);
+          console.log(`      Retry ${attempt}/${maxRetries} in ${delay / 1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+
       const errorText = await response.text();
       throw new Error(`Import queue failed: HTTP ${response.status}: ${errorText}`);
     }
 
-    return await response.json();
+    throw new Error(`Import queue failed: Doorway not ready after ${maxRetries} retries`);
   }
 
   /**
