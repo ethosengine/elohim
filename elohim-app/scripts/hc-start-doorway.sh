@@ -1,6 +1,6 @@
 #!/bin/bash
 # Holochain Development Stack Startup Script (Doorway version)
-# Starts sandbox, Doorway gateway, installs hApp
+# Starts sandbox, elohim-storage, Doorway gateway, installs hApp
 
 set -e
 
@@ -11,8 +11,19 @@ LOCAL_DEV_DIR="$HC_DIR/local-dev"
 HAPP_PATH="$HC_DIR/dna/elohim/workdir/elohim.happ"
 HC_PORTS_FILE="$LOCAL_DEV_DIR/.hc_ports"
 DOORWAY_BIN="$HC_DIR/doorway/target/release/doorway"
+STORAGE_BIN="$HC_DIR/elohim-storage/target/release/elohim-storage"
+STORAGE_DIR="/tmp/elohim-storage"
 
-echo "🚪 Starting Holochain Development Stack (Doorway)..."
+echo "🚪 Starting Holochain Development Stack (Doorway + Storage)..."
+
+# Check if elohim-storage binary exists
+if [ ! -f "$STORAGE_BIN" ]; then
+    echo "⚠️  elohim-storage binary not found at $STORAGE_BIN"
+    echo "   Building elohim-storage first..."
+    cd "$HC_DIR/elohim-storage"
+    RUSTFLAGS="" cargo build --release
+    echo "✅ elohim-storage built"
+fi
 
 # Check if Doorway binary exists
 if [ ! -f "$DOORWAY_BIN" ]; then
@@ -111,13 +122,29 @@ for i in {1..15}; do
     sleep 1
 done
 
-# Stop any existing proxy on 8888
-fuser -k 8888/tcp 2>/dev/null || true
+# Stop any existing services on 8888 and 8090
+fuser -k 8888/tcp 8090/tcp 2>/dev/null || true
 sleep 1
 
-# Start Doorway
+# Start elohim-storage
+echo "📦 Starting elohim-storage..."
+mkdir -p "$STORAGE_DIR"
+"$STORAGE_BIN" --http-port 8090 --storage-dir "$STORAGE_DIR" --enable-import-api &
+STORAGE_PID=$!
+
+# Wait for elohim-storage to be ready
+echo "⏳ Waiting for elohim-storage to start..."
+for i in {1..15}; do
+    if curl -s http://localhost:8090/health >/dev/null 2>&1; then
+        echo "✅ elohim-storage ready on port 8090"
+        break
+    fi
+    sleep 1
+done
+
+# Start Doorway with STORAGE_URL
 echo "🚪 Starting Doorway gateway..."
-"$DOORWAY_BIN" --dev-mode --listen 0.0.0.0:8888 --conductor-url "ws://localhost:$ADMIN_PORT" &
+STORAGE_URL=http://localhost:8090 "$DOORWAY_BIN" --dev-mode --listen 0.0.0.0:8888 --conductor-url "ws://localhost:$ADMIN_PORT" &
 DOORWAY_PID=$!
 
 # Wait for Doorway to be ready
@@ -132,13 +159,14 @@ done
 
 # Show status
 echo ""
-echo "🚪 Holochain Stack Status (Doorway):"
+echo "🚪 Holochain Stack Status (Doorway + Storage):"
 echo "   Admin port: $ADMIN_PORT"
 echo "   App port: 4445"
-echo "   Doorway: http://localhost:8888"
+echo "   Storage: http://localhost:8090"
+echo "   Doorway: http://localhost:8888 → storage:8090 → conductor:$ADMIN_PORT"
 curl -s http://localhost:8888/status 2>/dev/null | head -1 || echo "   Doorway: not responding"
 echo ""
 hc sandbox call --running "$ADMIN_PORT" list-apps 2>/dev/null | head -5
 
 echo ""
-echo "✅ Holochain stack ready with Doorway!"
+echo "✅ Holochain stack ready with Doorway + Storage!"

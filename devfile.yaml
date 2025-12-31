@@ -117,11 +117,11 @@ components:
   # Nix store volume - required for Nix/Holochain tooling
   - name: nix-store
     volume:
-      size: 25Gi
-  # XDG directories for Nix cache/config
+      size: 30Gi
+  # XDG directories for Nix cache/config (npm, cypress, typescript caches)
   - name: nix-xdg
     volume:
-      size: 2Gi
+      size: 5Gi
 commands:
   - id: setup-npm-env
     exec:
@@ -170,12 +170,19 @@ commands:
             --transport http \
             --header "Authorization: Basic $JENKINS_AUTH"
         fi
+  - id: start-storage
+    exec:
+      component: tools
+      workingDir: /projects/elohim/holochain/elohim-storage
+      commandLine: |
+        RUSTFLAGS="" cargo build --release && ./target/release/elohim-storage --http-port 8090 --storage-dir /tmp/elohim-storage --enable-import-api
+
   - id: start-doorway
     exec:
       component: tools
       workingDir: /projects/elohim/holochain/doorway
       commandLine: |
-        RUSTFLAGS="" cargo build --release && ./target/release/doorway --dev-mode --listen 0.0.0.0:8888 --conductor-url ws://localhost:4444
+        RUSTFLAGS="" cargo build --release && STORAGE_URL=http://localhost:8090 ./target/release/doorway --dev-mode --listen 0.0.0.0:8888 --conductor-url ws://localhost:4444
 
   - id: build-happ
     exec:
