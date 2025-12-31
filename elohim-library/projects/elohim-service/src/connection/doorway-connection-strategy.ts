@@ -392,7 +392,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   ): Promise<AppInfo | null> {
     try {
       const apps = await adminWs.listApps({});
-      return apps.find((app) => app.installed_app_id === appId) || null;
+      return apps.find((app: AppInfo) => app.installed_app_id === appId) || null;
     } catch {
       return null;
     }

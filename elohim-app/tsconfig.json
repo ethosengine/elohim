@@ -17,7 +17,9 @@
       "@app/shefa": ["src/app/shefa/index.ts"],
       "@app/shefa/*": ["src/app/shefa/*"],
       "@app/doorway": ["src/app/doorway/index.ts"],
-      "@app/doorway/*": ["src/app/doorway/*"]
+      "@app/doorway/*": ["src/app/doorway/*"],
+      "@holochain/client": ["node_modules/@holochain/client"],
+      "@holochain/client/*": ["node_modules/@holochain/client/*"]
     },
     "outDir": "./dist/out-tsc",
     "strict": true,

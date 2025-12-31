@@ -430,6 +430,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
+                    dir('elohim-library') {
+                        script {
+                            echo 'Installing elohim-library dependencies (required for elohim-service imports)'
+                            sh 'npm ci'
+                        }
+                    }
                     dir('elohim-app') {
                         script {
                             echo 'Installing npm dependencies'
