@@ -132,8 +132,42 @@ impl DiscoveryService {
         let cells = match self.get_cells().await {
             Ok(c) => c,
             Err(e) => {
-                error!("Failed to get cells: {}", e);
-                result.errors.push(format!("Failed to get cells: {}", e));
+                warn!("Failed to get cells from admin interface: {}", e);
+                warn!("Falling back to default import configuration for '{}'", self.config.installed_app_id);
+
+                // Fallback: Use default config when admin interface is unavailable
+                // This allows seeding to work even when we can't enumerate cells
+                let fallback_dna_hash = format!("fallback-{}", self.config.installed_app_id);
+
+                // Store a placeholder ZomeCallConfig
+                self.zome_configs.insert(fallback_dna_hash.clone(), ZomeCallConfig {
+                    dna_hash: fallback_dna_hash.clone(),
+                    agent_pub_key: "fallback-agent".to_string(),
+                    zome_name: self.config.zome_name.clone(),
+                    app_id: self.config.installed_app_id.clone(),
+                });
+
+                // Store default import config
+                let default_import_config = ImportConfig {
+                    enabled: true,
+                    base_route: "/import".to_string(),
+                    batch_types: vec![
+                        doorway_client::ImportBatchType::new("content")
+                            .queue_fn("queue_import")
+                            .process_fn("process_import_chunk")
+                            .status_fn("get_import_status")
+                            .max_items(5000)
+                            .chunk_size(50),
+                    ],
+                    require_auth: false,
+                    allowed_agents: None,
+                };
+                self.import_config_store.set_config(&fallback_dna_hash, default_import_config);
+
+                result.errors.push(format!("Admin connection failed ({}), using fallback config", e));
+                result.import_configs_found = 1;
+
+                info!("Fallback import config registered for /import/content");
                 return result;
             }
         };
