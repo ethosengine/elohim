@@ -265,6 +265,8 @@ impl DiscoveryService {
                 "Sec-WebSocket-Key",
                 tokio_tungstenite::tungstenite::handshake::client::generate_key(),
             )
+            // Add Origin header to pass conductor's allowed_origins check
+            .header("Origin", "http://localhost:8080")
             .body(())
             .map_err(|e| format!("Failed to build request: {}", e))?;
 
