@@ -40,10 +40,11 @@
 
 use clap::Parser;
 use elohim_storage::{BlobStore, Config, HttpServer, ImportHandler, ImportHandlerConfig};
+use elohim_storage::import_api::{ImportApi, ImportApiConfig};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, RwLock};
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
@@ -63,9 +64,14 @@ struct Args {
     #[arg(long)]
     http_port: Option<u16>,
 
-    /// Holochain conductor admin WebSocket URL
+    /// Holochain conductor admin WebSocket URL (for signal-based import handler)
     #[arg(long, env = "HOLOCHAIN_ADMIN_URL")]
     admin_url: Option<String>,
+
+    /// Holochain conductor app WebSocket URL (for ImportApi HTTP handler)
+    /// Used by doorway to forward import requests
+    #[arg(long, env = "HOLOCHAIN_APP_URL", default_value = "ws://localhost:4445")]
+    app_url: String,
 
     /// Installed Holochain app ID
     #[arg(long, env = "HOLOCHAIN_APP_ID", default_value = "elohim")]
@@ -78,6 +84,11 @@ struct Args {
     /// Disable import handler (HTTP only mode)
     #[arg(long)]
     no_import: bool,
+
+    /// Enable HTTP Import API (for doorway forwarding)
+    /// When enabled, exposes /import/* endpoints for batch imports
+    #[arg(long, env = "ENABLE_IMPORT_API")]
+    enable_import_api: bool,
 }
 
 #[tokio::main]
@@ -127,7 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Start HTTP server for shard API
     let http_addr: SocketAddr = format!("0.0.0.0:{}", config.http_port).parse()?;
-    let http_server = Arc::new(HttpServer::new(blob_store.clone(), http_addr));
+    let mut http_server = HttpServer::new(blob_store.clone(), http_addr);
 
     info!("HTTP API available at http://{}", http_addr);
     info!("Endpoints:");
@@ -138,6 +149,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("  PUT  /blob/{{hash}}      - Store blob (auto-sharding)");
     info!("  GET  /blob/{{hash}}      - Reassemble blob from shards");
     info!("  GET  /manifest/{{hash}}  - Get shard manifest");
+
+    // Initialize Import API if enabled
+    let import_api: Option<Arc<RwLock<ImportApi>>> = if args.enable_import_api {
+        info!("Import API enabled");
+        info!("  POST /import/queue           - Queue import batch");
+        info!("  GET  /import/status/{{batch}} - Get import status");
+        info!("  Conductor app URL: {}", args.app_url);
+
+        let mut import_api = ImportApi::new(
+            ImportApiConfig {
+                conductor_url: args.app_url.clone(),
+                zome_name: args.zome_name.clone(),
+                chunk_size: 50,
+                ..Default::default()
+            },
+            blob_store.clone(),
+        );
+
+        // Connect to conductor
+        match import_api.connect_conductor().await {
+            Ok(_) => {
+                info!("  ✅ Conductor connected");
+            }
+            Err(e) => {
+                warn!("  ⚠️ Conductor connection failed: {} (imports will queue locally)", e);
+            }
+        }
+
+        Some(Arc::new(RwLock::new(import_api)))
+    } else {
+        info!("Import API disabled (use --enable-import-api or ENABLE_IMPORT_API=true)");
+        None
+    };
+
+    // Attach ImportApi to HttpServer if enabled
+    if let Some(ref api) = import_api {
+        http_server = http_server.with_import_api(Arc::clone(api));
+    }
+    let http_server = Arc::new(http_server);
 
     // Start import handler if enabled
     let import_handle = if !args.no_import {

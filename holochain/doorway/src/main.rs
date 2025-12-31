@@ -14,7 +14,7 @@ use doorway::{
     orchestrator::{Orchestrator, OrchestratorConfig, OrchestratorState},
     projection::{EngineConfig, ProjectionEngine, SubscriberConfig, spawn_engine_task, spawn_subscriber},
     server,
-    services::{DiscoveryConfig, spawn_discovery_task},
+    services::{self, DiscoveryConfig, spawn_discovery_task},
     worker::{PoolConfig, WorkerPool},
 };
 
@@ -50,8 +50,9 @@ async fn main() -> anyhow::Result<()> {
     info!("Node ID: {}", args.node_id);
     info!("Listen: {}", args.listen);
     info!("Mode: {}", if args.dev_mode { "DEVELOPMENT" } else { "PRODUCTION" });
-    info!("Conductor (app): {}", args.conductor_url);
-    info!("Conductor (admin): {}", args.admin_url());
+    let startup_app_url = derive_app_url(&args.conductor_url, args.app_port_min);
+    info!("Conductor admin: {} (discovery, list_apps)", args.admin_url());
+    info!("Conductor app: {} (zome calls)", startup_app_url);
     info!("App ports: {}-{}", args.app_port_min, args.app_port_max);
     info!("NATS: {}", args.nats.nats_url);
     info!("MongoDB: {}", args.mongodb_uri);
@@ -94,9 +95,12 @@ async fn main() -> anyhow::Result<()> {
 
     // Create worker pool for scalable request routing
     // This provides connection pooling and request queuing without needing NATS
+    // IMPORTANT: Workers must connect to the APP interface (4445) for zome calls,
+    // not the admin interface (4444) which only handles admin commands.
+    let worker_app_url = derive_app_url(&args.conductor_url, args.app_port_min);
     let pool = match WorkerPool::new(PoolConfig {
         worker_count: args.worker_count,
-        conductor_url: args.conductor_url.clone(),
+        conductor_url: worker_app_url.clone(),
         request_timeout_ms: args.request_timeout_ms,
         max_queue_size: 1000,
     })
@@ -104,8 +108,8 @@ async fn main() -> anyhow::Result<()> {
     {
         Ok(p) => {
             info!(
-                "Worker pool started with {} workers (conductor: {})",
-                args.worker_count, args.conductor_url
+                "Worker pool started with {} workers (app interface: {})",
+                args.worker_count, worker_app_url
             );
             Some(Arc::new(p))
         }
@@ -143,6 +147,17 @@ async fn main() -> anyhow::Result<()> {
         server::AppState::with_services(args.clone(), mongo, nats)
     };
     state.orchestrator = orchestrator_state.clone();
+
+    // Create single-connection ImportClient for import operations
+    // Uses ONE connection to app interface to avoid overwhelming conductor during batch imports
+    let import_app_url = derive_app_url(&args.conductor_url, args.app_port_min);
+    let import_client = services::ImportClient::with_defaults(import_app_url.clone());
+    state.import_client = Some(Arc::new(import_client));
+    info!(
+        "ImportClient created (single connection to app interface: {})",
+        import_app_url
+    );
+
     let state = Arc::new(state);
 
     // Start zome capability discovery (import configs, cache rules)

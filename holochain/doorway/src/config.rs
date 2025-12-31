@@ -22,13 +22,15 @@ pub struct Args {
     #[arg(long, env = "LISTEN", default_value = "0.0.0.0:8080")]
     pub listen: SocketAddr,
 
-    /// Holochain conductor app WebSocket URL (for zome calls)
-    /// Workers connect here to make zome calls
+    /// Holochain conductor admin WebSocket URL (default port 4444)
+    /// Used for admin operations (list_apps, attach_app_interface, discovery)
+    /// The app interface URL for zome calls is derived by replacing port with APP_PORT_MIN
     #[arg(long, env = "CONDUCTOR_URL", default_value = "ws://localhost:4444")]
     pub conductor_url: String,
 
-    /// Holochain conductor admin WebSocket URL (for list_apps, attach_app_interface)
-    /// Discovery uses this to enumerate cells. Defaults to CONDUCTOR_URL if not set.
+    /// Explicit admin URL override (optional)
+    /// If set, used for admin operations instead of CONDUCTOR_URL
+    /// Useful when admin and app interfaces have different hosts
     #[arg(long, env = "CONDUCTOR_ADMIN_URL")]
     pub conductor_admin_url: Option<String>,
 

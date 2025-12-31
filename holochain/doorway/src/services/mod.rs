@@ -16,6 +16,7 @@
 
 pub mod custodian;
 pub mod discovery;
+pub mod import_client;
 pub mod import_config;
 pub mod import_orchestrator;
 pub mod recording;
@@ -58,3 +59,4 @@ pub use route_registry::{
     AgentRouteEntry, CompiledRoute, RouteRegistry, RouteRegistryConfig, RouteRegistryStats,
     RouteSource, RouteTarget, spawn_cleanup_task as spawn_route_cleanup_task,
 };
+pub use import_client::{ImportClient, ImportClientConfig};

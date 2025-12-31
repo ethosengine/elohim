@@ -75,6 +75,9 @@ pub struct AppState {
     pub import_config_store: Option<Arc<crate::services::ImportConfigStore>>,
     /// Zome call configs by DNA hash (discovered from conductor)
     pub zome_configs: Arc<dashmap::DashMap<String, ZomeCallConfig>>,
+    /// Single-connection import client for batch operations
+    /// Uses ONE connection to conductor to avoid overwhelming during imports
+    pub import_client: Option<Arc<crate::services::ImportClient>>,
 }
 
 impl AppState {
@@ -126,6 +129,7 @@ impl AppState {
             delivery_relay,
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
+            import_client: None, // Set later via set_import_client()
         }
     }
 
@@ -185,6 +189,7 @@ impl AppState {
             delivery_relay,
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
+            import_client: None, // Set later via set_import_client()
         }
     }
 
@@ -247,6 +252,7 @@ impl AppState {
             delivery_relay,
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
+            import_client: None, // Set later via set_import_client()
         }
     }
 
@@ -315,6 +321,7 @@ impl AppState {
             delivery_relay,
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
+            import_client: None, // Set later via set_import_client()
         })
     }
 
@@ -608,95 +615,41 @@ async fn handle_request(
             to_boxed(routes::handle_api_request(state, p, query, Some(remote_ip), auth_header).await)
         }
 
-        // Dynamic import routes (zome-declared via __doorway_import_config)
-        // POST /{base_route}/{batch_type} - queue import
-        // GET /{base_route}/{batch_type}/{batch_id} - get status
-        (method, p) if matches!(method, Method::POST | Method::GET) => {
-            // Try to match against discovered import routes
-            if let Some(ref import_store) = state.import_config_store {
-                if let Some((dna_hash, batch_type, batch_id)) = routes::match_import_route(p, import_store) {
-                    // Need worker pool and zome config to make the call
-                    if let Some(ref pool) = state.pool {
-                        // Get ZomeCallConfig for this DNA
-                        if let Some(zome_config) = state.zome_configs.get(&dna_hash) {
-                            info!(
-                                dna = %dna_hash,
-                                batch_type = %batch_type,
-                                batch_id = ?batch_id,
-                                "Handling import request"
-                            );
-
-                            return Ok(to_boxed(
-                                routes::handle_import_request(
-                                    req,
-                                    Arc::clone(import_store),
-                                    Arc::clone(pool),
-                                    zome_config.clone(),
-                                    dna_hash,
-                                    batch_type,
-                                    batch_id,
-                                ).await
-                            ));
-                        } else {
-                            // Config discovered but zome connection not established yet
-                            debug!(
-                                dna = %dna_hash,
-                                "Import route matched but ZomeCallConfig not yet available"
-                            );
-                            return Ok(to_boxed(
-                                Response::builder()
-                                    .status(StatusCode::SERVICE_UNAVAILABLE)
-                                    .header("Content-Type", "application/json")
-                                    .header("Retry-After", "5")
-                                    .body(Full::new(Bytes::from(format!(
-                                        r#"{{"error": "Import route discovered but conductor connection for DNA {} pending. Retry after connection is established."}}"#,
-                                        dna_hash
-                                    ))))
-                                    .unwrap(),
-                            ));
-                        }
-                    } else {
-                        return Ok(to_boxed(
-                            Response::builder()
-                                .status(StatusCode::SERVICE_UNAVAILABLE)
-                                .header("Content-Type", "application/json")
-                                .body(Full::new(Bytes::from(
-                                    r#"{"error": "Worker pool not available"}"#,
-                                )))
-                                .unwrap(),
-                        ));
-                    }
-                } else if p.starts_with("/import/") {
-                    // Path looks like an import route but no config matched
-                    // Check if discovery is still in progress
-                    let discovered_dnas = import_store.get_import_enabled_dnas();
-                    if discovered_dnas.is_empty() {
-                        // No import configs discovered yet - discovery may still be in progress
-                        debug!(
-                            path = p,
-                            "Import route requested but discovery not complete"
-                        );
-                        return Ok(to_boxed(
-                            Response::builder()
-                                .status(StatusCode::SERVICE_UNAVAILABLE)
-                                .header("Content-Type", "application/json")
-                                .header("Retry-After", "5")
-                                .body(Full::new(Bytes::from(
-                                    r#"{"error": "Import routes not yet discovered. Discovery in progress - retry in a few seconds.", "hint": "The doorway needs to connect to the conductor and discover import configurations before import routes are available."}"#,
-                                )))
-                                .unwrap(),
-                        ));
-                    }
-                    // Discovery complete but route not found - return 404
-                    debug!(
-                        path = p,
-                        discovered_count = discovered_dnas.len(),
-                        "Import route not matched (discovery complete)"
-                    );
-                }
+        // Dynamic import routes (forwarded to elohim-storage)
+        // POST /import/{batch_type} - queue import → forward to storage
+        // GET /import/{batch_type}/{batch_id} - get status → forward to storage
+        (method, p) if matches!(method, Method::POST | Method::GET) && p.starts_with("/import/") => {
+            // Parse import path: /import/{batch_type} or /import/{batch_type}/{batch_id}
+            let remainder = p.strip_prefix("/import/").unwrap_or("");
+            if remainder.is_empty() {
+                return Ok(to_boxed(
+                    Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .header("Content-Type", "application/json")
+                        .body(Full::new(Bytes::from(r#"{"error": "Missing batch_type in path"}"#)))
+                        .unwrap(),
+                ));
             }
-            // Not an import route, fall through to not found
-            to_boxed(not_found_response(&path))
+
+            let parts: Vec<&str> = remainder.splitn(2, '/').collect();
+            let batch_type = parts[0].to_string();
+            let batch_id = parts.get(1).map(|s| s.to_string());
+
+            info!(
+                batch_type = %batch_type,
+                batch_id = ?batch_id,
+                storage_url = ?state.args.storage_url,
+                "Forwarding import request to elohim-storage"
+            );
+
+            return Ok(to_boxed(
+                routes::handle_import_request(
+                    req,
+                    state.args.storage_url.clone(),
+                    batch_type,
+                    batch_id,
+                ).await
+            ));
         }
 
         // Not found

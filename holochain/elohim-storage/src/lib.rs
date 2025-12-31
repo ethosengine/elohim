@@ -36,6 +36,8 @@ pub mod error;
 pub mod sharding;
 pub mod http;
 pub mod import_handler;
+pub mod conductor_client;
+pub mod import_api;
 
 pub use blob_store::BlobStore;
 pub use metadata::MetadataDb;

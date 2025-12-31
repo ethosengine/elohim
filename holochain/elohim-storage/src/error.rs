@@ -37,6 +37,9 @@ pub enum StorageError {
     #[error("Holochain client error: {0}")]
     HolochainClient(String),
 
+    #[error("Conductor error: {0}")]
+    Conductor(String),
+
     #[error("Signal error: {0}")]
     Signal(String),
 

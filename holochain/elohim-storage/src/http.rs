@@ -34,6 +34,7 @@
 
 use crate::blob_store::BlobStore;
 use crate::error::StorageError;
+use crate::import_api::ImportApi;
 use crate::sharding::{ShardEncoder, ShardManifest};
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
@@ -54,6 +55,8 @@ pub struct HttpServer {
     blob_store: Arc<BlobStore>,
     manifests: Arc<RwLock<std::collections::HashMap<String, ShardManifest>>>,
     bind_addr: SocketAddr,
+    /// Optional Import API for handling /import/* routes
+    import_api: Option<Arc<RwLock<ImportApi>>>,
 }
 
 impl HttpServer {
@@ -63,7 +66,14 @@ impl HttpServer {
             blob_store,
             manifests: Arc::new(RwLock::new(std::collections::HashMap::new())),
             bind_addr,
+            import_api: None,
         }
+    }
+
+    /// Set the Import API handler
+    pub fn with_import_api(mut self, import_api: Arc<RwLock<ImportApi>>) -> Self {
+        self.import_api = Some(import_api);
+        self
     }
 
     /// Run the HTTP server
@@ -134,6 +144,22 @@ impl HttpServer {
             (Method::GET, p) if p.starts_with("/manifest/") => {
                 let hash = p.strip_prefix("/manifest/").unwrap_or("");
                 self.handle_get_manifest(hash).await
+            }
+
+            // Import API (forwarded from doorway)
+            (_, p) if p.starts_with("/import/") => {
+                if let Some(ref import_api) = self.import_api {
+                    let api = import_api.read().await;
+                    api.handle_request(req, &path).await
+                } else {
+                    Ok(Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error": "Import API not enabled. Set ENABLE_IMPORT_API=true"}"#
+                        )))
+                        .unwrap())
+                }
             }
 
             // Not found

@@ -1,39 +1,35 @@
-//! Import Route Handler - Dynamic routing for zome-declared import endpoints
+//! Import Route Handler - Forwards import requests to elohim-storage
 //!
-//! Routes import requests to zome functions based on discovered ImportConfig.
-//!
-//! ## Discovery Pattern
-//!
-//! 1. Doorway discovers import config from zome's `__doorway_import_config`
-//! 2. Zome declares base_route (e.g., "/import") and batch_types
-//! 3. Doorway dynamically routes:
-//!    - POST /{base_route}/{batch_type} → queue_fn
-//!    - GET /{base_route}/{batch_type}/{batch_id} → status_fn
-//!
-//! ## Example Flow
+//! ## Architecture
 //!
 //! ```text
-//! Seeder: POST /import/content {"items": [...]}
-//!    → Doorway matches route to discovered ImportConfig
-//!    → Doorway calls zome's queue_import function
-//!    → Returns batch_id to seeder
-//!
-//! Seeder: GET /import/content/batch-001
-//!    → Doorway calls zome's get_import_status function
-//!    → Returns batch status
+//! Seeder → Doorway → elohim-storage → Conductor
+//!               │           │
+//!          (relay)    (batching, single connection)
 //! ```
+//!
+//! Doorway acts as a simple relay:
+//! - If STORAGE_URL is set: forwards to elohim-storage
+//! - If not set: returns 503 (storage not configured)
+//!
+//! elohim-storage owns the conductor connection and handles:
+//! - Batch queuing and chunking
+//! - Write buffering to avoid overwhelming conductor
+//! - Progress tracking
+//!
+//! ## Endpoints (forwarded to storage)
+//!
+//! - POST /import/queue → elohim-storage /import/queue
+//! - GET /import/status/{batch_id} → elohim-storage /import/status/{batch_id}
 
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
 use hyper::{Method, Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 use crate::services::ImportConfigStore;
-use crate::worker::{WorkerPool, ZomeCallConfig};
-use crate::types::Result;
 
 // =============================================================================
 // Request/Response Types
@@ -140,31 +136,39 @@ pub fn match_import_route(
 
 /// Handle import route request
 ///
-/// Doorway acts as a relay:
-/// - POST /{base_route}/{batch_type} → queue_import on zome
-/// - GET /{base_route}/{batch_type}/{batch_id} → get_import_status on zome
+/// Doorway forwards all import requests to elohim-storage.
+/// elohim-storage owns the conductor connection and handles batching/buffering.
 ///
-/// Chunk processing happens in elohim-storage, which listens for
-/// ImportBatchQueued signals and calls process_import_chunk.
+/// ## Routes
+/// - POST /import/queue → forward to storage
+/// - GET /import/status/{batch_id} → forward to storage
 pub async fn handle_import_request(
     req: Request<Incoming>,
-    import_store: Arc<ImportConfigStore>,
-    worker_pool: Arc<WorkerPool>,
-    zome_config: ZomeCallConfig,
-    dna_hash: String,
+    storage_url: Option<String>,
     batch_type: String,
     batch_id: Option<String>,
 ) -> Response<Full<Bytes>> {
+    let storage_url = match storage_url {
+        Some(url) => url,
+        None => {
+            warn!("Import request received but STORAGE_URL not configured");
+            return import_error_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Import service unavailable: STORAGE_URL not configured",
+            );
+        }
+    };
+
     let method = req.method().clone();
 
     match method {
         Method::POST if batch_id.is_none() => {
-            // POST /{base_route}/{batch_type} - Queue new import
-            handle_queue_import(req, import_store, worker_pool, zome_config, &dna_hash, &batch_type).await
+            // POST /import/{batch_type} → forward to storage /import/queue
+            forward_queue_import(req, &storage_url, &batch_type).await
         }
         Method::GET if batch_id.is_some() => {
-            // GET /{base_route}/{batch_type}/{batch_id} - Get status
-            handle_get_status(import_store, worker_pool, zome_config, &dna_hash, &batch_type, batch_id.as_ref().unwrap()).await
+            // GET /import/{batch_type}/{batch_id} → forward to storage /import/status/{batch_id}
+            forward_get_status(&storage_url, batch_id.as_ref().unwrap()).await
         }
         _ => {
             import_error_response(
@@ -175,29 +179,12 @@ pub async fn handle_import_request(
     }
 }
 
-/// Handle POST - queue new import (relay to zome)
-///
-/// Doorway just relays the queue_import call to the zome.
-/// elohim-storage listens for ImportBatchQueued signal and processes chunks.
-async fn handle_queue_import(
+/// Forward POST queue request to elohim-storage
+async fn forward_queue_import(
     req: Request<Incoming>,
-    import_store: Arc<ImportConfigStore>,
-    worker_pool: Arc<WorkerPool>,
-    zome_config: ZomeCallConfig,
-    dna_hash: &str,
+    storage_url: &str,
     batch_type: &str,
 ) -> Response<Full<Bytes>> {
-    // Get batch type config
-    let batch_config = match import_store.get_batch_type(dna_hash, batch_type) {
-        Some(c) => c,
-        None => {
-            return import_error_response(
-                StatusCode::BAD_REQUEST,
-                &format!("Batch type '{}' not supported for this DNA", batch_type),
-            );
-        }
-    };
-
     // Read request body
     let body = match req.collect().await {
         Ok(collected) => collected.to_bytes(),
@@ -210,7 +197,7 @@ async fn handle_queue_import(
         }
     };
 
-    // Parse request
+    // Parse to validate
     let import_req: ImportQueueRequest = match serde_json::from_slice(&body) {
         Ok(r) => r,
         Err(e) => {
@@ -226,127 +213,118 @@ async fn handle_queue_import(
         batch_type = batch_type,
         blob_hash = %import_req.blob_hash,
         total_items = import_req.total_items,
-        queue_fn = batch_config.queue_fn,
-        "Relaying import queue request to zome"
+        "Forwarding import queue request to elohim-storage"
     );
 
-    // Generate batch ID if not provided
-    let batch_id = import_req.batch_id.unwrap_or_else(|| {
-        format!("import-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S-%3f"))
-    });
-
-    // Build zome call for queue_fn
-    // The zome expects "id" (not "batch_id") to match QueueImportInput struct
-    let payload = serde_json::json!({
-        "id": batch_id,
+    // Build storage request (add batch_type if not in original)
+    let storage_req = serde_json::json!({
+        "batch_id": import_req.batch_id,
         "batch_type": batch_type,
         "blob_hash": import_req.blob_hash,
         "total_items": import_req.total_items,
         "schema_version": import_req.schema_version,
     });
 
-    // Build the zome call
-    let call_payload = match build_zome_call(&zome_config, &batch_config.queue_fn, payload) {
-        Ok(p) => p,
+    // Forward to elohim-storage
+    let storage_endpoint = format!("{}/import/queue", storage_url.trim_end_matches('/'));
+
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+    {
+        Ok(c) => c,
         Err(e) => {
             return import_error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                &format!("Failed to build zome call: {}", e),
+                &format!("Failed to create HTTP client: {}", e),
             );
         }
     };
 
-    // Relay to conductor
-    match worker_pool.request(call_payload).await {
-        Ok(response) => {
-            // Parse response
-            match parse_zome_response::<ImportQueueResponse>(&response) {
-                Ok(result) => {
+    match client.post(&storage_endpoint)
+        .json(&storage_req)
+        .send()
+        .await
+    {
+        Ok(resp) => {
+            let status = resp.status();
+            match resp.text().await {
+                Ok(body) => {
                     info!(
-                        batch_id = %result.batch_id,
-                        queued_count = result.queued_count,
-                        "Import queued - elohim-storage will process chunks"
+                        status = %status,
+                        "elohim-storage queue response"
                     );
-                    import_json_response(StatusCode::ACCEPTED, &result)
+                    Response::builder()
+                        .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
+                        .header("Content-Type", "application/json")
+                        .header("Access-Control-Allow-Origin", "*")
+                        .body(Full::new(Bytes::from(body)))
+                        .unwrap()
                 }
                 Err(e) => {
-                    warn!(error = ?e, "Failed to parse queue response");
                     import_error_response(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        &format!("Failed to parse conductor response: {}", e),
+                        StatusCode::BAD_GATEWAY,
+                        &format!("Failed to read storage response: {}", e),
                     )
                 }
             }
         }
         Err(e) => {
-            warn!(error = ?e, "Conductor call failed");
+            warn!(error = %e, "Failed to reach elohim-storage");
             import_error_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                &format!("Conductor unavailable: {}", e),
+                StatusCode::BAD_GATEWAY,
+                &format!("Failed to reach elohim-storage: {}", e),
             )
         }
     }
 }
 
-/// Handle GET - get import status
-async fn handle_get_status(
-    import_store: Arc<ImportConfigStore>,
-    worker_pool: Arc<WorkerPool>,
-    zome_config: ZomeCallConfig,
-    dna_hash: &str,
-    batch_type: &str,
+/// Forward GET status request to elohim-storage
+async fn forward_get_status(
+    storage_url: &str,
     batch_id: &str,
 ) -> Response<Full<Bytes>> {
-    // Get batch type config
-    let batch_config = match import_store.get_batch_type(dna_hash, batch_type) {
-        Some(c) => c,
-        None => {
-            return import_error_response(
-                StatusCode::BAD_REQUEST,
-                &format!("Batch type '{}' not supported", batch_type),
-            );
-        }
-    };
+    debug!(batch_id = batch_id, "Forwarding status request to elohim-storage");
 
-    debug!(
-        batch_id = batch_id,
-        status_fn = batch_config.status_fn,
-        "Getting import status"
-    );
+    let storage_endpoint = format!("{}/import/status/{}", storage_url.trim_end_matches('/'), batch_id);
 
-    // Build zome call for status_fn
-    let payload = serde_json::json!({
-        "batch_id": batch_id,
-    });
-
-    let call_payload = match build_zome_call(&zome_config, &batch_config.status_fn, payload) {
-        Ok(p) => p,
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+    {
+        Ok(c) => c,
         Err(e) => {
             return import_error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                &format!("Failed to build zome call: {}", e),
+                &format!("Failed to create HTTP client: {}", e),
             );
         }
     };
 
-    // Send to conductor
-    match worker_pool.request(call_payload).await {
-        Ok(response) => {
-            match parse_zome_response::<ImportStatusResponse>(&response) {
-                Ok(result) => import_json_response(StatusCode::OK, &result),
+    match client.get(&storage_endpoint).send().await {
+        Ok(resp) => {
+            let status = resp.status();
+            match resp.text().await {
+                Ok(body) => {
+                    Response::builder()
+                        .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
+                        .header("Content-Type", "application/json")
+                        .header("Access-Control-Allow-Origin", "*")
+                        .body(Full::new(Bytes::from(body)))
+                        .unwrap()
+                }
                 Err(e) => {
-                    // Could be not found
                     import_error_response(
-                        StatusCode::NOT_FOUND,
-                        &format!("Batch not found or invalid response: {}", e),
+                        StatusCode::BAD_GATEWAY,
+                        &format!("Failed to read storage response: {}", e),
                     )
                 }
             }
         }
         Err(e) => {
             import_error_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                &format!("Conductor unavailable: {}", e),
+                StatusCode::BAD_GATEWAY,
+                &format!("Failed to reach elohim-storage: {}", e),
             )
         }
     }
@@ -355,43 +333,6 @@ async fn handle_get_status(
 // =============================================================================
 // Helpers
 // =============================================================================
-
-/// Build a zome call payload
-fn build_zome_call(
-    config: &ZomeCallConfig,
-    fn_name: &str,
-    payload: serde_json::Value,
-) -> Result<Vec<u8>> {
-    use crate::worker::ZomeCallBuilder;
-
-    let builder = ZomeCallBuilder::new(config.clone());
-    builder.build_zome_call(fn_name, &payload)
-}
-
-/// Parse zome response
-fn parse_zome_response<T: serde::de::DeserializeOwned>(response: &[u8]) -> Result<T> {
-    // Response is typically msgpack-encoded
-    // For simplicity, try JSON first then msgpack
-    if let Ok(result) = serde_json::from_slice::<T>(response) {
-        return Ok(result);
-    }
-
-    // Try msgpack
-    rmp_serde::from_slice::<T>(response)
-        .map_err(|e| crate::types::DoorwayError::Internal(format!("Parse error: {}", e)))
-}
-
-/// Create JSON response
-fn import_json_response<T: Serialize>(status: StatusCode, data: &T) -> Response<Full<Bytes>> {
-    let body = serde_json::to_string(data).unwrap_or_else(|_| r#"{"error":"Serialization failed"}"#.to_string());
-
-    Response::builder()
-        .status(status)
-        .header("Content-Type", "application/json")
-        .header("Access-Control-Allow-Origin", "*")
-        .body(Full::new(Bytes::from(body)))
-        .unwrap()
-}
 
 /// Create error response
 fn import_error_response(status: StatusCode, message: &str) -> Response<Full<Bytes>> {
