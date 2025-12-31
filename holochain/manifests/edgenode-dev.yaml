@@ -201,6 +201,8 @@ spec:
               value: "true"
             - name: RUST_LOG
               value: "info,doorway=debug"
+            - name: STORAGE_URL
+              value: "http://localhost:8090"
             - name: API_KEY_AUTHENTICATED
               valueFrom:
                 secretKeyRef:
@@ -235,6 +237,42 @@ spec:
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 30
+        # elohim-storage - Blob storage and import processing sidecar
+        # Handles heavy R/W operations, forwards to conductor
+        - name: elohim-storage
+          image: harbor.ethosengine.com/ethosengine/elohim-storage:dev-latest
+          imagePullPolicy: Always
+          env:
+            - name: RUST_LOG
+              value: "info,elohim_storage=debug"
+            - name: HOLOCHAIN_APP_URL
+              value: "ws://localhost:4445"
+            - name: HOLOCHAIN_APP_ID
+              value: "elohim"
+            - name: ENABLE_IMPORT_API
+              value: "true"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: storage-data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 10
+            periodSeconds: 30
         # hApp Installer - installs the hApp on conductor startup
         # Uses dev-latest tag - rebuilds when installer code changes
         # hApp is fetched by init container, not baked into image
@@ -266,6 +304,10 @@ spec:
         # Shared volume for hApp (fetched by init container)
         - name: happ-volume
           emptyDir: {}
+        # Storage data for elohim-storage blobs
+        - name: storage-data
+          emptyDir:
+            sizeLimit: 2Gi
         - name: holochain-data
           emptyDir:
             sizeLimit: 5Gi

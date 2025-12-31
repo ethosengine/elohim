@@ -2,10 +2,11 @@
  * Elohim Edge Infrastructure Pipeline (elohim-edge)
  *
  * Builds container images and deploys Edge Node to dev/prod environments.
- * Triggered by orchestrator when holochain/doorway/, edgenode/, or manifests/ change.
+ * Triggered by orchestrator when holochain/doorway/, elohim-storage/, edgenode/, or manifests/ change.
  *
  * What this pipeline builds:
  *   - elohim-doorway (HTTP gateway)
+ *   - elohim-storage (blob storage sidecar)
  *   - elohim-edgenode (Holochain conductor)
  *   - elohim-happ-installer (bootstrap sidecar)
  *
@@ -349,6 +350,36 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        stage('Build Storage') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Building elohim-storage: ${IMAGE_TAG}"
+
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                cd holochain/elohim-storage
+
+                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                    nerdctl -n k8s.io build \\
+                                    -t elohim-storage:${IMAGE_TAG} \\
+                                    -f Dockerfile .
+
+                                nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} elohim-storage:${GIT_COMMIT_HASH}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Build Edge Node Image') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
@@ -486,6 +517,19 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 """
 
                                 sh """
+                                    if nerdctl -n k8s.io images | grep -q "elohim-storage.*${IMAGE_TAG}"; then
+                                        echo "Pushing elohim-storage image..."
+                                        nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-storage:${IMAGE_TAG}
+                                        nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-storage:${GIT_COMMIT_HASH}
+
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-storage:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-storage:${GIT_COMMIT_HASH}
+                                    else
+                                        echo "elohim-storage image not found, skipping push"
+                                    fi
+                                """
+
+                                sh """
                                     if nerdctl -n k8s.io images | grep -q "elohim-happ-installer.*${IMAGE_TAG}"; then
                                         echo "Pushing hApp Installer image..."
                                         nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:${IMAGE_TAG}
@@ -510,6 +554,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                             nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:dev-latest
                                         fi
 
+                                        if nerdctl -n k8s.io images | grep -q "elohim-storage.*${IMAGE_TAG}"; then
+                                            nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-storage:dev-latest
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-storage:dev-latest
+                                        fi
+
                                         if nerdctl -n k8s.io images | grep -q "elohim-happ-installer.*${IMAGE_TAG}"; then
                                             nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:dev-latest
                                             nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:dev-latest
@@ -532,6 +581,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         allOf {
                             anyOf {
                                 changeset "holochain/doorway/**"
+                                changeset "holochain/elohim-storage/**"
                                 changeset "holochain/edgenode/**"
                                 changeset "holochain/manifests/**"
                             }
@@ -725,6 +775,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi elohim-doorway:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-doorway:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi elohim-storage:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-storage:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi elohim-happ-installer:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-happ-installer:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io system prune -af --volumes || true
