@@ -50,7 +50,8 @@ async fn main() -> anyhow::Result<()> {
     info!("Node ID: {}", args.node_id);
     info!("Listen: {}", args.listen);
     info!("Mode: {}", if args.dev_mode { "DEVELOPMENT" } else { "PRODUCTION" });
-    info!("Conductor: {}", args.conductor_url);
+    info!("Conductor (app): {}", args.conductor_url);
+    info!("Conductor (admin): {}", args.admin_url());
     info!("App ports: {}-{}", args.app_port_min, args.app_port_max);
     info!("NATS: {}", args.nats.nats_url);
     info!("MongoDB: {}", args.mongodb_uri);
@@ -147,8 +148,9 @@ async fn main() -> anyhow::Result<()> {
     // Start zome capability discovery (import configs, cache rules)
     // This populates zome_configs and import_config_store for route matching
     if let Some(ref import_config_store) = state.import_config_store {
+        let admin_url = args.admin_url().to_string();
         let discovery_config = DiscoveryConfig {
-            admin_url: args.conductor_url.clone(),
+            admin_url: admin_url.clone(),
             installed_app_id: args.installed_app_id.clone(),
             zome_name: "content_store".to_string(), // TODO: make configurable
             ..DiscoveryConfig::default()
@@ -159,7 +161,10 @@ async fn main() -> anyhow::Result<()> {
             Arc::clone(&state.zome_configs),
             Arc::clone(import_config_store),
         );
-        info!("Zome capability discovery started (import routes will be available after discovery completes)");
+        info!(
+            "Zome capability discovery started (admin: {}, import routes will be available after discovery completes)",
+            admin_url
+        );
     } else {
         warn!("Import config store not initialized, skipping zome discovery");
     }

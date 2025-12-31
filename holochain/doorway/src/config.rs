@@ -22,9 +22,15 @@ pub struct Args {
     #[arg(long, env = "LISTEN", default_value = "0.0.0.0:8080")]
     pub listen: SocketAddr,
 
-    /// Holochain conductor admin WebSocket URL
+    /// Holochain conductor app WebSocket URL (for zome calls)
+    /// Workers connect here to make zome calls
     #[arg(long, env = "CONDUCTOR_URL", default_value = "ws://localhost:4444")]
     pub conductor_url: String,
+
+    /// Holochain conductor admin WebSocket URL (for list_apps, attach_app_interface)
+    /// Discovery uses this to enumerate cells. Defaults to CONDUCTOR_URL if not set.
+    #[arg(long, env = "CONDUCTOR_ADMIN_URL")]
+    pub conductor_admin_url: Option<String>,
 
     /// Minimum app interface port
     #[arg(long, env = "APP_PORT_MIN", default_value = "4445")]
@@ -148,6 +154,11 @@ pub struct NatsArgs {
 }
 
 impl Args {
+    /// Get effective admin URL (falls back to conductor_url if not set)
+    pub fn admin_url(&self) -> &str {
+        self.conductor_admin_url.as_deref().unwrap_or(&self.conductor_url)
+    }
+
     /// Get effective JWT secret (uses default in dev mode)
     pub fn jwt_secret(&self) -> String {
         if self.dev_mode {

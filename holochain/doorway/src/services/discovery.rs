@@ -137,12 +137,14 @@ impl DiscoveryService {
 
                 // Fallback: Use default config when admin interface is unavailable
                 // This allows seeding to work even when we can't enumerate cells
-                let fallback_dna_hash = format!("fallback-{}", self.config.installed_app_id);
+                // Use valid base64 placeholder (all zeros) to avoid decode errors
+                let fallback_dna_hash = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string();
+                let fallback_agent = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string();
 
                 // Store a placeholder ZomeCallConfig
                 self.zome_configs.insert(fallback_dna_hash.clone(), ZomeCallConfig {
                     dna_hash: fallback_dna_hash.clone(),
-                    agent_pub_key: "fallback-agent".to_string(),
+                    agent_pub_key: fallback_agent,
                     zome_name: self.config.zome_name.clone(),
                     app_id: self.config.installed_app_id.clone(),
                 });
