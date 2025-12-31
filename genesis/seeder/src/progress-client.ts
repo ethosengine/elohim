@@ -104,6 +104,12 @@ export class ProgressClient extends EventEmitter {
   constructor(config: ProgressClientConfig | string) {
     super();
 
+    // CRITICAL: Add default error handler to prevent Node.js crashes
+    // EventEmitter throws if 'error' is emitted with no listeners
+    this.on('error', () => {
+      // Default handler - errors are logged elsewhere or caught by user handlers
+    });
+
     if (typeof config === 'string') {
       config = { doorwayUrl: config };
     }
@@ -207,9 +213,18 @@ export class ProgressClient extends EventEmitter {
     this.closed = true;
     this.subscriptions.clear();
     if (this.ws) {
+      // Remove all listeners to prevent events after close
+      this.ws.removeAllListeners();
       this.ws.close();
       this.ws = null;
     }
+    // Remove all event listeners from this client except the default error handler
+    this.removeAllListeners('progress');
+    this.removeAllListeners('complete');
+    this.removeAllListeners('heartbeat');
+    this.removeAllListeners('initial_state');
+    this.removeAllListeners('connected');
+    this.removeAllListeners('disconnected');
   }
 
   // ==========================================================================
@@ -247,6 +262,9 @@ export class ProgressClient extends EventEmitter {
   }
 
   private handleMessage(data: string): void {
+    // Don't process messages if client is closed
+    if (this.closed) return;
+
     try {
       const msg: ProgressMessage = JSON.parse(data);
 
@@ -259,6 +277,8 @@ export class ProgressClient extends EventEmitter {
           this.emit('progress', msg); // Also emit as progress for unified handling
           break;
         case 'error':
+          // Log error but don't crash - error events are handled by default handler
+          console.warn(`[ProgressClient] Server error: ${msg.message ?? 'Unknown error'}`);
           this.emit('error', new Error(msg.message ?? 'Unknown error'));
           break;
         case 'heartbeat':
@@ -268,6 +288,7 @@ export class ProgressClient extends EventEmitter {
           this.emit('initial_state', msg);
           // Also emit progress for each batch
           msg.batches?.forEach((batch) => {
+            if (this.closed) return; // Check again in case closed during iteration
             this.emit('progress', {
               type: 'progress',
               batch_id: batch.batch_id,
@@ -281,10 +302,12 @@ export class ProgressClient extends EventEmitter {
           });
           break;
         default:
-          // Unknown message type
+          // Unknown message type - ignore silently
           break;
       }
     } catch (error) {
+      // Log parse errors but don't crash
+      console.warn(`[ProgressClient] Failed to parse message: ${data.slice(0, 100)}...`);
       this.emit('error', new Error(`Failed to parse message: ${error}`));
     }
   }
