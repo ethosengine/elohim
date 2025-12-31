@@ -105,6 +105,11 @@ components:
           protocol: http
           #secure:true needed for che http -> ws upgrade, which uses traefik proxy
           secure: true
+        # elohim-storage - blob storage and import processing
+        - name: hc-storage
+          targetPort: 8090
+          exposure: public
+          protocol: http
       volumeMounts:
         - name: nix-store
           path: /nix
@@ -170,13 +175,6 @@ commands:
             --transport http \
             --header "Authorization: Basic $JENKINS_AUTH"
         fi
-  - id: start-storage
-    exec:
-      component: tools
-      workingDir: /projects/elohim/holochain/elohim-storage
-      commandLine: |
-        RUSTFLAGS="" cargo build --release && ./target/release/elohim-storage --http-port 8090 --storage-dir /tmp/elohim-storage --enable-import-api
-
   - id: start-doorway
     exec:
       component: tools
