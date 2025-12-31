@@ -698,11 +698,14 @@ impl ImportHandler {
         S: SinkExt<Message> + Unpin,
         S::Error: std::fmt::Display,
     {
+        let batch_start = std::time::Instant::now();
         info!(
             batch_id = %payload.batch_id,
+            batch_type = %payload.batch_type,
             blob_hash = %payload.blob_hash,
             total_items = payload.total_items,
-            "Processing ImportBatchQueued signal"
+            schema_version = payload.schema_version,
+            "📥 BATCH_START: Processing ImportBatchQueued signal"
         );
 
         // Read blob from storage
@@ -736,12 +739,14 @@ impl ImportHandler {
             let chunk_json = serde_json::to_string(chunk)
                 .map_err(|e| StorageError::Parse(format!("Failed to serialize chunk: {}", e)))?;
 
-            debug!(
+            let chunk_start = std::time::Instant::now();
+            info!(
                 batch_id = %payload.batch_id,
                 chunk_index = chunk_index,
-                chunk_size = chunk.len(),
+                chunk_items = chunk.len(),
+                total_chunks = total_chunks,
                 is_final = is_final,
-                "Sending chunk"
+                "🔄 CHUNK_START: Sending chunk to conductor"
             );
 
             // Call process_import_chunk
@@ -758,8 +763,18 @@ impl ImportHandler {
                 .await
             {
                 Ok(result) => {
+                    let chunk_duration = chunk_start.elapsed();
                     processed_count = result.total_processed;
                     error_count = result.total_errors;
+
+                    info!(
+                        batch_id = %payload.batch_id,
+                        chunk_index = chunk_index,
+                        chunk_items = chunk.len(),
+                        duration_ms = chunk_duration.as_millis(),
+                        total_processed = processed_count,
+                        "✅ CHUNK_OK: Chunk sent successfully"
+                    );
 
                     // Emit progress
                     let _ = self.progress_tx.send(ImportProgress {
@@ -774,11 +789,14 @@ impl ImportHandler {
                     });
                 }
                 Err(e) => {
+                    let chunk_duration = chunk_start.elapsed();
                     error!(
                         batch_id = %payload.batch_id,
                         chunk_index = chunk_index,
+                        chunk_items = chunk.len(),
+                        duration_ms = chunk_duration.as_millis(),
                         error = %e,
-                        "Chunk processing failed"
+                        "❌ CHUNK_ERROR: Chunk processing failed"
                     );
                     error_count += chunk.len() as u32;
                 }
@@ -790,11 +808,22 @@ impl ImportHandler {
             }
         }
 
+        let batch_duration = batch_start.elapsed();
+        let items_per_sec = if batch_duration.as_secs_f64() > 0.0 {
+            processed_count as f64 / batch_duration.as_secs_f64()
+        } else {
+            0.0
+        };
+
         info!(
             batch_id = %payload.batch_id,
+            batch_type = %payload.batch_type,
             processed = processed_count,
             errors = error_count,
-            "Import batch completed"
+            total_items = payload.total_items,
+            duration_ms = batch_duration.as_millis(),
+            items_per_sec = format!("{:.1}", items_per_sec),
+            "📦 BATCH_COMPLETE: Import batch finished"
         );
 
         Ok(())

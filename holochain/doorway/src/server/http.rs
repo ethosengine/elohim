@@ -44,8 +44,10 @@ pub struct AppState {
     pub mongo: Option<MongoClient>,
     pub nats: Option<NatsClient>,
     pub router: HostRouter,
-    /// Worker pool for request routing (always available)
+    /// Worker pool for APP interface (zome calls) - connects to port 4445
     pub pool: Option<Arc<WorkerPool>>,
+    /// Worker pool for ADMIN interface (generate_agent_pub_key, list_apps, etc.) - connects to admin port
+    pub admin_pool: Option<Arc<WorkerPool>>,
     /// Bootstrap store for agent discovery
     pub bootstrap: Option<Arc<BootstrapStore>>,
     /// Signal store for WebRTC signaling
@@ -115,6 +117,7 @@ impl AppState {
             nats: None,
             router: HostRouter::new(None),
             pool: None,
+            admin_pool: None,
             bootstrap,
             signal,
             cache,
@@ -175,6 +178,7 @@ impl AppState {
             nats,
             router,
             pool: None,
+            admin_pool: None,
             bootstrap,
             signal,
             cache,
@@ -193,7 +197,10 @@ impl AppState {
         }
     }
 
-    /// Create AppState with worker pool (pooled connection mode)
+    /// Create AppState with worker pools (pooled connection mode)
+    ///
+    /// - `app_pool`: Connects to APP interface (port 4445) for zome calls
+    /// - `admin_pool`: Connects to ADMIN interface for admin commands (generate_agent_pub_key, list_apps, etc.)
     ///
     /// Projection store is initialized in memory-only mode. Use `init_projection()`
     /// to upgrade to MongoDB-backed projection after async initialization.
@@ -201,7 +208,8 @@ impl AppState {
         args: Args,
         mongo: Option<MongoClient>,
         nats: Option<NatsClient>,
-        pool: Arc<WorkerPool>,
+        app_pool: Arc<WorkerPool>,
+        admin_pool: Option<Arc<WorkerPool>>,
     ) -> Self {
         let router = HostRouter::new(nats.clone());
         let bootstrap = if args.bootstrap_enabled {
@@ -226,7 +234,7 @@ impl AppState {
 
         // Create resolver with both projection and conductor fallback
         // Note: zome_config is discovered at runtime when conductor connection is established
-        let resolver = Arc::new(DoorwayResolver::new(projection.clone(), Some(Arc::clone(&pool)), None));
+        let resolver = Arc::new(DoorwayResolver::new(projection.clone(), Some(Arc::clone(&app_pool)), None));
 
         // Delivery relay for CDN-style caching (complements agent-side cache-core)
         // Note: Write batching is handled by agent's holochain-cache-core WriteBuffer, NOT here
@@ -237,7 +245,8 @@ impl AppState {
             mongo,
             nats,
             router,
-            pool: Some(pool),
+            pool: Some(app_pool),
+            admin_pool,
             bootstrap,
             signal,
             cache,
@@ -307,6 +316,7 @@ impl AppState {
             nats,
             router,
             pool,
+            admin_pool: None,
             bootstrap,
             signal,
             cache,

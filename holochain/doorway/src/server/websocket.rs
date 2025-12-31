@@ -48,14 +48,15 @@ pub async fn handle_admin_upgrade(
                     let conductor_url = state.args.conductor_url.clone();
                     let dev_mode = state.args.dev_mode;
 
-                    // Check if worker pool is available
-                    let pool = state.pool.clone();
+                    // Use ADMIN pool for admin connections (not app pool)
+                    // Admin pool connects to conductor admin interface (port 4444)
+                    let admin_pool = state.admin_pool.clone();
 
                     tokio::spawn(async move {
                         match websocket.await {
                             Ok(ws) => {
-                                // Use pool routing if available (better scalability)
-                                if let Some(p) = pool {
+                                // Use admin pool routing if available (better scalability)
+                                if let Some(p) = admin_pool {
                                     if let Err(e) = proxy::pool::run_admin_proxy(
                                         ws,
                                         p,

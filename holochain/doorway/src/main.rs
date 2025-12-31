@@ -93,12 +93,16 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    // Create worker pool for scalable request routing
-    // This provides connection pooling and request queuing without needing NATS
-    // IMPORTANT: Workers must connect to the APP interface (4445) for zome calls,
-    // not the admin interface (4444) which only handles admin commands.
+    // Create TWO worker pools for scalable request routing:
+    // 1. APP pool: connects to app interface (4445) for zome calls
+    // 2. ADMIN pool: connects to admin interface (4444) for admin commands
+    //
+    // The browser app needs admin commands (generate_agent_pub_key, list_apps, etc.)
+    // which MUST go to the admin interface, not the app interface.
+
+    // APP pool - for zome calls
     let worker_app_url = derive_app_url(&args.conductor_url, args.app_port_min);
-    let pool = match WorkerPool::new(PoolConfig {
+    let app_pool = match WorkerPool::new(PoolConfig {
         worker_count: args.worker_count,
         conductor_url: worker_app_url.clone(),
         request_timeout_ms: args.request_timeout_ms,
@@ -108,17 +112,45 @@ async fn main() -> anyhow::Result<()> {
     {
         Ok(p) => {
             info!(
-                "Worker pool started with {} workers (app interface: {})",
+                "App worker pool started with {} workers (app interface: {})",
                 args.worker_count, worker_app_url
             );
             Some(Arc::new(p))
         }
         Err(e) => {
             if args.dev_mode {
-                warn!("Worker pool failed to start (dev mode, using direct proxy): {}", e);
+                warn!("App worker pool failed to start (dev mode, using direct proxy): {}", e);
                 None
             } else {
-                error!("Worker pool failed to start: {}", e);
+                error!("App worker pool failed to start: {}", e);
+                std::process::exit(1);
+            }
+        }
+    };
+
+    // ADMIN pool - for admin commands (generate_agent_pub_key, list_apps, etc.)
+    let admin_url = args.admin_url().to_string();
+    let admin_pool = match WorkerPool::new(PoolConfig {
+        worker_count: args.worker_count,
+        conductor_url: admin_url.clone(),
+        request_timeout_ms: args.request_timeout_ms,
+        max_queue_size: 1000,
+    })
+    .await
+    {
+        Ok(p) => {
+            info!(
+                "Admin worker pool started with {} workers (admin interface: {})",
+                args.worker_count, admin_url
+            );
+            Some(Arc::new(p))
+        }
+        Err(e) => {
+            if args.dev_mode {
+                warn!("Admin worker pool failed to start (dev mode, using direct proxy): {}", e);
+                None
+            } else {
+                error!("Admin worker pool failed to start: {}", e);
                 std::process::exit(1);
             }
         }
@@ -141,8 +173,8 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Create application state
-    let mut state = if let Some(p) = pool {
-        server::AppState::with_pool(args.clone(), mongo, nats, p)
+    let mut state = if let Some(p) = app_pool {
+        server::AppState::with_pool(args.clone(), mongo, nats, p, admin_pool)
     } else {
         server::AppState::with_services(args.clone(), mongo, nats)
     };

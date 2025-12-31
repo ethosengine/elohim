@@ -212,6 +212,11 @@ impl ImportApi {
                 self.handle_get_status(batch_id).await
             }
 
+            // GET /import/batches - List all batches
+            (Method::GET, "/import/batches") => {
+                self.handle_list_batches().await
+            }
+
             // Not found
             _ => Ok(error_response(
                 StatusCode::NOT_FOUND,
@@ -374,6 +379,46 @@ impl ImportApi {
             .unwrap())
     }
 
+    /// Handle GET /import/batches - List all batches
+    async fn handle_list_batches(
+        &self,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let batches = self.batches.read().await;
+
+        let batch_list: Vec<ImportStatusResponse> = batches.values()
+            .map(|batch| {
+                let elapsed = batch.started_at.elapsed();
+                let items_per_second = if elapsed.as_secs_f64() > 0.0 {
+                    batch.processed_count as f64 / elapsed.as_secs_f64()
+                } else {
+                    0.0
+                };
+
+                ImportStatusResponse {
+                    batch_id: batch.batch_id.clone(),
+                    status: batch.status,
+                    total_items: batch.total_items,
+                    processed_count: batch.processed_count,
+                    error_count: batch.error_count,
+                    errors: batch.errors.clone(),
+                    elapsed_ms: elapsed.as_millis() as u64,
+                    items_per_second,
+                }
+            })
+            .collect();
+
+        let response = serde_json::json!({
+            "total": batch_list.len(),
+            "batches": batch_list,
+        });
+
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(serde_json::to_string(&response)?)))
+            .unwrap())
+    }
+
     /// Clone self for spawned processing task
     fn clone_for_processing(&self) -> ImportApiProcessor {
         ImportApiProcessor {
@@ -401,22 +446,43 @@ impl ImportApiProcessor {
         batch_type: &str,
         items_json: &str,
     ) -> Result<(), StorageError> {
+        let batch_start = Instant::now();
+
         // Update status to processing
         self.update_status(batch_id, ImportStatus::Processing).await;
 
         // Parse items
         let items: Vec<serde_json::Value> = serde_json::from_str(items_json)?;
         let total = items.len();
+        let total_chunks = (total + self.config.chunk_size - 1) / self.config.chunk_size;
 
-        info!(batch_id = %batch_id, total = total, "Starting batch processing");
+        info!(
+            batch_id = %batch_id,
+            batch_type = %batch_type,
+            total_items = total,
+            total_chunks = total_chunks,
+            chunk_size = self.config.chunk_size,
+            conductor_url = %self.config.conductor_url,
+            "📥 BATCH_START: Starting batch processing via ImportApi"
+        );
 
         // Process in chunks
         let mut processed = 0;
         let mut errors = 0;
 
         for (chunk_idx, chunk) in items.chunks(self.config.chunk_size).enumerate() {
+            let chunk_start = Instant::now();
             let chunk_json = serde_json::to_string(chunk)?;
             let is_final = processed + chunk.len() >= total;
+
+            info!(
+                batch_id = %batch_id,
+                chunk_index = chunk_idx,
+                chunk_items = chunk.len(),
+                total_chunks = total_chunks,
+                is_final = is_final,
+                "🔄 CHUNK_START: Sending chunk to conductor"
+            );
 
             // Call conductor if connected
             if let Some(ref conductor) = self.conductor {
@@ -439,14 +505,26 @@ impl ImportApiProcessor {
                         &payload_bytes,
                     ).await {
                         Ok(_) => {
+                            let chunk_duration = chunk_start.elapsed();
                             processed += chunk.len();
+                            info!(
+                                batch_id = %batch_id,
+                                chunk_index = chunk_idx,
+                                chunk_items = chunk.len(),
+                                duration_ms = chunk_duration.as_millis(),
+                                total_processed = processed,
+                                "✅ CHUNK_OK: Chunk sent to conductor successfully"
+                            );
                         }
                         Err(e) => {
-                            warn!(
+                            let chunk_duration = chunk_start.elapsed();
+                            error!(
                                 batch_id = %batch_id,
-                                chunk = chunk_idx,
+                                chunk_index = chunk_idx,
+                                chunk_items = chunk.len(),
+                                duration_ms = chunk_duration.as_millis(),
                                 error = %e,
-                                "Chunk processing failed"
+                                "❌ CHUNK_ERROR: Conductor call failed"
                             );
                             errors += chunk.len();
                             self.add_error(batch_id, format!("Chunk {}: {}", chunk_idx, e)).await;
@@ -454,12 +532,24 @@ impl ImportApiProcessor {
                     }
                 } else {
                     // No cell_id - just simulate success for testing
-                    debug!(batch_id = %batch_id, chunk = chunk_idx, "Processing chunk (no conductor)");
+                    let chunk_duration = chunk_start.elapsed();
+                    warn!(
+                        batch_id = %batch_id,
+                        chunk_index = chunk_idx,
+                        duration_ms = chunk_duration.as_millis(),
+                        "⚠️ CHUNK_SKIPPED: No cell_id configured, chunk not sent to conductor"
+                    );
                     processed += chunk.len();
                 }
             } else {
                 // No conductor - just count items
-                debug!(batch_id = %batch_id, chunk = chunk_idx, "Processing chunk (no conductor)");
+                let chunk_duration = chunk_start.elapsed();
+                warn!(
+                    batch_id = %batch_id,
+                    chunk_index = chunk_idx,
+                    duration_ms = chunk_duration.as_millis(),
+                    "⚠️ CHUNK_SKIPPED: No conductor connected, chunk not processed"
+                );
                 processed += chunk.len();
             }
 
@@ -483,12 +573,23 @@ impl ImportApiProcessor {
 
         self.update_status(batch_id, final_status).await;
 
+        let batch_duration = batch_start.elapsed();
+        let items_per_sec = if batch_duration.as_secs_f64() > 0.0 {
+            processed as f64 / batch_duration.as_secs_f64()
+        } else {
+            0.0
+        };
+
         info!(
             batch_id = %batch_id,
+            batch_type = %batch_type,
             processed = processed,
             errors = errors,
+            total_items = total,
+            duration_ms = batch_duration.as_millis(),
+            items_per_sec = format!("{:.1}", items_per_sec),
             status = ?final_status,
-            "Batch processing complete"
+            "📦 BATCH_COMPLETE: Batch processing finished"
         );
 
         Ok(())
