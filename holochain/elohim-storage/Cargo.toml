@@ -18,6 +18,7 @@ bytes = "1"
 
 # WebSocket for Holochain conductor communication
 tokio-tungstenite = "0.24"
+hyper-tungstenite = "0.15"
 futures-util = "0.3"
 
 # MessagePack for Holochain protocol

@@ -21,7 +21,6 @@
 
 use crate::progress_hub::{ProgressHub, ProgressMessage};
 use futures_util::{SinkExt, StreamExt};
-use hyper::upgrade::Upgraded;
 use hyper::{Request, Response, StatusCode};
 use hyper::body::Incoming;
 use http_body_util::Full;
@@ -31,8 +30,10 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
-use tokio_tungstenite::WebSocketStream;
 use tracing::{debug, error, info, warn};
+
+/// WebSocket type after upgrade (using hyper-tungstenite)
+type HyperWebSocket = hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
 
 /// Messages from client to server
 #[derive(Debug, Clone, Deserialize)]
@@ -72,86 +73,56 @@ pub fn is_websocket_upgrade(req: &Request<Incoming>) -> bool {
 }
 
 /// Handle WebSocket upgrade for progress endpoint
+///
+/// Uses hyper-tungstenite for proper RFC 6455 handshake with SHA-1
 pub async fn handle_progress_upgrade(
     req: Request<Incoming>,
     hub: Arc<ProgressHub>,
 ) -> Result<Response<Full<Bytes>>, hyper::Error> {
-    // Verify websocket upgrade
-    if !is_websocket_upgrade(&req) {
+    // Check if this is a WebSocket upgrade request
+    if !hyper_tungstenite::is_upgrade_request(&req) {
         return Ok(Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .body(Full::new(Bytes::from("Expected WebSocket upgrade")))
             .unwrap());
     }
 
-    // Get the websocket key
-    let ws_key = match req.headers().get("sec-websocket-key") {
-        Some(key) => key.clone(),
-        None => {
+    info!("WebSocket upgrade request for /import/progress");
+
+    // Perform the upgrade using hyper-tungstenite (handles SHA-1 correctly)
+    let (response, websocket) = match hyper_tungstenite::upgrade(req, None) {
+        Ok((resp, ws)) => (resp, ws),
+        Err(e) => {
+            error!("WebSocket upgrade failed: {}", e);
             return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Full::new(Bytes::from("Missing Sec-WebSocket-Key")))
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Full::new(Bytes::from("WebSocket upgrade failed")))
                 .unwrap());
         }
     };
 
-    // Calculate accept key
-    let accept_key = calculate_accept_key(ws_key.to_str().unwrap_or(""));
-
-    info!("WebSocket upgrade request for /import/progress");
-
-    // Spawn the connection handler after upgrade completes
+    // Spawn task to handle the connection after upgrade completes
     tokio::spawn(async move {
-        // The actual upgrade happens through hyper's upgrade mechanism
-        // For now, we'll use a simpler approach with tokio-tungstenite
-        match hyper::upgrade::on(req).await {
-            Ok(upgraded) => {
-                let ws_stream = WebSocketStream::from_raw_socket(
-                    hyper_util::rt::TokioIo::new(upgraded),
-                    tokio_tungstenite::tungstenite::protocol::Role::Server,
-                    None,
-                )
-                .await;
-
+        match websocket.await {
+            Ok(ws_stream) => {
                 if let Err(e) = handle_connection(ws_stream, hub).await {
                     warn!(error = %e, "WebSocket connection error");
                 }
             }
             Err(e) => {
-                error!(error = %e, "WebSocket upgrade failed");
+                error!(error = %e, "WebSocket connection failed");
             }
         }
     });
 
-    // Return the upgrade response
-    Ok(Response::builder()
-        .status(StatusCode::SWITCHING_PROTOCOLS)
-        .header(hyper::header::CONNECTION, "Upgrade")
-        .header(hyper::header::UPGRADE, "websocket")
-        .header("Sec-WebSocket-Accept", accept_key)
-        .body(Full::new(Bytes::new()))
-        .unwrap())
-}
-
-/// Calculate WebSocket accept key from client key
-/// Uses SHA-1 as per RFC 6455
-fn calculate_accept_key(key: &str) -> String {
-    use base64::Engine;
-    use sha2::Digest;
-
-    const WS_GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-    let combined = format!("{}{}", key, WS_GUID);
-
-    // WebSocket requires SHA-1, but we only have sha2 crate
-    // tokio-tungstenite handles the actual handshake, so we use a simplified approach
-    // The upgrade response is handled by the library's WebSocketStream::from_raw_socket
-    let hash = sha2::Sha256::digest(combined.as_bytes());
-    base64::engine::general_purpose::STANDARD.encode(&hash[..20]) // Truncate to SHA-1 size
+    // Return the upgrade response (hyper-tungstenite handles the correct headers)
+    let (parts, _body) = response.into_parts();
+    Ok(Response::from_parts(parts, Full::new(Bytes::new())))
 }
 
 /// Handle an established WebSocket connection
 async fn handle_connection(
-    ws_stream: WebSocketStream<hyper_util::rt::TokioIo<Upgraded>>,
+    ws_stream: HyperWebSocket,
     hub: Arc<ProgressHub>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (mut ws_sink, mut ws_stream) = ws_stream.split();
