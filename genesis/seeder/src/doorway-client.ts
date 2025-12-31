@@ -369,9 +369,15 @@ export class DoorwayClient {
         return await response.json();
       }
 
+      // Read body once
+      const responseText = await response.text();
+
       // Handle 503 (discovery in progress) with retry
       if (response.status === 503) {
-        const errorData = await response.json().catch(() => ({ error: 'Service unavailable' }));
+        const errorData = (() => {
+          try { return JSON.parse(responseText); }
+          catch { return { error: 'Service unavailable' }; }
+        })();
         const retryAfter = response.headers.get('Retry-After');
         const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : retryDelay;
 
@@ -383,8 +389,7 @@ export class DoorwayClient {
         }
       }
 
-      const errorText = await response.text();
-      throw new Error(`Import queue failed: HTTP ${response.status}: ${errorText}`);
+      throw new Error(`Import queue failed: HTTP ${response.status}: ${responseText}`);
     }
 
     throw new Error(`Import queue failed: Doorway not ready after ${maxRetries} retries`);
