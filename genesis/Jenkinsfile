@@ -7,9 +7,9 @@
  * Pipeline: source → seed → validate → feedback
  *
  * Auto-detects target environment from branch:
- *   - dev/feat-*/claude-* → alpha.elohim.host (doorway-dev)
- *   - staging*           → staging.elohim.host (doorway-dev)
- *   - main               → elohim.host (doorway)
+ *   - dev, feat-*, claude-* → alpha.elohim.host (doorway-dev)
+ *   - staging*              → staging.elohim.host (doorway-dev)
+ *   - main                  → elohim.host (doorway)
  *
  * Direct webhook triggers are ignored - use orchestrator or manual trigger.
  */

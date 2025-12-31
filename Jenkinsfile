@@ -10,7 +10,7 @@
  *   - Docker images pushed to Harbor registry
  *
  * Environment Architecture:
- *   - dev/feat-*/claude/* → alpha.elohim.host
+ *   - dev, feat-*, claude branches → alpha.elohim.host
  *   - staging* → staging.elohim.host
  *   - main → elohim.host (production)
  *
