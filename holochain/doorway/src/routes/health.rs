@@ -5,10 +5,12 @@
 //! - /ready, /readyz - Readiness probe (is the service ready for traffic?)
 //!
 //! Liveness probes return 200 if doorway is running, regardless of conductor status.
-//! Readiness probes return 200 only if at least one worker is connected to conductor.
+//! Readiness probes return 200 only if at least one worker is connected to conductor,
+//! UNLESS dev_mode is enabled (conductor connection is optional in dev mode).
 //!
-//! The seeder should check the `conductor.connected` field in the response body
-//! to determine if it's safe to begin seeding operations.
+//! Dev mode: Conductor connection is optional. Doorway can operate as a pure
+//! HTTP bridge to elohim-storage without direct conductor access. The conductor
+//! path is only needed for web-based development (Eclipse Che) scenarios.
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -73,27 +75,41 @@ fn build_health_response(state: &AppState) -> HealthResponse {
     let args = &state.args;
 
     // Check worker pool health
-    let (conductor_connected, connected_workers, total_workers) = match &state.pool {
+    let (actual_conductor_connected, connected_workers, total_workers) = match &state.pool {
         Some(pool) => {
             let connected = pool.connected_count();
             let total = pool.worker_count();
             (pool.is_healthy(), connected, total)
         }
         None => {
-            // No pool means dev mode with direct proxy - consider healthy
-            // as we can't verify conductor status without pool
-            (true, 0, 0)
+            // No pool - can't verify conductor status
+            (false, 0, 0)
         }
+    };
+
+    // In dev mode, conductor connection is optional
+    // Doorway can operate as pure HTTP bridge to elohim-storage
+    let conductor_connected = if args.dev_mode {
+        // Dev mode: always report healthy for conductor
+        // (actual status still shown in connected_workers/total_workers)
+        true
+    } else {
+        actual_conductor_connected
     };
 
     // Check if projection/cache is enabled
     let cache_enabled = state.projection.is_some();
 
-    // Include conductor status warning in error field if not connected
-    let error = if !conductor_connected {
+    // Include conductor status info in error field if not connected (but not blocking in dev mode)
+    let error = if !actual_conductor_connected && !args.dev_mode {
         Some(format!(
-            "No workers connected to conductor (0/{} workers) - seeding will fail",
-            total_workers
+            "No workers connected to conductor ({}/{} workers) - seeding will fail",
+            connected_workers, total_workers
+        ))
+    } else if !actual_conductor_connected && args.dev_mode {
+        Some(format!(
+            "Dev mode: conductor not connected ({}/{} workers) - using elohim-storage path",
+            connected_workers, total_workers
         ))
     } else {
         None
@@ -143,18 +159,21 @@ pub fn health_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 
 /// Handle readiness probe (/ready, /readyz)
 ///
-/// Returns 200 OK only if doorway can accept traffic (conductor connected).
-/// Returns 503 Service Unavailable if conductor is not connected.
+/// Returns 200 OK only if doorway can accept traffic.
+/// In production: requires conductor connection.
+/// In dev mode: conductor is optional (doorway bridges to elohim-storage).
 /// Use this endpoint for load balancer health checks and seeder pre-flight checks.
 pub fn readiness_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     let response = build_health_response(&state);
-    let conductor_connected = response.conductor.connected;
+
+    // In dev mode, conductor.connected is always true (set by build_health_response)
+    // so this check will pass even without actual conductor connection
+    let is_ready = response.conductor.connected;
 
     let body = serde_json::to_string(&response)
         .unwrap_or_else(|_| r#"{"healthy":false,"error":"Serialization failed"}"#.to_string());
 
-    // Readiness probe: return 503 if conductor not connected
-    let status = if conductor_connected {
+    let status = if is_ready {
         StatusCode::OK
     } else {
         StatusCode::SERVICE_UNAVAILABLE
