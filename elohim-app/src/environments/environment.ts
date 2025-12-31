@@ -16,5 +16,9 @@ export const environment: Environment = {
     authUrl: 'http://localhost:8888',
     proxyApiKey: 'dev-elohim-auth-2024',  // Authenticated access (not admin)
     useLocalProxy: true,  // Auto-detect Che and use local dev-proxy
+    // Connection mode: 'auto' detects Tauri→direct, browser→doorway
+    connectionMode: 'auto',
+    // elohim-storage sidecar URL (for direct mode blob storage)
+    storageUrl: 'http://localhost:8090',
   }
 };

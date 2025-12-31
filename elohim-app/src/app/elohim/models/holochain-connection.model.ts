@@ -55,6 +55,9 @@ export interface HolochainConfig {
 
   /** Use local dev-proxy for Che environment (auto-detected, but can be forced) */
   useLocalProxy?: boolean;
+
+  /** elohim-storage sidecar URL (for direct mode blob storage) */
+  storageUrl?: string;
 }
 
 /**
@@ -425,6 +428,7 @@ export const DEFAULT_HOLOCHAIN_CONFIG: HolochainConfig = {
   happPath: '/opt/holochain/elohim.happ',
   proxyApiKey: holochainConfig?.proxyApiKey,
   useLocalProxy: holochainConfig?.useLocalProxy ?? true, // Auto-detect Che and use dev-proxy
+  storageUrl: holochainConfig?.storageUrl ?? 'http://localhost:8090', // elohim-storage sidecar
 };
 
 /**

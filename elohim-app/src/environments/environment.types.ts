@@ -8,6 +8,15 @@
 export type LogLevel = 'debug' | 'info' | 'error';
 
 /**
+ * Connection mode for Holochain deployment
+ *
+ * - 'auto': Auto-detect based on environment (Tauri→direct, browser→doorway)
+ * - 'doorway': Route through Doorway proxy (web deployments)
+ * - 'direct': Connect directly to local conductor (native deployments)
+ */
+export type ConnectionMode = 'auto' | 'doorway' | 'direct';
+
+/**
  * Holochain connection configuration
  */
 export interface HolochainEnvironmentConfig {
@@ -21,6 +30,10 @@ export interface HolochainEnvironmentConfig {
   proxyApiKey?: string;
   /** Use local dev-proxy in Eclipse Che (auto-detected if true) */
   useLocalProxy?: boolean;
+  /** Connection mode: auto-detect, force doorway, or force direct */
+  connectionMode?: ConnectionMode;
+  /** elohim-storage sidecar URL (for direct mode blob storage) */
+  storageUrl?: string;
 }
 
 /**

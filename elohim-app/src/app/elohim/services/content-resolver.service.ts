@@ -60,6 +60,13 @@ import {
   TsContentResolver,
 } from '../../../../../elohim-library/projects/elohim-service/src/cache/content-resolver';
 
+// Import connection strategy types
+import type {
+  IConnectionStrategy,
+  ConnectionConfig,
+  ContentSourceConfig,
+} from '../../../../../elohim-library/projects/elohim-service/src/connection';
+
 // Re-export types and enums for convenience
 export {
   SourceTier,
@@ -297,6 +304,7 @@ export class ContentResolverService implements OnDestroy {
    * Register all standard sources for full Elohim Protocol resolution.
    *
    * @param urls - URL overrides for URL-based sources
+   * @deprecated Use initializeForMode() instead for mode-aware source registration
    */
   registerAllStandardSources(urls?: {
     projection?: string;
@@ -309,6 +317,90 @@ export class ContentResolverService implements OnDestroy {
     this.registerStandardSource('edgenode', urls?.edgenode);
     this.registerStandardSource('dht');
     this.registerStandardSource('cdn', urls?.cdn);
+  }
+
+  /**
+   * Initialize resolver with mode-aware sources from connection strategy.
+   *
+   * This method configures the content resolver sources based on the current
+   * connection mode (doorway or direct). Different modes have different source
+   * hierarchies:
+   *
+   * **Doorway Mode (browser)**:
+   * - indexeddb → projection → conductor
+   * - Uses Projection tier (Doorway's MongoDB cache) for fast reads
+   *
+   * **Direct Mode (native/Tauri)**:
+   * - indexeddb → conductor → elohim-storage
+   * - Skips Projection tier, goes directly to Authoritative
+   *
+   * @param strategy - The connection strategy providing source configuration
+   * @param config - Connection configuration for URL resolution
+   * @returns Initialization result
+   *
+   * @example
+   * ```typescript
+   * await resolver.initialize();
+   * await resolver.initializeForMode(strategy, connectionConfig);
+   * ```
+   */
+  async initializeForMode(
+    strategy: IConnectionStrategy,
+    config: ConnectionConfig
+  ): Promise<void> {
+    // Ensure resolver is initialized first
+    if (this.state !== 'ready') {
+      await this.initialize();
+    }
+
+    // Get sources from strategy
+    const sources = strategy.getContentSources(config);
+    console.log(
+      `[ContentResolverService] Configuring sources for ${strategy.name} mode:`,
+      sources.map(s => s.id)
+    );
+
+    // Register each source from the strategy
+    for (const source of sources) {
+      this.registerSource(
+        source.id,
+        source.tier,
+        source.priority,
+        source.contentTypes,
+        source.baseUrl
+      );
+
+      // Set initial availability
+      if (source.available !== undefined) {
+        this.setSourceAvailable(source.id, source.available);
+      }
+    }
+
+    console.log(
+      `[ContentResolverService] Initialized for ${strategy.mode} mode with ${sources.length} sources`
+    );
+  }
+
+  /**
+   * Register sources from a ContentSourceConfig array.
+   * Useful for custom source configurations or testing.
+   *
+   * @param sources - Array of source configurations
+   */
+  registerSourcesFromConfig(sources: ContentSourceConfig[]): void {
+    this.ensureReady();
+    for (const source of sources) {
+      this.registerSource(
+        source.id,
+        source.tier,
+        source.priority,
+        source.contentTypes,
+        source.baseUrl
+      );
+      if (source.available !== undefined) {
+        this.setSourceAvailable(source.id, source.available);
+      }
+    }
   }
 
   /**

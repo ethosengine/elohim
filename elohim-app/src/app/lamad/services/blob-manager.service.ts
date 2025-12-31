@@ -10,7 +10,7 @@
  * - Metadata retrieval from Holochain DHT
  */
 
-import { Injectable, Injector } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
 import { Observable, from, of, throwError } from 'rxjs';
 import { map, catchError, tap, switchMap } from 'rxjs/operators';
 import { ContentBlob } from '../models/content-node.model';
@@ -20,6 +20,9 @@ import {
   BlobFetchResult,
   UrlHealth,
 } from './blob-fallback.service';
+
+// Import HolochainClientService for strategy-aware blob URLs
+import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 
 /**
  * Full result of blob download and verification
@@ -124,11 +127,75 @@ export class BlobManagerService {
   /** Serialization lock for concurrent cache operations (FIX for race condition) */
   private cacheLock = Promise.resolve();
 
+  /** Holochain client for strategy-aware blob URLs (lazy injected) */
+  private holochainClient: HolochainClientService | null = null;
+
   constructor(
     private verificationService: BlobVerificationService,
     private fallbackService: BlobFallbackService,
     private injector: Injector,
   ) {}
+
+  // =========================================================================
+  // Strategy-Aware Blob URL Methods
+  // =========================================================================
+
+  /**
+   * Get blob storage URL based on connection strategy.
+   *
+   * Uses the HolochainClientService's connection strategy to determine
+   * the appropriate blob storage endpoint:
+   *
+   * - **Doorway mode**: `https://doorway-dev.elohim.host/api/blob/{hash}`
+   * - **Direct mode**: `http://localhost:8090/store/{hash}`
+   *
+   * @param blobHash SHA256 hash of the blob
+   * @returns URL string for the blob storage endpoint
+   */
+  getBlobUrl(blobHash: string): string {
+    const client = this.getHolochainClient();
+    return client.getBlobUrl(blobHash);
+  }
+
+  /**
+   * Get current connection mode for blob storage.
+   *
+   * @returns 'doorway' or 'direct'
+   */
+  get connectionMode(): 'doorway' | 'direct' {
+    const client = this.getHolochainClient();
+    return client.connectionMode;
+  }
+
+  /**
+   * Get the priority URL for a blob based on connection strategy.
+   * Combines strategy URL with existing fallback URLs for maximum availability.
+   *
+   * @param blobMetadata ContentBlob with fallback URLs
+   * @returns Array of URLs with strategy URL first (if not already present)
+   */
+  getPriorityUrls(blobMetadata: ContentBlob): string[] {
+    const strategyUrl = this.getBlobUrl(blobMetadata.hash);
+    const fallbackUrls = blobMetadata.fallbackUrls || [];
+
+    // Avoid duplicates: if strategy URL is already in fallbacks, don't add again
+    if (fallbackUrls.includes(strategyUrl)) {
+      return fallbackUrls;
+    }
+
+    // Strategy URL gets highest priority
+    return [strategyUrl, ...fallbackUrls];
+  }
+
+  /**
+   * Lazy-inject HolochainClientService to avoid circular dependency.
+   */
+  private getHolochainClient(): HolochainClientService {
+    if (!this.holochainClient) {
+      this.holochainClient = this.injector.get(HolochainClientService);
+    }
+    return this.holochainClient;
+  }
 
   /**
    * Download and verify a blob from ContentBlob metadata.
@@ -177,8 +244,9 @@ export class BlobManagerService {
       });
     }
 
-    // Fetch blob from fallback URLs
-    return this.fallbackService.fetchWithFallback(blobMetadata.fallbackUrls).pipe(
+    // Fetch blob using priority URLs (strategy URL first, then fallbacks)
+    const urls = this.getPriorityUrls(blobMetadata);
+    return this.fallbackService.fetchWithFallback(urls).pipe(
       tap((fetchResult: BlobFetchResult) => {
         if (progressCallback) {
           progressCallback({
@@ -315,16 +383,19 @@ export class BlobManagerService {
 
   /**
    * Get URL health information for a blob.
+   * Includes strategy-aware URL as the first priority.
    *
    * @param blobMetadata ContentBlob to check
    * @returns Array of URL health statuses
    */
   getUrlHealth(blobMetadata: ContentBlob): UrlHealth[] {
-    return this.fallbackService.getUrlsHealth(blobMetadata.fallbackUrls);
+    const urls = this.getPriorityUrls(blobMetadata);
+    return this.fallbackService.getUrlsHealth(urls);
   }
 
   /**
    * Check if all fallback URLs for a blob are healthy.
+   * Includes strategy-aware URL in the check.
    *
    * @param blobMetadata ContentBlob to check
    * @returns True if at least one URL is healthy
@@ -336,12 +407,14 @@ export class BlobManagerService {
 
   /**
    * Test all fallback URLs for a blob and report health.
+   * Includes strategy-aware URL as first test.
    *
    * @param blobMetadata ContentBlob to test
    * @returns Promise with health report
    */
   async testBlobAccess(blobMetadata: ContentBlob): Promise<UrlHealth[]> {
-    return this.fallbackService.testFallbackUrls(blobMetadata.fallbackUrls);
+    const urls = this.getPriorityUrls(blobMetadata);
+    return this.fallbackService.testFallbackUrls(urls);
   }
 
   /**

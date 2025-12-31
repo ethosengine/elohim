@@ -4,17 +4,15 @@
  * Manages WebSocket connections to a Holochain conductor (Edge Node).
  * Handles authentication, signing credentials, and zome calls.
  *
- * Architecture supports multiple environments:
+ * Architecture supports multiple deployment modes via ConnectionStrategy:
  *
- * 1. Eclipse Che (dev-proxy):
- *    Browser → Dev Proxy (wss://hc-dev-...devspaces/) → Conductor (local)
- *    Routes: /admin → :4444, /app/:port → :port
+ * 1. Doorway Mode (browser):
+ *    Browser → Doorway Proxy (wss://doorway-dev.elohim.host) → Conductor
+ *    Uses Projection tier for fast cached reads
  *
- * 2. Deployed (admin-proxy):
- *    Browser → Admin Proxy (wss://holochain-*.elohim.host) → Conductor → DHT
- *
- * 3. Local development:
- *    Browser → Conductor (ws://localhost:4444)
+ * 2. Direct Mode (native/Tauri):
+ *    Device → Local Conductor (ws://localhost:4444)
+ *    Uses elohim-storage sidecar for blob storage
  *
  * @see https://github.com/holochain/holochain-client-js
  */
@@ -25,9 +23,6 @@ import { firstValueFrom } from 'rxjs';
 import {
   AdminWebsocket,
   AppWebsocket,
-  generateSigningKeyPair,
-  randomCapSecret,
-  setSigningCredentials,
   type AgentPubKey,
   type CellId,
   type AppInfo,
@@ -47,6 +42,8 @@ import {
 } from '../models/holochain-connection.model';
 
 import { PerformanceMetricsService } from './performance-metrics.service';
+import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
+import type { IConnectionStrategy, ConnectionConfig } from '../../../../../elohim-library/projects/elohim-service/src/connection';
 
 @Injectable({
   providedIn: 'root',
@@ -57,6 +54,9 @@ export class HolochainClientService {
 
   /** Performance metrics service for recording zome call metrics */
   private readonly metrics = inject(PerformanceMetricsService);
+
+  /** Connection strategy (injected based on environment) */
+  private readonly strategy = inject(CONNECTION_STRATEGY);
 
   /** Current connection state */
   private readonly connectionSignal = signal<HolochainConnection>(INITIAL_CONNECTION_STATE);
@@ -74,6 +74,54 @@ export class HolochainClientService {
 
   /** Current configuration */
   private config: HolochainConfig = DEFAULT_HOLOCHAIN_CONFIG;
+
+  // ==========================================================================
+  // Strategy Accessors
+  // ==========================================================================
+
+  /** Get the current connection strategy name (e.g., 'doorway', 'direct') */
+  get strategyName(): string {
+    return this.strategy.name;
+  }
+
+  /** Get the current connection mode */
+  get connectionMode(): 'doorway' | 'direct' {
+    return this.strategy.mode;
+  }
+
+  /**
+   * Get blob storage URL for a given hash.
+   * Routes to appropriate storage based on connection mode:
+   * - Doorway: https://doorway-dev.elohim.host/api/blob/{hash}
+   * - Direct: http://localhost:8090/store/{hash}
+   */
+  getBlobUrl(blobHash: string): string {
+    return this.strategy.getBlobStorageUrl(this.buildConnectionConfig(), blobHash);
+  }
+
+  /**
+   * Get content sources for ContentResolver based on connection strategy.
+   */
+  getContentSources() {
+    return this.strategy.getContentSources(this.buildConnectionConfig());
+  }
+
+  /**
+   * Build ConnectionConfig from current HolochainConfig.
+   */
+  private buildConnectionConfig(): ConnectionConfig {
+    return {
+      mode: this.strategy.mode,
+      adminUrl: this.config.adminUrl,
+      appUrl: this.config.appUrl,
+      proxyApiKey: this.config.proxyApiKey,
+      storageUrl: this.config.storageUrl,
+      appId: this.config.appId,
+      happPath: this.config.happPath,
+      origin: this.config.origin,
+      useLocalProxy: this.config.useLocalProxy,
+    };
+  }
 
   /**
    * Detect if running in Eclipse Che environment.
@@ -113,55 +161,18 @@ export class HolochainClientService {
 
   /**
    * Resolve admin URL based on environment.
+   * @deprecated Use strategy.resolveAdminUrl() instead. Kept for testAdminConnection().
    */
   private resolveAdminUrl(): string {
-    const cheProxy = this.getCheDevProxyUrl();
-
-    if (cheProxy && this.config.useLocalProxy) {
-      // Che environment: use path-based routing through dev-proxy
-      const url = `${cheProxy}/admin`;
-      console.log('[Holochain] Admin URL resolved (Che dev-proxy):', url);
-      return url;
-    }
-
-    // Default: use configured URL with optional API key
-    const url = this.config.proxyApiKey
-      ? `${this.config.adminUrl}?apiKey=${encodeURIComponent(this.config.proxyApiKey)}`
-      : this.config.adminUrl;
-    console.log('[Holochain] Admin URL resolved (direct):', url);
-    return url;
+    return this.strategy.resolveAdminUrl(this.buildConnectionConfig());
   }
 
   /**
    * Resolve app interface URL based on environment and port.
+   * @deprecated Use strategy.resolveAppUrl() instead. Kept for testAdminConnection().
    */
   private resolveAppUrl(port: number): string {
-    const cheProxy = this.getCheDevProxyUrl();
-
-    if (cheProxy && this.config.useLocalProxy) {
-      // Che environment: use path-based routing with port through dev-proxy
-      const url = `${cheProxy}/app/${port}`;
-      console.log('[Holochain] App URL resolved (Che dev-proxy):', url);
-      return url;
-    }
-
-    // Check if we have a configured admin URL (deployed environment)
-    // Route app interface through admin-proxy using /app/:port path
-    if (this.config.adminUrl && !this.config.adminUrl.includes('localhost')) {
-      // Use admin URL base with /app/:port path
-      const baseUrl = this.config.adminUrl.replace(/\/$/, ''); // Remove trailing slash
-      const apiKeyParam = this.config.proxyApiKey
-        ? `?apiKey=${encodeURIComponent(this.config.proxyApiKey)}`
-        : '';
-      const url = `${baseUrl}/app/${port}${apiKeyParam}`;
-      console.log('[Holochain] App URL resolved (admin-proxy):', url);
-      return url;
-    }
-
-    // Default: direct localhost connection (works for local dev)
-    const url = `ws://localhost:${port}`;
-    console.log('[Holochain] App URL resolved (direct):', url);
-    return url;
+    return this.strategy.resolveAppUrl(this.buildConnectionConfig(), port);
   }
 
   /**
@@ -227,17 +238,22 @@ export class HolochainClientService {
   }
 
   /**
-   * Connect to Holochain conductor (full flow)
+   * Connect to Holochain conductor using the injected connection strategy.
    *
-   * Connection flow:
-   * 1. Connect to AdminWebsocket
-   * 2. Generate or restore signing credentials
-   * 3. Install app (if not already installed)
-   * 4. Attach app interface and get auth token
-   * 5. Connect to AppWebsocket with token
+   * The strategy handles the full 11-step connection flow:
+   * 1. Connect to AdminWebsocket (through proxy or direct)
+   * 2. Generate signing credentials
+   * 3. Generate agent key
+   * 4. Check/install app
+   * 5. Extract cell IDs (multi-DNA support)
+   * 6. Grant zome call capabilities
+   * 7. Register signing credentials
+   * 8. Find/create app interface
+   * 9. Authorize signing credentials
+   * 10. Issue app auth token
+   * 11. Connect to AppWebsocket
    *
-   * NOTE: Step 5 currently fails from browser because attachAppInterface
-   * returns a localhost port. Phase 2 will add app interface proxying.
+   * The service manages Angular state updates based on strategy results.
    */
   async connect(config?: Partial<HolochainConfig>): Promise<void> {
     if (config) {
@@ -247,158 +263,50 @@ export class HolochainClientService {
     this.updateState({ state: 'connecting' });
 
     try {
-      // Step 1: Connect to Admin WebSocket (through proxy or direct)
-      const adminUrl = this.resolveAdminUrl();
-      console.log('Connecting to admin:', adminUrl, { isChe: this.isCheEnvironment() });
+      // Delegate to connection strategy
+      const connectionConfig = this.buildConnectionConfig();
+      console.log(`[HolochainClient] Connecting via ${this.strategy.name} strategy...`);
 
-      // Browser uses native WebSocket - wsClientOptions.origin is for Node.js ws library only
-      // In browser, omit wsClientOptions to avoid passing it as WebSocket subprotocol
-      const adminWs = await AdminWebsocket.connect({ url: new URL(adminUrl) });
-
-      this.updateState({ adminWs });
-
-      // Step 2: Generate signing credentials
       this.updateState({ state: 'authenticating' });
+      const result = await this.strategy.connect(connectionConfig);
 
-      const [keyPair, signingKey] = await generateSigningKeyPair();
-      const capSecret = await randomCapSecret();
-
-      // Step 3: Generate agent key
-      const agentPubKey = await adminWs.generateAgentPubKey();
-      this.updateState({ agentPubKey });
-
-      // Step 4: Check if app is installed, install if needed
-      let appInfo = await this.getInstalledApp(adminWs);
-
-      if (!appInfo) {
-        // App not installed - need to install it
-        // Note: In production, the hApp should be pre-installed in the Edge Node
-        console.log(`App ${this.config.appId} not installed. Attempting installation...`);
-
-        if (this.config.happPath) {
-          appInfo = await adminWs.installApp({
-            source: { type: 'path', value: this.config.happPath },
-            installed_app_id: this.config.appId,
-            agent_key: agentPubKey,
-          });
-
-          await adminWs.enableApp({
-            installed_app_id: this.config.appId,
-          });
-        } else {
-          throw new Error(
-            `App ${this.config.appId} not installed and no happPath provided for installation`
-          );
-        }
+      if (!result.success) {
+        throw new Error(result.error || 'Connection failed');
       }
 
-      this.updateState({ appInfo });
+      // Update state from strategy result
+      const firstCellId = result.cellIds?.values().next().value ?? null;
 
-      // Step 5: Get all cell IDs from app info (multi-DNA support)
-      const cellIds = this.extractAllCellIds(appInfo);
-      if (cellIds.size === 0) {
-        throw new Error('Could not extract any cell IDs from app info');
-      }
-
-      // For backwards compatibility, also set the first cell as 'cellId'
-      const firstCellId = cellIds.values().next().value;
-      this.updateState({ cellId: firstCellId, cellIds });
-
-      console.log('[Holochain] Found', cellIds.size, 'cells:', Array.from(cellIds.keys()));
-
-      // Step 6: Grant zome call capability for ALL cells (multi-DNA)
-      for (const [roleName, cellId] of cellIds) {
-        await adminWs.grantZomeCallCapability({
-          cell_id: cellId,
-          cap_grant: {
-            tag: `browser-signing-${roleName}`,
-            functions: { type: 'all' },
-            access: {
-              type: 'assigned',
-              value: {
-                secret: capSecret,
-                assignees: [signingKey],
-              },
-            },
-          },
-        });
-        console.log(`[Holochain] Granted cap for role '${roleName}'`);
-      }
-
-      // Step 7: Register signing credentials for ALL cells
-      for (const [, cellId] of cellIds) {
-        setSigningCredentials(cellId, {
-          capSecret,
-          keyPair,
-          signingKey,
-        });
-      }
-
-      // Store credentials for persistence (optional)
-      this.storeSigningCredentials({ capSecret, keyPair, signingKey });
-
-      // Step 8: Find or create app interface
-      // First check for existing app interfaces to avoid creating duplicates
-      const existingInterfaces = await adminWs.listAppInterfaces();
-      let appPort: number;
-
-      if (existingInterfaces.length > 0) {
-        // Use the first existing app interface
-        appPort = existingInterfaces[0].port;
-        console.log(`[Holochain] Using existing app interface on port ${appPort}`);
-      } else {
-        // No existing interface, create one
-        // Use "*" for allowed_origins because the proxy handles authentication
-        // and may connect with different origins (browser origin, localhost, etc.)
-        const { port } = await adminWs.attachAppInterface({
-          allowed_origins: '*',
-        });
-        appPort = port;
-        console.log(`[Holochain] Created new app interface on port ${appPort}`);
-      }
-
-      // Step 9: Authorize signing credentials for ALL cells (multi-DNA)
-      for (const [roleName, cellId] of cellIds) {
-        await adminWs.authorizeSigningCredentials(cellId);
-        console.log(`[Holochain] Signing credentials authorized for role '${roleName}'`);
-      }
-
-      // Step 10: Get app authentication token
-      const issuedToken = await adminWs.issueAppAuthenticationToken({
-        installed_app_id: this.config.appId,
-        single_use: false,
-        expiry_seconds: 3600, // 1 hour
-      });
-
-      // Step 11: Connect to App WebSocket
-      // In Che: routes through dev-proxy path-based URL
-      // Local: connects directly to localhost:port
-      const appUrl = this.resolveAppUrl(appPort);
-      console.log('[Holochain] Connecting to app interface:', appUrl);
-
-      const appWs = await AppWebsocket.connect({
-        url: new URL(appUrl),
-        token: issuedToken.token,
-      });
-
-      // Success!
       this.updateState({
         state: 'connected',
-        appWs,
+        adminWs: result.adminWs ?? null,
+        appWs: result.appWs ?? null,
+        agentPubKey: result.agentPubKey ?? null,
+        cellId: firstCellId,
+        cellIds: result.cellIds ?? new Map(),
+        appInfo: result.appInfo ?? null,
         connectedAt: new Date(),
         error: undefined,
       });
 
+      // Store signing credentials from strategy for persistence
+      const credentials = this.strategy.getSigningCredentials();
+      if (credentials) {
+        this.storeSigningCredentials(credentials);
+      }
+
       // Reset error logging flag on successful connection
       this.connectionErrorLogged = false;
 
-      console.log('Connected to Holochain conductor', {
+      console.log(`[HolochainClient] Connected via ${this.strategy.name}`, {
         appId: this.config.appId,
-        agentPubKey: this.encodeAgentPubKey(agentPubKey),
+        agentPubKey: result.agentPubKey ? this.encodeAgentPubKey(result.agentPubKey) : 'N/A',
+        cellCount: result.cellIds?.size ?? 0,
+        mode: this.strategy.mode,
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown connection error';
-      console.error('Holochain connection failed:', errorMessage);
+      console.error(`[HolochainClient] Connection failed (${this.strategy.name}):`, errorMessage);
 
       this.updateState({
         state: 'error',
@@ -410,20 +318,14 @@ export class HolochainClientService {
   }
 
   /**
-   * Disconnect from Holochain conductor
+   * Disconnect from Holochain conductor using the connection strategy.
    */
   async disconnect(): Promise<void> {
-    const { adminWs, appWs } = this.connectionSignal();
-
     try {
-      if (appWs) {
-        await appWs.client.close();
-      }
-      if (adminWs) {
-        await adminWs.client.close();
-      }
+      await this.strategy.disconnect();
+      console.log(`[HolochainClient] Disconnected (${this.strategy.name})`);
     } catch (err) {
-      console.warn('Error during disconnect:', err);
+      console.warn('[HolochainClient] Error during disconnect:', err);
     }
 
     this.connectionSignal.set(INITIAL_CONNECTION_STATE);
