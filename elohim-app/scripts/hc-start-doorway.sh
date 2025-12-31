@@ -10,8 +10,9 @@ HC_DIR="$APP_DIR/../holochain"
 LOCAL_DEV_DIR="$HC_DIR/local-dev"
 HAPP_PATH="$HC_DIR/dna/elohim/workdir/elohim.happ"
 HC_PORTS_FILE="$LOCAL_DEV_DIR/.hc_ports"
-DOORWAY_BIN="$HC_DIR/doorway/target/release/doorway"
-STORAGE_BIN="$HC_DIR/elohim-storage/target/release/elohim-storage"
+# Binaries are in workspace target dir (holochain/target/release/)
+DOORWAY_BIN="$HC_DIR/target/release/doorway"
+STORAGE_BIN="$HC_DIR/target/release/elohim-storage"
 STORAGE_DIR="/tmp/elohim-storage"
 
 echo "🚪 Starting Holochain Development Stack (Doorway + Storage)..."
