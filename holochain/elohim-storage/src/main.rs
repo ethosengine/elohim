@@ -40,6 +40,7 @@
 
 use clap::Parser;
 use elohim_storage::{BlobStore, Config, HttpServer, ImportHandler, ImportHandlerConfig};
+use elohim_storage::{ProgressHub, ProgressHubConfig};
 use elohim_storage::import_api::{ImportApi, ImportApiConfig};
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -136,9 +137,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Initialize blob store
     let blob_store = Arc::new(BlobStore::new(config.blobs_dir()).await?);
 
+    // Create progress hub for WebSocket streaming
+    let progress_hub = Arc::new(ProgressHub::new(ProgressHubConfig::default()));
+    info!("Progress hub initialized for WebSocket streaming");
+
     // Start HTTP server for shard API
     let http_addr: SocketAddr = format!("0.0.0.0:{}", config.http_port).parse()?;
-    let mut http_server = HttpServer::new(blob_store.clone(), http_addr);
+    let mut http_server = HttpServer::new(blob_store.clone(), http_addr)
+        .with_progress_hub(Arc::clone(&progress_hub));
 
     info!("HTTP API available at http://{}", http_addr);
     info!("Endpoints:");
@@ -155,6 +161,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         info!("Import API enabled");
         info!("  POST /import/queue           - Queue import batch");
         info!("  GET  /import/status/{{batch}} - Get import status");
+        info!("  WS   /import/progress        - WebSocket progress stream");
         info!("  Conductor app URL: {}", args.app_url);
 
         let mut import_api = ImportApi::new(
@@ -165,7 +172,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 ..Default::default()
             },
             blob_store.clone(),
-        );
+        ).with_progress_hub(Arc::clone(&progress_hub));
 
         // Connect to conductor
         match import_api.connect_conductor().await {

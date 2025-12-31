@@ -6,7 +6,7 @@
 //!
 //! - **Holochain DNA**: Stores metadata/provenance (BlobEntry)
 //! - **elohim-storage**: Stores actual blob data locally
-//! - **P2P Signals**: Request/transfer blobs between nodes
+//! - **P2P Network**: Request/transfer blobs between nodes via rust-libp2p
 //!
 //! ## Why Separate from Holochain DHT?
 //!
@@ -25,9 +25,15 @@
 //! │   ├── sha256-abc123...   # First 2 chars of hash as subdirs
 //! │   └── sha256-def456...
 //! ├── meta.sled/             # Metadata database
+//! ├── identity.key           # libp2p keypair (if p2p feature enabled)
 //! └── config.toml            # Configuration
 //! ```
+//!
+//! ## Features
+//!
+//! - `p2p` - Enable rust-libp2p for P2P shard transfer
 
+// Core modules (always available)
 pub mod blob_store;
 pub mod metadata;
 pub mod config;
@@ -38,7 +44,23 @@ pub mod http;
 pub mod import_handler;
 pub mod conductor_client;
 pub mod import_api;
+pub mod progress_hub;
+pub mod progress_ws;
 
+// P2P identity and discovery (always available, but some types require p2p feature)
+pub mod identity;
+pub mod content_server;
+
+// P2P network modules (require p2p feature)
+#[cfg(feature = "p2p")]
+pub mod p2p;
+
+// Sovereignty and cluster modules
+pub mod sovereignty;
+#[cfg(feature = "p2p")]
+pub mod cluster;
+
+// Re-exports
 pub use blob_store::BlobStore;
 pub use metadata::MetadataDb;
 pub use config::Config;
@@ -46,3 +68,11 @@ pub use error::StorageError;
 pub use sharding::{ShardEncoder, ShardManifest, ShardConfig};
 pub use http::HttpServer;
 pub use import_handler::{ImportHandler, ImportHandlerConfig, ImportProgress};
+pub use progress_hub::{ProgressHub, ProgressHubConfig, ProgressMessage};
+
+// P2P re-exports
+pub use identity::{NodeCapabilities, NodeIdentityInfo};
+pub use content_server::{ContentServerBridge, ContentServerConfig, PublisherInfo};
+
+#[cfg(feature = "p2p")]
+pub use identity::NodeIdentity;

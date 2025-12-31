@@ -625,6 +625,15 @@ async fn handle_request(
             to_boxed(routes::handle_api_request(state, p, query, Some(remote_ip), auth_header).await)
         }
 
+        // WebSocket import progress (proxy to elohim-storage)
+        // GET /import/progress - WebSocket upgrade for real-time progress
+        (Method::GET, "/import/progress") if hyper_tungstenite::is_upgrade_request(&req) => {
+            info!("WebSocket upgrade request for /import/progress");
+            return Ok(to_boxed(
+                routes::handle_import_progress_ws(req, state.args.storage_url.clone()).await
+            ));
+        }
+
         // Dynamic import routes (forwarded to elohim-storage)
         // POST /import/{batch_type} - queue import → forward to storage
         // GET /import/{batch_type}/{batch_id} - get status → forward to storage

@@ -7,6 +7,7 @@ pub mod blob;
 pub mod dashboard_ws;
 pub mod health;
 pub mod import;
+pub mod import_ws;
 pub mod seed;
 pub mod status;
 pub mod stream;
@@ -24,6 +25,7 @@ pub use blob::{
 pub use dashboard_ws::handle_dashboard_ws;
 pub use health::{health_check, readiness_check};
 pub use import::{handle_import_request, match_import_route};
+pub use import_ws::handle_import_progress_ws;
 pub use seed::{handle_seed_blob, handle_check_blob, BlobUploadResponse};
 pub use status::status_check;
 pub use stream::handle_stream_request;

@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import DoorwayClient, { ImportStatusResponse } from './doorway-client.js';
 import StorageClient from './storage-client.js'; // Used for computing blob hash
+import { ProgressClient, waitForBatchCompletion, waitWithFallback, type ProgressMessage } from './progress-client.js';
 
 // ========================================
 // PERFORMANCE TIMING UTILITIES
@@ -718,54 +719,114 @@ async function seedViaDoorway() {
 
     console.log(`   ✅ Import queued: ${queueResult.batch_id} (${queueResult.queued_count} items)`);
 
-    // Step 3: Poll for completion (optional)
+    // Step 3: Wait for completion with real-time progress
+    const USE_WEBSOCKET = process.env.SEED_USE_WEBSOCKET !== 'false';
     const POLL_STATUS = process.env.SEED_POLL_STATUS !== 'false';
     const POLL_INTERVAL_MS = parseInt(process.env.SEED_POLL_INTERVAL || '5000', 10);
     const POLL_TIMEOUT_MS = parseInt(process.env.SEED_POLL_TIMEOUT || '300000', 10);
 
     if (POLL_STATUS) {
       console.log(`   ⏳ Waiting for import to complete...`);
-      console.log(`      (Poll interval=${POLL_INTERVAL_MS}ms, timeout=${POLL_TIMEOUT_MS}ms)`);
 
-      const startTime = Date.now();
-      let lastProcessed = 0;
-      let finalStatus: ImportStatusResponse | null = null;
+      if (USE_WEBSOCKET) {
+        // WebSocket-based real-time progress streaming
+        console.log(`      (Using WebSocket progress stream)`);
 
-      while (Date.now() - startTime < POLL_TIMEOUT_MS) {
-        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+        try {
+          const finalStatus = await waitWithFallback(
+            DOORWAY_URL!,
+            batchId,
+            {
+              timeoutMs: POLL_TIMEOUT_MS,
+              pollIntervalMs: POLL_INTERVAL_MS,
+              onProgress: (update) => {
+                if (update.processed_count !== undefined && update.total_items !== undefined) {
+                  const pct = ((update.processed_count / update.total_items) * 100).toFixed(1);
+                  const rate = update.items_per_second ? ` (${update.items_per_second.toFixed(1)}/s)` : '';
+                  console.log(`      Progress: ${update.processed_count}/${update.total_items} (${pct}%)${rate} - ${update.status}`);
+                }
+              }
+            },
+            async (pollBatchId) => {
+              // Fallback polling function
+              const status = await doorwayClient.getImportStatus('content', pollBatchId);
+              if (!status) return null;
+              return {
+                type: 'progress' as const,
+                batch_id: pollBatchId,
+                status: status.status,
+                total_items: status.total_items,
+                processed_count: status.processed_count,
+                error_count: status.error_count,
+                errors: status.errors,
+              };
+            }
+          );
 
-        const status = await doorwayClient.getImportStatus('content', batchId);
-        if (!status) {
-          console.warn(`      ⚠️ Batch ${batchId} not found`);
-          break;
-        }
-
-        if (status.processed_count !== lastProcessed) {
-          const pct = ((status.processed_count / status.total_items) * 100).toFixed(1);
-          console.log(`      Progress: ${status.processed_count}/${status.total_items} (${pct}%) - ${status.status}`);
-          lastProcessed = status.processed_count;
-        }
-
-        if (status.status === 'completed' || status.status === 'failed') {
-          finalStatus = status;
-          break;
-        }
-      }
-
-      if (finalStatus) {
-        if (finalStatus.error_count > 0 && finalStatus.errors.length > 0) {
-          console.log(`   ⚠️ ${finalStatus.errors.length} errors during import:`);
-          for (const err of finalStatus.errors.slice(0, 5)) {
-            console.error(`      • ${err}`);
+          // Handle final status
+          if (finalStatus.error_count && finalStatus.error_count > 0 && finalStatus.errors?.length) {
+            console.log(`   ⚠️ ${finalStatus.errors.length} errors during import:`);
+            for (const err of finalStatus.errors.slice(0, 5)) {
+              console.error(`      • ${err}`);
+            }
+            if (finalStatus.errors.length > 5) {
+              console.error(`      ... and ${finalStatus.errors.length - 5} more`);
+            }
           }
-          if (finalStatus.errors.length > 5) {
-            console.error(`      ... and ${finalStatus.errors.length - 5} more`);
-          }
+
+          const succeeded = (finalStatus.processed_count ?? 0) - (finalStatus.error_count ?? 0);
+          const elapsed = finalStatus.elapsed_ms ? ` (${(finalStatus.elapsed_ms / 1000).toFixed(1)}s` : '';
+          const rate = finalStatus.items_per_second ? `, ${finalStatus.items_per_second.toFixed(0)} items/sec)` : elapsed ? ')' : '';
+          console.log(`   ✅ Content import ${finalStatus.status}: ${succeeded} succeeded, ${finalStatus.error_count ?? 0} failed${elapsed}${rate}`);
+
+        } catch (wsError) {
+          console.error(`   ❌ Import wait failed: ${wsError}`);
         }
-        console.log(`   ✅ Content import ${finalStatus.status}: ${finalStatus.processed_count - finalStatus.error_count} succeeded, ${finalStatus.error_count} failed`);
+
       } else {
-        console.warn(`   ⚠️ Polling timeout - batch may still be processing`);
-        console.log(`      Check status: GET ${DOORWAY_URL}/import/content/${batchId}`);
+        // HTTP polling fallback (legacy behavior, SEED_USE_WEBSOCKET=false)
+        console.log(`      (HTTP polling: interval=${POLL_INTERVAL_MS}ms, timeout=${POLL_TIMEOUT_MS}ms)`);
+
+        const startTime = Date.now();
+        let lastProcessed = 0;
+        let finalStatus: ImportStatusResponse | null = null;
+
+        while (Date.now() - startTime < POLL_TIMEOUT_MS) {
+          await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+
+          const status = await doorwayClient.getImportStatus('content', batchId);
+          if (!status) {
+            console.warn(`      ⚠️ Batch ${batchId} not found`);
+            break;
+          }
+
+          if (status.processed_count !== lastProcessed) {
+            const pct = ((status.processed_count / status.total_items) * 100).toFixed(1);
+            console.log(`      Progress: ${status.processed_count}/${status.total_items} (${pct}%) - ${status.status}`);
+            lastProcessed = status.processed_count;
+          }
+
+          if (status.status === 'completed' || status.status === 'failed') {
+            finalStatus = status;
+            break;
+          }
+        }
+
+        if (finalStatus) {
+          if (finalStatus.error_count > 0 && finalStatus.errors.length > 0) {
+            console.log(`   ⚠️ ${finalStatus.errors.length} errors during import:`);
+            for (const err of finalStatus.errors.slice(0, 5)) {
+              console.error(`      • ${err}`);
+            }
+            if (finalStatus.errors.length > 5) {
+              console.error(`      ... and ${finalStatus.errors.length - 5} more`);
+            }
+          }
+          console.log(`   ✅ Content import ${finalStatus.status}: ${finalStatus.processed_count - finalStatus.error_count} succeeded, ${finalStatus.error_count} failed`);
+        } else {
+          console.warn(`   ⚠️ Polling timeout - batch may still be processing`);
+          console.log(`      Check status: GET ${DOORWAY_URL}/import/content/${batchId}`);
+        }
       }
     } else {
       console.log(`   ℹ️ Not polling - batch queued for background processing`);

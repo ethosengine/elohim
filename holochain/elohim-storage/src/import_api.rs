@@ -42,6 +42,7 @@ use tracing::{debug, error, info, warn};
 use crate::blob_store::BlobStore;
 use crate::conductor_client::{ConductorClient, ConductorClientConfig};
 use crate::error::StorageError;
+use crate::progress_hub::ProgressHub;
 
 // ============================================================================
 // Request/Response Types
@@ -165,6 +166,8 @@ pub struct ImportApi {
     conductor: Option<Arc<ConductorClient>>,
     /// Active batches by ID
     batches: Arc<RwLock<HashMap<String, ImportBatch>>>,
+    /// Progress hub for WebSocket streaming
+    progress_hub: Option<Arc<ProgressHub>>,
 }
 
 impl ImportApi {
@@ -175,7 +178,14 @@ impl ImportApi {
             blob_store,
             conductor: None,
             batches: Arc::new(RwLock::new(HashMap::new())),
+            progress_hub: None,
         }
+    }
+
+    /// Set the progress hub for WebSocket streaming
+    pub fn with_progress_hub(mut self, hub: Arc<ProgressHub>) -> Self {
+        self.progress_hub = Some(hub);
+        self
     }
 
     /// Initialize conductor connection
@@ -304,6 +314,11 @@ impl ImportApi {
             batches.insert(batch_id.clone(), batch);
         }
 
+        // Register with progress hub for WebSocket streaming
+        if let Some(ref hub) = self.progress_hub {
+            hub.register_batch(&batch_id, &request.batch_type, total_items).await;
+        }
+
         info!(
             batch_id = %batch_id,
             batch_type = %request.batch_type,
@@ -426,6 +441,7 @@ impl ImportApi {
             blob_store: Arc::clone(&self.blob_store),
             conductor: self.conductor.clone(),
             batches: Arc::clone(&self.batches),
+            progress_hub: self.progress_hub.clone(),
         }
     }
 }
@@ -436,6 +452,7 @@ struct ImportApiProcessor {
     blob_store: Arc<BlobStore>,
     conductor: Option<Arc<ConductorClient>>,
     batches: Arc<RwLock<HashMap<String, ImportBatch>>>,
+    progress_hub: Option<Arc<ProgressHub>>,
 }
 
 impl ImportApiProcessor {
@@ -603,24 +620,34 @@ impl ImportApiProcessor {
     }
 
     async fn update_progress(&self, batch_id: &str, processed: u32, errors: u32) {
-        let mut batches = self.batches.write().await;
-        if let Some(batch) = batches.get_mut(batch_id) {
-            batch.processed_count = processed;
-            batch.error_count = errors;
+        let response = {
+            let mut batches = self.batches.write().await;
+            if let Some(batch) = batches.get_mut(batch_id) {
+                batch.processed_count = processed;
+                batch.error_count = errors;
 
-            // Broadcast progress
-            let elapsed = batch.started_at.elapsed();
-            let response = ImportStatusResponse {
-                batch_id: batch.batch_id.clone(),
-                status: batch.status,
-                total_items: batch.total_items,
-                processed_count: processed,
-                error_count: errors,
-                errors: batch.errors.clone(),
-                elapsed_ms: elapsed.as_millis() as u64,
-                items_per_second: processed as f64 / elapsed.as_secs_f64().max(0.001),
-            };
-            let _ = batch.progress_tx.send(response);
+                // Broadcast progress to per-batch channel
+                let elapsed = batch.started_at.elapsed();
+                let response = ImportStatusResponse {
+                    batch_id: batch.batch_id.clone(),
+                    status: batch.status,
+                    total_items: batch.total_items,
+                    processed_count: processed,
+                    error_count: errors,
+                    errors: batch.errors.clone(),
+                    elapsed_ms: elapsed.as_millis() as u64,
+                    items_per_second: processed as f64 / elapsed.as_secs_f64().max(0.001),
+                };
+                let _ = batch.progress_tx.send(response.clone());
+                Some(response)
+            } else {
+                None
+            }
+        };
+
+        // Also broadcast to global progress hub
+        if let (Some(response), Some(ref hub)) = (response, &self.progress_hub) {
+            hub.update_progress(&response).await;
         }
     }
 

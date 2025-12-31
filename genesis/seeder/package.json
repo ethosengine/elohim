@@ -31,10 +31,12 @@
     "hc:start:snapshot": "hc sandbox run --root /projects/elohim/holochain/local-dev/conductor-data -p=4445"
   },
   "dependencies": {
-    "@holochain/client": "^0.20.1"
+    "@holochain/client": "^0.20.1",
+    "ws": "^8.16.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.10",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
   }

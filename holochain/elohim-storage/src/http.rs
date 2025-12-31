@@ -35,6 +35,8 @@
 use crate::blob_store::BlobStore;
 use crate::error::StorageError;
 use crate::import_api::ImportApi;
+use crate::progress_hub::ProgressHub;
+use crate::progress_ws;
 use crate::sharding::{ShardEncoder, ShardManifest};
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
@@ -57,6 +59,8 @@ pub struct HttpServer {
     bind_addr: SocketAddr,
     /// Optional Import API for handling /import/* routes
     import_api: Option<Arc<RwLock<ImportApi>>>,
+    /// Progress hub for WebSocket streaming
+    progress_hub: Option<Arc<ProgressHub>>,
 }
 
 impl HttpServer {
@@ -67,12 +71,19 @@ impl HttpServer {
             manifests: Arc::new(RwLock::new(std::collections::HashMap::new())),
             bind_addr,
             import_api: None,
+            progress_hub: None,
         }
     }
 
     /// Set the Import API handler
     pub fn with_import_api(mut self, import_api: Arc<RwLock<ImportApi>>) -> Self {
         self.import_api = Some(import_api);
+        self
+    }
+
+    /// Set the Progress Hub for WebSocket streaming
+    pub fn with_progress_hub(mut self, hub: Arc<ProgressHub>) -> Self {
+        self.progress_hub = Some(hub);
         self
     }
 
@@ -144,6 +155,30 @@ impl HttpServer {
             (Method::GET, p) if p.starts_with("/manifest/") => {
                 let hash = p.strip_prefix("/manifest/").unwrap_or("");
                 self.handle_get_manifest(hash).await
+            }
+
+            // WebSocket upgrade for progress streaming
+            (Method::GET, "/import/progress") if progress_ws::is_websocket_upgrade(&req) => {
+                if let Some(ref hub) = self.progress_hub {
+                    match progress_ws::handle_progress_upgrade(req, Arc::clone(hub)).await {
+                        Ok(response) => Ok(response),
+                        Err(e) => {
+                            error!(error = %e, "WebSocket upgrade failed");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .body(Full::new(Bytes::from("WebSocket upgrade failed")))
+                                .unwrap())
+                        }
+                    }
+                } else {
+                    Ok(Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error": "Progress hub not enabled"}"#
+                        )))
+                        .unwrap())
+                }
             }
 
             // Import API (forwarded from doorway)
