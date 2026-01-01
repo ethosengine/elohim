@@ -213,6 +213,14 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             steps {
                 container('builder') {
                     script {
+                        // Ensure jq is available for JSON parsing
+                        sh '''
+                            command -v jq >/dev/null 2>&1 || {
+                                echo "Installing jq..."
+                                apt-get update -qq && apt-get install -y -qq jq 2>/dev/null || apk add --no-cache jq
+                            }
+                        '''
+
                         def targetHost = env.TARGET_HOST
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
                         def internalDoorway = env.INTERNAL_DOORWAY_URL
