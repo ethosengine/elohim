@@ -1,0 +1,219 @@
+{
+  "version": "1.0.0",
+  "description": "Failure categorization for CI/CD pipelines - enables Claude to quickly identify root causes and remediation steps",
+  "categories": {
+    "DNA_BUILD": {
+      "description": "Rust/WASM compilation failures in holochain DNA zomes",
+      "pipelines": ["elohim-holochain"],
+      "patterns": [
+        "error\\[E\\d+\\]",
+        "cargo build.*failed",
+        "getrandom backend",
+        "wasm32.*error",
+        "cannot find crate"
+      ],
+      "search_pattern": "error\\[E\\d+\\]|cargo build.*failed",
+      "context_lines": 5,
+      "max_matches": 10,
+      "common_causes": [
+        "Missing RUSTFLAGS='--cfg getrandom_backend=\"custom\"'",
+        "Incompatible dependency versions in Cargo.lock",
+        "Syntax errors in zome code",
+        "HDK version mismatch"
+      ],
+      "remediation": [
+        "Ensure RUSTFLAGS='--cfg getrandom_backend=\"custom\"' is set",
+        "Run `cargo build --target wasm32-unknown-unknown` locally",
+        "Verify Cargo.lock is committed",
+        "Check HDK version compatibility"
+      ],
+      "downstream_impact": ["elohim-edge", "elohim-genesis"]
+    },
+    "APP_BUILD": {
+      "description": "Angular/TypeScript compilation failures",
+      "pipelines": ["elohim"],
+      "patterns": [
+        "error TS\\d+",
+        "Cannot find module",
+        "Type.*is not assignable",
+        "Property.*does not exist",
+        "ng build.*failed"
+      ],
+      "search_pattern": "error TS\\d+|Cannot find module",
+      "context_lines": 3,
+      "max_matches": 20,
+      "common_causes": [
+        "Type mismatches after model changes",
+        "Missing imports",
+        "Circular dependencies",
+        "elohim-library not built first"
+      ],
+      "remediation": [
+        "Run `npm run build` locally in elohim-app",
+        "Check sync between elohim-service and elohim-app models",
+        "Verify elohim-library builds first",
+        "Check tsconfig.json path mappings"
+      ],
+      "downstream_impact": ["elohim-genesis"]
+    },
+    "INFRASTRUCTURE": {
+      "description": "Container build/push failures in elohim-edge (doorway, edgenode, storage)",
+      "pipelines": ["elohim-edge"],
+      "patterns": [
+        "hApp artifact not found",
+        "nerdctl.*error",
+        "COPY failed",
+        "harbor.*denied",
+        "ImagePullBackOff"
+      ],
+      "search_pattern": "hApp.*not found|nerdctl|denied|COPY failed",
+      "context_lines": 5,
+      "max_matches": 10,
+      "common_causes": [
+        "hApp not available from elohim-holochain pipeline",
+        "Docker build context issues",
+        "Harbor registry authentication expired",
+        "Missing build artifacts from upstream"
+      ],
+      "remediation": [
+        "Verify elohim-holochain pipeline succeeded first",
+        "Check artifact URL availability",
+        "Run with FORCE_BUILD=true if artifacts exist",
+        "Check Harbor credentials in Jenkins"
+      ],
+      "downstream_impact": ["elohim-genesis"]
+    },
+    "SEEDING": {
+      "description": "Genesis content seeding failures",
+      "pipelines": ["elohim-genesis"],
+      "patterns": [
+        "PREFLIGHT FAILED",
+        "conductor.*error",
+        "ETIMEDOUT",
+        "Cell not found",
+        "connection refused",
+        "WebSocket.*error"
+      ],
+      "search_pattern": "PREFLIGHT|ETIMEDOUT|Cell not found|connection refused",
+      "context_lines": 10,
+      "max_matches": 5,
+      "common_causes": [
+        "Doorway not ready or unhealthy",
+        "Conductor connectivity issues",
+        "Storage service unhealthy",
+        "Cell not discovered (lazy init failed)"
+      ],
+      "remediation": [
+        "Check https://doorway-dev.elohim.host/health",
+        "Verify elohim-edge deployed and healthy",
+        "Check HOLOCHAIN_ADMIN_URL configuration",
+        "Review doorway and storage pod logs"
+      ],
+      "downstream_impact": []
+    },
+    "DEPLOYMENT": {
+      "description": "Kubernetes deployment/rollout failures",
+      "pipelines": ["elohim", "elohim-edge"],
+      "patterns": [
+        "kubectl.*failed",
+        "rollout.*timeout",
+        "rollout.*failed",
+        "CrashLoopBackOff",
+        "OOMKilled"
+      ],
+      "search_pattern": "kubectl.*failed|rollout|CrashLoopBackOff|OOMKilled",
+      "context_lines": 5,
+      "max_matches": 10,
+      "common_causes": [
+        "Image not pushed to Harbor",
+        "ConfigMap missing or invalid",
+        "Resource limits exceeded",
+        "Rolling update timeout"
+      ],
+      "remediation": [
+        "Verify image exists in Harbor registry",
+        "Check ConfigMap exists (elohim-config-{env})",
+        "Review pod events: kubectl describe pod",
+        "Check resource quotas and limits"
+      ],
+      "downstream_impact": ["elohim-genesis"]
+    },
+    "TEST_FAILURE": {
+      "description": "Unit or E2E test failures",
+      "pipelines": ["elohim", "elohim-genesis"],
+      "patterns": [
+        "FAILED",
+        "Expected.*but",
+        "Timeout.*exceeded",
+        "AssertionError"
+      ],
+      "search_pattern": "FAILED|AssertionError|Expected.*but",
+      "context_lines": 5,
+      "max_matches": 15,
+      "common_causes": [
+        "Code regression introduced",
+        "Flaky test (intermittent failure)",
+        "Test environment configuration issue"
+      ],
+      "remediation": [
+        "Use mcp__jenkins__getTestResults to get failing tests",
+        "Use mcp__jenkins__getFlakyFailures for intermittent issues",
+        "Run tests locally: npm run test",
+        "Check test isolation"
+      ],
+      "downstream_impact": []
+    },
+    "HEALTH_CHECK": {
+      "description": "Post-deployment health verification failures",
+      "pipelines": ["elohim-orchestrator"],
+      "patterns": [
+        "unhealthy",
+        "HTTP [45]\\d\\d",
+        "health check failed"
+      ],
+      "search_pattern": "unhealthy|HTTP [45]\\d\\d|health check",
+      "context_lines": 3,
+      "max_matches": 5,
+      "common_causes": [
+        "Service still starting (need more wait time)",
+        "Misconfigured endpoints",
+        "Dependent service down"
+      ],
+      "remediation": [
+        "Wait for service stabilization (30-60s)",
+        "Check service logs: kubectl logs",
+        "Verify ingress configuration",
+        "Check dependent services health"
+      ],
+      "downstream_impact": []
+    }
+  },
+  "severity_levels": {
+    "CRITICAL": "Blocks all downstream pipelines, immediate action required",
+    "HIGH": "Blocks deployment or causes service outage",
+    "MEDIUM": "Causes degraded functionality, can wait for next deploy",
+    "LOW": "Cosmetic or non-blocking issue"
+  },
+  "pipeline_dependencies": {
+    "elohim-holochain": {
+      "upstream": [],
+      "downstream": ["elohim-edge", "elohim-genesis"],
+      "failure_message": "DNA build failed - will block edge infrastructure and seeding"
+    },
+    "elohim-edge": {
+      "upstream": ["elohim-holochain"],
+      "downstream": ["elohim-genesis"],
+      "failure_message": "Infrastructure failed - will block seeding"
+    },
+    "elohim": {
+      "upstream": [],
+      "downstream": ["elohim-genesis"],
+      "failure_message": "App build failed - may affect genesis verification"
+    },
+    "elohim-genesis": {
+      "upstream": ["elohim-holochain", "elohim-edge", "elohim"],
+      "downstream": [],
+      "failure_message": "Seeding failed - content not available"
+    }
+  }
+}

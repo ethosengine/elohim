@@ -165,13 +165,14 @@ export class CircuitBreakerService {
       };
     } catch (err) {
       this.recordFailure(name, circuit, err);
-      // State may have changed to OPEN after recordFailure - use type assertion
-      const currentState: CircuitState = circuit.state;
+      // State may have changed to OPEN after recordFailure
+      // Use string comparison to avoid TypeScript's control flow narrowing
+      const currentState = circuit.state as string;
       return {
         success: false,
         error: err instanceof Error ? err.message : String(err),
         circuitOpen: currentState === 'OPEN',
-        state: currentState,
+        state: circuit.state,
       };
     }
   }
