@@ -245,6 +245,8 @@ spec:
           env:
             - name: RUST_LOG
               value: "info,elohim_storage=debug"
+            - name: HOLOCHAIN_ADMIN_URL
+              value: "ws://localhost:4444"
             - name: HOLOCHAIN_APP_URL
               value: "ws://localhost:4445"
             - name: HOLOCHAIN_APP_ID
