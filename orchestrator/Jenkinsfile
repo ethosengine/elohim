@@ -99,6 +99,20 @@ def getGitCommitHash() {
     return sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
 }
 
+// CI Summary helpers for Claude triage
+def categorizeFailure(String p) {
+    ['elohim-holochain':'DNA_BUILD', 'elohim-edge':'INFRASTRUCTURE',
+     'elohim':'APP_BUILD', 'elohim-genesis':'SEEDING', 'elohim-steward':'DESKTOP_BUILD'][p] ?: 'UNKNOWN'
+}
+def getRemediationHint(String p) {
+    ['elohim-holochain':'Check RUSTFLAGS, cargo build locally',
+     'elohim-edge':'Check hApp artifact, Harbor creds',
+     'elohim':'Run npm run build locally',
+     'elohim-genesis':'Check doorway-dev.elohim.host/health',
+     'elohim-steward':'Check Tauri build, hApp artifact'][p] ?: 'Check logs'
+}
+def calculateTriagePriority(int f, int u) { f > 0 && u > 0 ? 'CRITICAL' : f > 0 ? 'HIGH' : u > 0 ? 'MEDIUM' : 'LOW' }
+
 def getGitCommitHashFull() {
     return sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
 }
@@ -740,6 +754,57 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                         if (result?.url) echo "     ${result.url}"
                     }
                 }
+
+                // Generate machine-readable CI summary for Claude consumption
+                def unhealthyCount = postflight.count { k, v -> !v?.healthy }
+                def ciSummary = [
+                    schema_version: "1.0.0",
+                    timestamp: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+                    orchestration: [
+                        build_number: env.BUILD_NUMBER,
+                        build_url: env.BUILD_URL,
+                        branch: env.BRANCH_NAME,
+                        commit: env.GIT_COMMIT_SHORT ?: 'unknown',
+                        mode: params.MODE,
+                        duration_seconds: (System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000
+                    ],
+                    pipelines: results.collect { name, r ->
+                        [
+                            name: name,
+                            status: r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE'),
+                            url: r?.url,
+                            duration_ms: r?.duration,
+                            category: r?.success ? null : categorizeFailure(name),
+                            remediation_hint: r?.success ? null : getRemediationHint(name)
+                        ]
+                    },
+                    health: [
+                        preflight: preflight,
+                        postflight: postflight,
+                        degraded_services: postflight.findAll { k, v -> !v?.healthy }.keySet().toList()
+                    ],
+                    deployment: [
+                        verified: verification.every { k, v -> v?.match },
+                        verification_results: verification,
+                        mismatches: verification.findAll { k, v -> !v?.match }.keySet().toList()
+                    ],
+                    summary: [
+                        overall_status: failCount > 0 ? 'FAILURE' : (unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
+                        builds_succeeded: successCount,
+                        builds_failed: failCount,
+                        services_healthy: healthyCount,
+                        services_total: postflight.size(),
+                        failed_pipelines: results.findAll { k, v -> !v?.success }.keySet().toList(),
+                        triage_priority: calculateTriagePriority(failCount, unhealthyCount),
+                        action_required: failCount > 0 ? results.findAll { k, v -> !v?.success }.collect { name, r ->
+                            "${name}: ${getRemediationHint(name)}"
+                        } : []
+                    ]
+                ]
+
+                writeJSON file: 'ci-summary.json', json: ciSummary, pretty: 2
+                archiveArtifacts artifacts: 'ci-summary.json', allowEmptyArchive: false
+                echo "📋 CI Summary archived: ${env.BUILD_URL}artifact/ci-summary.json"
             }
         }
     }

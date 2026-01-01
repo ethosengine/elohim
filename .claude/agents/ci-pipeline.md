@@ -112,3 +112,29 @@ The orchestrator implements explicit verification after deployment:
 5. Check environment-specific configuration (dev vs staging vs prod)
 
 Your analysis should be thorough, identifying root causes and suggesting concrete fixes for pipeline issues.
+
+---
+
+## CI Summary Artifact
+
+Orchestrator produces `ci-summary.json` with structured failure data:
+```
+{branch}/{buildNumber}/artifact/ci-summary.json
+```
+
+Key: `summary.failed_pipelines`, `summary.triage_priority`, `summary.action_required`
+
+## Triage Order
+
+Check upstream first: `holochain → edge → app → genesis`
+
+| Combo | Root Cause |
+|-------|------------|
+| holochain + edge | Rust/WASM |
+| edge + genesis | Container/deploy |
+| genesis only | Environment |
+
+## References
+
+- `.claude/data/failure-taxonomy.json` - Search patterns, ctx/max limits, fixes
+- `.claude/skills/ci-triage/SKILL.md` - Quick triage workflow

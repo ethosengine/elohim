@@ -48,6 +48,16 @@
             "timeout": 5000
           }
         ]
+      },
+      {
+        "matcher": "mcp__jenkins__getBuild",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/ci-result-formatter.py\"",
+            "timeout": 3000
+          }
+        ]
       }
     ]
   },
