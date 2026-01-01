@@ -232,6 +232,7 @@ fn parse_cell_id_from_apps(
                             for cell in cell_arr {
                                 if let Value::Map(cell_map) = cell {
                                     // Try Holochain 0.3+ provisioned format first
+                                    // Format: { type: "provisioned", value: { cell_id: { dna_hash, agent_pub_key } } }
                                     if let Some((dna, agent)) = extract_provisioned_cell_id(cell_map) {
                                         let cell_id_value = Value::Array(vec![
                                             Value::Binary(dna.clone()),
@@ -251,6 +252,32 @@ fn parse_cell_id_from_apps(
                                             role = ?role_name,
                                             dna_hash = %hex::encode(&dna[..8.min(dna.len())]),
                                             "Discovered cell_id (provisioned format)"
+                                        );
+
+                                        return Ok(buf);
+                                    }
+
+                                    // Try JS client format: { provisioned: { cell_id: [dna, agent] } }
+                                    // This is the format returned by @holochain/client JS library
+                                    if let Some((dna, agent)) = extract_js_provisioned_cell_id(cell_map) {
+                                        let cell_id_value = Value::Array(vec![
+                                            Value::Binary(dna.clone()),
+                                            Value::Binary(agent.clone()),
+                                        ]);
+                                        let mut buf = Vec::new();
+                                        rmpv::encode::write_value(&mut buf, &cell_id_value)
+                                            .map_err(|e| {
+                                                StorageError::Parse(format!(
+                                                    "Failed to serialize cell_id: {}",
+                                                    e
+                                                ))
+                                            })?;
+
+                                        info!(
+                                            app_id = app_id,
+                                            role = ?role_name,
+                                            dna_hash = %hex::encode(&dna[..8.min(dna.len())]),
+                                            "Discovered cell_id (JS client format)"
                                         );
 
                                         return Ok(buf);
@@ -385,6 +412,39 @@ fn extract_provisioned_cell_id(cell_map: &[(Value, Value)]) -> Option<(Vec<u8>, 
     }
 }
 
+/// Extract cell_id from JS client format
+/// Format: { provisioned: { cell_id: [dna, agent] } }
+/// This is returned by @holochain/client when calling list_apps
+fn extract_js_provisioned_cell_id(cell_map: &[(Value, Value)]) -> Option<(Vec<u8>, Vec<u8>)> {
+    // Check if "provisioned" is a key in the map (not a type value)
+    let provisioned = get_field(cell_map, "provisioned")?;
+    let provisioned_map = match provisioned {
+        Value::Map(m) => m,
+        _ => return None,
+    };
+
+    // Get cell_id from provisioned object
+    let cell_id = get_field(provisioned_map, "cell_id")?;
+
+    match cell_id {
+        // Format: [dna, agent] as binary arrays
+        Value::Array(arr) if arr.len() >= 2 => {
+            let dna = if let Value::Binary(b) = &arr[0] { Some(b.clone()) } else { None }?;
+            let agent = if let Value::Binary(b) = &arr[1] { Some(b.clone()) } else { None }?;
+            Some((dna, agent))
+        }
+        // Also handle map format: { dna_hash, agent_pub_key }
+        Value::Map(id_map) => {
+            let dna = get_field(id_map, "dna_hash")
+                .and_then(|v| if let Value::Binary(b) = v { Some(b.clone()) } else { None })?;
+            let agent = get_field(id_map, "agent_pub_key")
+                .and_then(|v| if let Value::Binary(b) = v { Some(b.clone()) } else { None })?;
+            Some((dna, agent))
+        }
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -417,6 +477,41 @@ mod tests {
 
         let result = parse_cell_id_from_apps(&response, "elohim", Some("lamad"));
         assert!(result.is_ok());
+        let cell_id = result.unwrap();
+        assert!(!cell_id.is_empty());
+    }
+
+    #[test]
+    fn test_parse_js_client_format() {
+        // JS client format: { provisioned: { cell_id: [dna, agent] } }
+        let response = Value::Map(vec![
+            (Value::String("type".into()), Value::String("apps_listed".into())),
+            (
+                Value::String("data".into()),
+                Value::Array(vec![Value::Map(vec![
+                    (Value::String("installed_app_id".into()), Value::String("elohim".into())),
+                    (
+                        Value::String("cell_info".into()),
+                        Value::Map(vec![(
+                            Value::String("lamad".into()),
+                            Value::Array(vec![Value::Map(vec![(
+                                Value::String("provisioned".into()),
+                                Value::Map(vec![(
+                                    Value::String("cell_id".into()),
+                                    Value::Array(vec![
+                                        Value::Binary(vec![1, 2, 3, 4]),  // dna_hash
+                                        Value::Binary(vec![5, 6, 7, 8]),  // agent_pub_key
+                                    ]),
+                                )]),
+                            )])]),
+                        )]),
+                    ),
+                ])]),
+            ),
+        ]);
+
+        let result = parse_cell_id_from_apps(&response, "elohim", Some("lamad"));
+        assert!(result.is_ok(), "Should parse JS client format: {:?}", result);
         let cell_id = result.unwrap();
         assert!(!cell_id.is_empty());
     }
