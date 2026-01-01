@@ -226,32 +226,103 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             echo "✅ Target site responding: ${targetHost}"
                         """
 
-                        echo "Verifying Doorway API (internal): ${internalDoorway}"
+                        // Use /status endpoint for comprehensive preflight checks
+                        // This includes: conductor connectivity, storage health, cell discovery
+                        echo "Verifying Doorway readiness (internal): ${internalDoorway}"
                         sh """#!/bin/bash
                             set -euo pipefail
 
                             MAX_ATTEMPTS=30
                             ATTEMPT=1
+                            DOORWAY_READY=false
+                            DOORWAY_BASE_URL=""
 
+                            # First, wait for doorway to be reachable
                             while [ \$ATTEMPT -le \$MAX_ATTEMPTS ]; do
+                                # Try internal DNS first
                                 if curl -sf -o /dev/null "http://${internalDoorway}/health" 2>/dev/null; then
-                                    echo "✅ Doorway API responding (via internal DNS)"
+                                    DOORWAY_BASE_URL="http://${internalDoorway}"
+                                    echo "✅ Doorway responding (via internal DNS)"
                                     break
                                 fi
-                                echo "Waiting for Doorway API... (attempt \$ATTEMPT/\$MAX_ATTEMPTS)"
+                                # Fall back to external DNS
+                                if curl -sf -o /dev/null "${doorwayHost}/health" 2>/dev/null; then
+                                    DOORWAY_BASE_URL="${doorwayHost}"
+                                    echo "✅ Doorway responding (via external DNS)"
+                                    break
+                                fi
+                                echo "Waiting for Doorway... (attempt \$ATTEMPT/\$MAX_ATTEMPTS)"
                                 sleep 5
                                 ATTEMPT=\$((ATTEMPT + 1))
                             done
 
-                            if [ \$ATTEMPT -gt \$MAX_ATTEMPTS ]; then
-                                echo "⚠️ Internal DNS failed, trying external..."
-                                if curl -sf -o /dev/null "${doorwayHost}/health" 2>/dev/null; then
-                                    echo "✅ Doorway API responding (via external DNS)"
-                                else
-                                    echo "❌ Doorway API not responding"
-                                    exit 1
-                                fi
+                            if [ -z "\$DOORWAY_BASE_URL" ]; then
+                                echo "❌ Doorway not responding after \$MAX_ATTEMPTS attempts"
+                                exit 1
                             fi
+
+                            # Now use /status for comprehensive preflight checks
+                            echo ""
+                            echo "════════════════════════════════════════════════════════════"
+                            echo "🔍 PREFLIGHT CHECKS"
+                            echo "════════════════════════════════════════════════════════════"
+
+                            PREFLIGHT_ATTEMPTS=0
+                            PREFLIGHT_MAX=24  # 2 minutes with 5s intervals
+                            CONDUCTOR_READY=false
+
+                            while [ \$PREFLIGHT_ATTEMPTS -lt \$PREFLIGHT_MAX ]; do
+                                STATUS_JSON=\$(curl -sf "\$DOORWAY_BASE_URL/status" 2>/dev/null || echo '{}')
+
+                                # Parse status response
+                                CONDUCTOR_CONNECTED=\$(echo "\$STATUS_JSON" | jq -r '.conductor.connected // false')
+                                CONDUCTOR_WORKERS=\$(echo "\$STATUS_JSON" | jq -r '.conductor.connected_workers // 0')
+                                STORAGE_HEALTHY=\$(echo "\$STATUS_JSON" | jq -r '.storage.healthy // false')
+                                IMPORT_ENABLED=\$(echo "\$STATUS_JSON" | jq -r '.storage.import_enabled // false')
+                                CELL_DISCOVERED=\$(echo "\$STATUS_JSON" | jq -r '.diagnostics.cell_discovered // false')
+                                READY_FOR_SEEDING=\$(echo "\$STATUS_JSON" | jq -r '.diagnostics.ready_for_seeding // false')
+
+                                echo "  Conductor: connected=\$CONDUCTOR_CONNECTED workers=\$CONDUCTOR_WORKERS"
+                                echo "  Storage: healthy=\$STORAGE_HEALTHY import=\$IMPORT_ENABLED"
+                                echo "  Cell discovered: \$CELL_DISCOVERED"
+                                echo "  Ready for seeding: \$READY_FOR_SEEDING"
+
+                                # Check recommendations for any blockers
+                                RECOMMENDATIONS=\$(echo "\$STATUS_JSON" | jq -r '.diagnostics.recommendations // []')
+                                if [ "\$RECOMMENDATIONS" != "[]" ] && [ "\$RECOMMENDATIONS" != "null" ]; then
+                                    echo "  Recommendations:"
+                                    echo "\$RECOMMENDATIONS" | jq -r '.[] | "    ⚠️  " + .'
+                                fi
+
+                                # Check if ready
+                                if [ "\$CONDUCTOR_CONNECTED" = "true" ] && [ "\$STORAGE_HEALTHY" = "true" ]; then
+                                    # With lazy cell discovery, we don't need cell_discovered=true at preflight
+                                    # The seeder will trigger lazy discovery on first import
+                                    echo ""
+                                    echo "✅ Doorway ready for seeding"
+                                    echo "   Note: cell_id will be discovered lazily on first import if not already cached"
+                                    CONDUCTOR_READY=true
+                                    break
+                                fi
+
+                                PREFLIGHT_ATTEMPTS=\$((PREFLIGHT_ATTEMPTS + 1))
+                                if [ \$PREFLIGHT_ATTEMPTS -lt \$PREFLIGHT_MAX ]; then
+                                    echo "  ⏳ Waiting for conductor/storage... (\$PREFLIGHT_ATTEMPTS/\$PREFLIGHT_MAX)"
+                                    sleep 5
+                                fi
+                            done
+
+                            if [ "\$CONDUCTOR_READY" != "true" ]; then
+                                echo ""
+                                echo "❌ PREFLIGHT FAILED: Doorway not ready for seeding"
+                                echo "   Conductor connected: \$CONDUCTOR_CONNECTED"
+                                echo "   Storage healthy: \$STORAGE_HEALTHY"
+                                echo ""
+                                echo "Check doorway and elohim-storage logs for issues."
+                                exit 1
+                            fi
+
+                            echo "════════════════════════════════════════════════════════════"
                         """
                     }
                 }

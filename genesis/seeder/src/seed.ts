@@ -755,15 +755,42 @@ async function seedViaDoorway(): Promise<SeedResult> {
     retries: 3,
   });
 
-  // Check doorway health
-  console.log('\n🏥 Checking doorway health...');
-  const health = await doorwayClient.checkHealth();
-  if (!health.healthy) {
-    console.error(`❌ Doorway not healthy: ${health.error}`);
-    console.error('   Cannot proceed with doorway import. Exiting.');
-    process.exit(1);
+  // Check doorway status (comprehensive preflight)
+  console.log('\n🏥 Checking doorway status...');
+  const status = await doorwayClient.checkStatus();
+  if (!status) {
+    // Fall back to health check
+    const health = await doorwayClient.checkHealth();
+    if (!health.healthy) {
+      console.error(`❌ Doorway not healthy: ${health.error}`);
+      console.error('   Cannot proceed with doorway import. Exiting.');
+      process.exit(1);
+    }
+    console.log(`✅ Doorway healthy (v${health.version || 'unknown'}, cache=${health.cacheEnabled ? 'on' : 'off'})`);
+  } else {
+    console.log(`✅ Doorway status: ${status.status} (v${status.version || 'unknown'})`);
+    console.log(`   Conductor: ${status.conductor.connected ? '✅ connected' : '❌ disconnected'} (${status.conductor.connected_workers}/${status.conductor.total_workers} workers)`);
+    console.log(`   Storage: ${status.storage.healthy ? '✅ healthy' : '❌ unhealthy'} (import=${status.storage.import_enabled ? 'on' : 'off'})`);
+    console.log(`   Cell: ${status.diagnostics.cell_discovered ? '✅ discovered' : '⏳ will discover lazily'}`);
+
+    // Show any recommendations
+    if (status.diagnostics.recommendations.length > 0) {
+      console.log(`   ⚠️ Recommendations:`);
+      for (const rec of status.diagnostics.recommendations) {
+        console.log(`      • ${rec}`);
+      }
+    }
+
+    // Check if ready for seeding
+    if (!status.conductor.connected) {
+      console.error(`❌ Conductor not connected - cannot proceed with seeding`);
+      process.exit(1);
+    }
+    if (!status.storage.healthy) {
+      console.error(`❌ Storage not healthy - cannot proceed with seeding`);
+      process.exit(1);
+    }
   }
-  console.log(`✅ Doorway healthy (v${health.version || 'unknown'}, cache=${health.cacheEnabled ? 'on' : 'off'})`);
 
   // ========================================
   // LOAD CONTENT
@@ -911,25 +938,62 @@ async function seedViaDoorway(): Promise<SeedResult> {
             }
           );
 
-          // Handle final status
-          if (finalStatus.error_count && finalStatus.error_count > 0 && finalStatus.errors?.length) {
-            console.log(`   ⚠️ ${finalStatus.errors.length} errors during import:`);
-            for (const err of finalStatus.errors.slice(0, 5)) {
-              console.error(`      • ${err}`);
-            }
-            if (finalStatus.errors.length > 5) {
-              console.error(`      ... and ${finalStatus.errors.length - 5} more`);
-            }
-          }
-
+          // Handle final status - CHECK FOR ACTUAL FAILURE
           const succeeded = (finalStatus.processed_count ?? 0) - (finalStatus.error_count ?? 0);
           result.contentSucceeded = succeeded;  // Track for verification
           const elapsed = finalStatus.elapsed_ms ? ` (${(finalStatus.elapsed_ms / 1000).toFixed(1)}s` : '';
           const rate = finalStatus.items_per_second ? `, ${finalStatus.items_per_second.toFixed(0)} items/sec)` : elapsed ? ')' : '';
+
+          // Check for batch failure (failed status or all items errored)
+          if (finalStatus.status === 'failed') {
+            console.error(`   ❌ Content import FAILED`);
+            if (finalStatus.errors?.length) {
+              console.error(`   Errors:`);
+              for (const err of finalStatus.errors.slice(0, 10)) {
+                console.error(`      • ${err}`);
+              }
+              if (finalStatus.errors.length > 10) {
+                console.error(`      ... and ${finalStatus.errors.length - 10} more`);
+              }
+            }
+            console.error(`\n❌ SEEDING FAILED: Batch import failed. Check elohim-storage logs.`);
+            process.exit(1);
+          }
+
+          // Check for partial success with significant errors
+          if (finalStatus.error_count && finalStatus.error_count > 0) {
+            console.log(`   ⚠️ ${finalStatus.error_count} errors during import:`);
+            if (finalStatus.errors?.length) {
+              for (const err of finalStatus.errors.slice(0, 5)) {
+                console.error(`      • ${err}`);
+              }
+              if (finalStatus.errors.length > 5) {
+                console.error(`      ... and ${finalStatus.errors.length - 5} more`);
+              }
+            }
+
+            // Fail if more than 10% of items errored
+            const errorRate = (finalStatus.error_count / (finalStatus.total_items ?? 1)) * 100;
+            if (errorRate > 10) {
+              console.error(`\n❌ SEEDING FAILED: Too many errors (${errorRate.toFixed(1)}%). Check elohim-storage logs.`);
+              process.exit(1);
+            }
+          }
+
+          // Verify we actually processed items (not silent skip!)
+          if (succeeded === 0 && (finalStatus.total_items ?? 0) > 0) {
+            console.error(`\n❌ SEEDING FAILED: 0 items succeeded out of ${finalStatus.total_items}!`);
+            console.error(`   This likely means cell_id discovery failed or conductor rejected all items.`);
+            console.error(`   Check elohim-storage logs for "CELL_DISCOVERY" or "CHUNK_ERROR" messages.`);
+            process.exit(1);
+          }
+
           console.log(`   ✅ Content import ${finalStatus.status}: ${succeeded} succeeded, ${finalStatus.error_count ?? 0} failed${elapsed}${rate}`);
 
         } catch (wsError) {
           console.error(`   ❌ Import wait failed: ${wsError}`);
+          console.error(`\n❌ SEEDING FAILED: Could not confirm batch completion. Exiting.`);
+          process.exit(1);
         }
 
       } else {
@@ -962,7 +1026,23 @@ async function seedViaDoorway(): Promise<SeedResult> {
         }
 
         if (finalStatus) {
-          if (finalStatus.error_count > 0 && finalStatus.errors.length > 0) {
+          const succeeded = finalStatus.processed_count - finalStatus.error_count;
+          result.contentSucceeded = succeeded;  // Track for verification
+
+          // Check for batch failure
+          if (finalStatus.status === 'failed') {
+            console.error(`   ❌ Content import FAILED`);
+            if (finalStatus.errors.length > 0) {
+              for (const err of finalStatus.errors.slice(0, 10)) {
+                console.error(`      • ${err}`);
+              }
+            }
+            console.error(`\n❌ SEEDING FAILED: Batch import failed. Check elohim-storage logs.`);
+            process.exit(1);
+          }
+
+          // Check for partial success with significant errors
+          if (finalStatus.error_count > 0) {
             console.log(`   ⚠️ ${finalStatus.errors.length} errors during import:`);
             for (const err of finalStatus.errors.slice(0, 5)) {
               console.error(`      • ${err}`);
@@ -970,12 +1050,29 @@ async function seedViaDoorway(): Promise<SeedResult> {
             if (finalStatus.errors.length > 5) {
               console.error(`      ... and ${finalStatus.errors.length - 5} more`);
             }
+
+            // Fail if more than 10% of items errored
+            const errorRate = (finalStatus.error_count / finalStatus.total_items) * 100;
+            if (errorRate > 10) {
+              console.error(`\n❌ SEEDING FAILED: Too many errors (${errorRate.toFixed(1)}%). Check elohim-storage logs.`);
+              process.exit(1);
+            }
           }
-          result.contentSucceeded = finalStatus.processed_count - finalStatus.error_count;  // Track for verification
-          console.log(`   ✅ Content import ${finalStatus.status}: ${result.contentSucceeded} succeeded, ${finalStatus.error_count} failed`);
+
+          // Verify we actually processed items (not silent skip!)
+          if (succeeded === 0 && finalStatus.total_items > 0) {
+            console.error(`\n❌ SEEDING FAILED: 0 items succeeded out of ${finalStatus.total_items}!`);
+            console.error(`   This likely means cell_id discovery failed or conductor rejected all items.`);
+            console.error(`   Check elohim-storage logs for "CELL_DISCOVERY" or "CHUNK_ERROR" messages.`);
+            process.exit(1);
+          }
+
+          console.log(`   ✅ Content import ${finalStatus.status}: ${succeeded} succeeded, ${finalStatus.error_count} failed`);
         } else {
-          console.warn(`   ⚠️ Polling timeout - batch may still be processing`);
-          console.log(`      Check status: GET ${DOORWAY_URL}/import/content/${batchId}`);
+          console.error(`   ❌ Polling timeout - batch completion could not be confirmed`);
+          console.error(`\n❌ SEEDING FAILED: Timeout waiting for batch. Check status manually:`);
+          console.error(`      GET ${DOORWAY_URL}/import/content/${batchId}`);
+          process.exit(1);
         }
       }
     } else {

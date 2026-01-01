@@ -49,6 +49,34 @@ export interface HealthStatus {
   error?: string;
 }
 
+/** Comprehensive status from /status endpoint */
+export interface DoorwayStatus {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  version?: string;
+  uptime_seconds?: number;
+  conductor: {
+    connected: boolean;
+    connected_workers: number;
+    total_workers: number;
+  };
+  storage: {
+    healthy: boolean;
+    import_enabled: boolean;
+    active_batches?: number;
+    url?: string;
+  };
+  diagnostics: {
+    cell_discovered: boolean;
+    ready_for_seeding: boolean;
+    recommendations: string[];
+  };
+  cache?: {
+    enabled: boolean;
+    entries?: number;
+    size_bytes?: number;
+  };
+}
+
 export interface PushResult {
   success: boolean;
   hash: string;
@@ -160,6 +188,85 @@ export class DoorwayClient {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+  }
+
+  /**
+   * Get comprehensive status including conductor, storage, and diagnostics.
+   *
+   * This is the recommended method for preflight checks before seeding.
+   * It provides much more detail than checkHealth().
+   */
+  async checkStatus(): Promise<DoorwayStatus | null> {
+    try {
+      const response = await this.fetch('/status', {
+        method: 'GET',
+        timeout: 10000,
+      });
+
+      if (!response.ok) {
+        console.warn(`Status check failed: HTTP ${response.status}`);
+        return null;
+      }
+
+      const data = await response.json();
+      return {
+        status: data.status || 'unhealthy',
+        version: data.version,
+        uptime_seconds: data.uptime_seconds,
+        conductor: {
+          connected: data.conductor?.connected ?? false,
+          connected_workers: data.conductor?.connected_workers ?? 0,
+          total_workers: data.conductor?.total_workers ?? 0,
+        },
+        storage: {
+          healthy: data.storage?.healthy ?? false,
+          import_enabled: data.storage?.import_enabled ?? false,
+          active_batches: data.storage?.active_batches,
+          url: data.storage?.url,
+        },
+        diagnostics: {
+          cell_discovered: data.diagnostics?.cell_discovered ?? false,
+          ready_for_seeding: data.diagnostics?.ready_for_seeding ?? false,
+          recommendations: data.diagnostics?.recommendations ?? [],
+        },
+        cache: data.cache,
+      };
+    } catch (error) {
+      console.warn(`Status check error: ${error instanceof Error ? error.message : error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Wait for doorway to be ready for seeding.
+   *
+   * Polls /status until conductor and storage are healthy.
+   * Returns the final status or throws on timeout.
+   */
+  async waitForReady(options: {
+    timeoutMs?: number;
+    pollIntervalMs?: number;
+    onStatus?: (status: DoorwayStatus) => void;
+  } = {}): Promise<DoorwayStatus> {
+    const { timeoutMs = 120000, pollIntervalMs = 5000, onStatus } = options;
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeoutMs) {
+      const status = await this.checkStatus();
+
+      if (status) {
+        onStatus?.(status);
+
+        // Check if ready for seeding
+        if (status.conductor.connected && status.storage.healthy) {
+          return status;
+        }
+      }
+
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    }
+
+    throw new Error(`Doorway not ready after ${timeoutMs}ms`);
   }
 
   /**
