@@ -60,20 +60,20 @@ describe('BlobManagerService', () => {
       expect(cached).toBeNull();
     });
 
-    it('should remove blob from cache', () => {
+    it('should remove blob from cache', async () => {
       const hash = 'test_hash_123';
       const blob = new Blob(['test']);
 
       service['blobCache'].set(hash, blob);
       service['cacheSize'] = blob.size;
 
-      service.removeFromCache(hash);
+      await service.removeFromCache(hash);
 
       expect(service.isCached(hash)).toBe(false);
       expect(service['cacheSize']).toBe(0);
     });
 
-    it('should clear entire cache', () => {
+    it('should clear entire cache', async () => {
       const blob1 = new Blob(['data1']);
       const blob2 = new Blob(['data2']);
 
@@ -81,7 +81,7 @@ describe('BlobManagerService', () => {
       service['blobCache'].set('hash2', blob2);
       service['cacheSize'] = blob1.size + blob2.size;
 
-      service.clearCache();
+      await service.clearCache();
 
       expect(service['blobCache'].size).toBe(0);
       expect(service['cacheSize']).toBe(0);

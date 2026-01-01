@@ -1,5 +1,6 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { HolochainClientService } from './holochain-client.service';
+import { LoggerService } from './logger.service';
 
 /**
  * Offline operation that failed or was performed while disconnected
@@ -48,6 +49,7 @@ export interface OfflineOperation {
   providedIn: 'root'
 })
 export class OfflineOperationQueueService {
+  private readonly logger = inject(LoggerService).createChild('OfflineQueue');
   private readonly holochainClient = inject(HolochainClientService);
 
   /** Queue of pending operations */
@@ -92,9 +94,9 @@ export class OfflineOperationQueueService {
     try {
       // This would load from IndexedDB in production
       // For now, queue starts empty
-      console.log('[OfflineQueue] Loaded queue from storage');
+      this.logger.debug('Loaded queue from storage');
     } catch (err) {
-      console.error('[OfflineQueue] Failed to load queue from storage:', err);
+      this.logger.error('Failed to load queue from storage', err instanceof Error ? err : new Error(String(err)));
     }
   }
 
@@ -105,9 +107,9 @@ export class OfflineOperationQueueService {
     try {
       // This would save to IndexedDB in production
       const queueData = this.queue();
-      console.log(`[OfflineQueue] Saved ${queueData.length} operations to storage`);
+      this.logger.debug('Saved queue to storage', { count: queueData.length });
     } catch (err) {
-      console.error('[OfflineQueue] Failed to save queue to storage:', err);
+      this.logger.error('Failed to save queue to storage', err instanceof Error ? err : new Error(String(err)));
     }
   }
 
@@ -131,9 +133,11 @@ export class OfflineOperationQueueService {
     this.saveQueueToStorage();
     this.notifyQueueChanged();
 
-    console.log(`[OfflineQueue] Operation queued: ${fullOperation.description || operation.type}`, {
+    this.logger.debug('Operation queued', {
       operationId: id,
-      queueSize: this.queueSize()
+      type: operation.type,
+      description: fullOperation.description,
+      queueSize: this.queueSize(),
     });
 
     return id;
@@ -150,7 +154,7 @@ export class OfflineOperationQueueService {
       this.queue.set(filtered);
       this.saveQueueToStorage();
       this.notifyQueueChanged();
-      console.log(`[OfflineQueue] Operation removed: ${operationId}`);
+      this.logger.debug('Operation removed', { operationId });
     }
   }
 
@@ -163,13 +167,13 @@ export class OfflineOperationQueueService {
    */
   async syncAll(): Promise<{ succeeded: number; failed: number }> {
     if (this.isSyncing()) {
-      console.warn('[OfflineQueue] Sync already in progress');
+      this.logger.warn('Sync already in progress');
       return { succeeded: 0, failed: 0 };
     }
 
     // Check connection first
     if (!this.holochainClient.isConnected()) {
-      console.warn('[OfflineQueue] Not connected - deferring sync');
+      this.logger.debug('Not connected - deferring sync');
       return { succeeded: 0, failed: 0 };
     }
 
@@ -187,14 +191,14 @@ export class OfflineOperationQueueService {
         if (result) {
           this.dequeue(operation.id);
           succeeded++;
-          console.log(`[OfflineQueue] Operation synced: ${operation.id}`);
+          this.logger.debug('Operation synced', { operationId: operation.id });
         } else {
           failed++;
           this.retryOperation(operation);
         }
       } catch (err) {
         failed++;
-        console.error(`[OfflineQueue] Operation failed: ${operation.id}`, err);
+        this.logger.error('Operation failed', err instanceof Error ? err : new Error(String(err)), { operationId: operation.id });
         this.retryOperation(operation);
       }
     }
@@ -203,7 +207,7 @@ export class OfflineOperationQueueService {
     this.lastSyncTime.set(Date.now());
     this.notifySyncComplete(succeeded, failed);
 
-    console.log(`[OfflineQueue] Sync complete: ${succeeded} succeeded, ${failed} failed`);
+    this.logger.info('Sync complete', { succeeded, failed });
 
     return { succeeded, failed };
   }
@@ -216,7 +220,7 @@ export class OfflineOperationQueueService {
     const operation = currentQueue.find(op => op.id === operationId);
 
     if (!operation) {
-      console.warn(`[OfflineQueue] Operation not found: ${operationId}`);
+      this.logger.warn('Operation not found', { operationId });
       return false;
     }
 
@@ -231,7 +235,7 @@ export class OfflineOperationQueueService {
         return false;
       }
     } catch (err) {
-      console.error(`[OfflineQueue] Operation sync failed: ${operationId}`, err);
+      this.logger.error('Operation sync failed', err instanceof Error ? err : new Error(String(err)), { operationId });
       this.retryOperation(operation);
       return false;
     }
@@ -242,7 +246,7 @@ export class OfflineOperationQueueService {
    */
   private async executeOperation(operation: OfflineOperation): Promise<boolean> {
     if (!operation.zomeName || !operation.fnName) {
-      console.warn('[OfflineQueue] Operation missing zomeName or fnName');
+      this.logger.warn('Operation missing zomeName or fnName', { operationId: operation.id });
       return false;
     }
 
@@ -255,20 +259,32 @@ export class OfflineOperationQueueService {
 
       return result.success;
     } catch (err) {
-      console.error('[OfflineQueue] Zome call failed:', err);
+      this.logger.error('Zome call failed', err instanceof Error ? err : new Error(String(err)), { operationId: operation.id });
       return false;
     }
   }
+
+  /** Track pending retry timeouts to prevent duplicates */
+  private pendingRetries = new Map<string, ReturnType<typeof setTimeout>>();
 
   /**
    * Retry an operation with exponential backoff
    */
   private retryOperation(operation: OfflineOperation): void {
     if (operation.retryCount >= operation.maxRetries) {
-      console.warn(
-        `[OfflineQueue] Operation exceeded max retries: ${operation.id}`,
-        { retries: operation.retryCount, maxRetries: operation.maxRetries }
-      );
+      this.logger.warn('Operation exceeded max retries', {
+        operationId: operation.id,
+        retries: operation.retryCount,
+        maxRetries: operation.maxRetries,
+      });
+      // Remove from pending retries if exists
+      this.pendingRetries.delete(operation.id);
+      return;
+    }
+
+    // Skip if retry already scheduled
+    if (this.pendingRetries.has(operation.id)) {
+      this.logger.debug('Retry already scheduled', { operationId: operation.id });
       return;
     }
 
@@ -286,7 +302,43 @@ export class OfflineOperationQueueService {
 
     // Calculate exponential backoff delay: 1s, 2s, 4s, etc.
     const delayMs = 1000 * Math.pow(2, operation.retryCount);
-    console.log(`[OfflineQueue] Scheduling retry in ${delayMs}ms`, { operationId: operation.id });
+    this.logger.debug('Scheduling retry', { operationId: operation.id, delayMs });
+
+    // Schedule the actual retry
+    const timeoutId = setTimeout(async () => {
+      this.pendingRetries.delete(operation.id);
+
+      // Only retry if still in queue and connected
+      const stillQueued = this.queue().some(op => op.id === operation.id);
+      if (!stillQueued) {
+        this.logger.debug('Operation no longer in queue', { operationId: operation.id });
+        return;
+      }
+
+      if (!this.holochainClient.isConnected()) {
+        this.logger.debug('Not connected, deferring retry', { operationId: operation.id });
+        // Re-schedule with same retry count (don't increment again)
+        this.retryOperation({ ...operation, retryCount: operation.retryCount });
+        return;
+      }
+
+      this.logger.debug('Executing retry', { operationId: operation.id });
+      await this.syncOperation(operation.id);
+    }, delayMs);
+
+    this.pendingRetries.set(operation.id, timeoutId);
+  }
+
+  /**
+   * Cancel a pending retry
+   */
+  cancelRetry(operationId: string): void {
+    const timeoutId = this.pendingRetries.get(operationId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      this.pendingRetries.delete(operationId);
+      this.logger.debug('Cancelled retry', { operationId });
+    }
   }
 
   /**
@@ -310,7 +362,7 @@ export class OfflineOperationQueueService {
     this.queue.set([]);
     this.saveQueueToStorage();
     this.notifyQueueChanged();
-    console.log('[OfflineQueue] Queue cleared');
+    this.logger.info('Queue cleared');
   }
 
   /**

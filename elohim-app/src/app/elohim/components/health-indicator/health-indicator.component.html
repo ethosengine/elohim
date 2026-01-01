@@ -1,0 +1,56 @@
+<!-- Health Indicator - Compact status display with expandable details -->
+
+<div class="health-indicator" [class.expanded]="isExpanded">
+  <!-- Compact indicator (always visible) -->
+  <button
+    class="indicator-button"
+    [class]="getStatusClass(status().status)"
+    (click)="toggleExpanded()"
+    [attr.aria-expanded]="isExpanded"
+    aria-label="System health status"
+  >
+    <span class="indicator-dot" [class.checking]="isChecking()">
+      {{ quickStatus().icon }}
+    </span>
+    <span class="indicator-label">{{ quickStatus().label }}</span>
+    <span class="expand-icon">{{ isExpanded ? '▲' : '▼' }}</span>
+  </button>
+
+  <!-- Expanded details panel -->
+  @if (isExpanded) {
+    <div class="details-panel">
+      <div class="details-header">
+        <h4>System Health</h4>
+        <button
+          class="refresh-button"
+          (click)="refresh()"
+          [disabled]="isChecking()"
+          aria-label="Refresh health checks"
+        >
+          <span [class.spinning]="isChecking()">↻</span>
+        </button>
+      </div>
+
+      <div class="checks-list">
+        @for (check of checksArray(); track check.key) {
+          <div class="check-item" [class]="getStatusClass(check.status)">
+            <span class="check-icon">{{ getStatusIcon(check.status) }}</span>
+            <div class="check-info">
+              <span class="check-label">{{ check.label }}</span>
+              <span class="check-message">{{ check.message }}</span>
+            </div>
+            @if (check.durationMs !== undefined) {
+              <span class="check-duration">{{ check.durationMs }}ms</span>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="details-footer">
+        <span class="last-checked">
+          Last checked: {{ formatTime(status().lastChecked) }}
+        </span>
+      </div>
+    </div>
+  }
+</div>

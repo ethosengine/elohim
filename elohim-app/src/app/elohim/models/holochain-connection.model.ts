@@ -29,6 +29,7 @@ export type HolochainConnectionState =
   | 'connecting'      // WebSocket connection in progress
   | 'authenticating'  // Generating keys / getting token
   | 'connected'       // Ready for zome calls
+  | 'reconnecting'    // Auto-reconnecting after connection loss
   | 'error';          // Connection failed
 
 /**

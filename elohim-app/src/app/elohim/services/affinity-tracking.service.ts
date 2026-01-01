@@ -1,5 +1,6 @@
-import { Injectable, Optional } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { Injectable, Optional, OnDestroy } from '@angular/core';
+import { BehaviorSubject, Observable, Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import {
   HumanAffinity,
   AffinityStats,
@@ -24,7 +25,8 @@ import { SessionHumanService } from '@app/imagodei/services/session-human.servic
 @Injectable({
   providedIn: 'root',
 })
-export class AffinityTrackingService {
+export class AffinityTrackingService implements OnDestroy {
+  private readonly destroy$ = new Subject<void>();
   private readonly DEFAULT_STORAGE_KEY = 'elohim-human-affinity';
   private readonly AUTO_INCREMENT_DELTA = 0.2; // Bump on first view
   private readonly AUTO_INCREMENT_THRESHOLD = 0.01; // Only auto-increment if below this
@@ -44,13 +46,20 @@ export class AffinityTrackingService {
   ) {
     // Re-load if session changes
     if (this.sessionHumanService) {
-      this.sessionHumanService.session$.subscribe(session => {
+      this.sessionHumanService.session$.pipe(
+        takeUntil(this.destroy$)
+      ).subscribe(session => {
         if (session) {
           const loaded = this.loadFromStorage();
           this.affinitySubject.next(loaded);
         }
       });
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   /**

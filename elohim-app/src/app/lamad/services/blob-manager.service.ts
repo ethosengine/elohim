@@ -343,23 +343,44 @@ export class BlobManagerService {
 
   /**
    * Clear blob from cache.
+   * Serialized with lock to prevent race conditions.
    *
    * @param hash SHA256 hash of blob to remove
+   * @returns Promise that resolves when removal is complete
    */
-  removeFromCache(hash: string): void {
-    const blob = this.blobCache.get(hash);
-    if (blob) {
-      this.cacheSize -= blob.size;
-      this.blobCache.delete(hash);
-    }
+  async removeFromCache(hash: string): Promise<void> {
+    // Serialize with cache lock to prevent race conditions
+    this.cacheLock = this.cacheLock.then(() => {
+      return new Promise<void>((resolve) => {
+        const blob = this.blobCache.get(hash);
+        if (blob) {
+          this.cacheSize -= blob.size;
+          this.blobCache.delete(hash);
+        }
+        resolve();
+      });
+    });
+
+    await this.cacheLock;
   }
 
   /**
    * Clear entire blob cache.
+   * Serialized with lock to prevent race conditions.
+   *
+   * @returns Promise that resolves when cache is cleared
    */
-  clearCache(): void {
-    this.blobCache.clear();
-    this.cacheSize = 0;
+  async clearCache(): Promise<void> {
+    // Serialize with cache lock to prevent race conditions
+    this.cacheLock = this.cacheLock.then(() => {
+      return new Promise<void>((resolve) => {
+        this.blobCache.clear();
+        this.cacheSize = 0;
+        resolve();
+      });
+    });
+
+    await this.cacheLock;
   }
 
   /**

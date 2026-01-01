@@ -1,6 +1,6 @@
-import { Injectable, Optional } from '@angular/core';
-import { BehaviorSubject, Observable, of } from 'rxjs';
-import { map, tap, switchMap, take } from 'rxjs/operators';
+import { Injectable, Optional, OnDestroy } from '@angular/core';
+import { BehaviorSubject, Observable, of, Subject } from 'rxjs';
+import { map, tap, switchMap, take, takeUntil } from 'rxjs/operators';
 import { DataLoaderService } from './data-loader.service';
 
 // Models from elohim (local)
@@ -31,7 +31,8 @@ import { SessionHumanService } from '../../imagodei/services/session-human.servi
  * - Attestations tracked in session
  */
 @Injectable({ providedIn: 'root' })
-export class AgentService {
+export class AgentService implements OnDestroy {
+  private readonly destroy$ = new Subject<void>();
   private readonly agentSubject = new BehaviorSubject<Agent | null>(null);
   readonly agent$ = this.agentSubject.asObservable();
 
@@ -48,14 +49,21 @@ export class AgentService {
     this.initializeAgent();
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   /**
-   * Initialize agent based on context.
-   * For MVP, creates a session-based agent.
+   * Initialize agent based on session context.
+   * Creates agent from SessionHumanService or anonymous fallback.
    */
   private initializeAgent(): void {
     if (this.sessionHumanService) {
       // Create agent from session
-      this.sessionHumanService.session$.subscribe(session => {
+      this.sessionHumanService.session$.pipe(
+        takeUntil(this.destroy$)
+      ).subscribe(session => {
         if (session) {
           const agent: Agent = {
             id: session.sessionId,
@@ -69,20 +77,17 @@ export class AgentService {
         }
       });
     } else {
-      // Fallback to loading from data (legacy behavior)
-      this.loadCurrentAgent();
+      // No session service - create anonymous agent
+      const anonymousAgent: Agent = {
+        id: `anon-${Date.now()}`,
+        displayName: 'Anonymous',
+        type: 'human',
+        visibility: 'private',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      this.agentSubject.next(anonymousAgent);
     }
-  }
-
-  /**
-   * Load the current agent's profile from data files.
-   * Legacy behavior - used when no session service available.
-   */
-  private loadCurrentAgent(): void {
-    // Legacy fallback - load from JSON
-    this.dataLoader.getAgent('agent-matthew').subscribe(agent => {
-      this.agentSubject.next(agent);
-    });
   }
 
   /**

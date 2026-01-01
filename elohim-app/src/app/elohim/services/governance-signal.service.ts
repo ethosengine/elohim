@@ -1,7 +1,8 @@
-import { Injectable, Optional } from '@angular/core';
+import { Injectable, Optional, inject } from '@angular/core';
 import { BehaviorSubject, Observable, of, combineLatest } from 'rxjs';
-import { map, shareReplay } from 'rxjs/operators';
+import { map, shareReplay, take, catchError } from 'rxjs/operators';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { LoggerService } from './logger.service';
 import {
   EmotionalReaction,
   EmotionalReactionType,
@@ -9,6 +10,88 @@ import {
   MediationLog,
   REACTION_CATEGORIES,
 } from '@app/lamad/models/feedback-profile.model';
+
+// =============================================================================
+// LRU Cache Implementation
+// =============================================================================
+
+/**
+ * Simple LRU (Least Recently Used) cache with configurable max size.
+ * When capacity is reached, evicts the least recently accessed entries.
+ */
+class LruCache<K, V> {
+  private cache = new Map<K, V>();
+  private accessOrder: K[] = [];
+
+  constructor(private readonly maxSize: number) {}
+
+  has(key: K): boolean {
+    return this.cache.has(key);
+  }
+
+  get(key: K): V | undefined {
+    const value = this.cache.get(key);
+    if (value !== undefined) {
+      this.touch(key);
+    }
+    return value;
+  }
+
+  set(key: K, value: V): void {
+    if (this.cache.has(key)) {
+      this.cache.set(key, value);
+      this.touch(key);
+      return;
+    }
+
+    // Evict LRU entries if at capacity
+    while (this.cache.size >= this.maxSize && this.accessOrder.length > 0) {
+      const lruKey = this.accessOrder.shift()!;
+      this.cache.delete(lruKey);
+    }
+
+    this.cache.set(key, value);
+    this.accessOrder.push(key);
+  }
+
+  delete(key: K): boolean {
+    const deleted = this.cache.delete(key);
+    if (deleted) {
+      const idx = this.accessOrder.indexOf(key);
+      if (idx !== -1) {
+        this.accessOrder.splice(idx, 1);
+      }
+    }
+    return deleted;
+  }
+
+  clear(): void {
+    this.cache.clear();
+    this.accessOrder = [];
+  }
+
+  get size(): number {
+    return this.cache.size;
+  }
+
+  private touch(key: K): void {
+    const idx = this.accessOrder.indexOf(key);
+    if (idx !== -1) {
+      this.accessOrder.splice(idx, 1);
+    }
+    this.accessOrder.push(key);
+  }
+}
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+/** Maximum number of cached content signals */
+const MAX_CONTENT_CACHE_SIZE = 100;
+
+/** Maximum number of cached path signals */
+const MAX_PATH_CACHE_SIZE = 50;
 
 /**
  * GovernanceSignalService - Central Signal Hub for Governance Feedback
@@ -34,11 +117,12 @@ import {
  */
 @Injectable({ providedIn: 'root' })
 export class GovernanceSignalService {
+  private readonly logger = inject(LoggerService).createChild('GovernanceSignal');
   private readonly STORAGE_PREFIX = 'elohim-governance-signal-';
 
-  // Cached signal aggregates
-  private contentSignalsCache = new Map<string, Observable<AggregatedSignals>>();
-  private pathSignalsCache = new Map<string, Observable<PathSignalAggregate>>();
+  // Cached signal aggregates with LRU eviction
+  private contentSignalsCache = new LruCache<string, Observable<AggregatedSignals>>(MAX_CONTENT_CACHE_SIZE);
+  private pathSignalsCache = new LruCache<string, Observable<PathSignalAggregate>>(MAX_PATH_CACHE_SIZE);
 
   // Signal change stream for UI reactivity
   private readonly signalChangeSubject = new BehaviorSubject<SignalChangeEvent | null>(null);
@@ -673,7 +757,13 @@ export class GovernanceSignalService {
         evidenceType: 'assessment-success',
         score: assessmentScore,
         attempts,
-      }).subscribe();
+      }).pipe(
+        take(1),
+        catchError(err => {
+          this.logger.error('Failed to suggest attestation', err instanceof Error ? err : new Error(String(err)));
+          return of(null);
+        })
+      ).subscribe();
       return of(true);
     }
 
@@ -683,7 +773,13 @@ export class GovernanceSignalService {
         evidenceType: 'assessment-failure',
         attempts,
         avgScore: assessmentScore,
-      }).subscribe();
+      }).pipe(
+        take(1),
+        catchError(err => {
+          this.logger.error('Failed to flag for review', err instanceof Error ? err : new Error(String(err)));
+          return of(null);
+        })
+      ).subscribe();
       return of(true);
     }
 
@@ -710,7 +806,7 @@ export class GovernanceSignalService {
       this.saveToStorage(key, existing);
       return true;
     } catch (err) {
-      console.error(`[GovernanceSignalService] Failed to save ${signalType}`, err);
+      this.logger.error(`Failed to save ${signalType}`, err instanceof Error ? err : new Error(String(err)));
       return false;
     }
   }
@@ -733,7 +829,7 @@ export class GovernanceSignalService {
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (err) {
-      console.error('[GovernanceSignalService] Storage error', err);
+      this.logger.error('Storage error', err instanceof Error ? err : new Error(String(err)));
     }
   }
 

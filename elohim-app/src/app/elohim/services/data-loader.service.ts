@@ -1,6 +1,7 @@
 import { Injectable, inject, effect } from '@angular/core';
 import { Observable, of, from, defer, throwError, timer, forkJoin } from 'rxjs';
 import { catchError, map, shareReplay, timeout, retry, tap, switchMap, take } from 'rxjs/operators';
+import { LoggerService } from './logger.service';
 import {
   HolochainContentService,
   HolochainPathWithSteps,
@@ -205,6 +206,9 @@ export class DataLoaderService {
   /** Content Resolver for unified tiered resolution */
   private readonly contentResolver = inject(ContentResolverService);
 
+  /** Structured logger */
+  private readonly logger = inject(LoggerService).createChild('DataLoader');
+
   constructor(
     private readonly holochainContent: HolochainContentService,
     private readonly idbCache: IndexedDBCacheService
@@ -219,7 +223,7 @@ export class DataLoaderService {
       if (this.contentResolver.isReady) {
         this.contentResolver.setSourceAvailable('conductor', isAvailable);
         if (isAvailable) {
-          console.log('[DataLoader] Conductor source now available');
+          this.logger.debug('Conductor source now available');
         }
       }
     });
@@ -235,7 +239,7 @@ export class DataLoaderService {
       this.idbInitialized = await this.idbCache.init();
       if (this.idbInitialized) {
         const stats = await this.idbCache.getStats();
-        console.log('[DataLoader] IndexedDB cache initialized:', stats);
+        this.logger.debug('IndexedDB cache initialized', stats);
       }
 
       // Initialize ContentResolver and register sources
@@ -251,9 +255,9 @@ export class DataLoaderService {
       this.contentResolver.setSourceAvailable('projection', this.projectionApi.enabled);
       this.contentResolver.setSourceAvailable('conductor', this.holochainContent.isAvailable());
 
-      console.log('[DataLoader] ContentResolver initialized with sources');
+      this.logger.debug('ContentResolver initialized with sources');
     } catch (err) {
-      console.warn('[DataLoader] Cache initialization failed:', err);
+      this.logger.warn('Cache initialization failed', { error: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -312,9 +316,9 @@ export class DataLoaderService {
           const errMsg = err.message || String(err);
           // "Path not found" is expected for stale references - log as warning, not error
           if (errMsg.includes('Path not found') || errMsg.includes('not found')) {
-            console.warn(`[DataLoader] Path "${pathId}" not found (may be stale reference)`);
+            this.logger.warn('Path not found (may be stale reference)', { pathId });
           } else {
-            console.error(`[DataLoader] Error loading path "${pathId}":`, errMsg);
+            this.logger.error('Error loading path', err, { pathId });
           }
           // Remove from cache so next request retries
           this.pathCache.delete(pathId);
@@ -374,7 +378,7 @@ export class DataLoaderService {
         return this.transformHolochainPathOverview(result);
       }),
       catchError(err => {
-        console.warn(`[DataLoader] Path overview "${pathId}" failed:`, err.message || err);
+        this.logger.warn('Path overview failed', { pathId, error: err.message || err });
         throw err;
       }),
       shareReplay(1)
@@ -436,7 +440,7 @@ export class DataLoaderService {
 
     const resolution = await this.contentResolver.resolvePath(pathId);
     if (resolution) {
-      console.log(`[DataLoader] Path "${pathId}" loaded from ${resolution.sourceId} (${resolution.durationMs.toFixed(0)}ms)`);
+      this.logger.debug('Path loaded', { pathId, source: resolution.sourceId, durationMs: resolution.durationMs });
       // Cache in IndexedDB if loaded from remote source
       if (resolution.tier !== SourceTier.Local && this.idbInitialized) {
         this.contentResolver.cachePath(resolution.data).catch(() => {});
@@ -458,14 +462,14 @@ export class DataLoaderService {
     let chapters: LearningPath['chapters'] | undefined;
     try {
       const metadataJson = hcPath.path.metadata_json;
-      console.log(`[DataLoader] metadata_json for "${hcPath.path.id}":`, metadataJson?.substring(0, 100) ?? 'MISSING');
+      this.logger.debug('Path metadata', { pathId: hcPath.path.id, hasMetadata: !!metadataJson });
       const metadata = JSON.parse(metadataJson || '{}');
       if (metadata.chapters && Array.isArray(metadata.chapters)) {
         chapters = metadata.chapters;
-        console.log(`[DataLoader] Extracted ${metadata.chapters.length} chapters from metadata`);
+        this.logger.debug('Extracted chapters from metadata', { pathId: hcPath.path.id, chapterCount: metadata.chapters.length });
       }
     } catch (e) {
-      console.error('[DataLoader] Error parsing metadata_json:', e);
+      this.logger.error('Error parsing metadata_json', e, { pathId: hcPath.path.id });
       // Ignore JSON parse errors - chapters will remain undefined
     }
 
@@ -542,7 +546,7 @@ export class DataLoaderService {
       timeout(this.CONTENT_TIMEOUT_MS),
       map(content => {
         if (!content) {
-          console.warn(`[DataLoader] Content not found: ${resourceId}, returning placeholder`);
+          this.logger.warn('Content not found, returning placeholder', { resourceId });
           return this.createPlaceholderContent(resourceId);
         }
         return content;
@@ -557,7 +561,7 @@ export class DataLoaderService {
       }),
       catchError(err => {
         // Don't cache errors - return placeholder and don't cache this result
-        console.warn(`[DataLoader] Error loading "${resourceId}":`, err.message || err);
+        this.logger.warn('Error loading content', { resourceId, error: err.message || err });
         // Remove from cache so next request retries
         this.contentCache.delete(resourceId);
         return of(this.createPlaceholderContent(resourceId, err.message));
@@ -617,7 +621,7 @@ export class DataLoaderService {
     return defer(() => this.batchGetContentWithIDB(resourceIds)).pipe(
       timeout(this.CONTENT_TIMEOUT_MS * 2), // Allow more time for batch
       catchError(err => {
-        console.warn('[DataLoader] Batch load error:', err);
+        this.logger.warn('Batch load error', { count: resourceIds.length, error: err.message || err });
         // Return placeholders for all
         const contentMap = new Map<string, ContentNode>();
         for (const id of resourceIds) {
@@ -785,7 +789,7 @@ export class DataLoaderService {
         map(hcIndex => this.transformHolochainPathIndex(hcIndex)),
         shareReplay(1),
         catchError(err => {
-          console.error('[DataLoader] Failed to load path index:', err);
+          this.logger.error('Failed to load path index', err);
           // Clear cache on error so next call retries
           this.pathIndexCache$ = null;
           return of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() });
@@ -833,7 +837,7 @@ export class DataLoaderService {
     return defer(() => from(this.holochainContent.getAgentById(agentId))).pipe(
       map(result => result ? this.transformHolochainAgent(result.agent) : null),
       catchError((err) => {
-        console.warn(`[DataLoader] Failed to load agent "${agentId}":`, err);
+        this.logger.warn('Failed to load agent', { agentId, error: err.message || err });
         return of(null);
       })
     );

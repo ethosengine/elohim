@@ -88,7 +88,7 @@ describe('ContentService', () => {
   });
 
   it('should be created', () => {
-    expect(service).toBeTruthy();
+    expect(service).toBeInstanceOf(ContentService);
   });
 
   describe('getContent', () => {
@@ -670,7 +670,7 @@ describe('ContentService', () => {
       dataLoaderSpy.getContent.and.returnValue(of(apContent));
 
       service.getActivityPubObject('test-content').subscribe(obj => {
-        expect(obj).toBeTruthy();
+        expect(obj).not.toBeNull();
         if (obj) {
           expect(obj['type']).toBe('Article');
           expect(obj['@context']).toBe('https://www.w3.org/ns/activitystreams');
@@ -699,7 +699,7 @@ describe('ContentService', () => {
       dataLoaderSpy.getContent.and.returnValue(of(apContent));
 
       service.getActivityPubObject('test-content').subscribe(obj => {
-        expect(obj).toBeTruthy();
+        expect(obj).not.toBeNull();
         if (obj && Array.isArray(obj['tag'])) {
           expect(obj['tag'].length).toBe(2);
           expect(obj['tag'][0]['name']).toBe('#test');
@@ -802,9 +802,9 @@ describe('ContentService', () => {
       service.getStandardsMetadata('test-content').subscribe(metadata => {
         expect(metadata.did).toBe('did:web:test');
         expect(metadata.activityPubType).toBe('Article');
-        expect(metadata.openGraph).toBeTruthy();
-        expect(metadata.jsonLd).toBeTruthy();
-        expect(metadata.activityPubObject).toBeTruthy();
+        expect(metadata.openGraph).not.toBeNull();
+        expect(metadata.jsonLd).not.toBeNull();
+        expect(metadata.activityPubObject).not.toBeNull();
         done();
       });
     });

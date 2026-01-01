@@ -35,9 +35,10 @@
  * ```
  */
 
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 import { BehaviorSubject, Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+import { LoggerService } from './logger.service';
 
 // Import from framework-agnostic write buffer
 import type {
@@ -78,15 +79,66 @@ export interface BufferInitializationResult {
   error?: string;
 }
 
-/** Flush callback type */
-export type FlushCallback = (batch: WriteBatch) => Promise<void>;
-
-/** Flush result */
-export interface FlushResult {
+/**
+ * Result from processing individual operations in a batch.
+ * Allows tracking per-operation success/failure.
+ */
+export interface BatchOperationResult {
+  /** Operation ID */
+  opId: string;
+  /** Whether this specific operation succeeded */
   success: boolean;
-  batchId: string;
-  operationCount: number;
+  /** Error message if failed */
   error?: string;
+}
+
+/**
+ * Result from a batch callback.
+ * Can indicate partial success (some ops succeeded, some failed).
+ */
+export interface BatchCallbackResult {
+  /** Overall batch status */
+  success: boolean;
+  /** Per-operation results (if available) */
+  operationResults?: BatchOperationResult[];
+  /** Global error message if entire batch failed */
+  error?: string;
+}
+
+/**
+ * Flush callback type.
+ * Can return void (all-or-nothing) or BatchCallbackResult (partial success).
+ */
+export type FlushCallback = (batch: WriteBatch) => Promise<void | BatchCallbackResult>;
+
+/** Flush result with detailed operation tracking */
+export interface FlushResult {
+  /** Whether all operations succeeded */
+  success: boolean;
+  /** Batch ID */
+  batchId: string;
+  /** Total operations in batch */
+  operationCount: number;
+  /** Number of operations that succeeded */
+  successCount: number;
+  /** Number of operations that failed */
+  failureCount: number;
+  /** IDs of failed operations (for debugging/retry) */
+  failedOperationIds: string[];
+  /** Error message if any failures */
+  error?: string;
+}
+
+/** Result from flushing all operations */
+export interface FlushAllResult {
+  /** Total operations successfully committed */
+  totalCommitted: number;
+  /** Total operations that failed */
+  totalFailed: number;
+  /** Number of batches processed */
+  batchCount: number;
+  /** IDs of operations that failed (across all batches) */
+  failedOperationIds: string[];
 }
 
 /**
@@ -104,6 +156,7 @@ export interface FlushResult {
   providedIn: 'root',
 })
 export class WriteBufferService implements OnDestroy {
+  private readonly logger = inject(LoggerService).createChild('WriteBuffer');
   private buffer: IWriteBuffer | null = null;
 
   private readonly stateSubject = new BehaviorSubject<BufferServiceState>('uninitialized');
@@ -181,14 +234,14 @@ export class WriteBufferService implements OnDestroy {
       this.stateSubject.next('ready');
       this.updateStats();
 
-      console.log(`[WriteBufferService] Initialized with ${this.implementation} implementation`);
+      this.logger.info('Initialized', { implementation: this.implementation });
 
       return {
         success: true,
         implementation: this.implementation,
       };
     } catch (error) {
-      console.error('[WriteBufferService] Initialization failed:', error);
+      this.logger.error('Initialization failed', error instanceof Error ? error : new Error(String(error)));
 
       // Fallback to TypeScript implementation
       try {
@@ -318,8 +371,11 @@ export class WriteBufferService implements OnDestroy {
   /**
    * Flush a single batch using the provided callback.
    *
+   * Supports partial success - if the callback returns BatchCallbackResult
+   * with per-operation results, only failed operations will be retried.
+   *
    * @param callback - Function to send batch to conductor
-   * @returns Flush result
+   * @returns Flush result with detailed operation tracking
    */
   async flushBatch(callback: FlushCallback): Promise<FlushResult | null> {
     this.ensureReady();
@@ -330,23 +386,34 @@ export class WriteBufferService implements OnDestroy {
     }
 
     const batch = batchResult.batch;
+    const operationCount = batch.operations.length;
     this.stateSubject.next('flushing');
 
     try {
-      await callback(batch);
-      this.buffer!.markBatchCommitted(batch.batchId);
-      this.updateStats();
+      const result = await callback(batch);
 
-      if (this.buffer!.totalQueued() === 0) {
-        this.stateSubject.next('ready');
+      // Handle different result types
+      if (!result || result === undefined) {
+        // Legacy void callback - treat as all success
+        this.buffer!.markBatchCommitted(batch.batchId);
+        this.updateStats();
+        this.updateStateAfterFlush();
+
+        return {
+          success: true,
+          batchId: batch.batchId,
+          operationCount,
+          successCount: operationCount,
+          failureCount: 0,
+          failedOperationIds: [],
+        };
       }
 
-      return {
-        success: true,
-        batchId: batch.batchId,
-        operationCount: batch.operations.length,
-      };
+      // BatchCallbackResult - may have partial success
+      return this.handleBatchCallbackResult(batch, result);
+
     } catch (error) {
+      // Exception thrown - all operations failed
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.buffer!.markBatchFailed(batch.batchId, errorMessage);
       this.updateStats();
@@ -355,9 +422,106 @@ export class WriteBufferService implements OnDestroy {
       return {
         success: false,
         batchId: batch.batchId,
-        operationCount: batch.operations.length,
+        operationCount,
+        successCount: 0,
+        failureCount: operationCount,
+        failedOperationIds: batch.operations.map(op => op.opId),
         error: errorMessage,
       };
+    }
+  }
+
+  /**
+   * Process BatchCallbackResult to handle partial success.
+   */
+  private handleBatchCallbackResult(
+    batch: WriteBatch,
+    result: BatchCallbackResult
+  ): FlushResult {
+    const operationCount = batch.operations.length;
+
+    if (result.success && !result.operationResults) {
+      // All operations succeeded
+      this.buffer!.markBatchCommitted(batch.batchId);
+      this.updateStats();
+      this.updateStateAfterFlush();
+
+      return {
+        success: true,
+        batchId: batch.batchId,
+        operationCount,
+        successCount: operationCount,
+        failureCount: 0,
+        failedOperationIds: [],
+      };
+    }
+
+    if (result.operationResults && result.operationResults.length > 0) {
+      // Per-operation results available - handle partial success
+      const failedOps = result.operationResults.filter(op => !op.success);
+      const failedOpIds = failedOps.map(op => op.opId);
+      const successCount = operationCount - failedOps.length;
+      const failureCount = failedOps.length;
+
+      if (failureCount === 0) {
+        // All succeeded
+        this.buffer!.markBatchCommitted(batch.batchId);
+      } else if (failureCount === operationCount) {
+        // All failed
+        const errorMsg = failedOps[0]?.error || result.error || 'All operations failed';
+        this.buffer!.markBatchFailed(batch.batchId, errorMsg);
+      } else {
+        // Partial success - only retry failed operations
+        this.buffer!.markOperationsFailed(batch.batchId, failedOpIds);
+        this.logger.info('Partial batch success', {
+          successCount,
+          operationCount,
+          failureCount,
+          retriesQueued: failureCount,
+        });
+      }
+
+      this.updateStats();
+      this.updateStateAfterFlush();
+
+      const firstError = failedOps[0]?.error || result.error;
+      return {
+        success: failureCount === 0,
+        batchId: batch.batchId,
+        operationCount,
+        successCount,
+        failureCount,
+        failedOperationIds: failedOpIds,
+        error: failureCount > 0 ? firstError : undefined,
+      };
+    }
+
+    // success: false with no operationResults - all failed
+    const errorMessage = result.error || 'Batch failed';
+    this.buffer!.markBatchFailed(batch.batchId, errorMessage);
+    this.updateStats();
+    this.stateSubject.next('ready');
+
+    return {
+      success: false,
+      batchId: batch.batchId,
+      operationCount,
+      successCount: 0,
+      failureCount: operationCount,
+      failedOperationIds: batch.operations.map(op => op.opId),
+      error: errorMessage,
+    };
+  }
+
+  /**
+   * Update state after flush completes.
+   */
+  private updateStateAfterFlush(): void {
+    if (this.buffer!.totalQueued() === 0) {
+      this.stateSubject.next('ready');
+    } else {
+      // Still have items - stay in ready (not flushing) until next batch
+      this.stateSubject.next('ready');
     }
   }
 
@@ -365,28 +529,53 @@ export class WriteBufferService implements OnDestroy {
    * Flush all pending operations using the provided callback.
    *
    * Continues flushing until all queues are empty.
+   * Supports partial success - failed operations are automatically retried.
    *
    * @param callback - Function to send batch to conductor
-   * @param onProgress - Optional progress callback
-   * @returns Total operations committed
+   * @param onProgress - Optional progress callback with detailed results
+   * @returns Detailed flush results including success/failure counts
    */
   async flushAll(
     callback: FlushCallback,
-    onProgress?: (committed: number, remaining: number) => void
+    onProgress?: (committed: number, remaining: number, failed?: number) => void
   ): Promise<number> {
     this.ensureReady();
 
     let totalCommitted = 0;
+    let totalFailed = 0;
+    const allFailedIds: string[] = [];
+    let batchCount = 0;
+    let consecutiveFailures = 0;
+    const maxConsecutiveFailures = 3;
 
     while (this.buffer!.shouldFlush()) {
       const result = await this.flushBatch(callback);
+      batchCount++;
 
-      if (result?.success) {
-        totalCommitted += result.operationCount;
+      if (result) {
+        totalCommitted += result.successCount;
+        totalFailed += result.failureCount;
+        allFailedIds.push(...result.failedOperationIds);
+
+        if (result.success) {
+          consecutiveFailures = 0;
+        } else {
+          consecutiveFailures++;
+
+          // Stop if we're getting too many consecutive complete failures
+          if (consecutiveFailures >= maxConsecutiveFailures && result.successCount === 0) {
+            this.logger.warn('Stopping flush after consecutive failures', {
+              consecutiveFailures,
+              totalCommitted,
+              totalFailed,
+            });
+            break;
+          }
+        }
       }
 
       if (onProgress) {
-        onProgress(totalCommitted, this.buffer!.totalQueued());
+        onProgress(totalCommitted, this.buffer!.totalQueued(), totalFailed);
       }
 
       // Small delay between batches to prevent overwhelming conductor
@@ -394,7 +583,81 @@ export class WriteBufferService implements OnDestroy {
     }
 
     this.stateSubject.next('ready');
+
+    // Log summary if there were failures
+    if (totalFailed > 0) {
+      this.logger.warn('FlushAll completed with partial success', {
+        totalCommitted,
+        totalFailed,
+        batchCount,
+      });
+    }
+
     return totalCommitted;
+  }
+
+  /**
+   * Flush all pending operations with detailed result tracking.
+   *
+   * Unlike flushAll(), returns complete details about what succeeded/failed.
+   *
+   * @param callback - Function to send batch to conductor
+   * @param onProgress - Optional progress callback
+   * @returns Detailed flush results
+   */
+  async flushAllWithDetails(
+    callback: FlushCallback,
+    onProgress?: (committed: number, remaining: number, failed?: number) => void
+  ): Promise<{ totalCommitted: number; totalFailed: number; batchCount: number; failedOperationIds: string[] }> {
+    this.ensureReady();
+
+    let totalCommitted = 0;
+    let totalFailed = 0;
+    const allFailedIds: string[] = [];
+    let batchCount = 0;
+    let consecutiveFailures = 0;
+    const maxConsecutiveFailures = 3;
+
+    while (this.buffer!.shouldFlush()) {
+      const result = await this.flushBatch(callback);
+      batchCount++;
+
+      if (result) {
+        totalCommitted += result.successCount;
+        totalFailed += result.failureCount;
+        allFailedIds.push(...result.failedOperationIds);
+
+        if (result.success) {
+          consecutiveFailures = 0;
+        } else {
+          consecutiveFailures++;
+
+          if (consecutiveFailures >= maxConsecutiveFailures && result.successCount === 0) {
+            this.logger.warn('Stopping flush after consecutive failures', {
+              consecutiveFailures,
+              totalCommitted,
+              totalFailed,
+            });
+            break;
+          }
+        }
+      }
+
+      if (onProgress) {
+        onProgress(totalCommitted, this.buffer!.totalQueued(), totalFailed);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+
+    this.stateSubject.next('ready');
+
+    return {
+      totalCommitted,
+      totalFailed,
+      batchCount,
+      failedOperationIds: allFailedIds,
+    };
   }
 
   /**
@@ -417,7 +680,7 @@ export class WriteBufferService implements OnDestroy {
         }
       });
 
-    console.log(`[WriteBufferService] Auto-flush started (interval: ${intervalMs}ms)`);
+    this.logger.debug('Auto-flush started', { intervalMs });
   }
 
   /**

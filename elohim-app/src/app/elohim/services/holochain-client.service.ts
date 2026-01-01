@@ -42,6 +42,7 @@ import {
 } from '../models/holochain-connection.model';
 
 import { PerformanceMetricsService } from './performance-metrics.service';
+import { LoggerService } from './logger.service';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import type { IConnectionStrategy, ConnectionConfig } from '../../../../../elohim-library/projects/elohim-service/src/connection';
 
@@ -55,6 +56,9 @@ export class HolochainClientService {
   /** Performance metrics service for recording zome call metrics */
   private readonly metrics = inject(PerformanceMetricsService);
 
+  /** Logger for structured logging with correlation IDs */
+  private readonly logger = inject(LoggerService).createChild('HolochainClient');
+
   /** Connection strategy (injected based on environment) */
   private readonly strategy = inject(CONNECTION_STRATEGY);
 
@@ -63,6 +67,21 @@ export class HolochainClientService {
 
   /** Track if connection error has been logged to avoid console spam */
   private connectionErrorLogged = false;
+
+  /** Auto-reconnect configuration */
+  private readonly reconnectConfig = {
+    enabled: true,
+    maxRetries: 5,
+    baseDelayMs: 1000,
+    maxDelayMs: 30000,
+    currentRetries: 0,
+  };
+
+  /** Reconnect timeout handle */
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  /** Track if we're currently attempting to reconnect */
+  private isReconnecting = false;
 
   /** Expose connection state as readonly */
   readonly connection = this.connectionSignal.asReadonly();
@@ -150,7 +169,7 @@ export class HolochainClientService {
     // Replace '-angular-dev' suffix with '-hc-dev' in the hostname
     const hostname = currentUrl.hostname.replace(/-angular-dev\./, '-hc-dev.');
 
-    console.log('[Holochain] Che URL resolution:', {
+    this.logger.debug('Che URL resolution', {
       currentHostname: currentUrl.hostname,
       resolvedHostname: hostname,
       devProxyUrl: `wss://${hostname}`,
@@ -184,7 +203,7 @@ export class HolochainClientService {
 
     const isChe = this.isCheEnvironment();
     const mode = isChe && this.config.useLocalProxy ? 'Che dev-proxy' : 'direct';
-    console.log(`[Holochain] Testing admin connection (${mode})...`);
+    this.logger.info('Testing admin connection', { mode });
 
     this.updateState({ state: 'connecting' });
 
@@ -210,15 +229,12 @@ export class HolochainClientService {
       // Reset error logging flag on successful connection
       this.connectionErrorLogged = false;
 
-      console.log(`[Holochain] Connection successful (${mode})`, {
-        url: adminUrl,
-        apps: appIds,
-      });
+      this.logger.info('Connection successful', { mode, url: adminUrl, apps: appIds });
 
       return { success: true, apps: appIds };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Connection failed';
-      console.error(`[Holochain] Connection failed (${mode}):`, errorMessage);
+      this.logger.error('Connection failed', err, { mode });
 
       this.updateState({
         state: 'error',
@@ -257,7 +273,7 @@ export class HolochainClientService {
     try {
       // Delegate to connection strategy
       const connectionConfig = this.buildConnectionConfig();
-      console.log(`[HolochainClient] Connecting via ${this.strategy.name} strategy...`);
+      this.logger.info('Connecting', { strategy: this.strategy.name });
 
       this.updateState({ state: 'authenticating' });
       const result = await this.strategy.connect(connectionConfig);
@@ -290,7 +306,8 @@ export class HolochainClientService {
       // Reset error logging flag on successful connection
       this.connectionErrorLogged = false;
 
-      console.log(`[HolochainClient] Connected via ${this.strategy.name}`, {
+      this.logger.info('Connected', {
+        strategy: this.strategy.name,
         appId: this.config.appId,
         agentPubKey: result.agentPubKey ? this.encodeAgentPubKey(result.agentPubKey) : 'N/A',
         cellCount: result.cellIds?.size ?? 0,
@@ -298,7 +315,7 @@ export class HolochainClientService {
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown connection error';
-      console.error(`[HolochainClient] Connection failed (${this.strategy.name}):`, errorMessage);
+      this.logger.error('Connection failed', err, { strategy: this.strategy.name });
 
       this.updateState({
         state: 'error',
@@ -313,14 +330,127 @@ export class HolochainClientService {
    * Disconnect from Holochain conductor using the connection strategy.
    */
   async disconnect(): Promise<void> {
+    // Cancel any pending reconnect
+    this.cancelReconnect();
+
     try {
       await this.strategy.disconnect();
-      console.log(`[HolochainClient] Disconnected (${this.strategy.name})`);
+      this.logger.info('Disconnected', { strategy: this.strategy.name });
     } catch (err) {
-      console.warn('[HolochainClient] Error during disconnect:', err);
+      this.logger.warn('Error during disconnect', { error: err instanceof Error ? err.message : String(err) });
     }
 
     this.connectionSignal.set(INITIAL_CONNECTION_STATE);
+  }
+
+  // ==========================================================================
+  // Auto-Reconnect Logic
+  // ==========================================================================
+
+  /**
+   * Enable or disable auto-reconnect.
+   */
+  setAutoReconnect(enabled: boolean): void {
+    this.reconnectConfig.enabled = enabled;
+    if (!enabled) {
+      this.cancelReconnect();
+    }
+  }
+
+  /**
+   * Get current reconnect status.
+   */
+  getReconnectStatus(): { isReconnecting: boolean; retryCount: number; maxRetries: number } {
+    return {
+      isReconnecting: this.isReconnecting,
+      retryCount: this.reconnectConfig.currentRetries,
+      maxRetries: this.reconnectConfig.maxRetries,
+    };
+  }
+
+  /**
+   * Schedule a reconnection attempt with exponential backoff.
+   */
+  private scheduleReconnect(): void {
+    if (!this.reconnectConfig.enabled) {
+      this.logger.debug('Auto-reconnect disabled, not scheduling');
+      return;
+    }
+
+    if (this.reconnectConfig.currentRetries >= this.reconnectConfig.maxRetries) {
+      this.logger.error('Max reconnect attempts reached', undefined, {
+        attempts: this.reconnectConfig.currentRetries,
+        maxRetries: this.reconnectConfig.maxRetries,
+      });
+      this.isReconnecting = false;
+      return;
+    }
+
+    // Calculate delay with exponential backoff
+    const delay = Math.min(
+      this.reconnectConfig.baseDelayMs * Math.pow(2, this.reconnectConfig.currentRetries),
+      this.reconnectConfig.maxDelayMs
+    );
+
+    this.reconnectConfig.currentRetries++;
+    this.isReconnecting = true;
+
+    this.logger.info('Scheduling reconnect', {
+      attempt: this.reconnectConfig.currentRetries,
+      maxRetries: this.reconnectConfig.maxRetries,
+      delayMs: delay,
+    });
+
+    this.updateState({ state: 'reconnecting' as HolochainConnectionState });
+
+    this.reconnectTimeout = setTimeout(async () => {
+      try {
+        await this.connect();
+        // Success - reset retry count
+        this.reconnectConfig.currentRetries = 0;
+        this.isReconnecting = false;
+        this.logger.info('Reconnection successful');
+      } catch (err) {
+        this.logger.warn('Reconnection attempt failed', {
+          attempt: this.reconnectConfig.currentRetries,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        // Schedule another attempt
+        this.scheduleReconnect();
+      }
+    }, delay);
+  }
+
+  /**
+   * Cancel any pending reconnection attempt.
+   */
+  private cancelReconnect(): void {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    this.isReconnecting = false;
+    this.reconnectConfig.currentRetries = 0;
+  }
+
+  /**
+   * Handle connection loss - trigger reconnect if enabled.
+   */
+  private handleConnectionLost(reason?: string): void {
+    if (this.connectionSignal().state === 'disconnected') {
+      return; // Already disconnected intentionally
+    }
+
+    this.logger.warn('Connection lost', { reason });
+    this.updateState({
+      state: 'error',
+      error: reason || 'Connection lost',
+    });
+
+    // Trigger auto-reconnect
+    if (this.reconnectConfig.enabled && !this.isReconnecting) {
+      this.scheduleReconnect();
+    }
   }
 
   /**
@@ -360,16 +490,25 @@ export class HolochainClientService {
   async callZome<T>(input: ZomeCallInput): Promise<ZomeCallResult<T>> {
     let { appWs, cellIds, state } = this.connectionSignal();
 
-    // Record start time for metrics
-    const startTime = Date.now();
+    // Generate correlation ID for this request (for tracing)
+    const correlationId = `zome-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const callContext = {
+      correlationId,
+      zomeName: input.zomeName,
+      fnName: input.fnName,
+      roleName: input.roleName ?? 'lamad',
+    };
+
+    // Use logger timer for automatic duration tracking
+    const timer = this.logger.startTimer('zome-call');
 
     // Default to 'lamad' role if not specified (backwards compatibility)
     const roleName = input.roleName ?? 'lamad';
 
     // Return immediately if in disconnected or error state
     if (state === 'disconnected' || state === 'error') {
-      const duration = Date.now() - startTime;
-      this.metrics.recordQuery(duration, false);
+      timer.end({ ...callContext, success: false, reason: 'not_connected' });
+      this.metrics.recordQuery(timer.elapsed(), false);
       return {
         success: false,
         error: 'Not connected to Holochain conductor',
@@ -379,11 +518,11 @@ export class HolochainClientService {
     // If not connected yet, wait for connection (only if actively connecting)
     if (!appWs || cellIds.size === 0) {
       if (state === 'connecting' || state === 'authenticating') {
-        console.log('[HolochainClient] Waiting for connection before zome call...');
+        this.logger.debug('Waiting for connection before zome call', callContext);
         const connected = await this.waitForConnection();
         if (!connected) {
-          const duration = Date.now() - startTime;
-          this.metrics.recordQuery(duration, false);
+          timer.end({ ...callContext, success: false, reason: 'timeout' });
+          this.metrics.recordQuery(timer.elapsed(), false);
           return {
             success: false,
             error: 'Connection timed out',
@@ -395,8 +534,8 @@ export class HolochainClientService {
     }
 
     if (!appWs || cellIds.size === 0) {
-      const duration = Date.now() - startTime;
-      this.metrics.recordQuery(duration, false);
+      timer.end({ ...callContext, success: false, reason: 'no_connection' });
+      this.metrics.recordQuery(timer.elapsed(), false);
       return {
         success: false,
         error: 'Not connected to Holochain conductor',
@@ -406,9 +545,9 @@ export class HolochainClientService {
     // Look up the correct cell ID for this role
     const cellId = cellIds.get(roleName);
     if (!cellId) {
-      const duration = Date.now() - startTime;
-      this.metrics.recordQuery(duration, false);
       const availableRoles = Array.from(cellIds.keys()).join(', ');
+      timer.end({ ...callContext, success: false, reason: 'no_cell', availableRoles });
+      this.metrics.recordQuery(timer.elapsed(), false);
       return {
         success: false,
         error: `No cell found for role '${roleName}'. Available roles: ${availableRoles}`,
@@ -424,8 +563,9 @@ export class HolochainClientService {
       });
 
       // Record successful query
-      const duration = Date.now() - startTime;
+      const duration = timer.elapsed();
       this.metrics.recordQuery(duration, true);
+      timer.end({ ...callContext, success: true });
 
       return {
         success: true,
@@ -433,9 +573,7 @@ export class HolochainClientService {
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Zome call failed';
-
-      // Record failed query
-      const duration = Date.now() - startTime;
+      const duration = timer.elapsed();
       this.metrics.recordQuery(duration, false);
 
       // Detect connection-related errors and only log once
@@ -446,12 +584,11 @@ export class HolochainClientService {
 
       if (isConnectionError) {
         if (!this.connectionErrorLogged) {
-          console.error(`[Holochain] Connection error: ${errorMessage} - subsequent errors will be suppressed`);
+          this.logger.error('Connection error (subsequent errors suppressed)', err, callContext);
           this.connectionErrorLogged = true;
         }
       } else {
-        // Log non-connection errors normally
-        console.error(`Zome call failed: ${input.zomeName}.${input.fnName}`, err);
+        this.logger.error('Zome call failed', err, callContext);
       }
 
       return {
@@ -539,7 +676,7 @@ export class HolochainClientService {
       const duration = Date.now() - startTime;
       this.metrics.recordQuery(duration, false);
 
-      console.error(`[Holochain REST] ${input.zomeName}.${input.fnName} failed:`, errorMessage);
+      this.logger.error('REST call failed', undefined, { zomeName: input.zomeName, fnName: input.fnName, error: errorMessage });
       return { success: false, error: errorMessage };
     }
   }
@@ -596,7 +733,8 @@ export class HolochainClientService {
       for (const cell of cellArray) {
         if (cell.type === 'provisioned' && cell.value?.cell_id) {
           cellIds.set(roleName, cell.value.cell_id);
-          console.log(`[Holochain] Found cell for role '${roleName}':`, {
+          this.logger.debug('Found cell for role', {
+            roleName,
             dnaHash: this.uint8ArrayToBase64(cell.value.cell_id[0]).slice(0, 12) + '...',
           });
           break; // Only take first provisioned cell per role
@@ -634,7 +772,7 @@ export class HolochainClientService {
 
       localStorage.setItem(SIGNING_CREDENTIALS_KEY, JSON.stringify(serialized));
     } catch (err) {
-      console.warn('Could not store signing credentials:', err);
+      this.logger.warn('Could not store signing credentials', { error: err instanceof Error ? err.message : String(err) });
     }
   }
 
