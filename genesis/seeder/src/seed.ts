@@ -890,9 +890,11 @@ async function seedViaDoorway(): Promise<SeedResult> {
         total_items: allInputs.length,
         schema_version: 1,
       })
-    ) as ImportStatusResponse & { batch_id: string; queued_count: number; processing: boolean };
+    ) as ImportStatusResponse & { batch_id: string; queued_count?: number; total_items?: number; processing: boolean };
 
-    console.log(`   ✅ Import queued: ${queueResult.batch_id} (${queueResult.queued_count} items)`);
+    // Handle both response formats (queued_count from doorway, total_items from storage)
+    const queuedCount = queueResult.queued_count ?? queueResult.total_items ?? allInputs.length;
+    console.log(`   ✅ Import queued: ${queueResult.batch_id} (${queuedCount} items)`);
 
     // Step 3: Wait for completion with real-time progress
     const USE_WEBSOCKET = process.env.SEED_USE_WEBSOCKET !== 'false';

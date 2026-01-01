@@ -85,6 +85,9 @@ pub struct StorageStats {
     /// Storage healthy (from health check)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub healthy: Option<bool>,
+    /// Whether import API is enabled on storage
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub import_enabled: Option<bool>,
     /// Number of active import batches
     pub active_batches: usize,
     /// Recent import batches (last 5)
@@ -181,13 +184,14 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     // Get storage stats
     let storage = if let Some(ref storage_url) = state.args.storage_url {
         match fetch_storage_status(storage_url).await {
-            Ok((healthy, batches)) => StorageStats {
+            Ok(info) => StorageStats {
                 configured: true,
                 url: Some(storage_url.clone()),
                 reachable: true,
-                healthy: Some(healthy),
-                active_batches: batches.len(),
-                recent_batches: batches,
+                healthy: Some(info.healthy),
+                import_enabled: Some(info.import_enabled),
+                active_batches: info.batches.len(),
+                recent_batches: info.batches,
                 error: None,
             },
             Err(e) => {
@@ -197,6 +201,7 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
                     url: Some(storage_url.clone()),
                     reachable: false,
                     healthy: None,
+                    import_enabled: None,
                     active_batches: 0,
                     recent_batches: vec![],
                     error: Some(e),
@@ -210,6 +215,7 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
             url: None,
             reachable: false,
             healthy: None,
+            import_enabled: None,
             active_batches: 0,
             recent_batches: vec![],
             error: Some("STORAGE_URL not configured".to_string()),
@@ -371,6 +377,8 @@ struct StorageHealthResponse {
     bytes: u64,
     #[serde(default)]
     manifests: u64,
+    #[serde(default)]
+    import_enabled: bool,
 }
 
 /// Response from elohim-storage import batches endpoint
@@ -388,8 +396,15 @@ struct StorageBatchInfo {
     total_items: u32,
 }
 
+/// Storage status info from elohim-storage health endpoint
+struct StorageStatusInfo {
+    healthy: bool,
+    import_enabled: bool,
+    batches: Vec<ImportBatchSummary>,
+}
+
 /// Fetch health and batch status from elohim-storage
-async fn fetch_storage_status(storage_url: &str) -> Result<(bool, Vec<ImportBatchSummary>), String> {
+async fn fetch_storage_status(storage_url: &str) -> Result<StorageStatusInfo, String> {
     let base_url = storage_url.trim_end_matches('/');
 
     // Create HTTP client with timeout
@@ -415,6 +430,7 @@ async fn fetch_storage_status(storage_url: &str) -> Result<(bool, Vec<ImportBatc
 
     // Derive healthy from status field (elohim-storage returns status: "ok")
     let healthy = health.status == "ok";
+    let import_enabled = health.import_enabled;
 
     // Try to fetch batches (may not be available if import API disabled)
     let batches = match fetch_import_batches(&client, base_url).await {
@@ -422,7 +438,7 @@ async fn fetch_storage_status(storage_url: &str) -> Result<(bool, Vec<ImportBatc
         Err(_) => vec![], // Import API might not be enabled
     };
 
-    Ok((healthy, batches))
+    Ok(StorageStatusInfo { healthy, import_enabled, batches })
 }
 
 /// Fetch import batches from elohim-storage
@@ -482,6 +498,7 @@ mod tests {
                 url: Some("http://localhost:8090".to_string()),
                 reachable: true,
                 healthy: Some(true),
+                import_enabled: Some(true),
                 active_batches: 1,
                 recent_batches: vec![
                     ImportBatchSummary {

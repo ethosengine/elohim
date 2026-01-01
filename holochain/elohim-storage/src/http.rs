@@ -224,6 +224,7 @@ impl HttpServer {
             "blobs": stats.total_blobs,
             "bytes": stats.total_bytes,
             "manifests": self.manifests.read().await.len(),
+            "import_enabled": self.import_api.is_some(),
         });
 
         Ok(Response::builder()
