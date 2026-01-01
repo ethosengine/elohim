@@ -68,9 +68,10 @@ pub async fn discover_cell_id(
     debug!("Connected to admin interface, sending list_apps");
 
     // Build list_apps request
+    // Note: Holochain 0.6+ uses "value" not "data" for request parameters
     let inner = Value::Map(vec![
         (Value::String("type".into()), Value::String("list_apps".into())),
-        (Value::String("data".into()), Value::Map(vec![])),
+        (Value::String("value".into()), Value::Map(vec![])),
     ]);
 
     let response = send_admin_request(&mut write, &mut read, &inner, 1).await?;
@@ -177,66 +178,111 @@ fn parse_cell_id_from_apps(
     app_id: &str,
     role_filter: Option<&str>,
 ) -> Result<Vec<u8>, StorageError> {
-    // Response structure:
-    // { type: "...", data: [{ installed_app_id, cell_info: { role_name: [{ cell_id: [dna, agent] }] } }] }
-    if let Value::Map(map) = response {
-        if let Some(Value::Array(apps)) = get_field(map, "data") {
-            for app in apps {
-                if let Value::Map(app_map) = app {
-                    let is_our_app = get_string_field(app_map, "installed_app_id")
-                        .map(|id| id == app_id)
-                        .unwrap_or(false);
+    // Response structure can be:
+    // - Wrapped: { type: "apps_listed", data: [...] }
+    // - Direct: [...]
 
-                    if is_our_app {
-                        if let Some(Value::Map(cell_info)) = get_field(app_map, "cell_info") {
-                            // Iterate roles to find matching one (or first if no filter)
-                            for (role_key, cells) in cell_info {
-                                let role_name = match role_key {
-                                    Value::String(s) => s.as_str().map(|s| s.to_string()),
-                                    _ => None,
-                                };
+    // Handle both wrapped and direct array formats
+    // Holochain uses "value" in newer API versions
+    let apps = match response {
+        Value::Array(arr) => arr,
+        Value::Map(map) => {
+            if let Some(Value::Array(arr)) = get_field(map, "value") {
+                arr
+            } else if let Some(Value::Array(arr)) = get_field(map, "data") {
+                arr
+            } else {
+                return Err(StorageError::NotFound(format!(
+                    "App '{}' not found - no value/data field in response",
+                    app_id
+                )));
+            }
+        }
+        _ => {
+            return Err(StorageError::NotFound(format!(
+                "App '{}' not found - unexpected response format",
+                app_id
+            )));
+        }
+    };
 
-                                // Check role filter if specified
-                                if let Some(filter) = role_filter {
-                                    if role_name.as_deref() != Some(filter) {
-                                        continue;
+    for app in apps {
+        if let Value::Map(app_map) = app {
+            let is_our_app = get_string_field(app_map, "installed_app_id")
+                .map(|id| id == app_id)
+                .unwrap_or(false);
+
+            if is_our_app {
+                if let Some(Value::Map(cell_info)) = get_field(app_map, "cell_info") {
+                    // Iterate roles to find matching one (or first if no filter)
+                    for (role_key, cells) in cell_info {
+                        let role_name = match role_key {
+                            Value::String(s) => s.as_str().map(|s| s.to_string()),
+                            _ => None,
+                        };
+
+                        // Check role filter if specified
+                        if let Some(filter) = role_filter {
+                            if role_name.as_deref() != Some(filter) {
+                                continue;
+                            }
+                        }
+
+                        if let Value::Array(cell_arr) = cells {
+                            for cell in cell_arr {
+                                if let Value::Map(cell_map) = cell {
+                                    // Try Holochain 0.3+ provisioned format first
+                                    if let Some((dna, agent)) = extract_provisioned_cell_id(cell_map) {
+                                        let cell_id_value = Value::Array(vec![
+                                            Value::Binary(dna.clone()),
+                                            Value::Binary(agent.clone()),
+                                        ]);
+                                        let mut buf = Vec::new();
+                                        rmpv::encode::write_value(&mut buf, &cell_id_value)
+                                            .map_err(|e| {
+                                                StorageError::Parse(format!(
+                                                    "Failed to serialize cell_id: {}",
+                                                    e
+                                                ))
+                                            })?;
+
+                                        info!(
+                                            app_id = app_id,
+                                            role = ?role_name,
+                                            dna_hash = %hex::encode(&dna[..8.min(dna.len())]),
+                                            "Discovered cell_id (provisioned format)"
+                                        );
+
+                                        return Ok(buf);
                                     }
-                                }
 
-                                if let Value::Array(cell_arr) = cells {
-                                    for cell in cell_arr {
-                                        if let Value::Map(cell_map) = cell {
-                                            if let Some(Value::Array(cell_id)) =
-                                                get_field(cell_map, "cell_id")
-                                            {
-                                                if cell_id.len() >= 2 {
-                                                    let dna = extract_bytes(&cell_id[0])?;
-                                                    let agent = extract_bytes(&cell_id[1])?;
+                                    // Fall back to legacy format: { cell_id: [dna, agent] }
+                                    if let Some(Value::Array(cell_id)) = get_field(cell_map, "cell_id") {
+                                        if cell_id.len() >= 2 {
+                                            let dna = extract_bytes(&cell_id[0])?;
+                                            let agent = extract_bytes(&cell_id[1])?;
 
-                                                    // Serialize cell_id as MessagePack for zome calls
-                                                    let cell_id_value = Value::Array(vec![
-                                                        Value::Binary(dna.clone()),
-                                                        Value::Binary(agent.clone()),
-                                                    ]);
-                                                    let mut buf = Vec::new();
-                                                    rmpv::encode::write_value(&mut buf, &cell_id_value)
-                                                        .map_err(|e| {
-                                                            StorageError::Parse(format!(
-                                                                "Failed to serialize cell_id: {}",
-                                                                e
-                                                            ))
-                                                        })?;
+                                            let cell_id_value = Value::Array(vec![
+                                                Value::Binary(dna.clone()),
+                                                Value::Binary(agent.clone()),
+                                            ]);
+                                            let mut buf = Vec::new();
+                                            rmpv::encode::write_value(&mut buf, &cell_id_value)
+                                                .map_err(|e| {
+                                                    StorageError::Parse(format!(
+                                                        "Failed to serialize cell_id: {}",
+                                                        e
+                                                    ))
+                                                })?;
 
-                                                    info!(
-                                                        app_id = app_id,
-                                                        role = ?role_name,
-                                                        dna_hash = %hex::encode(&dna[..8.min(dna.len())]),
-                                                        "Discovered cell_id"
-                                                    );
+                                            info!(
+                                                app_id = app_id,
+                                                role = ?role_name,
+                                                dna_hash = %hex::encode(&dna[..8.min(dna.len())]),
+                                                "Discovered cell_id (legacy format)"
+                                            );
 
-                                                    return Ok(buf);
-                                                }
-                                            }
+                                            return Ok(buf);
                                         }
                                     }
                                 }
@@ -298,6 +344,44 @@ fn extract_bytes(value: &Value) -> Result<Vec<u8>, StorageError> {
     match value {
         Value::Binary(b) => Ok(b.clone()),
         _ => Err(StorageError::Parse("Expected binary value".to_string())),
+    }
+}
+
+/// Extract cell_id from Holochain 0.3+ provisioned cell format
+/// Format: { type: "provisioned", value: { cell_id: { dna_hash: <bytes>, agent_pub_key: <bytes> } } }
+fn extract_provisioned_cell_id(cell_map: &[(Value, Value)]) -> Option<(Vec<u8>, Vec<u8>)> {
+    // Check if this is a provisioned cell
+    let cell_type = get_string_field(cell_map, "type");
+    if cell_type.as_deref() != Some("provisioned") {
+        return None;
+    }
+
+    // Get the value field
+    let value = get_field(cell_map, "value")?;
+    let value_map = match value {
+        Value::Map(m) => m,
+        _ => return None,
+    };
+
+    // Get cell_id from value
+    let cell_id = get_field(value_map, "cell_id")?;
+
+    match cell_id {
+        // New format: { dna_hash: <bytes>, agent_pub_key: <bytes> }
+        Value::Map(id_map) => {
+            let dna = get_field(id_map, "dna_hash")
+                .and_then(|v| if let Value::Binary(b) = v { Some(b.clone()) } else { None })?;
+            let agent = get_field(id_map, "agent_pub_key")
+                .and_then(|v| if let Value::Binary(b) = v { Some(b.clone()) } else { None })?;
+            Some((dna, agent))
+        }
+        // Also handle legacy format just in case: [dna, agent]
+        Value::Array(arr) if arr.len() >= 2 => {
+            let dna = if let Value::Binary(b) = &arr[0] { Some(b.clone()) } else { None }?;
+            let agent = if let Value::Binary(b) = &arr[1] { Some(b.clone()) } else { None }?;
+            Some((dna, agent))
+        }
+        _ => None,
     }
 }
 

@@ -132,8 +132,12 @@ struct ImportBatch {
 /// Configuration for import API
 #[derive(Debug, Clone)]
 pub struct ImportApiConfig {
+    /// Conductor admin interface URL (for auth)
+    pub admin_url: String,
     /// Conductor app interface URL
     pub conductor_url: String,
+    /// App ID for authentication
+    pub app_id: String,
     /// Chunk size for processing
     pub chunk_size: usize,
     /// Delay between chunks (backpressure)
@@ -149,7 +153,9 @@ pub struct ImportApiConfig {
 impl Default for ImportApiConfig {
     fn default() -> Self {
         Self {
+            admin_url: "ws://localhost:4444".to_string(),
             conductor_url: "ws://localhost:4445".to_string(),
+            app_id: "elohim".to_string(),
             chunk_size: 50,
             chunk_delay: Duration::from_millis(100),
             max_concurrent_batches: 3,
@@ -191,7 +197,9 @@ impl ImportApi {
     /// Initialize conductor connection
     pub async fn connect_conductor(&mut self) -> Result<(), StorageError> {
         let conductor_config = ConductorClientConfig {
+            admin_url: self.config.admin_url.clone(),
             app_url: self.config.conductor_url.clone(),
+            app_id: self.config.app_id.clone(),
             request_timeout: Duration::from_secs(60),
             ..Default::default()
         };

@@ -314,10 +314,11 @@ impl ImportHandler {
         S::Error: std::fmt::Display,
         R: StreamExt<Item = Result<Message, tokio_tungstenite::tungstenite::Error>> + Unpin,
     {
-        // Build inner request: { type: "list_apps", data: {} }
+        // Build inner request: { type: "list_apps", value: {} }
+        // Note: Holochain 0.6+ uses "value" not "data" for request parameters
         let inner = Value::Map(vec![
             (Value::String("type".into()), Value::String("list_apps".into())),
-            (Value::String("data".into()), Value::Map(vec![])),
+            (Value::String("value".into()), Value::Map(vec![])),
         ]);
 
         let response = self.send_admin_request(write, read, &inner).await?;
@@ -348,17 +349,73 @@ impl ImportHandler {
                 Value::String("type".into()),
                 Value::String("issue_app_authentication_token".into()),
             ),
-            (Value::String("data".into()), data),
+            (Value::String("value".into()), data),
         ]);
 
         let response = self.send_admin_request(write, read, &inner).await?;
 
         // Parse token from response
-        // Response inner: { type: "app_authentication_token_issued", data: { token: <bytes> } }
+        // Response inner: { type: "app_authentication_token_issued", value: { token: <bytes> } }
         if let Value::Map(map) = &response {
-            if let Some(Value::Map(data_map)) = get_field(map, "data") {
-                if let Some(Value::Binary(token)) = get_field(data_map, "token") {
+            // Debug: log response structure
+            let keys: Vec<_> = map.iter()
+                .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+                .collect();
+            error!(keys = ?keys, "Token response map keys");
+
+            let data_opt = get_field(map, "value").or_else(|| get_field(map, "data"));
+            if let Some(value) = &data_opt {
+                error!(value_type = %response_type_str(value), "Token response value type");
+            }
+            match &data_opt {
+                Some(Value::Map(data_map)) => {
+                    // Check for token in the data map
+                    if let Some(token_val) = get_field(data_map, "token") {
+                        error!(token_type = %response_type_str(token_val), "Token field type");
+                        match token_val {
+                            Value::Binary(token) => return Ok(token.clone()),
+                            Value::Array(arr) => {
+                                // Token might be wrapped in array [<bytes>] OR array of byte integers
+                                if let Some(Value::Binary(token)) = arr.first() {
+                                    error!("Token was wrapped in array containing binary");
+                                    return Ok(token.clone());
+                                }
+                                // Try to convert array of integers to bytes
+                                let bytes: Result<Vec<u8>, _> = arr.iter()
+                                    .map(|v| match v {
+                                        Value::Integer(i) => i.as_u64().map(|n| n as u8).ok_or("invalid byte"),
+                                        _ => Err("not integer"),
+                                    })
+                                    .collect();
+                                if let Ok(token) = bytes {
+                                    info!("Token was array of {} bytes", token.len());
+                                    return Ok(token);
+                                }
+                            }
+                            Value::Ext(_, bytes) => {
+                                // Extension type
+                                error!("Token is Ext type");
+                                return Ok(bytes.clone());
+                            }
+                            _ => {}
+                        }
+                    }
+                    // Also check directly in the value map (newer format might just be { token: <bytes> })
+                    let token_keys: Vec<_> = data_map.iter()
+                        .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+                        .collect();
+                    error!(keys = ?token_keys, "Token data map keys (token field not binary)");
+                }
+                Some(Value::Binary(token)) => {
+                    // Token might be directly in the value field
+                    error!("Token value is binary, length={}", token.len());
                     return Ok(token.clone());
+                }
+                Some(other) => {
+                    error!(value_type = %response_type_str(other), "Token value is not a Map or Binary");
+                }
+                None => {
+                    error!("No value/data field in token response");
                 }
             }
         }
@@ -379,14 +436,15 @@ impl ImportHandler {
                 Value::String("type".into()),
                 Value::String("list_app_interfaces".into()),
             ),
-            (Value::String("data".into()), Value::Nil),
+            (Value::String("value".into()), Value::Nil),
         ]);
 
         let response = self.send_admin_request(write, read, &inner).await?;
 
-        // Check for existing interfaces
+        // Check for existing interfaces (try "value" first, then "data" for backwards compat)
         if let Value::Map(map) = &response {
-            if let Some(Value::Array(interfaces)) = get_field(map, "data") {
+            let interfaces_opt = get_field(map, "value").or_else(|| get_field(map, "data"));
+            if let Some(Value::Array(interfaces)) = interfaces_opt {
                 if let Some(Value::Map(iface)) = interfaces.first() {
                     if let Some(Value::Integer(port)) = get_field(iface, "port") {
                         return Ok(port.as_u64().unwrap_or(4445) as u16);
@@ -406,14 +464,15 @@ impl ImportHandler {
                 Value::String("type".into()),
                 Value::String("attach_app_interface".into()),
             ),
-            (Value::String("data".into()), attach_data),
+            (Value::String("value".into()), attach_data),
         ]);
 
         let attach_response = self.send_admin_request(write, read, &attach_inner).await?;
 
-        // Parse port from response
+        // Parse port from response (try "value" first, then "data")
         if let Value::Map(map) = &attach_response {
-            if let Some(Value::Map(data_map)) = get_field(map, "data") {
+            let data_opt = get_field(map, "value").or_else(|| get_field(map, "data"));
+            if let Some(Value::Map(data_map)) = data_opt {
                 if let Some(Value::Integer(port)) = get_field(data_map, "port") {
                     return Ok(port.as_u64().unwrap_or(4445) as u16);
                 }
@@ -526,6 +585,7 @@ impl ImportHandler {
         S::Error: std::fmt::Display,
     {
         // Build inner: { token: <bytes> }
+        // Note: Token was returned as array of integers, we have it as Vec<u8> now
         let inner = Value::Map(vec![(
             Value::String("token".into()),
             Value::Binary(token.to_vec()),
@@ -535,10 +595,10 @@ impl ImportHandler {
         rmpv::encode::write_value(&mut inner_buf, &inner)
             .map_err(|e| StorageError::Parse(format!("Failed to encode auth request: {}", e)))?;
 
-        // Wrap in envelope with id=0
+        // Wrap in "authenticate" envelope (NOT "request" - special format for auth)
+        // The SDK uses: { type: "authenticate", data: encode(request) }
         let envelope = Value::Map(vec![
-            (Value::String("id".into()), Value::Integer(0.into())),
-            (Value::String("type".into()), Value::String("request".into())),
+            (Value::String("type".into()), Value::String("authenticate".into())),
             (Value::String("data".into()), Value::Binary(inner_buf)),
         ]);
 
@@ -555,47 +615,56 @@ impl ImportHandler {
         Ok(())
     }
 
-    /// Wait for authentication response
+    /// Wait for authentication to complete
+    ///
+    /// The Holochain SDK doesn't wait for an explicit response - it just waits briefly
+    /// and assumes success if the connection doesn't close. We do the same here.
     async fn wait_for_auth_response<R>(&self, read: &mut R) -> Result<(), StorageError>
     where
         R: StreamExt<Item = Result<Message, tokio_tungstenite::tungstenite::Error>> + Unpin,
     {
-        let timeout = Duration::from_secs(5);
-        tokio::time::timeout(timeout, async {
-            while let Some(msg) = read.next().await {
-                match msg {
-                    Ok(Message::Binary(data)) => {
-                        let mut cursor = Cursor::new(&data[..]);
-                        if let Ok(value) = rmpv::decode::read_value(&mut cursor) {
-                            if let Value::Map(ref map) = value {
-                                // Check for error response
-                                if let Some(resp_type) = get_string_field(map, "type") {
-                                    if resp_type == "error" {
-                                        return Err(StorageError::Auth(
-                                            "Authentication rejected".to_string(),
-                                        ));
+        // Wait a brief moment to allow conductor to close connection if token is invalid
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Try to peek at the connection state - if we can poll without blocking
+        // and get a close message, auth failed
+        let check_timeout = Duration::from_millis(50);
+        let check_result = tokio::time::timeout(check_timeout, async {
+            // Use tokio::select! to check for close message without blocking
+            tokio::select! {
+                msg = read.next() => {
+                    match msg {
+                        Some(Ok(Message::Close(_))) => {
+                            Err(StorageError::Connection("Connection closed during auth - invalid token".to_string()))
+                        }
+                        Some(Ok(Message::Binary(data))) => {
+                            // Check if this is an error message
+                            let mut cursor = Cursor::new(&data[..]);
+                            if let Ok(value) = rmpv::decode::read_value(&mut cursor) {
+                                if let Value::Map(ref map) = value {
+                                    if let Some(resp_type) = get_string_field(map, "type") {
+                                        if resp_type == "error" {
+                                            return Err(StorageError::Auth("Authentication rejected".to_string()));
+                                        }
                                     }
                                 }
                             }
+                            // Non-error message means we're connected and receiving
+                            Ok(())
                         }
-                        // Any non-error response means success
-                        return Ok(());
+                        Some(Err(e)) => Err(StorageError::Connection(format!("WebSocket error during auth: {}", e))),
+                        None => Err(StorageError::Connection("Connection ended during auth".to_string())),
+                        _ => Ok(()) // Other messages (ping/pong) are fine
                     }
-                    Ok(Message::Close(_)) => {
-                        return Err(StorageError::Connection(
-                            "Connection closed during auth".to_string(),
-                        ));
-                    }
-                    Err(e) => {
-                        return Err(StorageError::Connection(format!("WebSocket error: {}", e)));
-                    }
-                    _ => continue,
                 }
             }
-            Err(StorageError::Connection("No auth response received".to_string()))
-        })
-        .await
-        .map_err(|_| StorageError::Timeout("Auth timeout".to_string()))?
+        }).await;
+
+        // If timeout occurred, that's actually good - no close message received
+        match check_result {
+            Ok(result) => result,
+            Err(_) => Ok(()), // Timeout means connection is still open, auth succeeded
+        }
     }
 
     // ========================================================================
@@ -911,7 +980,7 @@ impl ImportHandler {
 
         let inner = Value::Map(vec![
             (Value::String("type".into()), Value::String("call_zome".into())),
-            (Value::String("data".into()), call_data),
+            (Value::String("value".into()), call_data),
         ]);
 
         // Encode inner request
@@ -963,31 +1032,145 @@ impl ImportHandler {
 
     /// Parse cell info from list_apps response
     fn parse_cell_info_from_apps(&self, response: &Value) -> Result<(Vec<u8>, Vec<u8>), StorageError> {
-        // Response structure: { type: "...", data: [{ installed_app_id, cell_info: { role_name: [{ cell_id: [dna, agent] }] } }] }
-        if let Value::Map(map) = response {
-            if let Some(Value::Array(apps)) = get_field(map, "data") {
-                for app in apps {
-                    if let Value::Map(app_map) = app {
-                        let is_our_app = get_string_field(app_map, "installed_app_id")
-                            .map(|id| id == self.config.installed_app_id)
-                            .unwrap_or(false);
+        // Response structure varies by Holochain version:
+        // v0.3+: { type: "...", data: [{ installed_app_id, cell_info: { role_name: [{ type: "provisioned", value: { cell_id: { dna_hash: ..., agent_pub_key: ... } } }] } }] }
+        // Earlier: { type: "...", data: [{ installed_app_id, cell_info: { role_name: [{ cell_id: [dna, agent] }] } }] }
 
-                        if is_our_app {
-                            if let Some(Value::Map(cell_info)) = get_field(app_map, "cell_info") {
-                                // Get first role's first cell
-                                for (_, cells) in cell_info {
-                                    if let Value::Array(cell_arr) = cells {
-                                        for cell in cell_arr {
-                                            if let Value::Map(cell_map) = cell {
-                                                if let Some(Value::Array(cell_id)) =
-                                                    get_field(cell_map, "cell_id")
-                                                {
-                                                    if cell_id.len() >= 2 {
-                                                        let dna = extract_bytes(&cell_id[0])?;
-                                                        let agent = extract_bytes(&cell_id[1])?;
-                                                        return Ok((dna, agent));
-                                                    }
-                                                }
+        // Debug: log what we received
+        warn!(response_type = %response_type_str(response), "Parsing list_apps response");
+
+        // Handle wrapped { type, data/value: [...] } and direct [...] formats
+        // Holochain responses can be: Array, or Map with "value" or "data" containing the array
+        // The value might also be Binary (nested msgpack)
+
+        // Helper to extract apps array from a value (handles nested wrapping)
+        fn extract_apps(value: &Value, depth: u8) -> Option<Vec<Value>> {
+            if depth > 5 { return None; } // Prevent infinite recursion
+
+            // Debug logging for tracing
+            tracing::debug!("extract_apps depth={} type={}", depth, response_type_str(value));
+
+            match value {
+                Value::Array(arr) => {
+                    tracing::debug!("extract_apps depth={} found array len={}", depth, arr.len());
+                    Some(arr.clone())
+                },
+                Value::Map(map) => {
+                    let keys: Vec<_> = map.iter()
+                        .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+                        .collect();
+                    tracing::debug!("extract_apps depth={} map keys={:?}", depth, keys);
+
+                    // Try value field first (newer Holochain), then data
+                    // May be nested: response.value.value = [apps]
+                    if let Some(inner) = get_field(map, "value") {
+                        tracing::debug!("extract_apps depth={} found 'value' field type={}", depth, response_type_str(inner));
+                        if let Value::Array(arr) = inner {
+                            tracing::debug!("extract_apps depth={} value is array len={}", depth, arr.len());
+                            return Some(arr.clone());
+                        }
+                        // Recurse into nested wrapper
+                        if let Some(arr) = extract_apps(inner, depth + 1) {
+                            return Some(arr);
+                        }
+                    }
+                    if let Some(inner) = get_field(map, "data") {
+                        tracing::debug!("extract_apps depth={} found 'data' field type={}", depth, response_type_str(inner));
+                        if let Value::Array(arr) = inner {
+                            return Some(arr.clone());
+                        }
+                        if let Some(arr) = extract_apps(inner, depth + 1) {
+                            return Some(arr);
+                        }
+                    }
+                    tracing::debug!("extract_apps depth={} no value/data field found", depth);
+                    None
+                }
+                Value::Binary(bytes) => {
+                    tracing::debug!("extract_apps depth={} decoding binary len={}", depth, bytes.len());
+                    // Decode nested msgpack
+                    let mut cursor = Cursor::new(&bytes[..]);
+                    if let Ok(inner) = rmpv::decode::read_value(&mut cursor) {
+                        extract_apps(&inner, depth + 1)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        }
+
+        let apps = if let Some(apps_vec) = extract_apps(response, 0) {
+            apps_vec
+        } else {
+            // Log what we got for debugging - trace all the way down
+            if let Value::Map(map) = response {
+                let keys: Vec<_> = map.iter()
+                    .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+                    .collect();
+                error!("Response map keys: {:?}", keys);
+                if let Some(v) = get_field(map, "value") {
+                    error!("value field type: {}", response_type_str(v));
+                    if let Value::Map(inner) = v {
+                        let inner_keys: Vec<_> = inner.iter()
+                            .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+                            .collect();
+                        error!("Inner map keys: {:?}", inner_keys);
+                        // Go one level deeper
+                        if let Some(v2) = get_field(inner, "value") {
+                            error!("Inner.value field type: {}", response_type_str(v2));
+                            if let Value::Array(arr) = v2 {
+                                error!("Inner.value is array with {} elements!", arr.len());
+                            } else if let Value::Map(inner2) = v2 {
+                                let inner2_keys: Vec<_> = inner2.iter()
+                                    .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+                                    .collect();
+                                error!("Inner2 map keys: {:?}", inner2_keys);
+                            }
+                        }
+                    }
+                }
+            }
+            return Err(StorageError::NotFound(format!(
+                "App {} not found - could not extract apps array",
+                self.config.installed_app_id
+            )));
+        };
+
+        for app in &apps {
+            if let Value::Map(app_map) = app {
+                let is_our_app = get_string_field(app_map, "installed_app_id")
+                    .map(|id| id == self.config.installed_app_id)
+                    .unwrap_or(false);
+
+                if is_our_app {
+                    debug!(app_id = %self.config.installed_app_id, "Found app, extracting cell info");
+
+                    if let Some(Value::Map(cell_info)) = get_field(app_map, "cell_info") {
+                        // Get first role's first cell
+                        for (role_key, cells) in cell_info {
+                            let role_name = if let Value::String(s) = role_key {
+                                s.as_str().unwrap_or("unknown").to_string()
+                            } else {
+                                "unknown".to_string()
+                            };
+
+                            if let Value::Array(cell_arr) = cells {
+                                for cell in cell_arr {
+                                    if let Value::Map(cell_map) = cell {
+                                        // Try new format: { type: "provisioned", value: { cell_id: { dna_hash, agent_pub_key } } }
+                                        if let Some(cell_id) = self.extract_cell_id_from_provisioned(cell_map) {
+                                            debug!(role = %role_name, "Extracted cell_id from provisioned format");
+                                            return Ok(cell_id);
+                                        }
+
+                                        // Try legacy format: { cell_id: [dna, agent] }
+                                        if let Some(Value::Array(cell_id)) = get_field(cell_map, "cell_id") {
+                                            if cell_id.len() >= 2 {
+                                                let dna = extract_bytes(&cell_id[0])?;
+                                                let agent = extract_bytes(&cell_id[1])?;
+                                                debug!(role = %role_name, "Extracted cell_id from legacy format");
+                                                return Ok((dna, agent));
                                             }
                                         }
                                     }
@@ -995,14 +1178,58 @@ impl ImportHandler {
                             }
                         }
                     }
+
+                    // App found but no cells - this is an error state
+                    return Err(StorageError::NotFound(format!(
+                        "App {} found but has no cells",
+                        self.config.installed_app_id
+                    )));
                 }
             }
         }
 
         Err(StorageError::NotFound(format!(
-            "App {} not found",
+            "App {} not found in list_apps response",
             self.config.installed_app_id
         )))
+    }
+
+    /// Extract cell_id from provisioned cell format (Holochain 0.3+)
+    /// Format: { type: "provisioned", value: { cell_id: { dna_hash: <bytes>, agent_pub_key: <bytes> } } }
+    fn extract_cell_id_from_provisioned(&self, cell_map: &[(Value, Value)]) -> Option<(Vec<u8>, Vec<u8>)> {
+        // Check if this is a provisioned cell
+        let cell_type = get_string_field(cell_map, "type");
+        if cell_type.as_deref() != Some("provisioned") {
+            return None;
+        }
+
+        // Get the value field
+        let value = get_field(cell_map, "value")?;
+        let value_map = match value {
+            Value::Map(m) => m,
+            _ => return None,
+        };
+
+        // Get cell_id from value
+        let cell_id = get_field(value_map, "cell_id")?;
+
+        match cell_id {
+            // New format: { dna_hash: <bytes>, agent_pub_key: <bytes> }
+            Value::Map(id_map) => {
+                let dna = get_field(id_map, "dna_hash")
+                    .and_then(|v| extract_bytes(v).ok())?;
+                let agent = get_field(id_map, "agent_pub_key")
+                    .and_then(|v| extract_bytes(v).ok())?;
+                Some((dna, agent))
+            }
+            // Legacy format: [dna, agent]
+            Value::Array(arr) if arr.len() >= 2 => {
+                let dna = extract_bytes(&arr[0]).ok()?;
+                let agent = extract_bytes(&arr[1]).ok()?;
+                Some((dna, agent))
+            }
+            _ => None,
+        }
     }
 
     /// Derive app URL from admin URL
@@ -1036,6 +1263,26 @@ pub struct ChunkResult {
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/// Get string representation of response type for debugging
+fn response_type_str(value: &Value) -> String {
+    match value {
+        Value::Nil => "nil".to_string(),
+        Value::Boolean(_) => "bool".to_string(),
+        Value::Integer(_) => "int".to_string(),
+        Value::F32(_) | Value::F64(_) => "float".to_string(),
+        Value::String(s) => format!("string({})", s.as_str().unwrap_or("?")),
+        Value::Binary(b) => format!("binary({}b)", b.len()),
+        Value::Array(a) => format!("array({})", a.len()),
+        Value::Map(m) => {
+            let keys: Vec<_> = m.iter()
+                .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+                .collect();
+            format!("map({})[{}]", m.len(), keys.join(","))
+        }
+        Value::Ext(_, _) => "ext".to_string(),
+    }
+}
 
 /// Get a string field from a MessagePack map
 fn get_string_field(map: &[(Value, Value)], key: &str) -> Option<String> {

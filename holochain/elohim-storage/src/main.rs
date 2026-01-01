@@ -196,7 +196,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
         let mut import_api = ImportApi::new(
             ImportApiConfig {
+                admin_url: args.admin_url.clone().unwrap_or_else(|| "ws://localhost:4444".to_string()),
                 conductor_url: args.app_url.clone(),
+                app_id: args.app_id.clone(),
                 zome_name: args.zome_name.clone(),
                 chunk_size: 50,
                 cell_id,
