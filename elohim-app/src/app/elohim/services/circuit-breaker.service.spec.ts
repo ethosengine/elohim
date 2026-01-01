@@ -195,14 +195,15 @@ describe('CircuitBreakerService', () => {
       await service.execute('reopen-test', failFn);
       await service.execute('reopen-test', failFn);
 
-      // Trigger half-open
+      // Trigger half-open (resetTimeoutMs=0 means immediate transition)
       service.getState('reopen-test');
 
-      // One failure in half-open should open circuit again
-      await service.execute('reopen-test', failFn);
+      // Failure in half-open should re-open circuit
       await service.execute('reopen-test', failFn);
 
-      expect(service.getState('reopen-test')).toBe('OPEN');
+      // Use getStats to check state without triggering auto-transition
+      // (getState would transition OPEN→HALF_OPEN due to resetTimeoutMs=0)
+      expect(service.getStats('reopen-test')?.state).toBe('OPEN');
     });
   });
 

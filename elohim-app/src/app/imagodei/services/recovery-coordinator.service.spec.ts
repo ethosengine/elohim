@@ -98,14 +98,14 @@ describe('RecoveryCoordinatorService', () => {
   ];
 
   function mockFetchSuccess(data: any): void {
-    (global.fetch as jasmine.Spy).and.resolveTo({
+    (window.fetch as jasmine.Spy).and.resolveTo({
       ok: true,
       json: () => Promise.resolve(data),
     } as Response);
   }
 
   function mockFetchError(message: string, status = 400): void {
-    (global.fetch as jasmine.Spy).and.resolveTo({
+    (window.fetch as jasmine.Spy).and.resolveTo({
       ok: false,
       status,
       json: () => Promise.resolve({ message }),
@@ -113,8 +113,8 @@ describe('RecoveryCoordinatorService', () => {
   }
 
   beforeEach(() => {
-    originalFetch = global.fetch;
-    global.fetch = jasmine.createSpy('fetch');
+    originalFetch = window.fetch;
+    window.fetch = jasmine.createSpy('fetch');
 
     mockDoorwayRegistry = jasmine.createSpyObj('DoorwayRegistryService', [], {
       selectedUrl: jasmine.createSpy().and.returnValue(mockDoorwayUrl),
@@ -136,7 +136,7 @@ describe('RecoveryCoordinatorService', () => {
   });
 
   afterEach(() => {
-    global.fetch = originalFetch;
+    window.fetch = originalFetch;
   });
 
   // ===========================================================================
@@ -192,7 +192,7 @@ describe('RecoveryCoordinatorService', () => {
 
       expect(result).toBe(false);
       expect(service.error()).toBe('No doorway selected. Please select a doorway first.');
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(window.fetch).not.toHaveBeenCalled();
     });
 
     it('should initiate recovery successfully', async () => {
@@ -204,7 +204,7 @@ describe('RecoveryCoordinatorService', () => {
       expect(service.activeRequest()).toEqual(mockRecoveryRequest);
       expect(service.hasActiveRequest()).toBe(true);
       expect(service.error()).toBeNull();
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(window.fetch).toHaveBeenCalledWith(
         `${mockDoorwayUrl}/api/recovery/initiate`,
         jasmine.objectContaining({
           method: 'POST',
@@ -219,7 +219,7 @@ describe('RecoveryCoordinatorService', () => {
 
       await service.initiateRecovery('john.doe', 'Lost my device');
 
-      const [, options] = (global.fetch as jasmine.Spy).calls.mostRecent().args;
+      const [, options] = (window.fetch as jasmine.Spy).calls.mostRecent().args;
       const body = JSON.parse(options.body);
       expect(body.claimedIdentity).toBe('john.doe');
       expect(body.context).toBe('Lost my device');
@@ -239,7 +239,7 @@ describe('RecoveryCoordinatorService', () => {
 
     it('should set loading state during request', async () => {
       let capturedLoading = false;
-      (global.fetch as jasmine.Spy).and.callFake(async () => {
+      (window.fetch as jasmine.Spy).and.callFake(async () => {
         capturedLoading = service.isLoading();
         return { ok: true, json: () => Promise.resolve(mockRecoveryRequest) };
       });
@@ -258,7 +258,7 @@ describe('RecoveryCoordinatorService', () => {
   describe('refreshRequestStatus', () => {
     it('should do nothing if no active request', async () => {
       await service.refreshRequestStatus();
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(window.fetch).not.toHaveBeenCalled();
     });
 
     it('should do nothing if no doorway selected', async () => {
@@ -272,7 +272,7 @@ describe('RecoveryCoordinatorService', () => {
       await service.refreshRequestStatus();
 
       // Only the initiate call should have been made
-      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(window.fetch).toHaveBeenCalledTimes(1);
     });
 
     it('should update request status', async () => {
@@ -307,7 +307,7 @@ describe('RecoveryCoordinatorService', () => {
       await service.initiateRecovery('john.doe');
 
       const attestedRequest = { ...mockRecoveryRequest, status: 'attested' as const };
-      (global.fetch as jasmine.Spy).and.callFake((url: string) => {
+      (window.fetch as jasmine.Spy).and.callFake((url: string) => {
         if (url.includes('/status')) {
           return Promise.resolve({
             ok: true,
@@ -337,7 +337,7 @@ describe('RecoveryCoordinatorService', () => {
   describe('cancelRecovery', () => {
     it('should do nothing if no active request', async () => {
       await service.cancelRecovery();
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(window.fetch).not.toHaveBeenCalled();
     });
 
     it('should cancel active request', async () => {
@@ -349,7 +349,7 @@ describe('RecoveryCoordinatorService', () => {
 
       expect(service.activeRequest()).toBeNull();
       expect(service.hasActiveRequest()).toBe(false);
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(window.fetch).toHaveBeenCalledWith(
         `${mockDoorwayUrl}/api/recovery/recovery-123/cancel`,
         jasmine.objectContaining({ method: 'POST' })
       );
@@ -389,7 +389,7 @@ describe('RecoveryCoordinatorService', () => {
       expect(result).toBe(true);
       expect(service.credential()?.claimed).toBe(true);
       expect(service.activeRequest()).toBeNull();
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(window.fetch).toHaveBeenCalledWith(
         `${mockDoorwayUrl}/api/recovery/${mockCredential.requestId}/complete`,
         jasmine.objectContaining({
           method: 'POST',
@@ -419,7 +419,7 @@ describe('RecoveryCoordinatorService', () => {
 
       await service.loadPendingRequests();
 
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(window.fetch).not.toHaveBeenCalled();
     });
 
     it('should load pending requests', async () => {
@@ -429,7 +429,7 @@ describe('RecoveryCoordinatorService', () => {
 
       expect(service.pendingRequests()).toEqual(mockPendingRequests);
       expect(service.pendingCount()).toBe(1);
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(window.fetch).toHaveBeenCalledWith(
         `${mockDoorwayUrl}/api/recovery/queue`,
         jasmine.objectContaining({ credentials: 'include' })
       );
@@ -446,7 +446,7 @@ describe('RecoveryCoordinatorService', () => {
 
     it('should set loading state', async () => {
       let capturedLoading = false;
-      (global.fetch as jasmine.Spy).and.callFake(async () => {
+      (window.fetch as jasmine.Spy).and.callFake(async () => {
         capturedLoading = service.isLoading();
         return { ok: true, json: () => Promise.resolve({ requests: [] }) };
       });
@@ -478,7 +478,7 @@ describe('RecoveryCoordinatorService', () => {
 
       expect(result).toBe(true);
       expect(service.conductingInterview()).toEqual(mockInterview);
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(window.fetch).toHaveBeenCalledWith(
         `${mockDoorwayUrl}/api/recovery/recovery-123/interview/start`,
         jasmine.objectContaining({
           method: 'POST',
@@ -539,7 +539,7 @@ describe('RecoveryCoordinatorService', () => {
       const result = await service.submitResponse('q1', 'My answer');
 
       expect(result).toBeNull();
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(window.fetch).not.toHaveBeenCalled();
     });
 
     it('should submit response and update interview', async () => {
@@ -586,7 +586,7 @@ describe('RecoveryCoordinatorService', () => {
       (service as any)._conductingInterview.set(mockInterview);
 
       // Mock for attestation and for refreshing pending requests
-      (global.fetch as jasmine.Spy).and.callFake((url: string) => {
+      (window.fetch as jasmine.Spy).and.callFake((url: string) => {
         if (url.includes('/attestation')) {
           return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
         }
@@ -608,7 +608,7 @@ describe('RecoveryCoordinatorService', () => {
     it('should include all parameters in request', async () => {
       (service as any)._conductingInterview.set(mockInterview);
 
-      (global.fetch as jasmine.Spy).and.callFake((url: string, options?: RequestInit) => {
+      (window.fetch as jasmine.Spy).and.callFake((url: string, options?: RequestInit) => {
         if (url.includes('/attestation')) {
           const body = JSON.parse(options?.body as string);
           expect(body.interviewId).toBe('interview-123');
@@ -769,7 +769,7 @@ describe('RecoveryCoordinatorService', () => {
 
   describe('network error handling', () => {
     it('should handle fetch exceptions', async () => {
-      (global.fetch as jasmine.Spy).and.rejectWith(new Error('Network failure'));
+      (window.fetch as jasmine.Spy).and.rejectWith(new Error('Network failure'));
 
       const result = await service.initiateRecovery('john.doe');
 
@@ -778,7 +778,7 @@ describe('RecoveryCoordinatorService', () => {
     });
 
     it('should clear loading state on exception', async () => {
-      (global.fetch as jasmine.Spy).and.rejectWith(new Error('Network failure'));
+      (window.fetch as jasmine.Spy).and.rejectWith(new Error('Network failure'));
 
       await service.initiateRecovery('john.doe');
 

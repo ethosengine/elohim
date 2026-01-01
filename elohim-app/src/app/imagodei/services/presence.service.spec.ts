@@ -16,7 +16,7 @@ describe('PresenceService', () => {
   const mockPresenceEntry = {
     id: 'presence-123',
     display_name: 'Test Contributor',
-    presence_state: 'UNCLAIMED',
+    presence_state: 'unclaimed',
     external_identifiers_json: '[]',
     establishing_content_ids_json: '["content-1"]',
     established_at: new Date().toISOString(),
@@ -112,7 +112,7 @@ describe('PresenceService', () => {
       });
 
       expect(result.displayName).toBe('Test Contributor');
-      expect(result.presenceState).toBe('UNCLAIMED');
+      expect(result.presenceState).toBe('unclaimed');
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
         jasmine.objectContaining({
           zomeName: 'imagodei',
@@ -141,7 +141,7 @@ describe('PresenceService', () => {
       mockHolochainClient.isConnected.and.returnValue(true);
 
       let capturedLoading = false;
-      mockHolochainClient.callZome.and.callFake(async () => {
+      (mockHolochainClient.callZome as jasmine.Spy).and.callFake(async () => {
         capturedLoading = service.isLoading();
         return {
           success: true,
@@ -190,7 +190,7 @@ describe('PresenceService', () => {
 
       const stewardedEntry = {
         ...mockPresenceEntry,
-        presence_state: 'STEWARDED',
+        presence_state: 'stewarded',
         steward_id: 'agent-pub-key-123',
         stewardship_started_at: new Date().toISOString(),
       };
@@ -202,7 +202,7 @@ describe('PresenceService', () => {
 
       const result = await service.beginStewardship('presence-123', 'I will care for this');
 
-      expect(result.presenceState).toBe('STEWARDED');
+      expect(result.presenceState).toBe('stewarded');
       expect(result.stewardId).toBe('agent-pub-key-123');
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
         jasmine.objectContaining({
@@ -295,7 +295,7 @@ describe('PresenceService', () => {
 
       const claimedEntry = {
         ...mockPresenceEntry,
-        presence_state: 'CLAIMED',
+        presence_state: 'claimed',
         claim_verified_at: new Date().toISOString(),
         claimed_agent_id: 'agent-123',
       };
@@ -307,7 +307,7 @@ describe('PresenceService', () => {
 
       const result = await service.verifyClaim('presence-123');
 
-      expect(result.presenceState).toBe('CLAIMED');
+      expect(result.presenceState).toBe('claimed');
       expect(result.claimVerifiedAt).not.toBeNull();
     });
   });
@@ -363,7 +363,7 @@ describe('PresenceService', () => {
     it('should return empty when not connected', async () => {
       mockHolochainClient.isConnected.and.returnValue(false);
 
-      const result = await service.getPresencesByState('UNCLAIMED');
+      const result = await service.getPresencesByState('unclaimed');
 
       expect(result).toEqual([]);
     });
@@ -377,10 +377,10 @@ describe('PresenceService', () => {
         ],
       });
 
-      const result = await service.getPresencesByState('UNCLAIMED');
+      const result = await service.getPresencesByState('unclaimed');
 
       expect(result.length).toBe(1);
-      expect(result[0].presenceState).toBe('UNCLAIMED');
+      expect(result[0].presenceState).toBe('unclaimed');
     });
   });
 
