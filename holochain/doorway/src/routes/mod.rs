@@ -23,7 +23,7 @@ pub use blob::{
     error_response as blob_error_response, BlobContext, BlobError,
 };
 pub use dashboard_ws::handle_dashboard_ws;
-pub use health::{health_check, readiness_check};
+pub use health::{health_check, readiness_check, version_info};
 pub use import::{handle_import_request, match_import_route};
 pub use import_ws::handle_import_progress_ws;
 pub use seed::{handle_seed_blob, handle_check_blob, BlobUploadResponse};

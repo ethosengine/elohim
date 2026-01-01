@@ -185,3 +185,41 @@ pub fn readiness_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         .body(Full::new(Bytes::from(body)))
         .unwrap()
 }
+
+/// Version information for deployment verification
+#[derive(Serialize)]
+pub struct VersionResponse {
+    /// Cargo package version
+    pub version: &'static str,
+    /// Git commit hash (short)
+    pub commit: &'static str,
+    /// Git commit hash (full)
+    pub commit_full: &'static str,
+    /// Build timestamp
+    pub build_time: &'static str,
+    /// Service name
+    pub service: &'static str,
+}
+
+/// Handle version endpoint (/version)
+///
+/// Returns build information for deployment verification.
+/// The orchestrator uses this to verify deployments match expected commits.
+pub fn version_info() -> Response<Full<Bytes>> {
+    let response = VersionResponse {
+        version: env!("CARGO_PKG_VERSION"),
+        commit: option_env!("GIT_COMMIT_SHORT").unwrap_or("unknown"),
+        commit_full: option_env!("GIT_COMMIT_FULL").unwrap_or("unknown"),
+        build_time: option_env!("BUILD_TIMESTAMP").unwrap_or("unknown"),
+        service: "elohim-doorway",
+    };
+
+    let body = serde_json::to_string(&response)
+        .unwrap_or_else(|_| r#"{"version":"unknown","commit":"unknown"}"#.to_string());
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body)))
+        .unwrap()
+}

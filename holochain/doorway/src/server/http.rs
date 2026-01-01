@@ -467,6 +467,11 @@ async fn handle_request(
             to_boxed(routes::readiness_check(Arc::clone(&state)))
         }
 
+        // Version info for deployment verification
+        (Method::GET, "/version") => {
+            to_boxed(routes::version_info())
+        }
+
         // CORS preflight
         (Method::OPTIONS, _) => to_boxed(preflight_response()),
 
