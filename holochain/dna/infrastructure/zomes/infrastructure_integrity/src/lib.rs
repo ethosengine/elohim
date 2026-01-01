@@ -143,6 +143,21 @@ pub const CONTENT_SERVER_CAPABILITIES: [&str; 5] = [
     "custom",           // Custom capability
 ];
 
+/// Storage endpoint - a single reachable URL for content serving.
+/// A ContentServer can have multiple endpoints (different protocols, redundancy).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StorageEndpoint {
+    /// Base URL for fetching content. The content hash is appended to form the full URL.
+    /// Examples:
+    ///   - "http://192.168.1.100:8080/store" → GET /store/{hash}
+    ///   - "https://my-node.example.com/api/v1/blob" → GET /api/v1/blob/{hash}
+    pub url: String,
+    /// Protocol type: "http", "https", "libp2p"
+    pub protocol: String,
+    /// Priority within this server (0-100, higher = preferred)
+    pub priority: u8,
+}
+
 /// ContentServer - Registers an agent as content publisher in the DHT.
 ///
 /// When an agent stores content (e.g., HTML5 app zip), they create a ContentServer
@@ -155,13 +170,19 @@ pub const CONTENT_SERVER_CAPABILITIES: [&str; 5] = [
 #[derive(Clone, PartialEq)]
 pub struct ContentServer {
     /// Content hash this server can provide (e.g., "sha256-abc123")
+    /// Use "*" for wildcard registration (can serve any content of this capability)
     pub content_hash: String,
 
     /// What type of content serving this server supports (from CONTENT_SERVER_CAPABILITIES)
     pub capability: String,
 
-    /// URL where this server accepts content requests (doorway URL or direct URL)
+    /// URL where this server accepts content requests (DEPRECATED - use endpoints)
+    /// Kept for backwards compatibility with existing entries
     pub serve_url: Option<String>,
+
+    /// Multiple reachable endpoints for content fetching (NEW)
+    /// Enables redundancy and protocol flexibility (HTTP, HTTPS, libp2p)
+    pub endpoints: Vec<StorageEndpoint>,
 
     /// Whether this server is currently online and serving
     pub online: bool,
@@ -430,11 +451,55 @@ fn validate_content_server(server: &ContentServer) -> ExternResult<ValidateCallb
         ));
     }
 
-    // Validate serve_url format if provided
+    // Validate serve_url format if provided (deprecated but still accepted)
     if let Some(url) = &server.serve_url {
         if !url.starts_with("http://") && !url.starts_with("https://") {
             return Ok(ValidateCallbackResult::Invalid(
                 "serve_url must start with http:// or https://".to_string(),
+            ));
+        }
+    }
+
+    // Validate endpoints
+    for endpoint in &server.endpoints {
+        // Validate URL format
+        let valid_protocols = ["http", "https", "libp2p"];
+        if !valid_protocols.contains(&endpoint.protocol.as_str()) {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!(
+                    "Invalid endpoint protocol '{}'. Must be one of: {:?}",
+                    endpoint.protocol, valid_protocols
+                ),
+            ));
+        }
+
+        // Validate URL matches protocol
+        match endpoint.protocol.as_str() {
+            "http" => {
+                if !endpoint.url.starts_with("http://") {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        format!("Endpoint URL '{}' must start with http:// for http protocol", endpoint.url),
+                    ));
+                }
+            }
+            "https" => {
+                if !endpoint.url.starts_with("https://") {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        format!("Endpoint URL '{}' must start with https:// for https protocol", endpoint.url),
+                    ));
+                }
+            }
+            "libp2p" => {
+                // libp2p multiaddrs typically start with /ip4/, /ip6/, or /dns4/
+                // We'll be lenient here since libp2p addresses have many formats
+            }
+            _ => {}
+        }
+
+        // Validate priority
+        if endpoint.priority > 100 {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("Endpoint priority must be between 0 and 100, got {}", endpoint.priority),
             ));
         }
     }

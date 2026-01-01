@@ -64,17 +64,32 @@ pub struct RecordSummaryInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterContentServerInput {
     /// Content hash this server can provide (e.g., "sha256-abc123")
+    /// Use "*" for wildcard registration (can serve any content of this capability)
     pub content_hash: String,
     /// Capability: blob, html5_app, media_stream, learning_package, custom
     pub capability: String,
-    /// URL where this server accepts content requests
+    /// URL where this server accepts content requests (DEPRECATED - use endpoints)
     pub serve_url: Option<String>,
+    /// Multiple reachable endpoints for content fetching (NEW)
+    /// If empty and serve_url is provided, an endpoint will be auto-created from serve_url
+    pub endpoints: Option<Vec<StorageEndpointInput>>,
     /// Server priority (0-100, higher = preferred)
     pub priority: Option<u8>,
     /// Geographic region for latency-based routing
     pub region: Option<String>,
     /// Bandwidth capacity in Mbps
     pub bandwidth_mbps: Option<u32>,
+}
+
+/// Input for a storage endpoint
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorageEndpointInput {
+    /// Base URL for fetching content (hash appended)
+    pub url: String,
+    /// Protocol type: "http", "https", "libp2p"
+    pub protocol: String,
+    /// Priority within this server (0-100, higher = preferred)
+    pub priority: Option<u8>,
 }
 
 /// Output from content server operations
@@ -592,10 +607,41 @@ pub fn register_content_server(input: RegisterContentServerInput) -> ExternResul
     let now = sys_time()?;
     let now_secs = now.as_seconds_and_nanos().0 as u64;
 
+    // Build endpoints list
+    let endpoints: Vec<StorageEndpoint> = match input.endpoints {
+        Some(eps) if !eps.is_empty() => {
+            eps.into_iter()
+                .map(|e| StorageEndpoint {
+                    url: e.url,
+                    protocol: e.protocol,
+                    priority: e.priority.unwrap_or(50),
+                })
+                .collect()
+        }
+        _ => {
+            // Backwards compatibility: create endpoint from serve_url if provided
+            if let Some(ref url) = input.serve_url {
+                let protocol = if url.starts_with("https://") {
+                    "https".to_string()
+                } else {
+                    "http".to_string()
+                };
+                vec![StorageEndpoint {
+                    url: url.clone(),
+                    protocol,
+                    priority: 50,
+                }]
+            } else {
+                Vec::new()
+            }
+        }
+    };
+
     let server = ContentServer {
         content_hash: input.content_hash.clone(),
         capability: input.capability.clone(),
         serve_url: input.serve_url,
+        endpoints,
         online: true,
         priority: input.priority.unwrap_or(50),
         region: input.region.clone(),
