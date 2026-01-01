@@ -36,8 +36,6 @@ describe('HealthCheckService', () => {
     }));
 
     const mockChildLogger = {
-      parent: null as unknown,
-      source: 'HealthCheckService',
       debug: jasmine.createSpy('debug'),
       info: jasmine.createSpy('info'),
       warn: jasmine.createSpy('warn'),
@@ -48,7 +46,7 @@ describe('HealthCheckService', () => {
       }),
     };
     mockLogger = jasmine.createSpyObj('LoggerService', ['createChild']);
-    mockLogger.createChild.and.returnValue(mockChildLogger as ReturnType<LoggerService['createChild']>);
+    mockLogger.createChild.and.returnValue(mockChildLogger as unknown as ReturnType<LoggerService['createChild']>);
 
     TestBed.configureTestingModule({
       providers: [
