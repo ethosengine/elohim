@@ -201,7 +201,7 @@ describe('IdentityService', () => {
       expect(service.humanId()).toBe('human-abc');
       expect(service.displayName()).toBe('Test Human');
       expect(service.agentPubKey()).toBe('agent-pub-key-xyz');
-      expect(service.mode()).toBe('self-sovereign'); // localhost = self-sovereign
+      expect(service.mode()).toBe('steward'); // localhost = self-sovereign
     }));
 
     it('should remain in session mode when no Holochain identity', fakeAsync(() => {
@@ -262,7 +262,7 @@ describe('IdentityService', () => {
 
       expect(profile.displayName).toBe('Test Human');
       expect(service.isAuthenticated()).toBe(true);
-      expect(service.mode()).toBe('self-sovereign');
+      expect(service.mode()).toBe('steward');
     });
 
     it('should mark session as migrated after registration', async () => {
@@ -389,7 +389,7 @@ describe('IdentityService', () => {
       isConnectedSignal.set(true);
       tick();
 
-      expect(service.mode()).toBe('self-sovereign');
+      expect(service.mode()).toBe('steward');
 
       // Disconnect
       isConnectedSignal.set(false);
@@ -446,5 +446,113 @@ describe('IdentityService', () => {
 
       expect(result.isLocal).toBe(true);
     });
+  });
+
+  describe('DID Generation', () => {
+    it('should generate session DID on initialization', () => {
+      // Service initialized with mockSession in beforeEach
+      expect(service.did()).toBe('did:web:gateway.elohim.host:session:session-123');
+    });
+
+    it('should generate hosted DID when connected to remote conductor', fakeAsync(() => {
+      mockHolochainClient.getDisplayInfo.and.returnValue({
+        appUrl: 'wss://doorway.elohim.host/api',
+        adminUrl: null,
+        mode: 'doorway' as const,
+      });
+
+      mockHolochainClient.callZome.and.returnValue(Promise.resolve({
+        success: true,
+        data: mockHumanSessionResult,
+      }));
+
+      isConnectedSignal.set(true);
+      tick();
+
+      expect(service.mode()).toBe('hosted');
+      expect(service.did()).toBe('did:web:hosted.elohim.host:humans:human-abc');
+    }));
+
+    it('should generate steward DID (did:key) when connected to local conductor', fakeAsync(() => {
+      mockHolochainClient.getDisplayInfo.and.returnValue({
+        appUrl: 'ws://localhost:8888',
+        adminUrl: null,
+        mode: 'direct' as const,
+      });
+
+      mockHolochainClient.callZome.and.returnValue(Promise.resolve({
+        success: true,
+        data: mockHumanSessionResult,
+      }));
+
+      isConnectedSignal.set(true);
+      tick();
+
+      expect(service.mode()).toBe('steward');
+      // DID should be did:key with agent pubkey (base64 special chars stripped)
+      expect(service.did()).toMatch(/^did:key:z/);
+      expect(service.did()).toContain('agent');
+    }));
+
+    it('should preserve session DID format on fallback', fakeAsync(() => {
+      // First connect to Holochain
+      mockHolochainClient.getDisplayInfo.and.returnValue({
+        appUrl: 'wss://doorway.elohim.host/api',
+        adminUrl: null,
+        mode: 'doorway' as const,
+      });
+
+      mockHolochainClient.callZome.and.returnValue(Promise.resolve({
+        success: true,
+        data: mockHumanSessionResult,
+      }));
+
+      isConnectedSignal.set(true);
+      tick();
+
+      expect(service.did()).toBe('did:web:hosted.elohim.host:humans:human-abc');
+
+      // Disconnect - should fall back to session DID
+      isConnectedSignal.set(false);
+      tick();
+
+      expect(service.mode()).toBe('session');
+      expect(service.did()).toBe('did:web:gateway.elohim.host:session:session-123');
+    }));
+
+    it('should have null DID in anonymous mode', () => {
+      // Reset to no session
+      mockSessionHumanService.getSession.and.returnValue(null);
+      service['fallbackToSession']();
+
+      expect(service.mode()).toBe('anonymous');
+      expect(service.did()).toBeNull();
+    });
+
+    it('should generate DID on registration', fakeAsync(() => {
+      mockHolochainClient.getDisplayInfo.and.returnValue({
+        appUrl: 'wss://doorway.elohim.host/api',
+        adminUrl: null,
+        mode: 'doorway' as const,
+      });
+
+      mockHolochainClient.callZome.and.returnValue(Promise.resolve({
+        success: true,
+        data: mockHumanSessionResult,
+      }));
+
+      isConnectedSignal.set(true);
+
+      const request: RegisterHumanRequest = {
+        displayName: 'New User',
+        affinities: ['test'],
+        profileReach: 'community',
+      };
+
+      service.registerHuman(request);
+      tick();
+
+      expect(service.did()).toBe('did:web:hosted.elohim.host:humans:human-abc');
+    }));
   });
 });
