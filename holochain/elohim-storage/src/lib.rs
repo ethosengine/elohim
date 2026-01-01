@@ -46,6 +46,7 @@ pub mod conductor_client;
 pub mod import_api;
 pub mod progress_hub;
 pub mod progress_ws;
+pub mod cell_discovery;
 
 // P2P identity and discovery (always available, but some types require p2p feature)
 pub mod identity;
