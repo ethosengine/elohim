@@ -161,18 +161,10 @@ export class HolochainClientService {
 
   /**
    * Resolve admin URL based on environment.
-   * @deprecated Use strategy.resolveAdminUrl() instead. Kept for testAdminConnection().
+   * Uses strategy pattern for environment-specific URL resolution.
    */
   private resolveAdminUrl(): string {
     return this.strategy.resolveAdminUrl(this.buildConnectionConfig());
-  }
-
-  /**
-   * Resolve app interface URL based on environment and port.
-   * @deprecated Use strategy.resolveAppUrl() instead. Kept for testAdminConnection().
-   */
-  private resolveAppUrl(port: number): string {
-    return this.strategy.resolveAppUrl(this.buildConnectionConfig(), port);
   }
 
   /**
@@ -582,27 +574,6 @@ export class HolochainClientService {
     } catch {
       return null;
     }
-  }
-
-  /**
-   * Extract cell ID from app info (DEPRECATED - use extractAllCellIds)
-   *
-   * Holochain cell_info structure (0.6.x):
-   * { "role_name": [{ type: "provisioned", value: { cell_id: {...} } }] }
-   *
-   * @deprecated Use extractAllCellIds for multi-DNA hApps
-   */
-  private extractCellId(appInfo: AppInfo): CellId | null {
-    const cellInfoEntries = Object.entries(appInfo.cell_info);
-    for (const [, cells] of cellInfoEntries) {
-      const cellArray = cells as Array<{ type: string; value: { cell_id: CellId } }>;
-      for (const cell of cellArray) {
-        if (cell.type === 'provisioned' && cell.value?.cell_id) {
-          return cell.value.cell_id;
-        }
-      }
-    }
-    return null;
   }
 
   /**
