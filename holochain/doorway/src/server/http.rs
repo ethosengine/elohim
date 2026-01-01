@@ -532,9 +532,6 @@ async fn handle_request(
             }
         }
 
-        // Status endpoint with runtime info
-        (Method::GET, "/status") => to_boxed(routes::status_check(Arc::clone(&state)).await),
-
         // ====================================================================
         // Admin API endpoints for Shefa compute resources dashboard
         // ====================================================================

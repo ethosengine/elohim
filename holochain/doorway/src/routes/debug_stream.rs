@@ -256,7 +256,8 @@ async fn handle_debug_client(
                 if let Some(ref mut rx) = storage_rx {
                     rx.recv().await
                 } else {
-                    std::future::pending::<Option<Result<Message, _>>>().await
+                    // Type must match rx.recv().await which returns Option<Option<Result<...>>>
+                    std::future::pending::<Option<Option<Result<Message, tokio_tungstenite::tungstenite::Error>>>>().await
                 }
             } => {
                 if let Some(Ok(Message::Text(text))) = msg {
