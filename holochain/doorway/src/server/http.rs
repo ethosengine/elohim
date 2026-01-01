@@ -80,6 +80,8 @@ pub struct AppState {
     /// Single-connection import client for batch operations
     /// Uses ONE connection to conductor to avoid overwhelming during imports
     pub import_client: Option<Arc<crate::services::ImportClient>>,
+    /// Debug event hub for real-time debugging via WebSocket
+    pub debug_hub: Arc<routes::DebugHub>,
 }
 
 impl AppState {
@@ -133,6 +135,7 @@ impl AppState {
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
             import_client: None, // Set later via set_import_client()
+            debug_hub: Arc::new(routes::DebugHub::new(true))
         }
     }
 
@@ -194,6 +197,7 @@ impl AppState {
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
             import_client: None, // Set later via set_import_client()
+            debug_hub: Arc::new(routes::DebugHub::new(true))
         }
     }
 
@@ -262,6 +266,7 @@ impl AppState {
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
             import_client: None, // Set later via set_import_client()
+            debug_hub: Arc::new(routes::DebugHub::new(true))
         }
     }
 
@@ -332,6 +337,7 @@ impl AppState {
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
             import_client: None, // Set later via set_import_client()
+            debug_hub: Arc::new(routes::DebugHub::new(true))
         })
     }
 
@@ -470,6 +476,22 @@ async fn handle_request(
         // Version info for deployment verification
         (Method::GET, "/version") => {
             to_boxed(routes::version_info())
+        }
+
+        // Comprehensive status (runtime stats, cluster health, storage diagnostics)
+        (Method::GET, "/status") => {
+            to_boxed(routes::status_check(Arc::clone(&state)).await)
+        }
+
+        // Debug stream WebSocket for real-time debugging
+        (Method::GET, "/debug/stream") if hyper_tungstenite::is_upgrade_request(&req) => {
+            return Ok(to_boxed(
+                routes::handle_debug_stream(
+                    req,
+                    Arc::clone(&state.debug_hub),
+                    state.args.storage_url.clone(),
+                ).await
+            ));
         }
 
         // DID Document for federation discovery (W3C standard path)

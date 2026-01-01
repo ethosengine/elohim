@@ -40,7 +40,9 @@ use tokio::sync::{broadcast, RwLock};
 use tracing::{debug, error, info, warn};
 
 use crate::blob_store::BlobStore;
+use crate::cell_discovery::discover_cell_id;
 use crate::conductor_client::{ConductorClient, ConductorClientConfig};
+use crate::debug_stream::DebugBroadcaster;
 use crate::error::StorageError;
 use crate::progress_hub::ProgressHub;
 
@@ -138,6 +140,8 @@ pub struct ImportApiConfig {
     pub conductor_url: String,
     /// App ID for authentication
     pub app_id: String,
+    /// Role filter for cell discovery (e.g., "lamad")
+    pub role_filter: Option<String>,
     /// Chunk size for processing
     pub chunk_size: usize,
     /// Delay between chunks (backpressure)
@@ -156,6 +160,7 @@ impl Default for ImportApiConfig {
             admin_url: "ws://localhost:4444".to_string(),
             conductor_url: "ws://localhost:4445".to_string(),
             app_id: "elohim".to_string(),
+            role_filter: Some("lamad".to_string()),
             chunk_size: 50,
             chunk_delay: Duration::from_millis(100),
             max_concurrent_batches: 3,
@@ -174,23 +179,38 @@ pub struct ImportApi {
     batches: Arc<RwLock<HashMap<String, ImportBatch>>>,
     /// Progress hub for WebSocket streaming
     progress_hub: Option<Arc<ProgressHub>>,
+    /// Debug broadcaster for real-time debugging
+    debug_broadcaster: Option<Arc<DebugBroadcaster>>,
+    /// Lazily discovered cell_id cache - shared across all processing tasks
+    cell_id_cache: Arc<RwLock<Option<Vec<u8>>>>,
 }
 
 impl ImportApi {
     /// Create a new import API service
     pub fn new(config: ImportApiConfig, blob_store: Arc<BlobStore>) -> Self {
+        // Pre-populate cell_id cache if configured
+        let cell_id_cache = Arc::new(RwLock::new(config.cell_id.clone()));
+
         Self {
             config,
             blob_store,
             conductor: None,
             batches: Arc::new(RwLock::new(HashMap::new())),
             progress_hub: None,
+            debug_broadcaster: None,
+            cell_id_cache,
         }
     }
 
     /// Set the progress hub for WebSocket streaming
     pub fn with_progress_hub(mut self, hub: Arc<ProgressHub>) -> Self {
         self.progress_hub = Some(hub);
+        self
+    }
+
+    /// Set the debug broadcaster for real-time debugging
+    pub fn with_debug_broadcaster(mut self, broadcaster: Arc<DebugBroadcaster>) -> Self {
+        self.debug_broadcaster = Some(broadcaster);
         self
     }
 
@@ -450,6 +470,8 @@ impl ImportApi {
             conductor: self.conductor.clone(),
             batches: Arc::clone(&self.batches),
             progress_hub: self.progress_hub.clone(),
+            debug_broadcaster: self.debug_broadcaster.clone(),
+            cell_id_cache: Arc::clone(&self.cell_id_cache),
         }
     }
 }
@@ -461,9 +483,82 @@ struct ImportApiProcessor {
     conductor: Option<Arc<ConductorClient>>,
     batches: Arc<RwLock<HashMap<String, ImportBatch>>>,
     progress_hub: Option<Arc<ProgressHub>>,
+    debug_broadcaster: Option<Arc<DebugBroadcaster>>,
+    cell_id_cache: Arc<RwLock<Option<Vec<u8>>>>,
 }
 
 impl ImportApiProcessor {
+    /// Ensure cell_id is discovered - lazy discovery on first use
+    ///
+    /// This is the KEY fix for the silent failure bug. Previously, if cell_id
+    /// wasn't discovered at startup (race with hApp installer), imports would
+    /// silently skip. Now we discover lazily and fail loudly if we can't.
+    async fn ensure_cell_id(&self, batch_id: &str) -> Result<Vec<u8>, StorageError> {
+        // Check cache first (fast path)
+        {
+            let cache = self.cell_id_cache.read().await;
+            if let Some(ref cell_id) = *cache {
+                return Ok(cell_id.clone());
+            }
+        }
+
+        // Not cached - need to discover
+        info!(
+            batch_id = %batch_id,
+            admin_url = %self.config.admin_url,
+            app_id = %self.config.app_id,
+            role = ?self.config.role_filter,
+            "🔍 CELL_DISCOVERY: cell_id not cached, discovering lazily..."
+        );
+
+        // Emit debug event
+        if let Some(ref broadcaster) = self.debug_broadcaster {
+            broadcaster.cell_discovery_start(&self.config.admin_url, &self.config.app_id);
+        }
+
+        // Attempt discovery
+        match discover_cell_id(
+            &self.config.admin_url,
+            &self.config.app_id,
+            self.config.role_filter.as_deref(),
+        ).await {
+            Ok(cell_id) => {
+                // Cache it for future use
+                {
+                    let mut cache = self.cell_id_cache.write().await;
+                    *cache = Some(cell_id.clone());
+                }
+
+                info!(
+                    batch_id = %batch_id,
+                    cell_id_len = cell_id.len(),
+                    "✅ CELL_DISCOVERY: cell_id discovered and cached"
+                );
+
+                if let Some(ref broadcaster) = self.debug_broadcaster {
+                    broadcaster.cell_discovery_success(
+                        self.config.role_filter.as_deref().unwrap_or("default")
+                    );
+                }
+
+                Ok(cell_id)
+            }
+            Err(e) => {
+                error!(
+                    batch_id = %batch_id,
+                    error = %e,
+                    "❌ CELL_DISCOVERY: Failed to discover cell_id"
+                );
+
+                if let Some(ref broadcaster) = self.debug_broadcaster {
+                    broadcaster.cell_discovery_failed(&e.to_string());
+                }
+
+                Err(e)
+            }
+        }
+    }
+
     /// Process a batch of items
     async fn process_batch(
         &self,
@@ -475,6 +570,49 @@ impl ImportApiProcessor {
 
         // Update status to processing
         self.update_status(batch_id, ImportStatus::Processing).await;
+
+        // Emit debug event for batch start
+        if let Some(ref broadcaster) = self.debug_broadcaster {
+            let items_count: usize = serde_json::from_str::<Vec<serde_json::Value>>(items_json)
+                .map(|v| v.len())
+                .unwrap_or(0);
+            broadcaster.import_batch_start(batch_id, batch_type, items_count);
+        }
+
+        // CRITICAL: Ensure we have a cell_id BEFORE processing
+        // This is the lazy discovery - fail loudly if we can't discover
+        let cell_id = match self.ensure_cell_id(batch_id).await {
+            Ok(id) => id,
+            Err(e) => {
+                let error_msg = format!("Cell discovery failed: {}", e);
+                error!(batch_id = %batch_id, error = %error_msg, "❌ BATCH_FAILED: Cannot proceed without cell_id");
+                self.add_error(batch_id, error_msg.clone()).await;
+                self.update_status(batch_id, ImportStatus::Failed).await;
+
+                if let Some(ref broadcaster) = self.debug_broadcaster {
+                    broadcaster.import_batch_complete(batch_id, 0, 1, batch_start.elapsed().as_millis() as u64);
+                }
+
+                return Err(StorageError::NotFound(error_msg));
+            }
+        };
+
+        // Check conductor is connected
+        let conductor = match &self.conductor {
+            Some(c) => c,
+            None => {
+                let error_msg = "No conductor connection available";
+                error!(batch_id = %batch_id, "❌ BATCH_FAILED: {}", error_msg);
+                self.add_error(batch_id, error_msg.to_string()).await;
+                self.update_status(batch_id, ImportStatus::Failed).await;
+
+                if let Some(ref broadcaster) = self.debug_broadcaster {
+                    broadcaster.import_batch_complete(batch_id, 0, 1, batch_start.elapsed().as_millis() as u64);
+                }
+
+                return Err(StorageError::Connection(error_msg.to_string()));
+            }
+        };
 
         // Parse items
         let items: Vec<serde_json::Value> = serde_json::from_str(items_json)?;
@@ -488,7 +626,7 @@ impl ImportApiProcessor {
             total_chunks = total_chunks,
             chunk_size = self.config.chunk_size,
             conductor_url = %self.config.conductor_url,
-            "📥 BATCH_START: Starting batch processing via ImportApi"
+            "📥 BATCH_START: Starting batch processing via ImportApi (cell_id ready)"
         );
 
         // Process in chunks
@@ -497,7 +635,6 @@ impl ImportApiProcessor {
 
         for (chunk_idx, chunk) in items.chunks(self.config.chunk_size).enumerate() {
             let chunk_start = Instant::now();
-            let chunk_json = serde_json::to_string(chunk)?;
             let is_final = processed + chunk.len() >= total;
 
             info!(
@@ -509,73 +646,60 @@ impl ImportApiProcessor {
                 "🔄 CHUNK_START: Sending chunk to conductor"
             );
 
-            // Call conductor if connected
-            if let Some(ref conductor) = self.conductor {
-                if let Some(ref cell_id) = self.config.cell_id {
-                    // Build payload
-                    let payload = serde_json::json!({
-                        "batch_id": batch_id,
-                        "batch_type": batch_type,
-                        "chunk_index": chunk_idx,
-                        "is_final": is_final,
-                        "items": chunk,
-                    });
-                    let payload_bytes = rmp_serde::to_vec(&payload)
-                        .map_err(|e| StorageError::Internal(e.to_string()))?;
+            if let Some(ref broadcaster) = self.debug_broadcaster {
+                broadcaster.import_chunk_start(batch_id, chunk_idx, chunk.len());
+            }
 
-                    match conductor.call_zome(
-                        cell_id,
-                        &self.config.zome_name,
-                        "process_import_chunk",
-                        &payload_bytes,
-                    ).await {
-                        Ok(_) => {
-                            let chunk_duration = chunk_start.elapsed();
-                            processed += chunk.len();
-                            info!(
-                                batch_id = %batch_id,
-                                chunk_index = chunk_idx,
-                                chunk_items = chunk.len(),
-                                duration_ms = chunk_duration.as_millis(),
-                                total_processed = processed,
-                                "✅ CHUNK_OK: Chunk sent to conductor successfully"
-                            );
-                        }
-                        Err(e) => {
-                            let chunk_duration = chunk_start.elapsed();
-                            error!(
-                                batch_id = %batch_id,
-                                chunk_index = chunk_idx,
-                                chunk_items = chunk.len(),
-                                duration_ms = chunk_duration.as_millis(),
-                                error = %e,
-                                "❌ CHUNK_ERROR: Conductor call failed"
-                            );
-                            errors += chunk.len();
-                            self.add_error(batch_id, format!("Chunk {}: {}", chunk_idx, e)).await;
-                        }
-                    }
-                } else {
-                    // No cell_id - just simulate success for testing
+            // Build payload
+            let payload = serde_json::json!({
+                "batch_id": batch_id,
+                "batch_type": batch_type,
+                "chunk_index": chunk_idx,
+                "is_final": is_final,
+                "items": chunk,
+            });
+            let payload_bytes = rmp_serde::to_vec(&payload)
+                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+            match conductor.call_zome(
+                &cell_id,
+                &self.config.zome_name,
+                "process_import_chunk",
+                &payload_bytes,
+            ).await {
+                Ok(_) => {
                     let chunk_duration = chunk_start.elapsed();
-                    warn!(
+                    processed += chunk.len();
+                    info!(
                         batch_id = %batch_id,
                         chunk_index = chunk_idx,
+                        chunk_items = chunk.len(),
                         duration_ms = chunk_duration.as_millis(),
-                        "⚠️ CHUNK_SKIPPED: No cell_id configured, chunk not sent to conductor"
+                        total_processed = processed,
+                        "✅ CHUNK_OK: Chunk sent to conductor successfully"
                     );
-                    processed += chunk.len();
+
+                    if let Some(ref broadcaster) = self.debug_broadcaster {
+                        broadcaster.import_chunk_success(batch_id, chunk_idx, chunk_duration.as_millis() as u64);
+                    }
                 }
-            } else {
-                // No conductor - just count items
-                let chunk_duration = chunk_start.elapsed();
-                warn!(
-                    batch_id = %batch_id,
-                    chunk_index = chunk_idx,
-                    duration_ms = chunk_duration.as_millis(),
-                    "⚠️ CHUNK_SKIPPED: No conductor connected, chunk not processed"
-                );
-                processed += chunk.len();
+                Err(e) => {
+                    let chunk_duration = chunk_start.elapsed();
+                    error!(
+                        batch_id = %batch_id,
+                        chunk_index = chunk_idx,
+                        chunk_items = chunk.len(),
+                        duration_ms = chunk_duration.as_millis(),
+                        error = %e,
+                        "❌ CHUNK_ERROR: Conductor call failed"
+                    );
+                    errors += chunk.len();
+                    self.add_error(batch_id, format!("Chunk {}: {}", chunk_idx, e)).await;
+
+                    if let Some(ref broadcaster) = self.debug_broadcaster {
+                        broadcaster.import_chunk_error(batch_id, chunk_idx, &e.to_string());
+                    }
+                }
             }
 
             // Update progress
@@ -616,6 +740,15 @@ impl ImportApiProcessor {
             status = ?final_status,
             "📦 BATCH_COMPLETE: Batch processing finished"
         );
+
+        if let Some(ref broadcaster) = self.debug_broadcaster {
+            broadcaster.import_batch_complete(
+                batch_id,
+                processed,
+                errors,
+                batch_duration.as_millis() as u64,
+            );
+        }
 
         Ok(())
     }

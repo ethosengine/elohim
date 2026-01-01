@@ -47,6 +47,7 @@ pub mod import_api;
 pub mod progress_hub;
 pub mod progress_ws;
 pub mod cell_discovery;
+pub mod debug_stream;
 
 // P2P identity and discovery (always available, but some types require p2p feature)
 pub mod identity;
@@ -70,6 +71,7 @@ pub use sharding::{ShardEncoder, ShardManifest, ShardConfig};
 pub use http::HttpServer;
 pub use import_handler::{ImportHandler, ImportHandlerConfig, ImportProgress};
 pub use progress_hub::{ProgressHub, ProgressHubConfig, ProgressMessage};
+pub use debug_stream::{DebugBroadcaster, DebugEvent};
 
 // P2P re-exports
 pub use identity::{NodeCapabilities, NodeIdentityInfo};

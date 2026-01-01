@@ -266,20 +266,17 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         def internalDoorway = env.INTERNAL_DOORWAY_URL
                         def seedIds = params.SEED_IDS
 
-                        echo """
-═══════════════════════════════════════════════════════════
-🌱 SEEDING DATABASE
-═══════════════════════════════════════════════════════════
-Target: ${internalDoorway}
-IDs: ${seedIds ?: '(all content)'}
-═══════════════════════════════════════════════════════════
-                        """
-
                         dir('genesis/seeder') {
                             sh """#!/bin/bash
                                 set -euo pipefail
 
-                                echo "Running seeder (fast mode)..."
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "🌱 SEEDING DATABASE"
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "Target: ${internalDoorway}"
+                                echo "IDs: ${seedIds ?: '(all content)'}"
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo ""
 
                                 SEED_CMD="npx tsx src/seed.ts"
                                 if [ -n "${seedIds}" ]; then
@@ -300,15 +297,11 @@ IDs: ${seedIds ?: '(all content)'}
                                     \$SEED_CMD
 
                                 echo ""
-                                echo "✅ Seeding complete"
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "✅ DATABASE SEEDED SUCCESSFULLY"
+                                echo "═══════════════════════════════════════════════════════════"
                             """
                         }
-
-                        echo """
-═══════════════════════════════════════════════════════════
-✅ DATABASE SEEDED SUCCESSFULLY
-═══════════════════════════════════════════════════════════
-                        """
                     }
                 }
             }

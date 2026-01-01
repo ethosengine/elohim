@@ -165,9 +165,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         info!("  WS   /import/progress        - WebSocket progress stream");
         info!("  Conductor app URL: {}", args.app_url);
 
-        // Discover cell_id from admin interface if admin_url is set
+        // Try to discover cell_id from admin interface at startup (optional - will retry lazily)
         let cell_id = if let Some(ref admin_url) = args.admin_url {
-            info!("  Discovering cell_id from admin interface...");
+            info!("  Attempting cell_id discovery from admin interface...");
             match discover_cell_id(admin_url, &args.app_id, Some("lamad")).await {
                 Ok(cid) => {
                     info!("  ✅ Cell discovered for app '{}' role 'lamad'", args.app_id);
@@ -182,15 +182,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             Some(cid)
                         }
                         Err(e) => {
-                            error!("  ❌ Cell discovery failed: {} (imports will NOT be sent to conductor)", e);
+                            // With lazy discovery, this is no longer fatal - we'll retry on first import
+                            warn!("  ⚠️ Cell discovery failed at startup: {} (will retry lazily on first import)", e);
                             None
                         }
                     }
                 }
             }
         } else {
-            warn!("  ⚠️ No admin_url set - cannot discover cell_id (imports will NOT be sent to conductor)");
-            warn!("  Set HOLOCHAIN_ADMIN_URL or use --admin-url to enable cell discovery");
+            // With lazy discovery, we can proceed without admin_url at startup
+            // but we need it to be set for imports to work
+            info!("  ℹ️ No admin_url set at startup - cell_id will be discovered lazily on first import");
             None
         };
 
