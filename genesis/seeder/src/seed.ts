@@ -11,9 +11,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { AdminWebsocket, AppWebsocket, type CellId } from '@holochain/client';
 import DoorwayClient, { ImportStatusResponse } from './doorway-client.js';
 import StorageClient from './storage-client.js'; // Used for computing blob hash
 import { ProgressClient, waitForBatchCompletion, waitWithFallback, type ProgressMessage } from './progress-client.js';
+import { SeedingVerification, type ExpectedCounts } from './verification.js';
 
 // ========================================
 // PERFORMANCE TIMING UTILITIES
@@ -319,6 +321,10 @@ const FORCE_SEED = args.includes('--force') || process.env.FORCE_SEED === 'true'
 
 // Doorway URL is REQUIRED - seeder only works through doorway
 const DOORWAY_URL = process.env.DOORWAY_URL; // e.g., 'https://doorway-dev.elohim.host'
+const HOLOCHAIN_ADMIN_URL = process.env.HOLOCHAIN_ADMIN_URL; // e.g., 'wss://doorway-dev.elohim.host?apiKey=...'
+const SKIP_VERIFICATION = process.env.SKIP_VERIFICATION === 'true';
+const APP_ID = 'elohim';
+const ZOME_NAME = 'content_store';
 const DOORWAY_API_KEY = process.env.DOORWAY_API_KEY;
 
 /**
@@ -594,6 +600,128 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
   };
 }
 
+// =============================================================================
+// HOLOCHAIN CONNECTION FOR VERIFICATION
+// =============================================================================
+
+interface HolochainConnection {
+  appWs: AppWebsocket;
+  cellId: CellId;
+  close: () => Promise<void>;
+}
+
+/**
+ * Result of seeding operation - used for post-flight verification
+ */
+interface SeedResult {
+  contentAttempted: number;
+  contentSucceeded: number;
+  pathsAttempted: number;
+  pathsSucceeded: number;
+  sampleIds: string[];
+}
+
+/**
+ * Connect to Holochain conductor for pre/post-flight verification.
+ * Uses admin interface to discover cell, then connects to app interface.
+ */
+async function connectForVerification(): Promise<HolochainConnection | null> {
+  if (!HOLOCHAIN_ADMIN_URL) {
+    console.log('   ⚠️ HOLOCHAIN_ADMIN_URL not set - skipping verification');
+    return null;
+  }
+
+  try {
+    // Connect to admin interface
+    const adminWs = await AdminWebsocket.connect({
+      url: new URL(HOLOCHAIN_ADMIN_URL),
+      wsClientOptions: { origin: 'http://localhost' },
+    });
+
+    // Find our app
+    const apps = await adminWs.listApps({});
+    const app = apps.find((a) => a.installed_app_id === APP_ID);
+    if (!app) {
+      console.log(`   ⚠️ App '${APP_ID}' not found on conductor`);
+      await adminWs.client.close();
+      return null;
+    }
+
+    // Find cell (support both 'elohim' and legacy 'lamad' roles)
+    const availableRoles = Object.keys(app.cell_info);
+    const roleName = availableRoles.find(r => r === 'elohim') ||
+                     availableRoles.find(r => r === 'lamad') ||
+                     availableRoles[0];
+
+    if (!roleName) {
+      console.log('   ⚠️ No cell roles found');
+      await adminWs.client.close();
+      return null;
+    }
+
+    const cellInfo = app.cell_info[roleName];
+    const provisionedCell = cellInfo?.find((c: any) => 'provisioned' in c);
+    if (!provisionedCell) {
+      console.log('   ⚠️ No provisioned cell found');
+      await adminWs.client.close();
+      return null;
+    }
+
+    // Extract cell_id
+    const rawCellId = (provisionedCell as any).provisioned.cell_id;
+    function toUint8Array(val: any): Uint8Array {
+      if (val instanceof Uint8Array) return val;
+      if (val?.type === 'Buffer' && Array.isArray(val.data)) return new Uint8Array(val.data);
+      if (ArrayBuffer.isView(val)) return new Uint8Array(val.buffer);
+      throw new Error('Cannot convert to Uint8Array');
+    }
+    const cellId: CellId = [toUint8Array(rawCellId[0]), toUint8Array(rawCellId[1])];
+
+    // Get auth token
+    const token = await adminWs.issueAppAuthenticationToken({
+      installed_app_id: APP_ID,
+      single_use: false,
+      expiry_seconds: 300,
+    });
+
+    await adminWs.authorizeSigningCredentials(cellId);
+
+    // Resolve app interface URL
+    const existingInterfaces = await adminWs.listAppInterfaces();
+    const appPort = existingInterfaces.length > 0 ? existingInterfaces[0].port : 4445;
+
+    let appWsUrl: string;
+    if (!HOLOCHAIN_ADMIN_URL.includes('localhost') && !HOLOCHAIN_ADMIN_URL.includes('127.0.0.1')) {
+      const url = new URL(HOLOCHAIN_ADMIN_URL);
+      const baseUrl = `${url.protocol}//${url.host}`;
+      const apiKey = url.searchParams.get('apiKey');
+      const apiKeyParam = apiKey ? `?apiKey=${encodeURIComponent(apiKey)}` : '';
+      appWsUrl = `${baseUrl}/app/${appPort}${apiKeyParam}`;
+    } else {
+      appWsUrl = `ws://localhost:${appPort}`;
+    }
+
+    // Connect to app interface
+    const appWs = await AppWebsocket.connect({
+      url: new URL(appWsUrl),
+      wsClientOptions: { origin: 'http://localhost' },
+      token: token.token,
+    });
+
+    return {
+      appWs,
+      cellId,
+      close: async () => {
+        await appWs.client.close();
+        await adminWs.client.close();
+      },
+    };
+  } catch (error) {
+    console.log(`   ⚠️ Failed to connect for verification: ${error instanceof Error ? error.message : error}`);
+    return null;
+  }
+}
+
 /**
  * Doorway mode seeding
  *
@@ -605,8 +733,18 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
  * 2. Upload blob to doorway → doorway forwards to elohim-storage
  * 3. Queue import with blob_hash → doorway calls zome
  * 4. Poll for status → doorway calls zome
+ *
+ * @returns SeedResult with counts for post-flight verification
  */
-async function seedViaDoorway() {
+async function seedViaDoorway(): Promise<SeedResult> {
+  // Track results for verification
+  const result: SeedResult = {
+    contentAttempted: 0,
+    contentSucceeded: 0,
+    pathsAttempted: 0,
+    pathsSucceeded: 0,
+    sampleIds: [],
+  };
   timer.startPhase('Doorway Import');
 
   // Create doorway client
@@ -683,6 +821,16 @@ async function seedViaDoorway() {
       const relativePath = file.replace(DATA_DIR + '/', '');
       return conceptToInput(concept, relativePath);
     });
+
+    // Track for verification
+    result.contentAttempted = allInputs.length;
+    // Collect sample IDs (first 5, last 5, and some from middle)
+    const sampleIndices = [
+      0, 1, 2, 3, 4,  // first 5
+      Math.floor(allInputs.length / 2),  // middle
+      ...Array.from({ length: 5 }, (_, i) => Math.max(0, allInputs.length - 5 + i)),  // last 5
+    ].filter((i, idx, arr) => i < allInputs.length && arr.indexOf(i) === idx);  // dedupe
+    result.sampleIds = sampleIndices.map(i => allInputs[i].id);
 
     // Step 1: Upload items as blob
     const itemsJson = JSON.stringify(allInputs);
@@ -775,6 +923,7 @@ async function seedViaDoorway() {
           }
 
           const succeeded = (finalStatus.processed_count ?? 0) - (finalStatus.error_count ?? 0);
+          result.contentSucceeded = succeeded;  // Track for verification
           const elapsed = finalStatus.elapsed_ms ? ` (${(finalStatus.elapsed_ms / 1000).toFixed(1)}s` : '';
           const rate = finalStatus.items_per_second ? `, ${finalStatus.items_per_second.toFixed(0)} items/sec)` : elapsed ? ')' : '';
           console.log(`   ✅ Content import ${finalStatus.status}: ${succeeded} succeeded, ${finalStatus.error_count ?? 0} failed${elapsed}${rate}`);
@@ -822,7 +971,8 @@ async function seedViaDoorway() {
               console.error(`      ... and ${finalStatus.errors.length - 5} more`);
             }
           }
-          console.log(`   ✅ Content import ${finalStatus.status}: ${finalStatus.processed_count - finalStatus.error_count} succeeded, ${finalStatus.error_count} failed`);
+          result.contentSucceeded = finalStatus.processed_count - finalStatus.error_count;  // Track for verification
+          console.log(`   ✅ Content import ${finalStatus.status}: ${result.contentSucceeded} succeeded, ${finalStatus.error_count} failed`);
         } else {
           console.warn(`   ⚠️ Polling timeout - batch may still be processing`);
           console.log(`      Check status: GET ${DOORWAY_URL}/import/content/${batchId}`);
@@ -879,6 +1029,7 @@ async function seedViaDoorway() {
         order_index: i,
       })) || []),
     }));
+    result.pathsAttempted = pathInputs.length;  // Track for verification
 
     // Upload paths blob
     const pathsJson = JSON.stringify(pathInputs);
@@ -908,6 +1059,7 @@ async function seedViaDoorway() {
           total_items: pathInputs.length,
           schema_version: 1,
         });
+        result.pathsSucceeded = pathInputs.length;  // Paths queue is fire-and-forget, assume success
         console.log(`   ✅ Paths import queued: ${pathsQueueResult.batch_id}`);
       } catch (pathErr: any) {
         console.warn(`   ⚠️ Paths import queue failed: ${pathErr.message}`);
@@ -927,6 +1079,8 @@ async function seedViaDoorway() {
   console.log('='.repeat(70));
   timer.printReport();
   console.log('='.repeat(70));
+
+  return result;
 }
 
 /**
@@ -963,7 +1117,104 @@ async function seed() {
   if (IDS.length > 0) console.log(`🎯 Filtering to IDs: ${IDS.join(', ')}`);
   if (LIMIT > 0) console.log(`📊 Limit: ${LIMIT}`);
 
-  await seedViaDoorway();
+  // ========================================
+  // VERIFICATION SETUP
+  // ========================================
+  let verification: SeedingVerification | null = null;
+  let connection: HolochainConnection | null = null;
+
+  if (!SKIP_VERIFICATION) {
+    console.log('\n🔍 Connecting for verification...');
+    connection = await connectForVerification();
+
+    if (connection) {
+      verification = new SeedingVerification(connection.appWs, connection.cellId, ZOME_NAME);
+
+      // Run pre-flight checks
+      console.log('\n🔬 Running pre-flight checks...');
+      const preflight = await verification.runPreflightChecks();
+
+      // Display results
+      for (const check of preflight.checks) {
+        const icon = check.status === 'pass' ? '✅' : check.status === 'fail' ? '❌' : '⚠️';
+        console.log(`   ${icon} ${check.name}: ${check.message}`);
+        if (check.details) console.log(`      ${check.details}`);
+      }
+
+      if (preflight.warnings.length > 0) {
+        console.log('\n   ⚠️ Warnings:');
+        for (const warn of preflight.warnings) {
+          console.log(`      • ${warn}`);
+        }
+      }
+
+      if (!preflight.canProceed) {
+        console.error('\n❌ Pre-flight checks failed:');
+        for (const err of preflight.errors) {
+          console.error(`   • ${err}`);
+        }
+        console.error('\nSeeding aborted. Fix the issues above and try again.');
+        console.error('Set SKIP_VERIFICATION=true to bypass checks (not recommended).');
+        await connection.close();
+        process.exit(1);
+      }
+
+      console.log(`\n   📊 Existing content: ${preflight.existingCounts.content} items, ${preflight.existingCounts.paths} paths`);
+    } else {
+      console.log('   ⚠️ Verification unavailable - proceeding without pre/post-flight checks');
+    }
+  } else {
+    console.log('\n⚠️ Verification skipped (SKIP_VERIFICATION=true)');
+  }
+
+  // ========================================
+  // RUN SEEDING
+  // ========================================
+  const seedResult = await seedViaDoorway();
+
+  // ========================================
+  // POST-FLIGHT VERIFICATION
+  // ========================================
+  if (verification && connection) {
+    console.log('\n🔬 Running post-flight verification...');
+    const postflight = await verification.runPostflightVerification(
+      { content: seedResult.contentAttempted, paths: seedResult.pathsAttempted },
+      seedResult.sampleIds.slice(0, 5)  // Verify first 5 sample IDs
+    );
+
+    // Display results
+    for (const check of postflight.checks) {
+      const icon = check.status === 'pass' ? '✅' : check.status === 'fail' ? '❌' : '⚠️';
+      console.log(`   ${icon} ${check.name}: ${check.message}`);
+      if (check.details) console.log(`      ${check.details}`);
+    }
+
+    if (postflight.warnings.length > 0) {
+      console.log('\n   ⚠️ Warnings:');
+      for (const warn of postflight.warnings) {
+        console.log(`      • ${warn}`);
+      }
+    }
+
+    if (!postflight.success) {
+      console.error('\n❌ Post-flight verification FAILED:');
+      for (const err of postflight.errors) {
+        console.error(`   • ${err}`);
+      }
+      console.error('\n⚠️ Data may not have been properly written to the conductor!');
+      console.error('   Check conductor logs and verify data manually.');
+      await connection.close();
+      process.exit(1);
+    }
+
+    console.log(`\n   📊 Final content: ${postflight.finalCounts.content} items, ${postflight.finalCounts.paths} paths`);
+    console.log(`   📈 Delta: +${postflight.delta.content} content, +${postflight.delta.paths} paths`);
+    await connection.close();
+    console.log('\n✅ Seeding verified successfully!');
+  } else if (seedResult.contentSucceeded !== seedResult.contentAttempted) {
+    // Even without verification, warn if doorway reported failures
+    console.warn(`\n⚠️ Seeding completed with issues: ${seedResult.contentSucceeded}/${seedResult.contentAttempted} content items succeeded`);
+  }
 }
 
 seed().catch((error) => {
