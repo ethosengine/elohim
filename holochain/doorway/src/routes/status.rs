@@ -361,9 +361,16 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 // =============================================================================
 
 /// Response from elohim-storage health endpoint
+/// Note: elohim-storage returns { "status": "ok", ... } not { "healthy": bool }
 #[derive(serde::Deserialize)]
 struct StorageHealthResponse {
-    healthy: bool,
+    status: String,
+    #[serde(default)]
+    blobs: u64,
+    #[serde(default)]
+    bytes: u64,
+    #[serde(default)]
+    manifests: u64,
 }
 
 /// Response from elohim-storage import batches endpoint
@@ -406,13 +413,16 @@ async fn fetch_storage_status(storage_url: &str) -> Result<(bool, Vec<ImportBatc
         .await
         .map_err(|e| format!("Invalid health response: {}", e))?;
 
+    // Derive healthy from status field (elohim-storage returns status: "ok")
+    let healthy = health.status == "ok";
+
     // Try to fetch batches (may not be available if import API disabled)
     let batches = match fetch_import_batches(&client, base_url).await {
         Ok(b) => b,
         Err(_) => vec![], // Import API might not be enabled
     };
 
-    Ok((health.healthy, batches))
+    Ok((healthy, batches))
 }
 
 /// Fetch import batches from elohim-storage
