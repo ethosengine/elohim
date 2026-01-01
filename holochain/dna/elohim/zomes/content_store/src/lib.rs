@@ -10603,6 +10603,11 @@ pub struct RegisterShardLocationInput {
     pub shard_hash: String,
     pub shard_index: u8,
     pub holder: String,
+    /// W3C DID of the holder (e.g., "did:web:doorway.elohim.host")
+    pub holder_did: Option<String>,
+    /// Additional storage DIDs that can serve this shard
+    #[serde(default)]
+    pub storage_dids: Vec<String>,
     pub endpoint: Option<String>,
     pub storage_tier: Option<String>,
 }
@@ -10619,6 +10624,7 @@ pub struct RegisterShardLocationOutput {
 /// Creates a ShardLocation entry and links:
 /// - Anchor(shard_hash) -> ShardLocation (find holders by shard)
 /// - Anchor(holder) -> ShardLocation (find shards by holder)
+/// - Anchor(holder_did) -> ShardLocation (find locations by DID)
 #[hdk_extern]
 pub fn register_shard_location(input: RegisterShardLocationInput) -> ExternResult<RegisterShardLocationOutput> {
     let now = format!("{:?}", sys_time()?);
@@ -10627,6 +10633,8 @@ pub fn register_shard_location(input: RegisterShardLocationInput) -> ExternResul
         shard_hash: input.shard_hash.clone(),
         shard_index: input.shard_index,
         holder: input.holder.clone(),
+        holder_did: input.holder_did.clone(),
+        storage_dids: input.storage_dids,
         endpoint: input.endpoint,
         storage_tier: input.storage_tier,
         verified_at: now,
@@ -10656,6 +10664,19 @@ pub fn register_shard_location(input: RegisterShardLocationInput) -> ExternResul
         LinkTypes::HolderToShards,
         (),
     )?;
+
+    // Create holder_did -> ShardLocation link (if DID provided)
+    if let Some(ref did) = input.holder_did {
+        let did_anchor = StringAnchor::new("did_shards", did);
+        let did_anchor_hash = hash_entry(&EntryTypes::StringAnchor(did_anchor.clone()))?;
+        create_entry(EntryTypes::StringAnchor(did_anchor))?;
+        create_link(
+            did_anchor_hash,
+            action_hash.clone(),
+            LinkTypes::HolderToShards, // Reuse link type for DID lookups
+            (),
+        )?;
+    }
 
     Ok(RegisterShardLocationOutput { action_hash, location })
 }
@@ -10729,6 +10750,116 @@ pub fn deactivate_shard_location(action_hash: ActionHash) -> ExternResult<()> {
     update_entry(action_hash, &location)?;
 
     Ok(())
+}
+
+// =============================================================================
+// DID-Based Storage Discovery
+// =============================================================================
+
+/// Get all storage DIDs for a blob (aggregated from all shard locations)
+///
+/// This is the primary discovery function for DID-based content federation.
+/// Returns all DIDs (holder_did + storage_dids) from active shard locations.
+#[hdk_extern]
+pub fn get_storage_dids_for_blob(blob_hash: String) -> ExternResult<Vec<String>> {
+    // First get the manifest to find all shard hashes
+    let manifest_anchor = StringAnchor::new("blob_manifest", &blob_hash);
+    let manifest_anchor_hash = hash_entry(&EntryTypes::StringAnchor(manifest_anchor))?;
+
+    let query = LinkQuery::try_new(manifest_anchor_hash, LinkTypes::BlobToManifest)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut all_dids: Vec<String> = Vec::new();
+
+    // Get manifest to find shard hashes
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid manifest hash".to_string())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(Some(manifest)) = record.entry().to_app_option::<ShardManifest>() {
+                // For each shard in the manifest, get its locations
+                for shard_hash in &manifest.shard_hashes {
+                    let locations = get_shard_locations(shard_hash.clone())?;
+                    for loc in locations {
+                        // Add holder_did if present
+                        if let Some(ref did) = loc.holder_did {
+                            if !all_dids.contains(did) {
+                                all_dids.push(did.clone());
+                            }
+                        }
+                        // Add all storage_dids
+                        for did in &loc.storage_dids {
+                            if !all_dids.contains(did) {
+                                all_dids.push(did.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(all_dids)
+}
+
+/// Input for adding a storage DID to an existing shard location
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddStorageDIDInput {
+    pub action_hash: ActionHash,
+    pub storage_did: String,
+}
+
+/// Add a storage DID to an existing shard location
+///
+/// Used when a doorway or storage node replicates a shard and wants to
+/// advertise itself as an additional source.
+#[hdk_extern]
+pub fn add_storage_did_to_shard(input: AddStorageDIDInput) -> ExternResult<ShardLocation> {
+    let record = get(input.action_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Shard location not found".to_string())))?;
+
+    let mut location: ShardLocation = record.entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode location: {:?}", e))))?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Location entry not found".to_string())))?;
+
+    // Add DID if not already present
+    if !location.storage_dids.contains(&input.storage_did) {
+        location.storage_dids.push(input.storage_did.clone());
+        location.verified_at = format!("{:?}", sys_time()?);
+        update_entry(input.action_hash, &location)?;
+    }
+
+    Ok(location)
+}
+
+/// Get all shard locations for a specific DID
+///
+/// Useful for finding what shards a doorway/storage node is serving.
+#[hdk_extern]
+pub fn get_shard_locations_by_did(did: String) -> ExternResult<Vec<ShardLocation>> {
+    let did_anchor = StringAnchor::new("did_shards", &did);
+    let did_anchor_hash = hash_entry(&EntryTypes::StringAnchor(did_anchor))?;
+
+    let query = LinkQuery::try_new(did_anchor_hash, LinkTypes::HolderToShards)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut locations = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid location hash".to_string())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(Some(loc)) = record.entry().to_app_option::<ShardLocation>() {
+                if loc.is_active {
+                    locations.push(loc);
+                }
+            }
+        }
+    }
+
+    Ok(locations)
 }
 
 /// Get all manifests for a specific author

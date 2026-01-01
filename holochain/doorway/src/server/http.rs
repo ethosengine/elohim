@@ -472,6 +472,16 @@ async fn handle_request(
             to_boxed(routes::version_info())
         }
 
+        // DID Document for federation discovery (W3C standard path)
+        (Method::GET, "/.well-known/did.json") => {
+            to_boxed(routes::handle_did_document(Arc::clone(&state)))
+        }
+
+        // DID Document at explicit path (alternative)
+        (Method::GET, "/identity/did") | (Method::GET, "/identity/did.json") => {
+            to_boxed(routes::handle_did_endpoint(Arc::clone(&state)))
+        }
+
         // CORS preflight
         (Method::OPTIONS, _) => to_boxed(preflight_response()),
 

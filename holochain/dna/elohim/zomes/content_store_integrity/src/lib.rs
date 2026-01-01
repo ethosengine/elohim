@@ -629,6 +629,7 @@ pub struct ShardManifest {
 /// - P2P shard discovery without doorway
 /// - Geographic affinity routing
 /// - Load balancing across holders
+/// - DID-based discovery across doorways and P2P nodes
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct ShardLocation {
@@ -640,6 +641,19 @@ pub struct ShardLocation {
 
     /// Agent holding this shard (their Holochain pubkey)
     pub holder: String,
+
+    /// W3C DID of the holder for cross-topology discovery
+    /// Examples:
+    /// - "did:web:doorway-a.elohim.host" (doorway)
+    /// - "did:key:z6Mk..." (P2P storage node)
+    #[serde(default)]
+    pub holder_did: Option<String>,
+
+    /// Additional storage DIDs that can serve this shard
+    /// Enables federation: doorways/storage nodes register their DIDs here
+    /// Clients resolve DIDs to service endpoints for fetching
+    #[serde(default)]
+    pub storage_dids: Vec<String>,
 
     /// Optional HTTP endpoint for direct fetch (e.g., "https://node.example.com/shard/sha256-xxx")
     /// If None, use Holochain signals to request shard

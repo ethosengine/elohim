@@ -367,7 +367,7 @@ export function getAppUserDataResidency(): DataResidencyItem[] {
     {
       category: 'identity',
       label: 'Identity Keys',
-      description: 'Cryptographic identity (self-sovereign)',
+      description: 'Cryptographic identity (steward)',
       location: 'local-holochain',
       locationLabel: 'Your Device',
       icon: 'vpn_key',

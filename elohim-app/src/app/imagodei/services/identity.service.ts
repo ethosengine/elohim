@@ -33,6 +33,8 @@ import {
   type NodeOperatorHostingIncome,
   INITIAL_IDENTITY_STATE,
   getInitials,
+  isStewardMode,
+  isNetworkMode,
 } from '../models/identity.model';
 import { type PasswordCredentials, type AuthResult } from '../models/auth.model';
 
@@ -149,6 +151,88 @@ function toUpdatePayload(request: UpdateProfileRequest): UpdateHumanPayload {
 }
 
 // =============================================================================
+// DID Generation
+// =============================================================================
+
+/**
+ * Gateway domain for session DIDs.
+ * In production, this would come from environment configuration.
+ */
+const GATEWAY_DOMAIN = 'gateway.elohim.host';
+
+/**
+ * Hosted domain for hosted identity DIDs.
+ */
+const HOSTED_DOMAIN = 'hosted.elohim.host';
+
+/**
+ * Generate a W3C DID based on identity mode.
+ *
+ * DID patterns by mode (mapped to Elohim trust tiers):
+ * - anonymous: null (no DID for travelers)
+ * - session: did:web:gateway.elohim.host:session:{sessionId} (ephemeral visitor)
+ * - hosted: did:web:hosted.elohim.host:humans:{humanId} (custodial, medium trust)
+ * - self-sovereign (steward): did:key:{multibase-pubkey} (cryptographic, highest trust)
+ * - migrating: keeps previous DID during migration
+ *
+ * Note: The mode value 'self-sovereign' maps to "steward" in Elohim terminology.
+ * Stewards own their keys and operate as first-class network participants.
+ *
+ * @param mode - Current identity mode
+ * @param humanId - Human ID (for session/hosted)
+ * @param agentPubKey - Agent public key base64 (for steward/self-sovereign)
+ * @param sessionId - Session ID (for session mode fallback)
+ */
+function generateDID(
+  mode: IdentityMode,
+  humanId: string | null,
+  agentPubKey: string | null,
+  sessionId: string | null
+): string | null {
+  switch (mode) {
+    case 'anonymous':
+      return null;
+
+    case 'session':
+      // Session-based DID using session ID (ephemeral visitor)
+      if (humanId) {
+        return `did:web:${GATEWAY_DOMAIN}:session:${humanId}`;
+      }
+      if (sessionId) {
+        return `did:web:${GATEWAY_DOMAIN}:session:${sessionId}`;
+      }
+      return null;
+
+    case 'hosted':
+      // Hosted identity DID using human ID (custodial keys)
+      if (humanId) {
+        return `did:web:${HOSTED_DOMAIN}:humans:${humanId}`;
+      }
+      return null;
+
+    case 'steward':
+    case 'self-sovereign': // @deprecated - use 'steward'
+      // Steward DID using agent public key (cryptographic, self-custodied keys)
+      // did:key uses multibase encoding - we use z prefix for base58btc
+      if (agentPubKey) {
+        // Convert base64 agentPubKey to multibase format
+        // For simplicity, we use the raw pubkey with z prefix
+        // A full implementation would use proper multicodec encoding
+        return `did:key:z${agentPubKey.replace(/[+/=]/g, '')}`;
+      }
+      return null;
+
+    case 'migrating':
+      // During migration, DID should be preserved from previous state
+      // The caller should handle this by not updating DID during migration
+      return null;
+
+    default:
+      return null;
+  }
+}
+
+// =============================================================================
 // Identity Service
 // =============================================================================
 
@@ -196,6 +280,9 @@ export class IdentityService {
   /** Holochain agent public key */
   readonly agentPubKey = computed(() => this.identitySignal().agentPubKey);
 
+  /** W3C Decentralized Identifier for this identity */
+  readonly did = computed(() => this.identitySignal().did);
+
   /** Full profile (may be null if not loaded) */
   readonly profile = computed(() => this.identitySignal().profile);
 
@@ -215,8 +302,7 @@ export class IdentityService {
   /** Whether user can access gated content (requires network authentication) */
   readonly canAccessGatedContent = computed(() => {
     const mode = this.identitySignal().mode;
-    const isNetworkMode = mode === 'hosted' || mode === 'self-sovereign';
-    return isNetworkMode && this.identitySignal().isAuthenticated;
+    return isNetworkMode(mode) && this.identitySignal().isAuthenticated;
   });
 
   /** Whether user has a session (can be upgraded) */
@@ -256,7 +342,7 @@ export class IdentityService {
       if (isConnected && currentMode === 'session') {
         // Holochain just connected - check if we have an identity there
         this.checkHolochainIdentity();
-      } else if (!isConnected && (currentMode === 'hosted' || currentMode === 'self-sovereign')) {
+      } else if (!isConnected && isNetworkMode(currentMode)) {
         // Holochain disconnected - fall back to session
         this.fallbackToSession();
       }
@@ -296,12 +382,16 @@ export class IdentityService {
       // Determine mode based on session state
       const mode: IdentityMode = session.isAnonymous ? 'session' : 'session';
 
+      // Generate DID for session identity
+      const did = generateDID(mode, session.sessionId, session.linkedAgentPubKey ?? null, session.sessionId);
+
       this.updateState({
         mode,
         isAuthenticated: true,
         humanId: session.sessionId,
         displayName: session.displayName,
         agentPubKey: session.linkedAgentPubKey ?? null,
+        did,
         sovereigntyStage: 'visitor',
 
         // Session-specific state
@@ -357,7 +447,7 @@ export class IdentityService {
 
         // Determine conductor type and key location
         const conductorInfo = this.detectConductorType();
-        const identityMode = conductorInfo.isLocal ? 'self-sovereign' : 'hosted';
+        const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
         const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
         const sovereigntyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
 
@@ -365,12 +455,21 @@ export class IdentityService {
         const session = this.sessionHumanService.getSession();
         const linkedSessionId = session?.sessionId ?? null;
 
+        // Generate DID for this identity
+        const did = generateDID(
+          identityMode,
+          sessionResult.human.id,
+          sessionResult.agent_pubkey,
+          linkedSessionId
+        );
+
         this.updateState({
           mode: identityMode,
           isAuthenticated: true,
           humanId: sessionResult.human.id,
           displayName: sessionResult.human.display_name,
           agentPubKey: sessionResult.agent_pubkey,
+          did,
           profile: mapToProfile(sessionResult.human),
           attestations: sessionResult.attestations.map(a => a.attestation.attestation_type),
           sovereigntyStage,
@@ -471,12 +570,16 @@ export class IdentityService {
       const mode: IdentityMode = session.sessionState === 'linked' ? 'session' : 'session';
       const isAuthenticated = session.sessionState !== 'migrated';
 
+      // Generate DID for session identity
+      const did = generateDID(mode, session.sessionId, session.linkedAgentPubKey ?? null, session.sessionId);
+
       this.updateState({
         mode,
         isAuthenticated,
         humanId: session.sessionId,
         displayName: session.displayName,
         agentPubKey: session.linkedAgentPubKey ?? null,
+        did,
         profile: null,
         attestations: [],
         sovereigntyStage: 'visitor',
@@ -536,12 +639,20 @@ export class IdentityService {
 
       // Determine conductor type
       const conductorInfo = this.detectConductorType();
-      const identityMode = conductorInfo.isLocal ? 'self-sovereign' : 'hosted';
+      const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
       const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
       const sovereigntyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
 
       // Get session for linking
       const session = this.sessionHumanService.getSession();
+
+      // Generate DID for this identity
+      const did = generateDID(
+        identityMode,
+        sessionResult.human.id,
+        sessionResult.agent_pubkey,
+        session?.sessionId ?? null
+      );
 
       this.updateState({
         mode: identityMode,
@@ -549,6 +660,7 @@ export class IdentityService {
         humanId: sessionResult.human.id,
         displayName: sessionResult.human.display_name,
         agentPubKey: sessionResult.agent_pubkey,
+        did,
         profile,
         attestations: sessionResult.attestations.map(a => a.attestation.attestation_type),
         sovereigntyStage,
@@ -632,8 +744,7 @@ export class IdentityService {
     }
 
     const mode = this.mode();
-    const isNetworkMode = mode === 'hosted' || mode === 'self-sovereign';
-    if (!isNetworkMode) {
+    if (!isNetworkMode(mode)) {
       throw new Error('Cannot update profile in session mode');
     }
 
@@ -736,9 +847,17 @@ export class IdentityService {
 
         // Update identity state
         const conductorInfo = this.detectConductorType();
-        const identityMode = conductorInfo.isLocal ? 'self-sovereign' : 'hosted';
+        const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
         const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
         const sovereigntyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
+
+        // Generate DID for authenticated identity
+        const did = generateDID(
+          identityMode,
+          sessionResult.human.id,
+          sessionResult.agent_pubkey,
+          null
+        );
 
         this.updateState({
           mode: identityMode,
@@ -746,6 +865,7 @@ export class IdentityService {
           humanId: sessionResult.human.id,
           displayName: sessionResult.human.display_name,
           agentPubKey: sessionResult.agent_pubkey,
+          did,
           profile: mapToProfile(sessionResult.human),
           attestations: sessionResult.attestations.map(a => a.attestation.attestation_type),
           sovereigntyStage,

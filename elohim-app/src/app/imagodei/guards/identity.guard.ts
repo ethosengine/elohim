@@ -14,6 +14,7 @@ import { inject } from '@angular/core';
 import { Router, type CanActivateFn, type UrlTree } from '@angular/router';
 import { IdentityService } from '../services/identity.service';
 import { SessionHumanService } from '../services/session-human.service';
+import { isNetworkMode } from '../models/identity.model';
 
 /**
  * Guard that requires network authentication.
@@ -25,10 +26,9 @@ export const identityGuard: CanActivateFn = (route, state): boolean | UrlTree =>
   const identityService = inject(IdentityService);
   const router = inject(Router);
 
-  // Check if authenticated via network (hosted or self-sovereign)
+  // Check if authenticated via network (hosted or steward)
   const mode = identityService.mode();
-  const isNetworkMode = mode === 'hosted' || mode === 'self-sovereign';
-  if (isNetworkMode && identityService.isAuthenticated()) {
+  if (isNetworkMode(mode) && identityService.isAuthenticated()) {
     return true;
   }
 
@@ -49,10 +49,9 @@ export const sessionOrAuthGuard: CanActivateFn = (): boolean | UrlTree => {
   const sessionHumanService = inject(SessionHumanService);
   const router = inject(Router);
 
-  // Allow if authenticated via network (hosted or self-sovereign)
+  // Allow if authenticated via network (hosted or steward)
   const mode = identityService.mode();
-  const isNetworkMode = mode === 'hosted' || mode === 'self-sovereign';
-  if (isNetworkMode && identityService.isAuthenticated()) {
+  if (isNetworkMode(mode) && identityService.isAuthenticated()) {
     return true;
   }
 
@@ -80,10 +79,9 @@ export function attestationGuard(requiredAttestation: string): CanActivateFn {
     const identityService = inject(IdentityService);
     const router = inject(Router);
 
-    // Must be network authenticated (hosted or self-sovereign)
+    // Must be network authenticated (hosted or steward)
     const mode = identityService.mode();
-    const isNetworkMode = mode === 'hosted' || mode === 'self-sovereign';
-    if (!isNetworkMode || !identityService.isAuthenticated()) {
+    if (!isNetworkMode(mode) || !identityService.isAuthenticated()) {
       return router.createUrlTree(['/identity/register'], {
         queryParams: { returnUrl: state.url },
       });

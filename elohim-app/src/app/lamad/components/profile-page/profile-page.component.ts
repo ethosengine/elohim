@@ -13,6 +13,7 @@ import { ProfileService } from '@app/elohim/services/profile.service';
 import { MasteryStats, MasteryLevel } from '../../models';
 import { SessionHuman, SessionActivity, SessionPathProgress } from '@app/imagodei/models/session-human.model';
 import { ResumePoint, PathsOverview, TimelineEvent } from '@app/imagodei/models/profile.model';
+import { isNetworkMode } from '@app/imagodei/models/identity.model';
 
 /**
  * ProfilePageComponent - Session Human profile management.
@@ -59,10 +60,10 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   // Identity State (from IdentityService - unified source of truth)
   // ==========================================================================
 
-  /** Whether user is authenticated via Holochain (hosted or self-sovereign) */
+  /** Whether user is authenticated via Holochain (hosted or steward) */
   readonly isNetworkAuthenticated = computed(() => {
     const mode = this.identityService.mode();
-    return mode === 'hosted' || mode === 'self-sovereign';
+    return isNetworkMode(mode);
   });
 
   /** Current identity mode */
@@ -114,7 +115,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     const mode = this.identityMode();
     switch (mode) {
       case 'hosted': return 'Hosted Human';
-      case 'self-sovereign': return 'Self-Sovereign';
+      case 'steward': return 'Steward';
+      case 'self-sovereign': return 'Steward'; // deprecated, mapped to steward
       case 'session': return 'Session Visitor';
       case 'anonymous': return 'Anonymous';
       case 'migrating': return 'Migrating...';
@@ -127,7 +129,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     const mode = this.identityMode();
     switch (mode) {
       case 'hosted': return 'cloud_done';
-      case 'self-sovereign': return 'verified_user';
+      case 'steward': return 'verified_user';
+      case 'self-sovereign': return 'verified_user'; // deprecated, mapped to steward
       case 'session': return 'local_activity';
       case 'migrating': return 'sync';
       default: return 'person';

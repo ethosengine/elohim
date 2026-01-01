@@ -13,8 +13,10 @@
 //! - **ImportConfig**: Zome-declared import capability discovery
 //! - **Discovery**: Runtime discovery of zome capabilities from conductor
 //! - **RouteRegistry**: Dynamic route management from DNAs and external agents
+//! - **DIDResolver**: W3C DID resolution for doorway federation
 
 pub mod custodian;
+pub mod did_resolver;
 pub mod discovery;
 pub mod import_client;
 pub mod import_config;
@@ -63,4 +65,8 @@ pub use route_registry::{
 pub use import_client::{ImportClient, ImportClientConfig};
 pub use storage_registration::{
     StorageRegistrationConfig, StorageRegistrationResult, register_local_storage,
+};
+pub use did_resolver::{
+    DIDDocument, DIDResolver, DIDResolverConfig, DIDResolverError, DIDResolverStats,
+    Service as DIDService, VerificationMethod, create_resolver, create_resolver_with_config,
 };

@@ -56,11 +56,11 @@ export class ConnectionIndicatorComponent {
       };
     }
 
-    // Self-sovereign mode (local node connected)
-    if (identityMode === 'self-sovereign' && holochainState === 'connected') {
+    // Steward mode (local node connected) - handles both 'steward' and deprecated 'self-sovereign'
+    if ((identityMode === 'steward' || identityMode === 'self-sovereign') && holochainState === 'connected') {
       return {
-        mode: 'self-sovereign',
-        label: 'Local Node',
+        mode: 'steward',
+        label: 'Steward',
         icon: 'shield',
         color: '#22c55e',
         cssClass: 'status-local',
@@ -115,7 +115,7 @@ export class ConnectionIndicatorComponent {
   /** Whether the indicator should be visible */
   readonly isVisible = computed(() => {
     const mode = this.identityService.mode();
-    // Show for all non-anonymous users (session, hosted, self-sovereign)
+    // Show for all non-anonymous users (session, hosted, steward)
     // Session users are valued participants - they should see their status
     return mode !== 'anonymous';
   });

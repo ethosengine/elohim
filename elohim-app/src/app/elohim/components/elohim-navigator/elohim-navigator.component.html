@@ -99,7 +99,7 @@
             <div class="profile-avatar-large">{{ getInitials() }}</div>
             <div class="profile-info">
               <span class="profile-name">{{ authenticatedDisplayName() }}</span>
-              <span class="profile-stats">{{ identityMode() === 'hosted' ? 'Hosted Identity' : 'Self-Sovereign' }}</span>
+              <span class="profile-stats">{{ identityMode() === 'hosted' ? 'Hosted Identity' : 'Steward' }}</span>
             </div>
           </div>
 
@@ -137,7 +137,7 @@
 
             <!-- Footer -->
             <div class="profile-footer">
-              <span class="session-indicator">{{ identityMode() === 'hosted' ? 'Hosted on Edge Node' : 'Self-Sovereign Identity' }}</span>
+              <span class="session-indicator">{{ identityMode() === 'hosted' ? 'Hosted on Edge Node' : 'Steward Identity' }}</span>
             </div>
           </div>
         </div>

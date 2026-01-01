@@ -310,7 +310,7 @@ export class SovereigntyService {
           type: 'signing-key',
           label: 'Signing Key',
           value: 'On your device',
-          truncated: stage === 'node-operator' ? 'Self-Sovereign (Node)' : 'Self-Sovereign',
+          truncated: stage === 'node-operator' ? 'Steward (Node)' : 'Steward',
           canExport: true,
           canRevoke: true,
         };

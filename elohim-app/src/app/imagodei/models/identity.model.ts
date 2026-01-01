@@ -4,20 +4,25 @@
  * Philosophy:
  * - Bridge between session-based and Holochain-based identity
  * - Provide unified identity state regardless of backend
- * - Support graceful migration across sovereignty stages
+ * - Support graceful migration across stewardship stages
  *
- * Identity Modes reflect sovereignty progression:
+ * Identity Modes reflect stewardship progression:
  * - anonymous: Pure browser, no persistent identity
  * - session: localStorage visitor with temporary identity
  * - hosted: Holochain with custodial keys (edge node holds keys)
- * - self-sovereign: Holochain with local keys (device or hardware wallet)
+ * - steward: Holochain with local keys (device or hardware wallet)
  * - migrating: In process of transitioning between stages
+ *
+ * NOTE: 'self-sovereign' is deprecated and will be removed in a future version.
+ * Use 'steward' instead. The term "steward" better reflects the Elohim Protocol
+ * ethos of caring for what is entrusted to us, emphasizing relationship and
+ * mutual support rather than isolated self-determination.
  *
  * Key Location reflects where cryptographic material lives:
  * - none: No keys (visitor stage)
  * - browser: Keys in IndexedDB/localStorage (less secure)
  * - custodial: Keys held by edge node operator (hosted stage)
- * - device: Keys in local conductor (app-user stage)
+ * - device: Keys in local conductor (steward stage)
  * - hardware: Keys in hardware security module (maximum security)
  */
 
@@ -28,14 +33,42 @@ import type { SovereigntyStage } from './sovereignty.model';
 // =============================================================================
 
 /**
- * The current identity mode - reflects sovereignty progression.
+ * The current identity mode - reflects stewardship progression.
+ *
+ * @deprecated 'self-sovereign' - Use 'steward' instead. Will be removed in v2.0.
  */
 export type IdentityMode =
   | 'anonymous'      // Pure browser, no session created
   | 'session'        // localStorage visitor with session
   | 'hosted'         // Holochain with custodial keys on edge node
-  | 'self-sovereign' // Holochain with keys on user's device
+  | 'steward'        // Holochain with keys on user's device (preferred)
+  | 'self-sovereign' // @deprecated - use 'steward' instead
   | 'migrating';     // In transition between stages
+
+/**
+ * Check if the identity mode represents a steward (local keys).
+ * Handles both 'steward' and deprecated 'self-sovereign' values.
+ */
+export function isStewardMode(mode: IdentityMode): boolean {
+  return mode === 'steward' || mode === 'self-sovereign';
+}
+
+/**
+ * Normalize identity mode, converting deprecated values to current ones.
+ * @param mode - The identity mode (possibly deprecated)
+ * @returns The normalized mode ('self-sovereign' → 'steward')
+ */
+export function normalizeIdentityMode(mode: IdentityMode): IdentityMode {
+  return mode === 'self-sovereign' ? 'steward' : mode;
+}
+
+/**
+ * Check if the identity mode represents a network-authenticated mode.
+ * Includes both hosted and steward modes.
+ */
+export function isNetworkMode(mode: IdentityMode): boolean {
+  return mode === 'hosted' || isStewardMode(mode);
+}
 
 /**
  * Where the user's cryptographic keys are stored.
@@ -142,6 +175,14 @@ export interface IdentityState {
   displayName: string;
   /** Holochain agent public key (base64), if connected */
   agentPubKey: string | null;
+  /**
+   * W3C Decentralized Identifier for this identity.
+   * Generated based on identity mode:
+   * - session: did:web:gateway.elohim.host:session:{sessionId}
+   * - hosted: did:web:hosted.elohim.host:humans:{humanId}
+   * - steward: did:key:{multibase-encoded-pubkey}
+   */
+  did: string | null;
   /** Full profile data, if loaded */
   profile: HumanProfile | null;
   /** Attestations earned by this human */
@@ -252,6 +293,7 @@ export const INITIAL_IDENTITY_STATE: IdentityState = {
   humanId: null,
   displayName: 'Traveler',
   agentPubKey: null,
+  did: null,
   profile: null,
   attestations: [],
   sovereigntyStage: 'visitor',

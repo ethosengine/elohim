@@ -25,8 +25,11 @@
         </div>
         <p class="tooltip-description">
           @switch (status().mode) {
+            @case ('steward') {
+              Running on your local Holochain node. Full stewardship of your identity.
+            }
             @case ('self-sovereign') {
-              Running on your local Holochain node. Full sovereignty.
+              Running on your local Holochain node. Full stewardship of your identity.
             }
             @case ('hosted') {
               Connected via {{ status().doorwayName ?? 'doorway' }}. Hosted identity.
