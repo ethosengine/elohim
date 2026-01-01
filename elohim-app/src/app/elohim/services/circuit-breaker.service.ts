@@ -165,11 +165,13 @@ export class CircuitBreakerService {
       };
     } catch (err) {
       this.recordFailure(name, circuit, err);
+      // Re-read state after recordFailure as it may have transitioned to OPEN
+      const currentState = circuit.state;
       return {
         success: false,
         error: err instanceof Error ? err.message : String(err),
-        circuitOpen: circuit.state === 'OPEN',
-        state: circuit.state,
+        circuitOpen: currentState === 'OPEN',
+        state: currentState,
       };
     }
   }

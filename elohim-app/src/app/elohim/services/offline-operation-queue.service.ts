@@ -116,7 +116,7 @@ export class OfflineOperationQueueService {
   /**
    * Enqueue an operation that failed or was performed offline
    */
-  enqueue(operation: Omit<OfflineOperation, 'id' | 'timestamp' | 'retryCount'>): string {
+  enqueue(operation: Omit<OfflineOperation, 'id' | 'timestamp' | 'retryCount' | 'maxRetries'> & { maxRetries?: number }): string {
     const id = this.generateOperationId();
 
     const fullOperation: OfflineOperation = {

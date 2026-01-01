@@ -837,6 +837,7 @@ export class HolochainClientService {
 
     return {
       state: conn.state,
+      mode: this.connectionMode,
       adminUrl: config.adminUrl,
       appUrl: config.appUrl,
       agentPubKey: conn.agentPubKey ? this.uint8ArrayToBase64(conn.agentPubKey) : null,

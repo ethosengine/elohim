@@ -18,9 +18,9 @@ describe('HealthCheckService', () => {
     mockHolochainClient.isConnected.and.returnValue(true);
     mockHolochainClient.getDisplayInfo.and.returnValue({
       appUrl: 'ws://localhost:8888',
-      adminUrl: null,
+      adminUrl: 'ws://localhost:8889',
       mode: 'direct' as const,
-    });
+    } as ReturnType<HolochainClientService['getDisplayInfo']>);
 
     mockIndexedDbCache = jasmine.createSpyObj('IndexedDBCacheService', [
       'init',
@@ -36,6 +36,8 @@ describe('HealthCheckService', () => {
     }));
 
     const mockChildLogger = {
+      parent: null as unknown,
+      source: 'HealthCheckService',
       debug: jasmine.createSpy('debug'),
       info: jasmine.createSpy('info'),
       warn: jasmine.createSpy('warn'),
@@ -46,7 +48,7 @@ describe('HealthCheckService', () => {
       }),
     };
     mockLogger = jasmine.createSpyObj('LoggerService', ['createChild']);
-    mockLogger.createChild.and.returnValue(mockChildLogger);
+    mockLogger.createChild.and.returnValue(mockChildLogger as ReturnType<LoggerService['createChild']>);
 
     TestBed.configureTestingModule({
       providers: [
@@ -130,7 +132,7 @@ describe('HealthCheckService', () => {
     it('should include metadata when available', fakeAsync(() => {
       service.refresh().then(status => {
         expect(status.checks.holochain.metadata).toBeDefined();
-        expect(status.checks.holochain.metadata?.mode).toBe('direct');
+        expect(status.checks.holochain.metadata?.['mode']).toBe('direct');
       });
       tick();
       flush();

@@ -219,7 +219,7 @@ describe('LoggerService', () => {
       expect(console.info).toHaveBeenCalled();
       const logs = service.getRecentLogs();
       expect(logs[0].message).toContain('test-operation completed');
-      expect(logs[0].context?.durationMs).toBeDefined();
+      expect(logs[0].context?.['durationMs']).toBeDefined();
     });
 
     it('should time async operations', async () => {
@@ -233,7 +233,7 @@ describe('LoggerService', () => {
 
       expect(result).toBe('done');
       const logs = service.getRecentLogs();
-      expect(logs[0].context?.success).toBe(true);
+      expect(logs[0].context?.['success']).toBe(true);
     });
 
     it('should log failed async operations', async () => {
@@ -249,7 +249,7 @@ describe('LoggerService', () => {
       }
 
       const logs = service.getRecentLogs();
-      expect(logs[0].context?.success).toBe(false);
+      expect(logs[0].context?.['success']).toBe(false);
     });
   });
 

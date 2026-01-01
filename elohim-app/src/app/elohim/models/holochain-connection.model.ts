@@ -458,6 +458,9 @@ export interface EdgeNodeDisplayInfo {
   /** Current connection state */
   state: HolochainConnectionState;
 
+  /** Connection mode: 'doorway' (via gateway) or 'direct' (local conductor) */
+  mode: 'doorway' | 'direct';
+
   /** Admin WebSocket URL from config */
   adminUrl: string;
 
