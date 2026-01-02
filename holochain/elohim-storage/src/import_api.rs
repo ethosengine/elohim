@@ -223,7 +223,12 @@ impl ImportApi {
         self
     }
 
-    /// Initialize conductor connection
+    /// Initialize conductor connection with retry logic.
+    ///
+    /// Retries connection with exponential backoff because:
+    /// - Conductor may still be starting up
+    /// - App may not be installed yet (hApp installer runs async)
+    /// - Network may have transient issues
     pub async fn connect_conductor(&mut self) -> Result<(), StorageError> {
         let conductor_config = ConductorClientConfig {
             admin_url: self.config.admin_url.clone(),
@@ -233,10 +238,48 @@ impl ImportApi {
             ..Default::default()
         };
 
-        let client = ConductorClient::connect(conductor_config).await?;
-        self.conductor = Some(Arc::new(client));
-        info!("ImportApi conductor client connected");
-        Ok(())
+        // Retry with backoff - conductor/app may not be ready at startup
+        let max_attempts = 5;
+        let mut attempt = 0;
+        let mut delay = Duration::from_secs(2);
+
+        loop {
+            attempt += 1;
+            info!(
+                attempt = attempt,
+                max_attempts = max_attempts,
+                admin_url = %conductor_config.admin_url,
+                app_url = %conductor_config.app_url,
+                app_id = %conductor_config.app_id,
+                "Attempting conductor connection"
+            );
+
+            match ConductorClient::connect(conductor_config.clone()).await {
+                Ok(client) => {
+                    self.conductor = Some(Arc::new(client));
+                    info!("ImportApi conductor client connected");
+                    return Ok(());
+                }
+                Err(e) => {
+                    if attempt >= max_attempts {
+                        error!(
+                            attempt = attempt,
+                            error = %e,
+                            "Conductor connection failed after max attempts"
+                        );
+                        return Err(e);
+                    }
+                    warn!(
+                        attempt = attempt,
+                        error = %e,
+                        delay_secs = delay.as_secs(),
+                        "Conductor connection failed, retrying..."
+                    );
+                    tokio::time::sleep(delay).await;
+                    delay = std::cmp::min(delay * 2, Duration::from_secs(30));
+                }
+            }
+        }
     }
 
     /// Handle import API requests
