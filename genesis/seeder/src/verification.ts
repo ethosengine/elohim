@@ -329,19 +329,20 @@ export class SeedingVerification {
 
     try {
       // Try to create a test content entry
+      // Use 'concept' as content_type since it's a valid type that the zome accepts
       await this.appWs.callZome({
         cell_id: this.cellId,
         zome_name: this.zomeName,
         fn_name: 'create_content',
         payload: {
           id: testId,
-          content_type: '__preflight_test',
+          content_type: 'concept',  // Must be a valid content type
           title: 'Preflight Test Entry',
           description: 'This entry tests write capability. Safe to delete.',
           summary: '',
           content: '{}',
           content_format: 'json',
-          tags: ['__preflight'],
+          tags: ['__preflight', '__test'],  // Tag for easy identification/cleanup
           source_path: '',
           related_node_ids: [],
           reach: 'private',
