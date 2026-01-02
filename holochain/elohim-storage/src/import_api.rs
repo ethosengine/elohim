@@ -681,6 +681,51 @@ impl ImportApiProcessor {
             "📥 BATCH_START: Starting batch processing via ImportApi (cell_id ready)"
         );
 
+        // CRITICAL: Call queue_import FIRST to create the batch entry in the zome
+        // The zome's process_import_chunk looks up the batch by ID, so it MUST exist first
+        let queue_payload = serde_json::json!({
+            "id": batch_id,
+            "batch_type": batch_type,
+            "blob_hash": format!("inline-{}", batch_id), // No blob for inline imports
+            "total_items": total as u32,
+        });
+        let queue_payload_bytes = rmp_serde::to_vec(&queue_payload)
+            .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+        info!(
+            batch_id = %batch_id,
+            batch_type = %batch_type,
+            total_items = total,
+            "📝 QUEUE_IMPORT: Creating batch entry in zome"
+        );
+
+        match conductor.call_zome(
+            &cell_id,
+            &self.config.zome_name,
+            "queue_import",
+            &queue_payload_bytes,
+        ).await {
+            Ok(response) => {
+                info!(
+                    batch_id = %batch_id,
+                    response_len = response.len(),
+                    "✅ QUEUE_IMPORT_OK: Batch entry created in zome"
+                );
+            }
+            Err(e) => {
+                let error_msg = format!("Failed to create batch entry in zome: {}", e);
+                error!(batch_id = %batch_id, error = %error_msg, "❌ QUEUE_IMPORT_FAILED");
+                self.add_error(batch_id, error_msg.clone()).await;
+                self.update_status(batch_id, ImportStatus::Failed).await;
+
+                if let Some(ref broadcaster) = self.debug_broadcaster {
+                    broadcaster.import_batch_complete(batch_id, 0, 1, batch_start.elapsed().as_millis() as u64);
+                }
+
+                return Err(StorageError::Conductor(error_msg));
+            }
+        }
+
         // Process in chunks with adaptive backpressure
         let mut processed = 0;
         let mut errors = 0;
