@@ -108,6 +108,24 @@ pub enum ImportStatus {
     Failed,
 }
 
+/// Response from zome's process_import_chunk call
+/// Must match the Rust struct in content_store zome
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZomeChunkResponse {
+    /// Batch ID
+    pub batch_id: String,
+    /// Items processed in this chunk
+    pub chunk_processed: u32,
+    /// Errors in this chunk
+    pub chunk_errors: u32,
+    /// Total processed so far (across all chunks)
+    pub total_processed: u32,
+    /// Total errors so far (across all chunks)
+    pub total_errors: u32,
+    /// Current batch status
+    pub status: String,
+}
+
 // ============================================================================
 // Import Batch State
 // ============================================================================
@@ -784,11 +802,48 @@ impl ImportApiProcessor {
                 "process_import_chunk",
                 &payload_bytes,
             ).await {
-                Ok(_) => {
+                Ok(response_bytes) => {
                     let chunk_duration = chunk_start.elapsed();
                     let response_ms = chunk_duration.as_millis() as f64;
-                    processed += chunk.len();
-                    consecutive_errors = 0; // Reset on success
+
+                    // Parse the zome response to get actual results
+                    // CRITICAL: The zome returns ProcessImportChunkOutput with chunk_processed/chunk_errors
+                    // Previously we just assumed success - now we check the real values
+                    let (chunk_processed, chunk_errors) = match rmp_serde::from_slice::<ZomeChunkResponse>(&response_bytes) {
+                        Ok(zome_response) => {
+                            debug!(
+                                batch_id = %batch_id,
+                                chunk_index = chunk_idx,
+                                chunk_processed = zome_response.chunk_processed,
+                                chunk_errors = zome_response.chunk_errors,
+                                total_processed = zome_response.total_processed,
+                                total_errors = zome_response.total_errors,
+                                status = %zome_response.status,
+                                "📊 ZOME_RESPONSE: Parsed actual results from zome"
+                            );
+                            (zome_response.chunk_processed as usize, zome_response.chunk_errors as usize)
+                        }
+                        Err(parse_err) => {
+                            // Log parse failure but don't crash - fall back to assuming success
+                            // This handles backward compatibility if response format changes
+                            warn!(
+                                batch_id = %batch_id,
+                                chunk_index = chunk_idx,
+                                error = %parse_err,
+                                response_len = response_bytes.len(),
+                                response_hex = hex::encode(&response_bytes[..response_bytes.len().min(100)]),
+                                "⚠️ PARSE_WARNING: Could not parse zome response, assuming chunk success"
+                            );
+                            (chunk.len(), 0)
+                        }
+                    };
+
+                    processed += chunk_processed;
+                    errors += chunk_errors;
+
+                    if chunk_errors == 0 {
+                        consecutive_errors = 0; // Reset on success
+                    }
 
                     // Update running average of response times
                     if avg_response_time_ms == 0.0 {
@@ -805,12 +860,15 @@ impl ImportApiProcessor {
                     info!(
                         batch_id = %batch_id,
                         chunk_index = chunk_idx,
-                        chunk_items = chunk.len(),
+                        chunk_sent = chunk.len(),
+                        chunk_processed = chunk_processed,
+                        chunk_errors = chunk_errors,
                         duration_ms = chunk_duration.as_millis(),
                         total_processed = processed,
+                        total_errors = errors,
                         avg_response_ms = format!("{:.1}", avg_response_time_ms),
                         next_delay_ms = current_delay.as_millis(),
-                        "✅ CHUNK_OK: Chunk sent to conductor successfully"
+                        "✅ CHUNK_OK: Chunk processed by conductor"
                     );
 
                     if let Some(ref broadcaster) = self.debug_broadcaster {
