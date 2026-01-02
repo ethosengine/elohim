@@ -178,30 +178,59 @@ fn parse_cell_id_from_apps(
     app_id: &str,
     role_filter: Option<&str>,
 ) -> Result<Vec<u8>, StorageError> {
+    // Log response structure for debugging
+    debug!(
+        app_id = %app_id,
+        role_filter = ?role_filter,
+        response_type = ?std::mem::discriminant(response),
+        "Parsing list_apps response"
+    );
+
     // Response structure can be:
     // - Wrapped: { type: "apps_listed", data: [...] }
+    // - Wrapped (0.6+): { type: "apps_listed", value: [...] }
     // - Direct: [...]
 
     // Handle both wrapped and direct array formats
     // Holochain uses "value" in newer API versions
     let apps = match response {
-        Value::Array(arr) => arr,
+        Value::Array(arr) => {
+            debug!(apps_count = arr.len(), "Direct array response");
+            arr
+        }
         Value::Map(map) => {
+            // Log available keys for debugging
+            let keys: Vec<_> = map.iter()
+                .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(String::from) } else { None })
+                .collect();
+            debug!(keys = ?keys, "Map response with keys");
+
             if let Some(Value::Array(arr)) = get_field(map, "value") {
+                debug!(apps_count = arr.len(), "Found apps in 'value' field");
                 arr
             } else if let Some(Value::Array(arr)) = get_field(map, "data") {
+                debug!(apps_count = arr.len(), "Found apps in 'data' field");
                 arr
             } else {
+                // Log the actual structure for debugging
+                info!(
+                    keys = ?keys,
+                    "Cell discovery failed: response has no value/data array field"
+                );
                 return Err(StorageError::NotFound(format!(
-                    "App '{}' not found - no value/data field in response",
-                    app_id
+                    "App '{}' not found - no value/data field in response (keys: {:?})",
+                    app_id, keys
                 )));
             }
         }
         _ => {
+            info!(
+                response_type = ?std::mem::discriminant(response),
+                "Cell discovery failed: unexpected response type"
+            );
             return Err(StorageError::NotFound(format!(
-                "App '{}' not found - unexpected response format",
-                app_id
+                "App '{}' not found - unexpected response format: {:?}",
+                app_id, std::mem::discriminant(response)
             )));
         }
     };
@@ -312,11 +341,28 @@ fn parse_cell_id_from_apps(
                                             return Ok(buf);
                                         }
                                     }
+
+                                    // No format matched - log cell structure for debugging
+                                    let cell_keys: Vec<_> = cell_map.iter()
+                                        .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(String::from) } else { None })
+                                        .collect();
+                                    debug!(
+                                        role = ?role_name,
+                                        cell_keys = ?cell_keys,
+                                        "Cell found but format not recognized"
+                                    );
                                 }
                             }
                         }
                     }
                 }
+
+                // App found but no provisioned cells
+                info!(
+                    app_id = %app_id,
+                    role_filter = ?role_filter,
+                    "App found but no provisioned cells matched"
+                );
             }
         }
     }

@@ -144,10 +144,16 @@ pub struct ImportApiConfig {
     pub role_filter: Option<String>,
     /// Chunk size for processing
     pub chunk_size: usize,
-    /// Delay between chunks (backpressure)
+    /// Base delay between chunks (backpressure)
     pub chunk_delay: Duration,
+    /// Maximum delay between chunks (backpressure ceiling)
+    pub max_chunk_delay: Duration,
     /// Maximum concurrent batches
     pub max_concurrent_batches: usize,
+    /// Consecutive errors before circuit breaker trips
+    pub circuit_breaker_threshold: usize,
+    /// Pause duration when circuit breaker trips
+    pub circuit_breaker_pause: Duration,
     /// Cell ID for zome calls (discovered or configured)
     pub cell_id: Option<Vec<u8>>,
     /// Zome name
@@ -163,7 +169,10 @@ impl Default for ImportApiConfig {
             role_filter: Some("lamad".to_string()),
             chunk_size: 50,
             chunk_delay: Duration::from_millis(100),
+            max_chunk_delay: Duration::from_secs(5),
             max_concurrent_batches: 3,
+            circuit_breaker_threshold: 5,
+            circuit_breaker_pause: Duration::from_secs(10),
             cell_id: None,
             zome_name: "content_store".to_string(),
         }
@@ -629,13 +638,29 @@ impl ImportApiProcessor {
             "📥 BATCH_START: Starting batch processing via ImportApi (cell_id ready)"
         );
 
-        // Process in chunks
+        // Process in chunks with adaptive backpressure
         let mut processed = 0;
         let mut errors = 0;
+        let mut consecutive_errors = 0;
+        let mut current_delay = self.config.chunk_delay;
+        let mut avg_response_time_ms: f64 = 0.0;
 
         for (chunk_idx, chunk) in items.chunks(self.config.chunk_size).enumerate() {
             let chunk_start = Instant::now();
             let is_final = processed + chunk.len() >= total;
+
+            // Circuit breaker check - pause if too many consecutive errors
+            if consecutive_errors >= self.config.circuit_breaker_threshold {
+                warn!(
+                    batch_id = %batch_id,
+                    consecutive_errors = consecutive_errors,
+                    pause_seconds = self.config.circuit_breaker_pause.as_secs(),
+                    "⚡ CIRCUIT_BREAKER: Pausing due to consecutive errors"
+                );
+                tokio::time::sleep(self.config.circuit_breaker_pause).await;
+                consecutive_errors = 0; // Reset after pause
+                current_delay = self.config.chunk_delay; // Reset delay
+            }
 
             info!(
                 batch_id = %batch_id,
@@ -643,6 +668,7 @@ impl ImportApiProcessor {
                 chunk_items = chunk.len(),
                 total_chunks = total_chunks,
                 is_final = is_final,
+                current_delay_ms = current_delay.as_millis(),
                 "🔄 CHUNK_START: Sending chunk to conductor"
             );
 
@@ -669,13 +695,30 @@ impl ImportApiProcessor {
             ).await {
                 Ok(_) => {
                     let chunk_duration = chunk_start.elapsed();
+                    let response_ms = chunk_duration.as_millis() as f64;
                     processed += chunk.len();
+                    consecutive_errors = 0; // Reset on success
+
+                    // Update running average of response times
+                    if avg_response_time_ms == 0.0 {
+                        avg_response_time_ms = response_ms;
+                    } else {
+                        avg_response_time_ms = (avg_response_time_ms * 0.8) + (response_ms * 0.2);
+                    }
+
+                    // Adaptive backpressure: if responses are fast, reduce delay
+                    // Target: delay should be ~50% of average response time
+                    let target_delay_ms = (avg_response_time_ms * 0.5).max(self.config.chunk_delay.as_millis() as f64);
+                    current_delay = Duration::from_millis(target_delay_ms as u64).min(self.config.max_chunk_delay);
+
                     info!(
                         batch_id = %batch_id,
                         chunk_index = chunk_idx,
                         chunk_items = chunk.len(),
                         duration_ms = chunk_duration.as_millis(),
                         total_processed = processed,
+                        avg_response_ms = format!("{:.1}", avg_response_time_ms),
+                        next_delay_ms = current_delay.as_millis(),
                         "✅ CHUNK_OK: Chunk sent to conductor successfully"
                     );
 
@@ -685,13 +728,20 @@ impl ImportApiProcessor {
                 }
                 Err(e) => {
                     let chunk_duration = chunk_start.elapsed();
+                    consecutive_errors += 1;
+
+                    // Exponential backoff on errors (double delay, up to max)
+                    current_delay = (current_delay * 2).min(self.config.max_chunk_delay);
+
                     error!(
                         batch_id = %batch_id,
                         chunk_index = chunk_idx,
                         chunk_items = chunk.len(),
                         duration_ms = chunk_duration.as_millis(),
                         error = %e,
-                        "❌ CHUNK_ERROR: Conductor call failed"
+                        consecutive_errors = consecutive_errors,
+                        next_delay_ms = current_delay.as_millis(),
+                        "❌ CHUNK_ERROR: Conductor call failed, applying backoff"
                     );
                     errors += chunk.len();
                     self.add_error(batch_id, format!("Chunk {}: {}", chunk_idx, e)).await;
@@ -705,9 +755,9 @@ impl ImportApiProcessor {
             // Update progress
             self.update_progress(batch_id, processed as u32, errors as u32).await;
 
-            // Backpressure delay
+            // Adaptive backpressure delay
             if !is_final {
-                tokio::time::sleep(self.config.chunk_delay).await;
+                tokio::time::sleep(current_delay).await;
             }
         }
 
