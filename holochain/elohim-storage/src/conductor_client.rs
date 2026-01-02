@@ -83,6 +83,10 @@ impl ConductorClient {
         let (request_tx, request_rx) = mpsc::channel(config.max_pending_requests);
         let connected = Arc::new(RwLock::new(false));
 
+        // Use oneshot channel for reliable connection signaling
+        // This avoids the race condition of polling a shared flag
+        let (ready_tx, ready_rx) = oneshot::channel::<Result<(), String>>();
+
         let client = Self {
             config: config.clone(),
             request_tx,
@@ -94,19 +98,27 @@ impl ConductorClient {
         let conn_config = config.clone();
         let conn_connected = Arc::clone(&connected);
         tokio::spawn(async move {
-            connection_loop(conn_config, request_rx, conn_connected).await;
+            connection_loop(conn_config, request_rx, conn_connected, Some(ready_tx)).await;
         });
 
-        // Wait for initial connection
-        for _ in 0..50 {
-            if *client.connected.read().await {
+        // Wait for connection with generous timeout (auth token can take time)
+        // The timeout here should be longer than get_auth_token's 10-second timeout
+        match timeout(Duration::from_secs(30), ready_rx).await {
+            Ok(Ok(Ok(()))) => {
                 info!(app_url = %config.app_url, "ConductorClient connected");
-                return Ok(client);
+                Ok(client)
             }
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            Ok(Ok(Err(e))) => {
+                Err(StorageError::Conductor(format!("Connection failed: {}", e)))
+            }
+            Ok(Err(_)) => {
+                // Oneshot channel was dropped without sending - connection loop panicked or exited
+                Err(StorageError::Conductor("Connection loop terminated unexpectedly".into()))
+            }
+            Err(_) => {
+                Err(StorageError::Conductor("Connection timeout (30s)".into()))
+            }
         }
-
-        Err(StorageError::Conductor("Connection timeout".into()))
     }
 
     /// Send a zome call request
@@ -184,6 +196,7 @@ async fn connection_loop(
     config: ConductorClientConfig,
     mut request_rx: mpsc::Receiver<PendingRequest>,
     connected: Arc<RwLock<bool>>,
+    mut ready_tx: Option<oneshot::Sender<Result<(), String>>>,
 ) {
     loop {
         info!(url = %config.app_url, "Connecting to conductor app interface");
@@ -195,7 +208,13 @@ async fn connection_loop(
                 token
             }
             Err(e) => {
+                let error_msg = format!("Failed to get auth token: {}", e);
                 error!(error = %e, "Failed to get auth token");
+                // Signal failure on initial connection attempt
+                if let Some(tx) = ready_tx.take() {
+                    let _ = tx.send(Err(error_msg));
+                    return; // Exit loop on initial failure - caller will see the error
+                }
                 tokio::time::sleep(config.reconnect_delay).await;
                 continue;
             }
@@ -206,13 +225,24 @@ async fn connection_loop(
             Ok((mut ws_sink, mut ws_stream)) => {
                 // Step 3: Authenticate
                 if let Err(e) = authenticate_connection(&mut ws_sink, &mut ws_stream, &auth_token).await {
+                    let error_msg = format!("Failed to authenticate: {}", e);
                     error!(error = %e, "Failed to authenticate");
+                    // Signal failure on initial connection attempt
+                    if let Some(tx) = ready_tx.take() {
+                        let _ = tx.send(Err(error_msg));
+                        return; // Exit loop on initial failure
+                    }
                     tokio::time::sleep(config.reconnect_delay).await;
                     continue;
                 }
 
                 *connected.write().await = true;
                 info!("Connected and authenticated to conductor");
+
+                // Signal success on initial connection
+                if let Some(tx) = ready_tx.take() {
+                    let _ = tx.send(Ok(()));
+                }
 
                 // Pending responses by ID
                 let pending: Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Vec<u8>, StorageError>>>>> =
@@ -273,7 +303,13 @@ async fn connection_loop(
                 *connected.write().await = false;
             }
             Err(e) => {
+                let error_msg = format!("Failed to connect to conductor: {}", e);
                 error!(error = %e, "Failed to connect to conductor");
+                // Signal failure on initial connection attempt
+                if let Some(tx) = ready_tx.take() {
+                    let _ = tx.send(Err(error_msg));
+                    return; // Exit loop on initial failure
+                }
             }
         }
 
