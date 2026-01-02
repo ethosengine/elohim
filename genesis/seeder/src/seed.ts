@@ -660,15 +660,22 @@ async function connectForVerification(): Promise<HolochainConnection | null> {
     }
 
     const cellInfo = app.cell_info[roleName];
-    const provisionedCell = cellInfo?.find((c: any) => 'provisioned' in c);
+    // Handle both cell formats:
+    // - Holochain native: { type: "provisioned", value: { cell_id: [...] } }
+    // - JS client format: { provisioned: { cell_id: [...] } }
+    const provisionedCell = cellInfo?.find((c: any) =>
+      ('provisioned' in c) || (c.type === 'provisioned')
+    );
     if (!provisionedCell) {
       console.log('   ⚠️ No provisioned cell found');
       await adminWs.client.close();
       return null;
     }
 
-    // Extract cell_id
-    const rawCellId = (provisionedCell as any).provisioned.cell_id;
+    // Extract cell_id from either format
+    const rawCellId = ('provisioned' in provisionedCell)
+      ? (provisionedCell as any).provisioned.cell_id
+      : (provisionedCell as any).value.cell_id;
     function toUint8Array(val: any): Uint8Array {
       if (val instanceof Uint8Array) return val;
       if (val?.type === 'Buffer' && Array.isArray(val.data)) return new Uint8Array(val.data);

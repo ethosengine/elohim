@@ -141,8 +141,13 @@ async function diagnoseContent(adminWs: AdminWebsocket, apps: AppInfo[]): Promis
 
   for (const [role, cells] of Object.entries(app.cell_info)) {
     for (const cellInfo of cells as CellInfo[]) {
+      // Handle both cell formats: native { type: "provisioned", value: {...} } and JS { provisioned: {...} }
       if ('provisioned' in cellInfo) {
         cellId = (cellInfo as any).provisioned.cell_id;
+        roleName = role;
+        break;
+      } else if ((cellInfo as any).type === 'provisioned') {
+        cellId = (cellInfo as any).value.cell_id;
         roleName = role;
         break;
       }

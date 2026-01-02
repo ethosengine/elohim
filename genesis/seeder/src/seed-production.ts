@@ -381,10 +381,13 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
         }
 
         // Find the first role with provisioned cells
+        // Handle both cell formats: native { type: "provisioned", value: {...} } and JS { provisioned: {...} }
         const roleNames = Object.keys(app.cell_info);
         const roleName = roleNames.find(name => {
           const cells = app.cell_info[name];
-          return cells && cells.length > 0 && 'provisioned' in cells[0];
+          if (!cells || cells.length === 0) return false;
+          const cell = cells[0];
+          return ('provisioned' in cell) || (cell.type === 'provisioned');
         });
 
         if (!roleName) {
@@ -392,11 +395,14 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
         }
 
         const cellInfo = app.cell_info[roleName][0];
-        if (!('provisioned' in cellInfo)) {
+        const isProvisioned = ('provisioned' in cellInfo) || (cellInfo.type === 'provisioned');
+        if (!isProvisioned) {
           throw new Error('Cell not provisioned');
         }
 
-        const cellId: CellId = cellInfo.provisioned.cell_id;
+        const cellId: CellId = ('provisioned' in cellInfo)
+          ? (cellInfo as any).provisioned.cell_id
+          : (cellInfo as any).value.cell_id;
         const appInfo = await adminWs.attachAppInterface({ allowed_origins: '*' });
         const token = await adminWs.issueAppAuthenticationToken({ installed_app_id: config.appId });
         const appWsUrl = `ws://localhost:${appInfo.port}`;

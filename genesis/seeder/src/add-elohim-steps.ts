@@ -74,11 +74,15 @@ async function main() {
   }
 
   const cellInfo = Object.values(elohimApp.cell_info)[0]?.[0];
-  if (!cellInfo || !('provisioned' in cellInfo)) {
+  // Handle both cell formats: native { type: "provisioned", value: {...} } and JS { provisioned: {...} }
+  const isProvisioned = cellInfo && (('provisioned' in cellInfo) || (cellInfo.type === 'provisioned'));
+  if (!isProvisioned) {
     console.error('Could not get cell info');
     process.exit(1);
   }
-  const cellId = (cellInfo as { provisioned: { cell_id: any } }).provisioned.cell_id;
+  const cellId = ('provisioned' in cellInfo)
+    ? (cellInfo as { provisioned: { cell_id: any } }).provisioned.cell_id
+    : (cellInfo as { value: { cell_id: any } }).value.cell_id;
   console.log(`📦 Using cell: ${encodeHashToBase64(cellId[0]).slice(0, 15)}...`);
 
   // Load elohim-protocol.json

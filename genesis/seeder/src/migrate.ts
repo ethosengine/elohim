@@ -582,8 +582,13 @@ async function main() {
 function extractCellId(cellInfo: any): CellId | null {
   if (Array.isArray(cellInfo)) {
     for (const info of cellInfo) {
+      // Handle JS client format: { provisioned: { cell_id: [...] } }
       if (info.provisioned) {
         return info.provisioned.cell_id;
+      }
+      // Handle Holochain native format: { type: "provisioned", value: { cell_id: [...] } }
+      if (info.type === 'provisioned' && info.value) {
+        return info.value.cell_id;
       }
       if (info.cloned) {
         return info.cloned.cell_id;
