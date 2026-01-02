@@ -42,7 +42,6 @@ use clap::Parser;
 use elohim_storage::{BlobStore, Config, HttpServer, ImportHandler, ImportHandlerConfig};
 use elohim_storage::{ProgressHub, ProgressHubConfig};
 use elohim_storage::import_api::{ImportApi, ImportApiConfig};
-use elohim_storage::cell_discovery::discover_cell_id;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -165,45 +164,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         info!("  WS   /import/progress        - WebSocket progress stream");
         info!("  Conductor app URL: {}", args.app_url);
 
-        // Try to discover cell_id from admin interface at startup (optional - will retry lazily)
-        let cell_id = if let Some(ref admin_url) = args.admin_url {
-            info!("  Attempting cell_id discovery from admin interface...");
-            match discover_cell_id(admin_url, &args.app_id, Some("lamad")).await {
-                Ok(cid) => {
-                    info!("  ✅ Cell discovered for app '{}' role 'lamad'", args.app_id);
-                    Some(cid)
-                }
-                Err(e) => {
-                    warn!("  ⚠️ Cell discovery failed: {} (trying without role filter)", e);
-                    // Try again without role filter
-                    match discover_cell_id(admin_url, &args.app_id, None).await {
-                        Ok(cid) => {
-                            info!("  ✅ Cell discovered for app '{}'", args.app_id);
-                            Some(cid)
-                        }
-                        Err(e) => {
-                            // With lazy discovery, this is no longer fatal - we'll retry on first import
-                            warn!("  ⚠️ Cell discovery failed at startup: {} (will retry lazily on first import)", e);
-                            None
-                        }
-                    }
-                }
-            }
-        } else {
-            // With lazy discovery, we can proceed without admin_url at startup
-            // but we need it to be set for imports to work
-            info!("  ℹ️ No admin_url set at startup - cell_id will be discovered lazily on first import");
-            None
-        };
-
+        // HcClient handles cell discovery and signing internally
+        // No need for manual cell_id discovery - it happens on connect
         let mut import_api = ImportApi::new(
             ImportApiConfig {
                 admin_url: args.admin_url.clone().unwrap_or_else(|| "ws://localhost:4444".to_string()),
-                conductor_url: args.app_url.clone(),
+                app_url: args.app_url.clone(),
                 app_id: args.app_id.clone(),
+                role: Some("lamad".to_string()),
                 zome_name: args.zome_name.clone(),
                 chunk_size: 50,
-                cell_id,
                 ..Default::default()
             },
             blob_store.clone(),

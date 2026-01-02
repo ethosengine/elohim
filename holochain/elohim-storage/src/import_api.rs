@@ -15,7 +15,7 @@
 //!                                     ├── Parse items
 //!                                     ├── Queue chunks for processing
 //!                                     │
-//!                                     └── ConductorClient (single connection)
+//!                                     └── HcClient (signed zome calls)
 //!                                              │
 //!                                              └── Batched process_import_chunk calls
 //! ```
@@ -26,6 +26,11 @@
 //! 2. **Local blob storage** - Fast writes, no network hops
 //! 3. **WriteBuffer batching** - Protects conductor from overwhelming
 //! 4. **Scalable** - Multiple doorways can share one elohim-storage
+//!
+//! ## Holochain 0.6 Signing
+//!
+//! Uses the official `holochain_client` crate via `HcClient` wrapper.
+//! All zome calls are properly signed with nonce, expires_at, and ed25519 signature.
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -40,10 +45,9 @@ use tokio::sync::{broadcast, RwLock};
 use tracing::{debug, error, info, warn};
 
 use crate::blob_store::BlobStore;
-use crate::cell_discovery::{discover_cell_id, CellIdComponents};
-use crate::conductor::{ConductorClient, ConductorClientConfig};
 use crate::debug_stream::DebugBroadcaster;
 use crate::error::StorageError;
+use crate::hc_client::{HcClient, HcClientConfig};
 use crate::progress_hub::ProgressHub;
 
 // ============================================================================
@@ -171,14 +175,16 @@ struct ImportBatch {
 /// Configuration for import API
 #[derive(Debug, Clone)]
 pub struct ImportApiConfig {
-    /// Conductor admin interface URL (for auth)
+    /// Conductor admin interface URL (for signing credential authorization)
     pub admin_url: String,
-    /// Conductor app interface URL
-    pub conductor_url: String,
+    /// Conductor app interface URL (for signed zome calls)
+    pub app_url: String,
     /// App ID for authentication
     pub app_id: String,
-    /// Role filter for cell discovery (e.g., "lamad")
-    pub role_filter: Option<String>,
+    /// Role for cell selection (e.g., "lamad")
+    pub role: Option<String>,
+    /// Zome name for import operations
+    pub zome_name: String,
     /// Chunk size for processing
     pub chunk_size: usize,
     /// Base delay between chunks (backpressure)
@@ -191,27 +197,22 @@ pub struct ImportApiConfig {
     pub circuit_breaker_threshold: usize,
     /// Pause duration when circuit breaker trips
     pub circuit_breaker_pause: Duration,
-    /// Cell ID components for zome calls (discovered or configured)
-    pub cell_id: Option<CellIdComponents>,
-    /// Zome name
-    pub zome_name: String,
 }
 
 impl Default for ImportApiConfig {
     fn default() -> Self {
         Self {
             admin_url: "ws://localhost:4444".to_string(),
-            conductor_url: "ws://localhost:4445".to_string(),
+            app_url: "ws://localhost:4445".to_string(),
             app_id: "elohim".to_string(),
-            role_filter: Some("lamad".to_string()),
+            role: Some("lamad".to_string()),
+            zome_name: "content_store".to_string(),
             chunk_size: 50,
             chunk_delay: Duration::from_millis(100),
             max_chunk_delay: Duration::from_secs(5),
             max_concurrent_batches: 3,
             circuit_breaker_threshold: 5,
             circuit_breaker_pause: Duration::from_secs(10),
-            cell_id: None,
-            zome_name: "content_store".to_string(),
         }
     }
 }
@@ -220,31 +221,26 @@ impl Default for ImportApiConfig {
 pub struct ImportApi {
     config: ImportApiConfig,
     blob_store: Arc<BlobStore>,
-    conductor: Option<Arc<ConductorClient>>,
+    /// Holochain client with signing support
+    hc_client: Option<Arc<HcClient>>,
     /// Active batches by ID
     batches: Arc<RwLock<HashMap<String, ImportBatch>>>,
     /// Progress hub for WebSocket streaming
     progress_hub: Option<Arc<ProgressHub>>,
     /// Debug broadcaster for real-time debugging
     debug_broadcaster: Option<Arc<DebugBroadcaster>>,
-    /// Lazily discovered cell_id components cache - shared across all processing tasks
-    cell_id_cache: Arc<RwLock<Option<CellIdComponents>>>,
 }
 
 impl ImportApi {
     /// Create a new import API service
     pub fn new(config: ImportApiConfig, blob_store: Arc<BlobStore>) -> Self {
-        // Pre-populate cell_id cache if configured
-        let cell_id_cache = Arc::new(RwLock::new(config.cell_id.clone()));
-
         Self {
             config,
             blob_store,
-            conductor: None,
+            hc_client: None,
             batches: Arc::new(RwLock::new(HashMap::new())),
             progress_hub: None,
             debug_broadcaster: None,
-            cell_id_cache,
         }
     }
 
@@ -260,19 +256,22 @@ impl ImportApi {
         self
     }
 
-    /// Initialize conductor connection with retry logic.
+    /// Initialize Holochain client with retry logic.
+    ///
+    /// Uses the official `holochain_client` crate for properly signed zome calls.
+    /// Holochain 0.6+ requires all zome calls to be signed with nonce, expires_at,
+    /// and ed25519 signature.
     ///
     /// Retries connection with exponential backoff because:
     /// - Conductor may still be starting up
     /// - App may not be installed yet (hApp installer runs async)
     /// - Network may have transient issues
     pub async fn connect_conductor(&mut self) -> Result<(), StorageError> {
-        let conductor_config = ConductorClientConfig {
+        let hc_config = HcClientConfig {
             admin_url: self.config.admin_url.clone(),
-            app_url: self.config.conductor_url.clone(),
+            app_url: self.config.app_url.clone(),
             app_id: self.config.app_id.clone(),
-            request_timeout: Duration::from_secs(60),
-            ..Default::default()
+            role: self.config.role.clone(),
         };
 
         // Retry with backoff - conductor/app may not be ready at startup
@@ -285,16 +284,57 @@ impl ImportApi {
             info!(
                 attempt = attempt,
                 max_attempts = max_attempts,
-                admin_url = %conductor_config.admin_url,
-                app_url = %conductor_config.app_url,
-                app_id = %conductor_config.app_id,
-                "Attempting conductor connection"
+                admin_url = %hc_config.admin_url,
+                app_url = %hc_config.app_url,
+                app_id = %hc_config.app_id,
+                role = ?hc_config.role,
+                "Attempting HcClient connection (signed zome calls)"
             );
 
-            match ConductorClient::connect(conductor_config.clone()).await {
+            match HcClient::connect(hc_config.clone()).await {
                 Ok(client) => {
-                    self.conductor = Some(Arc::new(client));
-                    info!("ImportApi conductor client connected");
+                    // Run preflight health check to log conductor state
+                    info!("🔍 PREFLIGHT: Running conductor health check...");
+                    let health = client.get_health().await;
+
+                    // Log raw responses for evaluation
+                    if let Some(ref raw) = health.raw_storage {
+                        info!(
+                            "📊 PREFLIGHT_STORAGE:\n{}",
+                            truncate_for_log(raw, 2000)
+                        );
+                    }
+                    if let Some(ref raw) = health.raw_network_stats {
+                        info!(
+                            "📊 PREFLIGHT_NETWORK_STATS:\n{}",
+                            truncate_for_log(raw, 2000)
+                        );
+                    }
+                    if let Some(ref raw) = health.raw_network_metrics {
+                        info!(
+                            "📊 PREFLIGHT_NETWORK_METRICS:\n{}",
+                            truncate_for_log(raw, 3000)
+                        );
+                    }
+
+                    // Log parsed summary
+                    if let Some(ref storage) = health.storage {
+                        info!(
+                            bytes_used = storage.bytes_used,
+                            entry_count = storage.entry_count,
+                            "📊 PREFLIGHT_SUMMARY: Storage metrics"
+                        );
+                    }
+                    if let Some(ref network) = health.network {
+                        info!(
+                            peer_count = ?network.peer_count,
+                            details = %network.details,
+                            "📊 PREFLIGHT_SUMMARY: Network metrics"
+                        );
+                    }
+
+                    self.hc_client = Some(Arc::new(client));
+                    info!("✅ ImportApi HcClient connected with signing support");
                     return Ok(());
                 }
                 Err(e) => {
@@ -302,7 +342,7 @@ impl ImportApi {
                         error!(
                             attempt = attempt,
                             error = %e,
-                            "Conductor connection failed after max attempts"
+                            "HcClient connection failed after max attempts"
                         );
                         return Err(e);
                     }
@@ -310,7 +350,7 @@ impl ImportApi {
                         attempt = attempt,
                         error = %e,
                         delay_secs = delay.as_secs(),
-                        "Conductor connection failed, retrying..."
+                        "HcClient connection failed, retrying..."
                     );
                     tokio::time::sleep(delay).await;
                     delay = std::cmp::min(delay * 2, Duration::from_secs(30));
@@ -556,11 +596,10 @@ impl ImportApi {
         ImportApiProcessor {
             config: self.config.clone(),
             blob_store: Arc::clone(&self.blob_store),
-            conductor: self.conductor.clone(),
+            hc_client: self.hc_client.clone(),
             batches: Arc::clone(&self.batches),
             progress_hub: self.progress_hub.clone(),
             debug_broadcaster: self.debug_broadcaster.clone(),
-            cell_id_cache: Arc::clone(&self.cell_id_cache),
         }
     }
 }
@@ -569,87 +608,14 @@ impl ImportApi {
 struct ImportApiProcessor {
     config: ImportApiConfig,
     blob_store: Arc<BlobStore>,
-    conductor: Option<Arc<ConductorClient>>,
+    hc_client: Option<Arc<HcClient>>,
     batches: Arc<RwLock<HashMap<String, ImportBatch>>>,
     progress_hub: Option<Arc<ProgressHub>>,
     debug_broadcaster: Option<Arc<DebugBroadcaster>>,
-    cell_id_cache: Arc<RwLock<Option<CellIdComponents>>>,
 }
 
 impl ImportApiProcessor {
-    /// Ensure cell_id is discovered - lazy discovery on first use
-    ///
-    /// This is the KEY fix for the silent failure bug. Previously, if cell_id
-    /// wasn't discovered at startup (race with hApp installer), imports would
-    /// silently skip. Now we discover lazily and fail loudly if we can't.
-    async fn ensure_cell_id(&self, batch_id: &str) -> Result<CellIdComponents, StorageError> {
-        // Check cache first (fast path)
-        {
-            let cache = self.cell_id_cache.read().await;
-            if let Some(ref cell_id) = *cache {
-                return Ok(cell_id.clone());
-            }
-        }
-
-        // Not cached - need to discover
-        info!(
-            batch_id = %batch_id,
-            admin_url = %self.config.admin_url,
-            app_id = %self.config.app_id,
-            role = ?self.config.role_filter,
-            "🔍 CELL_DISCOVERY: cell_id not cached, discovering lazily..."
-        );
-
-        // Emit debug event
-        if let Some(ref broadcaster) = self.debug_broadcaster {
-            broadcaster.cell_discovery_start(&self.config.admin_url, &self.config.app_id);
-        }
-
-        // Attempt discovery
-        match discover_cell_id(
-            &self.config.admin_url,
-            &self.config.app_id,
-            self.config.role_filter.as_deref(),
-        ).await {
-            Ok(cell_id) => {
-                // Cache it for future use
-                {
-                    let mut cache = self.cell_id_cache.write().await;
-                    *cache = Some(cell_id.clone());
-                }
-
-                info!(
-                    batch_id = %batch_id,
-                    dna_hash_len = cell_id.dna_hash.len(),
-                    agent_pub_key_len = cell_id.agent_pub_key.len(),
-                    "✅ CELL_DISCOVERY: cell_id discovered and cached"
-                );
-
-                if let Some(ref broadcaster) = self.debug_broadcaster {
-                    broadcaster.cell_discovery_success(
-                        self.config.role_filter.as_deref().unwrap_or("default")
-                    );
-                }
-
-                Ok(cell_id)
-            }
-            Err(e) => {
-                error!(
-                    batch_id = %batch_id,
-                    error = %e,
-                    "❌ CELL_DISCOVERY: Failed to discover cell_id"
-                );
-
-                if let Some(ref broadcaster) = self.debug_broadcaster {
-                    broadcaster.cell_discovery_failed(&e.to_string());
-                }
-
-                Err(e)
-            }
-        }
-    }
-
-    /// Process a batch of items
+    /// Process a batch of items using signed zome calls
     async fn process_batch(
         &self,
         batch_id: &str,
@@ -669,29 +635,11 @@ impl ImportApiProcessor {
             broadcaster.import_batch_start(batch_id, batch_type, items_count);
         }
 
-        // CRITICAL: Ensure we have a cell_id BEFORE processing
-        // This is the lazy discovery - fail loudly if we can't discover
-        let cell_id = match self.ensure_cell_id(batch_id).await {
-            Ok(id) => id,
-            Err(e) => {
-                let error_msg = format!("Cell discovery failed: {}", e);
-                error!(batch_id = %batch_id, error = %error_msg, "❌ BATCH_FAILED: Cannot proceed without cell_id");
-                self.add_error(batch_id, error_msg.clone()).await;
-                self.update_status(batch_id, ImportStatus::Failed).await;
-
-                if let Some(ref broadcaster) = self.debug_broadcaster {
-                    broadcaster.import_batch_complete(batch_id, 0, 1, batch_start.elapsed().as_millis() as u64);
-                }
-
-                return Err(StorageError::NotFound(error_msg));
-            }
-        };
-
-        // Check conductor is connected
-        let conductor = match &self.conductor {
+        // Check HcClient is connected (cell discovery happens in HcClient::connect)
+        let hc_client = match &self.hc_client {
             Some(c) => c,
             None => {
-                let error_msg = "No conductor connection available";
+                let error_msg = "No HcClient connection available";
                 error!(batch_id = %batch_id, "❌ BATCH_FAILED: {}", error_msg);
                 self.add_error(batch_id, error_msg.to_string()).await;
                 self.update_status(batch_id, ImportStatus::Failed).await;
@@ -715,8 +663,8 @@ impl ImportApiProcessor {
             total_items = total,
             total_chunks = total_chunks,
             chunk_size = self.config.chunk_size,
-            conductor_url = %self.config.conductor_url,
-            "📥 BATCH_START: Starting batch processing via ImportApi (cell_id ready)"
+            app_url = %self.config.app_url,
+            "📥 BATCH_START: Starting batch processing via HcClient (signed zome calls)"
         );
 
         // CRITICAL: Call queue_import FIRST to create the batch entry in the zome
@@ -734,15 +682,13 @@ impl ImportApiProcessor {
             batch_id = %batch_id,
             batch_type = %batch_type,
             total_items = total,
-            "📝 QUEUE_IMPORT: Creating batch entry in zome"
+            "📝 QUEUE_IMPORT: Creating batch entry in zome (signed call)"
         );
 
-        match conductor.call_zome(
-            &cell_id.dna_hash,
-            &cell_id.agent_pub_key,
+        match hc_client.call_zome(
             &self.config.zome_name,
             "queue_import",
-            &queue_payload_bytes,
+            queue_payload_bytes,
         ).await {
             Ok(response) => {
                 info!(
@@ -796,7 +742,7 @@ impl ImportApiProcessor {
                 total_chunks = total_chunks,
                 is_final = is_final,
                 current_delay_ms = current_delay.as_millis(),
-                "🔄 CHUNK_START: Sending chunk to conductor"
+                "🔄 CHUNK_START: Sending signed chunk to conductor"
             );
 
             if let Some(ref broadcaster) = self.debug_broadcaster {
@@ -805,24 +751,22 @@ impl ImportApiProcessor {
 
             // Build payload
             // Serialize items to JSON string - zome expects items_json: String
-            let items_json = serde_json::to_string(&chunk)
+            let items_json_str = serde_json::to_string(&chunk)
                 .map_err(|e| StorageError::Internal(format!("Failed to serialize items: {}", e)))?;
 
             let payload = serde_json::json!({
                 "batch_id": batch_id,
                 "chunk_index": chunk_idx as u32,  // Explicit u32 to match zome's expected type
                 "is_final": is_final,
-                "items_json": items_json,
+                "items_json": items_json_str,
             });
             let payload_bytes = rmp_serde::to_vec(&payload)
                 .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-            match conductor.call_zome(
-                &cell_id.dna_hash,
-                &cell_id.agent_pub_key,
+            match hc_client.call_zome(
                 &self.config.zome_name,
                 "process_import_chunk",
-                &payload_bytes,
+                payload_bytes,
             ).await {
                 Ok(response_bytes) => {
                     let chunk_duration = chunk_start.elapsed();
@@ -917,7 +861,7 @@ impl ImportApiProcessor {
                         total_errors = errors,
                         avg_response_ms = format!("{:.1}", avg_response_time_ms),
                         next_delay_ms = current_delay.as_millis(),
-                        "✅ CHUNK_OK: Chunk processed by conductor"
+                        "✅ CHUNK_OK: Chunk processed by conductor (signed)"
                     );
 
                     if let Some(ref broadcaster) = self.debug_broadcaster {
@@ -939,7 +883,7 @@ impl ImportApiProcessor {
                         error = %e,
                         consecutive_errors = consecutive_errors,
                         next_delay_ms = current_delay.as_millis(),
-                        "❌ CHUNK_ERROR: Conductor call failed, applying backoff"
+                        "❌ CHUNK_ERROR: Signed zome call failed, applying backoff"
                     );
                     errors += chunk.len();
                     self.add_error(batch_id, format!("Chunk {}: {}", chunk_idx, e)).await;
@@ -1061,4 +1005,13 @@ fn error_response(status: StatusCode, message: &str) -> Response<Full<Bytes>> {
         .header(header::CONTENT_TYPE, "application/json")
         .body(Full::new(Bytes::from(body.to_string())))
         .unwrap()
+}
+
+/// Truncate a string for logging, adding ellipsis if needed
+fn truncate_for_log(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}...[truncated {} bytes]", &s[..max_len], s.len() - max_len)
+    }
 }

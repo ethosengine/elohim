@@ -33,6 +33,10 @@
 //!
 //! - `p2p` - Enable rust-libp2p for P2P shard transfer
 
+// Custom getrandom v0.3 backend for holochain dependencies
+// (must be declared before any modules that use randomness)
+mod getrandom_custom;
+
 // Core modules (always available)
 pub mod blob_store;
 pub mod metadata;
@@ -42,8 +46,10 @@ pub mod error;
 pub mod sharding;
 pub mod http;
 pub mod import_handler;
-pub mod conductor;              // New: well-structured conductor connection
+pub mod conductor;              // Custom conductor connection (unsigned - deprecated)
 pub mod conductor_client;       // Legacy: kept for backward compatibility during migration
+pub mod hc_client;              // Official holochain_client wrapper with signing support
+pub use hc_client::{HcClient, HcClientConfig, ConductorHealth, StorageHealth, NetworkHealth};
 pub mod import_api;
 pub mod progress_hub;
 pub mod progress_ws;
