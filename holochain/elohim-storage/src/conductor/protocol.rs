@@ -20,12 +20,12 @@
 //! {
 //!     "type": "call_zome",
 //!     "value": {
-//!         "cell_id": <binary>,
+//!         "cell_id": [<dna_hash>, <agent_pub_key>],  // Array, not binary!
 //!         "zome_name": <string>,
 //!         "fn_name": <string>,
 //!         "payload": <binary>,
 //!         "cap_secret": null,
-//!         "provenance": null,
+//!         "provenance": <agent_pub_key>,  // Required in Holochain 0.6
 //!     }
 //! }
 //! ```
@@ -60,7 +60,8 @@ pub struct DecodedResponse {
 ///
 /// # Arguments
 /// * `id` - Request ID for correlating the response
-/// * `cell_id` - The cell to call (DNA hash + agent pubkey)
+/// * `dna_hash` - DNA hash bytes
+/// * `agent_pub_key` - Agent public key bytes (also used for provenance)
 /// * `zome_name` - Name of the zome
 /// * `fn_name` - Name of the function
 /// * `payload` - Msgpack-encoded function arguments
@@ -69,26 +70,30 @@ pub struct DecodedResponse {
 /// An `EncodedRequest` containing the ID and the bytes to send.
 pub fn encode_zome_call(
     id: u64,
-    cell_id: &[u8],
+    dna_hash: &[u8],
+    agent_pub_key: &[u8],
     zome_name: &str,
     fn_name: &str,
     payload: &[u8],
 ) -> Result<EncodedRequest, StorageError> {
     use rmpv::encode::write_value;
 
-    // cell_id is msgpack-encoded [dna_hash, agent_pubkey] bytes from cell_discovery
-    // The conductor expects cell_id as Binary containing these bytes,
-    // which it decodes internally. Keep as Binary, don't decode.
+    // Holochain 0.6 wire format:
+    // - cell_id is an Array of [dna_hash, agent_pub_key] (NOT a binary blob)
+    // - provenance is the agent_pub_key (NOT nil)
+    let cell_id = Value::Array(vec![
+        Value::Binary(dna_hash.to_vec()),
+        Value::Binary(agent_pub_key.to_vec()),
+    ]);
 
     // Build the inner call_zome request
-    // Note: Holochain 0.6+ uses "value" not "data" for the inner structure
     let call_data = Value::Map(vec![
-        (Value::String("cell_id".into()), Value::Binary(cell_id.to_vec())),
+        (Value::String("cell_id".into()), cell_id),
         (Value::String("zome_name".into()), Value::String(zome_name.into())),
         (Value::String("fn_name".into()), Value::String(fn_name.into())),
         (Value::String("payload".into()), Value::Binary(payload.to_vec())),
         (Value::String("cap_secret".into()), Value::Nil),
-        (Value::String("provenance".into()), Value::Nil),
+        (Value::String("provenance".into()), Value::Binary(agent_pub_key.to_vec())),
     ]);
 
     let inner_request = Value::Map(vec![
@@ -236,7 +241,9 @@ mod tests {
 
     #[test]
     fn test_encode_zome_call_has_required_fields() {
-        let result = encode_zome_call(1, b"cell123", "my_zome", "my_fn", b"payload");
+        let dna_hash = b"dna_hash_here";
+        let agent_pub_key = b"agent_pub_key";
+        let result = encode_zome_call(1, dna_hash, agent_pub_key, "my_zome", "my_fn", b"payload");
         assert!(result.is_ok());
         let encoded = result.unwrap();
         assert_eq!(encoded.id, 1);

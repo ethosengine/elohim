@@ -146,7 +146,8 @@ impl ConductorClient {
     /// If the session is dead, attempts to reconnect first.
     ///
     /// # Arguments
-    /// * `cell_id` - The cell to call
+    /// * `dna_hash` - DNA hash bytes
+    /// * `agent_pub_key` - Agent public key bytes
     /// * `zome_name` - Name of the zome
     /// * `fn_name` - Name of the function
     /// * `payload` - Msgpack-encoded arguments
@@ -157,7 +158,8 @@ impl ConductorClient {
     /// - Zome returned an error
     pub async fn call_zome(
         &self,
-        cell_id: &[u8],
+        dna_hash: &[u8],
+        agent_pub_key: &[u8],
         zome_name: &str,
         fn_name: &str,
         payload: &[u8],
@@ -215,7 +217,7 @@ impl ConductorClient {
             .as_mut()
             .ok_or_else(|| StorageError::Conductor("No session available".into()))?;
 
-        session.call_zome(cell_id, zome_name, fn_name, payload).await
+        session.call_zome(dna_hash, agent_pub_key, zome_name, fn_name, payload).await
     }
 
     /// Check if the client currently has a live session.

@@ -5,7 +5,7 @@
 //! ## Usage
 //!
 //! ```ignore
-//! let cell_id = discover_cell_id(
+//! let (dna_hash, agent_pub_key) = discover_cell_id(
 //!     "ws://localhost:4444",  // admin URL
 //!     "elohim",               // app ID
 //!     Some("lamad"),          // role filter (optional)
@@ -23,10 +23,19 @@ use tokio_tungstenite::{
 };
 use tracing::{debug, info};
 
+/// Cell ID components returned by discovery
+#[derive(Debug, Clone)]
+pub struct CellIdComponents {
+    /// DNA hash bytes (typically 39 bytes including type prefix)
+    pub dna_hash: Vec<u8>,
+    /// Agent public key bytes (typically 39 bytes including type prefix)
+    pub agent_pub_key: Vec<u8>,
+}
+
 /// Discover cell_id from conductor admin interface
 ///
-/// Returns the serialized cell_id bytes (dna_hash + agent_pub_key concatenated)
-/// suitable for passing to zome calls.
+/// Returns the cell_id components (dna_hash and agent_pub_key) separately
+/// for proper wire protocol encoding.
 ///
 /// # Arguments
 /// * `admin_url` - Conductor admin WebSocket URL (e.g., "ws://localhost:4444")
@@ -34,13 +43,13 @@ use tracing::{debug, info};
 /// * `role_filter` - Optional role name to match (e.g., "lamad")
 ///
 /// # Returns
-/// * `Ok(Vec<u8>)` - Serialized cell_id bytes
+/// * `Ok(CellIdComponents)` - DNA hash and agent pubkey
 /// * `Err(StorageError)` - If discovery fails
 pub async fn discover_cell_id(
     admin_url: &str,
     app_id: &str,
     role_filter: Option<&str>,
-) -> Result<Vec<u8>, StorageError> {
+) -> Result<CellIdComponents, StorageError> {
     info!(admin_url = %admin_url, app_id = %app_id, role = ?role_filter, "Discovering cell_id from conductor");
 
     // Connect to admin interface
@@ -177,7 +186,7 @@ fn parse_cell_id_from_apps(
     response: &Value,
     app_id: &str,
     role_filter: Option<&str>,
-) -> Result<Vec<u8>, StorageError> {
+) -> Result<CellIdComponents, StorageError> {
     // Log response structure for debugging
     debug!(
         app_id = %app_id,
@@ -263,19 +272,6 @@ fn parse_cell_id_from_apps(
                                     // Try Holochain 0.3+ provisioned format first
                                     // Format: { type: "provisioned", value: { cell_id: { dna_hash, agent_pub_key } } }
                                     if let Some((dna, agent)) = extract_provisioned_cell_id(cell_map) {
-                                        let cell_id_value = Value::Array(vec![
-                                            Value::Binary(dna.clone()),
-                                            Value::Binary(agent.clone()),
-                                        ]);
-                                        let mut buf = Vec::new();
-                                        rmpv::encode::write_value(&mut buf, &cell_id_value)
-                                            .map_err(|e| {
-                                                StorageError::Parse(format!(
-                                                    "Failed to serialize cell_id: {}",
-                                                    e
-                                                ))
-                                            })?;
-
                                         info!(
                                             app_id = app_id,
                                             role = ?role_name,
@@ -283,25 +279,15 @@ fn parse_cell_id_from_apps(
                                             "Discovered cell_id (provisioned format)"
                                         );
 
-                                        return Ok(buf);
+                                        return Ok(CellIdComponents {
+                                            dna_hash: dna,
+                                            agent_pub_key: agent,
+                                        });
                                     }
 
                                     // Try JS client format: { provisioned: { cell_id: [dna, agent] } }
                                     // This is the format returned by @holochain/client JS library
                                     if let Some((dna, agent)) = extract_js_provisioned_cell_id(cell_map) {
-                                        let cell_id_value = Value::Array(vec![
-                                            Value::Binary(dna.clone()),
-                                            Value::Binary(agent.clone()),
-                                        ]);
-                                        let mut buf = Vec::new();
-                                        rmpv::encode::write_value(&mut buf, &cell_id_value)
-                                            .map_err(|e| {
-                                                StorageError::Parse(format!(
-                                                    "Failed to serialize cell_id: {}",
-                                                    e
-                                                ))
-                                            })?;
-
                                         info!(
                                             app_id = app_id,
                                             role = ?role_name,
@@ -309,7 +295,10 @@ fn parse_cell_id_from_apps(
                                             "Discovered cell_id (JS client format)"
                                         );
 
-                                        return Ok(buf);
+                                        return Ok(CellIdComponents {
+                                            dna_hash: dna,
+                                            agent_pub_key: agent,
+                                        });
                                     }
 
                                     // Fall back to legacy format: { cell_id: [dna, agent] }
@@ -318,19 +307,6 @@ fn parse_cell_id_from_apps(
                                             let dna = extract_bytes(&cell_id[0])?;
                                             let agent = extract_bytes(&cell_id[1])?;
 
-                                            let cell_id_value = Value::Array(vec![
-                                                Value::Binary(dna.clone()),
-                                                Value::Binary(agent.clone()),
-                                            ]);
-                                            let mut buf = Vec::new();
-                                            rmpv::encode::write_value(&mut buf, &cell_id_value)
-                                                .map_err(|e| {
-                                                    StorageError::Parse(format!(
-                                                        "Failed to serialize cell_id: {}",
-                                                        e
-                                                    ))
-                                                })?;
-
                                             info!(
                                                 app_id = app_id,
                                                 role = ?role_name,
@@ -338,7 +314,10 @@ fn parse_cell_id_from_apps(
                                                 "Discovered cell_id (legacy format)"
                                             );
 
-                                            return Ok(buf);
+                                            return Ok(CellIdComponents {
+                                                dna_hash: dna,
+                                                agent_pub_key: agent,
+                                            });
                                         }
                                     }
 
@@ -524,7 +503,8 @@ mod tests {
         let result = parse_cell_id_from_apps(&response, "elohim", Some("lamad"));
         assert!(result.is_ok());
         let cell_id = result.unwrap();
-        assert!(!cell_id.is_empty());
+        assert_eq!(cell_id.dna_hash, vec![1, 2, 3, 4]);
+        assert_eq!(cell_id.agent_pub_key, vec![5, 6, 7, 8]);
     }
 
     #[test]
@@ -559,6 +539,7 @@ mod tests {
         let result = parse_cell_id_from_apps(&response, "elohim", Some("lamad"));
         assert!(result.is_ok(), "Should parse JS client format: {:?}", result);
         let cell_id = result.unwrap();
-        assert!(!cell_id.is_empty());
+        assert_eq!(cell_id.dna_hash, vec![1, 2, 3, 4]);
+        assert_eq!(cell_id.agent_pub_key, vec![5, 6, 7, 8]);
     }
 }

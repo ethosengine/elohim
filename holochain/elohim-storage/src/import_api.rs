@@ -40,7 +40,7 @@ use tokio::sync::{broadcast, RwLock};
 use tracing::{debug, error, info, warn};
 
 use crate::blob_store::BlobStore;
-use crate::cell_discovery::discover_cell_id;
+use crate::cell_discovery::{discover_cell_id, CellIdComponents};
 use crate::conductor::{ConductorClient, ConductorClientConfig};
 use crate::debug_stream::DebugBroadcaster;
 use crate::error::StorageError;
@@ -191,8 +191,8 @@ pub struct ImportApiConfig {
     pub circuit_breaker_threshold: usize,
     /// Pause duration when circuit breaker trips
     pub circuit_breaker_pause: Duration,
-    /// Cell ID for zome calls (discovered or configured)
-    pub cell_id: Option<Vec<u8>>,
+    /// Cell ID components for zome calls (discovered or configured)
+    pub cell_id: Option<CellIdComponents>,
     /// Zome name
     pub zome_name: String,
 }
@@ -227,8 +227,8 @@ pub struct ImportApi {
     progress_hub: Option<Arc<ProgressHub>>,
     /// Debug broadcaster for real-time debugging
     debug_broadcaster: Option<Arc<DebugBroadcaster>>,
-    /// Lazily discovered cell_id cache - shared across all processing tasks
-    cell_id_cache: Arc<RwLock<Option<Vec<u8>>>>,
+    /// Lazily discovered cell_id components cache - shared across all processing tasks
+    cell_id_cache: Arc<RwLock<Option<CellIdComponents>>>,
 }
 
 impl ImportApi {
@@ -573,7 +573,7 @@ struct ImportApiProcessor {
     batches: Arc<RwLock<HashMap<String, ImportBatch>>>,
     progress_hub: Option<Arc<ProgressHub>>,
     debug_broadcaster: Option<Arc<DebugBroadcaster>>,
-    cell_id_cache: Arc<RwLock<Option<Vec<u8>>>>,
+    cell_id_cache: Arc<RwLock<Option<CellIdComponents>>>,
 }
 
 impl ImportApiProcessor {
@@ -582,7 +582,7 @@ impl ImportApiProcessor {
     /// This is the KEY fix for the silent failure bug. Previously, if cell_id
     /// wasn't discovered at startup (race with hApp installer), imports would
     /// silently skip. Now we discover lazily and fail loudly if we can't.
-    async fn ensure_cell_id(&self, batch_id: &str) -> Result<Vec<u8>, StorageError> {
+    async fn ensure_cell_id(&self, batch_id: &str) -> Result<CellIdComponents, StorageError> {
         // Check cache first (fast path)
         {
             let cache = self.cell_id_cache.read().await;
@@ -620,7 +620,8 @@ impl ImportApiProcessor {
 
                 info!(
                     batch_id = %batch_id,
-                    cell_id_len = cell_id.len(),
+                    dna_hash_len = cell_id.dna_hash.len(),
+                    agent_pub_key_len = cell_id.agent_pub_key.len(),
                     "✅ CELL_DISCOVERY: cell_id discovered and cached"
                 );
 
@@ -737,7 +738,8 @@ impl ImportApiProcessor {
         );
 
         match conductor.call_zome(
-            &cell_id,
+            &cell_id.dna_hash,
+            &cell_id.agent_pub_key,
             &self.config.zome_name,
             "queue_import",
             &queue_payload_bytes,
@@ -808,7 +810,7 @@ impl ImportApiProcessor {
 
             let payload = serde_json::json!({
                 "batch_id": batch_id,
-                "chunk_index": chunk_idx,
+                "chunk_index": chunk_idx as u32,  // Explicit u32 to match zome's expected type
                 "is_final": is_final,
                 "items_json": items_json,
             });
@@ -816,7 +818,8 @@ impl ImportApiProcessor {
                 .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             match conductor.call_zome(
-                &cell_id,
+                &cell_id.dna_hash,
+                &cell_id.agent_pub_key,
                 &self.config.zome_name,
                 "process_import_chunk",
                 &payload_bytes,

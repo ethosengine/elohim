@@ -156,7 +156,8 @@ impl Session {
     /// Make a zome call on this session.
     ///
     /// # Arguments
-    /// * `cell_id` - The cell to call (DNA hash + agent pubkey, concatenated)
+    /// * `dna_hash` - DNA hash bytes
+    /// * `agent_pub_key` - Agent public key bytes
     /// * `zome_name` - Name of the zome
     /// * `fn_name` - Name of the function
     /// * `payload` - Msgpack-encoded function arguments
@@ -170,7 +171,8 @@ impl Session {
     /// - Zome returns an error
     pub async fn call_zome(
         &mut self,
-        cell_id: &[u8],
+        dna_hash: &[u8],
+        agent_pub_key: &[u8],
         zome_name: &str,
         fn_name: &str,
         payload: &[u8],
@@ -185,7 +187,7 @@ impl Session {
         );
 
         // Encode the request
-        let encoded = encode_zome_call(id, cell_id, zome_name, fn_name, payload)?;
+        let encoded = encode_zome_call(id, dna_hash, agent_pub_key, zome_name, fn_name, payload)?;
 
         // Set up response channel
         let (response_tx, response_rx) = oneshot::channel();
