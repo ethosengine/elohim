@@ -720,12 +720,15 @@ impl ImportApiProcessor {
             }
 
             // Build payload
+            // Serialize items to JSON string - zome expects items_json: String
+            let items_json = serde_json::to_string(&chunk)
+                .map_err(|e| StorageError::Internal(format!("Failed to serialize items: {}", e)))?;
+
             let payload = serde_json::json!({
                 "batch_id": batch_id,
-                "batch_type": batch_type,
                 "chunk_index": chunk_idx,
                 "is_final": is_final,
-                "items": chunk,
+                "items_json": items_json,
             });
             let payload_bytes = rmp_serde::to_vec(&payload)
                 .map_err(|e| StorageError::Internal(e.to_string()))?;
