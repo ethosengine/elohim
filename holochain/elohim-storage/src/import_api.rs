@@ -41,7 +41,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::blob_store::BlobStore;
 use crate::cell_discovery::discover_cell_id;
-use crate::conductor_client::{ConductorClient, ConductorClientConfig};
+use crate::conductor::{ConductorClient, ConductorClientConfig};
 use crate::debug_stream::DebugBroadcaster;
 use crate::error::StorageError;
 use crate::progress_hub::ProgressHub;

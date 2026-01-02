@@ -42,7 +42,8 @@ pub mod error;
 pub mod sharding;
 pub mod http;
 pub mod import_handler;
-pub mod conductor_client;
+pub mod conductor;              // New: well-structured conductor connection
+pub mod conductor_client;       // Legacy: kept for backward compatibility during migration
 pub mod import_api;
 pub mod progress_hub;
 pub mod progress_ws;
