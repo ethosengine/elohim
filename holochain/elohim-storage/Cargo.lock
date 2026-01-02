@@ -539,7 +539,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1041,6 +1041,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "sled",
+ "sysinfo 0.36.1",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
@@ -2496,7 +2497,7 @@ dependencies = [
  "rpassword",
  "rusqlite",
  "sqlformat 0.4.0",
- "sysinfo",
+ "sysinfo 0.37.2",
  "tracing-subscriber",
 ]
 
@@ -4904,6 +4905,20 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.111",
+]
+
+[[package]]
+name = "sysinfo"
+version = "0.36.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "252800745060e7b9ffb7b2badbd8b31cfa4aa2e61af879d0a3bf2a317c20217d"
+dependencies = [
+ "libc",
+ "memchr",
+ "ntapi",
+ "objc2-core-foundation",
+ "objc2-io-kit",
+ "windows 0.61.3",
 ]
 
 [[package]]

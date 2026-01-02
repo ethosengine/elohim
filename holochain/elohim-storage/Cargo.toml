@@ -27,6 +27,10 @@ rmp = "=0.8.14"
 rmp-serde = "1.3"
 rmpv = "=1.3.0"
 
+# Pin sysinfo - v0.37+ requires edition2024/Rust 1.85 (CI uses Rust 1.83)
+# sysinfo is a transitive dep: holochain_client → lair_keystore → sysinfo
+sysinfo = "=0.36.1"
+
 # Official Holochain client for signed zome calls
 # Holochain 0.6 requires signed calls with nonce, expires_at, and signature
 # Use lair_signing for the signer, but not wasmer (we're native, not wasm)
