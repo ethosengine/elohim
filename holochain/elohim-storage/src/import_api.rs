@@ -126,6 +126,25 @@ pub struct ZomeChunkResponse {
     pub status: String,
 }
 
+/// Wrapper for Holochain ExternResult encoding
+/// The conductor returns zome results wrapped in {"Ok": value} or {"Err": error}
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum ZomeResultWrapper {
+    /// Holochain ExternResult Ok variant: {"Ok": value}
+    Ok {
+        #[serde(rename = "Ok")]
+        ok: ZomeChunkResponse,
+    },
+    /// Direct value (some Holochain versions)
+    Direct(ZomeChunkResponse),
+    /// Holochain ExternResult Err variant: {"Err": error}
+    Err {
+        #[serde(rename = "Err")]
+        err: serde_json::Value,
+    },
+}
+
 // ============================================================================
 // Import Batch State
 // ============================================================================
@@ -808,9 +827,10 @@ impl ImportApiProcessor {
 
                     // Parse the zome response to get actual results
                     // CRITICAL: The zome returns ProcessImportChunkOutput with chunk_processed/chunk_errors
-                    // Previously we just assumed success - now we check the real values
-                    let (chunk_processed, chunk_errors) = match rmp_serde::from_slice::<ZomeChunkResponse>(&response_bytes) {
-                        Ok(zome_response) => {
+                    // The conductor wraps this in ExternResult: {"Ok": value} or {"Err": error}
+                    // We try both wrapped and unwrapped formats for compatibility
+                    let (chunk_processed, chunk_errors) = match rmp_serde::from_slice::<ZomeResultWrapper>(&response_bytes) {
+                        Ok(ZomeResultWrapper::Ok { ok: zome_response }) => {
                             debug!(
                                 batch_id = %batch_id,
                                 chunk_index = chunk_idx,
@@ -819,22 +839,48 @@ impl ImportApiProcessor {
                                 total_processed = zome_response.total_processed,
                                 total_errors = zome_response.total_errors,
                                 status = %zome_response.status,
-                                "📊 ZOME_RESPONSE: Parsed actual results from zome"
+                                "📊 ZOME_RESPONSE_OK: Parsed wrapped Ok result from zome"
                             );
                             (zome_response.chunk_processed as usize, zome_response.chunk_errors as usize)
                         }
+                        Ok(ZomeResultWrapper::Direct(zome_response)) => {
+                            debug!(
+                                batch_id = %batch_id,
+                                chunk_index = chunk_idx,
+                                chunk_processed = zome_response.chunk_processed,
+                                chunk_errors = zome_response.chunk_errors,
+                                total_processed = zome_response.total_processed,
+                                total_errors = zome_response.total_errors,
+                                status = %zome_response.status,
+                                "📊 ZOME_RESPONSE_DIRECT: Parsed direct result from zome"
+                            );
+                            (zome_response.chunk_processed as usize, zome_response.chunk_errors as usize)
+                        }
+                        Ok(ZomeResultWrapper::Err { err }) => {
+                            // Zome returned an error - this is critical!
+                            error!(
+                                batch_id = %batch_id,
+                                chunk_index = chunk_idx,
+                                zome_error = %err,
+                                "❌ ZOME_ERROR: Zome returned error in ExternResult, chunk NOT processed"
+                            );
+                            // Count entire chunk as errors
+                            (0, chunk.len())
+                        }
                         Err(parse_err) => {
-                            // Log parse failure but don't crash - fall back to assuming success
-                            // This handles backward compatibility if response format changes
-                            warn!(
+                            // Log parse failure with hex dump for debugging
+                            // This indicates a protocol mismatch we need to investigate
+                            error!(
                                 batch_id = %batch_id,
                                 chunk_index = chunk_idx,
                                 error = %parse_err,
                                 response_len = response_bytes.len(),
-                                response_hex = hex::encode(&response_bytes[..response_bytes.len().min(100)]),
-                                "⚠️ PARSE_WARNING: Could not parse zome response, assuming chunk success"
+                                response_hex = hex::encode(&response_bytes[..response_bytes.len().min(200)]),
+                                "❌ PARSE_ERROR: Could not parse zome response - treating as error"
                             );
-                            (chunk.len(), 0)
+                            // Previously we assumed success here, but that hid real failures
+                            // Now we treat unparseable responses as errors to surface the problem
+                            (0, chunk.len())
                         }
                     };
 
