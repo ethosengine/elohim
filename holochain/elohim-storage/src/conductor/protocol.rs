@@ -76,16 +76,14 @@ pub fn encode_zome_call(
 ) -> Result<EncodedRequest, StorageError> {
     use rmpv::encode::write_value;
 
-    // Decode cell_id from msgpack bytes back to Value
-    // Cell discovery returns msgpack-encoded [dna_hash, agent_pubkey] array
-    // The conductor expects this as a Value::Array, not Value::Binary
-    let cell_id_value = rmpv::decode::read_value(&mut Cursor::new(cell_id))
-        .map_err(|e| StorageError::Internal(format!("Invalid cell_id bytes: {}", e)))?;
+    // cell_id is msgpack-encoded [dna_hash, agent_pubkey] bytes from cell_discovery
+    // The conductor expects cell_id as Binary containing these bytes,
+    // which it decodes internally. Keep as Binary, don't decode.
 
     // Build the inner call_zome request
     // Note: Holochain 0.6+ uses "value" not "data" for the inner structure
     let call_data = Value::Map(vec![
-        (Value::String("cell_id".into()), cell_id_value),
+        (Value::String("cell_id".into()), Value::Binary(cell_id.to_vec())),
         (Value::String("zome_name".into()), Value::String(zome_name.into())),
         (Value::String("fn_name".into()), Value::String(fn_name.into())),
         (Value::String("payload".into()), Value::Binary(payload.to_vec())),
