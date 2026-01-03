@@ -130,6 +130,38 @@ pub struct ZomeChunkResponse {
     pub status: String,
 }
 
+// ============================================================================
+// Zome Input Types - MUST match content_store zome structs exactly
+// ============================================================================
+
+/// Input for queue_import zome call
+/// Must match content_store::QueueImportInput exactly
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ZomeQueueImportInput {
+    /// Unique batch identifier
+    pub id: String,
+    /// Type of items: "content", "paths", "steps", "full"
+    pub batch_type: String,
+    /// Hash of the blob in elohim-store containing the items JSON
+    pub blob_hash: String,
+    /// Total number of items to be processed
+    pub total_items: u32,
+}
+
+/// Input for process_import_chunk zome call
+/// Must match content_store::ProcessImportChunkInput exactly
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ZomeProcessImportChunkInput {
+    /// Batch ID this chunk belongs to
+    pub batch_id: String,
+    /// Chunk index (0-based, for ordering)
+    pub chunk_index: u32,
+    /// Whether this is the last chunk
+    pub is_final: bool,
+    /// JSON array of items to process (partial batch)
+    pub items_json: String,
+}
+
 /// Wrapper for Holochain ExternResult encoding
 /// The conductor returns zome results wrapped in {"Ok": value} or {"Err": error}
 #[derive(Debug, Deserialize)]
@@ -669,12 +701,13 @@ impl ImportApiProcessor {
 
         // CRITICAL: Call queue_import FIRST to create the batch entry in the zome
         // The zome's process_import_chunk looks up the batch by ID, so it MUST exist first
-        let queue_payload = serde_json::json!({
-            "id": batch_id,
-            "batch_type": batch_type,
-            "blob_hash": format!("inline-{}", batch_id), // No blob for inline imports
-            "total_items": total as u32,
-        });
+        // Use proper struct to ensure MessagePack serialization matches zome expectations
+        let queue_payload = ZomeQueueImportInput {
+            id: batch_id.to_string(),
+            batch_type: batch_type.to_string(),
+            blob_hash: format!("inline-{}", batch_id), // No blob for inline imports
+            total_items: total as u32,
+        };
         let queue_payload_bytes = rmp_serde::to_vec(&queue_payload)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
 
@@ -749,17 +782,19 @@ impl ImportApiProcessor {
                 broadcaster.import_chunk_start(batch_id, chunk_idx, chunk.len());
             }
 
-            // Build payload
+            // Build payload using proper struct for correct MessagePack serialization
             // Serialize items to JSON string - zome expects items_json: String
             let items_json_str = serde_json::to_string(&chunk)
                 .map_err(|e| StorageError::Internal(format!("Failed to serialize items: {}", e)))?;
 
-            let payload = serde_json::json!({
-                "batch_id": batch_id,
-                "chunk_index": chunk_idx as u32,  // Explicit u32 to match zome's expected type
-                "is_final": is_final,
-                "items_json": items_json_str,
-            });
+            // Use proper struct to ensure MessagePack serialization matches zome expectations
+            // Previously used serde_json::json! which caused type mismatches (e.g., u32 vs Number)
+            let payload = ZomeProcessImportChunkInput {
+                batch_id: batch_id.to_string(),
+                chunk_index: chunk_idx as u32,
+                is_final,
+                items_json: items_json_str,
+            };
             let payload_bytes = rmp_serde::to_vec(&payload)
                 .map_err(|e| StorageError::Internal(e.to_string()))?;
 
