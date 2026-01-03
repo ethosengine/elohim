@@ -1,6 +1,6 @@
 # Build stage
-# Note: Must use Rust 1.85+ for edition2024 support (required by sysinfo 0.37+)
-FROM rust:1.85-slim-bookworm AS builder
+# Note: sysinfo 0.37.2 (via lair_keystore 0.6.3) requires Rust 1.88+
+FROM rust:1.88-slim-bookworm AS builder
 
 WORKDIR /app
 
