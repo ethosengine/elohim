@@ -440,6 +440,23 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         script {
                             echo 'Installing npm dependencies'
                             sh 'npm ci'
+
+                            // Copy WASM files from fetched location to node_modules
+                            // This is needed because Angular expects WASM in node_modules/holochain-cache-core
+                            def wasmSrc = '../holochain/holochain-cache-core/pkg'
+                            def wasmDest = 'node_modules/holochain-cache-core'
+                            if (fileExists(wasmSrc)) {
+                                echo 'Copying holochain-cache-core WASM to node_modules...'
+                                sh """
+                                    mkdir -p '${wasmDest}'
+                                    cp -v '${wasmSrc}'/*.js '${wasmDest}/' 2>/dev/null || true
+                                    cp -v '${wasmSrc}'/*.wasm '${wasmDest}/' 2>/dev/null || true
+                                    cp -v '${wasmSrc}'/*.ts '${wasmDest}/' 2>/dev/null || true
+                                    ls -la '${wasmDest}/' || true
+                                """
+                            } else {
+                                echo "⚠️ WASM source not found at ${wasmSrc} - TypeScript fallback will be used"
+                            }
                         }
                     }
                 }

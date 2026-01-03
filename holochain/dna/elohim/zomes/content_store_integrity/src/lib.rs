@@ -4531,8 +4531,64 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// Validate DHT operations for all entry types
+///
+/// This validation callback runs on both:
+/// - Author's node when creating entries (blocks invalid entries from source chain)
+/// - All peers when gossiping entries (blocks invalid entries from DHT)
+///
+/// Validation must be deterministic - identical outcomes regardless of validator or timing.
+/// Reference: https://developer.holochain.org/build/validation/
 #[hdk_extern]
-pub fn validate(_op: Op) -> ExternResult<ValidateCallbackResult> {
-    // TODO: Add proper validation for each entry type
-    Ok(ValidateCallbackResult::Valid)
+pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    match op.flattened::<EntryTypes, LinkTypes>()? {
+        FlatOp::StoreEntry(store_entry) => match store_entry {
+            OpEntry::CreateEntry { app_entry, .. } => validate_create_entry(&app_entry),
+            OpEntry::UpdateEntry { app_entry, .. } => validate_update_entry(&app_entry),
+            _ => Ok(ValidateCallbackResult::Valid),
+        },
+        FlatOp::RegisterCreateLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+/// Validate entry creation operations
+///
+/// High-priority types validated:
+/// - Content: Core learning content
+/// - LearningPath: Learning path definitions
+/// - PathStep: Individual steps in paths
+/// - ContentMastery: User progress tracking
+fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
+    use hc_rna::SelfHealingEntry;
+
+    match app_entry {
+        // High-priority: Lamad learning types (used in bulk imports)
+        EntryTypes::Content(content) => adapt_validation(content.validate()),
+        EntryTypes::LearningPath(path) => adapt_validation(path.validate()),
+        EntryTypes::PathStep(step) => adapt_validation(step.validate()),
+        EntryTypes::ContentMastery(mastery) => adapt_validation(mastery.validate()),
+
+        // Other entry types: accept for now (can add validation incrementally)
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+/// Validate entry update operations
+///
+/// Updates are validated the same as creates - the new entry state must be valid.
+fn validate_update_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
+    // Updates follow the same validation rules as creates
+    validate_create_entry(app_entry)
+}
+
+/// Adapt SelfHealingEntry validation result to ValidateCallbackResult
+///
+/// Converts Result<(), String> to ExternResult<ValidateCallbackResult>
+fn adapt_validation(result: Result<(), String>) -> ExternResult<ValidateCallbackResult> {
+    match result {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(reason) => Ok(ValidateCallbackResult::Invalid(reason)),
+    }
 }

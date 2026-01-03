@@ -1148,6 +1148,40 @@ pub struct RevokeContentAttestationInput {
 // Input/Output Types for Learning Paths
 // =============================================================================
 
+/// Input for bulk path import (from seeder)
+/// Includes embedded steps to create in one batch
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PathImportInput {
+    pub id: String,
+    pub version: String,
+    pub title: String,
+    pub description: String,
+    pub purpose: Option<String>,
+    pub difficulty: String,
+    pub estimated_duration: Option<String>,
+    pub visibility: String,
+    pub path_type: String,
+    pub tags: Vec<String>,
+    pub metadata_json: Option<String>,
+    /// Embedded steps to create with the path
+    #[serde(default)]
+    pub steps: Vec<PathImportStepInput>,
+}
+
+/// Step input embedded in PathImportInput
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PathImportStepInput {
+    pub step_type: String,
+    pub resource_id: String,
+    pub order_index: u32,
+    #[serde(default)]
+    pub step_title: Option<String>,
+    #[serde(default)]
+    pub step_narrative: Option<String>,
+    #[serde(default)]
+    pub is_optional: bool,
+}
+
 /// Input for creating a learning path
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreatePathInput {
@@ -1798,10 +1832,12 @@ fn create_content_unchecked(input: CreateContentInput) -> ExternResult<ContentOu
     let entry_hash = hash_entry(&EntryTypes::Content(content.clone()))?;
 
     // Create index links
+    // Note: Only ID and tag links are created to reduce write amplification.
+    // Type and author can be filtered client-side from cached data.
+    // See: holochain/ESCALATION-validation-integration.md - Write Amplification section
     create_id_to_content_link(&input.id, &action_hash)?;
-    create_type_to_content_link(&input.content_type, &action_hash)?;
-    create_author_to_content_link(&action_hash)?;
 
+    // Tag links enable content discovery by topic
     for tag in &input.tags {
         create_tag_to_content_link(tag, &action_hash)?;
     }
@@ -2038,12 +2074,6 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
         batch.started_at = Some(timestamp.clone());
     }
 
-    // Parse and process items
-    let items: Vec<CreateContentInput> = serde_json::from_str(&input.items_json)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-            "Failed to parse items_json: {}", e
-        ))))?;
-
     let mut chunk_processed: u32 = 0;
     let mut chunk_errors: u32 = 0;
     let mut chunk_skipped: u32 = 0;
@@ -2053,35 +2083,127 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
     let mut failed_ids: Vec<(String, String)> = Vec::new();
     let mut skipped_ids: Vec<String> = Vec::new();
 
-    // OPTIMIZATION: Batch existence check - do ONE query for all IDs instead of per-item
-    let all_ids: Vec<String> = items.iter().map(|item| item.id.clone()).collect();
-    let existing_check = check_content_ids_exist(CheckIdsExistInput { ids: all_ids })?;
-    let existing_set: std::collections::HashSet<_> = existing_check.existing_ids.into_iter().collect();
+    // Branch based on batch_type
+    match batch.batch_type.as_str() {
+        "paths" => {
+            // Parse and process paths
+            let items: Vec<PathImportInput> = serde_json::from_str(&input.items_json)
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to parse paths items_json: {}", e
+                ))))?;
 
-    // Process only NEW items (skip existing)
-    for content_input in items {
-        // Skip items that already exist - no source chain writes needed
-        if existing_set.contains(&content_input.id) {
-            chunk_skipped += 1;
-            chunk_processed += 1; // Count as processed for progress tracking
-            skipped_ids.push(content_input.id.clone());
-            continue;
-        }
+            // Batch existence check for paths
+            let all_ids: Vec<String> = items.iter().map(|item| item.id.clone()).collect();
+            let existing_check = check_path_ids_exist(CheckIdsExistInput { ids: all_ids })?;
+            let existing_set: std::collections::HashSet<_> = existing_check.existing_ids.into_iter().collect();
 
-        // Use unchecked create since we already verified ID doesn't exist
-        match create_content_unchecked(content_input.clone()) {
-            Ok(output) => {
-                // Link content to this batch for traceability
-                create_import_batch_link(&input.batch_id, &output.action_hash)?;
-                chunk_processed += 1;
+            // Process paths
+            for path_input in items {
+                if existing_set.contains(&path_input.id) {
+                    chunk_skipped += 1;
+                    chunk_processed += 1;
+                    skipped_ids.push(path_input.id.clone());
+                    continue;
+                }
+
+                // Create the path
+                let create_input = CreatePathInput {
+                    id: path_input.id.clone(),
+                    version: path_input.version,
+                    title: path_input.title,
+                    description: path_input.description,
+                    purpose: path_input.purpose,
+                    difficulty: path_input.difficulty,
+                    estimated_duration: path_input.estimated_duration,
+                    visibility: path_input.visibility,
+                    path_type: path_input.path_type,
+                    tags: path_input.tags,
+                    metadata_json: path_input.metadata_json,
+                };
+
+                match create_path(create_input) {
+                    Ok(action_hash) => {
+                        create_import_batch_link(&input.batch_id, &action_hash)?;
+                        chunk_processed += 1;
+
+                        // Create steps for this path
+                        for step in path_input.steps {
+                            let step_input = AddPathStepInput {
+                                path_id: path_input.id.clone(),
+                                chapter_id: None,
+                                order_index: step.order_index,
+                                step_type: step.step_type,
+                                resource_id: step.resource_id,
+                                step_title: step.step_title,
+                                step_narrative: step.step_narrative,
+                                is_optional: step.is_optional,
+                                // Optional fields defaulted to None
+                                learning_objectives: None,
+                                reflection_prompts: None,
+                                practice_exercises: None,
+                                estimated_minutes: None,
+                                completion_criteria: None,
+                                attestation_required: None,
+                                attestation_granted: None,
+                                mastery_threshold: None,
+                                metadata_json: None,
+                            };
+                            if let Err(e) = add_path_step(step_input) {
+                                // Log step error but don't fail the path
+                                debug!("Warning: Failed to add step to path '{}': {:?}", path_input.id, e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        chunk_errors += 1;
+                        let error_msg = format!("{:?}", e);
+                        failed_ids.push((path_input.id.clone(), error_msg.clone()));
+                        let error_msg = format!("Failed to create path '{}': {:?}", path_input.id, e);
+                        if errors.len() < 100 {
+                            errors.push(error_msg);
+                        }
+                    }
+                }
             }
-            Err(e) => {
-                chunk_errors += 1;
-                let error_msg = format!("{:?}", e);
-                failed_ids.push((content_input.id.clone(), error_msg.clone()));
-                let error_msg = format!("Failed to create '{}': {:?}", content_input.id, e);
-                if errors.len() < 100 {
-                    errors.push(error_msg);
+        }
+        _ => {
+            // Default: parse and process content items
+            let items: Vec<CreateContentInput> = serde_json::from_str(&input.items_json)
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to parse items_json: {}", e
+                ))))?;
+
+            // OPTIMIZATION: Batch existence check - do ONE query for all IDs instead of per-item
+            let all_ids: Vec<String> = items.iter().map(|item| item.id.clone()).collect();
+            let existing_check = check_content_ids_exist(CheckIdsExistInput { ids: all_ids })?;
+            let existing_set: std::collections::HashSet<_> = existing_check.existing_ids.into_iter().collect();
+
+            // Process only NEW items (skip existing)
+            for content_input in items {
+                // Skip items that already exist - no source chain writes needed
+                if existing_set.contains(&content_input.id) {
+                    chunk_skipped += 1;
+                    chunk_processed += 1; // Count as processed for progress tracking
+                    skipped_ids.push(content_input.id.clone());
+                    continue;
+                }
+
+                // Use unchecked create since we already verified ID doesn't exist
+                match create_content_unchecked(content_input.clone()) {
+                    Ok(output) => {
+                        // Link content to this batch for traceability
+                        create_import_batch_link(&input.batch_id, &output.action_hash)?;
+                        chunk_processed += 1;
+                    }
+                    Err(e) => {
+                        chunk_errors += 1;
+                        let error_msg = format!("{:?}", e);
+                        failed_ids.push((content_input.id.clone(), error_msg.clone()));
+                        let error_msg = format!("Failed to create '{}': {:?}", content_input.id, e);
+                        if errors.len() < 100 {
+                            errors.push(error_msg);
+                        }
+                    }
                 }
             }
         }
@@ -2090,7 +2212,8 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
     // Log skip stats for observability
     if chunk_skipped > 0 {
         debug!(
-            "Import chunk: {} new, {} skipped (already exist), {} errors",
+            "Import chunk ({}): {} new, {} skipped (already exist), {} errors",
+            batch.batch_type,
             chunk_processed - chunk_skipped,
             chunk_skipped,
             chunk_errors

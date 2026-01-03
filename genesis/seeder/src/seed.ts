@@ -46,6 +46,7 @@ import * as path from 'path';
 import { AdminWebsocket, AppWebsocket, type CellId } from '@holochain/client';
 import DoorwayClient, { ImportStatusResponse } from './doorway-client.js';
 import StorageClient from './storage-client.js'; // Used for computing blob hash
+import { validateBatch, logValidationErrors, isStrictValidation } from './validators.js';
 import { ProgressClient, waitForBatchCompletion, waitWithFallback, type ProgressMessage } from './progress-client.js';
 import { SeedingVerification, type ExpectedCounts } from './verification.js';
 
@@ -888,18 +889,43 @@ async function seedViaDoorway(): Promise<SeedResult> {
       return conceptToInput(concept, relativePath);
     });
 
+    // Pre-flight validation - catch issues before blob upload
+    timer.startPhase('Pre-flight Validation');
+    console.log(`\n🔍 Validating ${allInputs.length} content items...`);
+
+    const validationResult = validateBatch(allInputs);
+
+    if (validationResult.totalInvalid > 0) {
+      console.warn(`   ⚠️  ${validationResult.totalInvalid} items failed validation:`);
+      logValidationErrors(validationResult.invalidItems, 10);
+
+      if (isStrictValidation()) {
+        console.error(`\n❌ VALIDATION FAILED: ${validationResult.totalInvalid} invalid items.`);
+        console.error(`   Set STRICT_VALIDATION=false to continue with valid items only.`);
+        process.exit(1);
+      }
+
+      console.log(`   ℹ️  Continuing with ${validationResult.totalValid} valid items (STRICT_VALIDATION not set)`);
+    } else {
+      console.log(`   ✅ All ${validationResult.totalValid} items passed validation`);
+    }
+    timer.endPhase('Pre-flight Validation');
+
+    // Use only valid items for seeding
+    const itemsToSeed = validationResult.validItems;
+
     // Track for verification
-    result.contentAttempted = allInputs.length;
+    result.contentAttempted = itemsToSeed.length;
     // Collect sample IDs (first 5, last 5, and some from middle)
     const sampleIndices = [
       0, 1, 2, 3, 4,  // first 5
-      Math.floor(allInputs.length / 2),  // middle
-      ...Array.from({ length: 5 }, (_, i) => Math.max(0, allInputs.length - 5 + i)),  // last 5
-    ].filter((i, idx, arr) => i < allInputs.length && arr.indexOf(i) === idx);  // dedupe
-    result.sampleIds = sampleIndices.map(i => allInputs[i].id);
+      Math.floor(itemsToSeed.length / 2),  // middle
+      ...Array.from({ length: 5 }, (_, i) => Math.max(0, itemsToSeed.length - 5 + i)),  // last 5
+    ].filter((i, idx, arr) => i < itemsToSeed.length && arr.indexOf(i) === idx);  // dedupe
+    result.sampleIds = sampleIndices.map(i => itemsToSeed[i].id);
 
     // Step 1: Upload items as blob
-    const itemsJson = JSON.stringify(allInputs);
+    const itemsJson = JSON.stringify(itemsToSeed);
     const itemsBuffer = Buffer.from(itemsJson, 'utf-8');
     console.log(`   📦 Uploading content blob: ${(itemsBuffer.length / 1024 / 1024).toFixed(2)} MB`);
 
@@ -926,13 +952,13 @@ async function seedViaDoorway(): Promise<SeedResult> {
       doorwayClient.queueImport('content', {
         batch_id: batchId,
         blob_hash: blobHash,
-        total_items: allInputs.length,
+        total_items: itemsToSeed.length,
         schema_version: 1,
       })
     ) as ImportStatusResponse & { batch_id: string; queued_count?: number; total_items?: number; processing: boolean };
 
     // Handle both response formats (queued_count from doorway, total_items from storage)
-    const queuedCount = queueResult.queued_count ?? queueResult.total_items ?? allInputs.length;
+    const queuedCount = queueResult.queued_count ?? queueResult.total_items ?? itemsToSeed.length;
     console.log(`   ✅ Import queued: ${queueResult.batch_id} (${queuedCount} items)`);
 
     // Step 3: Wait for completion with real-time progress
@@ -1197,8 +1223,64 @@ async function seedViaDoorway(): Promise<SeedResult> {
           total_items: pathInputs.length,
           schema_version: 1,
         });
-        result.pathsSucceeded = pathInputs.length;  // Paths queue is fire-and-forget, assume success
         console.log(`   ✅ Paths import queued: ${pathsQueueResult.batch_id}`);
+
+        // Wait for paths import to complete (like content import)
+        const POLL_TIMEOUT_MS = parseInt(process.env.SEED_POLL_TIMEOUT || '300000', 10);
+        const POLL_INTERVAL_MS = parseInt(process.env.SEED_POLL_INTERVAL || '5000', 10);
+
+        console.log(`   ⏳ Waiting for paths import to complete...`);
+
+        try {
+          const finalStatus = await waitWithFallback(
+            DOORWAY_URL!,
+            pathsBatchId,
+            {
+              timeoutMs: POLL_TIMEOUT_MS,
+              pollIntervalMs: POLL_INTERVAL_MS,
+              onProgress: (update) => {
+                if (update.processed_count !== undefined && update.total_items !== undefined) {
+                  const pct = ((update.processed_count / update.total_items) * 100).toFixed(1);
+                  const rate = update.items_per_second ? ` (${update.items_per_second.toFixed(1)}/s)` : '';
+                  console.log(`      Progress: ${update.processed_count}/${update.total_items} (${pct}%)${rate} - ${update.status}`);
+                }
+              }
+            },
+            async (pollBatchId) => {
+              const status = await doorwayClient.getImportStatus('paths', pollBatchId);
+              if (!status) return null;
+              return {
+                type: 'progress' as const,
+                batch_id: pollBatchId,
+                status: status.status,
+                total_items: status.total_items,
+                processed_count: status.processed_count,
+                error_count: status.error_count,
+                errors: status.errors,
+              };
+            }
+          );
+
+          const succeeded = (finalStatus.processed_count ?? 0) - (finalStatus.error_count ?? 0);
+          result.pathsSucceeded = succeeded;
+
+          if (finalStatus.status === 'failed') {
+            console.error(`   ❌ Paths import FAILED`);
+            if (finalStatus.errors?.length) {
+              for (const err of finalStatus.errors.slice(0, 5)) {
+                console.error(`      • ${err}`);
+              }
+            }
+          } else if (finalStatus.error_count && finalStatus.error_count > 0) {
+            console.log(`   ⚠️ ${finalStatus.error_count} path errors during import`);
+            console.log(`   ✅ Paths import ${finalStatus.status}: ${succeeded} succeeded, ${finalStatus.error_count} failed`);
+          } else {
+            console.log(`   ✅ Paths import ${finalStatus.status}: ${succeeded} paths created`);
+          }
+        } catch (waitErr) {
+          console.warn(`   ⚠️ Paths import wait failed: ${waitErr}`);
+          console.log(`      Check status: GET ${DOORWAY_URL}/import/paths/${pathsBatchId}`);
+        }
       } catch (pathErr: any) {
         console.warn(`   ⚠️ Paths import queue failed: ${pathErr.message}`);
         console.log(`      (Paths import may not be implemented yet in the zome)`);
