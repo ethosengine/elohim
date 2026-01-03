@@ -366,14 +366,11 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                 # - DOORWAY_URL: HTTP endpoint for blob uploads and queue_import
                                 # - DOORWAY_API_KEY: Authentication for admin endpoints
                                 # - HOLOCHAIN_ADMIN_URL: WebSocket for pre/post-flight verification
-                                # - SEED_FAST_MODE: Skip inter-batch delays (DB starts empty)
-                                # - SEED_BATCH_SIZE: 100 concepts per batch
                                 # - SEED_POLL_TIMEOUT: 60 min for full seeding (generous buffer)
+                                # Note: Chunk size/delay now controlled by elohim-storage env vars
                                 DOORWAY_URL="http://${internalDoorway}" \
                                 DOORWAY_API_KEY="dev-elohim-auth-2024" \
                                 HOLOCHAIN_ADMIN_URL="ws://${internalDoorway}?apiKey=dev-elohim-auth-2024" \
-                                SEED_FAST_MODE=true \
-                                SEED_BATCH_SIZE=100 \
                                 SEED_POLL_TIMEOUT=3600000 \
                                     \$SEED_CMD
 

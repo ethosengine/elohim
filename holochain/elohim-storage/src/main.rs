@@ -96,6 +96,14 @@ struct Args {
     /// When enabled, exposes /import/* endpoints for batch imports
     #[arg(long, env = "ENABLE_IMPORT_API")]
     enable_import_api: bool,
+
+    /// Import chunk size (items per chunk)
+    #[arg(long, env = "IMPORT_CHUNK_SIZE", default_value = "50")]
+    import_chunk_size: usize,
+
+    /// Delay between import chunks in milliseconds (conductor breathing room)
+    #[arg(long, env = "IMPORT_CHUNK_DELAY_MS", default_value = "200")]
+    import_chunk_delay_ms: u64,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -198,6 +206,8 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
         info!("  GET  /import/status/{{batch}} - Get import status");
         info!("  WS   /import/progress        - WebSocket progress stream");
         info!("  Conductor app URL: {}", args.app_url);
+        info!("  Chunk size: {} items", args.import_chunk_size);
+        info!("  Chunk delay: {}ms", args.import_chunk_delay_ms);
         info!("  Import processing on dedicated runtime (4 workers)");
 
         // HcClient handles cell discovery and signing internally
@@ -209,7 +219,8 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
                 app_id: args.app_id.clone(),
                 role: Some("lamad".to_string()),
                 zome_name: args.zome_name.clone(),
-                chunk_size: 50,
+                chunk_size: args.import_chunk_size,
+                chunk_delay: std::time::Duration::from_millis(args.import_chunk_delay_ms),
                 ..Default::default()
             },
             blob_store.clone(),

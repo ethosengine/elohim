@@ -253,6 +253,11 @@ spec:
               value: "elohim"
             - name: ENABLE_IMPORT_API
               value: "true"
+            # Import tuning: prevent conductor overload during bulk seeding
+            - name: IMPORT_CHUNK_SIZE
+              value: "50"
+            - name: IMPORT_CHUNK_DELAY_MS
+              value: "300"
           resources:
             requests:
               memory: "128Mi"
