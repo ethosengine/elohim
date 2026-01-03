@@ -1755,6 +1755,14 @@ pub fn create_content(input: CreateContentInput) -> ExternResult<ContentOutput> 
         ))));
     }
 
+    // Delegate to unchecked version (caller verified uniqueness)
+    create_content_unchecked(input)
+}
+
+/// Internal: Create content without existence check.
+/// Used by batch import when caller has already verified IDs don't exist.
+/// This avoids O(n) existence checks when processing import chunks.
+fn create_content_unchecked(input: CreateContentInput) -> ExternResult<ContentOutput> {
     let agent_info = agent_info()?;
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
@@ -2029,11 +2037,25 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
 
     let mut chunk_processed: u32 = 0;
     let mut chunk_errors: u32 = 0;
+    let mut chunk_skipped: u32 = 0;
     let mut errors: Vec<String> = serde_json::from_str(&batch.errors_json).unwrap_or_default();
 
-    // Process items one at a time
+    // OPTIMIZATION: Batch existence check - do ONE query for all IDs instead of per-item
+    let all_ids: Vec<String> = items.iter().map(|item| item.id.clone()).collect();
+    let existing_check = check_content_ids_exist(CheckIdsExistInput { ids: all_ids })?;
+    let existing_set: std::collections::HashSet<_> = existing_check.existing_ids.into_iter().collect();
+
+    // Process only NEW items (skip existing)
     for content_input in items {
-        match create_content(content_input.clone()) {
+        // Skip items that already exist - no source chain writes needed
+        if existing_set.contains(&content_input.id) {
+            chunk_skipped += 1;
+            chunk_processed += 1; // Count as processed for progress tracking
+            continue;
+        }
+
+        // Use unchecked create since we already verified ID doesn't exist
+        match create_content_unchecked(content_input.clone()) {
             Ok(output) => {
                 // Link content to this batch for traceability
                 create_import_batch_link(&input.batch_id, &output.action_hash)?;
@@ -2047,6 +2069,16 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
                 }
             }
         }
+    }
+
+    // Log skip stats for observability
+    if chunk_skipped > 0 {
+        debug!(
+            "Import chunk: {} new, {} skipped (already exist), {} errors",
+            chunk_processed - chunk_skipped,
+            chunk_skipped,
+            chunk_errors
+        );
     }
 
     // Update batch progress

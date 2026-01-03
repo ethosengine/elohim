@@ -98,12 +98,20 @@ struct Args {
     enable_import_api: bool,
 
     /// Import chunk size (items per chunk)
-    #[arg(long, env = "IMPORT_CHUNK_SIZE", default_value = "50")]
+    #[arg(long, env = "IMPORT_CHUNK_SIZE", default_value = "30")]
     import_chunk_size: usize,
 
     /// Delay between import chunks in milliseconds (conductor breathing room)
-    #[arg(long, env = "IMPORT_CHUNK_DELAY_MS", default_value = "200")]
+    #[arg(long, env = "IMPORT_CHUNK_DELAY_MS", default_value = "300")]
     import_chunk_delay_ms: u64,
+
+    /// Minimum chunk size (floor for adaptive reduction)
+    #[arg(long, env = "IMPORT_MIN_CHUNK_SIZE", default_value = "10")]
+    import_min_chunk_size: usize,
+
+    /// Response time threshold (ms) to trigger chunk reduction
+    #[arg(long, env = "IMPORT_SLOW_THRESHOLD_MS", default_value = "30000")]
+    import_slow_threshold_ms: u64,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -206,8 +214,9 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
         info!("  GET  /import/status/{{batch}} - Get import status");
         info!("  WS   /import/progress        - WebSocket progress stream");
         info!("  Conductor app URL: {}", args.app_url);
-        info!("  Chunk size: {} items", args.import_chunk_size);
+        info!("  Chunk size: {} items (min: {})", args.import_chunk_size, args.import_min_chunk_size);
         info!("  Chunk delay: {}ms", args.import_chunk_delay_ms);
+        info!("  Slow threshold: {}ms (triggers chunk reduction)", args.import_slow_threshold_ms);
         info!("  Import processing on dedicated runtime (4 workers)");
 
         // HcClient handles cell discovery and signing internally
@@ -221,6 +230,8 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
                 zome_name: args.zome_name.clone(),
                 chunk_size: args.import_chunk_size,
                 chunk_delay: std::time::Duration::from_millis(args.import_chunk_delay_ms),
+                min_chunk_size: args.import_min_chunk_size,
+                slow_response_threshold_ms: args.import_slow_threshold_ms,
                 ..Default::default()
             },
             blob_store.clone(),

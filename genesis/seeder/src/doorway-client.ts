@@ -127,11 +127,14 @@ export interface ImportQueueResponse {
 
 export interface ImportStatusResponse {
   batch_id: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed';
+  status: 'queued' | 'processing' | 'completed' | 'completed_with_errors' | 'failed';
   total_items: number;
   processed_count: number;
   error_count: number;
+  skipped_count?: number;  // Items that already existed in DHT
   errors: string[];
+  elapsed_ms?: number;
+  items_per_second?: number;
   completed_at?: string;
 }
 

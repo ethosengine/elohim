@@ -104,9 +104,37 @@ pub struct ImportStatusResponse {
     pub total_items: u32,
     pub processed_count: u32,
     pub error_count: u32,
+    pub skipped_count: u32,
     pub errors: Vec<String>,
     pub elapsed_ms: u64,
     pub items_per_second: f64,
+}
+
+/// Detailed batch diagnostics for debugging stuck/failed imports
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchDiagnostics {
+    pub batch_id: String,
+    pub status: ImportStatus,
+    pub total_items: u32,
+    pub processed_count: u32,
+    pub error_count: u32,
+    pub skipped_count: u32,
+    /// Items remaining = total - processed - errors
+    pub remaining_count: u32,
+    /// Last chunk that completed successfully (for resume)
+    pub last_completed_chunk: Option<usize>,
+    /// Failed IDs with reasons
+    pub failed_items: Vec<FailedItem>,
+    /// Blob hash for re-reading original items
+    pub blob_hash: String,
+    pub elapsed_ms: u64,
+}
+
+/// A failed item with diagnostic info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FailedItem {
+    pub id: String,
+    pub reason: String,
 }
 
 /// Import status enum
@@ -204,7 +232,12 @@ struct ImportBatch {
     status: ImportStatus,
     processed_count: u32,
     error_count: u32,
+    skipped_count: u32,  // Already existed in DHT
     errors: Vec<String>,
+    /// IDs that failed with reasons (for diagnostics)
+    failed_ids: Vec<(String, String)>,  // (id, reason)
+    /// Last chunk index that completed (for resume)
+    last_completed_chunk: Option<usize>,
     started_at: Instant,
     /// Progress broadcast channel
     progress_tx: broadcast::Sender<ImportStatusResponse>,
@@ -233,12 +266,20 @@ pub struct ImportApiConfig {
     pub chunk_delay: Duration,
     /// Maximum delay between chunks (backpressure ceiling)
     pub max_chunk_delay: Duration,
+    /// Minimum chunk size (floor for adaptive reduction)
+    pub min_chunk_size: usize,
+    /// Response time threshold to trigger chunk reduction (ms)
+    pub slow_response_threshold_ms: u64,
     /// Maximum concurrent batches
     pub max_concurrent_batches: usize,
     /// Consecutive errors before circuit breaker trips
     pub circuit_breaker_threshold: usize,
     /// Pause duration when circuit breaker trips
     pub circuit_breaker_pause: Duration,
+    /// Timeout for individual zome calls (prevents hanging forever)
+    pub zome_call_timeout: Duration,
+    /// Max retries for a timed-out zome call before counting as error
+    pub zome_call_retries: usize,
 }
 
 impl Default for ImportApiConfig {
@@ -252,9 +293,13 @@ impl Default for ImportApiConfig {
             chunk_size: 50,
             chunk_delay: Duration::from_millis(100),
             max_chunk_delay: Duration::from_secs(5),
+            min_chunk_size: 10,
+            slow_response_threshold_ms: 30_000, // 30 seconds
             max_concurrent_batches: 3,
             circuit_breaker_threshold: 5,
             circuit_breaker_pause: Duration::from_secs(10),
+            zome_call_timeout: Duration::from_secs(120), // 2 min per chunk - generous but not infinite
+            zome_call_retries: 3, // Retry up to 3 times before counting as error
         }
     }
 }
@@ -439,6 +484,12 @@ impl ImportApi {
                 self.handle_list_batches().await
             }
 
+            // GET /import/diagnostics/{batch_id} - Detailed diagnostics for debugging
+            (Method::GET, p) if p.starts_with("/import/diagnostics/") => {
+                let batch_id = p.strip_prefix("/import/diagnostics/").unwrap_or("");
+                self.handle_get_diagnostics(batch_id).await
+            }
+
             // Not found
             _ => Ok(error_response(
                 StatusCode::NOT_FOUND,
@@ -515,7 +566,10 @@ impl ImportApi {
             status: ImportStatus::Queued,
             processed_count: 0,
             error_count: 0,
+            skipped_count: 0,
             errors: Vec::new(),
+            failed_ids: Vec::new(),
+            last_completed_chunk: None,
             started_at: Instant::now(),
             progress_tx,
         };
@@ -609,6 +663,7 @@ impl ImportApi {
             total_items: batch.total_items,
             processed_count: batch.processed_count,
             error_count: batch.error_count,
+            skipped_count: batch.skipped_count,
             errors: batch.errors.clone(),
             elapsed_ms: elapsed.as_millis() as u64,
             items_per_second,
@@ -642,6 +697,7 @@ impl ImportApi {
                     total_items: batch.total_items,
                     processed_count: batch.processed_count,
                     error_count: batch.error_count,
+                    skipped_count: batch.skipped_count,
                     errors: batch.errors.clone(),
                     elapsed_ms: elapsed.as_millis() as u64,
                     items_per_second,
@@ -658,6 +714,51 @@ impl ImportApi {
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/json")
             .body(Full::new(Bytes::from(serde_json::to_string(&response)?)))
+            .unwrap())
+    }
+
+    /// Handle GET /import/diagnostics/{batch_id} - Detailed diagnostics for debugging
+    async fn handle_get_diagnostics(
+        &self,
+        batch_id: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let batches = self.batches.read().await;
+
+        let Some(batch) = batches.get(batch_id) else {
+            return Ok(error_response(
+                StatusCode::NOT_FOUND,
+                &format!("Batch '{}' not found", batch_id),
+            ));
+        };
+
+        let elapsed = batch.started_at.elapsed();
+        let remaining = batch.total_items
+            .saturating_sub(batch.processed_count)
+            .saturating_sub(batch.error_count);
+
+        let diagnostics = BatchDiagnostics {
+            batch_id: batch.batch_id.clone(),
+            status: batch.status,
+            total_items: batch.total_items,
+            processed_count: batch.processed_count,
+            error_count: batch.error_count,
+            skipped_count: batch.skipped_count,
+            remaining_count: remaining,
+            last_completed_chunk: batch.last_completed_chunk,
+            failed_items: batch.failed_ids.iter()
+                .map(|(id, reason)| FailedItem {
+                    id: id.clone(),
+                    reason: reason.clone(),
+                })
+                .collect(),
+            blob_hash: batch.blob_hash.clone(),
+            elapsed_ms: elapsed.as_millis() as u64,
+        };
+
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(serde_json::to_string(&diagnostics)?)))
             .unwrap())
     }
 
@@ -747,14 +848,16 @@ impl ImportApiProcessor {
             .map(Duration::from_millis)
             .unwrap_or(self.config.chunk_delay);
 
-        let total_chunks = (total + chunk_size - 1) / chunk_size;
+        let estimated_chunks = (total + chunk_size - 1) / chunk_size;
 
         info!(
             batch_id = %batch_id,
             batch_type = %batch_type,
             total_items = total,
-            total_chunks = total_chunks,
-            chunk_size = chunk_size,
+            initial_chunks = estimated_chunks,
+            initial_chunk_size = chunk_size,
+            min_chunk_size = self.config.min_chunk_size,
+            slow_threshold_ms = self.config.slow_response_threshold_ms,
             chunk_delay_ms = base_chunk_delay.as_millis(),
             app_url = %self.config.app_url,
             "📥 BATCH_START: Starting batch processing via HcClient (signed zome calls)"
@@ -808,16 +911,41 @@ impl ImportApiProcessor {
             }
         }
 
-        // Process in chunks with adaptive backpressure
+        // Process in chunks with adaptive backpressure AND adaptive chunk sizing
         let mut processed = 0;
         let mut errors = 0;
         let mut consecutive_errors = 0;
         let mut current_delay = base_chunk_delay;
         let mut avg_response_time_ms: f64 = 0.0;
+        let mut current_chunk_size = chunk_size;
+        let mut chunk_idx = 0;
+        let mut remaining_items = items.as_slice();
 
-        for (chunk_idx, chunk) in items.chunks(chunk_size).enumerate() {
+        while !remaining_items.is_empty() {
+            // Adaptive chunk sizing: reduce chunk size when responses are slow
+            if avg_response_time_ms > self.config.slow_response_threshold_ms as f64
+                && current_chunk_size > self.config.min_chunk_size
+            {
+                let new_size = (current_chunk_size / 2).max(self.config.min_chunk_size);
+                if new_size != current_chunk_size {
+                    warn!(
+                        batch_id = %batch_id,
+                        avg_response_ms = format!("{:.0}", avg_response_time_ms),
+                        threshold_ms = self.config.slow_response_threshold_ms,
+                        old_chunk_size = current_chunk_size,
+                        new_chunk_size = new_size,
+                        "📉 CHUNK_REDUCTION: Reducing chunk size due to slow responses"
+                    );
+                    current_chunk_size = new_size;
+                }
+            }
+
+            let take_size = current_chunk_size.min(remaining_items.len());
+            let chunk = &remaining_items[..take_size];
+            remaining_items = &remaining_items[take_size..];
+
             let chunk_start = Instant::now();
-            let is_final = processed + chunk.len() >= total;
+            let is_final = remaining_items.is_empty();
 
             // Circuit breaker check - pause if too many consecutive errors
             if consecutive_errors >= self.config.circuit_breaker_threshold {
@@ -836,9 +964,10 @@ impl ImportApiProcessor {
                 batch_id = %batch_id,
                 chunk_index = chunk_idx,
                 chunk_items = chunk.len(),
-                total_chunks = total_chunks,
+                remaining_items = remaining_items.len(),
                 is_final = is_final,
                 current_delay_ms = current_delay.as_millis(),
+                current_chunk_size = current_chunk_size,
                 "🔄 CHUNK_START: Sending signed chunk to conductor"
             );
 
@@ -864,11 +993,39 @@ impl ImportApiProcessor {
             let payload_bytes = rmp_serde::to_vec_named(&payload)
                 .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-            match hc_client.call_zome(
-                &self.config.zome_name,
-                "process_import_chunk",
-                payload_bytes,
-            ).await {
+            // Wrap zome call with timeout and retry logic
+            // This prevents hanging forever if conductor is overwhelmed
+            let mut zome_result: Option<Result<Vec<u8>, _>> = None;
+            for attempt in 1..=self.config.zome_call_retries {
+                match tokio::time::timeout(
+                    self.config.zome_call_timeout,
+                    hc_client.call_zome(
+                        &self.config.zome_name,
+                        "process_import_chunk",
+                        payload_bytes.clone(),
+                    )
+                ).await {
+                    Ok(result) => {
+                        zome_result = Some(result);
+                        break;
+                    }
+                    Err(_elapsed) => {
+                        warn!(
+                            batch_id = %batch_id,
+                            chunk_index = chunk_idx,
+                            attempt = attempt,
+                            timeout_secs = self.config.zome_call_timeout.as_secs(),
+                            "⏱️ ZOME_TIMEOUT: Chunk call timed out, will retry"
+                        );
+                        if attempt < self.config.zome_call_retries {
+                            // Back off before retry
+                            tokio::time::sleep(Duration::from_secs(5 * attempt as u64)).await;
+                        }
+                    }
+                }
+            }
+
+            match zome_result.unwrap_or(Err(StorageError::Internal("All zome call attempts timed out".to_string()))) {
                 Ok(response_bytes) => {
                     let chunk_duration = chunk_start.elapsed();
                     let response_ms = chunk_duration.as_millis() as f64;
@@ -1002,6 +1159,8 @@ impl ImportApiProcessor {
             if !is_final {
                 tokio::time::sleep(current_delay).await;
             }
+
+            chunk_idx += 1;
         }
 
         // Final status
@@ -1068,6 +1227,7 @@ impl ImportApiProcessor {
                     total_items: batch.total_items,
                     processed_count: processed,
                     error_count: errors,
+                    skipped_count: batch.skipped_count,
                     errors: batch.errors.clone(),
                     elapsed_ms: elapsed.as_millis() as u64,
                     items_per_second: processed as f64 / elapsed.as_secs_f64().max(0.001),
