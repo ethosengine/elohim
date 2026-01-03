@@ -103,8 +103,11 @@ impl HttpServer {
                     async move { server.handle_request(req).await }
                 });
 
+                // Enable HTTP upgrades for WebSocket support
+                // Without .with_upgrades(), WebSocket handshakes fail immediately
                 if let Err(err) = http1::Builder::new()
                     .serve_connection(io, service)
+                    .with_upgrades()
                     .await
                 {
                     warn!(addr = %remote_addr, error = %err, "Connection error");

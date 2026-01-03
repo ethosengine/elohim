@@ -74,6 +74,14 @@ pub struct QueueImportRequest {
     /// Inline items JSON (alternative to blob_hash)
     #[serde(default)]
     pub items: Option<Vec<serde_json::Value>>,
+    /// Items per chunk (optional, uses server default if not provided)
+    /// Smaller chunks = less conductor pressure, slower overall
+    #[serde(default)]
+    pub chunk_size: Option<usize>,
+    /// Delay between chunks in ms (optional, uses server default if not provided)
+    /// Higher delay = more conductor breathing room, slower overall
+    #[serde(default)]
+    pub chunk_delay_ms: Option<u64>,
 }
 
 fn default_schema_version() -> u32 { 1 }
@@ -535,8 +543,12 @@ impl ImportApi {
         let api_self = self.clone_for_processing();
         let batch_id_clone = batch_id.clone();
         let batch_type = request.batch_type.clone();
+        let batch_options = BatchOptions {
+            chunk_size: request.chunk_size,
+            chunk_delay_ms: request.chunk_delay_ms,
+        };
         let processing_future = async move {
-            if let Err(e) = api_self.process_batch(&batch_id_clone, &batch_type, &items_json).await {
+            if let Err(e) = api_self.process_batch(&batch_id_clone, &batch_type, &items_json, batch_options).await {
                 error!(batch_id = %batch_id_clone, error = %e, "Batch processing failed");
             }
         };
@@ -677,6 +689,15 @@ struct ImportApiProcessor {
     debug_broadcaster: Option<Arc<DebugBroadcaster>>,
 }
 
+/// Per-batch processing options (override server defaults)
+#[derive(Debug, Clone, Default)]
+struct BatchOptions {
+    /// Override chunk size for this batch
+    chunk_size: Option<usize>,
+    /// Override chunk delay for this batch
+    chunk_delay_ms: Option<u64>,
+}
+
 impl ImportApiProcessor {
     /// Process a batch of items using signed zome calls
     async fn process_batch(
@@ -684,6 +705,7 @@ impl ImportApiProcessor {
         batch_id: &str,
         batch_type: &str,
         items_json: &str,
+        options: BatchOptions,
     ) -> Result<(), StorageError> {
         let batch_start = Instant::now();
 
@@ -718,14 +740,22 @@ impl ImportApiProcessor {
         // Parse items
         let items: Vec<serde_json::Value> = serde_json::from_str(items_json)?;
         let total = items.len();
-        let total_chunks = (total + self.config.chunk_size - 1) / self.config.chunk_size;
+
+        // Use per-request options if provided, otherwise fall back to server config
+        let chunk_size = options.chunk_size.unwrap_or(self.config.chunk_size);
+        let base_chunk_delay = options.chunk_delay_ms
+            .map(Duration::from_millis)
+            .unwrap_or(self.config.chunk_delay);
+
+        let total_chunks = (total + chunk_size - 1) / chunk_size;
 
         info!(
             batch_id = %batch_id,
             batch_type = %batch_type,
             total_items = total,
             total_chunks = total_chunks,
-            chunk_size = self.config.chunk_size,
+            chunk_size = chunk_size,
+            chunk_delay_ms = base_chunk_delay.as_millis(),
             app_url = %self.config.app_url,
             "📥 BATCH_START: Starting batch processing via HcClient (signed zome calls)"
         );
@@ -782,10 +812,10 @@ impl ImportApiProcessor {
         let mut processed = 0;
         let mut errors = 0;
         let mut consecutive_errors = 0;
-        let mut current_delay = self.config.chunk_delay;
+        let mut current_delay = base_chunk_delay;
         let mut avg_response_time_ms: f64 = 0.0;
 
-        for (chunk_idx, chunk) in items.chunks(self.config.chunk_size).enumerate() {
+        for (chunk_idx, chunk) in items.chunks(chunk_size).enumerate() {
             let chunk_start = Instant::now();
             let is_final = processed + chunk.len() >= total;
 
