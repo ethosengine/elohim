@@ -5,9 +5,13 @@ FROM rust:1.88-slim-bookworm AS builder
 WORKDIR /app
 
 # Install build dependencies
+# - build-essential: provides make, gcc for native builds (libsodium-sys-stable)
+# - libsodium-dev: prebuilt libsodium to avoid compiling from source
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
+    build-essential \
+    libsodium-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy manifests first for dependency caching
@@ -40,6 +44,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
+    libsodium23 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
