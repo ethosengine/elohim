@@ -965,7 +965,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
     const USE_WEBSOCKET = process.env.SEED_USE_WEBSOCKET !== 'false';
     const POLL_STATUS = process.env.SEED_POLL_STATUS !== 'false';
     const POLL_INTERVAL_MS = parseInt(process.env.SEED_POLL_INTERVAL || '5000', 10);
-    const POLL_TIMEOUT_MS = parseInt(process.env.SEED_POLL_TIMEOUT || '300000', 10);
+    const POLL_TIMEOUT_MS = parseInt(process.env.SEED_POLL_TIMEOUT || '5400000', 10); // 90 min default
 
     if (POLL_STATUS) {
       console.log(`   ⏳ Waiting for import to complete...`);
@@ -1226,7 +1226,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
         console.log(`   ✅ Paths import queued: ${pathsQueueResult.batch_id}`);
 
         // Wait for paths import to complete (like content import)
-        const POLL_TIMEOUT_MS = parseInt(process.env.SEED_POLL_TIMEOUT || '300000', 10);
+        const POLL_TIMEOUT_MS = parseInt(process.env.SEED_POLL_TIMEOUT || '5400000', 10); // 90 min default
         const POLL_INTERVAL_MS = parseInt(process.env.SEED_POLL_INTERVAL || '5000', 10);
 
         console.log(`   ⏳ Waiting for paths import to complete...`);

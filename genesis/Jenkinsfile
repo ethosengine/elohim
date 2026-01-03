@@ -98,7 +98,7 @@ spec:
 
     options {
         skipDefaultCheckout(true)
-        timeout(time: 90, unit: 'MINUTES')  // Increased for large seed datasets (3500+ concepts)
+        timeout(time: 120, unit: 'MINUTES')  // 2 hours for large seed datasets (3500+ items + paths)
         buildDiscarder(logRotator(numToKeepStr: '20'))
     }
 
@@ -366,12 +366,12 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                 # - DOORWAY_URL: HTTP endpoint for blob uploads and queue_import
                                 # - DOORWAY_API_KEY: Authentication for admin endpoints
                                 # - HOLOCHAIN_ADMIN_URL: WebSocket for pre/post-flight verification
-                                # - SEED_POLL_TIMEOUT: 60 min for full seeding (generous buffer)
+                                # - SEED_POLL_TIMEOUT: 90 min for full seeding (content + paths)
                                 # Note: Chunk size/delay now controlled by elohim-storage env vars
                                 DOORWAY_URL="http://${internalDoorway}" \
                                 DOORWAY_API_KEY="dev-elohim-auth-2024" \
                                 HOLOCHAIN_ADMIN_URL="ws://${internalDoorway}?apiKey=dev-elohim-auth-2024" \
-                                SEED_POLL_TIMEOUT=3600000 \
+                                SEED_POLL_TIMEOUT=5400000 \
                                     \$SEED_CMD
 
                                 echo ""
