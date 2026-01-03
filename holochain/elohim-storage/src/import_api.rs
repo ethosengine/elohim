@@ -146,6 +146,8 @@ struct ZomeQueueImportInput {
     pub blob_hash: String,
     /// Total number of items to be processed
     pub total_items: u32,
+    /// Schema version for the items
+    pub schema_version: u32,
 }
 
 /// Input for process_import_chunk zome call
@@ -707,6 +709,7 @@ impl ImportApiProcessor {
             batch_type: batch_type.to_string(),
             blob_hash: format!("inline-{}", batch_id), // No blob for inline imports
             total_items: total as u32,
+            schema_version: 1, // Current schema version
         };
         // CRITICAL: Use to_vec_named to serialize as a map with field names
         // to_vec serializes structs as arrays (positional), but zomes expect maps (named fields)
