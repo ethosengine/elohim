@@ -1307,6 +1307,10 @@ impl ImportApiProcessor {
 
         self.update_status(batch_id, final_status).await;
 
+        // CRITICAL: Broadcast final progress with completed status to WebSocket clients
+        // Without this, clients see 100% "processing" but never receive "completed"
+        self.update_progress(batch_id, processed as u32, errors as u32).await;
+
         let batch_duration = batch_start.elapsed();
         let items_per_sec = if batch_duration.as_secs_f64() > 0.0 {
             processed as f64 / batch_duration.as_secs_f64()
