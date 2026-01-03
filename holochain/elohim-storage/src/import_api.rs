@@ -708,7 +708,9 @@ impl ImportApiProcessor {
             blob_hash: format!("inline-{}", batch_id), // No blob for inline imports
             total_items: total as u32,
         };
-        let queue_payload_bytes = rmp_serde::to_vec(&queue_payload)
+        // CRITICAL: Use to_vec_named to serialize as a map with field names
+        // to_vec serializes structs as arrays (positional), but zomes expect maps (named fields)
+        let queue_payload_bytes = rmp_serde::to_vec_named(&queue_payload)
             .map_err(|e| StorageError::Internal(e.to_string()))?;
 
         info!(
@@ -795,7 +797,9 @@ impl ImportApiProcessor {
                 is_final,
                 items_json: items_json_str,
             };
-            let payload_bytes = rmp_serde::to_vec(&payload)
+            // CRITICAL: Use to_vec_named to serialize as a map with field names
+            // to_vec serializes structs as arrays (positional), but zomes expect maps (named fields)
+            let payload_bytes = rmp_serde::to_vec_named(&payload)
                 .map_err(|e| StorageError::Internal(e.to_string()))?;
 
             match hc_client.call_zome(
