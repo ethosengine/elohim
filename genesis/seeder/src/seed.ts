@@ -6,6 +6,38 @@
  *
  * Pipeline: docs/ → Claude + MCP → data/lamad/ → seeder → Holochain DHT
  *
+ * ## Diagnosing Failed Seeds
+ *
+ * When a seed operation fails or times out, use these endpoints to investigate:
+ *
+ * ### 1. Get Batch Diagnostics
+ * Shows overall batch state including failed items and progress:
+ * ```bash
+ * curl https://doorway-dev.elohim.host/import/diagnostics/<batch_id>
+ * ```
+ * Returns: remaining_count, last_completed_chunk, failed_items with error reasons
+ *
+ * ### 2. Get Remaining Items
+ * Re-reads the original blob and shows what wasn't successfully processed:
+ * ```bash
+ * curl https://doorway-dev.elohim.host/import/remaining/<batch_id>
+ * ```
+ * Returns: list of items with reasons ("not_attempted" or actual zome error)
+ *
+ * ### 3. Common Issues
+ * - **Schema mismatches**: Check error messages for "invalid content_format" etc.
+ * - **Timeouts**: Items marked "not_attempted" were in chunks that timed out
+ * - **Validation errors**: Zome error messages show what validation failed
+ *
+ * ### 4. Finding the batch_id
+ * The batch_id is printed in the seeder output, e.g.:
+ *   "📤 Queuing import "seed-content-1704307200000"..."
+ *
+ * Or check all batches:
+ * ```bash
+ * curl https://doorway-dev.elohim.host/import/batches
+ * ```
+ *
  * @version 2024-12-24 - Trigger seeder after seed data migration
  */
 

@@ -158,10 +158,16 @@ pub struct ZomeChunkResponse {
     pub chunk_processed: u32,
     /// Errors in this chunk
     pub chunk_errors: u32,
+    /// Items skipped (already existed)
+    pub chunk_skipped: u32,
     /// Total processed so far (across all chunks)
     pub total_processed: u32,
     /// Total errors so far (across all chunks)
     pub total_errors: u32,
+    /// IDs that failed with error messages
+    pub failed_ids: Vec<(String, String)>,
+    /// IDs that were skipped (already existed)
+    pub skipped_ids: Vec<String>,
     /// Current batch status
     pub status: String,
 }
@@ -490,6 +496,12 @@ impl ImportApi {
                 self.handle_get_diagnostics(batch_id).await
             }
 
+            // GET /import/remaining/{batch_id} - Get items that weren't processed
+            (Method::GET, p) if p.starts_with("/import/remaining/") => {
+                let batch_id = p.strip_prefix("/import/remaining/").unwrap_or("");
+                self.handle_get_remaining(batch_id).await
+            }
+
             // Not found
             _ => Ok(error_response(
                 StatusCode::NOT_FOUND,
@@ -759,6 +771,106 @@ impl ImportApi {
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/json")
             .body(Full::new(Bytes::from(serde_json::to_string(&diagnostics)?)))
+            .unwrap())
+    }
+
+    /// Handle GET /import/remaining/{batch_id} - Get items that weren't processed
+    async fn handle_get_remaining(
+        &self,
+        batch_id: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let batches = self.batches.read().await;
+
+        let Some(batch) = batches.get(batch_id) else {
+            return Ok(error_response(
+                StatusCode::NOT_FOUND,
+                &format!("Batch '{}' not found", batch_id),
+            ));
+        };
+
+        // Read original items from blob
+        let blob_data = match self.blob_store.get(&batch.blob_hash).await {
+            Ok(data) => data,
+            Err(e) => {
+                return Ok(error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &format!("Failed to read blob {}: {}", batch.blob_hash, e),
+                ));
+            }
+        };
+
+        let items_json = match String::from_utf8(blob_data) {
+            Ok(s) => s,
+            Err(e) => {
+                return Ok(error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &format!("Invalid UTF-8 in blob: {}", e),
+                ));
+            }
+        };
+
+        // Parse items to extract IDs
+        let all_items: Vec<serde_json::Value> = match serde_json::from_str(&items_json) {
+            Ok(items) => items,
+            Err(e) => {
+                return Ok(error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &format!("Failed to parse items JSON: {}", e),
+                ));
+            }
+        };
+
+        // Get failed IDs
+        let failed_ids: std::collections::HashSet<_> = batch.failed_ids.iter()
+            .map(|(id, _)| id.as_str())
+            .collect();
+
+        // Compute which items are remaining (failed or never attempted)
+        let chunk_size = self.config.chunk_size;
+        let last_chunk = batch.last_completed_chunk.unwrap_or(0);
+        let items_attempted = (last_chunk + 1) * chunk_size;
+
+        let remaining_items: Vec<_> = all_items.iter()
+            .enumerate()
+            .filter_map(|(idx, item)| {
+                let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+
+                // Include if: failed OR never attempted
+                let is_failed = failed_ids.contains(id);
+                let was_attempted = idx < items_attempted;
+
+                if is_failed || !was_attempted {
+                    Some(serde_json::json!({
+                        "index": idx,
+                        "id": id,
+                        "reason": if is_failed {
+                            batch.failed_ids.iter()
+                                .find(|(fid, _)| fid == id)
+                                .map(|(_, reason)| reason.as_str())
+                                .unwrap_or("unknown")
+                        } else {
+                            "not_attempted"
+                        }
+                    }))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let response = serde_json::json!({
+            "batch_id": batch_id,
+            "total_items": all_items.len(),
+            "remaining_count": remaining_items.len(),
+            "last_completed_chunk": batch.last_completed_chunk,
+            "items_attempted": items_attempted.min(all_items.len()),
+            "remaining_items": remaining_items,
+        });
+
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(serde_json::to_string(&response)?)))
             .unwrap())
     }
 
@@ -1034,19 +1146,21 @@ impl ImportApiProcessor {
                     // CRITICAL: The zome returns ProcessImportChunkOutput with chunk_processed/chunk_errors
                     // The conductor wraps this in ExternResult: {"Ok": value} or {"Err": error}
                     // We try both wrapped and unwrapped formats for compatibility
-                    let (chunk_processed, chunk_errors) = match rmp_serde::from_slice::<ZomeResultWrapper>(&response_bytes) {
+                    let zome_result: Option<ZomeChunkResponse> = match rmp_serde::from_slice::<ZomeResultWrapper>(&response_bytes) {
                         Ok(ZomeResultWrapper::Ok { ok: zome_response }) => {
                             debug!(
                                 batch_id = %batch_id,
                                 chunk_index = chunk_idx,
                                 chunk_processed = zome_response.chunk_processed,
                                 chunk_errors = zome_response.chunk_errors,
+                                chunk_skipped = zome_response.chunk_skipped,
+                                failed_count = zome_response.failed_ids.len(),
                                 total_processed = zome_response.total_processed,
                                 total_errors = zome_response.total_errors,
                                 status = %zome_response.status,
                                 "📊 ZOME_RESPONSE_OK: Parsed wrapped Ok result from zome"
                             );
-                            (zome_response.chunk_processed as usize, zome_response.chunk_errors as usize)
+                            Some(zome_response)
                         }
                         Ok(ZomeResultWrapper::Direct(zome_response)) => {
                             debug!(
@@ -1054,12 +1168,14 @@ impl ImportApiProcessor {
                                 chunk_index = chunk_idx,
                                 chunk_processed = zome_response.chunk_processed,
                                 chunk_errors = zome_response.chunk_errors,
+                                chunk_skipped = zome_response.chunk_skipped,
+                                failed_count = zome_response.failed_ids.len(),
                                 total_processed = zome_response.total_processed,
                                 total_errors = zome_response.total_errors,
                                 status = %zome_response.status,
                                 "📊 ZOME_RESPONSE_DIRECT: Parsed direct result from zome"
                             );
-                            (zome_response.chunk_processed as usize, zome_response.chunk_errors as usize)
+                            Some(zome_response)
                         }
                         Ok(ZomeResultWrapper::Err { err }) => {
                             // Zome returned an error - this is critical!
@@ -1069,8 +1185,7 @@ impl ImportApiProcessor {
                                 zome_error = %err,
                                 "❌ ZOME_ERROR: Zome returned error in ExternResult, chunk NOT processed"
                             );
-                            // Count entire chunk as errors
-                            (0, chunk.len())
+                            None
                         }
                         Err(parse_err) => {
                             // Log parse failure with hex dump for debugging
@@ -1083,14 +1198,26 @@ impl ImportApiProcessor {
                                 response_hex = hex::encode(&response_bytes[..response_bytes.len().min(200)]),
                                 "❌ PARSE_ERROR: Could not parse zome response - treating as error"
                             );
-                            // Previously we assumed success here, but that hid real failures
-                            // Now we treat unparseable responses as errors to surface the problem
-                            (0, chunk.len())
+                            None
                         }
+                    };
+
+                    let (chunk_processed, chunk_errors) = if let Some(ref resp) = zome_result {
+                        (resp.chunk_processed as usize, resp.chunk_errors as usize)
+                    } else {
+                        // Failed to parse or zome error - count entire chunk as errors
+                        (0, chunk.len())
                     };
 
                     processed += chunk_processed;
                     errors += chunk_errors;
+
+                    // Capture failed IDs for diagnostics
+                    if let Some(ref resp) = zome_result {
+                        if !resp.failed_ids.is_empty() {
+                            self.add_failed_ids(batch_id, resp.failed_ids.clone()).await;
+                        }
+                    }
 
                     if chunk_errors == 0 {
                         consecutive_errors = 0; // Reset on success
@@ -1152,8 +1279,9 @@ impl ImportApiProcessor {
                 }
             }
 
-            // Update progress
+            // Update progress and track last completed chunk
             self.update_progress(batch_id, processed as u32, errors as u32).await;
+            self.update_last_chunk(batch_id, chunk_idx).await;
 
             // Adaptive backpressure delay
             if !is_final {
@@ -1251,6 +1379,26 @@ impl ImportApiProcessor {
             if batch.errors.len() < 100 {
                 batch.errors.push(error);
             }
+        }
+    }
+
+    /// Add failed IDs from zome response for diagnostics
+    async fn add_failed_ids(&self, batch_id: &str, failed: Vec<(String, String)>) {
+        let mut batches = self.batches.write().await;
+        if let Some(batch) = batches.get_mut(batch_id) {
+            // Limit stored failures to prevent memory bloat
+            let remaining_capacity = 500_usize.saturating_sub(batch.failed_ids.len());
+            for item in failed.into_iter().take(remaining_capacity) {
+                batch.failed_ids.push(item);
+            }
+        }
+    }
+
+    /// Update last completed chunk index
+    async fn update_last_chunk(&self, batch_id: &str, chunk_idx: usize) {
+        let mut batches = self.batches.write().await;
+        if let Some(batch) = batches.get_mut(batch_id) {
+            batch.last_completed_chunk = Some(chunk_idx);
         }
     }
 }

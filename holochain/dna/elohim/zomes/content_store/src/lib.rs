@@ -1975,17 +1975,26 @@ pub struct ProcessImportChunkOutput {
     /// Batch ID
     pub batch_id: String,
 
-    /// Items processed in this chunk
+    /// Items processed in this chunk (includes skipped)
     pub chunk_processed: u32,
 
     /// Errors in this chunk
     pub chunk_errors: u32,
+
+    /// Items skipped (already existed in DHT)
+    pub chunk_skipped: u32,
 
     /// Total processed so far (across all chunks)
     pub total_processed: u32,
 
     /// Total errors so far
     pub total_errors: u32,
+
+    /// IDs that failed in this chunk with error messages
+    pub failed_ids: Vec<(String, String)>,
+
+    /// IDs that were skipped (already existed)
+    pub skipped_ids: Vec<String>,
 
     /// Current batch status
     pub status: String,
@@ -2040,6 +2049,10 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
     let mut chunk_skipped: u32 = 0;
     let mut errors: Vec<String> = serde_json::from_str(&batch.errors_json).unwrap_or_default();
 
+    // Track failed and skipped IDs for diagnostics
+    let mut failed_ids: Vec<(String, String)> = Vec::new();
+    let mut skipped_ids: Vec<String> = Vec::new();
+
     // OPTIMIZATION: Batch existence check - do ONE query for all IDs instead of per-item
     let all_ids: Vec<String> = items.iter().map(|item| item.id.clone()).collect();
     let existing_check = check_content_ids_exist(CheckIdsExistInput { ids: all_ids })?;
@@ -2051,6 +2064,7 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
         if existing_set.contains(&content_input.id) {
             chunk_skipped += 1;
             chunk_processed += 1; // Count as processed for progress tracking
+            skipped_ids.push(content_input.id.clone());
             continue;
         }
 
@@ -2063,6 +2077,8 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
             }
             Err(e) => {
                 chunk_errors += 1;
+                let error_msg = format!("{:?}", e);
+                failed_ids.push((content_input.id.clone(), error_msg.clone()));
                 let error_msg = format!("Failed to create '{}': {:?}", content_input.id, e);
                 if errors.len() < 100 {
                     errors.push(error_msg);
@@ -2123,8 +2139,11 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
         batch_id: input.batch_id,
         chunk_processed,
         chunk_errors,
+        chunk_skipped,
         total_processed: batch.processed_count,
         total_errors: batch.error_count,
+        failed_ids,
+        skipped_ids,
         status: batch.status,
     })
 }
