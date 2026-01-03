@@ -362,6 +362,11 @@ impl ImportApi {
         self
     }
 
+    /// Check if HcClient connection is missing and reconnection is needed
+    pub fn needs_reconnect(&self) -> bool {
+        self.hc_client.is_none()
+    }
+
     /// Initialize Holochain client with retry logic.
     ///
     /// Uses the official `holochain_client` crate for properly signed zome calls.

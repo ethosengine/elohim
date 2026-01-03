@@ -187,6 +187,23 @@ impl HttpServer {
             // Import API (forwarded from doorway)
             (_, p) if p.starts_with("/import/") => {
                 if let Some(ref import_api) = self.import_api {
+                    // Lazy reconnection: if HcClient is not connected, attempt to reconnect
+                    // This handles the case where elohim-storage starts before the hApp is installed
+                    {
+                        let api = import_api.read().await;
+                        if api.needs_reconnect() {
+                            drop(api); // Release read lock before acquiring write lock
+                            let mut api_write = import_api.write().await;
+                            if api_write.needs_reconnect() { // Double-check after acquiring write lock
+                                info!("Import API: Attempting lazy reconnection to conductor...");
+                                match api_write.connect_conductor().await {
+                                    Ok(_) => info!("Import API: Lazy reconnection successful"),
+                                    Err(e) => warn!(error = %e, "Import API: Lazy reconnection failed"),
+                                }
+                            }
+                        }
+                    }
+
                     let api = import_api.read().await;
                     api.handle_request(req, &path).await
                 } else {
