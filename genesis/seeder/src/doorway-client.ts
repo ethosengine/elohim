@@ -104,6 +104,18 @@ export interface ImportQueueRequest {
   total_items: number;
   /** Schema version for the import data */
   schema_version?: number;
+  /**
+   * Items per chunk (optional, uses server default if not provided).
+   * Smaller chunks = less conductor pressure but slower throughput.
+   * Server default: 50 items per chunk.
+   */
+  chunk_size?: number;
+  /**
+   * Delay between chunks in ms (optional, uses server default if not provided).
+   * Higher delay = more conductor breathing room but slower throughput.
+   * Server default: 300ms.
+   */
+  chunk_delay_ms?: number;
 }
 
 export interface ImportQueueResponse {
