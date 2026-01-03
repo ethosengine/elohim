@@ -37,6 +37,12 @@
 //! 1. Reading blob from local storage
 //! 2. Parsing items JSON
 //! 3. Sending chunks to zome via process_import_chunk
+//!
+//! ## Runtime Isolation
+//!
+//! Uses dedicated tokio runtimes to prevent import processing from starving HTTP/WebSocket:
+//! - **Server runtime (2 workers)**: HTTP/WebSocket server - always responsive for upgrades
+//! - **Import runtime (4 workers)**: Zome call processing - can saturate without blocking server
 
 use clap::Parser;
 use elohim_storage::{BlobStore, Config, HttpServer, ImportHandler, ImportHandlerConfig};
@@ -92,15 +98,44 @@ struct Args {
     enable_import_api: bool,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Initialize tracing
+fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Initialize tracing BEFORE creating runtimes
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::from_default_env().add_directive("elohim_storage=info".parse()?),
         )
         .init();
 
+    // Create dedicated server runtime - small, always responsive for HTTP/WebSocket
+    let server_rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .thread_name("http-server")
+        .enable_all()
+        .build()
+        .expect("Failed to create server runtime");
+
+    // Create dedicated import runtime - larger, for heavy zome call processing
+    let import_rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .thread_name("import-worker")
+        .enable_all()
+        .build()
+        .expect("Failed to create import runtime");
+
+    // Get handle to import runtime for spawning import tasks
+    let import_handle = import_rt.handle().clone();
+
+    info!(
+        server_workers = 2,
+        import_workers = 4,
+        "Runtime isolation enabled: HTTP/WebSocket on server runtime, imports on dedicated runtime"
+    );
+
+    // Run the main async logic on server runtime
+    server_rt.block_on(async_main(import_handle))
+}
+
+async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let args = Args::parse();
 
     // Load config
@@ -163,6 +198,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         info!("  GET  /import/status/{{batch}} - Get import status");
         info!("  WS   /import/progress        - WebSocket progress stream");
         info!("  Conductor app URL: {}", args.app_url);
+        info!("  Import processing on dedicated runtime (4 workers)");
 
         // HcClient handles cell discovery and signing internally
         // No need for manual cell_id discovery - it happens on connect
@@ -177,7 +213,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 ..Default::default()
             },
             blob_store.clone(),
-        ).with_progress_hub(Arc::clone(&progress_hub));
+        )
+        .with_progress_hub(Arc::clone(&progress_hub))
+        .with_import_runtime(import_runtime.clone());
 
         // Connect to conductor
         match import_api.connect_conductor().await {

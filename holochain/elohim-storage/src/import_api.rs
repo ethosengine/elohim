@@ -263,6 +263,8 @@ pub struct ImportApi {
     progress_hub: Option<Arc<ProgressHub>>,
     /// Debug broadcaster for real-time debugging
     debug_broadcaster: Option<Arc<DebugBroadcaster>>,
+    /// Dedicated runtime for import processing (prevents HTTP/WebSocket starvation)
+    import_runtime: Option<tokio::runtime::Handle>,
 }
 
 impl ImportApi {
@@ -275,6 +277,7 @@ impl ImportApi {
             batches: Arc::new(RwLock::new(HashMap::new())),
             progress_hub: None,
             debug_broadcaster: None,
+            import_runtime: None,
         }
     }
 
@@ -287,6 +290,16 @@ impl ImportApi {
     /// Set the debug broadcaster for real-time debugging
     pub fn with_debug_broadcaster(mut self, broadcaster: Arc<DebugBroadcaster>) -> Self {
         self.debug_broadcaster = Some(broadcaster);
+        self
+    }
+
+    /// Set the dedicated import runtime handle
+    ///
+    /// When set, batch processing tasks will be spawned on this dedicated runtime
+    /// instead of the current runtime, preventing import work from starving
+    /// HTTP/WebSocket operations.
+    pub fn with_import_runtime(mut self, runtime: tokio::runtime::Handle) -> Self {
+        self.import_runtime = Some(runtime);
         self
     }
 
@@ -517,15 +530,26 @@ impl ImportApi {
             "Import batch queued"
         );
 
-        // Spawn processing task
+        // Spawn processing task on dedicated import runtime (if configured)
+        // This prevents heavy zome call processing from starving HTTP/WebSocket operations
         let api_self = self.clone_for_processing();
         let batch_id_clone = batch_id.clone();
         let batch_type = request.batch_type.clone();
-        tokio::spawn(async move {
+        let processing_future = async move {
             if let Err(e) = api_self.process_batch(&batch_id_clone, &batch_type, &items_json).await {
                 error!(batch_id = %batch_id_clone, error = %e, "Batch processing failed");
             }
-        });
+        };
+
+        if let Some(import_rt) = self.get_import_runtime() {
+            // Spawn on dedicated import runtime - prevents HTTP/WebSocket starvation
+            import_rt.spawn(processing_future);
+            debug!(batch_id = %batch_id, "Batch processing spawned on dedicated import runtime");
+        } else {
+            // Fallback to current runtime if no dedicated runtime configured
+            tokio::spawn(processing_future);
+            debug!(batch_id = %batch_id, "Batch processing spawned on current runtime (no dedicated runtime)");
+        };
 
         // Return response
         let response = QueueImportResponse {
@@ -635,6 +659,11 @@ impl ImportApi {
             progress_hub: self.progress_hub.clone(),
             debug_broadcaster: self.debug_broadcaster.clone(),
         }
+    }
+
+    /// Get the import runtime handle if configured
+    fn get_import_runtime(&self) -> Option<&tokio::runtime::Handle> {
+        self.import_runtime.as_ref()
     }
 }
 
