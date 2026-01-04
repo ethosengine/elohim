@@ -1207,11 +1207,22 @@ async function seedViaDoorway(): Promise<SeedResult> {
         }));
       }
 
-      // Flatten hierarchical structure: chapters → modules → sections → conceptIds
+      // Flatten hierarchical structure: chapters → modules → sections
+      // Each level can have either conceptIds (flat) or steps (structured)
       if (pathData.chapters && Array.isArray(pathData.chapters)) {
         for (const chapter of pathData.chapters) {
-          // Chapter-level conceptIds
-          if (chapter.conceptIds) {
+          // Chapter-level steps array (structured)
+          if (chapter.steps && Array.isArray(chapter.steps)) {
+            for (const step of chapter.steps) {
+              steps.push({
+                step_type: step.step_type || step.stepType || 'content',
+                resource_id: step.resource_id || step.resourceId || step.id,
+                order_index: orderIndex++,
+              });
+            }
+          }
+          // Chapter-level conceptIds (flat)
+          if (chapter.conceptIds && Array.isArray(chapter.conceptIds)) {
             for (const id of chapter.conceptIds) {
               steps.push({ step_type: 'content', resource_id: id, order_index: orderIndex++ });
             }
@@ -1219,8 +1230,18 @@ async function seedViaDoorway(): Promise<SeedResult> {
           // Modules within chapters
           if (chapter.modules && Array.isArray(chapter.modules)) {
             for (const module of chapter.modules) {
+              // Module-level steps array
+              if (module.steps && Array.isArray(module.steps)) {
+                for (const step of module.steps) {
+                  steps.push({
+                    step_type: step.step_type || step.stepType || 'content',
+                    resource_id: step.resource_id || step.resourceId || step.id,
+                    order_index: orderIndex++,
+                  });
+                }
+              }
               // Module-level conceptIds
-              if (module.conceptIds) {
+              if (module.conceptIds && Array.isArray(module.conceptIds)) {
                 for (const id of module.conceptIds) {
                   steps.push({ step_type: 'content', resource_id: id, order_index: orderIndex++ });
                 }
@@ -1228,7 +1249,18 @@ async function seedViaDoorway(): Promise<SeedResult> {
               // Sections within modules
               if (module.sections && Array.isArray(module.sections)) {
                 for (const section of module.sections) {
-                  if (section.conceptIds) {
+                  // Section-level steps array
+                  if (section.steps && Array.isArray(section.steps)) {
+                    for (const step of section.steps) {
+                      steps.push({
+                        step_type: step.step_type || step.stepType || 'content',
+                        resource_id: step.resource_id || step.resourceId || step.id,
+                        order_index: orderIndex++,
+                      });
+                    }
+                  }
+                  // Section-level conceptIds
+                  if (section.conceptIds && Array.isArray(section.conceptIds)) {
                     for (const id of section.conceptIds) {
                       steps.push({ step_type: 'content', resource_id: id, order_index: orderIndex++ });
                     }
