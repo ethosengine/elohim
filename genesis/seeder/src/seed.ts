@@ -1324,6 +1324,10 @@ async function seedViaDoorway(): Promise<SeedResult> {
           blob_hash: pathsBlobHash,
           total_items: pathInputs.length,
           schema_version: 1,
+          // Process 1 path per chunk - paths create many steps/links internally
+          // elohim-protocol alone has 56 steps, each requiring DHT operations
+          chunk_size: 1,
+          chunk_delay_ms: 500, // More breathing room between paths
         });
         console.log(`   ✅ Paths import queued: ${pathsQueueResult.batch_id}`);
 
