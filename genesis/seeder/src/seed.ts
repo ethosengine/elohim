@@ -1174,6 +1174,66 @@ async function seedViaDoorway(): Promise<SeedResult> {
     timer.startPhase('Path Import');
     console.log(`\n🚀 Importing ${allPaths.length} paths via doorway...`);
 
+    // Helper to flatten hierarchical path structure into steps
+    // Paths can have: chapters → modules → sections → conceptIds
+    function extractStepsFromPath(pathData: any): Array<{step_type: string; resource_id: string; order_index: number}> {
+      const steps: Array<{step_type: string; resource_id: string; order_index: number}> = [];
+      let orderIndex = 0;
+
+      // If path has explicit steps array, use it directly
+      if (pathData.steps && Array.isArray(pathData.steps)) {
+        return pathData.steps.map((step: any, i: number) => ({
+          step_type: step.step_type || step.stepType || 'content',
+          resource_id: step.resource_id || step.resourceId || step.id,
+          order_index: step.order_index ?? step.orderIndex ?? i,
+        }));
+      }
+
+      // If path has flat conceptIds array
+      if (pathData.conceptIds && Array.isArray(pathData.conceptIds)) {
+        return pathData.conceptIds.map((id: string, i: number) => ({
+          step_type: 'content',
+          resource_id: id,
+          order_index: i,
+        }));
+      }
+
+      // Flatten hierarchical structure: chapters → modules → sections → conceptIds
+      if (pathData.chapters && Array.isArray(pathData.chapters)) {
+        for (const chapter of pathData.chapters) {
+          // Chapter-level conceptIds
+          if (chapter.conceptIds) {
+            for (const id of chapter.conceptIds) {
+              steps.push({ step_type: 'content', resource_id: id, order_index: orderIndex++ });
+            }
+          }
+          // Modules within chapters
+          if (chapter.modules && Array.isArray(chapter.modules)) {
+            for (const module of chapter.modules) {
+              // Module-level conceptIds
+              if (module.conceptIds) {
+                for (const id of module.conceptIds) {
+                  steps.push({ step_type: 'content', resource_id: id, order_index: orderIndex++ });
+                }
+              }
+              // Sections within modules
+              if (module.sections && Array.isArray(module.sections)) {
+                for (const section of module.sections) {
+                  if (section.conceptIds) {
+                    for (const id of section.conceptIds) {
+                      steps.push({ step_type: 'content', resource_id: id, order_index: orderIndex++ });
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return steps;
+    }
+
     // Convert paths to zome inputs
     const pathInputs = allPaths.map(({ pathData }) => ({
       id: pathData.id,
@@ -1187,12 +1247,13 @@ async function seedViaDoorway(): Promise<SeedResult> {
       path_type: pathData.pathType || 'linear',
       tags: pathData.tags || [],
       metadata_json: JSON.stringify(pathData.chapters || pathData.metadata || {}),
-      steps: (pathData.steps || pathData.conceptIds?.map((id: string, i: number) => ({
-        step_type: 'content',
-        resource_id: id,
-        order_index: i,
-      })) || []),
+      steps: extractStepsFromPath(pathData),
     }));
+
+    // Log step counts for debugging
+    for (const path of pathInputs) {
+      console.log(`   📍 Path "${path.id}": ${path.steps.length} steps`);
+    }
     result.pathsAttempted = pathInputs.length;  // Track for verification
 
     // Upload paths blob
