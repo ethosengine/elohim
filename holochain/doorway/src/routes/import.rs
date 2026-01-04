@@ -53,6 +53,14 @@ pub struct ImportQueueRequest {
     /// Schema version for the import data
     #[serde(default = "default_schema_version")]
     pub schema_version: u32,
+    /// Items per chunk (optional, uses server default if not provided)
+    /// Smaller chunks = less conductor pressure, slower overall
+    #[serde(default)]
+    pub chunk_size: Option<usize>,
+    /// Delay between chunks in ms (optional, uses server default if not provided)
+    /// Higher delay = more conductor breathing room, slower overall
+    #[serde(default)]
+    pub chunk_delay_ms: Option<u64>,
 }
 
 fn default_schema_version() -> u32 { 1 }
@@ -213,6 +221,8 @@ async fn forward_queue_import(
         batch_type = batch_type,
         blob_hash = %import_req.blob_hash,
         total_items = import_req.total_items,
+        chunk_size = ?import_req.chunk_size,
+        chunk_delay_ms = ?import_req.chunk_delay_ms,
         "Forwarding import queue request to elohim-storage"
     );
 
@@ -223,6 +233,8 @@ async fn forward_queue_import(
         "blob_hash": import_req.blob_hash,
         "total_items": import_req.total_items,
         "schema_version": import_req.schema_version,
+        "chunk_size": import_req.chunk_size,
+        "chunk_delay_ms": import_req.chunk_delay_ms,
     });
 
     // Forward to elohim-storage
