@@ -334,6 +334,8 @@ const LIMIT = LIMIT_ARG ? parseInt(LIMIT_ARG.split('=')[1] || args[args.indexOf(
 const IDS_ARG = args.find(a => a.startsWith('--ids'));
 const IDS = IDS_ARG ? (IDS_ARG.split('=')[1] || args[args.indexOf(IDS_ARG) + 1] || '').split(',').filter(Boolean) : [];
 const FORCE_SEED = args.includes('--force') || process.env.FORCE_SEED === 'true';
+const PATHS_ONLY = args.includes('--paths-only') || process.env.SEED_PATHS_ONLY === 'true';
+const CONTENT_ONLY = args.includes('--content-only') || process.env.SEED_CONTENT_ONLY === 'true';
 
 // =============================================================================
 // DOORWAY MODE (Required)
@@ -835,6 +837,9 @@ async function seedViaDoorway(): Promise<SeedResult> {
   // ========================================
   // LOAD CONTENT
   // ========================================
+  if (PATHS_ONLY) {
+    console.log('\n⏭️  Skipping content (--paths-only mode)');
+  } else {
   timer.startPhase('Content Loading');
   console.log('\n📚 Loading content from data/lamad/content/...');
   const contentDir = path.join(DATA_DIR, 'content');
@@ -1149,10 +1154,14 @@ async function seedViaDoorway(): Promise<SeedResult> {
 
     timer.endPhase('Content Import');
   }
+  } // end if (!PATHS_ONLY)
 
   // ========================================
   // LOAD & IMPORT PATHS
   // ========================================
+  if (CONTENT_ONLY) {
+    console.log('\n⏭️  Skipping paths (--content-only mode)');
+  } else {
   timer.startPhase('Path Loading');
   console.log('\n📍 Loading paths from data/lamad/paths/...');
   const pathsDir = path.join(DATA_DIR, 'paths');
@@ -1350,6 +1359,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
 
     timer.endPhase('Path Import');
   }
+  } // end if (!CONTENT_ONLY)
 
   // ========================================
   // SUMMARY
