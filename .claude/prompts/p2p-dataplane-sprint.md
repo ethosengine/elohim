@@ -43,7 +43,7 @@ Review the documentation in `holochain/` to understand the current architecture 
 
 1. `holochain/README.md` — Overview and principles
 2. `holochain/ARCHITECTURE-GAP.md` — Client vs Agent vs Community models
-3. `holochain/COMMUNITY-COMPUTE.md` — The full vision document
+3. `holochain/COMMUNITY-COMPUTE.md` — The vision document for compute as a resource
 4. `holochain/DEPLOYMENT-RUNTIMES.md` — Current deployment patterns
 5. `holochain/doorway/` — The current web gateway
 6. `holochain/elohim-storage/` — The current storage layer
@@ -72,7 +72,10 @@ Requirements:
 - Syncs when connected (CRDT or merge strategies)
 - Community replication (not "everyone has everything")
 - Scales with community investment
-- Can run on: laptops, phones, home servers, doorways
+- Can run on: laptops, phones, home servers
+- Serves to doorways
+- Is aware of local clusters (home rack), family clusters (regional-racks), as always on nodes which provide always on for replication, sync, and 
+  a base for some operators to host and managed federated doorway instances. 
 
 Questions to answer:
 - What existing P2P protocols/frameworks could serve this? (libp2p, IPFS, custom?)
@@ -115,8 +118,23 @@ Research these for the P2P data plane:
 6. **Hypercore/Hyperswarm** — Append-only logs + P2P discovery
 7. **Matrix protocol** — Federated sync (we cloned their repos in `/research/matrix/`)
 8. **Electric SQL** — Local-first sync for SQLite
+9. **Pinecone** — Matrix's P2P overlay routing (`/research/matrix/pinecone/`)
+   - Routes by public key (aligns with agent-centric identity)
+   - SNEK routing handles topology changes gracefully
+   - Transport-agnostic (TCP, WebSockets, Bluetooth LE)
+   - QUIC for multiplexed sessions + connection migration
+   - Self-healing, mobile-first design
+   - Written in Go (would need Rust bindings)
 
 Don't just pick one. Understand what each does well and what we'd need to build ourselves.
+
+**Key Insight from Pinecone Research:**
+Pinecone solves the *transport/routing* layer (how nodes find and connect to each other).
+It could complement other layers:
+- Pinecone for P2P routing (by public key)
+- libp2p protocols for content transfer
+- Automerge for CRDT sync
+- elohim-storage for blob management
 
 ## Output Expected
 
@@ -158,7 +176,7 @@ Don't just pick one. Understand what each does well and what we'd need to build 
 Start by reading:
 1. `holochain/COMMUNITY-COMPUTE.md` (the vision)
 2. `holochain/ARCHITECTURE-GAP.md` (the problem)
-3. `/research/matrix/` repos (how Matrix solved federation/sync)
+3. `/research/matrix/` repos (how Matrix solved federation/sync) hint: they went federation-first, we want p2p 1st, extended by a thin-federation (doorway)
 
 Then propose an architecture that separates:
 - Trust (Holochain)
