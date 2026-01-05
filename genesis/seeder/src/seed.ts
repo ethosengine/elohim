@@ -1183,19 +1183,38 @@ async function seedViaDoorway(): Promise<SeedResult> {
     timer.startPhase('Path Import');
     console.log(`\n🚀 Importing ${allPaths.length} paths via doorway...`);
 
+    // Step type matching zome's PathImportStepInput struct
+    interface StepInput {
+      step_type: string;
+      resource_id: string;
+      order_index: number;
+      step_title?: string;
+      step_narrative?: string;
+      is_optional?: boolean;
+    }
+
+    // Helper to extract step data from a step object (preserves optional fields)
+    function extractStepData(step: any, orderIndex: number): StepInput {
+      return {
+        step_type: step.step_type || step.stepType || 'content',
+        resource_id: step.resource_id || step.resourceId || step.id,
+        order_index: step.order_index ?? step.orderIndex ?? orderIndex,
+        // Optional fields - only include if present
+        ...(step.step_title || step.stepTitle ? { step_title: step.step_title || step.stepTitle } : {}),
+        ...(step.step_narrative || step.stepNarrative ? { step_narrative: step.step_narrative || step.stepNarrative } : {}),
+        ...((step.is_optional ?? step.optional) !== undefined ? { is_optional: step.is_optional ?? step.optional ?? false } : {}),
+      };
+    }
+
     // Helper to flatten hierarchical path structure into steps
     // Paths can have: chapters → modules → sections → conceptIds
-    function extractStepsFromPath(pathData: any): Array<{step_type: string; resource_id: string; order_index: number}> {
-      const steps: Array<{step_type: string; resource_id: string; order_index: number}> = [];
+    function extractStepsFromPath(pathData: any): StepInput[] {
+      const steps: StepInput[] = [];
       let orderIndex = 0;
 
       // If path has explicit steps array, use it directly
       if (pathData.steps && Array.isArray(pathData.steps)) {
-        return pathData.steps.map((step: any, i: number) => ({
-          step_type: step.step_type || step.stepType || 'content',
-          resource_id: step.resource_id || step.resourceId || step.id,
-          order_index: step.order_index ?? step.orderIndex ?? i,
-        }));
+        return pathData.steps.map((step: any, i: number) => extractStepData(step, i));
       }
 
       // If path has flat conceptIds array
@@ -1211,14 +1230,10 @@ async function seedViaDoorway(): Promise<SeedResult> {
       // Each level can have either conceptIds (flat) or steps (structured)
       if (pathData.chapters && Array.isArray(pathData.chapters)) {
         for (const chapter of pathData.chapters) {
-          // Chapter-level steps array (structured)
+          // Chapter-level steps array (structured) - preserves step metadata
           if (chapter.steps && Array.isArray(chapter.steps)) {
             for (const step of chapter.steps) {
-              steps.push({
-                step_type: step.step_type || step.stepType || 'content',
-                resource_id: step.resource_id || step.resourceId || step.id,
-                order_index: orderIndex++,
-              });
+              steps.push(extractStepData(step, orderIndex++));
             }
           }
           // Chapter-level conceptIds (flat)
@@ -1230,14 +1245,10 @@ async function seedViaDoorway(): Promise<SeedResult> {
           // Modules within chapters
           if (chapter.modules && Array.isArray(chapter.modules)) {
             for (const module of chapter.modules) {
-              // Module-level steps array
+              // Module-level steps array - preserves step metadata
               if (module.steps && Array.isArray(module.steps)) {
                 for (const step of module.steps) {
-                  steps.push({
-                    step_type: step.step_type || step.stepType || 'content',
-                    resource_id: step.resource_id || step.resourceId || step.id,
-                    order_index: orderIndex++,
-                  });
+                  steps.push(extractStepData(step, orderIndex++));
                 }
               }
               // Module-level conceptIds
@@ -1249,14 +1260,10 @@ async function seedViaDoorway(): Promise<SeedResult> {
               // Sections within modules
               if (module.sections && Array.isArray(module.sections)) {
                 for (const section of module.sections) {
-                  // Section-level steps array
+                  // Section-level steps array - preserves step metadata
                   if (section.steps && Array.isArray(section.steps)) {
                     for (const step of section.steps) {
-                      steps.push({
-                        step_type: step.step_type || step.stepType || 'content',
-                        resource_id: step.resource_id || step.resourceId || step.id,
-                        order_index: orderIndex++,
-                      });
+                      steps.push(extractStepData(step, orderIndex++));
                     }
                   }
                   // Section-level conceptIds
@@ -1287,7 +1294,13 @@ async function seedViaDoorway(): Promise<SeedResult> {
       visibility: pathData.visibility || 'public',
       path_type: pathData.pathType || 'linear',
       tags: pathData.tags || [],
-      metadata_json: JSON.stringify(pathData.chapters || pathData.metadata || {}),
+      // metadata_json must be an object with a `chapters` property for the UI to parse it
+      // The UI does: metadata.chapters (not just metadata as an array)
+      metadata_json: JSON.stringify(
+        pathData.chapters
+          ? { chapters: pathData.chapters, ...pathData.metadata }
+          : pathData.metadata || {}
+      ),
       steps: extractStepsFromPath(pathData),
     }));
 
