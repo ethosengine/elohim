@@ -456,8 +456,11 @@ export class HolochainClientService {
   /**
    * Wait for connection to be established (with timeout).
    * Returns true if connected, false if timed out.
+   *
+   * Default timeout is 30 seconds to accommodate doorway connections
+   * which can take 15-20 seconds on first connect.
    */
-  async waitForConnection(timeoutMs: number = 10000): Promise<boolean> {
+  async waitForConnection(timeoutMs: number = 30000): Promise<boolean> {
     const startTime = Date.now();
     const pollInterval = 100;
 
@@ -616,9 +619,9 @@ export class HolochainClientService {
 
     // Need cellIds for DNA hash lookup
     if (cellIds.size === 0) {
-      // If not connected but connecting, wait briefly
+      // If not connected but connecting, wait for connection
       if (state === 'connecting' || state === 'authenticating') {
-        const connected = await this.waitForConnection(5000);
+        const connected = await this.waitForConnection();
         if (!connected) {
           const duration = Date.now() - startTime;
           this.metrics.recordQuery(duration, false);
