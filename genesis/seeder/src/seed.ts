@@ -1193,10 +1193,34 @@ async function seedViaDoorway(): Promise<SeedResult> {
       is_optional?: boolean;
     }
 
+    // Valid step types per DNA validation
+    const VALID_STEP_TYPES = ['content', 'read', 'path', 'external', 'practice', 'assess', 'video', 'interactive'];
+
+    // Normalize step type aliases to valid zome values
+    function normalizeStepType(type: string | undefined): string {
+      if (!type) return 'content';
+      const normalized = type.toLowerCase();
+      // Common aliases
+      const aliases: Record<string, string> = {
+        'assessment': 'assess',
+        'quiz': 'assess',
+        'test': 'assess',
+        'reading': 'read',
+        'lesson': 'content',
+        'article': 'content',
+      };
+      const mapped = aliases[normalized] || normalized;
+      if (!VALID_STEP_TYPES.includes(mapped)) {
+        console.warn(`   ⚠️ Unknown step_type '${type}' -> defaulting to 'content'`);
+        return 'content';
+      }
+      return mapped;
+    }
+
     // Helper to extract step data from a step object (preserves optional fields)
     function extractStepData(step: any, orderIndex: number): StepInput {
       return {
-        step_type: step.step_type || step.stepType || 'content',
+        step_type: normalizeStepType(step.step_type || step.stepType),
         resource_id: step.resource_id || step.resourceId || step.id,
         order_index: step.order_index ?? step.orderIndex ?? orderIndex,
         // Optional fields - only include if present

@@ -44,7 +44,7 @@
       "steps": [
         {
           "order": 1,
-          "stepType": "assessment",
+          "stepType": "assess",
           "resourceId": "assessment-values-hierarchy",
           "stepTitle": "Values Hierarchy Assessment",
           "stepNarrative": "Discover what you truly value most",
@@ -70,7 +70,7 @@
       "steps": [
         {
           "order": 1,
-          "stepType": "assessment",
+          "stepType": "assess",
           "resourceId": "assessment-attachment-style",
           "stepTitle": "Attachment Style Exploration",
           "stepNarrative": "Understand your relationship patterns",
@@ -96,7 +96,7 @@
       "steps": [
         {
           "order": 1,
-          "stepType": "assessment",
+          "stepType": "assess",
           "resourceId": "assessment-strengths-finder",
           "stepTitle": "Character Strengths",
           "stepNarrative": "Discover your signature strengths",
