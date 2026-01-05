@@ -358,61 +358,53 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     script {
                         echo 'Fetching holochain-cache-core WASM module...'
 
-                        // Try to fetch from holochain pipeline artifacts
                         def wasmDir = 'holochain/holochain-cache-core/pkg'
+                        def wasmFiles = [
+                            'holochain_cache_core.js',
+                            'holochain_cache_core_bg.wasm',
+                            'holochain_cache_core.d.ts',
+                            'holochain_cache_core_bg.wasm.d.ts',
+                            'package.json'
+                        ]
 
-                        // First, try current branch
-                        def branchUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/pkg/"
-                        def fetchedFromBranch = sh(
-                            script: """
-                                mkdir -p '${wasmDir}'
-                                wget --recursive --no-parent --no-host-directories --cut-dirs=6 \
-                                    --timeout=30 --tries=2 \
-                                    -P '${wasmDir}' \
-                                    '${branchUrl}' 2>&1 || exit 1
-                                ls -la '${wasmDir}/'
-                            """,
-                            returnStatus: true
-                        ) == 0
+                        // Helper to download WASM files from a branch
+                        def downloadWasm = { branch ->
+                            def baseUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${branch}/lastSuccessfulBuild/artifact/pkg"
+                            sh "mkdir -p '${wasmDir}'"
 
-                        if (!fetchedFromBranch) {
-                            echo "WASM not found for branch ${env.BRANCH_NAME}, trying dev..."
-                            def devUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/pkg/"
-                            def fetchedFromDev = sh(
-                                script: """
-                                    mkdir -p '${wasmDir}'
-                                    wget --recursive --no-parent --no-host-directories --cut-dirs=6 \
-                                        --timeout=30 --tries=2 \
-                                        -P '${wasmDir}' \
-                                        '${devUrl}' 2>&1 || exit 1
-                                    ls -la '${wasmDir}/'
-                                """,
-                                returnStatus: true
-                            ) == 0
-
-                            if (!fetchedFromDev) {
-                                echo "WASM not found in dev, trying main..."
-                                def mainUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/pkg/"
-                                def fetchedFromMain = sh(
-                                    script: """
-                                        mkdir -p '${wasmDir}'
-                                        wget --recursive --no-parent --no-host-directories --cut-dirs=6 \
-                                            --timeout=30 --tries=2 \
-                                            -P '${wasmDir}' \
-                                            '${mainUrl}' 2>&1 || exit 1
-                                        ls -la '${wasmDir}/'
-                                    """,
+                            def success = true
+                            for (file in wasmFiles) {
+                                def result = sh(
+                                    script: "wget -q --timeout=30 --tries=2 -O '${wasmDir}/${file}' '${baseUrl}/${file}' 2>&1",
                                     returnStatus: true
-                                ) == 0
-
-                                if (!fetchedFromMain) {
-                                    echo """
-                                    ⚠️ Could not fetch holochain-cache-core WASM from any branch.
-                                    App will use TypeScript fallback (slightly slower but functional).
-                                    To enable WASM: Run holochain pipeline with FORCE_BUILD=true
-                                    """
+                                )
+                                if (result != 0) {
+                                    success = false
+                                    break
                                 }
                             }
+                            return success
+                        }
+
+                        // Try current branch, then dev, then main
+                        def fetched = downloadWasm(env.BRANCH_NAME)
+
+                        if (!fetched) {
+                            echo "WASM not found for branch ${env.BRANCH_NAME}, trying dev..."
+                            fetched = downloadWasm('dev')
+                        }
+
+                        if (!fetched) {
+                            echo "WASM not found in dev, trying main..."
+                            fetched = downloadWasm('main')
+                        }
+
+                        if (!fetched) {
+                            echo """
+                            ⚠️ Could not fetch holochain-cache-core WASM from any branch.
+                            App will use TypeScript fallback (slightly slower but functional).
+                            To enable WASM: Run holochain pipeline with FORCE_BUILD=true
+                            """
                         }
 
                         if (fileExists("${wasmDir}/holochain_cache_core.js")) {
