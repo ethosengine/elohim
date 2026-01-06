@@ -304,7 +304,7 @@ impl Default for ImportApiConfig {
             max_concurrent_batches: 3,
             circuit_breaker_threshold: 5,
             circuit_breaker_pause: Duration::from_secs(10),
-            zome_call_timeout: Duration::from_secs(120), // 2 min per chunk - generous but not infinite
+            zome_call_timeout: Duration::from_secs(300), // 5 min per chunk - paths with many steps need more time
             zome_call_retries: 3, // Retry up to 3 times before counting as error
         }
     }
