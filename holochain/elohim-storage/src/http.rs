@@ -33,6 +33,7 @@
 //! ```
 
 use crate::blob_store::BlobStore;
+use crate::db::{self, ContentDb, ContentQuery};
 use crate::error::StorageError;
 use crate::import_api::ImportApi;
 use crate::progress_hub::ProgressHub;
@@ -64,6 +65,8 @@ pub struct HttpServer {
     progress_hub: Option<Arc<ProgressHub>>,
     /// Sync manager for CRDT document sync
     sync_manager: Option<Arc<SyncManager>>,
+    /// SQLite content database for structured data
+    content_db: Option<Arc<ContentDb>>,
 }
 
 impl HttpServer {
@@ -76,6 +79,7 @@ impl HttpServer {
             import_api: None,
             progress_hub: None,
             sync_manager: None,
+            content_db: None,
         }
     }
 
@@ -94,6 +98,12 @@ impl HttpServer {
     /// Set the Sync Manager for CRDT document sync
     pub fn with_sync_manager(mut self, sync_manager: Arc<SyncManager>) -> Self {
         self.sync_manager = Some(sync_manager);
+        self
+    }
+
+    /// Set the SQLite Content Database
+    pub fn with_content_db(mut self, content_db: Arc<ContentDb>) -> Self {
+        self.content_db = Some(content_db);
         self
     }
 
@@ -237,6 +247,21 @@ impl HttpServer {
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Full::new(Bytes::from(
                             r#"{"error": "Sync API not enabled"}"#
+                        )))
+                        .unwrap())
+                }
+            }
+
+            // Database API: Content, Paths, Stats
+            (method, p) if p.starts_with("/db/") => {
+                if let Some(ref content_db) = self.content_db {
+                    self.handle_db_request(req, method, &path, content_db.clone()).await
+                } else {
+                    Ok(Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error": "Content database not enabled"}"#
                         )))
                         .unwrap())
                 }
@@ -934,6 +959,540 @@ impl HttpServer {
                             .unwrap())
                     }
                 }
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap()),
+        }
+    }
+
+    // =========================================================================
+    // Database API handlers
+    // =========================================================================
+
+    /// Handle database API requests
+    ///
+    /// Routes:
+    /// - GET /db/stats - Database statistics
+    /// - GET /db/content - List content (with query params)
+    /// - GET /db/content/{id} - Get content by ID
+    /// - POST /db/content - Create single content
+    /// - POST /db/content/bulk - Bulk create content
+    /// - GET /db/paths - List paths
+    /// - GET /db/paths/{id} - Get path by ID with steps
+    /// - POST /db/paths - Create single path
+    /// - POST /db/paths/bulk - Bulk create paths
+    async fn handle_db_request(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        path: &str,
+        content_db: Arc<ContentDb>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Strip /db/ prefix
+        let sub_path = path.strip_prefix("/db/").unwrap_or("");
+
+        // Route to specific handlers
+        if sub_path == "stats" {
+            return self.handle_db_stats(method, &content_db).await;
+        }
+
+        if sub_path == "content" {
+            return self.handle_db_content_list(req, method, &content_db).await;
+        }
+
+        if sub_path == "content/bulk" {
+            return self.handle_db_content_bulk(req, method, &content_db).await;
+        }
+
+        if let Some(content_id) = sub_path.strip_prefix("content/") {
+            return self.handle_db_content_by_id(req, method, content_id, &content_db).await;
+        }
+
+        if sub_path == "paths" {
+            return self.handle_db_paths_list(req, method, &content_db).await;
+        }
+
+        if sub_path == "paths/bulk" {
+            return self.handle_db_paths_bulk(req, method, &content_db).await;
+        }
+
+        if let Some(path_id) = sub_path.strip_prefix("paths/") {
+            return self.handle_db_path_by_id(req, method, path_id, &content_db).await;
+        }
+
+        Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(r#"{"error": "Unknown database endpoint"}"#)))
+            .unwrap())
+    }
+
+    /// GET /db/stats - Database statistics
+    async fn handle_db_stats(
+        &self,
+        method: Method,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap());
+        }
+
+        match content_db.stats() {
+            Ok(stats) => {
+                let body = serde_json::to_string(&stats)
+                    .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(body)))
+                    .unwrap())
+            }
+            Err(e) => {
+                error!(error = %e, "Failed to get database stats");
+                Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                    .unwrap())
+            }
+        }
+    }
+
+    /// GET /db/content - List content, POST /db/content - Create content
+    async fn handle_db_content_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        match method {
+            Method::GET => {
+                // Parse query params
+                let query_str = req.uri().query().unwrap_or("");
+                let params: std::collections::HashMap<String, String> =
+                    url::form_urlencoded::parse(query_str.as_bytes())
+                        .into_owned()
+                        .collect();
+
+                let query = ContentQuery {
+                    content_type: params.get("content_type").cloned(),
+                    content_format: params.get("content_format").cloned(),
+                    tags: params
+                        .get("tags")
+                        .map(|s| s.split(',').map(|t| t.trim().to_string()).collect())
+                        .unwrap_or_default(),
+                    search: params.get("search").cloned(),
+                    limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
+                    offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+                };
+
+                content_db.with_conn(|conn| {
+                    match db::content::list_content(conn, &query) {
+                        Ok(items) => {
+                            let body = serde_json::json!({
+                                "items": items,
+                                "count": items.len(),
+                                "limit": query.limit,
+                                "offset": query.offset,
+                            });
+
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body.to_string())))
+                                .unwrap())
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to list content");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            Method::POST => {
+                // Parse body
+                let body = req.collect().await.map_err(|e| {
+                    StorageError::Internal(format!("Failed to read body: {}", e))
+                })?;
+                let body_bytes = body.to_bytes();
+
+                let input: db::content::CreateContentInput = serde_json::from_slice(&body_bytes)
+                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+                content_db.with_conn_mut(|conn| {
+                    match db::content::create_content(conn, input) {
+                        Ok(content) => {
+                            let body = serde_json::to_string(&content)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                            Ok(Response::builder()
+                                .status(StatusCode::CREATED)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to create content");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap()),
+        }
+    }
+
+    /// POST /db/content/bulk - Bulk create content
+    async fn handle_db_content_bulk(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap());
+        }
+
+        let body = req.collect().await.map_err(|e| {
+            StorageError::Internal(format!("Failed to read body: {}", e))
+        })?;
+        let body_bytes = body.to_bytes();
+
+        let items: Vec<db::content::CreateContentInput> = serde_json::from_slice(&body_bytes)
+            .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+        let count = items.len();
+        info!(count = count, "Bulk creating content");
+
+        content_db.with_conn_mut(|conn| {
+            match db::content::bulk_create_content(conn, items) {
+                Ok(result) => {
+                    info!(inserted = result.inserted, skipped = result.skipped, "Bulk content creation complete");
+
+                    let body = serde_json::to_string(&result)
+                        .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                    Ok(Response::builder()
+                        .status(StatusCode::OK)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(body)))
+                        .unwrap())
+                }
+                Err(e) => {
+                    error!(error = %e, "Failed to bulk create content");
+                    Ok(Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                        .unwrap())
+                }
+            }
+        })
+    }
+
+    /// GET/DELETE /db/content/{id} - Get or delete content by ID
+    async fn handle_db_content_by_id(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        content_id: &str,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        match method {
+            Method::GET => {
+                content_db.with_conn(|conn| {
+                    match db::content::get_content(conn, content_id) {
+                        Ok(Some(content)) => {
+                            let body = serde_json::to_string(&content)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Ok(None) => Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "Content not found: {}"}}"#,
+                                content_id
+                            ))))
+                            .unwrap()),
+                        Err(e) => {
+                            error!(error = %e, content_id = %content_id, "Failed to get content");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            Method::DELETE => {
+                content_db.with_conn_mut(|conn| {
+                    match db::content::delete_content(conn, content_id) {
+                        Ok(true) => Ok(Response::builder()
+                            .status(StatusCode::NO_CONTENT)
+                            .body(Full::new(Bytes::new()))
+                            .unwrap()),
+                        Ok(false) => Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "Content not found: {}"}}"#,
+                                content_id
+                            ))))
+                            .unwrap()),
+                        Err(e) => {
+                            error!(error = %e, content_id = %content_id, "Failed to delete content");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap()),
+        }
+    }
+
+    /// GET /db/paths - List paths, POST /db/paths - Create path
+    async fn handle_db_paths_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        match method {
+            Method::GET => {
+                let query_str = req.uri().query().unwrap_or("");
+                let params: std::collections::HashMap<String, String> =
+                    url::form_urlencoded::parse(query_str.as_bytes())
+                        .into_owned()
+                        .collect();
+
+                let limit: u32 = params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100);
+                let offset: u32 = params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0);
+
+                content_db.with_conn(|conn| {
+                    match db::paths::list_paths(conn, limit, offset) {
+                        Ok(paths) => {
+                            let body = serde_json::json!({
+                                "items": paths,
+                                "count": paths.len(),
+                                "limit": limit,
+                                "offset": offset,
+                            });
+
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body.to_string())))
+                                .unwrap())
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to list paths");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            Method::POST => {
+                let body = req.collect().await.map_err(|e| {
+                    StorageError::Internal(format!("Failed to read body: {}", e))
+                })?;
+                let body_bytes = body.to_bytes();
+
+                let input: db::paths::CreatePathInput = serde_json::from_slice(&body_bytes)
+                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+                content_db.with_conn_mut(|conn| {
+                    match db::paths::create_path(conn, input) {
+                        Ok(path) => {
+                            let body = serde_json::to_string(&path)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                            Ok(Response::builder()
+                                .status(StatusCode::CREATED)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to create path");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap()),
+        }
+    }
+
+    /// POST /db/paths/bulk - Bulk create paths
+    async fn handle_db_paths_bulk(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap());
+        }
+
+        let body = req.collect().await.map_err(|e| {
+            StorageError::Internal(format!("Failed to read body: {}", e))
+        })?;
+        let body_bytes = body.to_bytes();
+
+        let paths: Vec<db::paths::CreatePathInput> = serde_json::from_slice(&body_bytes)
+            .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+        let count = paths.len();
+        info!(count = count, "Bulk creating paths");
+
+        content_db.with_conn_mut(|conn| {
+            match db::paths::bulk_create_paths(conn, paths) {
+                Ok(result) => {
+                    info!(inserted = result.inserted, skipped = result.skipped, "Bulk path creation complete");
+
+                    let body = serde_json::to_string(&result)
+                        .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                    Ok(Response::builder()
+                        .status(StatusCode::OK)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(body)))
+                        .unwrap())
+                }
+                Err(e) => {
+                    error!(error = %e, "Failed to bulk create paths");
+                    Ok(Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                        .unwrap())
+                }
+            }
+        })
+    }
+
+    /// GET/DELETE /db/paths/{id} - Get or delete path by ID
+    async fn handle_db_path_by_id(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        path_id: &str,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        match method {
+            Method::GET => {
+                content_db.with_conn(|conn| {
+                    // Return path with all steps
+                    match db::paths::get_path_with_steps(conn, path_id) {
+                        Ok(Some(path_with_steps)) => {
+                            let body = serde_json::to_string(&path_with_steps)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Ok(None) => Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "Path not found: {}"}}"#,
+                                path_id
+                            ))))
+                            .unwrap()),
+                        Err(e) => {
+                            error!(error = %e, path_id = %path_id, "Failed to get path");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            Method::DELETE => {
+                content_db.with_conn_mut(|conn| {
+                    match db::paths::delete_path(conn, path_id) {
+                        Ok(true) => Ok(Response::builder()
+                            .status(StatusCode::NO_CONTENT)
+                            .body(Full::new(Bytes::new()))
+                            .unwrap()),
+                        Ok(false) => Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "Path not found: {}"}}"#,
+                                path_id
+                            ))))
+                            .unwrap()),
+                        Err(e) => {
+                            error!(error = %e, path_id = %path_id, "Failed to delete path");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
             }
             _ => Ok(Response::builder()
                 .status(StatusCode::METHOD_NOT_ALLOWED)

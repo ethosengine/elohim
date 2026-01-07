@@ -39,6 +39,7 @@ mod getrandom_custom;
 
 // Core modules (always available)
 pub mod blob_store;
+pub mod db;  // SQLite content/path storage
 pub mod metadata;
 pub mod config;
 pub mod signals;
@@ -94,3 +95,6 @@ pub use p2p::{P2PConfig, P2PNode};
 
 // Sync re-exports
 pub use sync::{DocStore, DocStoreConfig, StoredDocument, StreamPosition, StreamTracker, SyncManager};
+
+// SQLite re-exports
+pub use db::{ContentDb, DbStats, ContentRow, PathRow, StepRow};

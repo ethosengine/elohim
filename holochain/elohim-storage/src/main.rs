@@ -45,7 +45,7 @@
 //! - **Import runtime (4 workers)**: Zome call processing - can saturate without blocking server
 
 use clap::Parser;
-use elohim_storage::{BlobStore, Config, HttpServer, ImportHandler, ImportHandlerConfig};
+use elohim_storage::{BlobStore, Config, ContentDb, HttpServer, ImportHandler, ImportHandlerConfig};
 use elohim_storage::{ProgressHub, ProgressHubConfig};
 use elohim_storage::import_api::{ImportApi, ImportApiConfig};
 use std::net::SocketAddr;
@@ -101,6 +101,11 @@ struct Args {
     /// When enabled, exposes /import/* endpoints for batch imports
     #[arg(long, env = "ENABLE_IMPORT_API")]
     enable_import_api: bool,
+
+    /// Enable SQLite content database
+    /// When enabled, exposes /db/* endpoints for content and paths
+    #[arg(long, env = "ENABLE_CONTENT_DB")]
+    enable_content_db: bool,
 
     /// Import chunk size (items per chunk)
     #[arg(long, env = "IMPORT_CHUNK_SIZE", default_value = "30")]
@@ -258,6 +263,30 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
     #[cfg(not(feature = "p2p"))]
     let p2p_node: Option<()> = None;
 
+    // Initialize SQLite content database if enabled
+    let content_db: Option<Arc<ContentDb>> = if args.enable_content_db {
+        info!("SQLite content database enabled");
+        match ContentDb::open(&config.storage_dir) {
+            Ok(db) => {
+                let db = Arc::new(db);
+                if let Ok(stats) = db.stats() {
+                    info!("  Content: {} items", stats.content_count);
+                    info!("  Paths: {} items", stats.path_count);
+                    info!("  Steps: {} items", stats.step_count);
+                    info!("  Tags: {} unique", stats.unique_tags);
+                }
+                Some(db)
+            }
+            Err(e) => {
+                error!("Failed to open content database: {}", e);
+                None
+            }
+        }
+    } else {
+        info!("SQLite content database disabled (use --enable-content-db or ENABLE_CONTENT_DB=true)");
+        None
+    };
+
     // Start HTTP server for shard API
     let http_addr: SocketAddr = format!("0.0.0.0:{}", config.http_port).parse()?;
     let mut http_server = HttpServer::new(blob_store.clone(), http_addr)
@@ -325,6 +354,22 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
     if let Some(ref api) = import_api {
         http_server = http_server.with_import_api(Arc::clone(api));
     }
+
+    // Attach ContentDb to HttpServer if enabled
+    if let Some(ref db) = content_db {
+        http_server = http_server.with_content_db(Arc::clone(db));
+        info!("Database API:");
+        info!("  GET  /db/stats           - Database statistics");
+        info!("  GET  /db/content         - List content");
+        info!("  GET  /db/content/{{id}}    - Get content by ID");
+        info!("  POST /db/content         - Create content");
+        info!("  POST /db/content/bulk    - Bulk create content");
+        info!("  GET  /db/paths           - List paths");
+        info!("  GET  /db/paths/{{id}}      - Get path with steps");
+        info!("  POST /db/paths           - Create path");
+        info!("  POST /db/paths/bulk      - Bulk create paths");
+    }
+
     let http_server = Arc::new(http_server);
 
     // Start import handler if enabled
