@@ -16,7 +16,6 @@ export {
   COMPLETION_CRITERIA,
   CONTENT_FORMATS,
   CONTENT_TYPES,
-  DOORWAY_TIER,
   ENGAGEMENT_TYPES,
   MASTERY_LEVELS,
   PATH_VISIBILITIES,
@@ -24,35 +23,34 @@ export {
   STEP_TYPES,
 } from './generated/schema-enums.js';
 
-// Import and re-export types
-import type {
-  CompletionCriteria as CompletionCriteriaType,
-  ContentFormats as ContentFormatsType,
-  ContentTypes as ContentTypesType,
-  DoorwayTier as DoorwayTierType,
-  EngagementTypes as EngagementTypesType,
-  MasteryLevels as MasteryLevelsType,
-  PathVisibilities as PathVisibilitiesType,
-  ReachLevels as ReachLevelsType,
-  StepTypes as StepTypesType,
+// Re-export types from generated file
+export type {
+  CompletionCriteria,
+  ContentFormat,
+  ContentType,
+  EngagementType,
+  MasteryLevel,
+  PathVisibility,
+  ReachLevel,
+  StepType,
 } from './generated/schema-enums.js';
 
-// Export types (using original names from generated file)
-export type CompletionCriteria = CompletionCriteriaType;
-export type ContentFormats = ContentFormatsType;
-export type ContentTypes = ContentTypesType;
-export type DoorwayTier = DoorwayTierType;
-export type EngagementTypes = EngagementTypesType;
-export type MasteryLevels = MasteryLevelsType;
-export type PathVisibilities = PathVisibilitiesType;
-export type ReachLevels = ReachLevelsType;
-export type StepTypes = StepTypesType;
+// Type aliases for backward compatibility (plural form)
+import type {
+  CompletionCriteria as CompletionCriteriaType,
+  ContentFormat as ContentFormatType,
+  ContentType as ContentTypeAlias,
+  EngagementType as EngagementTypeAlias,
+  MasteryLevel as MasteryLevelAlias,
+  PathVisibility as PathVisibilityAlias,
+  ReachLevel as ReachLevelAlias,
+  StepType as StepTypeAlias,
+} from './generated/schema-enums.js';
 
-// Type aliases for backward compatibility (singular form)
-export type ContentType = ContentTypesType;
-export type ContentFormat = ContentFormatsType;
-export type ReachLevel = ReachLevelsType;
-export type StepType = StepTypesType;
-export type MasteryLevel = MasteryLevelsType;
-export type PathVisibility = PathVisibilitiesType;
-export type EngagementType = EngagementTypesType;
+export type ContentFormats = ContentFormatType;
+export type ContentTypes = ContentTypeAlias;
+export type EngagementTypes = EngagementTypeAlias;
+export type MasteryLevels = MasteryLevelAlias;
+export type PathVisibilities = PathVisibilityAlias;
+export type ReachLevels = ReachLevelAlias;
+export type StepTypes = StepTypeAlias;

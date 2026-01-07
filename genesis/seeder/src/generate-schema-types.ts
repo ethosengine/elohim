@@ -90,11 +90,18 @@ function generateTypeScript(constants: ParsedConstant[]): string {
     lines.push('] as const;');
     lines.push('');
 
-    // Generate type
-    const typeName = constant.name.replace(/_/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase())
-      .replace(/\s/g, '')
-      .replace(/s$/, ''); // Remove trailing 's' for singular type name
+    // Generate type name: CONTENT_TYPES -> ContentType (singular PascalCase)
+    let typeName = constant.name
+      .toLowerCase()
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join('');
+    // Singularize: remove trailing 's', but handle 'ies' -> 'y'
+    if (typeName.endsWith('ies')) {
+      typeName = typeName.slice(0, -3) + 'y';
+    } else if (typeName.endsWith('s')) {
+      typeName = typeName.slice(0, -1);
+    }
     lines.push(`export type ${typeName} = typeof ${constant.name}[number];`);
     lines.push('');
   }
