@@ -253,6 +253,9 @@ spec:
               value: "elohim"
             - name: ENABLE_IMPORT_API
               value: "true"
+            # SQLite content database for fast seeding (bypasses DHT)
+            - name: ENABLE_CONTENT_DB
+              value: "true"
             # Import tuning: prevent conductor overload during bulk seeding
             - name: IMPORT_CHUNK_SIZE
               value: "50"
@@ -342,6 +345,11 @@ spec:
     - name: gateway-ws
       port: 8080
       targetPort: 8080
+      protocol: TCP
+    # elohim-storage SQLite DB API (for fast seeding)
+    - name: storage-db
+      port: 8090
+      targetPort: 8090
       protocol: TCP
   selector:
     app: elohim-edgenode

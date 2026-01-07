@@ -98,7 +98,7 @@ spec:
 
     options {
         skipDefaultCheckout(true)
-        timeout(time: 120, unit: 'MINUTES')  // 2 hours for large seed datasets (3500+ items + paths)
+        timeout(time: 15, unit: 'MINUTES')  // SQLite seeding is fast (~5 seconds)
         buildDiscarder(logRotator(numToKeepStr: '20'))
     }
 
@@ -351,6 +351,24 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                 exit 1
                             fi
 
+                            # Verify SQLite database is available on storage port 8090
+                            echo ""
+                            echo "🔍 Checking SQLite database availability..."
+                            STORAGE_URL="\${DOORWAY_BASE_URL/8080/8090}"
+                            DB_STATS=\$(curl -sf "\$STORAGE_URL/db/stats" 2>/dev/null || echo '{}')
+                            DB_READY=\$(echo "\$DB_STATS" | jq -r 'has("content_count")' 2>/dev/null || echo 'false')
+
+                            if [ "\$DB_READY" = "true" ]; then
+                                echo "✅ SQLite database ready at \$STORAGE_URL"
+                                CURRENT_CONTENT=\$(echo "\$DB_STATS" | jq -r '.content_count // 0')
+                                CURRENT_PATHS=\$(echo "\$DB_STATS" | jq -r '.path_count // 0')
+                                echo "   Current state: \$CURRENT_CONTENT content, \$CURRENT_PATHS paths"
+                            else
+                                echo "❌ SQLite database not available at \$STORAGE_URL"
+                                echo "   Ensure ENABLE_CONTENT_DB=true is set on elohim-storage"
+                                exit 1
+                            fi
+
                             echo "════════════════════════════════════════════════════════════"
                         """
                     }
@@ -364,6 +382,8 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def internalDoorway = env.INTERNAL_DOORWAY_URL
+                        // Storage runs on port 8090 in the same pod
+                        def internalStorage = internalDoorway.replace(':8080', ':8090')
                         def seedIds = params.SEED_IDS
 
                         dir('genesis/seeder') {
@@ -371,29 +391,17 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                 set -euo pipefail
 
                                 echo "═══════════════════════════════════════════════════════════"
-                                echo "🌱 SEEDING DATABASE"
+                                echo "🌱 SEEDING DATABASE (SQLite)"
                                 echo "═══════════════════════════════════════════════════════════"
-                                echo "Target: ${internalDoorway}"
+                                echo "Storage: ${internalStorage}"
                                 echo "IDs: ${seedIds ?: '(all content)'}"
                                 echo "═══════════════════════════════════════════════════════════"
                                 echo ""
 
-                                SEED_CMD="npx tsx src/seed.ts"
-                                if [ -n "${seedIds}" ]; then
-                                    SEED_CMD="\$SEED_CMD --ids ${seedIds}"
-                                fi
-
-                                # CI uses doorway HTTP import: blob upload + queue import
-                                # - DOORWAY_URL: HTTP endpoint for blob uploads and queue_import
-                                # - DOORWAY_API_KEY: Authentication for admin endpoints
-                                # - HOLOCHAIN_ADMIN_URL: WebSocket for pre/post-flight verification
-                                # - SEED_POLL_TIMEOUT: 90 min for full seeding (content + paths)
-                                # Note: Chunk size/delay now controlled by elohim-storage env vars
-                                DOORWAY_URL="http://${internalDoorway}" \
-                                DOORWAY_API_KEY="dev-elohim-auth-2024" \
-                                HOLOCHAIN_ADMIN_URL="ws://${internalDoorway}?apiKey=dev-elohim-auth-2024" \
-                                SEED_POLL_TIMEOUT=5400000 \
-                                    \$SEED_CMD
+                                # SQLite seeding - direct to elohim-storage, bypasses DHT
+                                # ~5 seconds vs 50+ minutes with DHT seeding
+                                STORAGE_URL="http://${internalStorage}" \
+                                    npx tsx src/seed-sqlite.ts
 
                                 echo ""
                                 echo "═══════════════════════════════════════════════════════════"
@@ -412,25 +420,64 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def internalDoorway = env.INTERNAL_DOORWAY_URL
+                        def internalStorage = internalDoorway.replace(':8080', ':8090')
 
-                        dir('genesis/seeder') {
-                            sh """#!/bin/bash
-                                set -euo pipefail
+                        sh """#!/bin/bash
+                            set -euo pipefail
 
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "🔍 VERIFYING SEEDING"
-                                echo "═══════════════════════════════════════════════════════════"
+                            echo "═══════════════════════════════════════════════════════════"
+                            echo "🔍 VERIFYING SEEDING"
+                            echo "═══════════════════════════════════════════════════════════"
 
-                                # Verify data was actually written
-                                HOLOCHAIN_ADMIN_URL="ws://${internalDoorway}?apiKey=dev-elohim-auth-2024" \
-                                    npx tsx src/verify-seed.ts
+                            # Query SQLite database stats
+                            STATS=\$(curl -sf "http://${internalStorage}/db/stats")
 
-                                echo ""
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "✅ SEEDING VERIFIED"
-                                echo "═══════════════════════════════════════════════════════════"
-                            """
-                        }
+                            CONTENT_COUNT=\$(echo "\$STATS" | jq -r '.content_count')
+                            PATH_COUNT=\$(echo "\$STATS" | jq -r '.path_count')
+                            STEP_COUNT=\$(echo "\$STATS" | jq -r '.step_count')
+                            TAG_COUNT=\$(echo "\$STATS" | jq -r '.unique_tags')
+
+                            echo ""
+                            echo "📊 Database Statistics:"
+                            echo "   Content: \$CONTENT_COUNT items"
+                            echo "   Paths:   \$PATH_COUNT items"
+                            echo "   Steps:   \$STEP_COUNT items"
+                            echo "   Tags:    \$TAG_COUNT unique"
+                            echo ""
+
+                            # Verify minimum expected counts
+                            MIN_CONTENT=3400
+                            MIN_PATHS=5
+
+                            if [ "\$CONTENT_COUNT" -lt "\$MIN_CONTENT" ]; then
+                                echo "❌ Content count \$CONTENT_COUNT is below minimum \$MIN_CONTENT"
+                                exit 1
+                            fi
+
+                            if [ "\$PATH_COUNT" -lt "\$MIN_PATHS" ]; then
+                                echo "❌ Path count \$PATH_COUNT is below minimum \$MIN_PATHS"
+                                exit 1
+                            fi
+
+                            echo "✅ Content: \$CONTENT_COUNT items (min: \$MIN_CONTENT)"
+                            echo "✅ Paths: \$PATH_COUNT items (min: \$MIN_PATHS)"
+
+                            # Verify a sample content item exists
+                            SAMPLE_ID="manifesto"
+                            SAMPLE=\$(curl -sf "http://${internalStorage}/db/content/\$SAMPLE_ID" || echo '{}')
+                            SAMPLE_TITLE=\$(echo "\$SAMPLE" | jq -r '.title // empty')
+
+                            if [ -n "\$SAMPLE_TITLE" ]; then
+                                echo "✅ Sample content '\$SAMPLE_ID' verified: \$SAMPLE_TITLE"
+                            else
+                                echo "⚠️ Sample content '\$SAMPLE_ID' not found (may be expected)"
+                            fi
+
+                            echo ""
+                            echo "═══════════════════════════════════════════════════════════"
+                            echo "✅ SEEDING VERIFIED"
+                            echo "═══════════════════════════════════════════════════════════"
+                        """
                     }
                 }
             }
