@@ -211,41 +211,18 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
             steps {
                 container('builder') {
-                    script {
-                        // This stage is optional - validation constants are committed to repo
-                        // Only runs if hc-rna-schema binary exists (built by holochain pipeline)
-                        def result = sh(script: '''#!/bin/bash
+                    dir('genesis/seeder') {
+                        sh '''#!/bin/bash
                             set -euo pipefail
 
-                            # Check if hc-rna-schema binary exists
-                            if [ ! -f "holochain/target/release/hc-rna-schema" ]; then
-                                echo "⏭️ hc-rna-schema not found - using committed validation constants"
-                                echo "   (Run holochain pipeline to build hc-rna-schema if schema changed)"
-                                exit 0
-                            fi
+                            echo "Generating TypeScript types from Rust healing.rs..."
 
-                            echo "Generating TypeScript types from DNA schema..."
+                            # Generate schema types from Rust source directly (no Rust toolchain needed)
+                            # This parses healing.rs and extracts validation constants
+                            npx tsx src/generate-schema-types.ts
 
-                            # Export validation constants from Rust DNA
-                            holochain/target/release/hc-rna-schema \
-                                -i holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs \
-                                --constants-file holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs \
-                                -o genesis/seeder/src/generated/schema-enums.json \
-                                --export-enums -v
-
-                            # Generate TypeScript from JSON if generator exists
-                            if [ -f "genesis/seeder/src/generate-schema-types.ts" ]; then
-                                cd genesis/seeder
-                                npx tsx src/generate-schema-types.ts --input src/generated/schema-enums.json
-                                echo "✅ Schema types generated"
-                            else
-                                echo "⏭️ Schema type generator not found - using committed types"
-                            fi
-                        ''', returnStatus: true)
-
-                        if (result != 0) {
-                            echo "⚠️ Schema generation failed but continuing (using committed constants)"
-                        }
+                            echo "✅ Schema types generated"
+                        '''
                     }
                 }
             }
