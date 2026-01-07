@@ -1,12 +1,10 @@
-import { Injectable, inject, effect } from '@angular/core';
-import { Observable, of, from, defer, throwError, timer, forkJoin } from 'rxjs';
-import { catchError, map, shareReplay, timeout, retry, tap, switchMap, take } from 'rxjs/operators';
+import { Injectable, inject } from '@angular/core';
+import { Observable, of, from, defer, forkJoin } from 'rxjs';
+import { catchError, map, shareReplay, tap, switchMap, timeout } from 'rxjs/operators';
 import { LoggerService } from './logger.service';
 import {
   HolochainContentService,
-  HolochainPathWithSteps,
   HolochainPathOverview,
-  HolochainPathIndex,
   HolochainAgentEntry,
   HolochainAttestationEntry,
   HolochainContentGraph,
@@ -15,7 +13,8 @@ import {
 } from './holochain-content.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
-import { ContentResolverService, SourceTier } from './content-resolver.service';
+import { ContentResolverService } from './content-resolver.service';
+import { ContentService } from './content.service';
 
 // Models from elohim (local)
 import { Agent, AgentProgress, AgentAttestation } from '../models/agent.model';
@@ -23,7 +22,7 @@ import { Agent, AgentProgress, AgentAttestation } from '../models/agent.model';
 // Models from lamad pillar (will stay there - content-specific)
 // Using relative imports for now; will update to @app/lamad after full migration
 import { LearningPath, PathIndex } from '../../lamad/models/learning-path.model';
-import { ContentNode, ContentGraph, ContentGraphMetadata, ContentRelationship, ContentRelationshipType } from '../../lamad/models/content-node.model';
+import { ContentNode, ContentGraph, ContentRelationship, ContentRelationshipType } from '../../lamad/models/content-node.model';
 import { ContentAttestation } from '../../lamad/models/content-attestation.model';
 import {
   KnowledgeMapIndex,
@@ -191,11 +190,7 @@ export class DataLoaderService {
   private graphCache$: Observable<ContentGraph> | null = null;
   private pathIndexCache$: Observable<PathIndex> | null = null;
 
-  /** Maximum number of content items to keep in cache */
-  private readonly CONTENT_CACHE_MAX_SIZE = 500;
-
-  /** Maximum number of paths to keep in cache */
-  private readonly PATH_CACHE_MAX_SIZE = 50;
+  // NOTE: LRU cache logic removed - ContentService handles caching
 
   /** IndexedDB cache initialized flag */
   private idbInitialized = false;
@@ -205,6 +200,9 @@ export class DataLoaderService {
 
   /** Content Resolver for unified tiered resolution */
   private readonly contentResolver = inject(ContentResolverService);
+
+  /** Content Service for doorway-based content operations (new pattern) */
+  private readonly contentService = inject(ContentService);
 
   /** Structured logger */
   private readonly logger = inject(LoggerService).createChild('DataLoader');
@@ -216,17 +214,9 @@ export class DataLoaderService {
     // Initialize caches in background
     this.initCaches();
 
-    // Watch for Holochain availability changes and update conductor source
-    // This fixes the race condition where initCaches() runs before Holochain connects
-    effect(() => {
-      const isAvailable = this.holochainContent.available();
-      if (this.contentResolver.isReady) {
-        this.contentResolver.setSourceAvailable('conductor', isAvailable);
-        if (isAvailable) {
-          this.logger.debug('Conductor source now available');
-        }
-      }
-    });
+    // NOTE: Conductor availability tracking removed.
+    // Conductor is no longer used for content resolution - content comes from doorway projection.
+    // Holochain conductor is only used for agent-centric data (identity, attestations, points).
   }
 
   /**
@@ -261,74 +251,39 @@ export class DataLoaderService {
     }
   }
 
-  /** Path loading timeout in milliseconds (30s for heavy paths) */
-  private readonly PATH_TIMEOUT_MS = 30000;
+  // NOTE: PATH_TIMEOUT_MS removed - ContentService handles timeouts
 
   /**
    * Load a LearningPath by ID.
    * Does NOT load the content for each step (lazy loading).
-   * Uses Holochain as the only source.
-   *
-   * Cache hierarchy:
-   * 1. In-memory cache (fastest, LRU eviction)
-   * 2. IndexedDB cache (persistent across refreshes)
-   * 3. Holochain zome call (network)
-   *
-   * Uses LRU-style cache eviction to prevent unbounded memory growth.
+   * Uses ContentService which routes to doorway (browser) or local storage (Tauri).
    */
   getPath(pathId: string): Observable<LearningPath> {
-    // Check if already cached (and move to end for LRU)
-    if (this.pathCache.has(pathId)) {
-      const existing = this.pathCache.get(pathId)!;
-      // Move to end (most recently used) - delete and re-add
-      this.pathCache.delete(pathId);
-      this.pathCache.set(pathId, existing);
-      return existing;
-    }
-
-    // Evict oldest entries if cache is at capacity
-    while (this.pathCache.size >= this.PATH_CACHE_MAX_SIZE) {
-      const firstKey = this.pathCache.keys().next().value;
-      if (firstKey) {
-        this.pathCache.delete(firstKey);
-      } else {
-        break;
-      }
-    }
-
-    const request = defer(() => this.loadPathWithIDBFallback(pathId)).pipe(
-        timeout(this.PATH_TIMEOUT_MS),
-        map(result => {
-          if (!result) {
-            throw new Error(`Path not found: ${pathId}`);
-          }
-          return result;
-        }),
-        tap(path => {
-          // Store in IndexedDB cache (background, non-blocking)
-          if (this.idbInitialized) {
-            this.idbCache.setPath(path).catch(() => {
-              // Ignore IndexedDB errors
-            });
-          }
-        }),
-        catchError(err => {
-          const errMsg = err.message || String(err);
-          // "Path not found" is expected for stale references - log as warning, not error
-          if (errMsg.includes('Path not found') || errMsg.includes('not found')) {
-            this.logger.warn('Path not found (may be stale reference)', { pathId });
-          } else {
-            this.logger.error('Error loading path', err, { pathId });
-          }
-          // Remove from cache so next request retries
-          this.pathCache.delete(pathId);
-          throw err; // Re-throw - paths are critical, can't use placeholder
-        }),
-        shareReplay(1)
-      );
-
-    this.pathCache.set(pathId, request);
-    return request;
+    return this.contentService.getPath(pathId).pipe(
+      map(path => {
+        if (!path) {
+          throw new Error(`Path not found: ${pathId}`);
+        }
+        return path;
+      }),
+      tap(path => {
+        // Store in IndexedDB cache for offline persistence (background, non-blocking)
+        if (this.idbInitialized) {
+          this.idbCache.setPath(path).catch(() => {
+            // Ignore IndexedDB errors
+          });
+        }
+      }),
+      catchError(err => {
+        const errMsg = err.message || String(err);
+        if (errMsg.includes('Path not found') || errMsg.includes('not found')) {
+          this.logger.warn('Path not found (may be stale reference)', { pathId });
+        } else {
+          this.logger.error('Error loading path', err, { pathId });
+        }
+        throw err; // Re-throw - paths are critical, can't use placeholder
+      })
+    );
   }
 
   /**
@@ -424,126 +379,14 @@ export class DataLoaderService {
   }
 
   /**
-   * Load path with unified cache resolution.
-   *
-   * Uses ContentResolver for intelligent tiered source selection.
-   * Cache hierarchy:
-   * 1. IndexedDB (local persistent cache)
-   * 2. Projection API (Doorway's MongoDB cache - fast HTTP)
-   * 3. Holochain (direct conductor - slow, authoritative)
-   */
-  private async loadPathWithIDBFallback(pathId: string): Promise<LearningPath | null> {
-    // Ensure ContentResolver is initialized
-    if (!this.contentResolver.isReady) {
-      await this.contentResolver.initialize();
-    }
-
-    const resolution = await this.contentResolver.resolvePath(pathId);
-    if (resolution) {
-      this.logger.debug('Path loaded', { pathId, source: resolution.sourceId, durationMs: resolution.durationMs });
-      // Cache in IndexedDB if loaded from remote source
-      if (resolution.tier !== SourceTier.Local && this.idbInitialized) {
-        this.contentResolver.cachePath(resolution.data).catch(() => {});
-      }
-      return resolution.data;
-    }
-    return null;
-  }
-
-  /**
-   * Transform Holochain path response to LearningPath model.
-   * Maps snake_case Rust fields to camelCase TypeScript fields.
-   *
-   * Extracts chapters from metadata_json if present, preserving
-   * the hierarchical structure for UI display.
-   */
-  private transformHolochainPath(hcPath: HolochainPathWithSteps): LearningPath {
-    // Parse metadata to extract chapters if available
-    let chapters: LearningPath['chapters'] | undefined;
-    try {
-      const metadataJson = hcPath.path.metadata_json;
-      this.logger.debug('Path metadata', { pathId: hcPath.path.id, hasMetadata: !!metadataJson });
-      const metadata = JSON.parse(metadataJson || '{}');
-      if (metadata.chapters && Array.isArray(metadata.chapters)) {
-        chapters = metadata.chapters;
-        this.logger.debug('Extracted chapters from metadata', { pathId: hcPath.path.id, chapterCount: metadata.chapters.length });
-      }
-    } catch (e) {
-      this.logger.error('Error parsing metadata_json', e, { pathId: hcPath.path.id });
-      // Ignore JSON parse errors - chapters will remain undefined
-    }
-
-    return {
-      id: hcPath.path.id,
-      version: hcPath.path.version,
-      title: hcPath.path.title,
-      description: hcPath.path.description,
-      purpose: hcPath.path.purpose ?? '',
-      createdBy: hcPath.path.created_by,
-      contributors: [],
-      createdAt: hcPath.path.created_at,
-      updatedAt: hcPath.path.updated_at,
-      difficulty: hcPath.path.difficulty as LearningPath['difficulty'],
-      estimatedDuration: hcPath.path.estimated_duration ?? '',
-      tags: hcPath.path.tags,
-      visibility: hcPath.path.visibility as LearningPath['visibility'],
-      // Include chapters from metadata (hierarchical structure)
-      chapters,
-      // Steps remain flattened for backward compatibility and progress tracking
-      steps: hcPath.steps.map((s, index) => ({
-        order: s.step.order_index,
-        stepType: (s.step.step_type || 'content') as 'content' | 'path' | 'external' | 'checkpoint',
-        resourceId: s.step.resource_id,
-        stepTitle: s.step.step_title ?? `Step ${index + 1}`,
-        stepNarrative: s.step.step_narrative ?? '',
-        learningObjectives: [],
-        optional: s.step.is_optional,
-        completionCriteria: [],
-      })),
-    };
-  }
-
-  /** Content loading timeout in milliseconds (15s for slow responses) */
-  private readonly CONTENT_TIMEOUT_MS = 15000;
-
-  /**
    * Load a ContentNode by ID.
-   * This is the only way to get content - enforces lazy loading.
-   * Uses Holochain as the only source.
+   * Uses ContentService which routes to doorway (browser) or local storage (Tauri).
    *
    * IMPORTANT: Returns a placeholder node instead of throwing for missing content.
    * This prevents one missing item from breaking entire path loading.
-   *
-   * Cache hierarchy:
-   * 1. In-memory cache (fastest, LRU eviction)
-   * 2. IndexedDB cache (persistent across refreshes)
-   * 3. Holochain zome call (network)
-   *
-   * Uses LRU-style cache eviction to prevent unbounded memory growth.
    */
   getContent(resourceId: string): Observable<ContentNode> {
-    // Check if already in memory cache (and move to end for LRU)
-    if (this.contentCache.has(resourceId)) {
-      const existing = this.contentCache.get(resourceId)!;
-      // Move to end (most recently used) - delete and re-add
-      this.contentCache.delete(resourceId);
-      this.contentCache.set(resourceId, existing);
-      return existing;
-    }
-
-    // Evict oldest entries if cache is at capacity
-    while (this.contentCache.size >= this.CONTENT_CACHE_MAX_SIZE) {
-      const firstKey = this.contentCache.keys().next().value;
-      if (firstKey) {
-        this.contentCache.delete(firstKey);
-      } else {
-        break;
-      }
-    }
-
-    // Check IndexedDB cache first, then fall back to Holochain
-    const request = defer(() => this.loadContentWithIDBFallback(resourceId)).pipe(
-      timeout(this.CONTENT_TIMEOUT_MS),
+    return this.contentService.getContent(resourceId).pipe(
       map(content => {
         if (!content) {
           this.logger.warn('Content not found, returning placeholder', { resourceId });
@@ -552,7 +395,7 @@ export class DataLoaderService {
         return content;
       }),
       tap(content => {
-        // Store in IndexedDB cache (background, non-blocking)
+        // Store in IndexedDB cache for offline persistence (background, non-blocking)
         if (this.idbInitialized && content.contentType !== 'placeholder') {
           this.idbCache.setContent(content).catch(() => {
             // Ignore IndexedDB errors
@@ -560,55 +403,15 @@ export class DataLoaderService {
         }
       }),
       catchError(err => {
-        // Don't cache errors - return placeholder and don't cache this result
         this.logger.warn('Error loading content', { resourceId, error: err.message || err });
-        // Remove from cache so next request retries
-        this.contentCache.delete(resourceId);
         return of(this.createPlaceholderContent(resourceId, err.message));
-      }),
-      shareReplay(1)
+      })
     );
-
-    this.contentCache.set(resourceId, request);
-    return request;
-  }
-
-  /**
-   * Load content with unified cache resolution.
-   *
-   * Uses ContentResolver for intelligent tiered source selection.
-   * Cache hierarchy:
-   * 1. IndexedDB (local persistent cache)
-   * 2. Projection API (Doorway's MongoDB cache - fast HTTP)
-   * 3. Holochain (direct conductor - slow, authoritative)
-   */
-  private async loadContentWithIDBFallback(resourceId: string): Promise<ContentNode | null> {
-    // Ensure ContentResolver is initialized
-    if (!this.contentResolver.isReady) {
-      await this.contentResolver.initialize();
-    }
-
-    const resolution = await this.contentResolver.resolveContent(resourceId);
-    if (resolution) {
-      // Cache in IndexedDB if loaded from remote source
-      if (resolution.tier !== SourceTier.Local && this.idbInitialized) {
-        this.contentResolver.cacheContent(resolution.data).catch(() => {});
-      }
-      return resolution.data;
-    }
-    return null;
   }
 
   /**
    * Batch load multiple content items efficiently.
-   *
-   * Uses a single zome call to fetch all content, then populates the cache.
-   * Much more efficient than calling getContent() multiple times.
-   *
-   * Cache hierarchy:
-   * 1. In-memory cache (checked individually)
-   * 2. IndexedDB batch lookup
-   * 3. Holochain batch zome call
+   * Uses ContentService which routes to doorway (browser) or local storage (Tauri).
    *
    * @param resourceIds Array of content IDs to load
    * @returns Observable of Map<id, ContentNode>
@@ -618,8 +421,25 @@ export class DataLoaderService {
       return of(new Map());
     }
 
-    return defer(() => this.batchGetContentWithIDB(resourceIds)).pipe(
-      timeout(this.CONTENT_TIMEOUT_MS * 2), // Allow more time for batch
+    return this.contentService.batchGetContent(resourceIds).pipe(
+      tap(contentMap => {
+        // Store in IndexedDB cache for offline persistence (background, non-blocking)
+        if (this.idbInitialized && contentMap.size > 0) {
+          const toCache = Array.from(contentMap.values()).filter(c => c.contentType !== 'placeholder');
+          if (toCache.length > 0) {
+            this.idbCache.setContentBatch(toCache).catch(() => {});
+          }
+        }
+      }),
+      map(contentMap => {
+        // Add placeholders for any IDs not found
+        for (const id of resourceIds) {
+          if (!contentMap.has(id)) {
+            contentMap.set(id, this.createPlaceholderContent(id));
+          }
+        }
+        return contentMap;
+      }),
       catchError(err => {
         this.logger.warn('Batch load error', { count: resourceIds.length, error: err.message || err });
         // Return placeholders for all
@@ -630,72 +450,6 @@ export class DataLoaderService {
         return of(contentMap);
       })
     );
-  }
-
-  /**
-   * Internal batch get with unified cache resolution.
-   *
-   * Uses ContentResolver for intelligent tiered source selection.
-   * Cache hierarchy:
-   * 1. In-memory cache (checked individually)
-   * 2. ContentResolver (IndexedDB → Projection → Holochain)
-   */
-  private async batchGetContentWithIDB(resourceIds: string[]): Promise<Map<string, ContentNode>> {
-    const contentMap = new Map<string, ContentNode>();
-    const uncachedIds: string[] = [];
-
-    // 1. First pass: check in-memory cache
-    for (const id of resourceIds) {
-      if (this.contentCache.has(id)) {
-        try {
-          const content = await this.contentCache.get(id)!.toPromise();
-          if (content) {
-            contentMap.set(id, content);
-            continue;
-          }
-        } catch {
-          // Continue to next cache layer
-        }
-      }
-      uncachedIds.push(id);
-    }
-
-    if (uncachedIds.length === 0) {
-      return contentMap;
-    }
-
-    // Ensure ContentResolver is initialized
-    if (!this.contentResolver.isReady) {
-      await this.contentResolver.initialize();
-    }
-
-    // 2. Use unified resolver for remaining IDs
-    const resolved = await this.contentResolver.batchResolveContent(uncachedIds);
-    const toCache: ContentNode[] = [];
-
-    for (const [id, resolution] of resolved) {
-      contentMap.set(id, resolution.data);
-      this.contentCache.set(id, of(resolution.data).pipe(shareReplay(1)));
-      // Queue for local caching if from remote source
-      if (resolution.tier !== SourceTier.Local) {
-        toCache.push(resolution.data);
-      }
-    }
-
-    // Cache remotely-fetched content in IndexedDB
-    if (this.idbInitialized && toCache.length > 0) {
-      this.idbCache.setContentBatch(toCache).catch(() => {});
-    }
-
-    // Add placeholders for not found
-    for (const id of uncachedIds) {
-      if (!resolved.has(id)) {
-        const placeholder = this.createPlaceholderContent(id);
-        contentMap.set(id, placeholder);
-      }
-    }
-
-    return contentMap;
   }
 
   /**
@@ -778,15 +532,13 @@ export class DataLoaderService {
 
   /**
    * Load the path index for discovery.
-   * Uses Holochain as the only source.
-   * Cached with shareReplay(1) to prevent redundant Holochain calls.
+   * Uses ContentService (doorway projection) as the source.
+   * Cached with shareReplay(1) to prevent redundant calls.
    */
   getPathIndex(): Observable<PathIndex> {
     if (!this.pathIndexCache$) {
-      this.pathIndexCache$ = defer(() =>
-        from(this.holochainContent.getPathIndex())
-      ).pipe(
-        map(hcIndex => this.transformHolochainPathIndex(hcIndex)),
+      this.pathIndexCache$ = this.contentService.queryPaths({}).pipe(
+        map(paths => this.transformPathsToIndex(paths)),
         shareReplay(1),
         catchError(err => {
           this.logger.error('Failed to load path index', err);
@@ -800,30 +552,58 @@ export class DataLoaderService {
   }
 
   /**
+   * Transform LearningPath[] to PathIndex model.
+   */
+  private transformPathsToIndex(paths: LearningPath[]): PathIndex {
+    return {
+      lastUpdated: new Date().toISOString(),
+      totalCount: paths.length,
+      paths: paths.map(p => ({
+        id: p.id,
+        title: p.title,
+        description: p.description || '',
+        difficulty: p.difficulty as any,
+        estimatedDuration: p.estimatedDuration ?? '',
+        stepCount: this.calculateStepCount(p),
+        tags: p.tags || [],
+      })),
+    };
+  }
+
+  /**
+   * Calculate total step count for a path (handles both flat and chapter-based paths).
+   */
+  private calculateStepCount(path: LearningPath): number {
+    // Check if raw data includes pre-computed stepCount (from doorway)
+    const rawStepCount = (path as any).stepCount ?? (path as any).step_count;
+    if (typeof rawStepCount === 'number' && rawStepCount > 0) {
+      return rawStepCount;
+    }
+
+    // Calculate from structure
+    if (path.chapters && path.chapters.length > 0) {
+      return path.chapters.reduce((total, chapter) => {
+        if (chapter.steps) {
+          return total + chapter.steps.length;
+        }
+        if (chapter.modules) {
+          return total + chapter.modules.reduce((modTotal, mod) =>
+            modTotal + mod.sections.reduce((secTotal, sec) =>
+              secTotal + (sec.conceptIds?.length ?? 0), 0), 0);
+        }
+        return total;
+      }, 0);
+    }
+
+    return path.steps?.length ?? 0;
+  }
+
+  /**
    * Invalidate the path index cache.
    * Call this after creating/updating/deleting paths.
    */
   invalidatePathIndexCache(): void {
     this.pathIndexCache$ = null;
-  }
-
-  /**
-   * Transform Holochain path index to PathIndex model.
-   */
-  private transformHolochainPathIndex(hcIndex: HolochainPathIndex): PathIndex {
-    return {
-      lastUpdated: hcIndex.last_updated,
-      totalCount: hcIndex.total_count,
-      paths: hcIndex.paths.map(p => ({
-        id: p.id,
-        title: p.title,
-        description: p.description,
-        difficulty: p.difficulty as any,
-        estimatedDuration: p.estimated_duration ?? '',
-        stepCount: p.step_count,
-        tags: p.tags,
-      })),
-    };
   }
 
   /**
@@ -1776,82 +1556,11 @@ export class DataLoaderService {
     if (!reverseAdjacency.has(node.id)) reverseAdjacency.set(node.id, new Set());
   }
 
-  /**
-   * Build ContentGraph structure from raw data.
-   */
-  private buildContentGraph(
-    metadata: ContentGraphMetadata,
-    contentIndex: { nodes?: ContentNode[] },
-    relationshipData: { relationships: Array<{ id: string; source: string; target: string; type: string }> }
-  ): ContentGraph {
-    const nodes = new Map<string, ContentNode>();
-    const nodesByType = new Map<string, Set<string>>();
-    const nodesByTag = new Map<string, Set<string>>();
-    const nodesByCategory = new Map<string, Set<string>>();
-    const adjacency = new Map<string, Set<string>>();
-    const reverseAdjacency = new Map<string, Set<string>>();
-
-    this.indexNodes(contentIndex.nodes || [], nodes, nodesByType, nodesByTag, nodesByCategory, adjacency, reverseAdjacency);
-    const relationshipsMap = this.buildRelationships(relationshipData.relationships || [], nodes, adjacency, reverseAdjacency);
-
-    return { nodes, relationships: relationshipsMap, nodesByType, nodesByTag, nodesByCategory, adjacency, reverseAdjacency, metadata };
-  }
-
-  private indexNodes(
-    nodeList: ContentNode[],
-    nodes: Map<string, ContentNode>,
-    nodesByType: Map<string, Set<string>>,
-    nodesByTag: Map<string, Set<string>>,
-    nodesByCategory: Map<string, Set<string>>,
-    adjacency: Map<string, Set<string>>,
-    reverseAdjacency: Map<string, Set<string>>
-  ): void {
-    for (const node of nodeList) {
-      nodes.set(node.id, node);
-      this.addToSetMap(nodesByType, node.contentType, node.id);
-      for (const tag of node.tags || []) {
-        this.addToSetMap(nodesByTag, tag, node.id);
-      }
-      const category = (node.metadata as any)?.category ?? 'uncategorized';
-      this.addToSetMap(nodesByCategory, category, node.id);
-      adjacency.set(node.id, new Set());
-      reverseAdjacency.set(node.id, new Set());
-    }
-  }
-
   private addToSetMap(map: Map<string, Set<string>>, key: string, value: string): void {
     if (!map.has(key)) {
       map.set(key, new Set());
     }
     map.get(key)!.add(value);
-  }
-
-  private buildRelationships(
-    relationships: Array<{ id: string; source: string; target: string; type: string }>,
-    nodes: Map<string, ContentNode>,
-    adjacency: Map<string, Set<string>>,
-    reverseAdjacency: Map<string, Set<string>>
-  ): Map<string, any> {
-    const relationshipsMap = new Map<string, any>();
-
-    for (const rel of relationships) {
-      const relId = rel.id || `${rel.source}-${rel.target}`;
-      relationshipsMap.set(relId, { id: relId, sourceId: rel.source, targetId: rel.target, type: rel.type });
-
-      adjacency.get(rel.source)?.add(rel.target);
-      reverseAdjacency.get(rel.target)?.add(rel.source);
-
-      const sourceNode = nodes.get(rel.source);
-      const targetNode = nodes.get(rel.target);
-      if (sourceNode && !sourceNode.relatedNodeIds.includes(rel.target)) {
-        sourceNode.relatedNodeIds.push(rel.target);
-      }
-      if (targetNode && !targetNode.relatedNodeIds.includes(rel.source)) {
-        targetNode.relatedNodeIds.push(rel.source);
-      }
-    }
-
-    return relationshipsMap;
   }
 
   /**

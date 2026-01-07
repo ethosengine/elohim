@@ -70,27 +70,40 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Initialize Holochain connection on app startup with retry logic.
+   * Initialize services on app startup.
    *
-   * Attempts full connection flow with exponential backoff:
-   * 1. Connect to admin interface (via dev-proxy in Che)
-   * 2. Discover existing app interfaces
-   * 3. Authorize signing credentials
-   * 4. Connect to app interface for zome calls
-   * 5. Test content service availability
+   * Architecture:
+   * - CONTENT: Served from doorway projection (SQLite) or local storage (Tauri)
+   *   - ElohimClient handles mode-aware routing automatically
+   *   - App works fully offline with cached/local content
    *
-   * Runs in background without blocking app initialization.
-   * On failure, retries with exponential backoff up to maxAttempts.
+   * - AGENT DATA: Holochain DHT (identity, attestations, points)
+   *   - Optional - app degrades gracefully without it
+   *   - Uses exponential backoff retry for connection
    *
-   * Also initializes blob streaming in degraded mode (cached blobs only)
-   * if Holochain config is not available.
+   * Graceful degradation scenarios:
+   * - Doorway + Holochain: Full functionality
+   * - Doorway only: Content works, agent features degraded
+   * - Tauri (local): Full offline functionality via local SQLite
+   * - Neither: Cached content only, no writes
    */
   private async initializeHolochainConnection(): Promise<void> {
-    // Only attempt connection if holochain config exists
+    // Test doorway availability (non-blocking, informational)
+    const doorwayAvailable = await this.testDoorwayConnection();
+    if (doorwayAvailable) {
+      console.log('[App] Doorway available - content from projection');
+    } else {
+      console.log('[App] Doorway unavailable - using cached/local content');
+    }
+
+    // Start blob bootstrap regardless of connectivity
+    // It will serve cached blobs and upgrade to streaming when services connect
+    this.blobBootstrap.startBootstrap();
+
+    // Only attempt Holochain connection if config exists
+    // Holochain is only for agent-centric data (identity, attestations, points)
     if (!environment.holochain?.adminUrl) {
-      console.log('[Holochain] Config not found, initializing blob bootstrap in degraded mode');
-      // Start blob bootstrap in degraded mode - can serve cached blobs without Holochain
-      this.blobBootstrap.startBootstrap();
+      console.log('[App] Holochain config not found - content-only mode');
       return;
     }
 
@@ -98,7 +111,34 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Attempt to connect with retry support.
+   * Test doorway projection API availability.
+   * Non-blocking - returns false on any error.
+   */
+  private async testDoorwayConnection(): Promise<boolean> {
+    const doorwayUrl = environment.client?.doorwayUrl;
+    if (!doorwayUrl) {
+      return false;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      const response = await fetch(`${doorwayUrl}/health`, {
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch {
+      // Silent fail - graceful degradation
+      return false;
+    }
+  }
+
+  /**
+   * Attempt Holochain connection with retry support.
+   * Holochain is used for agent-centric data only (identity, attestations, points).
    */
   private async attemptConnection(): Promise<void> {
     if (this.isDestroyed) return;
@@ -113,18 +153,15 @@ export class AppComponent implements OnInit, OnDestroy {
       await this.holochainService.connect();
 
       if (this.holochainService.isConnected()) {
-        console.log('[Holochain] Connection successful, testing content availability...');
+        console.log('[Holochain] Connection successful, testing zome availability...');
 
-        // Test if content service can make zome calls
-        const contentAvailable = await this.holochainContent.testAvailability();
+        // Test if we can make zome calls (for agent-centric data)
+        const zomeAvailable = await this.holochainContent.testAvailability();
 
-        if (contentAvailable) {
-          console.log('[Holochain] Content service available - Holochain data ready!');
-
-          // Initialize blob streaming now that Holochain is ready
-          this.blobBootstrap.startBootstrap();
+        if (zomeAvailable) {
+          console.log('[Holochain] Zome calls available - agent features ready!');
         } else {
-          console.warn('[Holochain] Connected but content service unavailable');
+          console.warn('[Holochain] Connected but zome calls unavailable');
         }
 
         // Reset retry counter on success

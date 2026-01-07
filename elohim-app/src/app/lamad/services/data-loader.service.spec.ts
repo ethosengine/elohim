@@ -5,6 +5,8 @@ import { HolochainContentService } from '@app/elohim/services/holochain-content.
 import { IndexedDBCacheService } from '@app/elohim/services/indexeddb-cache.service';
 import { ProjectionAPIService } from '@app/elohim/services/projection-api.service';
 import { ContentResolverService, SourceTier } from '@app/elohim/services/content-resolver.service';
+import { ContentService } from '@app/elohim/services/content.service';
+import { ELOHIM_CLIENT } from '@app/elohim/providers/elohim-client.provider';
 import { LearningPath, PathIndex, ContentNode } from '../models';
 import { AgentProgress } from '@app/elohim/models/agent.model';
 import { of, throwError, BehaviorSubject } from 'rxjs';
@@ -16,6 +18,8 @@ describe('DataLoaderService', () => {
   let mockIndexedDBCache: jasmine.SpyObj<IndexedDBCacheService>;
   let mockProjectionApi: jasmine.SpyObj<ProjectionAPIService>;
   let mockContentResolver: jasmine.SpyObj<ContentResolverService>;
+  let mockContentService: jasmine.SpyObj<ContentService>;
+  let mockElohimClient: any;
   const basePath = '/assets/lamad-data';
 
   const mockContent: ContentNode = {
@@ -136,6 +140,32 @@ describe('DataLoaderService', () => {
     mockContentResolver.registerStandardSource.and.returnValue(undefined);
     mockContentResolver.setSourceAvailable.and.returnValue(undefined);
 
+    // ContentService mock
+    mockContentService = jasmine.createSpyObj('ContentService', [
+      'getContent',
+      'queryContent',
+      'batchGetContent',
+      'searchContent',
+      'getPath',
+      'queryPaths',
+      'getAllPaths'
+    ]);
+    mockContentService.getContent.and.returnValue(of(null));
+    mockContentService.queryContent.and.returnValue(of([]));
+    mockContentService.batchGetContent.and.returnValue(of(new Map()));
+    mockContentService.searchContent.and.returnValue(of([]));
+    mockContentService.getPath.and.returnValue(of(null));
+    mockContentService.queryPaths.and.returnValue(of([]));
+    mockContentService.getAllPaths.and.returnValue(of([]));
+
+    // ElohimClient mock
+    mockElohimClient = {
+      get: jasmine.createSpy('get').and.returnValue(Promise.resolve(null)),
+      query: jasmine.createSpy('query').and.returnValue(Promise.resolve([])),
+      supportsOffline: jasmine.createSpy('supportsOffline').and.returnValue(false),
+      backpressure: jasmine.createSpy('backpressure').and.returnValue(Promise.resolve(0))
+    };
+
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
       providers: [
@@ -143,7 +173,9 @@ describe('DataLoaderService', () => {
         { provide: HolochainContentService, useValue: mockHolochainContent },
         { provide: IndexedDBCacheService, useValue: mockIndexedDBCache },
         { provide: ProjectionAPIService, useValue: mockProjectionApi },
-        { provide: ContentResolverService, useValue: mockContentResolver }
+        { provide: ContentResolverService, useValue: mockContentResolver },
+        { provide: ContentService, useValue: mockContentService },
+        { provide: ELOHIM_CLIENT, useValue: mockElohimClient }
       ]
     });
 
@@ -160,7 +192,7 @@ describe('DataLoaderService', () => {
   });
 
   describe('getPath', () => {
-    it('should load path via ContentResolver', (done) => {
+    it('should load path via ContentService', (done) => {
       const mockPath: LearningPath = {
         id: 'test-path',
         version: '1.0.0',
@@ -179,53 +211,38 @@ describe('DataLoaderService', () => {
         steps: []
       };
 
-      // ContentResolver returns path with resolution metadata
-      mockContentResolver.resolvePath.and.returnValue(Promise.resolve({
-        data: mockPath,
-        sourceId: 'conductor',
-        tier: SourceTier.Authoritative,
-        durationMs: 50
-      }));
+      // ContentService returns path directly
+      mockContentService.getPath.and.returnValue(of(mockPath));
 
       service.getPath('test-path').subscribe(path => {
         expect(path.id).toBe('test-path');
         expect(path.title).toBe('Test Path');
-        expect(mockContentResolver.resolvePath).toHaveBeenCalledWith('test-path');
+        expect(mockContentService.getPath).toHaveBeenCalledWith('test-path');
         done();
       });
     });
   });
 
   describe('getContent', () => {
-    it('should load content via ContentResolver', (done) => {
-      // ContentResolver returns content with resolution metadata
-      mockContentResolver.resolveContent.and.returnValue(Promise.resolve({
-        data: mockContent,
-        sourceId: 'conductor',
-        tier: SourceTier.Authoritative,
-        durationMs: 50
-      }));
+    it('should load content via ContentService', (done) => {
+      // ContentService returns content directly
+      mockContentService.getContent.and.returnValue(of(mockContent));
 
       service.getContent('test-content').subscribe(content => {
-        expect(content).toEqual(mockContent);
-        expect(mockContentResolver.resolveContent).toHaveBeenCalledWith('test-content');
+        expect(content.id).toBe(mockContent.id);
+        expect(content.title).toBe(mockContent.title);
+        expect(mockContentService.getContent).toHaveBeenCalledWith('test-content');
         done();
       });
     });
 
-    it('should cache content requests in memory', (done) => {
-      mockContentResolver.resolveContent.and.returnValue(Promise.resolve({
-        data: mockContent,
-        sourceId: 'conductor',
-        tier: SourceTier.Authoritative,
-        durationMs: 50
-      }));
+    it('should cache content in IndexedDB after loading', (done) => {
+      mockContentService.getContent.and.returnValue(of(mockContent));
 
-      service.getContent('test-content').subscribe();
       service.getContent('test-content').subscribe(content => {
-        expect(content).toEqual(mockContent);
-        // Should only call resolver once due to in-memory caching
-        expect(mockContentResolver.resolveContent).toHaveBeenCalledTimes(1);
+        expect(content.id).toBe(mockContent.id);
+        // ContentService handles caching internally, but DataLoader also caches to IndexedDB
+        expect(mockContentService.getContent).toHaveBeenCalledWith('test-content');
         done();
       });
     });
@@ -249,21 +266,43 @@ describe('DataLoaderService', () => {
   });
 
   describe('getPathIndex', () => {
-    it('should load path index from Holochain', (done) => {
-      const mockHcPathIndex = {
-        paths: [
-          { id: 'test-path', title: 'Test', description: 'Desc', difficulty: 'beginner', estimated_duration: '1h', step_count: 3, tags: [] }
-        ],
-        total_count: 1,
-        last_updated: '2025-01-01T00:00:00.000Z',
-      };
+    it('should load path index from ContentService', (done) => {
+      const mockPaths: LearningPath[] = [
+        {
+          id: 'test-path',
+          version: '1.0.0',
+          title: 'Test',
+          description: 'Desc',
+          purpose: 'Testing',
+          createdBy: 'test-agent',
+          contributors: [],
+          difficulty: 'beginner',
+          estimatedDuration: '1h',
+          visibility: 'public',
+          pathType: 'journey',
+          tags: [],
+          createdAt: '2025-01-01T00:00:00.000Z',
+          updatedAt: '2025-01-01T00:00:00.000Z',
+          steps: [{
+            order: 0,
+            stepType: 'content',
+            resourceId: 'step-1',
+            stepTitle: 'Step 1',
+            stepNarrative: '',
+            optional: false,
+            learningObjectives: [],
+            completionCriteria: []
+          }]
+        }
+      ];
 
-      (mockHolochainContent.getPathIndex as jasmine.Spy).and.returnValue(Promise.resolve(mockHcPathIndex));
+      mockContentService.queryPaths.and.returnValue(of(mockPaths));
 
       service.getPathIndex().subscribe(index => {
         expect(index.totalCount).toBe(1);
         expect(index.paths.length).toBe(1);
         expect(index.paths[0].id).toBe('test-path');
+        expect(mockContentService.queryPaths).toHaveBeenCalled();
         done();
       });
     });

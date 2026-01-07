@@ -13,7 +13,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, from, of } from 'rxjs';
 import { map, catchError, shareReplay } from 'rxjs/operators';
 
-import { ELOHIM_CLIENT, ContentQuery } from '@elohim/service/client';
+import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
+import type { ContentQuery } from '@elohim/service/client';
 import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
 
@@ -43,7 +44,7 @@ export interface PathFilters {
 
 @Injectable({ providedIn: 'root' })
 export class ContentService {
-  private readonly client = inject(ELOHIM_CLIENT);
+  private readonly client: ElohimClient = inject(ELOHIM_CLIENT);
 
   // In-memory cache for hot paths
   private contentCache = new Map<string, Observable<ContentNode | null>>();

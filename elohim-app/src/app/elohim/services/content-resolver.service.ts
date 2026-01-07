@@ -112,11 +112,16 @@ export const STANDARD_SOURCES: Record<string, SourceRegistration> = {
     contentTypes: ['path', 'content', 'graph', 'assessment', 'profile', 'blob'],
     // baseUrl set dynamically based on doorway connection
   },
+  /**
+   * @deprecated Conductor is no longer used for content resolution.
+   * Content is now served from doorway projection (SQLite).
+   * Conductor remains available for agent-centric data only (identity, attestations, points).
+   */
   conductor: {
     id: 'conductor',
     tier: SourceTier.Authoritative,
     priority: 50,
-    contentTypes: ['path', 'content', 'graph', 'assessment', 'profile', 'blob', 'identity'],
+    contentTypes: ['identity', 'attestation', 'point-balance'], // Content types removed - use projection instead
   },
   edgenode: {
     id: 'edgenode',
@@ -653,7 +658,10 @@ export class ContentResolverService implements OnDestroy {
         return await firstValueFrom(this.projectionApi.getContent(contentId));
 
       case 'conductor':
-        return await this.holochainContent.getContent(contentId).toPromise() ?? null;
+        // Conductor no longer handles content - use projection instead
+        // Conductor is now reserved for agent-centric data (identity, attestations, points)
+        console.debug('[ContentResolver] Conductor skipped for content - use projection');
+        return null;
 
       default:
         return null;
@@ -719,15 +727,11 @@ export class ContentResolverService implements OnDestroy {
         if (!this.projectionApi.enabled) return null;
         return await firstValueFrom(this.projectionApi.getPath(pathId));
 
-      case 'conductor': {
-        // Double-check actual availability (handles race conditions during init)
-        if (!this.holochainContent.isAvailable()) {
-          console.debug('[ContentResolver] Conductor not yet available, skipping');
-          return null;
-        }
-        const hcPath = await this.holochainContent.getPathWithSteps(pathId);
-        return hcPath ? this.transformHolochainPath(hcPath) : null;
-      }
+      case 'conductor':
+        // Conductor no longer handles paths - use projection instead
+        // Conductor is now reserved for agent-centric data (identity, attestations, points)
+        console.debug('[ContentResolver] Conductor skipped for path - use projection');
+        return null;
 
       default:
         return null;
@@ -794,10 +798,11 @@ export class ContentResolverService implements OnDestroy {
         if (!this.projectionApi.enabled) return new Map();
         return await firstValueFrom(this.projectionApi.batchGetContent(ids));
 
-      case 'conductor': {
-        const result = await this.holochainContent.batchGetContent(ids);
-        return result.found;
-      }
+      case 'conductor':
+        // Conductor no longer handles content batches - use projection instead
+        // Conductor is now reserved for agent-centric data (identity, attestations, points)
+        console.debug('[ContentResolver] Conductor skipped for batch content - use projection');
+        return new Map();
 
       default:
         return new Map();

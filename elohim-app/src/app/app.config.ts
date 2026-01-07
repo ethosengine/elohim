@@ -5,8 +5,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { routes } from './app.routes';
 import { environment } from '../environments/environment';
 
-// ElohimClient - mode-aware content client
-import { provideElohimClient, detectClientMode } from '@elohim/service/client';
+// ElohimClient - mode-aware content client (local provider to avoid Angular version mismatch)
+import { provideElohimClient, detectClientMode } from './elohim/providers/elohim-client.provider';
 
 // Content I/O module with unified format plugins
 import { ContentIOModuleWithPlugins } from './lamad/content-io/content-io.module';

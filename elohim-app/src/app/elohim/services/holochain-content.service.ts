@@ -1,21 +1,23 @@
 /**
  * Holochain Content Service
  *
- * Provides content retrieval from Holochain conductor.
+ * Provides Holochain zome call wrappers.
  * Uses the HolochainClientService for WebSocket communication.
  *
- * Architecture:
- *   Browser → HolochainClientService → Holochain Conductor → DHT
+ * DEPRECATION NOTICE:
+ * Content methods (getContent, batchGetContent, getPathIndex, etc.) are DEPRECATED.
+ * Content is now served from doorway projection (SQLite), not DHT.
+ * Use ContentService instead for all content operations.
  *
- * NOTE: This service is prepared for Holochain integration but currently returns
- * unavailable status until the app interface proxy (Phase 2) is implemented.
- * The admin interface works for testing, but zome calls require app interface.
+ * This service remains active for AGENT-CENTRIC DATA ONLY:
+ * - Identity and agent profiles
+ * - Attestations (trust claims about humans/content)
+ * - Points and participation metrics
+ * - Consent relationships
+ * - Governance operations
  *
- * Once the proxy is ready, this service will transparently provide content
- * from the Holochain DHT.
- *
+ * @see ContentService for content operations (paths, content nodes, search)
  * @see HolochainClientService for connection management
- * @see DataLoaderService for the primary content abstraction (delegates here when ready)
  */
 
 import { Injectable, computed, signal, inject } from '@angular/core';
@@ -877,6 +879,9 @@ export class HolochainContentService {
   /**
    * Get content by ID from Holochain.
    *
+   * @deprecated Use ContentService.getContent() instead.
+   * Content is now served from doorway projection (SQLite), not DHT.
+   *
    * Returns null if content not found or service unavailable.
    * Uses caching to avoid redundant zome calls.
    */
@@ -904,6 +909,9 @@ export class HolochainContentService {
 
   /**
    * Batch get multiple content items by IDs in a single zome call.
+   *
+   * @deprecated Use ContentService.batchGetContent() instead.
+   * Content is now served from doorway projection (SQLite), not DHT.
    *
    * This is more efficient than calling getContent() multiple times
    * as it reduces network round-trips.
@@ -1007,6 +1015,9 @@ export class HolochainContentService {
 
   /**
    * Get content by type from Holochain.
+   *
+   * @deprecated Use ContentService.queryContent({contentType}) instead.
+   * Content is now served from doorway projection (SQLite), not DHT.
    *
    * Returns empty array if service unavailable.
    */
@@ -1134,6 +1145,8 @@ export class HolochainContentService {
   /**
    * Get content statistics from Holochain.
    *
+   * @deprecated Content stats should come from doorway projection.
+   *
    * Cached with shareReplay for efficiency.
    */
   getStats(): Observable<HolochainContentStats> {
@@ -1189,11 +1202,14 @@ export class HolochainContentService {
   }
 
   // ===========================================================================
-  // Learning Path Methods
+  // Learning Path Methods (DEPRECATED - use ContentService)
   // ===========================================================================
 
   /**
    * Get all learning paths (path index).
+   *
+   * @deprecated Use ContentService.queryPaths() instead.
+   * Paths are now served from doorway projection (SQLite), not DHT.
    */
   async getPathIndex(): Promise<HolochainPathIndex> {
     console.log('[HolochainContent] Calling get_all_paths...');
@@ -1216,6 +1232,9 @@ export class HolochainContentService {
 
   /**
    * Get a learning path with all its steps.
+   *
+   * @deprecated Use ContentService.getPath() instead.
+   * Paths are now served from doorway projection (SQLite), not DHT.
    */
   async getPathWithSteps(pathId: string): Promise<HolochainPathWithSteps | null> {
     const result = await this.holochainClient.callZome<HolochainPathWithSteps | null>({
@@ -1233,6 +1252,9 @@ export class HolochainContentService {
 
   /**
    * Get a lightweight path overview via REST API (cached by Doorway).
+   *
+   * @deprecated Use ContentService.getPath() instead.
+   * Paths are now served from doorway projection (SQLite), not DHT.
    *
    * This is MUCH faster than getPathWithSteps because:
    * - Only counts step links instead of fetching each step record
