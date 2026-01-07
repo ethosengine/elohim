@@ -24,8 +24,6 @@ import { Injectable, OnDestroy } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 
 // Import from framework-agnostic cache module
-// Note: In production, this would be from '@aspect/elohim-service/cache'
-// For now, using relative path until package is built
 import type {
   IReachAwareCache,
   IBlobCache,
@@ -34,12 +32,12 @@ import type {
   CacheEntryMetadata,
   PriorityParams,
   CacheConfig,
-} from '../../../../../elohim-library/projects/elohim-service/src/cache/types';
+} from '@elohim/service/cache/types';
 
 import {
   ReachLevel,
   MasteryLevel,
-} from '../../../../../elohim-library/projects/elohim-service/src/cache/types';
+} from '@elohim/service/cache/types';
 
 import {
   createReachAwareCache,
@@ -51,7 +49,7 @@ import {
   TsReachAwareCache,
   TsBlobCache,
   TsChunkCache,
-} from '../../../../../elohim-library/projects/elohim-service/src/cache/reach-aware-cache';
+} from '@elohim/service/cache/reach-aware-cache';
 
 // Re-export constants for convenience
 export { ReachLevel, MasteryLevel };

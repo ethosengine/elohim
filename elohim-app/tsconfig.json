@@ -18,6 +18,8 @@
       "@app/shefa/*": ["src/app/shefa/*"],
       "@app/doorway": ["src/app/doorway/index.ts"],
       "@app/doorway/*": ["src/app/doorway/*"],
+      "@elohim/service": ["../elohim-library/projects/elohim-service/src/index.ts"],
+      "@elohim/service/*": ["../elohim-library/projects/elohim-service/src/*"],
       "@holochain/client": ["node_modules/@holochain/client"],
       "@holochain/client/*": ["node_modules/@holochain/client/*"]
     },

@@ -48,7 +48,7 @@ import type {
   BatchResult,
   WriteBufferStats,
   WriteBufferConfig,
-} from '../../../../../elohim-library/projects/elohim-service/src/cache/write-buffer';
+} from '@elohim/service/cache/write-buffer';
 
 import {
   WritePriority,
@@ -56,7 +56,7 @@ import {
   createWriteBuffer,
   isWasmBufferAvailable,
   TsWriteBuffer,
-} from '../../../../../elohim-library/projects/elohim-service/src/cache/write-buffer';
+} from '@elohim/service/cache/write-buffer';
 
 // Re-export types and enums for convenience
 export {

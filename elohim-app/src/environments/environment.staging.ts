@@ -5,12 +5,19 @@ export const environment: Environment = {
   logLevel: 'info' as LogLevel,
   environment: 'staging',
   gitHash: 'GIT_HASH_PLACEHOLDER',
-  // Holochain Edge Node configuration
+  // Holochain Edge Node configuration (legacy - used by HolochainClientService)
   // Alpha and Staging share doorway-dev for pre-production testing
-  // This allows RNA version testing before production deployment
   holochain: {
     adminUrl: 'wss://doorway-dev.elohim.host',
     appUrl: 'wss://doorway-dev.elohim.host',
     proxyApiKey: 'dev-elohim-auth-2024',
-  }
+  },
+  // ElohimClient configuration (new - mode-aware content client)
+  client: {
+    doorwayUrl: 'https://doorway-dev.elohim.host',
+    apiKey: 'dev-elohim-auth-2024',
+    nodeUrls: [],
+    holochainAppId: 'elohim',
+    holochainConductorUrl: 'wss://doorway-dev.elohim.host',
+  },
 };

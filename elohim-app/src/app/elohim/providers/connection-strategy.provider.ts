@@ -30,7 +30,7 @@ import {
   createConnectionStrategy,
   DoorwayConnectionStrategy,
   DirectConnectionStrategy,
-} from '../../../../../elohim-library/projects/elohim-service/src/connection';
+} from '@elohim/service/connection';
 
 /**
  * Injection token for the connection strategy.

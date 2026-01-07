@@ -20,5 +20,15 @@ export const environment: Environment = {
     connectionMode: 'auto',
     // elohim-storage sidecar URL (for direct mode blob storage)
     storageUrl: 'http://localhost:8090',
-  }
+  },
+  // ElohimClient configuration
+  // Drives content operations (browser→doorway, tauri→local storage)
+  client: {
+    doorwayUrl: 'http://localhost:8888',
+    apiKey: 'dev-elohim-auth-2024',
+    // For Tauri mode: personal nodes and conductor
+    nodeUrls: [],  // No personal nodes in dev
+    holochainAppId: 'elohim',
+    holochainConductorUrl: 'ws://localhost:8888',
+  },
 };

@@ -51,6 +51,25 @@ export interface ProjectionApiConfig {
 }
 
 /**
+ * ElohimClient configuration for environment
+ * Maps to elohim-service/client types
+ */
+export interface ClientEnvironmentConfig {
+  /** Primary doorway URL */
+  doorwayUrl: string;
+  /** Fallback doorway URLs */
+  doorwayFallbacks?: string[];
+  /** API key for doorway authentication */
+  apiKey?: string;
+  /** Personal elohim-node URLs for Tauri sync (DHT-registered) */
+  nodeUrls?: string[];
+  /** Holochain app ID for agent data */
+  holochainAppId?: string;
+  /** Direct conductor URL (Tauri mode only) */
+  holochainConductorUrl?: string;
+}
+
+/**
  * Environment configuration interface
  */
 export interface Environment {
@@ -65,4 +84,6 @@ export interface Environment {
   projectionApi?: ProjectionApiConfig;
   /** Doorway API base URL (defaults to same origin if not set) */
   doorwayUrl?: string;
+  /** ElohimClient configuration */
+  client?: ClientEnvironmentConfig;
 }

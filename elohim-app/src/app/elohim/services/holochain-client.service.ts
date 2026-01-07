@@ -44,7 +44,7 @@ import {
 import { PerformanceMetricsService } from './performance-metrics.service';
 import { LoggerService } from './logger.service';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
-import type { IConnectionStrategy, ConnectionConfig } from '../../../../../elohim-library/projects/elohim-service/src/connection';
+import type { IConnectionStrategy, ConnectionConfig } from '@elohim/service/connection';
 
 @Injectable({
   providedIn: 'root',

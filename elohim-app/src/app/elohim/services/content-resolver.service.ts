@@ -51,21 +51,21 @@ import type {
   ResolverStats,
   SourceInfo,
   ResolverConfig,
-} from '../../../../../elohim-library/projects/elohim-service/src/cache/content-resolver';
+} from '@elohim/service/cache/content-resolver';
 
 import {
   SourceTier,
   createContentResolver,
   isWasmResolverAvailable,
   TsContentResolver,
-} from '../../../../../elohim-library/projects/elohim-service/src/cache/content-resolver';
+} from '@elohim/service/cache/content-resolver';
 
 // Import connection strategy types
 import type {
   IConnectionStrategy,
   ConnectionConfig,
   ContentSourceConfig,
-} from '../../../../../elohim-library/projects/elohim-service/src/connection';
+} from '@elohim/service/connection';
 
 // Re-export types and enums for convenience
 export {

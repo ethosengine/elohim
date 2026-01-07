@@ -44,5 +44,45 @@ export * from './db';
 // Cache (framework-agnostic reach-aware caching)
 export * from './cache';
 
+// Client (mode-aware content client, mirrors Rust elohim-sdk)
+// Note: Selective export to avoid conflicts with cache module types
+export {
+  // Main client
+  ElohimClient,
+  WriteBuffer as ClientWriteBuffer,
+  ReachEnforcer,
+
+  // Modes
+  type ClientMode,
+  type BrowserMode,
+  type TauriMode,
+  type TauriInvoke,
+
+  // Sync configuration
+  type DoorwayConfig,
+  type NodeSyncConfig,
+
+  // Holochain (parallel connection, not a mode)
+  type HolochainConnection,
+
+  // Content interfaces
+  type ContentType as ClientContentType,
+  type ContentReadable,
+  type ContentWriteable,
+  type ContentQuery,
+
+  // Config
+  type ElohimClientConfig,
+  type WriteOp,
+  WriteBufferDefaults,
+
+  // Angular integration
+  ELOHIM_CLIENT,
+  ELOHIM_CLIENT_CONFIG,
+  provideElohimClient,
+  provideAnonymousBrowserClient,
+  detectClientMode,
+} from './client';
+
 // Re-export main functions for convenience
 export { runImportPipeline, importContent } from './services/import-pipeline.service';

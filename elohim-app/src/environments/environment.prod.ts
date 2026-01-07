@@ -5,13 +5,19 @@ export const environment: Environment = {
   logLevel: 'error' as LogLevel,
   environment: 'production',
   gitHash: 'GIT_HASH_PLACEHOLDER',
-  // Holochain Edge Node configuration (production)
-  // Single proxy URL handles admin operations with authentication
+  // Holochain Edge Node configuration (legacy - used by HolochainClientService)
   holochain: {
     adminUrl: 'wss://doorway.elohim.host',
     appUrl: 'wss://doorway.elohim.host',
     // IMPORTANT: This key must match the secret in edgenode-prod.yaml
-    // Update both when changing production credentials
     proxyApiKey: 'CHANGE-ME-prod-elohim-auth-2024',
-  }
+  },
+  // ElohimClient configuration (new - mode-aware content client)
+  client: {
+    doorwayUrl: 'https://doorway.elohim.host',
+    apiKey: 'CHANGE-ME-prod-elohim-auth-2024',
+    nodeUrls: [],
+    holochainAppId: 'elohim',
+    holochainConductorUrl: 'wss://doorway.elohim.host',
+  },
 };
