@@ -13,6 +13,7 @@ export const environment: Environment = {
     proxyApiKey: 'CHANGE-ME-prod-elohim-auth-2024',
   },
   // ElohimClient configuration (new - mode-aware content client)
+  // IMPORTANT: Update both apiKey values when changing production credentials
   client: {
     doorwayUrl: 'https://doorway.elohim.host',
     apiKey: 'CHANGE-ME-prod-elohim-auth-2024',
