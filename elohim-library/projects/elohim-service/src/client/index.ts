@@ -77,8 +77,8 @@
 // Main client
 export { ElohimClient, WriteBuffer, ReachEnforcer } from './elohim-client';
 
-// Types
-export {
+// Type exports (interfaces, type aliases) - must use 'export type' with isolatedModules
+export type {
   // Modes
   ClientMode,
   BrowserMode,
@@ -99,16 +99,18 @@ export {
   ContentQuery,
 
   // Write buffer
-  WritePriority,
   WriteOp,
   WriteBufferConfig,
-  WriteBufferDefaults,
-
-  // Reach/access control
-  ReachLevel,
 
   // Config
   ElohimClientConfig,
+} from './types';
+
+// Value exports (enums, consts) - normal export
+export {
+  WritePriority,
+  WriteBufferDefaults,
+  ReachLevel,
 } from './types';
 
 // Angular integration
