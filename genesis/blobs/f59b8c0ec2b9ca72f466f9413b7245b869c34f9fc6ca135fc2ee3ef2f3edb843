@@ -1,0 +1,11 @@
+Scenario: Climate grief and loss acknowledged in elderly experience
+    Given Helen has witnessed massive environmental change
+    And loss of familiar ecosystems causes grief
+    When Helen expresses climate grief
+    Then her emotional response should be validated and supported
+    And loss of familiar nature should be acknowledged as legitimate grief
+    And the protocol should recognize that elders witness most environmental loss
+    And climate change impacts include psychological dimensions
+    And Helen's grief should be honored, not dismissed
+    And witnessing ecological destruction across lifetime should be recognized as trauma
+    And elder perspectives should inform community understanding of what's being lost

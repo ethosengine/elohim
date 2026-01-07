@@ -1,0 +1,9 @@
+Scenario: Municipal policy integration with protocol decisions
+    Given city council passes new housing affordability ordinance
+    And Municipal Elohim flags potential conflict with property protocols
+    When conflict is identified
+    Then Constitutional Council reviews constitutional alignment
+    And council determines whether ordinance or protocol needs adjustment
+    And Jamal facilitates resolution through democratic deliberation
+    And city retains policy sovereignty within constitutional bounds
+    And agents and elected government work as partners

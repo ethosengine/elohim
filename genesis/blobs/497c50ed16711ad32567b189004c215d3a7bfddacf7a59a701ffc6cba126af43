@@ -1,0 +1,10 @@
+Scenario: Connecting classroom learning to lived experience
+    Given Kenji learns economic theory in classes
+    And he lives care economy reality daily in his household
+    When the educational_elohim bridges theory and practice
+    Then it should help Kenji see connections between academic concepts and daily life
+    And it should validate his experiential knowledge as real learning
+    And it should show how his household management applies economic principles
+    And lived experience should be recognized as legitimate knowledge source
+    And the system should integrate academic and experiential learning
+    And Kenji's practical care economy work should inform his academic understanding

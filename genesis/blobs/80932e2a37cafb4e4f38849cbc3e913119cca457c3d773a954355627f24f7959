@@ -1,0 +1,9 @@
+Scenario: Parent involvement recognition values Maria's solo engagement
+    Given Maria manages all school engagement for three children alone
+    And partnered parents split involvement between two people
+    When schools recognize parent involvement
+    Then the educational_elohim should quantify Maria's engagement across all three children
+    And her solo involvement should be recognized as extraordinary effort
+    And schools should value her participation even if she cannot match two-parent family availability
+    And parent involvement metrics should account for family structure differences
+    And Maria should receive appropriate recognition for managing everything alone

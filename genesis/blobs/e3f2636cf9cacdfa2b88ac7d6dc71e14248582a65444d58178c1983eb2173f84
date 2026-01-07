@@ -1,0 +1,9 @@
+Scenario: Activist challenges school closure targeting Black neighborhoods
+    Given the district proposes closing schools for "efficiency"
+    And the activist suspects racial targeting
+    When the Observer analyzes closure patterns across time
+    Then the activist sees schools in Black neighborhoods systematically closed
+    And white neighborhood schools remain open despite similar enrollment
+    And "efficiency" rationale masks structural racism
+    And community organizes opposition with documented evidence
+    And racist policy becomes undeniable and challengeable

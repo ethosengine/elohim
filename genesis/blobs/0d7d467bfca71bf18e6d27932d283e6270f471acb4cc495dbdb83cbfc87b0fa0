@@ -1,0 +1,9 @@
+Scenario: Activist exposes politician voting record inconsistency
+    Given a council member claims affordable housing support
+    But the activist suspects performative politics
+    When the Observer tracks five years of voting records
+    Then the activist sees votes against transit funding 5 times
+    And approvals of luxury development tax breaks
+    And budget votes defunding affordable housing programs
+    And patterns reveal rhetoric vs action divergence
+    And accountability campaigns gain evidentiary backbone

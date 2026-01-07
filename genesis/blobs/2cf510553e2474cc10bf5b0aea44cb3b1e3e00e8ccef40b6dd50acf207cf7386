@@ -1,0 +1,9 @@
+Scenario: Farmworker recruitment and retention improve through ownership opportunity
+    Given agricultural labor traditionally has high turnover due to low pay and poor conditions
+    And farm struggled to retain skilled workers who left for better opportunities
+    When democratic ownership offers farmworkers equity stake and voice
+    Then recruitment improves as workers seek dignified agricultural employment
+    And retention increases dramatically (90%+ vs. previous 40% annual retention)
+    And institutional expertise accumulates through stable workforce
+    And farm benefits from long-term worker commitment and skill development
+    And workplace_elohim tracks retention improvements and workforce stability

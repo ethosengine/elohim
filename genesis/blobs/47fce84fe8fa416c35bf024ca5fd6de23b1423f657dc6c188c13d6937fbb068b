@@ -1,0 +1,10 @@
+Scenario: Student contribution to neighborhood safety and mutual care
+    Given Kenji walks neighborhood streets regularly
+    And neighborhood safety is collective responsibility
+    When Kenji participates in neighborhood mutual care
+    Then the neighborhood_elohim should recognize his watchfulness
+    And it should value informal safety contributions: checking on neighbors, reporting issues
+    And it should accumulate care tokens for neighborhood care work
+    And students should be recognized as safety contributors, not threats
+    And the system should value informal mutual aid
+    And neighborhood care should be understood as everyone's work

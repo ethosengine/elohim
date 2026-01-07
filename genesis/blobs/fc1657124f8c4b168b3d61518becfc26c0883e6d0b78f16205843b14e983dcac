@@ -1,0 +1,9 @@
+Scenario: Politician builds coalition for worker protection legislation
+    Given the politician champions paid sick leave requirement
+    And needs support from diverse constituencies
+    When the Observer identifies coalition building opportunities
+    Then they see public health advocates support disease prevention
+    And identify parent groups concerned about sick children and work
+    And connect with faith communities serving working families
+    And facilitate coalition across worker rights and community health interests
+    And build broad-based support for worker protections

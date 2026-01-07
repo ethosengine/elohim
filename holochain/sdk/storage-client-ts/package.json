@@ -1,0 +1,35 @@
+{
+  "name": "@elohim/storage-client",
+  "version": "0.1.0",
+  "description": "TypeScript client for elohim-storage sync API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "keywords": [
+    "elohim",
+    "storage",
+    "crdt",
+    "automerge",
+    "sync"
+  ],
+  "author": "Elohim Protocol",
+  "license": "AGPL-3.0",
+  "dependencies": {
+    "@automerge/automerge": "^3.0.0",
+    "multiformats": "^13.4.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

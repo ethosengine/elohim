@@ -1,0 +1,9 @@
+Scenario: Journalist fact-checks governor's claims on economic record
+    Given the governor campaigns on economic success claims
+    And the journalist provides accountability coverage
+    When the Observer analyzes state economic data
+    Then the journalist verifies job growth claim (accurate but misleading framing)
+    And finds wage growth lags behind neighboring states
+    And shows poverty rate increased despite jobs claim
+    And identifies tax cut benefits concentrated in top income bracket
+    And publishes fact-check grounding rhetoric in evidence

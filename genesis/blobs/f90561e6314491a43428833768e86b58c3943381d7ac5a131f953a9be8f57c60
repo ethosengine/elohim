@@ -1,0 +1,146 @@
+@epic:value_scanner
+@user_type:teen
+@governance_layer:individual
+@related_users:preteen,young_adult,parent,student,worker
+@related_layers:family,educational,workplace_organizational
+@elohim_agents:personal_agent
+
+Feature: Individual Layer Value Recognition for Teen
+  As a teen (ages 14-17) in the value scanner system
+  Operating at the individual governance layer
+  I want adult-level economic autonomy with appropriate scaffolding
+  So that I build real capability for financial independence and self-governance
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the teen user "Jasmine" is registered in the system
+    And Jasmine is 16 years old
+    And the individual governance context is active
+    And Jasmine's personal_agent is configured for adult-level autonomy
+    And Jasmine has part-time employment at a local retail store
+
+  Scenario: Adult-capable interface for sophisticated decision-making
+    Given Jasmine is using the Value Scanner independently
+    And she has complex financial goals and multiple contexts to manage
+    When Jasmine opens the scanner application
+    Then the interface should provide comprehensive budgeting tools
+    And the personal_agent should offer professional-grade financial analysis
+    And multi-context care tracking should be available (school, work, family, community)
+    And sophisticated planning and analysis features should be accessible
+    And privacy controls should be granular and user-controlled
+    And the interface should treat Jasmine as the competent person she is
+
+  Scenario: Teen makes independent financial decisions with real consequences
+    Given Jasmine is shopping with money from her part-time job
+    And she is saving for college expenses
+    And she has set a monthly budget of $150 for discretionary spending
+    When Jasmine considers purchasing a $60 jacket
+    Then her personal_agent should provide decision support without controlling her choice
+    And the agent should surface relevant information: "This is 40% of your monthly discretionary budget"
+    And the agent should connect to her goals: "You're saving $200/month for college"
+    And Jasmine should retain full authority to make the decision
+    And the choice should have real economic consequences
+    And the system should support learning from mistakes without catastrophic outcomes
+
+  Scenario: Building adult financial capability through practice
+    Given Jasmine manages portions of her household budget
+    And she has responsibility for weekly grocery shopping
+    And her family has allocated $100/week for her to manage
+    When Jasmine makes purchasing decisions
+    Then her personal_agent should track spending against budget
+    And provide analysis of value optimization
+    And highlight patterns: "You've stayed within budget 7 of 8 weeks"
+    And surface learning opportunities: "Buying bulk rice saved $12 this month"
+    And build sophisticated financial literacy through real practice
+    And scaffold her capability without removing decision-making authority
+
+  Scenario: Privacy controls honor teen's developing autonomy
+    Given Jasmine's care contributions are tracked across multiple contexts
+    And she has legitimate need for privacy from parents
+    When Jasmine configures her privacy settings
+    Then she should have granular control over what data is shared with whom
+    And parents should have access to family-relevant information only
+    And her personal data (friendships, personal purchases, private reflections) should be protected
+    And community resource coordinators should see care contributions but not private details
+    And employers should not access her family or school data
+    And Jasmine should actively learn to manage privacy boundaries
+
+  Scenario: Recognition of care contributions across multiple life contexts
+    Given Jasmine contributes care work in multiple domains
+    And she works 15 hours/week at her part-time job
+    And she does substantial household labor
+    And she volunteers 4 hours/week at community center
+    When her personal_agent aggregates her care contributions
+    Then all contexts should be recognized: household, paid work, volunteering, civic engagement
+    And care tokens should reflect her substantial contributions
+    And her work should be made visible as genuine economic participation
+    And she should see herself as a productive member of society
+    And her care contributions should give her standing in care economy discussions
+
+  Scenario: Personal agent serves as sophisticated decision support system
+    Given Jasmine has complex scheduling and coordination needs
+    And she balances school, work, family responsibilities, and social life
+    When Jasmine uses her personal_agent for planning
+    Then the agent should function as financial advisor, schedule coordinator, and career counselor
+    And provide information, analysis, and memory support
+    And help her see connections: "Your work schedule affects family dinner planning"
+    And surface opportunities: "Your community volunteering builds skills for your intended career"
+    And never make decisions for her
+    And model healthy AI-human partnership where AI amplifies human capability
+
+  Scenario: Value formation through autonomous exploration
+    Given Jasmine is consciously forming her personal values
+    And she tests values through real economic decisions
+    When Jasmine makes purchasing choices reflecting her values
+    Then her personal_agent should help her track alignment between values and actions
+    And surface patterns: "You've prioritized local/sustainable products 12 of 15 purchases"
+    And support her value exploration without imposing external values
+    And recognize that she's developing adult value framework
+    And protect her space for individual identity development
+    And acknowledge her increasing moral sophistication
+
+  Scenario: Savings and investment education through real practice
+    Given Jasmine is saving for college and future goals
+    And she has accumulated $2,400 in savings from work
+    When she explores investment options through her personal_agent
+    Then the agent should provide age-appropriate investment education
+    And explain concepts like compound interest, risk, diversification
+    And connect to her specific goals and timeline
+    And help her understand long-term financial planning
+    And provide resources for learning about different investment vehicles
+    And support her building adult financial capability
+    And never pressure her toward specific investment products
+
+  Scenario: Right to disconnect maintained for teen autonomy
+    Given Jasmine has been using the Value Scanner extensively
+    And constitutional constraints protect her agency
+    When Jasmine chooses to disconnect from the system
+    Then the disconnection must be honored immediately
+    And no data retention beyond legal requirements should occur
+    And no manipulative patterns to retain usage should be employed
+    And her right to not participate must be respected
+    And her care contributions should be exportable in standard format
+    And she should maintain full control over her participation
+
+  Scenario: Learning from financial mistakes with safety nets
+    Given Jasmine overspent her monthly budget by $40
+    And she used her college savings to cover the shortfall
+    When her personal_agent analyzes the situation
+    Then it should provide non-judgmental feedback about the pattern
+    And help her understand the long-term impact on her college savings goal
+    And support her learning from the mistake
+    And suggest strategies for getting back on track
+    And not shame or guilt her about the decision
+    And recognize that learning requires room for mistakes
+    And ensure the mistake isn't catastrophic to her future
+
+  Scenario: Building identity around care contribution and capability
+    Given Jasmine has made substantial care contributions over months
+    And she balances multiple demanding contexts successfully
+    When she reflects on her Value Scanner usage and care economy participation
+    Then she should experience herself as a capable, contributing adult
+    And her identity should be forming around care for others and community
+    And she should understand that her work has genuine economic value
+    And she should expect to be taken seriously in economic conversations
+    And she should internalize that care economy principles are normal
+    And her self-concept should reflect her actual capability and contribution

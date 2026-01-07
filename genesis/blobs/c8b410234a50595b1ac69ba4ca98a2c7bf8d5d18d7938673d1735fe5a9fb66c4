@@ -1,0 +1,89 @@
+@epic:public_observer
+@user_type:journalist
+@governance_layer:county_regional
+@related_users:journalist,activist,politician,citizen
+@related_layers:municipality,provincial_state,community
+@elohim_agents:public_observer,regional_elohim,pattern_elohim
+
+Feature: Regional Pattern Journalism for Journalist
+  As a journalist in the public_observer system
+  Operating at the county/regional governance layer
+  I want pattern detection across jurisdictional boundaries
+  So that regional investigations expose systemic issues
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the journalist user is registered in the system
+    And the county_regional governance context is active
+
+  Scenario: Journalist coordinates regional investigation across 15 municipalities
+    Given affordable housing crisis affects entire metropolitan region
+    And the journalist collaborates with reporters in neighboring coverage areas
+    When the Observer provides civic surveillance across all municipalities
+    Then journalists access comprehensive data from all 15 cities
+    And identify common patterns in zoning and development approval
+    And compare policy approaches and housing production outcomes
+    And publish coordinated regional investigation
+    And local stories reveal regional systemic failure
+
+  Scenario: Journalist exposes developer's regional exploitation pattern
+    Given a development firm proposes controversial project locally
+    And uses familiar tactics the journalist suspects are standardized
+    When the Observer tracks developer across regional jurisdictions
+    Then the journalist sees same firm operating in 8 municipalities
+    And documents pattern of community promises never fulfilled
+    And identifies political contributions across region
+    And finds environmental violations in 3 other states
+    And publishes investigation warning other communities
+    And regional surveillance exposes systematic bad actor
+
+  Scenario: Journalist detects environmental racism at regional scale
+    Given pollution facilities cluster in certain neighborhoods
+    And the journalist investigates environmental justice
+    When the Observer analyzes regional environmental patterns
+    Then the journalist sees industrial permits concentrate in communities of color
+    And maps proximity of pollution sources to schools and residences
+    And documents health outcome disparities by neighborhood and race
+    And shows pattern across county regardless of municipal boundaries
+    And publishes investigation exposing regional environmental racism
+
+  Scenario: Journalist investigates regional transit inequity
+    Given transit access varies dramatically across metropolitan area
+    And the journalist covers regional transit authority
+    When the Observer analyzes transit service distribution
+    Then the journalist sees frequent service to employment centers from white suburbs
+    And finds infrequent service in communities of color despite higher ridership
+    And documents decades of investment decisions favoring certain areas
+    And compares stated equity goals to actual funding allocation
+    And publishes accountability story on transit racism
+
+  Scenario: Journalist tracks regional displacement and gentrification
+    Given housing costs rise across metropolitan region
+    And the journalist investigates who benefits and who is harmed
+    When the Observer tracks displacement patterns regionally
+    Then the journalist sees working-class communities of color losing residents
+    And maps evictions, rent increases, and demographic changes
+    And identifies corporate landlords buying properties across region
+    And documents regional coordination of displacement
+    And publishes investigation connecting local experiences to regional pattern
+
+  Scenario: Journalist fact-checks regional economic development claims
+    Given county officials tout major economic development success
+    And claim massive job creation and tax revenue
+    When the Observer analyzes economic development outcomes
+    Then the journalist verifies jobs created are lower-wage than promised
+    And finds tax incentives cost more than revenue generated
+    And sees environmental violations and labor law violations
+    And tracks development firm's record in other regions
+    And publishes accountability story on corporate welfare
+    And instant research exposes exaggerated claims
+
+  Scenario: Journalist compares county policies to state and national patterns
+    Given county debates approach to criminal justice reform
+    And the journalist provides context on policy options
+    When the Observer enables comparative policy research
+    Then the journalist reviews outcomes from counties with reform policies
+    And analyzes data on recidivism, cost, and community safety
+    And interviews officials and residents in comparison jurisdictions
+    And provides evidence-based policy journalism
+    And regional coverage connects to national criminal justice debate

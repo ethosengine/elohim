@@ -1,0 +1,11 @@
+Scenario: Supporting protocol adoption in Global South nations
+    Given developing nations need technology transfer and support
+    And protocol shouldn't be Global North privilege
+    When I advocate for international development support
+    Then I promote: funding for Global South protocol infrastructure
+    And I support: technology transfer and capacity building
+    And I resist: digital colonialism disguised as development
+    And I ensure: Global South communities control their adoption
+    And I fund: mutual aid between wealthy and poor communities
+    And I work: toward global equity in democratic AI governance
+    And I recognize: that justice requires reducing inequality

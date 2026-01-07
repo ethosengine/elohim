@@ -1,0 +1,10 @@
+Scenario: Building care relationships that support Margaret's own aging
+    Given Margaret is building community care networks now
+    And she will need community support as she ages
+    When the community_elohim tracks care relationship development
+    Then it should recognize Margaret is building future care security
+    And her current contributions should create community reciprocity
+    And community members she helps now will support her later
+    And community care networks should enable aging in place
+    And Margaret's care work should create long-term community integration
+    And care economy should provide retirement security beyond finances

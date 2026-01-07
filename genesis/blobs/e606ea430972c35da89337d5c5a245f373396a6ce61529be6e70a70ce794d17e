@@ -1,0 +1,12 @@
+Scenario: Career development balanced with peak care responsibilities
+    Given Robert has substantial professional responsibilities
+    And his care demands are also at peak levels
+    And he has opportunities for career advancement
+    When Robert considers professional development opportunities
+    Then his personal_agent should help him assess realistic capacity
+    And analyze: "This promotion would add 10 hours weekly with your parents needing increased care"
+    And support him in making career decisions that honor his full life context
+    And help him recognize that care responsibilities are legitimate constraints on career
+    And surface when career advancement would create unsustainable burden
+    And validate that choosing care over career advancement is reasonable
+    And ensure he doesn't sacrifice relationships for professional success

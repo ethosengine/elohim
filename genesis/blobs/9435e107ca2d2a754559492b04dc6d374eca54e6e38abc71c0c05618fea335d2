@@ -1,0 +1,10 @@
+Scenario: Recognizing that student patterns shape adult life
+    Given Kenji is forming habits and patterns that will persist
+    And his college years are when adult identity and practices solidify
+    When the personal_agent reflects on Kenji's pattern development
+    Then it should help him see that current choices shape future self
+    And it should validate that learning care economy now matters lifelong
+    And it should recognize this developmental phase as formative
+    And the agent should support intentional pattern-building
+    And the system should help Kenji become the adult he wants to be
+    And student years should be recognized as foundation-laying time

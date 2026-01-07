@@ -1,0 +1,9 @@
+Scenario: Journalist grounds state education policy in local school impacts
+    Given state legislature debates education funding formula
+    And the journalist covers state education policy
+    When the Observer shows local impacts across specific districts
+    Then the journalist sees how formula change affects 230 individual schools
+    And identifies which communities gain or lose funding
+    And contacts affected teachers, parents, and students in specific districts
+    And publishes story connecting state policy to lived local experiences
+    And policy journalism serves communities not just political class

@@ -1,0 +1,12 @@
+Scenario: Community networks provide backup support for care crises
+    Given Robert manages complex care demands that could face crisis
+    And care crises happen: parent hospitalization, child emergency, personal illness
+    And community networks could provide emergency support
+    When community_elohim builds crisis resilience
+    Then it should connect Robert to community members who could help in crisis
+    And identify backup support for his various care responsibilities
+    And ensure he's not isolated when crisis hits
+    And recognize that his care contributions create reciprocal crisis support
+    And build community resilience through mutual aid networks
+    And demonstrate that care economy participation provides safety net
+    And prevent care crisis from becoming catastrophic

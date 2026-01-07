@@ -1,0 +1,10 @@
+Scenario: Learning recognized as valuable work, not just credential pursuit
+    Given Kenji spends 40+ hours per week on academic work
+    And traditional economics treats student labor as non-productive
+    When the educational_elohim tracks Kenji's educational work
+    Then it should recognize studying as labor that creates value
+    And it should accumulate care tokens for learning work
+    And it should validate "You invested 45 hours in learning this week"
+    And student intellectual labor should be valued, not invisible
+    And the system should recognize education as work toward capability development
+    And learning should be understood as care economy investment

@@ -1,0 +1,9 @@
+Scenario: Journalist investigates regulatory capture of environmental agency
+    Given environmental regulations are weakly enforced
+    And the journalist suspects industry influence over regulators
+    When the Observer tracks regulatory agency decisions and relationships
+    Then the journalist sees violation fines reduced 78% in 3 years
+    And documents revolving door between industry and agency leadership
+    And identifies campaign contributions from regulated industries
+    And shows pattern of violations detected but not penalized
+    And publishes investigation exposing regulatory capture

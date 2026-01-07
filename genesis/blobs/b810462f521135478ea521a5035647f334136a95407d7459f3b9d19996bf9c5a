@@ -1,0 +1,9 @@
+Scenario: Childcare assistance coordination without formal program barriers
+    Given Maria cannot afford formal childcare for three children
+    And she needs flexible care support for work, emergencies, and sustainability
+    When Maria needs childcare assistance
+    Then the community_elohim should coordinate community childcare support
+    And it should connect her to subsidized programs without bureaucratic barriers
+    And it should facilitate informal care networks for flexible needs
+    And childcare support should be adequate and appropriate for her family
+    And Maria should access care help needed for solo parent survival

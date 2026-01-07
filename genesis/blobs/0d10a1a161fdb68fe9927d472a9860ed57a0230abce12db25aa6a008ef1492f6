@@ -1,0 +1,11 @@
+Scenario: Coordination of support services with Alex maintaining authority
+    Given Alex requires assistance with some physical tasks
+    And Alex coordinates support workers for specific needs
+    When support services are scheduled
+    Then Alex should have complete authority over service direction
+    And the personal_agent should help coordinate schedules efficiently
+    And Alex should be able to communicate needs clearly
+    And support quality should be tracked per Alex's assessment
+    And Alex should experience professional partnership, not caretaking
+    And the relationship should be employer/coordinator to service provider
+    And Alex's autonomy should be structurally protected

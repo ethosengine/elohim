@@ -1,0 +1,9 @@
+Scenario: Managing children's grief and questions about absent co-parent
+    Given children may grieve or question their absent other parent
+    And Maria must handle these emotions while managing her own feelings
+    When children express feelings about family structure
+    Then the family_elohim should help Maria respond appropriately to each child's age
+    And it should remind her to validate their feelings without defensiveness
+    And it should help her maintain healthy narrative about family structure
+    And it should support her in helping children process complicated family reality
+    And Maria should have guidance for emotionally complex parenting situations

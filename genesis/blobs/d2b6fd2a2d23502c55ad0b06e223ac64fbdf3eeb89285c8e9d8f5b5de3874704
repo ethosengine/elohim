@@ -1,0 +1,10 @@
+Scenario: Child recognizes care labor in neighborhood economy
+    Given Emma interacts with store workers during shopping
+    And she is learning to see invisible care work
+    When Emma completes a transaction
+    Then her personal_agent should prompt recognition of care labor
+    And the agent should say "Thank the checker for scanning your items"
+    And Emma should learn to see stockers, checkers, farmers, truckers
+    And she should understand economy is made of people caring for each other
+    And awareness of care labor should extend beyond family
+    And she should be socialized into seeing economy as care relationships

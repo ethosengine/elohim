@@ -1,0 +1,10 @@
+Scenario: Family care tokens accumulate across all members' contributions
+    Given family participates in care token economy
+    And Sarah, partner, Tommy, and Emma all contribute
+    When family care tokens are calculated
+    Then Sarah's extensive contributions should be valued highly
+    And children's age-appropriate work should count
+    And partner's contributions should be recognized
+    And extended family care should be tracked
+    And family care tokens should reflect collective contributions
+    And tokens should be available for family resource access

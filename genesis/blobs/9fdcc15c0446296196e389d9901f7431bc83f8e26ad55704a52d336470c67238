@@ -1,0 +1,9 @@
+Scenario: Teacher challenges standardized assessment overemphasis
+    Given standardized testing dominates education policy decisions
+    And teachers know tests measure narrow slice of learning
+    When teachers provide professional perspective on assessment through Observer
+    Then teachers show how test prep narrows curriculum and reduces rich learning
+    And document student stress and declining engagement with testing
+    And present comprehensive assessment approaches that inform teaching
+    And build parent coalition around learning-centered not test-centered education
+    And assessment policy reflects professional expertise about student learning

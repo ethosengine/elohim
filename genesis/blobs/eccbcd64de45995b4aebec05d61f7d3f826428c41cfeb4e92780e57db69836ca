@@ -1,0 +1,11 @@
+Scenario: Accessible communication ensures Alex can participate in neighborhood decisions
+    Given neighborhood uses various communication methods
+    And some methods may exclude Alex
+    When neighborhood decisions are made
+    Then the neighborhood_elohim should ensure accessible communication
+    And neighborhood should use multiple formats (digital, physical, verbal)
+    And Alex should have equal access to all neighborhood information
+    And voting and input processes should be accessible
+    And Alex's voice should be included in neighborhood governance
+    And accessibility should be default, not accommodation
+    And the protocol should ensure Alex's full participation

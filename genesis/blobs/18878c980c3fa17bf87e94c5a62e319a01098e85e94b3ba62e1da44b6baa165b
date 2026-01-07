@@ -1,0 +1,11 @@
+Scenario: Traditional water conservation from era of scarcity
+    Given Helen learned water conservation in era without modern plumbing
+    And water scarcity is increasing due to climate change
+    When Helen teaches water conservation practices
+    Then her knowledge should inform community water management
+    And traditional conservation practices should be revived
+    And younger generations should learn from those who conserved by necessity
+    And Helen should be recognized as expert in water conservation
+    And the protocol should preserve water wisdom before it's lost
+    And bioregional water management should incorporate elder knowledge
+    And Helen's experience should increase community water resilience

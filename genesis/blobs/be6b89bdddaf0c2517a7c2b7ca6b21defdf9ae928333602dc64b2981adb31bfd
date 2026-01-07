@@ -1,0 +1,9 @@
+Scenario: Journalist exposes systematic school resource inequities
+    Given the journalist investigates education equity
+    And suspects under-resourcing of schools serving students of color
+    When the Observer analyzes district resource distribution
+    Then the journalist sees experienced teachers concentrate in white affluent schools
+    And documents gifted programs and AP courses cluster by race and class
+    And finds per-student spending disparities of thousands of dollars
+    And shows facility quality varies dramatically by neighborhood
+    And publishes investigation exposing structural educational racism

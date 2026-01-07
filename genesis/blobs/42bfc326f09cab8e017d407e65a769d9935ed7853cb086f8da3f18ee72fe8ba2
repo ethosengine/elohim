@@ -1,0 +1,11 @@
+Scenario: Neighborhood governance participation accessible to aging residents
+    Given Frank is aging and may have mobility or accessibility needs
+    And neighborhood governance should remain accessible
+    When Frank participates in neighborhood governance
+    Then meetings should be accessible (location, seating, acoustics)
+    And remote participation options should be available
+    And meeting materials should be provided in accessible formats
+    And the neighborhood_elohim should coordinate accessibility needs
+    And Frank should be able to participate fully despite aging
+    And governance access should be universal, not assuming youth
+    And his participation should be welcomed and supported

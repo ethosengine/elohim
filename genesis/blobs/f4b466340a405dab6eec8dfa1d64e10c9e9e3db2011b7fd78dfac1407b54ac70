@@ -1,0 +1,10 @@
+Scenario: Maintaining regular family contact on own terms
+    Given Jordan's parents want to stay connected
+    And Jordan values family relationships
+    When Jordan decides how often to communicate with family
+    Then the personal_agent helps Jordan set communication preferences
+    And the interface shows simple options (daily calls, weekly visits, etc.)
+    And Jordan's communication preferences are communicated to family
+    And the family_elohim helps family honor Jordan's boundaries
+    And Jordan experiences autonomy over family connection frequency
+    And Jordan's adult status is respected through choice

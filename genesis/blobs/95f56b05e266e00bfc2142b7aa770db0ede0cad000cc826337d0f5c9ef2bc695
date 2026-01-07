@@ -1,0 +1,9 @@
+Scenario: Community care contributions connect to municipal governance
+    Given Sarah's community care work is substantial
+    And municipal policy affects community well-being
+    When municipal governance decisions are made
+    Then Sarah's care contributions should give her voice
+    And community care economy data should inform municipal policy
+    And care work should be recognized at municipal level
+    And Sarah's advocacy should carry weight based on demonstrated contribution
+    And care economy should scale from community to municipal governance

@@ -1,0 +1,9 @@
+Scenario: Grocery management with $175 per week for four people
+    Given Maria feeds four people on $175/week budget
+    And this requires strategic planning and waste prevention
+    When Maria plans grocery shopping
+    Then the household_elohim should optimize for maximum nutrition per dollar
+    And it should coordinate strategic shopping across stores based on sales
+    And it should plan meals that stretch ingredients efficiently
+    And it should prevent food waste she cannot afford
+    And Maria should achieve remarkable efficiency with AI support

@@ -1,0 +1,11 @@
+Scenario: Null findings about protocol effects inform honest assessment
+    Given my analysis found protocol didn't improve outcomes in certain domains
+    And publication bias favors positive results
+    When I publish findings showing limitations and failures
+    Then I report: honestly about what doesn't work
+    And I provide: evidence challenging protocol advocates' claims
+    And I maintain: scientific integrity over ideological commitment
+    And I enable: realistic expectations and targeted improvements
+    And I contribute: to honest democratic deliberation about governance alternatives
+    And My credibility comes from: willingness to report unflattering truths
+    And Science serves democracy by: providing reliable knowledge not propaganda

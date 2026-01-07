@@ -1,0 +1,10 @@
+Scenario: Parent organizing for family-friendly community policies
+    Given community policies affect families' quality of life
+    And Sarah wants better parks, libraries, family resources
+    When parents organize for policy change
+    Then the community_elohim should facilitate collective advocacy
+    And it should coordinate parent political power
+    And organizing labor should accumulate care tokens
+    And Sarah's advocacy should be recognized as community contribution
+    And parent collective action should be amplified by care economy
+    And the system should translate care work into political power

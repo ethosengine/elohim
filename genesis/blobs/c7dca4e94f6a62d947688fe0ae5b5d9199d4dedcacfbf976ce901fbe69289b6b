@@ -1,0 +1,11 @@
+Scenario: Neighborhood emergency response utilizes retired residents' availability
+    Given Frank has daytime availability when many neighbors work
+    And neighborhoods need emergency response capacity
+    When the neighborhood_elohim coordinates emergency preparedness
+    Then it should include Frank in neighborhood emergency plans
+    And utilize his construction skills for emergency assessment
+    And coordinate check-ins on vulnerable neighbors during crises
+    And recognize retired residents as neighborhood resilience resources
+    And Frank should feel valuable in emergency response role
+    And his availability should serve collective security
+    And neighborhood should benefit from his time flexibility

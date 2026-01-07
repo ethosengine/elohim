@@ -1,0 +1,11 @@
+Scenario: Serving on Regional Council with greater complexity and time
+    Given I was selected for Regional Constitutional Council
+    And this layer handles escalated appeals and novel situations
+    When I begin my 4-month term meeting twice weekly
+    Then I review: cases that couldn't be resolved at community layer
+    And I deliberate: complex constitutional questions affecting region
+    And I create: precedent influencing multiple communities
+    And I work with: citizens from diverse communities across region
+    And I receive: enhanced training for greater responsibility
+    And I am compensated: for significant time commitment
+    And I feel: weight of creating regional constitutional law

@@ -1,0 +1,12 @@
+Scenario: Municipal services coordinate for multigenerational family support
+    Given Robert's family needs span eldercare, young adult support, and household services
+    And municipal services are often siloed by department
+    And coordinated service delivery would better serve families
+    When municipal_elohim coordinates service delivery
+    Then it should help Robert navigate municipal services across departments
+    And connect aging services, youth programs, housing assistance, and employment support
+    And surface relevant municipal resources across his family's needs
+    And demonstrate how integrated service delivery serves families
+    And advocate for municipal coordination across service silos
+    And build municipal systems that recognize multigenerational family reality
+    And reduce burden of navigating fragmented municipal services

@@ -1,0 +1,11 @@
+Scenario: Alex maintains complete authority as household manager
+    Given Alex coordinates support workers for physical assistance
+    And some might assume support workers are in charge
+    When household decisions need to be made
+    Then Alex should have absolute authority over all household choices
+    And support workers should provide services Alex directs
+    And the household_elohim should structure Alex as employer/coordinator
+    And Alex's autonomy should be protected systematically
+    And the relationship should be professional partnership, not caretaking
+    And Alex should never be treated as passive recipient of care
+    And the protocol should embody Alex's household sovereignty

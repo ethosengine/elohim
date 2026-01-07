@@ -1,0 +1,99 @@
+@epic:public_observer
+@user_type:journalist
+@governance_layer:workplace_organizational
+@related_users:worker,union_organizer,activist,politician
+@related_layers:municipality,county_regional,provincial_state
+@elohim_agents:public_observer,labor_elohim,pattern_elohim,research_elohim
+
+Feature: Labor and Economic Justice Journalism for Journalist
+  As a journalist in the public_observer system
+  Operating at the workplace/organizational governance layer
+  I want comprehensive labor surveillance and economic data
+  So that labor journalism holds employers and regulators accountable
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the journalist user is registered in the system
+    And the workplace_organizational governance context is active
+
+  Scenario: Journalist monitors labor board and regulatory hearings
+    Given the journalist covers labor and employment
+    And must track labor board, wage enforcement, OSHA, and related agencies
+    When the Observer monitors all labor regulatory agencies
+    Then the journalist reviews all violation cases and enforcement actions
+    And receives alerts for significant labor violations
+    And tracks patterns in enforcement and employer violations
+    And comprehensive labor accountability coverage becomes sustainable
+    And worker exploitation cannot hide in regulatory obscurity
+
+  Scenario: Journalist exposes wage theft pattern across employers
+    Given workers report unpaid wages and overtime violations
+    And the journalist investigates wage theft
+    When the Observer analyzes wage violation enforcement data
+    Then the journalist sees systematic wage theft across multiple employers
+    And identifies industries with concentrated violations
+    And documents millions in stolen wages and minimal enforcement
+    And shows workers of color disproportionately affected
+    And publishes investigation exposing wage theft epidemic
+
+  Scenario: Journalist investigates workplace safety violations
+    Given workers report unsafe conditions at warehouse
+    And the journalist covers workplace safety
+    When the Observer analyzes employer's safety violation history
+    Then the journalist finds company has 47 OSHA violations in 5 years
+    And sees pattern of violations detected but minimally fined
+    And documents worker injuries and company's inadequate response
+    And shows same company violates safety rules at facilities in other states
+    And publishes investigation forcing regulatory accountability
+
+  Scenario: Journalist fact-checks employer claims during union campaign
+    Given workers organize union at major retailer
+    And employer makes claims about wages and benefits
+    When the Observer provides instant fact-checking against labor data
+    Then the journalist verifies wage claim is misleading (includes management)
+    And finds actual frontline worker wages below poverty level
+    And shows benefits exclude most workers due to hour restrictions
+    And identifies employer's union-busting expenditures
+    And publishes real-time fact-check supporting informed worker vote
+
+  Scenario: Journalist tracks economic development promises to accountability
+    Given company received tax incentives for job creation
+    And the journalist covered initial economic development announcement
+    When the Observer monitors job creation and wage outcomes
+    Then the journalist finds company created 40% of promised jobs
+    And sees wages are lower than promised in tax incentive agreement
+    And documents tax breaks cost more than economic benefit
+    And identifies lack of enforcement from economic development agency
+    And publishes accountability story on corporate welfare waste
+
+  Scenario: Journalist exposes misclassification of workers as contractors
+    Given gig economy companies classify workers as independent contractors
+    And the journalist investigates worker classification
+    When the Observer analyzes employment patterns and labor violations
+    Then the journalist sees workers have employer control without worker rights
+    And documents workers denied minimum wage, overtime, and benefits
+    And shows companies avoid taxes through misclassification
+    And identifies regulatory agencies failing to enforce classification rules
+    And publishes investigation on worker exploitation through misclassification
+
+  Scenario: Journalist develops worker sources on retaliation
+    Given workers face retaliation for organizing or complaining
+    And fear job loss for speaking to journalist
+    When the Observer provides secure anonymous channel
+    Then workers share evidence of retaliation and illegal firings
+    And journalist investigates without exposing individual sources
+    And aggregates worker experiences to show pattern
+    And verifies claims through labor board records
+    And publishes investigation protecting sources while exposing employer
+    And source protection enables workers to speak truth
+
+  Scenario: Journalist investigates regional economic inequality patterns
+    Given the journalist covers regional economy
+    And economic growth statistics mask inequality
+    When the Observer analyzes economic data by demographics and geography
+    Then the journalist sees wage growth concentrated in top income brackets
+    And documents working-class wage stagnation despite economic growth claims
+    And shows poverty increasing in communities of color despite job growth
+    And identifies industries paying poverty wages receiving subsidies
+    And publishes investigation exposing economic inequality
+    And pattern recognition reveals who benefits from "strong economy"

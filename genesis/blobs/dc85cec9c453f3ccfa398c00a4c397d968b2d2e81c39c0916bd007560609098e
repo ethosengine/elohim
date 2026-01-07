@@ -1,0 +1,11 @@
+Scenario: Teaching others in community about IDD experience
+    Given a local school wants to teach students about inclusion
+    And Jordan is willing to share their experience
+    When Jordan participates in educational presentation
+    Then the personal_agent helps Jordan prepare accessible talking points
+    And Jordan shares their story in their own words with support
+    And students learn from Jordan directly, not just about IDD in abstract
+    And Jordan accumulates care tokens for educational contribution
+    And Jordan's teaching shapes community understanding
+    And Jordan experiences being an educator and advocate
+    And the community learns to see IDD people as full humans

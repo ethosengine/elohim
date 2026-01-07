@@ -1,0 +1,11 @@
+Scenario: Family financial coordination for retirement on fixed income
+    Given Frank lives on fixed income of $28k/year
+    And he occasionally provides financial support to adult children
+    And he's managing his mother-in-law's care costs
+    When family_elohim coordinates financial flows
+    Then it should track Frank's financial contributions to family
+    And surface when financial support compromises his own security
+    And help family understand his economic constraints
+    And facilitate honest conversations about financial capacity
+    And protect Frank from unsustainable financial requests
+    And ensure his fixed income sustains his own household first

@@ -1,4 +1,4 @@
-//! ElohimStorageBehaviour - Combined network behaviour for P2P shard transfer
+//! ElohimStorageBehaviour - Combined network behaviour for P2P shard and sync transfer
 
 use libp2p::{
     identity::Keypair,
@@ -8,9 +8,9 @@ use libp2p::{
     swarm::NetworkBehaviour,
     PeerId,
 };
-use std::time::Duration;
 
 use super::shard_protocol::{ShardCodec, ShardProtocol};
+use super::sync_protocol::{SyncCodec, SyncProtocol};
 use super::P2PConfig;
 
 /// Combined network behaviour for elohim-storage
@@ -21,6 +21,8 @@ pub struct ElohimStorageBehaviour {
     pub kademlia: Kademlia<MemoryStore>,
     /// Request-response for shard transfer
     pub shard_protocol: RequestResponse<ShardCodec>,
+    /// Request-response for CRDT sync
+    pub sync_protocol: RequestResponse<SyncCodec>,
     /// Local network discovery (mDNS)
     pub mdns: mdns::tokio::Behaviour,
 }
@@ -32,6 +34,8 @@ pub enum ElohimStorageBehaviourEvent {
     Kademlia(kad::Event),
     /// Shard protocol event
     ShardProtocol(request_response::Event<super::ShardRequest, super::ShardResponse>),
+    /// Sync protocol event
+    SyncProtocol(request_response::Event<super::SyncRequest, super::SyncResponse>),
     /// mDNS event
     Mdns(mdns::Event),
 }
@@ -56,6 +60,14 @@ impl From<mdns::Event> for ElohimStorageBehaviourEvent {
     }
 }
 
+impl From<request_response::Event<super::SyncRequest, super::SyncResponse>>
+    for ElohimStorageBehaviourEvent
+{
+    fn from(event: request_response::Event<super::SyncRequest, super::SyncResponse>) -> Self {
+        Self::SyncProtocol(event)
+    }
+}
+
 impl ElohimStorageBehaviour {
     /// Create a new behaviour
     pub fn new(keypair: Keypair, config: P2PConfig) -> Self {
@@ -72,6 +84,13 @@ impl ElohimStorageBehaviour {
                 .with_request_timeout(config.request_timeout),
         );
 
+        // Sync request-response protocol
+        let sync_protocol = RequestResponse::new(
+            [(SyncProtocol, ProtocolSupport::Full)],
+            request_response::Config::default()
+                .with_request_timeout(config.request_timeout),
+        );
+
         // mDNS for local discovery
         let mdns = mdns::tokio::Behaviour::new(
             mdns::Config::default(),
@@ -82,6 +101,7 @@ impl ElohimStorageBehaviour {
         Self {
             kademlia,
             shard_protocol,
+            sync_protocol,
             mdns,
         }
     }

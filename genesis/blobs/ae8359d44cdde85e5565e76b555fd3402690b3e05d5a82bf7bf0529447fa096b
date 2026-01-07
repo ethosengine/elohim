@@ -1,0 +1,11 @@
+Scenario: Value literacy education through lived experience at advanced age
+    Given Helen uses Value Scanner with assistance
+    And she's learning care economy principles through practice
+    When Helen makes care-based decisions
+    Then she should be learning that her contributions still matter
+    And value literacy should be accessible at all ages
+    And care economy principles should be demonstrated through her experience
+    And she should understand that care has value regardless of age
+    And the protocol should teach through experience, not explanation
+    And Helen should internalize that she has worth beyond productivity
+    And care economy education should include all ages

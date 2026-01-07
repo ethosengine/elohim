@@ -1,0 +1,11 @@
+Scenario: Responding to community emergency with supported capability
+    Given there's a community crisis (natural disaster, emergency)
+    And everyone is mobilizing to help
+    When Jordan wants to contribute to emergency response
+    Then the personal_agent helps Jordan identify safe ways to help
+    And Jordan contributes at their capability (preparing supplies, making calls)
+    And Jordan's crisis contribution is recognized and valued
+    And the community includes Jordan in collective response
+    And Jordan accumulates care tokens for emergency care work
+    And Jordan experiences being part of community resilience
+    And Jordan's citizenship includes both receiving and providing care

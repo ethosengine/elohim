@@ -1,0 +1,11 @@
+Scenario: Preparing family for Frank's eventual increased care needs
+    Given Frank is currently more provider than receiver
+    And his care needs will likely increase in next 10-20 years
+    When family_elohim supports care planning
+    Then it should help Frank discuss future care needs with family
+    And prepare adult children for eventual role reversal
+    And surface: "Frank's contributions now create legitimate claims later"
+    And facilitate planning conversations that preserve Frank's dignity
+    And help family anticipate and prepare for increasing needs
+    And ensure Frank experiences agency in planning his aging
+    And care reciprocity across time should be made explicit

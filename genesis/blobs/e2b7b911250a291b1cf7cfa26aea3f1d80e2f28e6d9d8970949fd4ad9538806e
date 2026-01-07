@@ -1,0 +1,10 @@
+Scenario: Teen accesses community resources based on care contributions
+    Given Jasmine has accumulated significant care tokens
+    And the community offers educational programs and skill-building workshops
+    When Jasmine seeks to access community opportunities
+    Then her care contributions should qualify her for access
+    And she should not need parent mediation to access community resources
+    And the community_elohim should recognize her as an independent participant
+    And opportunities should be surfaced based on her interests and contribution patterns
+    And she should experience that care economy operates on reciprocity
+    And her care tokens should give her legitimate standing to access community resources

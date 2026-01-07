@@ -1,0 +1,9 @@
+Scenario: Workplace acknowledges single parents have no backup for emergencies
+    Given Maria has no co-parent to handle child illness, school emergencies, or family crises
+    And she must handle every emergency alone while maintaining employment
+    When workplace policies address family emergencies
+    Then the workplace_elohim should make visible that single parents have no backup
+    And policies should recognize emergencies are inevitable and not optional
+    And Maria should be able to handle crises without job security risk
+    And single parent realities should inform workplace family leave policies
+    And employers should understand solo parents cannot simply "find coverage" at home

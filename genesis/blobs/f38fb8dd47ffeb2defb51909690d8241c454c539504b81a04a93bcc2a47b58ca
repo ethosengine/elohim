@@ -1,0 +1,60 @@
+# Economic Events: Where Value Becomes Visible
+
+## What is an Economic Event?
+
+An Economic Event in hREA is an **observed economic flow** - something that actually happened, involving resources moving between agents.
+
+Unlike intents (what might happen) or commitments (what will happen), events are **facts** - recorded observations of value creation.
+
+## Event Anatomy
+
+Every economic event records:
+
+| Field | Purpose |
+|-------|---------|
+| `action` | The verb: produce, consume, transfer, use, work, cite |
+| `provider` | The agent giving the resource |
+| `receiver` | The agent receiving the resource |
+| `resourceQuantity` | How much of what |
+| `effortQuantity` | Labor involved (for work actions) |
+| `hasPointInTime` | When it happened |
+
+## Actions: The Verbs of Value
+
+hREA defines standard actions:
+
+- **produce**: Create a new resource
+- **consume**: Use up a resource
+- **use**: Apply a resource without consuming it
+- **work**: Apply effort/labor
+- **transfer**: Move resource between agents
+- **cite**: Reference another's work
+- **modify**: Transform a resource
+
+## Care Work as Economic Events
+
+A caregiver's day creates many events:
+
+```json
+{
+  "action": "work",
+  "provider": "parent_maria",
+  "receiver": "family_household",
+  "effortQuantity": { "value": 3, "unit": "hours" },
+  "note": "Meal preparation, homework help, emotional support",
+  "resourceClassifiedAs": ["care-work", "household-labor"]
+}
+```
+
+In traditional accounting, this is invisible.
+In REA accounting, this is a recorded economic event.
+
+## Track and Trace
+
+Events connect into flows:
+- `previous`: What events led to this one
+- `next`: What events follow from this one
+- `track`: Follow resources forward
+- `trace`: Follow resources backward
+
+This creates **value chain visibility** - seeing how care and creation flow through communities.

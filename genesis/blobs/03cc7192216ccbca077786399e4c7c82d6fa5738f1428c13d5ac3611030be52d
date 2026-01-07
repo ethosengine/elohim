@@ -1,0 +1,164 @@
+@epic:value_scanner
+@user_type:elderly
+@governance_layer:household
+@related_users:caregiver,family_member,home_health_aide
+@related_layers:individual,family,community
+@elohim_agents:personal_agent,household_elohim
+
+Feature: Household Layer Dignity-Preserving Care Coordination for Elderly
+  As an elderly person living in my own home
+  Operating at the household governance layer
+  I want to maintain my household with support while preserving my sense of home
+  So that I remain in control of my own living space despite needing assistance
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the elderly user "Helen" is registered in the system
+    And Helen lives in her own home
+    And Helen requires support for household maintenance
+    And the household governance context is active
+    And the household_elohim coordinates support services
+    And Helen's sense of home is critical to her identity
+
+  Scenario: Home maintenance coordinated with dignity preservation
+    Given Helen can no longer manage all household tasks independently
+    And she needs help with cleaning, repairs, and maintenance
+    When the household_elohim coordinates support services
+    Then Helen should remain the authority in her own home
+    And support workers should be coordinated around her preferences
+    And the household should feel like hers, not an institution
+    And her choices about how things are done should be respected
+    And assistance should enhance her ability to stay home
+    And she should not feel like a guest in her own space
+    And the protocol should preserve the dignity of "this is my home"
+
+  Scenario: Household safety modifications balance autonomy and protection
+    Given Helen has mobility limitations and fall risk
+    And safety modifications would reduce risk
+    When household safety needs are assessed
+    Then modifications should be proposed, not imposed
+    And Helen should decide what changes occur in her home
+    And options should be presented with dignity: "Would grab bars help you feel safer?"
+    And her preferences about aesthetics and comfort should matter
+    And safety should support her autonomy, not restrict it
+    And the goal should be enabling continued home living
+    And Helen's agency over her space should be preserved
+
+  Scenario: Home health aide coordination respects household authority
+    Given Helen receives visits from home health aides
+    And multiple aides may rotate through her schedule
+    When aides enter Helen's household
+    Then Helen should remain the authority in her space
+    And her household_elohim should communicate her preferences to aides
+    And aides should be briefed on Helen's routines and wishes
+    And consistency should be maintained across different workers
+    And Helen should not have to repeatedly assert her preferences
+    And care should be provided on her terms in her space
+    And the protocol should establish Helen's household sovereignty
+
+  Scenario: Household budget management with severe resource constraint
+    Given Helen's $24k/year income barely covers necessities
+    And household expenses are challenging on fixed income
+    When the household_elohim manages budget tracking
+    Then it should help Helen navigate financial limitations
+    And priority should be given to keeping her housed
+    And community resources for home maintenance should be surfaced
+    And no shame should attach to needing financial assistance
+    And the system should connect her to care economy support
+    And assistance should flow as reciprocity, not charity
+    And Helen's ability to remain in her home should be prioritized
+
+  Scenario: Household routines maintained for cognitive support
+    Given Helen's dementia makes routine important for functioning
+    And familiar patterns help her maintain independence
+    When the household_elohim supports daily routines
+    Then her established patterns should be preserved
+    And reminders should support her existing habits
+    And changes should be minimized to reduce confusion
+    And her personal_agent should say "Time for your morning tea, like always"
+    And routine should provide cognitive scaffolding
+    And household familiarity should support her capability
+    And the protocol should recognize that routine enables autonomy
+
+  Scenario: Household technology adapted for accessibility
+    Given Helen has difficulty with complex technology
+    And her home includes various devices and systems
+    When household technology is configured
+    Then all systems should be simplified for her access
+    And voice control should be available throughout
+    And large, simple controls should replace complex interfaces
+    And emergency systems should be easily accessible
+    And technology should serve her, not frustrate her
+    And assistive devices should integrate seamlessly
+    And the household should be adapted to her capabilities
+
+  Scenario: Shared living space decisions preserve elderly authority
+    Given Helen's daughter occasionally stays to provide care
+    And Helen's home is multigenerational at times
+    When household decisions need to be made
+    Then Helen's authority in her own home should be paramount
+    And family members should defer to her household preferences
+    And the household_elohim should mediate conflicting preferences
+    And Helen's long-standing patterns should have priority
+    And she should not feel like she's lost control of her space
+    And care recipients should not become subordinate in their own homes
+    And the protocol should preserve hierarchy: this is Helen's home
+
+  Scenario: Household care coordination prevents caregiver burnout
+    Given Helen's daughter provides substantial household support
+    And family caregiving risks burnout
+    When the household_elohim tracks care labor
+    Then it should identify when daughter's burden is unsustainable
+    And it should suggest respite care before crisis occurs
+    And it should coordinate additional support sources
+    And daughter's care work should be recognized and valued
+    And care tokens should accumulate for her labor
+    And the system should protect both Helen and her caregivers
+    And sustainable care networks should be built proactively
+
+  Scenario: Household accessibility increases with declining mobility
+    Given Helen's mobility is gradually declining
+    And her household needs ongoing adaptation
+    When accessibility needs change over time
+    Then the household_elohim should proactively suggest adaptations
+    And Helen should be consulted on all modifications
+    And her home should evolve to support her changing capabilities
+    And the goal should be maximum independence at home
+    And dignity should be preserved throughout adaptation
+    And the protocol should enable aging in place with grace
+    And her ability to remain home should be extended as long as possible
+
+  Scenario: Emergency response configured to Helen's advance directives
+    Given emergency situations may occur in Helen's household
+    And Helen has specific wishes about medical intervention
+    When emergency protocols are configured
+    Then her advance directives should guide emergency response
+    And emergency contacts should understand her wishes
+    And the household_elohim should communicate her preferences to responders
+    And her values should be respected even in crisis
+    And emergency systems should serve her autonomy, not override it
+    And her voice should remain authoritative about her own care
+    And the protocol should ensure her wishes guide all household emergency response
+
+  Scenario: Household privacy maintained despite care coordination needs
+    Given multiple people enter Helen's home to provide care
+    And care coordination requires information sharing
+    When household privacy is managed
+    Then Helen should control what information is shared with whom
+    And her personal spaces should remain private
+    And intimate care should be provided with maximum dignity
+    And she should have privacy in her own home
+    And surveillance should be minimized to necessity
+    And her home should not feel like an institution
+    And the protocol should preserve the privacy of home life
+
+  Scenario: Household contribution recognition for care reciprocity
+    Given Helen has lived in this home for 40 years
+    And she raised family and contributed to community from this household
+    When household care economy is tracked
+    Then her lifetime of household labor should be visible
+    And her decades of contribution should create legitimate claims
+    And current care receipt should be framed as reciprocity
+    And she should not feel like a burden in her own home
+    And the household_elohim should surface her contribution history
+    And care flowing to her should be recognized as earned through lifetime of giving

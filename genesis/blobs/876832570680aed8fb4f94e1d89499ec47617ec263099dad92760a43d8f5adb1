@@ -1,0 +1,9 @@
+Scenario: Teacher exposes resource distribution inequities
+    Given some schools have abundant materials while others lack basics
+    And district claims equitable allocation
+    When teachers document resources across schools through Observer
+    Then data reveals wealthy-area schools get $800/student discretionary
+    And high-poverty schools get $200/student discretionary
+    And teachers coordinate with parents in under-resourced schools
+    And bring evidence of systematic inequity to board
+    And resource distribution becomes equity accountability issue

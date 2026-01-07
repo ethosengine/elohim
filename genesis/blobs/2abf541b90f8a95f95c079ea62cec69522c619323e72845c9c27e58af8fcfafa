@@ -1,0 +1,9 @@
+Scenario: Right to disconnect maintained for adult user
+    Given Aisha has full autonomy over technology use
+    And the constitutional constraints apply at all layers
+    When Aisha chooses to disconnect from the system
+    Then the disconnection must be honored immediately
+    And all data retention must follow legal minimums only
+    And no manipulative patterns should attempt to retain usage
+    And Aisha's right to opt out must be absolute
+    And the system must respect her sovereign choice

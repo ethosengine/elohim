@@ -1,0 +1,10 @@
+Scenario: Local store relationships built through consistent presence
+    Given Marcus shops weekly at neighborhood stores
+    And he is a regular, recognizable customer
+    When Marcus builds relationships with store workers
+    Then the neighborhood_elohim should facilitate positive recognition
+    And store workers should see Marcus's care contributions
+    And they should understand he's feeding his family, not just shopping
+    And informal support networks should develop
+    And local relationships should provide informal safety net
+    And Marcus should be known and looked after in his neighborhood

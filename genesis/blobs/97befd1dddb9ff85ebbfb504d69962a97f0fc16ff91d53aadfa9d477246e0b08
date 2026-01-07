@@ -1,0 +1,9 @@
+Scenario: Organizer tracks implementation of restorative justice commitment
+    Given district adopted restorative justice to reduce suspensions
+    And the organizer's coalition of parents and students won the policy
+    When the Observer tracks implementation progress
+    Then the organizer monitors training of school staff
+    And sees suspension data by school, race, and disability status
+    And identifies schools not implementing restorative practices
+    And documents where implementation succeeds and changes outcomes
+    And policy victory leads to implementation accountability

@@ -1,0 +1,10 @@
+Scenario: Manager facilitates scheduling through negotiation, not command
+    Given workers need coordinated schedule balancing operational and personal needs
+    And corporate model had Marcus impose schedule unilaterally
+    When scheduling conflicts arise
+    Then Marcus proposes schedule based on operational requirements
+    And Marcus facilitates negotiation between workers with competing needs
+    And workers modify proposal based on their life circumstances
+    And workers democratically approve final schedule
+    And Marcus cannot override worker decision
+    And workplace_elohim ensures process remains democratic

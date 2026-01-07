@@ -1,0 +1,8 @@
+Scenario: Owner protects workers while achieving own security
+    Given Rosa could sell to buyer who would fire workers and cut quality
+    And she refuses to betray workers despite financial pressure
+    When EAE acquisition enables both worker protection and owner security
+    Then workers gain ownership, higher wages, and governance voice
+    And Rosa achieves financial security without worker exploitation
+    And false choice between owner security and worker dignity is resolved
+    And Rosa's ethical commitments are honored, not punished

@@ -1,0 +1,10 @@
+Scenario: Learning about local and seasonal food choices
+    Given local and seasonal food has lower environmental impact
+    And Aisha is learning about bioregional food systems
+    When Aisha shops for produce
+    Then the bioregional_elohim should highlight local options
+    And it should explain seasonal availability
+    And it should teach about her bioregion's food production
+    And local food choices should be encouraged when affordable
+    And she should learn her region's agricultural patterns
+    And bioregional food literacy should develop

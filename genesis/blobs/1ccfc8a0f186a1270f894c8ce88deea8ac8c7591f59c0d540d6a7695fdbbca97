@@ -1,0 +1,9 @@
+Scenario: Activist monitors multiple municipal bodies simultaneously
+    Given the activist's issue spans city council, planning commission, and housing authority
+    And attending all meetings is physically impossible
+    When the Observer monitors all civic bodies
+    Then the activist receives alerts for relevant agenda items
+    And sees summaries of decisions across all bodies
+    And identifies coordination opportunities across agencies
+    And sustainable multi-body surveillance becomes possible
+    And activist capacity multiplies through automation

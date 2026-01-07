@@ -1,0 +1,9 @@
+Scenario: Care coordination with James's mother while caring for David
+    Given James's mother (76) needs increasing support
+    And James is already overwhelmed caring for David
+    When James coordinates care for his mother
+    Then the family_elohim should help him manage both relationships
+    And it should recognize he cannot provide intensive care in both directions
+    And it should help coordinate additional support for his mother
+    And it should prevent James from collapsing under dual burden
+    And family care should be sustainable across multiple recipients

@@ -1,0 +1,10 @@
+Scenario: Learning about industrial agriculture impacts
+    Given industrial agriculture has severe environmental costs
+    And Aisha consumes products of agricultural systems
+    When the personal_agent teaches about food systems
+    Then it should explain industrial agriculture's impacts
+    And it should highlight alternatives like regenerative agriculture
+    And it should help her support better food systems
+    And agricultural literacy should inform purchasing
+    And she should understand systemic environmental issues
+    And food system education should enable values-aligned choices

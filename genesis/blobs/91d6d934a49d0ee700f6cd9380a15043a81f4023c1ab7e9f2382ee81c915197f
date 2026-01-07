@@ -1,0 +1,10 @@
+Scenario: Personal agent serves child's flourishing without manipulation
+    Given Tommy's personal_agent has AI capabilities
+    And Tommy is highly vulnerable to manipulation
+    When the personal_agent interacts with Tommy
+    Then it must never manipulate through guilt or shame
+    And it must never extract data for commercial purposes
+    And it must never train Tommy toward consumption patterns
+    And it must serve only Tommy's dignity and flourishing
+    And it must preserve Tommy's natural generosity from corruption
+    And it must set Tommy's baseline expectation that technology serves humans

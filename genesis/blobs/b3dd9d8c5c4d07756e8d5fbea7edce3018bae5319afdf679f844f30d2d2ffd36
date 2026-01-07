@@ -1,0 +1,11 @@
+Scenario: Family care legacy and preparing for Margaret's own aging
+    Given Margaret is building care economy capital through current contributions
+    And she will need increasing care as she ages
+    When the family_elohim tracks care patterns across time
+    Then it should show Margaret's accumulated care contributions
+    And it should recognize she is building reciprocal relationships
+    And it should help family understand care flows across life stages
+    And grandchildren learning now will be caregivers later
+    And Sarah will reciprocate care as Margaret ages
+    And family care economy should be sustainable across time
+    And Margaret's current care should create future care security

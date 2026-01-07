@@ -1,0 +1,12 @@
+Scenario: Coordinating family decision-making about major changes
+    Given major decisions affect my children and our whole family
+    And I want children to have age-appropriate voice while I retain authority
+    When we face decisions about housing, location, schooling, or other major changes
+    Then the family_elohim facilitates age-appropriate family discussions
+    And helps children express their needs and preferences
+    And supports me in making final decisions considering everyone's input
+    And tracks family decision-making process
+    And validates children's participation without parentifying them
+    And my personal_agent ensures all voices are heard appropriately
+    And recognizes inclusive decision-making as sophisticated parenting
+    And celebrates family decisions made together

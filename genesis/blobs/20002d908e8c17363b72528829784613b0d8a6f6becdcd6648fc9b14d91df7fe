@@ -1,0 +1,10 @@
+Scenario: Board member understands community priorities beyond meeting testimony
+    Given board considers policy change to school calendar
+    And testimony at meeting is dominated by teachers union advocating position
+    And only 15 community members attended to testify
+    When the board member seeks community accountability data from Observer
+    Then they see survey data from thousands of district families on calendar preferences
+    And discover working families have different priorities than those who testified
+    And access childcare impact analysis showing consequences for different populations
+    And understand community needs beyond who has time to attend meetings
+    And community accountability helps board serve diverse constituent interests

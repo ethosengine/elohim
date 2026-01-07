@@ -1,0 +1,10 @@
+Scenario: Accessing appeals process without technical expertise
+    Given I am not tech-savvy and don't understand AI systems well
+    And an agent decision has affected me in a way I disagree with
+    When I want to file an appeal
+    Then I can trigger the appeal with a simple button: "I disagree with this decision"
+    And I can state my complaint in plain language without legal jargon
+    And I don't need a lawyer or technical knowledge to participate
+    And The interface guides me through the process step-by-step
+    And Support is available in my language and accessible format
+    And The process respects my dignity regardless of my technical literacy

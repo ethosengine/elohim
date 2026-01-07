@@ -1,0 +1,12 @@
+Scenario: Elder care financial coordination across family
+    Given Robert's parents' care costs are increasing
+    And long-term care may eventually be needed
+    And financial planning needs to involve siblings
+    When family_elohim coordinates elder care financing
+    Then it should help siblings discuss financial responsibility
+    And surface each sibling's capacity to contribute financially
+    And track actual financial contributions to parent care
+    And help coordinate long-term care insurance, Medicare, and family support
+    And ensure parents' dignity is protected in financial discussions
+    And prevent financial burden from falling entirely on one sibling
+    And support transparent, equitable financial planning

@@ -1,0 +1,9 @@
+Scenario: Learning about ecological carrying capacity and limits
+    Given ecosystems have finite carrying capacity
+    And consumption must stay within ecological limits
+    When the personal_agent teaches environmental concepts
+    Then it should explain ecological limits and boundaries
+    And it should help her understand planetary boundaries
+    And it should frame consumption within ecological context
+    And she should learn that infinite growth is impossible
+    And ecological literacy should include limits and constraints

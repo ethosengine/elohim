@@ -1,0 +1,10 @@
+Scenario: Housing authority board member evaluates rent increase proposal
+    Given authority staff recommends rent increases to cover operating costs
+    And staff presentation emphasizes authority's fiduciary responsibility and budget needs
+    And tenant advocates testify about hardship but lack supporting data
+    When the board member requests Observer independent analysis
+    Then they receive comparison of authority's costs to peer housing authorities
+    And see tenant income data showing rent burden impacts by increase level
+    And access analysis of cost drivers and alternative budget approaches
+    And discover authority's administrative costs higher than similar authorities
+    And independent analysis reveals trade-offs staff presentation minimized

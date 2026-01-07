@@ -1,0 +1,106 @@
+---
+node_type: organization
+org_id: conversence39s_idealoom_platform
+name: "Conversence&#39;s IdeaLoom platform"
+url: "https://www.conversence.com/pages/idealoom.html"
+gem_id: "FtgGAKWPaLx87R8tuU6z"
+
+# Epic relationships (NO DUPLICATION NEEDED)
+primary_epic: autonomous_entity
+related_epics: [governance, social_medium]
+
+epic_relationships:
+  autonomous_entity:
+    inspiration: "[How Conversence&#39;s IdeaLoom platform inspires the autonomous_entity epic]"
+    parallel_work: []
+  governance:
+    inspiration: "[How Conversence&#39;s IdeaLoom platform inspires the governance epic]"
+    parallel_work: []
+  social_medium:
+    inspiration: "[How Conversence&#39;s IdeaLoom platform inspires the social_medium epic]"
+    parallel_work: []
+
+# What they demonstrate
+demonstrates_principles: []
+
+# Who they inspire (across ALL epics)
+inspires_users: []
+
+# Where they operate
+operates_at_layers: []
+
+# Graph relationships (automatically generated from above)
+edge_types:
+  - inspires_epic
+  - demonstrates_principle
+  - aligns_with_user
+  - operates_at_layer
+---
+
+# Conversence&#39;s IdeaLoom platform
+
+## Description
+
+IdeaLoom is our flagship Collective Intelligence platform, which allows large communities to hold a meaningful conversation at scale, converge to a common understanding, and elaborate solutions beyond what each participant could have envisioned. IdeaLoom allows a structured navigation through conversations on&nbsp;...
+
+**Publisher:** Conversence
+
+## Vision Alignment
+
+How this organization's work aligns with the Elohim Protocol vision:
+
+- [Alignment point 1 - to be filled in]
+- [Alignment point 2 - to be filled in]
+
+## Multi-Epic Inspiration
+
+### Primary Epic: autonomous_entity
+
+[Detailed explanation of how Conversence&#39;s IdeaLoom platform relates to and inspires the autonomous_entity epic]
+
+**Parallel Work:**
+- [What they're doing that parallels this epic]
+
+### Related Epic: governance
+
+[How Conversence&#39;s IdeaLoom platform also inspires the governance epic]
+
+**Parallel Work:**
+- [What relates to this epic]
+
+### Related Epic: social_medium
+
+[How Conversence&#39;s IdeaLoom platform also inspires the social_medium epic]
+
+**Parallel Work:**
+- [What relates to this epic]
+
+## Demonstrations of Principles
+
+### [Principle 1]
+How this organization demonstrates this principle in practice
+
+### [Principle 2]  
+How this organization demonstrates this principle in practice
+
+## Key Resources
+
+- **Website:** https://www.conversence.com/pages/idealoom.html
+- **Key reading:** [Links to important content]
+- **People:** [Key figures]
+
+## Graph Connections
+
+### Inspires Epics
+- `autonomous_entity` - Primary focus and location
+- `governance` - [Connection description]
+- `social_medium` - [Connection description]
+
+### Inspires Users
+- `[epic:user_type]` - [how/why]
+
+### Demonstrates Principles
+- `[principle_name]` - [how they demonstrate it]
+
+### Operates At Layers
+- `[layer_name]` - [what they do at this layer]

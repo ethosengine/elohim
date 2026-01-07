@@ -1,0 +1,9 @@
+Scenario: Investor earns fair financial returns without requiring extraction
+    Given stock market averages ~7% annual returns through maximizing extraction
+    And Patricia accepted lower returns (5%) for values alignment
+    When democratic business proves financially sustainable
+    Then 5% returns are paid reliably from business revenue
+    And returns come from democratic value circulation, not worker exploitation
+    And financial viability proves extraction isn't necessary for investor returns
+    And she earns modestly while workers earn living wages and community benefits
+    And community_elohim ensures transparent return calculations and timely payments

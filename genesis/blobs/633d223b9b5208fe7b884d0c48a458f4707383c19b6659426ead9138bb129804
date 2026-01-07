@@ -1,0 +1,10 @@
+Scenario: Health literacy education empowers self-care
+    Given Margaret navigates complex health systems
+    And health literacy affects health outcomes
+    When the educational_elohim provides health education
+    Then Margaret should access senior-appropriate health information
+    And education should empower her health decision-making
+    And her nursing background should be acknowledged
+    And health literacy should support active aging
+    And education should enhance autonomy in health care
+    And Margaret should be informed patient and advocate

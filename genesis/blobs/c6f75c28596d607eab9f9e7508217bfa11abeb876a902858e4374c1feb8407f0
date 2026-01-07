@@ -1,0 +1,10 @@
+Scenario: Multigenerational family gatherings coordinated with care recognition
+    Given Margaret often hosts or coordinates family gatherings
+    And these gatherings require significant labor
+    When Margaret organizes family events
+    Then the planning, preparation, and hosting labor should be tracked
+    And other family members should see the work involved
+    And equitable distribution of hosting burden should be encouraged
+    And Margaret's contributions should be recognized and appreciated
+    And family gatherings should not depend on her invisible labor
+    And care work that makes family connection possible should be valued

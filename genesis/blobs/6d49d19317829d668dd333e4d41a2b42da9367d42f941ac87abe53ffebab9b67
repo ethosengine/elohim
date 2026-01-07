@@ -1,0 +1,11 @@
+Scenario: Appeal agent decision that involved factual error
+    Given a Family Elohim agent denies teenager permission to attend event
+    And the agent based decision on incorrect data about event location
+    And the event was actually a volunteer environmental cleanup
+    When the teenager files an appeal citing factual error
+    Then the appeal is fast-tracked for factual verification
+    And peer agents cross-reference data sources
+    And the address parsing error is identified
+    And the original decision is immediately overturned
+    And the appellant receives acknowledgment of the error
+    And the error pattern is flagged for protocol improvement

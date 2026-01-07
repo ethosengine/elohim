@@ -1,0 +1,8 @@
+Scenario: Accessing individual health monitoring
+    Given work conditions threaten my physical and mental health
+    When my personal_agent detects warning signs
+    Such as declining nutrition, inadequate rest, or chronic stress
+    Then it should provide gentle health monitoring
+    And surface accessible healthcare resources
+    And help me understand my rights to workplace accommodations
+    And support me in prioritizing my health despite work pressure

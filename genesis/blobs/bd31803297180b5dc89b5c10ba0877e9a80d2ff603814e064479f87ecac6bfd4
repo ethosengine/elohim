@@ -1,0 +1,9 @@
+Scenario: Living wage that enables sole provider to support family
+    Given Maria is the only income earner for household of four
+    And $42k/year is barely sustainable for her family size
+    When Maria's compensation is determined
+    Then the workplace_elohim should provide data on single parent economic needs
+    And wage should enable household flourishing, not just survival
+    And employers should understand many workers are sole household providers
+    And fair compensation should account for single-income household realities
+    And Maria should earn enough to support her family with dignity

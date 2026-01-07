@@ -38,6 +38,7 @@ use crate::import_api::ImportApi;
 use crate::progress_hub::ProgressHub;
 use crate::progress_ws;
 use crate::sharding::{ShardEncoder, ShardManifest};
+use crate::sync::SyncManager;
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
@@ -61,6 +62,8 @@ pub struct HttpServer {
     import_api: Option<Arc<RwLock<ImportApi>>>,
     /// Progress hub for WebSocket streaming
     progress_hub: Option<Arc<ProgressHub>>,
+    /// Sync manager for CRDT document sync
+    sync_manager: Option<Arc<SyncManager>>,
 }
 
 impl HttpServer {
@@ -72,6 +75,7 @@ impl HttpServer {
             bind_addr,
             import_api: None,
             progress_hub: None,
+            sync_manager: None,
         }
     }
 
@@ -84,6 +88,12 @@ impl HttpServer {
     /// Set the Progress Hub for WebSocket streaming
     pub fn with_progress_hub(mut self, hub: Arc<ProgressHub>) -> Self {
         self.progress_hub = Some(hub);
+        self
+    }
+
+    /// Set the Sync Manager for CRDT document sync
+    pub fn with_sync_manager(mut self, sync_manager: Arc<SyncManager>) -> Self {
+        self.sync_manager = Some(sync_manager);
         self
     }
 
@@ -217,6 +227,21 @@ impl HttpServer {
                 }
             }
 
+            // Sync API: /sync/v1/{app_id}/docs[/{doc_id}[/heads|/changes]]
+            (method, p) if p.starts_with("/sync/v1/") => {
+                if let Some(ref sync_manager) = self.sync_manager {
+                    self.handle_sync_request(req, method, &path, sync_manager.clone()).await
+                } else {
+                    Ok(Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error": "Sync API not enabled"}"#
+                        )))
+                        .unwrap())
+                }
+            }
+
             // Not found
             _ => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
@@ -266,9 +291,13 @@ impl HttpServer {
         })?;
         let data = body.to_bytes();
 
-        // Verify hash
+        // Verify hash - normalize both to hex for comparison
+        // URL may contain raw hex, sha256-prefixed, or CID format
         let computed_hash = BlobStore::compute_hash(&data);
-        if !expected_hash.is_empty() && computed_hash != expected_hash {
+        let computed_hex = computed_hash.strip_prefix("sha256-").unwrap_or(&computed_hash);
+        let expected_hex = expected_hash.strip_prefix("sha256-").unwrap_or(expected_hash);
+
+        if !expected_hash.is_empty() && computed_hex != expected_hex {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .body(Full::new(Bytes::from(format!(
@@ -388,9 +417,13 @@ impl HttpServer {
         })?;
         let data = body.to_bytes().to_vec();
 
-        // Verify hash if provided
+        // Verify hash if provided - normalize both to hex for comparison
+        // URL may contain raw hex, sha256-prefixed, or CID format
         let computed_hash = BlobStore::compute_hash(&data);
-        if !expected_hash.is_empty() && computed_hash != expected_hash {
+        let computed_hex = computed_hash.strip_prefix("sha256-").unwrap_or(&computed_hash);
+        let expected_hex = expected_hash.strip_prefix("sha256-").unwrap_or(expected_hash);
+
+        if !expected_hash.is_empty() && computed_hex != expected_hex {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .body(Full::new(Bytes::from(format!(
@@ -546,6 +579,366 @@ impl HttpServer {
             None => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .body(Full::new(Bytes::from("Manifest not found")))
+                .unwrap()),
+        }
+    }
+
+    /// Handle sync API requests
+    ///
+    /// Routes:
+    /// - GET /sync/v1/{app_id}/docs - List documents
+    /// - GET /sync/v1/{app_id}/docs/{doc_id}/heads - Get document heads
+    /// - GET /sync/v1/{app_id}/docs/{doc_id}/changes?have={heads} - Get changes since heads
+    /// - POST /sync/v1/{app_id}/docs/{doc_id}/changes - Apply changes
+    async fn handle_sync_request(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        path: &str,
+        sync_manager: Arc<SyncManager>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Parse path: /sync/v1/{app_id}/docs[/{doc_id}[/heads|/changes]]
+        let parts: Vec<&str> = path.trim_start_matches("/sync/v1/").split('/').collect();
+
+        if parts.is_empty() || parts[0].is_empty() {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Missing app_id"}"#)))
+                .unwrap());
+        }
+
+        let app_id = parts[0];
+
+        // /sync/v1/{app_id}/docs
+        if parts.len() == 2 && parts[1] == "docs" {
+            return self.handle_sync_list_docs(method, app_id, &req, sync_manager).await;
+        }
+
+        // /sync/v1/{app_id}/docs/{doc_id}
+        if parts.len() == 3 && parts[1] == "docs" {
+            let doc_id = parts[2];
+            return self.handle_sync_doc(method, app_id, doc_id, req, sync_manager).await;
+        }
+
+        // /sync/v1/{app_id}/docs/{doc_id}/{action}
+        if parts.len() == 4 && parts[1] == "docs" {
+            let doc_id = parts[2];
+            let action = parts[3];
+
+            return match action {
+                "heads" => self.handle_sync_heads(method, app_id, doc_id, sync_manager).await,
+                "changes" => self.handle_sync_changes(method, app_id, doc_id, req, sync_manager).await,
+                _ => Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error": "Unknown action: {}"}}"#,
+                        action
+                    ))))
+                    .unwrap()),
+            };
+        }
+
+        Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(r#"{"error": "Invalid sync path"}"#)))
+            .unwrap())
+    }
+
+    /// GET /sync/v1/{app_id}/docs - List documents
+    async fn handle_sync_list_docs(
+        &self,
+        method: Method,
+        app_id: &str,
+        req: &Request<Incoming>,
+        sync_manager: Arc<SyncManager>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap());
+        }
+
+        // Parse query params: ?prefix=&offset=&limit=
+        let query = req.uri().query().unwrap_or("");
+        let params: std::collections::HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes())
+            .into_owned()
+            .collect();
+
+        let prefix = params.get("prefix").map(|s| s.as_str());
+        let offset: u32 = params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0);
+        let limit: u32 = params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100);
+
+        match sync_manager.list_documents(app_id, prefix, offset, limit).await {
+            Ok((docs, total)) => {
+                let documents: Vec<serde_json::Value> = docs
+                    .into_iter()
+                    .map(|d| {
+                        serde_json::json!({
+                            "doc_id": d.doc_id,
+                            "doc_type": d.doc_type,
+                            "change_count": d.change_count,
+                            "last_modified": d.last_modified,
+                            "heads": d.heads,
+                        })
+                    })
+                    .collect();
+
+                let body = serde_json::json!({
+                    "app_id": app_id,
+                    "documents": documents,
+                    "total": total,
+                    "offset": offset,
+                    "limit": limit,
+                });
+
+                Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(body.to_string())))
+                    .unwrap())
+            }
+            Err(e) => {
+                error!(app_id = %app_id, error = %e, "Failed to list documents");
+                Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error": "{}"}}"#,
+                        e
+                    ))))
+                    .unwrap())
+            }
+        }
+    }
+
+    /// Handle document-level requests
+    async fn handle_sync_doc(
+        &self,
+        method: Method,
+        app_id: &str,
+        doc_id: &str,
+        _req: Request<Incoming>,
+        sync_manager: Arc<SyncManager>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        match method {
+            Method::GET => {
+                // Return document info
+                match sync_manager.get_heads(app_id, doc_id).await {
+                    Ok(heads) => {
+                        if heads.is_empty() {
+                            return Ok(Response::builder()
+                                .status(StatusCode::NOT_FOUND)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(
+                                    r#"{{"error": "Document not found: {}"}}"#,
+                                    doc_id
+                                ))))
+                                .unwrap());
+                        }
+
+                        let body = serde_json::json!({
+                            "app_id": app_id,
+                            "doc_id": doc_id,
+                            "heads": heads,
+                        });
+
+                        Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(body.to_string())))
+                            .unwrap())
+                    }
+                    Err(e) => {
+                        error!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to get document");
+                        Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "{}"}}"#,
+                                e
+                            ))))
+                            .unwrap())
+                    }
+                }
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap()),
+        }
+    }
+
+    /// GET /sync/v1/{app_id}/docs/{doc_id}/heads - Get document heads
+    async fn handle_sync_heads(
+        &self,
+        method: Method,
+        app_id: &str,
+        doc_id: &str,
+        sync_manager: Arc<SyncManager>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap());
+        }
+
+        match sync_manager.get_heads(app_id, doc_id).await {
+            Ok(heads) => {
+                let body = serde_json::json!({
+                    "app_id": app_id,
+                    "doc_id": doc_id,
+                    "heads": heads,
+                });
+
+                Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(body.to_string())))
+                    .unwrap())
+            }
+            Err(e) => {
+                error!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to get heads");
+                Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error": "{}"}}"#,
+                        e
+                    ))))
+                    .unwrap())
+            }
+        }
+    }
+
+    /// GET/POST /sync/v1/{app_id}/docs/{doc_id}/changes
+    async fn handle_sync_changes(
+        &self,
+        method: Method,
+        app_id: &str,
+        doc_id: &str,
+        req: Request<Incoming>,
+        sync_manager: Arc<SyncManager>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        match method {
+            Method::GET => {
+                // GET changes since given heads
+                let query = req.uri().query().unwrap_or("");
+                let params: std::collections::HashMap<String, String> =
+                    url::form_urlencoded::parse(query.as_bytes())
+                        .into_owned()
+                        .collect();
+
+                // Parse have_heads from comma-separated list
+                let have_heads: Vec<String> = params
+                    .get("have")
+                    .map(|s| s.split(',').map(|h| h.to_string()).collect())
+                    .unwrap_or_default();
+
+                match sync_manager.get_changes_since(app_id, doc_id, &have_heads).await {
+                    Ok((changes, new_heads)) => {
+                        // Encode changes as base64 for JSON transport
+                        let changes_b64: Vec<String> = changes
+                            .iter()
+                            .map(|c| base64::Engine::encode(&base64::engine::general_purpose::STANDARD, c))
+                            .collect();
+
+                        let body = serde_json::json!({
+                            "app_id": app_id,
+                            "doc_id": doc_id,
+                            "changes": changes_b64,
+                            "new_heads": new_heads,
+                        });
+
+                        Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(body.to_string())))
+                            .unwrap())
+                    }
+                    Err(e) => {
+                        error!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to get changes");
+                        Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "{}"}}"#,
+                                e
+                            ))))
+                            .unwrap())
+                    }
+                }
+            }
+            Method::POST => {
+                // Apply changes from client
+                let body = req.collect().await.map_err(|e| {
+                    StorageError::Internal(format!("Failed to read body: {}", e))
+                })?;
+                let body_bytes = body.to_bytes();
+
+                // Parse JSON body: { "changes": ["base64..."] }
+                let payload: serde_json::Value = serde_json::from_slice(&body_bytes)
+                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+                let changes_b64 = payload["changes"]
+                    .as_array()
+                    .ok_or_else(|| StorageError::Internal("Missing 'changes' array".to_string()))?;
+
+                // Decode base64 changes
+                let changes: Vec<Vec<u8>> = changes_b64
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .filter_map(|s| base64::Engine::decode(&base64::engine::general_purpose::STANDARD, s).ok())
+                    .collect();
+
+                if changes.is_empty() {
+                    return Ok(Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(r#"{"error": "No valid changes"}"#)))
+                        .unwrap());
+                }
+
+                match sync_manager.apply_changes(app_id, doc_id, changes).await {
+                    Ok(new_heads) => {
+                        info!(app_id = %app_id, doc_id = %doc_id, heads = ?new_heads, "Applied changes via HTTP");
+
+                        let body = serde_json::json!({
+                            "app_id": app_id,
+                            "doc_id": doc_id,
+                            "new_heads": new_heads,
+                        });
+
+                        Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(body.to_string())))
+                            .unwrap())
+                    }
+                    Err(e) => {
+                        error!(app_id = %app_id, doc_id = %doc_id, error = %e, "Failed to apply changes");
+                        Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "{}"}}"#,
+                                e
+                            ))))
+                            .unwrap())
+                    }
+                }
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
                 .unwrap()),
         }
     }

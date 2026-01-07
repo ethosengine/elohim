@@ -1,0 +1,11 @@
+Scenario: Teen manages portions of household budget with real responsibility
+    Given Jasmine has been allocated responsibility for weekly food budget
+    And the family has allocated $100/week for her to manage
+    And this is part of the actual household budget, not pretend
+    When Jasmine makes purchasing decisions
+    Then she should have genuine authority over those funds
+    And her decisions should have real impact on family wellbeing
+    And the family_elohim should track her budget management
+    And provide feedback on value optimization
+    And recognize successful management: "Jasmine has stayed within budget and met family needs for 12 consecutive weeks"
+    And support her learning household economics through real practice

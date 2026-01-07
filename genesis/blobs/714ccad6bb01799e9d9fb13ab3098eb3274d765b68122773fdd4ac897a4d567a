@@ -1,0 +1,9 @@
+Scenario: Citizen receives time-efficient community meeting summary
+    Given a neighborhood council meeting occurred last night
+    And the citizen has indicated interest in local amenities
+    When the citizen checks their morning brief
+    Then they see a 3-minute summary of key decisions
+    And they see plain-language explanations of policy changes
+    And they are notified only about decisions affecting their stated interests
+    And they can submit async feedback on decisions
+    And their time commitment is under 15 minutes

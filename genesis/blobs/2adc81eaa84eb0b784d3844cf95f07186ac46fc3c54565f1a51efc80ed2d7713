@@ -1,0 +1,12 @@
+Scenario: Community care policy advocacy informed by personal experience
+    Given Robert manages multigenerational care and work-life balance
+    And he's learned what community systems help and what fails
+    And policy could be improved based on his experience
+    When community_elohim connects him to policy advocacy
+    Then it should surface opportunities to influence care economy policy
+    And help him translate personal experience into policy recommendations
+    And connect him to boards, councils, and advocacy organizations
+    And recognize that his voice matters because he's lived the complexity
+    And support him in advocating for elder care resources, work-family policies, and care infrastructure
+    And channel his accumulated wisdom toward system improvement
+    And demonstrate that care economy includes policy transformation

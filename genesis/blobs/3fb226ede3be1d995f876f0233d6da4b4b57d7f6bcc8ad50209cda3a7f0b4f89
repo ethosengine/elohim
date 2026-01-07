@@ -1,0 +1,11 @@
+Scenario: Appeal with significant regional impact gets extensive deliberation
+    Given my case could affect thousands of families across the region
+    And the constitutional question has major implications
+    When Regional Constitutional Council reviews my high-stakes appeal
+    Then they allocate substantial time (multiple sessions over weeks)
+    And They invite testimony from diverse community leaders
+    And They consult with technical experts on implementation implications
+    And They examine long-term consequences of different interpretations
+    And They consider dissenting views and minority perspectives
+    And They produce comprehensive written opinion with reasoning
+    And The thorough deliberation legitimates the significant precedent they create

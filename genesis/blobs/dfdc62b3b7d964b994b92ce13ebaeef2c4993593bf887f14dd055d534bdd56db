@@ -1,0 +1,8 @@
+Scenario: Protecting individual autonomy under employment pressure
+    Given my employer demands maximum flexibility
+    And employment pressure threatens my autonomy
+    When I need to maintain boundaries for self-care
+    Then my personal_agent should help me recognize when boundaries are violated
+    And support me in protecting essential personal time
+    And remind me that I have rights beyond being a labor unit
+    And provide language for asserting my needs

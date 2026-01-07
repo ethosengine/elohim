@@ -1,0 +1,10 @@
+Scenario: Teen contributes to community knowledge and improvement
+    Given Jasmine has insights about what works and doesn't work for teens
+    And she uses community services and programs
+    When the community seeks feedback about youth programs
+    Then her input should be actively sought and valued
+    And she should have voice in shaping community services
+    And the community_elohim should facilitate youth feedback to reach decision-makers
+    And her experience using systems should inform system improvement
+    And communities should recognize that users have valuable knowledge about how systems function
+    And teen voice should shape care economy design and implementation

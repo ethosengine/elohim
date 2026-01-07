@@ -1,0 +1,10 @@
+Scenario: Planning and executive function skills from complex coordination
+    Given Marcus coordinates meals across week
+    And he manages inventory, shopping lists, multi-store trips
+    When Marcus exercises planning capabilities
+    Then his executive function should be developing rapidly
+    And he should be learning advanced planning and organization
+    And time management and future orientation should develop
+    And working memory and cognitive flexibility should be exercised
+    And the personal_agent should support executive function development
+    And real responsibility should build sophisticated planning capacity

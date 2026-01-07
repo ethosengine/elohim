@@ -1,0 +1,12 @@
+Scenario: Career advancement pathways accommodate care responsibilities
+    Given Robert has capacity for career advancement
+    And traditional advancement often requires sacrificing care
+    And career paths should accommodate caregiving
+    When workplace_elohim supports career planning
+    Then it should help Robert explore advancement that works with care responsibilities
+    And surface opportunities that provide advancement without unsustainable burden
+    And advocate for flexible advancement pathways
+    And support him in negotiating advancement terms that honor his full life
+    And build career structures that don't force choice between advancement and care
+    And demonstrate that talented employees shouldn't have to choose
+    And create advancement pathways compatible with care economy

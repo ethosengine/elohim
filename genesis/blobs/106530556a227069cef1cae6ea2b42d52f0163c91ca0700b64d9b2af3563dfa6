@@ -1,0 +1,10 @@
+Scenario: Advocating for workplace accessibility improvements
+    Given Jordan notices that new book cart is hard to maneuver
+    And workplace equipment should be accessible
+    When Jordan reports the accessibility issue
+    Then supervisors take Jordan's feedback seriously
+    And the workplace_elohim facilitates accommodation discussion
+    And the library adjusts equipment or provides alternative
+    And Jordan's advocacy improves workplace for everyone
+    And Jordan experiences being an active participant in workplace improvement
+    And Jordan's voice shapes workplace accessibility

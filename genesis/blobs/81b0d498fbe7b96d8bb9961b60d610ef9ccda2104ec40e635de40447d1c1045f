@@ -1,0 +1,9 @@
+Scenario: Neighborhood environmental initiatives coordinate care for place
+    Given neighborhood shares common environmental interests
+    And ecological care is part of care economy
+    When neighborhood organizes environmental initiatives
+    Then the neighborhood_elohim should coordinate collective action
+    And it should track contributions to neighborhood environment
+    And it should organize community gardens, clean-ups, sustainability efforts
+    And care for place should be recognized as care work
+    And neighborhood should steward shared environment

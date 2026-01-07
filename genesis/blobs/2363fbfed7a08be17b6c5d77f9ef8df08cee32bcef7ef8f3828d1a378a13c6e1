@@ -1,0 +1,10 @@
+Scenario: Organizing and coordinating community care initiatives
+    Given Margaret has organizational skills and community connections
+    And community care initiatives need coordination
+    When Margaret helps organize mutual aid, care networks, or community programs
+    Then the community_elohim should recognize organizational labor
+    And it should value coordination work as essential care
+    And it should support Margaret in community organizing
+    And organizational leadership should accumulate care tokens
+    And community should benefit from her coordination skills
+    And care infrastructure should be built and maintained

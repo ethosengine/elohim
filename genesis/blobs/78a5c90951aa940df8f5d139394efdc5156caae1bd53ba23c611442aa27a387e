@@ -1,0 +1,11 @@
+Scenario: Managing fixed income with dignity and sophistication
+    Given Margaret has a $150/week grocery budget
+    And her income is fixed and cannot be increased through employment
+    When Margaret plans her shopping
+    Then her personal_agent should provide sophisticated budgeting tools
+    And it should identify sales and optimize value per dollar
+    And it should track spending across weeks for pattern analysis
+    And it should suggest resource optimization without stigma
+    And it should help her maintain quality of life within constraints
+    And the framing should be dignity-preserving, not scarcity-shaming
+    And Margaret should experience agency, not deprivation

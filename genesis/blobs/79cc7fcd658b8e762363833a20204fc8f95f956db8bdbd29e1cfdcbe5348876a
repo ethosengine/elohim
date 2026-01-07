@@ -1,0 +1,10 @@
+Scenario: Maintaining independence through effective resource management
+    Given Margaret values her independence
+    And she wants to avoid becoming "a burden"
+    When Margaret uses the Value Scanner over time
+    Then it should help her maintain self-sufficiency
+    And it should optimize her resources for maximum independence
+    And it should connect her to community resources without stigma
+    And it should make her care contributions visible
+    And Margaret should experience continued agency and autonomy
+    And the system should support her in aging on her own terms

@@ -1,0 +1,10 @@
+Scenario: Teen recognized as full community participant, not future member
+    Given Jasmine has substantial care contributions across multiple contexts
+    And she volunteers 4 hours per week at community center
+    When the community_elohim processes her participation
+    Then she should be recognized as a current contributor, not a youth in training
+    And her care work should be valued at the same care economy rate as adults
+    And community resources should be accessible based on her demonstrated contribution
+    And she should have standing in community care economy discussions
+    And the system should reflect that she is already a productive member of society
+    And her generation's contributions should be made visible at community scale

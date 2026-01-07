@@ -1,0 +1,9 @@
+Scenario: Preventing oldest child from becoming surrogate parent to younger siblings
+    Given Maria's 14-year-old may feel responsible for younger siblings
+    And parentification is common and harmful in single-parent families
+    When the family_elohim monitors family dynamics
+    Then it should detect if teen is taking on too much parental responsibility
+    And it should alert Maria to concerning patterns
+    And it should help her accept appropriate help while preventing harmful role-reversal
+    And it should protect her teen's adolescence and development
+    And the protocol should prevent damage from well-intentioned but unhealthy dynamics

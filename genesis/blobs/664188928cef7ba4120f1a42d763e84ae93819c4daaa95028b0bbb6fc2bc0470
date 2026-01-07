@@ -1,0 +1,7 @@
+Scenario: Making visible that current conditions prevent care work
+    Given my 50+ hour work weeks leave no time or energy for self-care or family care
+    When I want to demonstrate that work conditions are unsustainable
+    Then the protocol should help me document how work prevents care
+    And make visible the contradiction between work demands and human needs
+    And provide evidence for advocacy around reduced hours and better conditions
+    And build case that "labor shortage" is really "dignity and compensation shortage"

@@ -1,0 +1,10 @@
+Scenario: Neighborhood shopping patterns affect local product availability
+    Given Emma shops at local grocery store
+    And the store stocks products based on community demand
+    When Emma consistently chooses certain products
+    Then she should learn her choices influence what stores carry
+    And her personal_agent should explain "When families buy local produce, stores stock more of it"
+    And Emma should understand demand shapes supply at community level
+    And she should see connection between individual choice and collective power
+    And economic literacy should include understanding market dynamics
+    And she should learn communities shape local economies

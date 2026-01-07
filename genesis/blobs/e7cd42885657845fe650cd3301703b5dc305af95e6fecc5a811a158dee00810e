@@ -1,0 +1,9 @@
+Scenario: Neighborhood understanding prevents stigma around cognitive decline
+    Given David's Alzheimer's may cause concerning behaviors
+    And neighbors might not understand cognitive decline
+    When the neighborhood_elohim provides education
+    Then neighbors should understand Alzheimer's symptoms
+    And they should respond with compassion, not fear
+    And stigma around cognitive decline should be reduced
+    And David should be treated with dignity in neighborhood
+    And neighborhood should be safe and supportive for both James and David

@@ -1,0 +1,10 @@
+Scenario: Neighborhood care economy helps young adult on tight budget
+    Given Aisha has limited financial resources
+    And neighborhood cooperation can reduce costs
+    When Aisha participates in neighborhood care economy
+    Then bulk buying should reduce her grocery costs
+    And resource sharing should reduce acquisition needs
+    And skill exchanges should replace paid services
+    And the neighborhood_elohim should identify cost-saving opportunities
+    And community participation should improve financial sustainability
+    And care economy should make tight budgets more livable

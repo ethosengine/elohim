@@ -1,0 +1,10 @@
+Scenario: Coordinating support schedules respectfully
+    Given the group home has support workers on rotating shifts
+    And each housemate has different support needs and preferences
+    When the household reviews the support schedule
+    Then Jordan can express preferences for support worker assignments
+    And the scheduling system honors Jordan's preferences when possible
+    And Jordan's input is weighted equally with other housemates
+    And the household_elohim coordinates fair schedule distribution
+    And Jordan experiences having voice in who supports them
+    And Jordan's preferences shape their daily life experience

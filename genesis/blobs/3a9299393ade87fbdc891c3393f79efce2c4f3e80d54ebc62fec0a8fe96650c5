@@ -1,0 +1,12 @@
+Scenario: Municipal elder care policy informed by caregiver experience
+    Given Robert coordinates care for parents ages 78 and 75
+    And he's navigated municipal elder care systems
+    And he understands what works and what's missing
+    When municipal_elohim connects his experience to policy development
+    Then it should channel his feedback to municipal elder care planning
+    And surface his expertise to municipal aging services
+    And help him advocate for caregiver support programs
+    And connect him to municipal boards and advisory committees
+    And ensure municipal policy reflects actual caregiver needs
+    And recognize that users of systems should shape policy
+    And build elder care infrastructure based on lived experience

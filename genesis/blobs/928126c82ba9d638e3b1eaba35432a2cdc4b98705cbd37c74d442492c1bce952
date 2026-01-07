@@ -1,0 +1,9 @@
+Scenario: Caregiver's own health monitoring and protection
+    Given James neglects his own health amid caregiving
+    And caregiver health decline creates cascading crisis
+    When the personal_agent monitors James's health
+    Then it should ensure he attends his own medical appointments
+    And it should prompt him to take prescribed medications
+    And it should recognize when his health is declining
+    And it should insist on self-care when necessary
+    And James's health should be protected as essential infrastructure

@@ -1,0 +1,10 @@
+Scenario: Managing personal space within shared home
+    Given Jordan has their own bedroom in the group home
+    And personal space is important for privacy and autonomy
+    When Jordan wants to decorate their room
+    Then Jordan can choose decorations within household guidelines
+    And the personal_agent helps Jordan shop for items in budget
+    And support workers respect Jordan's room as their private space
+    And Jordan's choices about their space are honored
+    And Jordan experiences having a home, not just a placement
+    And privacy boundaries around Jordan's room are maintained

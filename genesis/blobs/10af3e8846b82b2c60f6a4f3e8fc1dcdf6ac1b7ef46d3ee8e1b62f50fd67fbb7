@@ -1,0 +1,12 @@
+Scenario: Workplace flexibility negotiated for elder care emergencies
+    Given Robert's parents ages 78 and 75 have occasional health emergencies
+    And he needs workplace flexibility to respond to care crises
+    And his professional position gives him standing to negotiate
+    When workplace_elohim supports flexibility negotiation
+    Then it should help Robert advocate for flexible work arrangements
+    And provide data about productivity maintenance with flexibility
+    And support him in negotiating remote work options for care emergencies
+    And help him demonstrate that flexibility enables sustainable high performance
+    And build workplace policy that accommodates care emergencies
+    And prevent him from choosing between professional standing and family care
+    And demonstrate that care-friendly workplaces benefit employer and employee

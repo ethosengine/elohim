@@ -1,0 +1,8 @@
+Scenario: Participating in composting and food waste reduction
+    Given restaurants generate significant compostable waste
+    And composting returns nutrients to soil and supports local ecology
+    When I want to participate in composting initiatives
+    Then the protocol should connect me to composting programs
+    And recognize participation in waste reduction as care work
+    And support workplace implementation of composting
+    And contribute to bioregional nutrient cycling and soil health

@@ -1,0 +1,9 @@
+Scenario: Medical appointment coordination across multiple specialists
+    Given David requires regular appointments with multiple providers
+    And James must coordinate complex scheduling
+    When the healthcare_elohim manages appointments
+    Then it should maintain integrated calendar across providers
+    And it should remind James of upcoming appointments
+    And it should coordinate transportation and timing
+    And it should prepare James with information needed for each visit
+    And medical coordination burden should be reduced through system support

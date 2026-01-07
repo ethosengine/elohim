@@ -1,0 +1,10 @@
+Scenario: Household health management while providing care
+    Given both Margaret and Robert have health considerations
+    And Margaret's care work requires physical and mental energy
+    When the household_elohim monitors health impacts
+    Then it should track whether care work affects Margaret's health
+    And it should ensure both partners maintain health appointments and self-care
+    And it should alert if care burden is compromising well-being
+    And household health should be prioritized alongside care provision
+    And both partners should support each other's health management
+    And the system should enable sustainable care without health sacrifice

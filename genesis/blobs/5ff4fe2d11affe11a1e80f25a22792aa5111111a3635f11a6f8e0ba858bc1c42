@@ -1,0 +1,9 @@
+Scenario: Worker exits with portable documented expertise
+    Given Maria has accumulated 8 years of documented contributions
+    And she decides to leave ChickenMax for another opportunity
+    When she requests her portable REA profile
+    Then she receives cryptographically signed documentation of her expertise
+    And her profile includes training mastery, care work, and management skills
+    And she can present this profile to prospective employers
+    And her accumulated skill tokens remain valid across the EAE network
+    And her ownership tokens are converted to fair value upon exit

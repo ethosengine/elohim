@@ -1,0 +1,12 @@
+Scenario: Neighborhood care exchange coordinates mutual support
+    Given Robert has skills and resources to share
+    And he also needs support managing his care demands
+    And neighbors have complementary needs and capacities
+    When neighborhood_elohim coordinates care exchange
+    Then it should match Robert's capacities with neighborhood needs
+    And connect him to neighbors who can provide support
+    And recognize his contributions: lawn care help for elderly neighbor, professional mentoring
+    And surface opportunities: "Maria can provide backup childcare when your grandchild visits"
+    And build reciprocal relationships based on mutual care
+    And demonstrate that neighborhood functions through care exchange
+    And strengthen local social capital

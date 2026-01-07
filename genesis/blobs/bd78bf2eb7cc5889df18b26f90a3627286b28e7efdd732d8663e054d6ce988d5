@@ -1,0 +1,9 @@
+Scenario: Maintaining hope for children's thriving despite single-parent family structure
+    Given society often assumes single-parent families are inherently deficient
+    And Maria worries about impact of solo parenting on her children
+    When the family_elohim assesses family well-being
+    Then it should recognize that children can thrive in single-parent families
+    And it should validate Maria's parenting rather than reinforcing deficit narratives
+    And it should help her see her children's actual thriving, not societal stereotypes
+    And it should remind her that she is enough for her children
+    And Maria should feel empowered as parent, not defined by family structure stigma

@@ -1,0 +1,9 @@
+Scenario: School events and volunteer expectations account for single parent constraints
+    Given schools often expect parent participation in events and volunteering
+    And Maria has severe time and energy constraints as solo working parent
+    When schools set participation expectations
+    Then the educational_elohim should make visible single parents' realistic capacity
+    And schools should not penalize children whose single parents cannot volunteer extensively
+    And limited participation should not reflect on children's family or parent's commitment
+    And schools should recognize some parents are managing heroically just to survive
+    And Maria's children should not suffer because she cannot match two-parent family participation

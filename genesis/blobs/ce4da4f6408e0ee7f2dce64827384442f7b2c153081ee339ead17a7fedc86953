@@ -1,0 +1,11 @@
+Scenario: Advising on global technical standards with cultural sensitivity
+    Given global protocol needs technical standards
+    And different cultures have different technical capacities
+    When I help develop culturally-sensitive technical requirements
+    Then I ensure: standards work with varying infrastructure
+    And I avoid: assuming Global North technical context
+    And I support: diverse implementation approaches
+    And I enable: low-resource communities to participate
+    And I collaborate: with Global South technical experts
+    And I resist: digital colonialism in technical design
+    And I demonstrate: that technical standards can honor diversity

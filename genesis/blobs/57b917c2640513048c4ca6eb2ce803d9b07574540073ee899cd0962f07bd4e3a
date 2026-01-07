@@ -1,0 +1,11 @@
+Scenario: Teaching about aging and mortality to younger generations
+    Given Helen faces mortality consciously
+    And younger generations need education about aging and death
+    When Helen shares her experience of aging
+    Then this should be recognized as valuable teaching
+    And younger people should learn from her direct experience
+    And education about mortality should come from those facing it
+    And Helen should be recognized as expert on her own aging
+    And the protocol should facilitate difficult but necessary conversations
+    And death education should be normalized through elder participation
+    And Helen's voice should teach community about aging with dignity

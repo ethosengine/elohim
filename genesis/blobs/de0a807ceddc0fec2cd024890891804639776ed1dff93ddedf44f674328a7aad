@@ -1,0 +1,9 @@
+Scenario: Citizen participates in curriculum policy discussion
+    Given the school board is considering curriculum changes
+    And the citizen has children or cares about education
+    When the Observer provides background and context
+    Then the citizen learns what successful curriculum looks like
+    And sees teacher professional perspectives on the proposal
+    And understands student and parent concerns
+    And can contribute informed perspective to discussion
+    And participatory democracy extends to educational content

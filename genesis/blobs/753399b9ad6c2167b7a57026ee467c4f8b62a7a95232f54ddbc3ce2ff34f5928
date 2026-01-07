@@ -1,0 +1,10 @@
+Scenario: Cross-cultural constitutional interpretation
+    Given appeals from collectivist and individualist cultures
+    And one culture views family intervention as natural care
+    And another culture views same intervention as autonomy violation
+    When global council interprets universal constitutional minimums
+    Then the council distinguishes coercion from cultural difference
+    And the council establishes that genuine consent within cultural context suffices
+    And the council prohibits force but doesn't mandate individualism
+    And appellants from both cultures feel heard
+    And constitutional pluralism is preserved within universal boundaries

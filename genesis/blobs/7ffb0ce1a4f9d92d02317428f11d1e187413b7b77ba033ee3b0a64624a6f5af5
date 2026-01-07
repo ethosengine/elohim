@@ -1,0 +1,9 @@
+Scenario: Household schedule coordination around intensive care demands
+    Given David requires constant supervision and care
+    And James must balance caregiving with part-time work
+    When household schedules are coordinated
+    Then the household_elohim should integrate care demands with work
+    And it should identify conflicts between care and employment
+    And it should help James negotiate sustainable scheduling
+    And household operations should be possible despite constraints
+    And schedule coordination should prevent impossible demands

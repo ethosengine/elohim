@@ -1,0 +1,72 @@
+# From ValueFlows to Elohim: Building the Care Economy
+
+## ValueFlows: The Vocabulary
+
+ValueFlows is the vocabulary specification that hREA implements. It defines how to describe economic activity in a way that's:
+- **Network-native**: Designed for P2P systems
+- **Agent-centric**: Humans, not institutions, are primary
+- **Value-aware**: Tracks actual value, not just money
+
+## The Elohim Extension
+
+The Elohim Protocol extends ValueFlows for care economies:
+
+| ValueFlows Concept | Elohim Extension |
+|-------------------|------------------|
+| Agent | + Care tokens, skill attestations, creator presence |
+| EconomicEvent | + Witnessed care work, invisible labor visibility |
+| Resource | + Time, attention, emotional labor as resources |
+| Appreciation | + Care token grants, community recognition |
+| Process | + Care processes, teaching, mentoring |
+
+## Constitutional Flow Control
+
+Elohim adds governance layers that ValueFlows doesn't specify:
+
+```
+ELOHIM VALUE FLOW CONSTITUTION
+
+Layer 1: Existential Minimums
+- Basic needs flow first
+- Care labor always recognized
+- Dignity threshold maintained
+
+Layer 2: Contribution Recognition
+- Value flows to creators
+- Absent creators accumulate in trust
+- Derivatives share with sources
+
+Layer 3: Community Circulation
+- Velocity requirements
+- Accumulation limits
+- Community pools
+
+Layer 4: Network Development
+- Infrastructure maintenance
+- Next community liberation
+- Coordination sustainability
+```
+
+## The Technical Bridge
+
+```
+hREA (Holochain)
+    ↓ implements
+ValueFlows (Vocabulary)
+    ↓ extends
+Elohim Protocol (Care Economy Rules)
+    ↓ serves
+Human Flourishing (Purpose)
+```
+
+## Shared Concepts, Aligned Purpose
+
+Both hREA and Elohim share:
+- **Visibility**: Making value flows transparent
+- **Agency**: Humans control their economic participation
+- **Coordination**: Enabling cooperation without central control
+- **Recognition**: Valuing contribution beyond monetary payment
+
+hREA provides the infrastructure.
+Elohim provides the constitutional purpose.
+Together: a care-based economy.

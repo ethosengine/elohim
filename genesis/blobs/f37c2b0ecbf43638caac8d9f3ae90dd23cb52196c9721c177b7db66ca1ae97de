@@ -1,0 +1,10 @@
+Scenario: Household food security maintained on fixed budget
+    Given household has $140/week grocery budget for two people
+    And nutritional needs change with age for both partners
+    When the household_elohim supports food planning
+    Then it should help maintain nutrition within budget constraints
+    And it should coordinate meal planning for both partners' dietary needs
+    And it should reduce food waste to maximize budget efficiency
+    And it should connect household to community food resources without stigma
+    And food security should be maintained with dignity
+    And household should not face nutrition inadequacy

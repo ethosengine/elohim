@@ -1,0 +1,9 @@
+Scenario: Citizen participates in zoning decision with real-time context
+    Given a city council meeting is discussing zoning changes
+    And the citizen is following virtually during dinner
+    When officials and developers make claims
+    Then the Observer provides real-time fact-checking
+    And shows what "efficient development" actually means for residents
+    And calculates community costs hidden in presentations
+    And surfaces conflicts of interest (donations, relationships)
+    And informed participation happens in real-time

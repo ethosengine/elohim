@@ -1,0 +1,9 @@
+Scenario: Activist demands community benefits agreement for environmental justice
+    Given a development will impact the activist's environmental justice community
+    And community has disproportionate environmental burden
+    When the Observer documents cumulative environmental harms
+    Then the activist presents evidence of existing pollution exposure
+    And demands green infrastructure investment as mitigation
+    And proposes specific community benefits (parks, tree canopy, remediation)
+    And coalition negotiates from position of documented harm
+    And development must address environmental justice not just profit

@@ -1,0 +1,9 @@
+Scenario: Community investment enables municipal small business preservation
+    Given small business displacement threatens community character and economic diversity
+    And Patricia values preserving local businesses as community institutions
+    When community investment supports exit-to-community conversions
+    Then small businesses are preserved as democratic enterprises, not displaced by chains
+    And municipal economic diversity is maintained through democratic conversions
+    And community investment becomes small business preservation strategy
+    And neighborhood character is protected through democratic ownership
+    And municipality_elohim tracks small business preservation through community investment

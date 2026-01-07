@@ -1,0 +1,10 @@
+Scenario: Household transportation logistics for care provision
+    Given Margaret transports grandchildren to activities and appointments
+    And this uses household vehicle and resources
+    When the household_elohim tracks transportation
+    Then it should recognize transportation as care work
+    And it should track vehicle use, gas costs, wear and tear
+    And it should coordinate transportation between partners
+    And it should help determine when family should reimburse costs
+    And household transportation resources should be managed fairly
+    And both partners should share transportation care labor

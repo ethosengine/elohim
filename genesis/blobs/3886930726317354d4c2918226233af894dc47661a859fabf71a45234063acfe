@@ -1,0 +1,11 @@
+Scenario: Financial constraint management without stigma
+    Given Helen's fixed income is $24k/year
+    And this is severe resource constraint
+    When Helen uses the Value Scanner for purchasing decisions
+    Then the system should help her navigate financial limits
+    And budget assistance should be provided with dignity
+    And no shame should be attached to limited resources
+    And community care economy connections should be surfaced
+    And food assistance should be presented as legitimate reciprocity
+    And her lifetime of contributions should create valid claims on support
+    And assistance should flow with respect, not charity

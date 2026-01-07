@@ -1,0 +1,9 @@
+Scenario: Extended family contributions distributed equitably
+    Given James carries enormous family care burden
+    And other family members could provide some support
+    When the family_elohim analyzes family care distribution
+    Then it should identify who is doing what
+    And it should make visible that James is carrying most burden
+    And it should prevent care from falling entirely on one person
+    And it should enable equitable distribution negotiations
+    And family care should be shared fairly, not concentrated

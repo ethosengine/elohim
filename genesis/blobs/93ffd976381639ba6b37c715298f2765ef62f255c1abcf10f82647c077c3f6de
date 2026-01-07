@@ -1,0 +1,11 @@
+Scenario: Balancing technical expert advice with my human judgment
+    Given Marcus's case involves complex pattern detection algorithms
+    And I don't understand the technical details
+    When technical expert Dr. Okonkwo explains the agent's reasoning
+    Then she translates: cryptographic proofs into accessible language
+    And she clarifies: what confidence levels mean and their limitations
+    And she acknowledges: uncertainties and competing interpretations
+    And she informs: but doesn't tell us what decision is right
+    And I weigh: her technical knowledge alongside my human wisdom
+    And I judge: whether constitutional principles were honored
+    And I respect: expertise without surrendering my judgment authority

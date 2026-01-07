@@ -1,0 +1,9 @@
+Scenario: Community food security for caregiver households
+    Given James's household faces food insecurity on reduced income
+    And care demands make food shopping difficult
+    When the community_elohim assesses food security
+    Then food assistance should be available through care economy
+    And delivery should accommodate caregiver constraints
+    And food should meet David's specialized nutritional needs
+    And access should be dignified and based on care contributions
+    And community should ensure caregiver households have food security

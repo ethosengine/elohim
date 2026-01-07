@@ -1,0 +1,10 @@
+Scenario: Navigating neighborhood with wayfinding support
+    Given Jordan is learning the neighborhood geography
+    And some streets and locations still confuse Jordan
+    When Jordan wants to visit a neighbor or shop
+    Then the personal_agent provides visual wayfinding assistance
+    And the interface shows landmarks and turn-by-turn pictures
+    And Jordan's navigation skills improve with accessible support
+    And Jordan gains increasing independence in the neighborhood
+    And support workers can reduce assistance as Jordan's capability grows
+    And Jordan experiences growing autonomy and confidence

@@ -1,0 +1,30 @@
+Feature: Shefa Dashboard
+  As a community participant
+  I want to view the Shefa dashboard
+  So that I can see community metrics and my participation
+
+  @smoke @shefa @navigation
+  Scenario: Shefa dashboard route is accessible
+    Given I am on the home page
+    When I navigate to "/shefa"
+    Then the page should load successfully
+    And the page should not show an error message
+
+  @shefa @navigation
+  Scenario: Dashboard displays after navigation
+    Given I am on the Shefa dashboard
+    Then the dashboard should display
+    And no loading spinner should be visible
+
+  @shefa @navigation
+  Scenario: Navigation to Shefa from main nav
+    Given I am on the home page
+    When I click on "Shefa" in the navigation
+    Then I should be on the "/shefa" page
+    And the page should load successfully
+
+  @shefa @data
+  Scenario: Dashboard content renders without errors
+    Given I am on the Shefa dashboard
+    Then the page should be accessible
+    And there should be no console errors

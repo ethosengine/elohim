@@ -1,0 +1,9 @@
+Scenario: Teacher reports curriculum concerns anonymously
+    Given the principal mandates instructional approach contradicting research
+    And the teacher knows this won't work for students
+    When the teacher reports concern through Observer anonymously
+    Then the contribution is documented without revealing identity
+    And pattern detection shows 45 other teachers share concern
+    And school leadership sees collective professional judgment
+    And curriculum decision is reconsidered based on teacher expertise
+    And teacher voice emerges without individual retaliation risk

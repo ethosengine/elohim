@@ -1,0 +1,10 @@
+Scenario: Creating intergenerational connections in neighborhood
+    Given Margaret engages with neighbors of all ages
+    And she bridges generational divides through relationships
+    When the neighborhood_elohim tracks social connections
+    Then it should recognize Margaret's role in intergenerational connection
+    And it should value her relationships with children, parents, and elders
+    And she should help create all-ages neighborhood culture
+    And intergenerational mixing should strengthen neighborhood resilience
+    And Margaret's social bridging should be recognized as care work
+    And neighborhood should benefit from cross-generational relationships

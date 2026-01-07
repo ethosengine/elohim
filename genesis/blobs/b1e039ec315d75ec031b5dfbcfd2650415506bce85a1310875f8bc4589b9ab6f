@@ -1,0 +1,9 @@
+Scenario: Resource constraints create low consumption footprint
+    Given Maria cannot afford unnecessary purchases or waste
+    And she maximizes every dollar and minimizes consumption
+    When her household's environmental impact is assessed
+    Then the bioregional_elohim should recognize her low consumption footprint
+    And it should frame her thrift as environmental virtue, not just poverty
+    And her resource efficiency should be celebrated as ecological stewardship
+    And economic constraint should be reframed as environmental contribution
+    And Maria should see her household as environmentally exemplary

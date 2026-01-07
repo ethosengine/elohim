@@ -1,0 +1,12 @@
+Scenario: Work and career choices evaluated for ecological impact
+    Given Robert's professional work affects ecological systems
+    And career choices have bioregional ecological consequences
+    And some work serves ecological health while other work degrades it
+    When bioregional_elohim analyzes professional ecological impact
+    Then it should help Robert understand his work's ecological footprint
+    And surface opportunities to align profession with ecological health
+    And recognize when professional choices serve or harm bioregional systems
+    And support career decisions that integrate care economy and ecological values
+    And demonstrate that professional work is ecological care or harm
+    And build careers that serve bioregional flourishing
+    And advance ecological sustainability through professional choices

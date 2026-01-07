@@ -1,0 +1,12 @@
+Scenario: Transitioning from temporary assistance to employment without losing critical support prematurely
+    Given I receive temporary assistance (SNAP, TANF, housing support, childcare subsidies)
+    And employment may affect benefit eligibility
+    When I transition from assistance to employment
+    Then the workplace_elohim helps me understand benefits cliff dynamics
+    And calculates whether employment genuinely improves my financial situation after benefit loss
+    And identifies transition supports that prevent benefit cliff harm
+    And validates that benefits cliff is policy failure, not my failure
+    And helps me time employment transition to minimize harm
+    And my personal_agent tracks benefit eligibility thresholds and employment income
+    And recognizes that benefits navigation is complex policy navigation labor
+    And ensures employment transition genuinely serves rather than harms my family

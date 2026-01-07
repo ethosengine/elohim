@@ -1,0 +1,10 @@
+Scenario: Elder knowledge of historical building techniques and materials
+    Given Frank has decades of construction experience
+    And traditional building techniques are often more sustainable
+    When the bioregional_elohim coordinates building knowledge
+    Then it should value Frank's knowledge of traditional techniques
+    And facilitate teaching historical building methods
+    And recognize that older practices may be more ecological
+    And connect past building wisdom to contemporary sustainability
+    And Frank's experience should inform bioregional building culture
+    And elder knowledge should guide sustainable building revival

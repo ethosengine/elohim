@@ -1,0 +1,12 @@
+Scenario: Coordinating children's basic needs amid housing instability
+    Given I am in transitional housing with uncertain future
+    And my children need stability, routine, and predictability
+    When I plan daily and weekly household operations
+    Then the Value Scanner helps me maintain consistency where possible
+    And tracks children's schedules, needs, and preferences
+    And helps me create portable routines that work across housing changes
+    And surfaces strategies for stability even in unstable circumstances
+    And coordinates meal planning with catastrophically limited budget
+    And my personal_agent reminds me of important household tasks
+    And recognizes my household management as substantial care work
+    And celebrates the stability I'm providing under impossible conditions

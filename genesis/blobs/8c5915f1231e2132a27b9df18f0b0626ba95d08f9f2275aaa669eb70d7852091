@@ -1,0 +1,12 @@
+Scenario: Managing privacy and information sharing on my terms
+    Given I have sensitive information about my situation
+    And multiple institutions are requesting access to my data
+    When I decide what to share and with whom
+    Then the Value Scanner gives me granular control over all data sharing
+    And defaults to maximum privacy protection
+    And clearly explains consequences of sharing vs. not sharing
+    And never shares information without my explicit consent
+    And helps me understand my rights regarding privacy
+    And protects me from institutional coercion to over-share
+    And my personal_agent alerts me to privacy risks
+    And my safety-critical information remains absolutely protected

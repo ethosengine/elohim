@@ -1,0 +1,11 @@
+Scenario: Seeing patterns across multiple appeals inform community calibration
+    Given our council has reviewed 50 appeals over two months
+    And I notice recurring themes and tensions
+    When I observe patterns in appeal types and outcomes
+    Then I see: many adolescent autonomy conflicts emerging
+    And I notice: three business loan denials with similar criteria
+    And I identify: recurring privacy threshold concerns
+    And I share: these observations with community leader
+    And community can: consider local protocol calibration
+    And my service: informs democratic governance beyond individual cases
+    And patterns reveal: community-wide issues requiring deliberation

@@ -1,0 +1,9 @@
+Scenario: Parent participates without attending evening meetings
+    Given the parent has evening work shifts and bedtime routines
+    And cannot attend 7 PM community meetings in person
+    When decisions about afterschool programs are being made
+    Then the parent reviews 5-minute summaries during lunch break
+    And submits questions and positions via mobile app
+    And receives alerts if live intervention would be high-impact
+    And gets post-meeting summary with next action steps
+    And democracy respects that raising children is the priority job

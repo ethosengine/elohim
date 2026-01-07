@@ -1,0 +1,10 @@
+Scenario: Connecting to community food security programs
+    Given Aisha's budget is tight
+    And community food programs could help
+    When Aisha explores community food resources
+    Then the community_elohim should surface available programs
+    And it should explain how care economy participation enables access
+    And it should connect her to community gardens, food banks, or cooperatives
+    And the system should reduce stigma through care economy framing
+    And community food security should be presented as mutual support
+    And accessing help should be dignified when contributing care

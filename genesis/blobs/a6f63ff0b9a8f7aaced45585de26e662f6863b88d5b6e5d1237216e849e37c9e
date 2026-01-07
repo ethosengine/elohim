@@ -1,0 +1,9 @@
+Scenario: Municipal care token supplements support low-income families
+    Given Sarah's household income is $65k/year
+    And many families have less economic resources
+    When municipal care economy operates
+    Then care token supplements should be available based on income
+    And the Value Scanner should be accessible regardless of ability to pay
+    And municipal subsidies should ensure universal access
+    And care economy should function as economic support system
+    And access should be dignified and universal

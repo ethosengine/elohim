@@ -1,0 +1,9 @@
+Scenario: Part-time work options during intensive parenting periods
+    Given some life stages require more intensive parenting presence
+    And Maria may need reduced hours during children's critical developmental periods
+    When Maria's care responsibilities temporarily increase
+    Then workplace should offer part-time or reduced hours options
+    And reduced schedule should not mean permanent career penalty or benefit loss
+    And single parents should be able to modulate work based on care needs
+    And career paths should accommodate care economy participation
+    And Maria should have flexibility to adjust work commitment based on family needs

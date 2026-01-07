@@ -1,0 +1,9 @@
+Scenario: Managing competing demands on personal resources
+    Given Aisha has limited time and energy
+    And she must balance work, self-care, and family obligations
+    When Aisha plans her week in the Value Scanner
+    Then the personal_agent should help her allocate care capacity
+    And it should flag when she's over-committed
+    And it should recognize self-care as legitimate care work
+    And recommendations should support sustainable work-life balance
+    And the system should help her set healthy boundaries

@@ -1,0 +1,9 @@
+Scenario: Neighborhood youth gain apprenticeship and ownership pathways
+    Given community lacks skilled trades training and economic opportunity for youth
+    And Rosa's expertise could benefit next generation but individual ownership prevents scaling
+    When democratic governance creates youth apprenticeship program
+    Then neighborhood youth learn auto repair skills with paid training
+    And apprentices can become worker-owners after demonstrating competency
+    And economic opportunity stays in community, not extracting to corporate chains
+    And intergenerational knowledge transfer strengthens community resilience
+    And community_elohim documents youth pathways from apprenticeship to ownership

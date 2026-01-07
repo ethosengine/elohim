@@ -1,0 +1,11 @@
+Scenario: Neighborhood watch supports elderly safety with dignity
+    Given Helen is vulnerable to scams and exploitation
+    And neighborhood watch includes elder protection
+    When potential threats are identified
+    Then the neighborhood_elohim should alert Helen and support network
+    And protection should be provided without infantilizing
+    And Helen should be informed: "Neighbors are seeing scam calls in the area"
+    And her autonomy should be preserved while providing protection
+    And neighborhood should look out for vulnerable members
+    And safety should be communal responsibility
+    And the protocol should enable neighborhood care without surveillance

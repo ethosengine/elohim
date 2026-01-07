@@ -1,0 +1,9 @@
+Scenario: Owner exits gracefully with community gratitude after transition completes
+    Given Rosa has completed two-year transition steward commitment
+    And workers are confidently governing the business democratically
+    When Rosa's transition steward role concludes
+    Then workers celebrate her choice to enable democratic ownership
+    And community honors her as founder who chose workers over individual wealth
+    And Rosa exits with consulting income and profound sense of legacy preserved
+    And business continues thriving under worker governance
+    And workplace_elohim documents successful transition as model for future conversions

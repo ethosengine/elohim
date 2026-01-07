@@ -1,0 +1,12 @@
+Scenario: Voting on constitutional amendments after deep deliberation
+    Given we have deliberated for months on proposed amendments
+    And I have learned from thousands of fellow citizens
+    When we vote on amendments to global constitution
+    Then my vote: carries equal weight to every other delegate
+    And I vote: based on my judgment informed by deliberation
+    And I know: my decision will affect billions of people
+    And I feel: weight of democratic responsibility
+    And I trust: the collective wisdom of this assembly
+    And I accept: that we might be wrong but must still choose
+    And I participate: in most consequential democratic act of my life
+    And I fulfill: citizenship at planetary scale

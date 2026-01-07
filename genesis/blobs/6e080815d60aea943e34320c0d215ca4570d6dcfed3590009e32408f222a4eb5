@@ -1,0 +1,12 @@
+Scenario: Coordinating household operations while navigating legal system
+    Given I have family court hearings, protective order renewals, and legal appointments
+    And household operations must continue despite legal demands
+    When I manage competing priorities of legal navigation and household needs
+    Then the Value Scanner coordinates across both domains
+    And ensures children's needs don't fall through cracks during legal crisis
+    And tracks legal deadlines without letting household management suffer
+    And helps me prepare for legal events while maintaining household stability
+    And my personal_agent balances urgent legal tasks with ongoing household care
+    And surfaces support for children during particularly stressful legal periods
+    And recognizes that managing both is extraordinary organizational labor
+    And prevents either domain from overwhelming the other

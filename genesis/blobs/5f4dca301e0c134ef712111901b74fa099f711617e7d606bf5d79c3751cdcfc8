@@ -1,0 +1,12 @@
+Scenario: Cross-cultural deliberation with radical diversity
+    Given I am deliberating with citizens from radically different contexts
+    And we have different languages, cultures, values, lived experiences
+    When we work through constitutional questions together
+    Then we rely on: skilled translation and cultural mediation
+    And we practice: listening across profound difference
+    And we identify: shared human concerns despite diversity
+    And we navigate: disagreement with respect and curiosity
+    And we discover: unexpected common ground
+    And we honor: legitimate pluralism while seeking universal minimums
+    And we demonstrate: humanity can deliberate together on existential questions
+    And we embody: democratic hope for planetary governance

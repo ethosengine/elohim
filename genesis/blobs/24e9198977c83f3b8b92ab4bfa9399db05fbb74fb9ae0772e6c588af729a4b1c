@@ -1,0 +1,10 @@
+Scenario: Tracking personal growth in life skills
+    Given Aisha has been using the Value Scanner for three months
+    And she's developing adult household management skills
+    When Aisha reviews her progress
+    Then the system should show skill development over time
+    And it should highlight improvements in waste reduction
+    And it should track nutritional balance improvements
+    And it should show budget optimization progress
+    And the feedback should build confidence and competence
+    And Aisha should see evidence of her growing capability

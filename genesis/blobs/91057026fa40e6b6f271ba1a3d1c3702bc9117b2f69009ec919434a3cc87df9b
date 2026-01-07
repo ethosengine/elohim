@@ -1,0 +1,10 @@
+Scenario: Discovering neighborhood through care economy participation
+    Given Aisha is new to her neighborhood
+    And she doesn't know local patterns yet
+    When Aisha explores neighborhood resources
+    Then the neighborhood_elohim should surface local care opportunities
+    And it should identify local shops and services
+    And it should highlight community initiatives she can join
+    And the system should help her learn neighborhood geography through care
+    And community building should happen through participation
+    And she should discover her neighborhood as care network, not just location

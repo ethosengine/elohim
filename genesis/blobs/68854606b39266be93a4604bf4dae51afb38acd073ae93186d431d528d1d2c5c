@@ -1,0 +1,10 @@
+Scenario: Community recognizes preteen caregivers without exploitation
+    Given Marcus represents many young people with household responsibilities
+    And community should support rather than exploit young caregivers
+    When the community_elohim identifies preteen caregivers
+    Then it should channel appropriate support to these families
+    And it should prevent exploitation of children's labor
+    And it should work to reduce excessive burden on young people
+    And it should advocate for family support that makes Marcus's work unnecessary
+    And paradoxically, while recognizing his work, it should work toward making it optional
+    And care economy should support children while addressing systemic issues

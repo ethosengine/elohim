@@ -1,0 +1,9 @@
+Scenario: Journalist monitors all neighborhood meetings despite being one person
+    Given the journalist covers 8 neighborhood associations
+    And can only attend one meeting per week physically
+    When the Observer monitors all neighborhood meetings simultaneously
+    Then the journalist reviews transcripts of all 8 weekly meetings
+    And receives alerts for newsworthy developments
+    And identifies stories across all neighborhoods efficiently
+    And comprehensive hyperlocal coverage becomes sustainable
+    And no important neighborhood decision goes unreported

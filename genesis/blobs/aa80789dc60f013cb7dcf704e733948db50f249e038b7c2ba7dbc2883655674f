@@ -1,0 +1,10 @@
+Scenario: Fair compensation and wage theft prevention
+    Given Kenji depends on every dollar he earns
+    And low-wage employers sometimes violate wage laws
+    When the workplace_elohim monitors Kenji's compensation
+    Then it should verify he's paid for all hours worked
+    And it should flag if he's working off-clock or unpaid
+    And it should teach him to recognize wage theft
+    And it should help him assert right to legal minimum wage
+    And the system should protect vulnerable student workers from exploitation
+    And Kenji should receive every penny he earns

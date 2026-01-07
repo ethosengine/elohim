@@ -1,0 +1,9 @@
+Scenario: Organizer coordinates testimony from diverse coalition members
+    Given coalition spans four languages and six neighborhoods
+    And members work different shifts limiting meeting availability
+    When the organizer uses Observer for testimony coordination
+    Then members access testimony guidelines in their languages
+    And sign up for speaking slots that work with their schedules
+    And share testimony drafts for peer feedback asynchronously
+    And arrive at city council with coordinated powerful messages
+    And coalition shows municipal government the breadth and depth of community power

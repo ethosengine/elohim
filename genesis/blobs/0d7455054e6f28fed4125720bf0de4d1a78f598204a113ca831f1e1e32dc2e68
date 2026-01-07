@@ -1,0 +1,10 @@
+Scenario: Teaching grandchildren as recognized educational contribution
+    Given Margaret teaches her grandchildren skills, values, and knowledge
+    And intergenerational knowledge transmission is educational labor
+    When the educational_elohim tracks Margaret's teaching
+    Then teaching grandchildren should be recognized as education work
+    And the value of grandmother knowledge should be quantified
+    And family education contributions should be visible
+    And Margaret's role in grandchildren's learning should be tracked
+    And informal education should be valued alongside formal
+    And intergenerational teaching should be care economy category

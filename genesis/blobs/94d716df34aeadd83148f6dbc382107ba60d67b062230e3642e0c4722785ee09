@@ -1,0 +1,9 @@
+Scenario: Developer receives honest regional impact analysis
+    Given a developer claims project creates regional economic benefit
+    But analysis omits regional infrastructure burden
+    When the Observer provides regional cost-benefit assessment
+    Then the developer sees: promised jobs mostly go to workers from outside region
+    And traffic impacts affect three counties' transportation networks
+    And environmental impacts span watershed affecting six municipalities
+    And honest regional accounting reveals actual trade-offs
+    And local extraction versus regional benefit becomes clear

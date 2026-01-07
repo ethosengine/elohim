@@ -1,0 +1,9 @@
+Scenario: Community investment enables renewable energy cooperatives
+    Given fossil fuel dependence threatens climate stability
+    And Patricia wants investment supporting renewable energy transition
+    When community investment expands to renewable energy cooperatives
+    Then her capital supports community solar and wind projects
+    And democratic energy ownership replaces fossil fuel extraction
+    And bioregional energy sovereignty increases through distributed renewables
+    And climate mitigation is advanced through values-aligned investment
+    And bioregional_elohim coordinates renewable energy cooperative investment

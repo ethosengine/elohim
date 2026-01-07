@@ -1,0 +1,9 @@
+Scenario: Moderator detects and prevents infiltration attempt
+    Given the housing justice organizing space has active membership
+    When the pattern detection agent identifies suspicious new member
+    And the new member exhibits patterns of infiltrator behavior
+    Then Alex receives alert with evidence of concerning patterns
+    And Alex can see the member lacks community trust connections
+    And Alex reviews their contribution patterns and tactics
+    And Alex prevents the infiltrator from disrupting organizing
+    And the space remains safe for genuine organizing work

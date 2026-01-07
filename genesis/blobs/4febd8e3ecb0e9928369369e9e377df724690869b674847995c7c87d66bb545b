@@ -1,0 +1,11 @@
+Scenario: Personal agency maintained even when needing support
+    Given Alex requires assistance with some aspects of life
+    And society often conflates needing help with lacking agency
+    When Alex makes decisions about their life
+    Then needing support should not diminish Alex's autonomy
+    And the system should separate assistance from authority
+    And Alex should maintain full decision-making power
+    And support should flow to Alex's direction, not override it
+    And interdependence should be recognized as human reality
+    And Alex's agency should be protected even when vulnerable
+    And the protocol should embody disability rights principle: "Nothing about us without us"

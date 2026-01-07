@@ -1,0 +1,10 @@
+Scenario: Construction knowledge applied to home energy efficiency improvements
+    Given Frank has expertise in building systems and repairs
+    And home energy efficiency reduces environmental impact and costs
+    When the bioregional_elohim coordinates weatherization and efficiency
+    Then it should connect Frank's skills to home efficiency improvements
+    And facilitate community weatherization projects
+    And recognize efficiency work as ecological care contribution
+    And help low-income households reduce energy costs and consumption
+    And Frank's construction knowledge should serve ecological and equity goals
+    And his volunteer work should build community energy resilience

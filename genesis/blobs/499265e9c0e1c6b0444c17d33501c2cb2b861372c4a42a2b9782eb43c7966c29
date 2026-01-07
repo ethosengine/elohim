@@ -1,0 +1,9 @@
+Scenario: Neighborhood boundaries respect caregiver capacity
+    Given James has extremely limited capacity for neighborhood activities
+    And well-meaning neighbors might make unsustainable demands
+    When the neighborhood_elohim manages expectations
+    Then neighbors should understand James cannot contribute labor currently
+    And they should offer support without expecting reciprocation immediately
+    And James's care work should be recognized as neighborhood contribution
+    And neighborhood should not burden caregivers with additional demands
+    And boundaries should protect James from overwhelming expectations

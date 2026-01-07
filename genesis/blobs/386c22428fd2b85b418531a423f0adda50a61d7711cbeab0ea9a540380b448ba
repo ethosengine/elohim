@@ -1,0 +1,10 @@
+Scenario: Relationship with parent shifts toward adult partnership
+    Given Jasmine has demonstrated substantial capability
+    And she contributes meaningfully to household functioning
+    When parent Maya interacts with Jasmine through the care economy
+    Then the family_elohim should reflect their evolving relationship
+    And Maya should receive prompts that honor Jasmine's growing autonomy
+    And support Maya in trusting Jasmine's judgment
+    And recognize when Jasmine needs support versus when she's capable
+    And facilitate the gradual transition from parent-child to adult-adult relationship
+    And help Maya learn to be available for support without controlling

@@ -1,0 +1,9 @@
+Scenario: Mayor monitors policy implementation against intended outcomes
+    Given the politician voted for homelessness intervention program
+    And expected specific outcomes from policy
+    When the Observer tracks implementation
+    Then they see which programs launched versus stalled
+    And learn actual outcomes compared to projections
+    And identify bureaucratic barriers to implementation
+    And intervene to align execution with legislative intent
+    And ensure votes translate to real community impact

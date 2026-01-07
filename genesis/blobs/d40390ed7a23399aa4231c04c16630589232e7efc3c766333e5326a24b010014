@@ -1,0 +1,12 @@
+Scenario: Community resource coordination supports multigenerational care
+    Given Robert coordinates care across multiple generations
+    And community resources exist but are hard to navigate
+    And he needs eldercare support, young adult resources, and family services
+    When community_elohim coordinates resources
+    Then it should connect Robert to relevant community support services
+    And surface eldercare programs for his parents
+    And identify young adult support programs for his children
+    And connect him to caregiver support groups
+    And reduce time spent researching and coordinating resources
+    And demonstrate that community infrastructure should serve caregivers
+    And make visible the resources built through care economy

@@ -1,0 +1,9 @@
+Scenario: Young child's care patterns inform family resource allocation
+    Given Tommy has established care contribution patterns
+    And the family makes resource allocation decisions
+    When the family_elohim analyzes care economy data
+    Then Tommy's care patterns should inform family planning
+    And his demonstrated care for Emma should be considered
+    And resource decisions should reflect all family members' contributions
+    And Tommy should experience being valued in family economics
+    And his care work should give him legitimate standing in family decisions

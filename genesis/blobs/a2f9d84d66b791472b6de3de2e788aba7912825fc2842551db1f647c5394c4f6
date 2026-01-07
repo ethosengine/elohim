@@ -1,0 +1,9 @@
+Scenario: Detecting when work demands destroy self-care capacity
+    Given my personal_agent monitors my nutrition and rest patterns
+    When my meal quality decreases for multiple consecutive days
+    And my sleep falls below healthy minimums
+    And I show signs of chronic exhaustion
+    Then the protocol should surface a crisis alert
+    And provide resources for immediate support
+    And suggest workplace advocacy options
+    And connect me to community care resources

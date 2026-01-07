@@ -1,0 +1,9 @@
+Scenario: Parent coordinates school crossing guard advocacy
+    Given the community removed crossing guards at three intersections
+    And the parent's child crosses one of these intersections daily
+    When the Observer connects parents with children at all three crossings
+    Then parents form rapid coalition with documented safety data
+    And coordinate to attend the community safety meeting together
+    And present unified testimony about near-miss incidents
+    And individual parent concerns become undeniable pattern
+    And crossing guards are restored within two weeks

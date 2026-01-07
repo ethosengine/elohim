@@ -1,0 +1,9 @@
+Scenario: Neighborhood meal support during caregiver crisis periods
+    Given caregiving intensity varies with David's condition
+    And James may have periods of extreme overwhelm
+    When the neighborhood_elohim detects crisis conditions
+    Then it should coordinate meal support from neighbors
+    And meal delivery should be appropriate for David's dietary needs
+    And food support should be dignified, not stigmatizing
+    And neighborhood should provide practical crisis support
+    And James should access help during overwhelming periods

@@ -1,0 +1,11 @@
+Scenario: Appeal involves national security or existential risk considerations
+    Given an agent decision involved claimed national security justification
+    And I believe my rights were violated despite security concerns
+    When National Constitutional Council reviews the appeal
+    Then they evaluate if security claim was legitimate or pretext
+    And They examine if security need was balanced with individual dignity
+    And They consider if less rights-violating alternatives existed
+    And They assess transparency appropriate to security context
+    And They create precedent for security-rights balance at national scale
+    And My appeal prevents security from becoming excuse for unchecked power
+    And Constitutional limits on authority are maintained even under threat

@@ -1,0 +1,10 @@
+Scenario: Neighborhood outdoor spaces and environmental care
+    Given children need access to nature and outdoor play
+    And Sarah wants to teach environmental stewardship
+    When the neighborhood_elohim coordinates environmental care
+    Then it should organize neighborhood green space maintenance
+    And it should coordinate children's environmental education
+    And it should track ecological care labor
+    And Sarah's environmental teaching should be recognized
+    And neighborhood sustainability should be collective project
+    And the system should connect child-rearing to ecological health

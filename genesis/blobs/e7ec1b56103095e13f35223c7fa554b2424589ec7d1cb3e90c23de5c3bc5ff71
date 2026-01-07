@@ -1,0 +1,9 @@
+Scenario: Respite visits from neighbors to prevent social isolation
+    Given James is profoundly socially isolated by caregiving
+    And he desperately needs human connection
+    When neighbors provide respite visits
+    Then the neighborhood_elohim should coordinate visiting schedules
+    And neighbors could stay with David briefly while James takes walk
+    And they could provide social connection for both James and David
+    And brief respite periods should be regular, not just emergency
+    And neighborhood should actively prevent caregiver isolation

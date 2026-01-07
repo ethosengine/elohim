@@ -1,0 +1,10 @@
+Scenario: Recognizing resource constraint as ecological practice
+    Given Kenji's $180/week budget forces minimal consumption
+    And ecological sustainability requires reduced consumption
+    When the bioregional_elohim reframes Kenji's scarcity
+    Then it should recognize that living on limited resources is low ecological impact
+    And it should validate "Your minimal consumption is ecological stewardship"
+    And it should show how his constrained lifestyle aligns with sustainability
+    And resource constraint should be recognized as ecological care
+    And the system should honor scarcity as ecological practice
+    And Kenji should understand his poverty as inadvertently sustainable

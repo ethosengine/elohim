@@ -1,0 +1,10 @@
+Scenario: School site council member advocates for resources from district
+    Given school has aging facilities and overcrowded classrooms
+    And site council wants district to prioritize school for capital improvements
+    And needs to present compelling case competing with other schools
+    When the council member uses Observer to prepare advocacy
+    Then they receive documentation of facility conditions and capacity issues
+    And see comparison to other district schools showing relative needs
+    And access student outcome data linking conditions to learning impacts
+    And get examples of how district allocated capital funds in past
+    And evidence-based advocacy connects community needs to district decisions

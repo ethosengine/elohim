@@ -1,0 +1,10 @@
+Scenario: Understanding bioregional food systems
+    Given Kenji's food comes from complex global supply chains
+    And bioregional food systems are more sustainable
+    When the bioregional_elohim educates about food sourcing
+    Then it should show him where his food comes from
+    And it should help him identify local and seasonal options within budget
+    And it should teach him about bioregional food production
+    And it should connect his shopping to support for local food systems
+    And the system should build bioregional food literacy
+    And Kenji should understand food through ecological and regional lens

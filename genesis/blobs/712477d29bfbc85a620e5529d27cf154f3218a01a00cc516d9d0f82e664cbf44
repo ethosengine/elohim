@@ -1,0 +1,9 @@
+Scenario: Parent tracks municipal library service commitments
+    Given the city council promised to restore library weekend hours
+    And the parent's children depend on library for homework and programs
+    When three months pass without weekend hours being restored
+    Then the Observer alerts parent about the broken commitment
+    And provides evidence from the original council promise
+    And shows which council members voted for the restoration
+    And parent can demand accountability for family-serving commitments
+    And municipal promises to families persist despite turnover

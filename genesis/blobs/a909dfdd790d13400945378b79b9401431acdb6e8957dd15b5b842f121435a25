@@ -1,0 +1,9 @@
+Scenario: Developer faces accountability for past broken promises
+    Given a developer claimed "200 jobs" in previous project
+    But Observer tracking shows only 12 permanent jobs materialized
+    When the developer proposes new project with similar claims
+    Then planning commission sees documented gap between promises and delivery
+    And community members access track record evidence
+    And developer must explain past failures or adjust projections
+    And accountability creates pressure for honest projections
+    And extractive practices face uncomfortable transparency

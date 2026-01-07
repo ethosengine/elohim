@@ -1,0 +1,9 @@
+Scenario: Municipal small business support programs incorporate democratic conversion pathways
+    Given city offers small business loans, technical assistance, and development support
+    And these programs could facilitate democratic conversions
+    When municipality recognizes conversion potential for struggling businesses
+    Then small business support programs add worker ownership conversion option
+    And struggling owners learn they can exit with dignity while protecting workers
+    And municipal economic development staff are trained in democratic transition support
+    And public resources help overcome conversion barriers (legal costs, financing, technical assistance)
+    And municipality_elohim provides conversion expertise to municipal programs

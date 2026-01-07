@@ -1,0 +1,9 @@
+Scenario: Parent exposes school resource inequities
+    Given the parent suspects their child's school gets fewer resources
+    And neighboring school seems to have more programs and facilities
+    When the parent reviews Observer's district equity analysis
+    Then they see per-student spending varies by thousands of dollars
+    And westside schools have gifted programs and experienced teachers
+    And their child's school lacks arts, music, and advanced courses
+    And systematic inequity pattern becomes documented evidence
+    And parent advocacy shifts to structural equity demands

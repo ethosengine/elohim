@@ -1,0 +1,10 @@
+Scenario: Supporting local businesses as valued patron
+    Given Jordan visits the neighborhood coffee shop weekly
+    And the barista knows Jordan's regular order
+    When Jordan enters the coffee shop
+    Then the personal_agent might help with ordering if needed
+    And the barista greets Jordan by name and remembers their preference
+    And Jordan's weekly purchase contributes to business sustainability
+    And Jordan experiences being a valued, recognized customer
+    And the relationship is genuine, not charity or pity
+    And Jordan's economic participation in neighborhood is visible

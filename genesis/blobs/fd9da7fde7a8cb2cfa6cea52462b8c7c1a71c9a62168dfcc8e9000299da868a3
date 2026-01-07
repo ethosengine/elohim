@@ -1,0 +1,12 @@
+Scenario: Asserting parenting authority despite institutional scrutiny
+    Given institutions are monitoring my parenting during crisis
+    And I fear judgment or intervention
+    When I make parenting decisions based on my knowledge of my children
+    Then the Value Scanner validates my parental authority
+    And documents my sophisticated parenting labor
+    And helps me articulate my parenting reasoning to institutions
+    And recognizes that I am the expert on my children's needs
+    And supports me in resisting inappropriate institutional interference
+    And my personal_agent helps me present my parenting capability effectively
+    And the care token system makes visible my substantial parenting contributions
+    And my parenting is recognized as valuable work, not scrutinized as potential failure

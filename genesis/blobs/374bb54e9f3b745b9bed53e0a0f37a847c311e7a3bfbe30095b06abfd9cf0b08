@@ -1,0 +1,11 @@
+Scenario: Connecting disabled people to resources and support
+    Given Alex has expertise about disability resources and systems
+    And many disabled people struggle to navigate complex systems
+    When Alex helps other disabled people access resources
+    Then this navigation support should be recognized as care work
+    And the community_elohim should track Alex's peer support
+    And connecting people to resources should accumulate care tokens
+    And Alex's expertise reduces others' suffering and struggle
+    And peer navigation is sophisticated skilled labor
+    And the protocol should value disability community mutual aid
+    And Alex's support enables others' flourishing

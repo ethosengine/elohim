@@ -1,0 +1,66 @@
+# REA: The Accounting Model That Sees Value
+
+## What is REA?
+
+REA (Resources, Events, Agents) is an accounting framework developed by William McCarthy in 1982 that tracks **actual value flows** rather than monetary abstractions.
+
+Traditional double-entry bookkeeping asks: "What accounts changed?"
+REA asks: "What happened? Who was involved? What was transformed?"
+
+## The Three Core Elements
+
+### Resources
+Things of economic value that can be:
+- **Consumed** (used up in a process)
+- **Produced** (created through work)
+- **Transferred** (moved between agents)
+- **Used** (applied without consumption)
+
+Resources include: time, skills, materials, care, attention, knowledge, environmental capacity.
+
+### Events
+Economic happenings that transform resources:
+- A nurse stabilizes a patient (care event)
+- A repair tech fixes a laptop (production event)
+- A teacher explains a concept (knowledge transfer event)
+- A parent prepares a meal (care work event)
+
+Events are **observable** and **recorded** - they happened, someone saw them.
+
+### Agents
+The economic actors who participate in events:
+- **Providers**: Those who give resources
+- **Receivers**: Those who receive resources
+- **Witnesses**: Those who observe and validate
+
+## Why REA Matters for Care Economies
+
+Traditional accounting is **value-blind**:
+- A dollar from exploitation equals a dollar from care
+- Invisible labor isn't counted
+- Environmental costs are externalized
+
+REA accounting is **value-aware**:
+- Every resource transformation is recorded
+- Care work becomes visible
+- All contributions can be recognized
+
+## The REA Event Structure
+
+```
+EVENT: Emergency_Care_2024
+├── Resources Consumed:
+│   ├── Nurse time: 47 minutes
+│   ├── Medical supplies: IV kit
+│   └── Emotional labor: high intensity
+├── Resources Created:
+│   ├── Patient stability: restored
+│   ├── Family peace: anxiety → hope
+│   └── Junior nurse learning: witnessed
+└── Agents:
+    ├── Provider: Nurse Adaeze
+    ├── Receiver: Patient
+    └── Witnesses: 2 junior nurses
+```
+
+This is the foundation of economic visibility.

@@ -1,0 +1,9 @@
+Scenario: Workplace privacy protects care economy data from employer misuse
+    Given Maria participates in care economy tracking
+    And this generates data about her personal life and care responsibilities
+    When workplace seeks information about employees
+    Then Maria's personal care economy data must be completely private
+    And employers should never access her household care patterns or constraints
+    And the workplace_elohim should only see work-relevant information
+    And Maria's privacy should be absolute regarding personal care matters
+    And care economy participation should not expose her to employer surveillance

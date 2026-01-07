@@ -1,0 +1,11 @@
+Scenario: Family education about disability justice improves relationships
+    Given family relationships improve when family understands disability better
+    And many families lack disability justice frameworks
+    When the family_elohim detects ableist patterns
+    Then it should provide family members with educational resources
+    And it should prompt family toward social model understanding
+    And it should share disability culture and community perspectives
+    And family should be invited to learn from Alex's expertise
+    And education should be offered supportively, not punitively
+    And the goal should be transforming family culture toward inclusion
+    And better understanding should enable healthier family relationships

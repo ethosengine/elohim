@@ -1,0 +1,11 @@
+Scenario: Participating in neighborhood events with support
+    Given the neighborhood is holding a summer block party
+    And Jordan wants to attend and participate
+    When Jordan's support worker helps coordinate attendance
+    Then the personal_agent shows event details in accessible format
+    And Jordan can decide whether and how long to attend
+    And Jordan participates in activities at their capability level
+    And neighbors engage with Jordan directly, not just support worker
+    And Jordan's presence adds to the community celebration
+    And Jordan accumulates care tokens for community participation
+    And Jordan experiences neighborhood belonging

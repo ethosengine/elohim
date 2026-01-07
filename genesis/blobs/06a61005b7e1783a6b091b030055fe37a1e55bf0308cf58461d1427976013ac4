@@ -1,0 +1,10 @@
+Scenario: Learning bioregional ecological patterns
+    Given Kenji lives in specific bioregion with unique ecology
+    And bioregional awareness is core to ecological care
+    When the bioregional_elohim teaches about local ecology
+    Then it should help Kenji learn local watershed, species, and ecosystems
+    And it should connect him to bioregional natural patterns
+    And it should show seasonal changes and ecological cycles
+    And it should build his sense of place in bioregional context
+    And the system should foster bioregional ecological literacy
+    And Kenji should understand himself as member of bioregional community

@@ -1,0 +1,7 @@
+Scenario: Challenging tipped wage systems
+    Given tipped minimum wage is exploitative and creates instability
+    When workers organize to eliminate tipped wage and demand full minimum wage
+    Then the protocol should support advocacy for one fair wage
+    And provide evidence of problems with tipped wage systems
+    And help workers coordinate across tipped industries
+    And push for legislative elimination of tipped wage carveouts

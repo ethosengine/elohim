@@ -1,0 +1,12 @@
+Scenario: Coordinating employment search with childcare constraints
+    Given I can only work when childcare is available and affordable
+    And childcare availability severely limits employment options
+    When I search for employment compatible with childcare
+    Then the workplace_elohim filters opportunities by schedule and childcare compatibility
+    And identifies employers offering childcare support or flexibility
+    And helps me calculate whether employment pays enough after childcare costs
+    And coordinates employment search with childcare subsidy applications
+    And validates that childcare constraints are real barriers, not excuses
+    And my personal_agent tracks childcare availability and employment schedule compatibility
+    And recognizes that coordinating employment and childcare is complex labor
+    And ensures employment genuinely improves rather than worsens my situation

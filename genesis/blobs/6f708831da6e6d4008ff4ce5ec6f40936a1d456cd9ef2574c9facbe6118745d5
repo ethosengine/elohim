@@ -1,0 +1,9 @@
+Scenario: Journalist compares city policies to neighboring municipalities
+    Given city council debates new approach to homelessness
+    And politicians claim no alternatives exist
+    When the Observer provides comparative policy analysis
+    Then the journalist sees 3 nearby cities using housing-first approach
+    And reviews outcome data showing reduced homelessness
+    And finds cost comparison showing housing cheaper than criminalization
+    And interviews officials in cities with successful programs
+    And publishes story presenting evidence-based alternatives

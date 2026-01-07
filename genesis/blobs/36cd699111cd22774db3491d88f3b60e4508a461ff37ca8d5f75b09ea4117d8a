@@ -1,0 +1,9 @@
+Scenario: Teacher advocates for mental health and wellness support
+    Given teaching is emotionally demanding work with high burnout
+    And district provides minimal employee mental health support
+    When teachers document wellness needs and impacts through Observer
+    Then data shows 68% of teachers experience burnout symptoms
+    And 82% say job stress affects personal life and health
+    And teachers identify needed supports (counseling, reasonable workload, respect)
+    And union negotiates wellness provisions in contract
+    And teacher wellbeing becomes labor rights priority

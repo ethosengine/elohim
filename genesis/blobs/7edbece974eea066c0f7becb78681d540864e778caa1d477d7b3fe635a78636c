@@ -1,0 +1,11 @@
+Scenario: Bioregional belonging includes disabled people as full participants
+    Given disabled people are often excluded from community belonging
+    And bioregional identity requires full inclusion of all residents
+    When bioregional community is defined
+    Then the bioregional_elohim should include disabled people as essential members
+    And Alex should be welcomed as full bioregional participant
+    And disability should be recognized as part of human diversity in ecosystem
+    And bioregional care economy should serve disabled members
+    And Alex's contributions should be valued within bioregional context
+    And the protocol should embody that everyone belongs to place
+    And disabled people's relationship to land and ecosystem should be honored

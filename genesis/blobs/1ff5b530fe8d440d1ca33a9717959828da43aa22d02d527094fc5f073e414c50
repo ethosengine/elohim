@@ -1,0 +1,12 @@
+Scenario: Advocating for children's educational needs when institutional responses are inadequate
+    Given school is not providing appropriate support for my children
+    And I need to advocate more forcefully for services
+    When school fails to meet children's educational needs
+    Then the Value Scanner helps me understand escalation options
+    And provides resources on children's educational rights
+    And connects me to educational advocacy organizations
+    And helps me document inadequate services for advocacy purposes
+    And my personal_agent drafts advocacy communications
+    And recognizes forceful advocacy as necessary parenting work
+    And validates that schools should serve all children appropriately
+    And supports me in demanding what my children deserve

@@ -1,0 +1,12 @@
+Scenario: Mentoring younger adults in care economy navigation
+    Given Robert has learned to navigate work-care balance over decades
+    And younger adults are earlier in their journey
+    And his experience could help others avoid struggles
+    When community_elohim coordinates mentoring
+    Then it should connect Robert with younger adults seeking guidance
+    And recognize his mentoring as valuable care contribution
+    And support him in sharing knowledge about care economy practices
+    And help younger generation learn from his experience
+    And value his mentoring in community care tokens
+    And prevent him from being exploited for free emotional labor
+    And build intergenerational knowledge transfer

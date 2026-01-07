@@ -1,0 +1,9 @@
+Scenario: Journalist monitors multiple school districts despite limited capacity
+    Given the journalist covers regional education
+    And must track 8 school districts plus state education department
+    When the Observer monitors all district school boards simultaneously
+    Then the journalist reviews all board meetings across districts
+    And receives alerts for newsworthy decisions and patterns
+    And identifies stories affecting multiple districts
+    And comprehensive regional education coverage becomes sustainable
+    And no consequential education decision escapes scrutiny

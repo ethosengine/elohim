@@ -1,0 +1,10 @@
+Scenario: Pension board member prepares for decision on emerging market investments
+    Given investment staff recommends increasing allocation to emerging markets
+    And recommendation includes complex analysis of risk-adjusted returns
+    And board member wants to make informed fiduciary decision but lacks investment expertise
+    When the board member uses Observer decision support
+    Then they receive executive summary of emerging market investment considerations
+    And see performance and volatility data from peer pension funds' allocations
+    And access key questions to ask investment staff about risk management
+    And understand how proposed allocation fits pension fund's overall strategy
+    And accessible expertise enables informed fiduciary judgment

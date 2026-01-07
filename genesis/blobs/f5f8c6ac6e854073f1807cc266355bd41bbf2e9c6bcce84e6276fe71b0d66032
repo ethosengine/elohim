@@ -1,0 +1,11 @@
+Scenario: Learning from care economy participation across life stages
+    Given Robert has participated in care economy as child, parent, and adult child
+    And he now sees care patterns across the full lifecycle
+    When his personal_agent helps him reflect on his care economy journey
+    Then it should surface insights from his accumulated experience
+    And help him recognize: "You learned care reciprocity from your parents' care for their parents"
+    And connect past care received to present care given
+    And support him in understanding care as lifecycle reciprocity
+    And validate that his care contributions across decades have genuine value
+    And help him see that he's building care economy that will serve his own aging
+    And recognize his whole life as care economy participation

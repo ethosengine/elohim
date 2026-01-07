@@ -1,0 +1,10 @@
+Scenario: Hosting guests and social events at home
+    Given Jordan wants to invite friends to the group home
+    And the household has policies about guests
+    When Jordan plans a small gathering
+    Then the personal_agent helps Jordan coordinate with housemates
+    And the interface shows the guest policy in simple language
+    And Jordan can request guest approval using the household system
+    And housemates discuss and approve Jordan's gathering
+    And Jordan experiences autonomy in their home social life
+    And the household supports Jordan's social connections

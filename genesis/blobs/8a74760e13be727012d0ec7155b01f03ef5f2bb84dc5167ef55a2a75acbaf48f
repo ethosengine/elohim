@@ -1,0 +1,9 @@
+Scenario: Creator produces age-appropriate content for local youth
+    Given Sam creates content about neighborhood nature exploration
+    And the content is designed for children aged 8-12
+    When Sam contributes the content to educational spaces
+    Then the guardian agent verifies age-appropriateness
+    And local children can access the content safely
+    And parents can review and approve their children's participation
+    And Sam helps children learn about their local environment
+    And community benefits from quality youth programming

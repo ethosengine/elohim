@@ -1,0 +1,10 @@
+Scenario: Understanding value creation through care economy education
+    Given traditional economics education emphasizes market transactions
+    And Aisha is learning care economy principles
+    When the personal_agent teaches value concepts
+    Then it should explain how care creates value
+    And it should teach that invisible work is valuable
+    And it should explain care token economics
+    And it should help her understand reciprocal care systems
+    And care economy literacy should provide alternative to market capitalism
+    And foundational economic understanding should center care

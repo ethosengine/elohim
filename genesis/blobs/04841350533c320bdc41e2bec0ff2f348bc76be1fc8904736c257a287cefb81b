@@ -1,0 +1,8 @@
+Scenario: Recognizing invisible family care labor
+    Given I provide emotional support, communication, and coordination
+    Even when I cannot provide hands-on care
+    When family members track care contributions
+    Then the protocol should recognize all forms of care work
+    And make visible my emotional labor and communication work
+    And validate that staying connected is valuable care contribution
+    And ensure I am not invisibilized due to employment constraints

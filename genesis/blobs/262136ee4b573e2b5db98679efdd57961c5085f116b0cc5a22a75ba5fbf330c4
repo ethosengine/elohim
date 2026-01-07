@@ -1,0 +1,10 @@
+Scenario: Student mental health support as educational care infrastructure
+    Given academic pressure threatens student mental health
+    And learning requires emotional and psychological well-being
+    When educational institutions provide mental health support
+    Then the educational_elohim should recognize counseling as educational care
+    And it should value mental health services as essential to learning
+    And it should accumulate care tokens for peer emotional support
+    And mental health work should be understood as educational infrastructure
+    And the system should recognize that learning requires whole-person care
+    And educational care economy includes psychological and emotional support

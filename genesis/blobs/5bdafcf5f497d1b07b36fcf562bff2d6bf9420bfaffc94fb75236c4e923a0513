@@ -1,0 +1,9 @@
+Scenario: Household boundaries coordinate with individual autonomy
+    Given Sarah has individual autonomy over her choices
+    And she also participates in household governance
+    When Sarah makes decisions affecting the household
+    Then household boundaries should be negotiated, not imposed
+    And Sarah should maintain individual agency within household context
+    And household_elohim should balance individual and collective needs
+    And neither Sarah nor partner should dominate household governance
+    And equitable partnership should be structurally supported

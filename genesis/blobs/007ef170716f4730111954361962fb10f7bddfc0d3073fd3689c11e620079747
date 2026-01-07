@@ -1,0 +1,10 @@
+Scenario: Activist prevents extraction by powerful institutions
+    Given major foundations want to "support" the climate movement
+    And they offer funding that would create dependency and moderate demands
+    When the network evaluates the funding opportunity
+    Then historical patterns of movement capture surface for consideration
+    And communities who worked with these funders share experiences
+    And the network collectively evaluates risks and benefits
+    And alternative solidarity economy models are proposed
+    And the movement maintains independence while building sustainable support
+    And extractive relationships are refused through collective accountability

@@ -1,0 +1,12 @@
+Scenario: Accessible interface accommodates aging-related needs without patronizing
+    Given Margaret has age-related vision and dexterity changes
+    And she is a competent adult with decades of nursing experience
+    When Margaret uses the Value Scanner
+    Then the interface should have large, high-contrast fonts
+    And touch targets should be generous and forgiving
+    And voice interface options should be available
+    And navigation should be simple and consistent
+    And the pace should be patient without being condescending
+    And the tone should be respectful, never infantilizing
+    And Margaret should feel empowered and capable
+    And accessibility should enhance rather than diminish dignity

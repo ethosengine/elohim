@@ -1,0 +1,9 @@
+Scenario: Citizen tracks school resource distribution equity
+    Given the citizen is concerned about educational equity
+    And lives in a diverse municipality
+    When the Observer analyzes district resource patterns
+    Then the citizen sees which schools get experienced teachers
+    And views facility quality across neighborhoods
+    And identifies program access disparities (gifted, AP, arts)
+    And understands systematic resource distribution patterns
+    And educational justice concerns become evidence-based

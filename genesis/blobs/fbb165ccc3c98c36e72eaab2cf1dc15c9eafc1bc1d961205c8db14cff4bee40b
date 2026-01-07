@@ -1,0 +1,9 @@
+Scenario: Regional food security through care economy participation
+    Given Maria participates in food cooperatives and bulk buying networks
+    And these networks build local food security and resilience
+    When bioregional food systems are assessed
+    Then the bioregional_elohim should recognize her contribution to food security
+    And it should value community food cooperation as regional resilience
+    And her participation should be seen as strengthening local food systems
+    And food economy cooperation should be honored as bioregional stewardship
+    And Maria should see herself as contributing to regional food sovereignty

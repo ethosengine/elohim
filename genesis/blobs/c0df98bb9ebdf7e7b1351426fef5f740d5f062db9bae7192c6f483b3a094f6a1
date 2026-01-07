@@ -1,0 +1,10 @@
+Scenario: Financial literacy education grounded in real practice
+    Given Jasmine manages real budgets and makes real economic decisions
+    And school provides financial literacy education
+    When educational_elohim integrates school learning with lived experience
+    Then abstract financial concepts should connect to her real practice
+    And she should learn budgeting through managing actual household budget
+    And understand compound interest through her real college savings
+    And learn financial planning by making real financial plans
+    And develop sophisticated financial capability through practice, not just theory
+    And integrate formal education with applied learning

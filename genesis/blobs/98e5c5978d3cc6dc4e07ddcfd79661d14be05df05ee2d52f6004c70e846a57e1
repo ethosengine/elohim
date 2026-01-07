@@ -1,0 +1,10 @@
+Scenario: Learning about different families' economic circumstances
+    Given Emma's family has $40k/year income
+    And neighborhood includes families with varied economic situations
+    When Emma learns about community economic diversity
+    Then teaching should be age-appropriate about economic difference
+    And the personal_agent should explain without judgment
+    And Emma should learn that families have different resources
+    And she should develop empathy about economic constraint
+    And class awareness should be taught with dignity for all
+    And care economy should serve families across income spectrum

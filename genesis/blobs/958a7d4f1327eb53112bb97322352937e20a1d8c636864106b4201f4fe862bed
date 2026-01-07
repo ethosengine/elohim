@@ -1,0 +1,64 @@
+# Intents and Commitments: From Desire to Promise
+
+## The Planning Layer
+
+hREA distinguishes between three temporal states:
+1. **Intent**: What might happen (desired/offered)
+2. **Commitment**: What will happen (promised)
+3. **Economic Event**: What did happen (observed)
+
+This enables coordination before action.
+
+## Intents: Offers and Requests
+
+An Intent is a planned economic flow that hasn't been committed to yet.
+
+**As an Offer** (provider specified):
+```
+Intent: "I can provide 10 hours of tutoring per week"
+├── provider: tutor_amara
+├── receiver: (unspecified - open offer)
+├── action: work
+├── effortQuantity: 10 hours/week
+└── resourceConformsTo: tutoring-service
+```
+
+**As a Request** (receiver specified):
+```
+Intent: "We need someone to repair our community laptops"
+├── provider: (unspecified - seeking provider)
+├── receiver: community_center
+├── action: work
+├── resourceConformsTo: electronics-repair
+└── note: "15 laptops needing maintenance"
+```
+
+## Commitments: Promises Made
+
+When agents agree, intents become commitments:
+
+```
+Commitment: Tutoring Agreement
+├── provider: tutor_amara
+├── receiver: student_emeka
+├── action: work
+├── effortQuantity: 2 hours/week
+├── hasBeginning: 2024-12-01
+├── satisfies: [intent_tutoring_request]
+└── agreedIn: learning-circle-agreement
+```
+
+Commitments are **promises** that can be:
+- **Fulfilled** by economic events
+- **Tracked** for accountability
+- **Connected** to agreements
+
+## Coordination Without Central Control
+
+This intent/commitment pattern enables:
+- **Matching**: Offers find requests automatically
+- **Negotiation**: Agents adjust until agreement
+- **Accountability**: Commitments can be tracked
+- **Trust**: Fulfillment history builds reputation
+
+No central authority needed - just agents making and keeping promises.

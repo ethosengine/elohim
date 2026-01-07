@@ -1,0 +1,9 @@
+Scenario: Journalist tracks city promises to accountability
+    Given city council approved affordable housing plan 3 years ago
+    And the journalist covered initial announcement and then moved on
+    When the Observer alerts on promise implementation timeline
+    Then the journalist investigates and finds only 12% of promised units built
+    And sees budget that was supposed to fund program redirected elsewhere
+    And identifies which council members voted for budget changes
+    And publishes accountability story on broken housing commitments
+    And politicians learn promises will be tracked and verified

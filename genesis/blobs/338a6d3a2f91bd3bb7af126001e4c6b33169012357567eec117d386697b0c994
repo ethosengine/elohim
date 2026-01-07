@@ -1,0 +1,11 @@
+Scenario: Household budget management on fixed retirement income
+    Given Margaret's household has fixed income of $32k/year
+    And income cannot be increased through additional employment
+    When the household_elohim manages resource allocation
+    Then it should track all household expenses and patterns
+    And it should optimize spending across categories
+    And it should identify opportunities for cost reduction
+    And it should help Margaret maintain quality of life within constraints
+    And the $150/week grocery budget should be managed carefully
+    And household financial dignity should be preserved
+    And the framing should be resource optimization, not poverty

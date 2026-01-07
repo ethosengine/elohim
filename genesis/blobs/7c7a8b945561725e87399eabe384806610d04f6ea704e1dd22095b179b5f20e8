@@ -1,0 +1,10 @@
+Scenario: Neighborhood walking and outdoor activity with grandchildren
+    Given Margaret takes grandchildren on neighborhood walks
+    And they visit parks, library, neighbors, and local businesses
+    When the neighborhood_elohim tracks local engagement
+    Then it should recognize this as neighborhood participation
+    And it should value intergenerational use of neighborhood spaces
+    And it should show Margaret teaching grandchildren about their community
+    And walking should build neighborhood social connections
+    And local business patronage should support neighborhood economy
+    And Margaret's activities should strengthen neighborhood vitality

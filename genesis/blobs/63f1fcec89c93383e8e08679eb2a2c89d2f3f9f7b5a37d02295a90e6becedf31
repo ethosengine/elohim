@@ -1,0 +1,10 @@
+Scenario: Personal agent helps maintain well-being during work pressure
+    Given Aisha's job is demanding
+    And professional pressures are intense
+    When work stress affects her health
+    Then the personal_agent should prioritize her well-being
+    And it should flag declining self-care patterns
+    And it should remind her that personal health enables professional contribution
+    And the system should validate self-care as essential, not optional
+    And she should learn that sustainable work requires personal stewardship
+    And wholeness should be preserved despite workplace demands

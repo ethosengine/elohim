@@ -1,0 +1,12 @@
+Scenario: Housing and energy use optimized for sustainability
+    Given Robert's household uses energy for heating, cooling, and power
+    And housing energy use significantly affects ecological impact
+    And household improvements can reduce ecological footprint
+    When bioregional_elohim supports energy optimization
+    Then it should analyze household energy consumption patterns
+    And suggest improvements: insulation, renewable energy, efficiency upgrades
+    And connect energy reduction to cost savings that support care economy participation
+    And help Robert prioritize improvements within household budget
+    And recognize that sustainable housing serves current and future generations
+    And demonstrate that ecological stewardship is long-term care
+    And build household infrastructure that reduces bioregional impact

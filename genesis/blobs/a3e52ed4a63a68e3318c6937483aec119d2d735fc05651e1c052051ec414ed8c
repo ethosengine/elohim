@@ -1,0 +1,10 @@
+Scenario: Food cooperative participation builds community food security
+    Given Sarah participates in community food cooperative
+    And she contributes labor to collective food purchasing
+    When food cooperative operates
+    Then the community_elohim should track Sarah's contributions
+    And it should coordinate cooperative logistics
+    And it should connect Sarah to other food security advocates
+    And cooperative should reduce costs for all members
+    And community food security should be built through care economy
+    And Sarah's contributions should be recognized and valued

@@ -1,0 +1,10 @@
+Scenario: Community mutual aid framework includes youth contributors
+    Given Marcus provides substantial care labor
+    And mutual aid operates on everyone having something to give
+    When community mutual aid networks operate
+    Then Marcus should be recognized as legitimate contributor
+    And his household labor should count as mutual aid contribution
+    And youth should be included in reciprocal care networks
+    And age should not exclude him from mutual aid participation
+    And community should value care work regardless of who performs it
+    And Marcus should experience being valued community member

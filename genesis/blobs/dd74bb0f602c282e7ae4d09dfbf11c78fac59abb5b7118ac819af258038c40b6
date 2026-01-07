@@ -1,0 +1,9 @@
+Scenario: Preventing Sarah's overcommitment through community coordination
+    Given Sarah is highly engaged in community
+    And she tends to say yes to too many requests
+    When community organizations ask Sarah to contribute
+    Then the community_elohim should track her total commitments
+    And it should warn Sarah when she's approaching overcommitment
+    And it should help her maintain sustainable participation
+    And community should benefit from Sarah's long-term engagement
+    And burnout should be prevented through coordination

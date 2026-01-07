@@ -42,6 +42,11 @@ async-trait = "0.1"
 sha2 = "0.10"
 hex = "0.4"
 base64 = "0.22"
+url = "2"  # Query string parsing for HTTP sync API
+
+# CID (Content Identifiers) - IPFS-compatible content addressing
+cid = "0.11"
+multihash-codetable = { version = "0.1", features = ["sha2"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -49,6 +54,9 @@ serde_json = "1"
 
 # Local database for metadata
 sled = "0.34"
+
+# CRDT sync - Automerge for offline-first document sync
+automerge = "0.5"
 
 # Error handling
 thiserror = "1"
@@ -96,7 +104,7 @@ futures = { version = "0.3", optional = true }
 lz4_flex = { version = "0.11", optional = true }
 
 [features]
-default = []
+default = ["p2p"]
 compression = ["lz4_flex"]
 p2p = ["libp2p", "futures"]
 

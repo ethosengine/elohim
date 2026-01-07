@@ -1,0 +1,9 @@
+Scenario: Parent coordinates district-wide program cut opposition
+    Given the district plans to eliminate music programs to save money
+    And the parent's child participates in the school band
+    When the Observer connects parents across all affected schools
+    Then 230 parents from 8 schools join coordinated advocacy
+    And coalition presents unified data on music program benefits
+    And shows alternative cost-saving options that preserve programs
+    And district-wide parent power prevents divide-and-conquer
+    And music programs are preserved through collective action

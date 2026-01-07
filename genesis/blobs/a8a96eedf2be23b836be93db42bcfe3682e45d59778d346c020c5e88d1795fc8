@@ -1,0 +1,11 @@
+Scenario: Performance evaluation accounts for part-time status and accommodations
+    Given Alex works part-time with accommodations
+    And performance should be measured appropriately for Alex's situation
+    When Alex receives performance evaluations
+    Then the workplace_elohim should help Alex ensure fair evaluation
+    And expectations should be adjusted for part-time hours worked
+    And accommodations should not be held against Alex
+    And productivity should be measured per hours worked, not full-time standard
+    And disability-related absences should not negatively impact evaluation
+    And the protocol should support Alex in advocating for fair treatment
+    And evaluation should recognize Alex's actual contributions accurately

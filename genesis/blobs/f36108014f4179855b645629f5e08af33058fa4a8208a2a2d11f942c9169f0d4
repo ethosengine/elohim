@@ -1,0 +1,11 @@
+Scenario: Peer reviewing other expert testimony for quality assurance
+    Given multiple experts advise National Council
+    And peer review prevents individual capture or error
+    When I review fellow expert's testimony
+    Then I assess: technical accuracy and completeness
+    And I identify: bias or conflicts of interest
+    And I check: if alternative interpretations exist
+    And I verify: adherence to testimony guidelines
+    And I provide: constructive critique
+    And I accept: critique of my own testimony
+    And peer review: maintains expertise quality and independence

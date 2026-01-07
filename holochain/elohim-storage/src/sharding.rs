@@ -27,7 +27,10 @@ pub const SINGLE_SHARD_MAX: usize = 16 * 1024 * 1024;
 /// Shard manifest - matches DNA ShardManifest structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShardManifest {
-    /// Original blob hash (sha256-xxx)
+    /// CID (Content Identifier) of the blob - IPFS-compatible
+    pub blob_cid: String,
+
+    /// Original blob hash (sha256-xxx) - for backward compatibility
     pub blob_hash: String,
 
     /// Total size of the original blob in bytes
@@ -78,6 +81,10 @@ pub struct ShardConfig {
 
     /// Threshold for using Reed-Solomon (bytes)
     pub rs_threshold: usize,
+
+    /// Maximum size for single-shard blobs (bytes)
+    /// Blobs larger than this use chunked or RS encoding
+    pub single_shard_max: usize,
 }
 
 impl Default for ShardConfig {
@@ -87,6 +94,7 @@ impl Default for ShardConfig {
             rs_data_shards: 4,
             rs_parity_shards: 3,
             rs_threshold: RS_THRESHOLD,
+            single_shard_max: SINGLE_SHARD_MAX,
         }
     }
 }
@@ -104,7 +112,7 @@ impl ShardEncoder {
 
     /// Determine encoding type based on blob size and config
     pub fn determine_encoding(&self, size: usize) -> &'static str {
-        if size <= SINGLE_SHARD_MAX {
+        if size <= self.config.single_shard_max {
             "none"
         } else if size < self.config.rs_threshold {
             "chunked"
@@ -115,7 +123,8 @@ impl ShardEncoder {
 
     /// Create a manifest for a blob
     pub fn create_manifest(&self, data: &[u8], mime_type: &str, reach: &str) -> ShardManifest {
-        let blob_hash = BlobStore::compute_hash(data);
+        let (blob_cid, blob_hash) = BlobStore::compute_addresses(data);
+        let blob_cid_str = blob_cid.to_string();
         let total_size = data.len() as u64;
         let encoding = self.determine_encoding(data.len());
 
@@ -184,6 +193,7 @@ impl ShardEncoder {
         let now = chrono::Utc::now().to_rfc3339();
 
         ShardManifest {
+            blob_cid: blob_cid_str,
             blob_hash,
             total_size,
             mime_type: mime_type.to_string(),
@@ -347,12 +357,16 @@ mod tests {
         assert_eq!(manifest.total_shards, 1);
         assert_eq!(manifest.shard_hashes.len(), 1);
         assert_eq!(manifest.blob_hash, manifest.shard_hashes[0]);
+        // Verify CID is present and valid
+        assert!(manifest.blob_cid.starts_with("bafkrei")); // CIDv1 with raw codec
     }
 
     #[test]
     fn test_chunked_manifest() {
         let encoder = ShardEncoder::new(ShardConfig {
             shard_size: 10,
+            single_shard_max: 50, // Force chunking for data > 50 bytes
+            rs_threshold: 500,    // RS only for data > 500 bytes
             ..Default::default()
         });
 
@@ -362,10 +376,10 @@ mod tests {
             *byte = (i % 256) as u8;
         }
 
-        // Override single shard max for test
         let manifest = encoder.create_manifest(&data, "application/octet-stream", "family");
 
         // With shard_size=10 and 100 bytes, we get 10 chunks
+        assert_eq!(manifest.encoding, "chunked");
         assert_eq!(manifest.shard_hashes.len(), 10);
     }
 
@@ -375,11 +389,15 @@ mod tests {
             shard_size: 10,
             rs_data_shards: 4,
             rs_parity_shards: 3,
-            rs_threshold: 50, // Lower threshold for testing
+            rs_threshold: 50,      // RS for data > 50 bytes
+            single_shard_max: 10,  // Force RS encoding for test data
         });
 
         let data: Vec<u8> = (0..100).map(|i| (i % 256) as u8).collect();
         let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
+
+        // Verify RS encoding was used
+        assert_eq!(manifest.encoding, "rs-4-7");
 
         // Create shards
         let shards = encoder.create_shards(&data, &manifest.encoding);
@@ -397,17 +415,23 @@ mod tests {
             shard_size: 25,
             rs_data_shards: 4,
             rs_parity_shards: 3,
-            rs_threshold: 50,
+            rs_threshold: 50,      // RS for data > 50 bytes
+            single_shard_max: 10,  // Force RS encoding for test data
         });
 
         let data: Vec<u8> = (0..100).map(|i| (i % 256) as u8).collect();
         let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
+
+        // Verify RS encoding was used
+        assert_eq!(manifest.encoding, "rs-4-7");
+        assert!(manifest.total_shards >= 7, "Expected at least 7 shards for rs-4-7");
+
         let shards = encoder.create_shards(&data, &manifest.encoding);
 
         // Remove 2 shards (we can lose up to 3 with rs-4-7)
         let mut shard_opts: Vec<Option<Vec<u8>>> = shards.iter().map(|s| Some(s.clone())).collect();
         shard_opts[0] = None; // Remove first data shard
-        shard_opts[5] = None; // Remove second parity shard
+        shard_opts[5] = None; // Remove a parity shard
 
         let reconstructed = encoder.reconstruct(&manifest, &shard_opts).unwrap();
         assert_eq!(reconstructed, data);

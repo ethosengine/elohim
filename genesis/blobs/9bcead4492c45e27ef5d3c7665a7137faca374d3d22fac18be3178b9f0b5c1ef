@@ -1,0 +1,10 @@
+Scenario: Safe environment for learning from mistakes
+    Given Emma is practicing value literacy
+    And mistakes are essential to learning
+    When Emma makes a choice that doesn't work out well
+    Then the experience should be treated as learning opportunity
+    And her personal_agent should guide reflection: "How did that work out?"
+    And no shame or punishment should be attached to mistakes
+    And consequences should be educational, not harmful
+    And judgment should be built through safe practice
+    And error should be normalized as part of learning process

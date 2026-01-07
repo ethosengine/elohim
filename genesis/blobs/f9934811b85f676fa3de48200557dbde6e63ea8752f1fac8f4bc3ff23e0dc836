@@ -1,0 +1,9 @@
+Scenario: Activist demands community benefits agreement for development
+    Given a developer seeks public subsidies for project
+    And claims it will "create jobs"
+    When the Observer analyzes developer's labor track record
+    Then the activist shows previous projects created mostly temp low-wage work
+    And demonstrates few jobs went to local community members
+    And reveals history of labor violations and union-busting
+    And organizes coalition demanding binding labor standards
+    And economic development serves workers not just capital

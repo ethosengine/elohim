@@ -1,0 +1,10 @@
+Scenario: Activist prevents movement co-optation by bad actors
+    Given a corporate-funded organization tries to join the network
+    And they claim to support climate action but oppose systemic change
+    When they attempt to participate in network coordination
+    Then their limited community trust becomes visible
+    And their ties to fossil fuel funding are surfaced through documentation
+    And the network collectively evaluates the participation request
+    And communities share experiences with similar co-optation attempts
+    And the network maintains boundaries while remaining open to good-faith participation
+    And the movement's integrity is protected through transparent evaluation

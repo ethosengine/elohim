@@ -1,0 +1,9 @@
+Scenario: Journalist develops whistleblower source on contract fraud
+    Given a city employee witnesses fraudulent contracting
+    And fears retaliation for speaking to press
+    When the Observer provides secure anonymous channel
+    Then the whistleblower shares documents through protected system
+    And journalist receives evidence of no-bid contracts to connected firms
+    And investigates without exposing source identity
+    And publishes investigation based on documents and additional reporting
+    And source protection enables accountability journalism

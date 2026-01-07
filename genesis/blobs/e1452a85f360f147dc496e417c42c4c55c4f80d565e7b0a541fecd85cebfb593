@@ -1,0 +1,27 @@
+# Maria
+
+Came here for a better life. Working hard, learning the language, trying to build a future for my family.
+
+**Profile Reach:** network
+
+**Is Pseudonymous:** false
+
+**Accepting Connections:** true
+
+**Primary Location:** {
+  "layer": "neighborhood",
+  "displayName": "Tech Valley",
+  "reach": "community"
+}
+
+**Communities:** community-immigrant-support, community-local-church, community-esl-program
+
+**Public Affinities:** language-learning, family, community-integration, faith
+
+**Accessibility Needs:** translation-support, simple-language
+
+**Language Preferences:** {
+  "primary": "es",
+  "secondary": "en",
+  "learningLevel": "intermediate"
+}

@@ -1,0 +1,12 @@
+Scenario: Municipal civic participation valued as care contribution
+    Given Robert serves on municipal boards and commissions
+    And civic participation is care for community
+    And his service benefits all residents
+    When municipal_elohim tracks civic participation
+    Then it should recognize his municipal service as care contribution
+    And value civic participation in care token economy
+    And track his contributions: planning commission, park board, aging advisory committee
+    And demonstrate that governance participation is care work
+    And recognize that his civic service strengthens municipal care economy
+    And build culture where civic participation is valued as contribution
+    And support sustainable civic engagement without exploitation

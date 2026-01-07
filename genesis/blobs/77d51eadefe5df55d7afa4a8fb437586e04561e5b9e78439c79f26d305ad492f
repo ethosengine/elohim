@@ -1,0 +1,11 @@
+Scenario: Research on council effectiveness includes my service
+    Given Dr. Chen studies national council deliberations
+    And my service contributes to understanding democratic AI governance
+    When my deliberations become research data (anonymized)
+    Then researchers learn: how citizens grapple with complexity
+    And they analyze: what enables effective sortition governance
+    And they examine: whether democratic oversight scales successfully
+    And they identify: improvements to support future councils
+    And my service: advances global knowledge of democratic governance
+    And I contribute: to humanity's understanding of how to govern with AI
+    And my unlikely journey: from nurse to constitutional architect serves future generations

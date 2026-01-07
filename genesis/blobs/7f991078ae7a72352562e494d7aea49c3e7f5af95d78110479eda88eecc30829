@@ -1,0 +1,9 @@
+Scenario: Council member surfaces constituent intelligence at scale
+    Given the politician represents 50,000 residents
+    And only 20 constituents typically attend council meetings
+    When the Observer aggregates constituent patterns from civic engagement
+    Then the politician sees 230 families losing 90 minutes daily to bus delays
+    And identifies senior centers underutilized due to access barriers
+    And learns small businesses struggle with permit complexity
+    And hears from working parents and shift workers who can't attend meetings
+    And understands actual constituent needs beyond loudest voices

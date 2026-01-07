@@ -1,0 +1,10 @@
+Scenario: Advocating for elder-friendly community policies
+    Given Margaret represents retired community members' interests
+    And community policies affect elder well-being and participation
+    When community considers policies on housing, transportation, or services
+    Then Margaret's voice and advocacy should be valued
+    And her care contributions should give her standing in decisions
+    And elder perspective should inform community planning
+    And age-friendly policies should be prioritized
+    And community should serve members of all ages
+    And Margaret should help shape community for aging population

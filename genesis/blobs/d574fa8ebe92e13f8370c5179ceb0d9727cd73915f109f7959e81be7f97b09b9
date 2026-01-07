@@ -1,0 +1,9 @@
+Scenario: Creator documents community history through elder interviews
+    Given Sam is creating an oral history project for Riverside neighborhood
+    When Sam interviews Rose about neighborhood changes over 50 years
+    And creates content preserving her memories and insights
+    Then the content is shared with the Riverside community
+    And community members add their own memories and context
+    And Rose receives recognition for her knowledge contribution
+    And community history is preserved for future generations
+    And the content earns reach to similar history preservation projects

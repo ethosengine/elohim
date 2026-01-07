@@ -1,0 +1,10 @@
+Scenario: Retired residents as experienced community leaders and organizers
+    Given Frank has decades of community experience
+    And he understands community dynamics and history
+    When the community_elohim facilitates leadership
+    Then Frank's accumulated experience should position him for leadership
+    And his knowledge should inform community organizing and policy
+    And community should actively seek his participation in decision-making
+    And decades of community investment should confer legitimate authority
+    And elder leadership should be welcomed and valued
+    And Frank should experience himself as community leader, not marginal participant

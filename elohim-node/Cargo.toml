@@ -1,0 +1,85 @@
+[package]
+name = "elohim-node"
+version = "0.1.0"
+edition = "2021"
+description = "Always-on infrastructure runtime for the Elohim Protocol"
+license = "Apache-2.0"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Sync engine
+automerge = "0.5"
+
+# P2P networking
+libp2p = { version = "0.53", features = [
+    "tokio",
+    "tcp",
+    "quic",
+    "noise",
+    "yamux",
+    "mdns",
+    "kad",
+    "identify",
+    "relay",
+    "dcutr",
+    "request-response",
+] }
+
+# Storage
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+toml = "0.8"
+rmp-serde = "1"
+
+# API
+axum = "0.7"
+tonic = "0.11"
+tokio-tungstenite = "0.21"
+
+# HTTP middleware
+tower-http = { version = "0.5", features = ["fs"] }
+
+# HTTP client for updates
+reqwest = { version = "0.11", features = ["json", "stream"] }
+futures = "0.3"
+
+# Crypto for update verification
+sha2 = "0.10"
+
+# Utilities
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "1"
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+uuid = { version = "1", features = ["v4"] }
+hostname = "0.3"
+num_cpus = "1.16"
+async-trait = "0.1"
+crc32fast = "1.4"
+
+# System metrics
+sysinfo = "0.30"
+
+# Platform-specific
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[build-dependencies]
+tonic-build = "0.11"
+
+[[bin]]
+name = "elohim-node"
+path = "src/main.rs"
+
+[features]
+default = []

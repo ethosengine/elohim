@@ -1,0 +1,10 @@
+Scenario: Supporting Sarah's work and life through care provision
+    Given Margaret's childcare enables Sarah to work and thrive
+    And this support is essential to Sarah's economic security
+    When the family_elohim tracks how care enables flourishing
+    Then it should show that Margaret's care supports Sarah's career
+    And it should recognize care as infrastructure for Sarah's life
+    And it should make visible that Margaret enables Sarah's economic participation
+    And multigenerational care should enable all generations to thrive
+    And Margaret's contribution to Sarah's flourishing should be recognized
+    And care economy should show how generations support each other

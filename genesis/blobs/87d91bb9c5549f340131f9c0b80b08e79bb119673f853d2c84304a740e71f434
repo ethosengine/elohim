@@ -1,0 +1,9 @@
+Scenario: Investor capital enables community programs addressing neighborhood needs
+    Given traditional investment extracts value from communities
+    And Patricia wanted investment supporting community benefit, not extraction
+    When democratic business allocates revenue to community programs
+    Then her investment enables senior meal programs, youth employment, community space
+    And investment returns include social dividends: stronger community, less isolation, economic opportunity
+    And capital builds community infrastructure, not just individual wealth
+    And social returns are documented and valued alongside financial returns
+    And community_elohim manages community program funding from democratic business revenue

@@ -1,0 +1,9 @@
+Scenario: Teacher exposes state curriculum standards implementation gap
+    Given state adopted new curriculum standards three years ago
+    But provided no implementation funding or professional development
+    When teachers document implementation reality through Observer
+    Then statewide data shows 68% of teachers lack standards-aligned materials
+    And 71% received no professional development on new standards
+    And student assessment results reflect implementation failure
+    And teachers coordinate testimony to state education committee
+    And policy implementation accountability emerges from teacher evidence

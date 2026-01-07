@@ -1,0 +1,9 @@
+Scenario: Citizen detects politician voting pattern inconsistency
+    Given a council member claims to support affordable housing
+    And the citizen cares about housing affordability
+    When the Observer tracks voting records over time
+    Then the citizen sees the council member voted against 5 housing measures
+    And approved tax breaks for luxury development
+    And observes patterns vs rhetoric divergence
+    And can hold officials accountable in elections
+    And political theater becomes visible

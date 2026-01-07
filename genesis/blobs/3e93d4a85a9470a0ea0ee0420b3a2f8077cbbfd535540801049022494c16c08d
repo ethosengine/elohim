@@ -1,0 +1,10 @@
+Scenario: Maintaining neighborhood relationships across class differences
+    Given Margaret has limited income but middle-class background
+    And the neighborhood may have economic diversity
+    When the neighborhood_elohim facilitates connections
+    Then Margaret should be connected across economic boundaries
+    And her value should not depend on financial resources
+    And care contributions should create cross-class solidarity
+    And the neighborhood should value all members' contributions
+    And economic diversity should strengthen rather than divide
+    And Margaret's care economy participation should bridge differences

@@ -1,0 +1,9 @@
+Scenario: Activist exposes corporate lobbying influence
+    Given a harmful environmental bill is advancing
+    And the activist suspects industry capture
+    When the Observer tracks lobbying and donations
+    Then the activist sees which companies lobby for the bill
+    And views campaign contributions to bill sponsors
+    And identifies revolving door between industry and regulators
+    And corruption patterns become documented
+    And advocacy targets political vulnerabilities

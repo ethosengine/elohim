@@ -1,0 +1,10 @@
+Scenario: Anonymous service when facing community controversy
+    Given I am reviewing a highly controversial local case
+    And I am concerned about community pressure or retaliation
+    When I request anonymous service protections
+    Then my identity is: revealed only to verification systems
+    And I can: serve without public knowing who I am
+    And I am protected: from intimidation or capture attempts
+    And I can: deliberate freely without fear
+    And cryptographic proofs: verify I'm legitimate member without revealing identity
+    And my judgment: maintains democratic legitimacy despite anonymity

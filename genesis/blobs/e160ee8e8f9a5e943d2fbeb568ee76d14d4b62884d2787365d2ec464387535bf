@@ -1,0 +1,9 @@
+Scenario: Organizer coordinates block club coalition on neighborhood safety
+    Given five block clubs care about pedestrian safety improvements
+    And members work different shifts and speak different languages
+    When the organizer uses Observer for coalition coordination
+    Then all members see shared information base in their languages
+    And can engage asynchronously on their schedules
+    And track who's committed to testify at traffic commission
+    And coordinate meeting attendance across 35 residents
+    And coalition functions at scale without exhausting organizer

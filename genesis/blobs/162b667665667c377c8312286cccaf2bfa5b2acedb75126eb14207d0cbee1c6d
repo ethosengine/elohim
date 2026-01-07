@@ -1,0 +1,10 @@
+Scenario: Remote care contributions to family of origin
+    Given Aisha lives in a different city from her family
+    And she wants to stay connected through care
+    When Aisha helps her younger siblings with homework remotely
+    Then the family_elohim should track her care contributions
+    And care tokens should accumulate for her help
+    And her parents should see her contributions
+    And siblings should be able to request her help
+    And the system should maintain family care bonds across distance
+    And geographic separation shouldn't prevent care economy participation

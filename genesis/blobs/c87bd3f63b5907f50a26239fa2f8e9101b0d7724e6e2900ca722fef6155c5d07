@@ -1,0 +1,11 @@
+Scenario: Using research evidence to justify protocol support
+    Given I need to defend protocol against skeptical colleagues
+    And Dr. Chen's research provides rigorous evaluation
+    When I cite evidence in committee hearings
+    Then I present: data showing reduced loneliness and improved wellbeing
+    And I provide: evidence about successful crisis response
+    And I demonstrate: marginalized community access patterns
+    And I show: comparison with communities without protocol
+    And I address: limitations and challenges honestly
+    And evidence base: supports informed policy choice
+    And I maintain: scientific credibility through honest assessment

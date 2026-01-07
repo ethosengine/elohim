@@ -1,0 +1,11 @@
+Scenario: Aging in place supported by neighborhood care infrastructure
+    Given Frank plans to age in his neighborhood
+    And neighborhoods can support aging in place through care economy
+    When the neighborhood_elohim coordinates aging support
+    Then it should connect Frank to neighbors who can provide future support
+    And facilitate reciprocal care arrangements as needs change
+    And coordinate check-ins and assistance for aging residents
+    And Frank's current contributions should create future neighborhood support
+    And care reciprocity should operate at neighborhood scale
+    And aging in place should be supported through neighborhood care economy
+    And Frank should experience security in continuing neighborhood membership

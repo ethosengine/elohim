@@ -1,0 +1,11 @@
+Scenario: Preventing exploitation of grandparent care labor
+    Given Margaret provides substantial unpaid care
+    And she could potentially be taken advantage of
+    When the family_elohim monitors care economy equity
+    Then it should flag if Margaret's contributions are excessive relative to reciprocity
+    And it should prevent family from treating her as "free childcare"
+    And it should ensure her care work is appreciated and valued
+    And it should help family recognize when to compensate or reciprocate
+    And Margaret should have standing to set boundaries
+    And care economy should protect grandparents from exploitation
+    And family relationships should be equitable, not extractive

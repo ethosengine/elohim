@@ -1,0 +1,10 @@
+Scenario: Community volunteering contributions quantified and recognized
+    Given Margaret volunteers 10 hours/week across community organizations
+    And this represents ~500 hours/year of community labor
+    When the community_elohim tracks volunteer contributions
+    Then all volunteer hours should be quantified and valued
+    And the economic value of her labor should be calculated
+    And community care tokens should accumulate to reflect contributions
+    And Margaret's productivity should be visible despite retirement status
+    And the narrative that retirees "don't work" should be countered
+    And her community standing should reflect her contributions

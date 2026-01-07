@@ -1,0 +1,10 @@
+Scenario: Pension board member understands worker and community concerns on investment
+    Given pension fund invests in companies with controversial labor practices
+    And beneficiaries and community members raise concerns at board meeting
+    And board wants to understand stakeholder perspectives beyond who testified
+    When the board member seeks community accountability data from Observer
+    Then they receive survey data from pension beneficiaries on investment priorities
+    And see worker concerns about fund investments in companies with poor labor records
+    And access analysis of investment alignment with beneficiary values
+    And understand community impacts of fund investment decisions
+    And community accountability helps board consider stakeholder interests

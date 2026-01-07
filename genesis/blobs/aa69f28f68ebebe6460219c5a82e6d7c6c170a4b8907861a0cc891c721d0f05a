@@ -1,0 +1,9 @@
+Scenario: Child joins school homework help space
+    Given Emma's school has a homework help space on the Elohim network
+    And the space is moderated by teachers and parent volunteers
+    When Emma joins the space through her school connection
+    Then she gains access to homework help from peers and mentors
+    And all participants are verified members of the school community
+    And the moderation agent maintains supportive atmosphere
+    And predatory behavior is structurally impossible
+    And Emma can ask questions and help classmates

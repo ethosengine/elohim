@@ -1,0 +1,9 @@
+Scenario: Politician monitors environmental agency enforcement patterns
+    Given the politician has oversight of environmental regulators
+    And community groups report lax enforcement
+    When the Observer tracks environmental compliance and enforcement
+    Then they see violation patterns by facility and location
+    And identify enforcement disparities by neighborhood demographics
+    And understand whether penalties effectively deter violations
+    And learn which facilities are repeat violators
+    And demand stronger enforcement protecting community health

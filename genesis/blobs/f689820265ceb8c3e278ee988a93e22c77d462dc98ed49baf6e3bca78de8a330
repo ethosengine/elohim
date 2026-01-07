@@ -1,0 +1,9 @@
+Scenario: Developer habitat destruction versus mitigation reality
+    Given a developer destroys 40 acres of forest for development
+    And promises habitat mitigation will offset ecological loss
+    When the Observer tracks mitigation outcomes over five years
+    Then analysis shows: mitigation site has 40% native species survival
+    And ecological function is fraction of destroyed habitat
+    And offset calculation was based on optimistic assumptions not reality
+    And net ecological loss is substantial despite mitigation promises
+    And honest accounting informs better environmental protection policy

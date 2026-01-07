@@ -1,0 +1,10 @@
+Scenario: Future orientation toward food system transformation
+    Given Marcus experiences food system failures personally
+    And he is developing values and political consciousness
+    When Marcus reflects on food systems
+    Then he should envision better alternatives
+    And the personal_agent should present possibilities for transformation
+    And it should explain food sovereignty and community agriculture
+    And his generation should expect fundamental food system change
+    And care economy should provide framework for reimagining food systems
+    And his current struggles should fuel commitment to creating just alternatives

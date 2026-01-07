@@ -1,0 +1,11 @@
+Scenario: Shared living space decisions preserve elderly authority
+    Given Helen's daughter occasionally stays to provide care
+    And Helen's home is multigenerational at times
+    When household decisions need to be made
+    Then Helen's authority in her own home should be paramount
+    And family members should defer to her household preferences
+    And the household_elohim should mediate conflicting preferences
+    And Helen's long-standing patterns should have priority
+    And she should not feel like she's lost control of her space
+    And care recipients should not become subordinate in their own homes
+    And the protocol should preserve hierarchy: this is Helen's home

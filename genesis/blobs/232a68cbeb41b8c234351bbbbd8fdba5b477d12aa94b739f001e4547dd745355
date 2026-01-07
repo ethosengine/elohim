@@ -1,0 +1,10 @@
+Scenario: Municipal care economy data informs retirement policy
+    Given Frank's care contributions are tracked through Value Scanner
+    And municipal data reveals aggregate retired resident contributions
+    When the municipal_elohim analyzes retirement care economy
+    Then it should quantify total volunteer labor from retired residents
+    And calculate market value of unpaid care work (~millions annually)
+    And surface that retired residents provide massive municipal value
+    And inform policy recognizing caregiving in benefit calculations
+    And demonstrate that retirement is transition to care work, not exit from contribution
+    And support municipal policy that values and supports retired residents

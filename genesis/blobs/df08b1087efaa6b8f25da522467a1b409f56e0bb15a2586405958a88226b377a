@@ -1,0 +1,9 @@
+Scenario: Medical provider education about caregiver as care partner
+    Given some providers dismiss or ignore family caregivers
+    And this undermines care quality and caregiver well-being
+    When the healthcare_elohim advocates for caregiver role
+    Then it should educate providers about caregiver expertise
+    And it should demonstrate caregivers improve care outcomes
+    And it should advocate for caregiver partnership in care teams
+    And providers should be trained to work with family caregivers
+    And healthcare culture should recognize caregivers as essential partners

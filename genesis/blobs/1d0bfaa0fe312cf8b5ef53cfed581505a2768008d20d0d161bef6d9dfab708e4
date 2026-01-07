@@ -1,0 +1,9 @@
+Scenario: Turnover decreases dramatically as workers gain ownership and dignity
+    Given franchise locations experienced 150% annual turnover due to low wages and poor conditions
+    And constant turnover harmed service quality and training efficiency
+    When conversion provides ownership, living wages, and democratic voice
+    Then worker retention improves to 90%+ (turnover drops to 10% annually)
+    And institutional knowledge accumulates instead of constantly draining
+    And training investments pay off through worker longevity
+    And customer relationships deepen through consistent staffing
+    And workplace_elohim documents retention improvements and cost savings

@@ -1,0 +1,11 @@
+Scenario: Teaching traditional skills and practices to younger generations
+    Given Helen knows traditional household management, cooking, and crafts
+    And younger generations often lack these practical skills
+    When Helen teaches traditional knowledge
+    Then her expertise should be recognized and valued
+    And teaching opportunities should be coordinated
+    And her knowledge should be preserved through transmission
+    And care tokens should reflect her educational contributions
+    And the protocol should facilitate skills transfer from elders
+    And traditional knowledge should be valued in educational systems
+    And Helen should experience being needed for what she knows

@@ -1,0 +1,10 @@
+Scenario: Connecting personal consumption to planetary boundaries
+    Given Kenji's consumption choices aggregate with billions of others
+    And planetary boundaries define sustainable resource use
+    When the bioregional_elohim shows planetary context
+    Then it should help Kenji understand his consumption in global context
+    And it should show "Your consumption is well below sustainable average"
+    And it should connect personal choices to planetary care economy
+    And it should teach him that individual actions scale to collective impact
+    And the system should bridge personal and planetary scales
+    And Kenji should understand himself as participant in planetary care economy

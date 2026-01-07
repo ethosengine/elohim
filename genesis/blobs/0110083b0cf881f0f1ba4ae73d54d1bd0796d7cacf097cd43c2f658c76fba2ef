@@ -1,0 +1,10 @@
+Scenario: Transition and turnover management in student households
+    Given student housing is temporary and roommates change
+    And Kenji might have different roommates each year
+    When roommates transition in and out of household
+    Then the household_elohim should document established patterns
+    And it should help new roommates integrate into household norms
+    And it should preserve institutional knowledge across transitions
+    And it should help negotiate new arrangements with new people
+    And the system should reduce friction from household turnover
+    And care economy patterns should transfer across roommate changes

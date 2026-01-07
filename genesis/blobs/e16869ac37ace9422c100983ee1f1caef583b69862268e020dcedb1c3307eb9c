@@ -1,0 +1,9 @@
+Scenario: Parent receives child-focused community updates
+    Given the parent works shifts and has 15 minutes during lunch
+    And community decisions were made last night about parks and safety
+    When the parent checks their morning brief
+    Then they see only decisions affecting their children's bus stops, parks, and routes
+    And the summary takes 3 minutes to read
+    And jargon is translated to real impacts ("longer walk," "no crossing guard")
+    And the parent can submit feedback during their break
+    And civic engagement fits into a working parent's schedule

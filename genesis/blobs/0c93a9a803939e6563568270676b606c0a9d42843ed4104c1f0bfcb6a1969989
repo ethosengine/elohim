@@ -1,0 +1,11 @@
+Scenario: Activist shares evidence-based call to action
+    Given the activist has researched city council voting records on housing
+    And they have compiled data showing repeated votes against affordability
+    When they create a contribution calling for community action
+    And they attach verified sources and documentation
+    And they propose attending the next city council meeting
+    Then the system evaluates the evidence quality
+    And the contribution reaches all organizing space members immediately
+    And it reaches wider community with evidence-based reach boost
+    And community members can endorse the call to action
+    And coordination tools help organize attendance and testimony

@@ -1,0 +1,8 @@
+Scenario: Building relationships with neighbors despite time constraints
+    Given neighborhood resilience depends on connection between residents
+    And my work schedule limits social time
+    When I have brief moments available
+    Then the protocol should help me build neighbor relationships
+    And suggest low-time ways to connect and contribute
+    And recognize that presence and greeting count as care
+    And support neighborhood social fabric even with limited participation

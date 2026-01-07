@@ -1,0 +1,8 @@
+Scenario: Shopping locally to support neighborhood economy
+    Given I need to buy groceries and household items
+    And local businesses are part of neighborhood care economy
+    When I shop for necessities
+    Then the protocol should identify accessible local businesses
+    And recognize that shopping locally is care economy participation
+    And show me how my purchases support neighborhood resilience
+    And accumulate care tokens for supporting local commerce

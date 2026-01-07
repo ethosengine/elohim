@@ -1,0 +1,9 @@
+Scenario: Community crisis support for caregiver emergencies
+    Given caregiving crises can become tragedies quickly
+    And James could reach complete burnout or medical emergency
+    When the community_elohim detects caregiver crisis
+    Then it should provide immediate crisis intervention
+    And emergency respite care should be available immediately
+    And medical support should be accessible for caregiver health
+    And community should have safety net for caregiver collapse
+    And crisis detection should prevent tragedy

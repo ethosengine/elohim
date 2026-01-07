@@ -1,0 +1,9 @@
+Scenario: Teacher participates in school policy decisions
+    Given the school site council is revising discipline policy
+    And teachers have frontline knowledge about what works
+    When the Observer facilitates teacher input on policy options
+    Then teachers share evidence-based practices anonymously
+    And successful approaches from other schools are surfaced
+    And student outcome data informs policy design
+    And final policy reflects teacher professional expertise
+    And school governance becomes genuinely participatory

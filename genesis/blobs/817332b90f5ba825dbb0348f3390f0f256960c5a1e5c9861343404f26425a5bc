@@ -1,0 +1,11 @@
+Scenario: Household privacy maintained while coordinating with extended family
+    Given Robert and Jennifer coordinate with Robert's siblings on parent care
+    And they communicate with adult children about support
+    And they participate in community care economy
+    When household_elohim manages information sharing
+    Then it should protect household privacy while enabling coordination
+    And share parent care information with Robert's siblings appropriately
+    And keep household financial details private from extended family
+    And allow children to access relevant information without full household visibility
+    And ensure community sees care contributions without sensitive details
+    And support household autonomy while enabling family coordination

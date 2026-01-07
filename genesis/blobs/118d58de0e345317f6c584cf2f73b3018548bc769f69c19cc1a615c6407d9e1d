@@ -1,0 +1,11 @@
+Scenario: Appeal involves technical complexity requiring expert testimony
+    Given my appeal concerns cryptographic verification of agent reasoning
+    And I question whether the agent actually followed claimed constitutional principles
+    When Technical Expert Dr. Amara Okonkwo testifies to the Constitutional Council
+    Then she explains the cryptographic proof in accessible language
+    And She clarifies what confidence levels mean and their limitations
+    And She acknowledges uncertainties in the technical analysis
+    And She presents competing interpretations when experts disagree
+    And She informs but doesn't dictate the council's judgment
+    And The council weighs technical information alongside human wisdom
+    And I understand the technical basis of the decision through her explanation

@@ -1,0 +1,10 @@
+Scenario: Siblings learning from student care economy practices
+    Given Kenji has younger siblings who will become students
+    And he's learning valuable care economy skills
+    When the family_elohim tracks knowledge transfer
+    Then it should recognize Kenji mentoring siblings in life skills
+    And it should value his teaching them budgeting, cooking, household management
+    And it should accumulate care tokens for mentorship work
+    And older siblings should be recognized as teachers for younger ones
+    And the system should value peer education within families
+    And Kenji's student experience should benefit future student siblings

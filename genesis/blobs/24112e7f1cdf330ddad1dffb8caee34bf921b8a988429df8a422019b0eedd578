@@ -1,0 +1,11 @@
+Scenario: Municipal planning commission uses agent constitutional analysis
+    Given planning commission reviews development proposals
+    And developments affect multiple neighborhoods and city environment
+    When Municipal Elohim provides constitutional analysis
+    Then agent flags: if development would harm watershed
+    And agent assesses: effects on housing affordability, traffic, equity
+    And agent provides: constitutional principles analysis
+    And planning commission: still makes final decision
+    And commissioners: use information but maintain judgment authority
+    And development review: incorporates constitutional considerations
+    And city planning: serves broader values beyond narrow economics

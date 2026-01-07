@@ -1,0 +1,11 @@
+Scenario: Household care coordination prevents caregiver burnout
+    Given Helen's daughter provides substantial household support
+    And family caregiving risks burnout
+    When the household_elohim tracks care labor
+    Then it should identify when daughter's burden is unsustainable
+    And it should suggest respite care before crisis occurs
+    And it should coordinate additional support sources
+    And daughter's care work should be recognized and valued
+    And care tokens should accumulate for her labor
+    And the system should protect both Helen and her caregivers
+    And sustainable care networks should be built proactively

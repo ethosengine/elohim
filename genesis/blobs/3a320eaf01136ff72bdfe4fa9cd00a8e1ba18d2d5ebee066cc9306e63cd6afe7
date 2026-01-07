@@ -1,0 +1,11 @@
+Scenario: Household maintenance coordinated with accessibility considerations
+    Given Alex's household requires regular maintenance
+    And some maintenance tasks are physically inaccessible to Alex
+    When household maintenance needs arise
+    Then the household_elohim should help Alex coordinate necessary services
+    And it should identify which tasks need external assistance
+    And it should help Alex hire appropriate service providers
+    And Alex should maintain authority over what work is done and how
+    And service providers should respect Alex's expertise about their own home
+    And coordination should be efficient and dignity-preserving
+    And Alex should be able to maintain their home independently with appropriate support

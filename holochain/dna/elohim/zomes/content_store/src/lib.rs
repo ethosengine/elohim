@@ -828,6 +828,19 @@ pub fn __doorway_import_config(_: ()) -> ExternResult<ImportConfig> {
 // =============================================================================
 
 /// Input for creating content (matches ContentNode from elohim-service)
+///
+/// ## Manifest Mode (Recommended for content > 1KB)
+///
+/// For large content, store the body in elohim-storage and provide:
+/// - `blob_cid`: CID returned from elohim-storage
+/// - `content_hash`: SHA256 of the content body
+/// - `content_size_bytes`: Size of the content body
+/// - `content`: Empty string or the hash (for backwards compatibility)
+///
+/// The Angular app/seeder should:
+/// 1. Upload content body to elohim-storage: `PUT /blob/{hash}` -> returns CID
+/// 2. Create entry with blob_cid pointing to stored content
+/// 3. On read: check blob_cid, fetch from elohim-storage if present
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CreateContentInput {
     pub id: String,
@@ -835,7 +848,7 @@ pub struct CreateContentInput {
     pub title: String,
     pub description: String,
     pub summary: Option<String>,          // Short preview text for cards/lists
-    pub content: String,
+    pub content: String,                  // Legacy: full body. Manifest mode: empty or hash
     pub content_format: String,
     pub tags: Vec<String>,
     pub source_path: Option<String>,
@@ -844,6 +857,16 @@ pub struct CreateContentInput {
     pub estimated_minutes: Option<u32>,   // Reading/viewing time
     pub thumbnail_url: Option<String>,    // Preview image for visual cards
     pub metadata_json: String,
+    // Content manifest fields (Phase 0 refactor)
+    /// CID pointing to content body in elohim-storage (set for manifest mode)
+    #[serde(default)]
+    pub blob_cid: Option<String>,
+    /// Size of content body in bytes
+    #[serde(default)]
+    pub content_size_bytes: Option<u64>,
+    /// SHA256 hash of content body (for integrity verification)
+    #[serde(default)]
+    pub content_hash: Option<String>,
 }
 
 /// Output when retrieving content
@@ -1822,6 +1845,10 @@ fn create_content_unchecked(input: CreateContentInput) -> ExternResult<ContentOu
         updated_at: timestamp,
         schema_version: 2,  // Always current version
         validation_status: String::new(),  // Will be set by prepare_
+        // Content manifest fields (Phase 0 refactor)
+        blob_cid: input.blob_cid,
+        content_size_bytes: input.content_size_bytes,
+        content_hash: input.content_hash,
     };
 
     // Prepare and validate - sets schema_version=2 and validation_status
@@ -2083,9 +2110,18 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
     let mut failed_ids: Vec<(String, String)> = Vec::new();
     let mut skipped_ids: Vec<String> = Vec::new();
 
+    // DEBUG: Log batch_type before matching
+    debug!(
+        "process_import_chunk: batch_id={}, batch_type='{}', batch_type_len={}, batch_type_bytes={:?}",
+        batch.id,
+        batch.batch_type,
+        batch.batch_type.len(),
+        batch.batch_type.as_bytes()
+    );
+
     // Branch based on batch_type
     match batch.batch_type.as_str() {
-        "paths" => {
+        "paths" | "path" => {
             // Parse and process paths
             let items: Vec<PathImportInput> = serde_json::from_str(&input.items_json)
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
@@ -2168,9 +2204,16 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
         }
         _ => {
             // Default: parse and process content items
+            // Log unexpected batch_type to help debug routing issues
+            if batch.batch_type != "content" {
+                debug!(
+                    "WARNING: Using content parser for unexpected batch_type='{}' (batch_id={})",
+                    batch.batch_type, batch.id
+                );
+            }
             let items: Vec<CreateContentInput> = serde_json::from_str(&input.items_json)
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to parse items_json: {}", e
+                    "Failed to parse items_json (batch_type='{}'): {}", batch.batch_type, e
                 ))))?;
 
             // OPTIMIZATION: Batch existence check - do ONE query for all IDs instead of per-item

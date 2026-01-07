@@ -1,0 +1,10 @@
+Scenario: Coordinating with neighborhood parents around children's activities
+    Given Margaret cares for grandchildren in neighborhood context
+    And she interacts with other children and parents
+    When Margaret participates in neighborhood child activities
+    Then the neighborhood_elohim should help coordinate with other parents
+    And it should facilitate communication about children's play and safety
+    And it should support collective neighborhood childcare
+    And Margaret should be recognized as part of neighborhood care network
+    And grandparents should be valued participants in children's community
+    And neighborhood should benefit from grandparent engagement

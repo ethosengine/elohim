@@ -1,0 +1,111 @@
+Feature: Individual Worker Self-Care and Autonomy
+  As a worker balancing employment and care needs
+  I need to maintain individual autonomy and self-care despite work demands
+  So that I can preserve my dignity, health, and capacity for human flourishing
+
+  Background:
+    Given I am a worker with irregular employment schedule
+    And I have limited time and energy for self-care
+    And my personal_agent monitors my well-being
+    And the protocol recognizes my care work as valuable
+
+  Scenario: Managing self-care with unpredictable work schedule
+    Given my work schedule changes weekly with different shift patterns
+    And I need to maintain basic nutrition and rest
+    When my personal_agent detects schedule changes
+    Then it should adapt my meal planning to available time slots
+    And suggest efficient meal prep strategies for my schedule
+    And protect time blocks for essential self-care
+    And remind me that my well-being matters despite work demands
+
+  Scenario: Recognizing my own labor as care contribution
+    Given I work 50+ hours per week as a line cook
+    And I prepare food for hundreds of people daily
+    When I view my work through the care economy lens
+    Then the protocol should recognize my labor as care work
+    And accumulate care tokens reflecting my contribution to community nourishment
+    And show me that my work has dignity and social value
+    And reframe my relationship to labor from pure exploitation to meaningful contribution
+
+  Scenario: Tracking self-care achievements despite exhaustion
+    Given I am exhausted after double shifts
+    And self-care feels impossible
+    When I manage to cook a nutritious meal for myself
+    Or maintain my living space
+    Or get adequate sleep
+    Then the protocol should recognize these achievements
+    And validate that caring for myself is valuable work
+    And celebrate small victories in maintaining well-being
+    And build evidence that I deserve conditions that make self-care possible
+
+  Scenario: Detecting when work demands destroy self-care capacity
+    Given my personal_agent monitors my nutrition and rest patterns
+    When my meal quality decreases for multiple consecutive days
+    And my sleep falls below healthy minimums
+    And I show signs of chronic exhaustion
+    Then the protocol should surface a crisis alert
+    And provide resources for immediate support
+    And suggest workplace advocacy options
+    And connect me to community care resources
+
+  Scenario: Managing tight budget for individual needs
+    Given I earn $32k/year and have $60/week food budget
+    And I need to maximize nutritional value per dollar
+    When I plan my grocery shopping
+    Then the protocol should provide sophisticated budget optimization
+    And suggest high-value nutritious ingredients
+    And identify sales and discounts at accessible stores
+    And help me stretch limited resources without sacrificing health
+
+  Scenario: Protecting individual autonomy under employment pressure
+    Given my employer demands maximum flexibility
+    And employment pressure threatens my autonomy
+    When I need to maintain boundaries for self-care
+    Then my personal_agent should help me recognize when boundaries are violated
+    And support me in protecting essential personal time
+    And remind me that I have rights beyond being a labor unit
+    And provide language for asserting my needs
+
+  Scenario: Meal prepping efficiently with limited energy
+    Given I have only 2 hours between shifts to prepare meals
+    And I am already exhausted from work
+    When I need to prep food for the next several days
+    Then the protocol should suggest maximum-efficiency meal prep strategies
+    And provide step-by-step guidance requiring minimal cognitive load
+    And optimize for nutritional value, cost, and preparation time
+    And recognize this household labor as valuable care work
+
+  Scenario: Building individual resilience through care work visibility
+    Given the protocol tracks all my care contributions
+    Including my paid labor and household self-care
+    When I review my care economy participation
+    Then I should see comprehensive evidence of my contributions
+    And understand that I am providing valuable service to community
+    And recognize that I deserve better compensation and conditions
+    And feel empowered to advocate for my needs
+
+  Scenario: Accessing individual health monitoring
+    Given work conditions threaten my physical and mental health
+    When my personal_agent detects warning signs
+    Such as declining nutrition, inadequate rest, or chronic stress
+    Then it should provide gentle health monitoring
+    And surface accessible healthcare resources
+    And help me understand my rights to workplace accommodations
+    And support me in prioritizing my health despite work pressure
+
+  Scenario: Planning personal development despite time constraints
+    Given I have skills and interests beyond my current job
+    And employment leaves minimal time for personal development
+    When I want to learn new skills or pursue interests
+    Then the protocol should help me find micro-opportunities
+    And connect me to accessible learning resources
+    And recognize that my growth and flourishing matter
+    And support me in maintaining identity beyond worker role
+
+  Scenario: Documenting personal needs for advocacy
+    Given I experience specific challenges due to work conditions
+    When I want to advocate for changes
+    Then the protocol should help me document my needs
+    And provide evidence of how current conditions affect my well-being
+    And support me in articulating what I need to thrive
+    And empower me to advocate for care-economy-aligned workplace policies

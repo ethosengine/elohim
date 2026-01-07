@@ -1,0 +1,10 @@
+Scenario: Housing authority board member evaluates mixed-income development policy
+    Given authority considers policy requiring mixed-income units in new developments
+    And staff presents complex financing and legal considerations
+    And board member wants to make informed decision but has limited affordable housing expertise
+    When the board member uses Observer accessible expertise
+    Then they receive plain-language explanation of mixed-income development models
+    And see examples from peer housing authorities with outcomes data
+    And access key trade-offs between requiring affordability and reducing development
+    And get questions to ask staff about implementation and enforcement
+    And accessible expertise enables informed policy judgment

@@ -1,0 +1,9 @@
+Scenario: Educational assessment measures value literacy development
+    Given Sarah wants to know if children are learning value literacy
+    And assessment can support or undermine learning
+    When children's value literacy is assessed
+    Then the educational_elohim should measure care-based decision making
+    And assessment should observe whether children see care as valuable
+    And it should track development of care economy principles
+    And assessment should support learning, not create anxiety
+    And Sarah should see children's value literacy growth over time

@@ -1,0 +1,11 @@
+Scenario: Adult children supported in independence while teaching care economy
+    Given Robert's children ages 19 and 22 are establishing independence
+    And Robert provides financial support, guidance, and care economy education
+    When family_elohim tracks the parent-adult child relationship
+    Then it should recognize Robert's support contributions
+    And help him teach care economy principles to his children
+    And surface opportunities: "Jordan could help coordinate grandmother's birthday celebration"
+    And model multigenerational care reciprocity for the next generation
+    And support the transition from parenting to adult partnership
+    And help his children learn that care flows in multiple directions
+    And prepare them to eventually care for him

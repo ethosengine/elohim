@@ -1,10 +1,19 @@
 //! Content store streaming routes with HTTP 206 Range request support
 //!
 //! Provides efficient media delivery without blocking conductor threads:
-//! - `GET /store/{hash}` - Stream entire content or byte range
+//! - `GET /store/{address}` - Stream entire content or byte range
 //! - Supports `Range: bytes=start-end` header for partial content
 //! - Returns `206 Partial Content` for range requests
 //! - Returns `200 OK` for full content requests
+//!
+//! ## Content Addressing
+//!
+//! Accepts multiple address formats for backward compatibility:
+//! - CID (Content Identifier): `bafkreihdwdcefgh...` (IPFS-compatible, preferred)
+//! - SHA256 prefixed: `sha256-a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a`
+//! - Raw SHA256 hex: `a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a`
+//!
+//! All formats are normalized internally to SHA256 hex for cache lookups.
 //!
 //! ## Shard Resolution Fallback
 //!
@@ -17,20 +26,25 @@
 //! ## Example Usage
 //!
 //! ```bash
-//! # Full content
+//! # CID format (preferred)
+//! curl https://doorway.example.com/store/bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku
+//!
+//! # Legacy SHA256 format
 //! curl https://doorway.example.com/store/sha256-abc123
 //!
 //! # Partial content (video seeking)
-//! curl -H "Range: bytes=1000000-2000000" https://doorway.example.com/store/sha256-abc123
+//! curl -H "Range: bytes=1000000-2000000" https://doorway.example.com/store/bafkreihdwdcefgh...
 //! ```
 
 use crate::cache::ContentCache;
 use crate::projection::ProjectionStore;
 use crate::services::{BlobResolution, ShardLocation, ShardManifest, ShardResolver};
 use bytes::Bytes;
+use cid::Cid;
 use http_body_util::Full;
 use hyper::{header, Method, Request, Response, StatusCode};
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
@@ -39,6 +53,7 @@ use tracing::{debug, info, warn};
 pub enum BlobError {
     NotFound,
     InvalidRange,
+    InvalidAddress(String),
     MethodNotAllowed,
     InternalError(String),
 }
@@ -48,10 +63,67 @@ impl std::fmt::Display for BlobError {
         match self {
             BlobError::NotFound => write!(f, "Blob not found"),
             BlobError::InvalidRange => write!(f, "Invalid range"),
+            BlobError::InvalidAddress(addr) => write!(f, "Invalid content address: {}", addr),
             BlobError::MethodNotAllowed => write!(f, "Method not allowed"),
             BlobError::InternalError(msg) => write!(f, "Internal error: {}", msg),
         }
     }
+}
+
+/// Parse a content address (CID or SHA256 hash) and return normalized SHA256 hex.
+///
+/// Accepts:
+/// - CID (e.g., "bafkreihdwdcefgh...") - extracts SHA256 from multihash
+/// - SHA256 prefixed (e.g., "sha256-abc123...") - strips prefix
+/// - Raw SHA256 hex (64 char hex string) - returns as-is
+///
+/// Returns SHA256 hex string for cache lookups.
+fn parse_content_address(addr: &str) -> Result<String, BlobError> {
+    // Try CID first (starts with common CID prefixes)
+    if addr.starts_with("baf") || addr.starts_with("Qm") || addr.starts_with("z") {
+        match Cid::from_str(addr) {
+            Ok(cid) => {
+                // Extract the raw hash bytes from the multihash
+                let hash_bytes = cid.hash().digest();
+                // Verify it's SHA256 (32 bytes)
+                if hash_bytes.len() == 32 {
+                    return Ok(format!("sha256-{}", hex::encode(hash_bytes)));
+                }
+                return Err(BlobError::InvalidAddress(format!(
+                    "CID uses unsupported hash algorithm (expected SHA256, got {} bytes)",
+                    hash_bytes.len()
+                )));
+            }
+            Err(e) => {
+                return Err(BlobError::InvalidAddress(format!(
+                    "Invalid CID format: {}",
+                    e
+                )));
+            }
+        }
+    }
+
+    // Try sha256- prefix
+    if let Some(hex_hash) = addr.strip_prefix("sha256-") {
+        // Validate it's valid hex of correct length
+        if hex_hash.len() == 64 && hex_hash.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Ok(addr.to_string());
+        }
+        return Err(BlobError::InvalidAddress(format!(
+            "Invalid sha256 hash: expected 64 hex chars, got {}",
+            hex_hash.len()
+        )));
+    }
+
+    // Try raw hex (64 chars)
+    if addr.len() == 64 && addr.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Ok(format!("sha256-{}", addr));
+    }
+
+    Err(BlobError::InvalidAddress(format!(
+        "Unrecognized address format: {}",
+        addr
+    )))
 }
 
 /// Parse HTTP Range header.
@@ -96,8 +168,10 @@ fn parse_range_header(range_header: &str, total_size: usize) -> Option<(usize, u
 /// Handle content store requests with Range support.
 ///
 /// # Routes
-/// - `GET /store/{hash}` - Get content (full or partial)
-/// - `HEAD /store/{hash}` - Get content metadata only
+/// - `GET /store/{address}` - Get content (full or partial)
+/// - `HEAD /store/{address}` - Get content metadata only
+///
+/// Address can be CID (bafkrei...), sha256-prefixed, or raw hex.
 ///
 /// # Headers
 /// - `Range: bytes=start-end` - Request partial content
@@ -107,24 +181,27 @@ fn parse_range_header(range_header: &str, total_size: usize) -> Option<(usize, u
 /// - `200 OK` - Full content
 /// - `206 Partial Content` - Range request fulfilled
 /// - `304 Not Modified` - ETag matched
+/// - `400 Bad Request` - Invalid address format
 /// - `404 Not Found` - Content not in cache
 /// - `416 Range Not Satisfiable` - Invalid range
 pub async fn handle_blob_request(
     req: Request<hyper::body::Incoming>,
     cache: Arc<ContentCache>,
 ) -> Result<Response<Full<Bytes>>, BlobError> {
-    // Extract hash from path: /store/{hash}
+    // Extract address from path: /store/{address}
     let path = req.uri().path();
-    let hash = path
+    let raw_address = path
         .strip_prefix("/store/")
-        .ok_or(BlobError::NotFound)?
-        .to_string();
+        .ok_or(BlobError::NotFound)?;
 
-    if hash.is_empty() {
+    if raw_address.is_empty() {
         return Err(BlobError::NotFound);
     }
 
-    debug!(hash = %hash, method = %req.method(), "Blob request");
+    // Normalize address to SHA256 format for cache lookup
+    let hash = parse_content_address(raw_address)?;
+
+    debug!(raw_address = %raw_address, hash = %hash, method = %req.method(), "Blob request");
 
     match *req.method() {
         Method::GET => handle_get_blob(req, cache, &hash).await,
@@ -258,6 +335,7 @@ pub fn error_response(err: BlobError) -> Response<Full<Bytes>> {
     let (status, message) = match err {
         BlobError::NotFound => (StatusCode::NOT_FOUND, "Blob not found"),
         BlobError::InvalidRange => (StatusCode::RANGE_NOT_SATISFIABLE, "Invalid range"),
+        BlobError::InvalidAddress(_) => (StatusCode::BAD_REQUEST, "Invalid content address"),
         BlobError::MethodNotAllowed => (StatusCode::METHOD_NOT_ALLOWED, "Method not allowed"),
         BlobError::InternalError(_) => {
             (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
@@ -314,6 +392,8 @@ impl BlobContext {
 /// This is the enhanced handler that tries shard resolution when
 /// content is not in the local cache.
 ///
+/// Address can be CID (bafkrei...), sha256-prefixed, or raw hex.
+///
 /// # Resolution Order
 /// 1. Check local ContentCache (hot path)
 /// 2. If miss and resolver available, try shard resolution:
@@ -326,18 +406,20 @@ pub async fn handle_blob_request_with_fallback(
     req: Request<hyper::body::Incoming>,
     ctx: Arc<BlobContext>,
 ) -> Result<Response<Full<Bytes>>, BlobError> {
-    // Extract hash from path: /store/{hash}
+    // Extract address from path: /store/{address}
     let path = req.uri().path();
-    let hash = path
+    let raw_address = path
         .strip_prefix("/store/")
-        .ok_or(BlobError::NotFound)?
-        .to_string();
+        .ok_or(BlobError::NotFound)?;
 
-    if hash.is_empty() {
+    if raw_address.is_empty() {
         return Err(BlobError::NotFound);
     }
 
-    debug!(hash = %hash, method = %req.method(), "Blob request with fallback");
+    // Normalize address to SHA256 format for cache lookup
+    let hash = parse_content_address(raw_address)?;
+
+    debug!(raw_address = %raw_address, hash = %hash, method = %req.method(), "Blob request with fallback");
 
     match *req.method() {
         Method::GET => handle_get_blob_with_fallback(req, ctx, &hash).await,
@@ -545,5 +627,57 @@ mod tests {
 
         // Suffix larger than file
         assert_eq!(parse_range_header("bytes=-200", 100), Some((0, 100)));
+    }
+
+    #[test]
+    fn test_parse_content_address_sha256_prefixed() {
+        let hash = "sha256-a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a";
+        let result = parse_content_address(hash).unwrap();
+        assert_eq!(result, hash);
+    }
+
+    #[test]
+    fn test_parse_content_address_raw_hex() {
+        let hex = "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a";
+        let result = parse_content_address(hex).unwrap();
+        assert_eq!(
+            result,
+            "sha256-a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
+        );
+    }
+
+    #[test]
+    fn test_parse_content_address_cid() {
+        // CIDv1 with raw codec and SHA256 for empty data
+        // This is the CID for empty content: bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku
+        // But for testing, let's use a simpler CID we can verify
+        use cid::Cid;
+        use multihash_codetable::{Code, MultihashDigest};
+
+        // Create a CID for known data
+        let data = b"Hello, Elohim!";
+        let hash = Code::Sha2_256.digest(data);
+        let cid = Cid::new_v1(0x55, hash); // 0x55 = raw codec
+        let cid_str = cid.to_string();
+
+        // Parse should extract SHA256 and prefix with sha256-
+        let result = parse_content_address(&cid_str).unwrap();
+        assert!(result.starts_with("sha256-"));
+
+        // Verify the hash matches what we computed directly
+        let expected_hash = hex::encode(hash.digest());
+        assert_eq!(result, format!("sha256-{}", expected_hash));
+    }
+
+    #[test]
+    fn test_parse_content_address_invalid() {
+        // Too short
+        assert!(parse_content_address("abc123").is_err());
+
+        // Invalid characters
+        assert!(parse_content_address("sha256-gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg").is_err());
+
+        // Wrong length
+        assert!(parse_content_address("sha256-abc123").is_err());
     }
 }

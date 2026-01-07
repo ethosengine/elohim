@@ -1,0 +1,10 @@
+Scenario: Multi-family appeal about shared resources
+    Given multiple families share community resources
+    And Family Elohim decisions affect resource distribution across families
+    When we collectively appeal an allocation we believe is unjust
+    Then the appeal bridges family layer to community layer governance
+    And The Constitutional Council evaluates inter-family equity
+    And They consider if resource distribution follows constitutional minimums
+    And They examine if families had meaningful participation in allocation process
+    And The appeal can trigger community deliberation on sharing principles
+    And Multi-family coordination patterns emerge through appeal precedents

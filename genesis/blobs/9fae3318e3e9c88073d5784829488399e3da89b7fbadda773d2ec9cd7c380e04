@@ -1,0 +1,11 @@
+Scenario: Appellant testimony influences national policy legislation
+    Given my appeal established important national constitutional precedent
+    And Senator Ruiz is drafting national AI governance legislation
+    When she invites me to testify about my appeal experience
+    Then I share lived experience of exercising constitutional recourse
+    And I explain how appeal process protected my dignity
+    And I describe remaining gaps and needed improvements
+    And My testimony humanizes abstract constitutional principles
+    And Policy makers understand governance through appellant eyes
+    And Legislation better serves actual people because of my voice
+    And Democratic policy making includes those most affected

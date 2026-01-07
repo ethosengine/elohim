@@ -1,0 +1,12 @@
+Scenario: Municipal aging infrastructure influenced by sandwich generation
+    Given Robert manages care for both aging parents and adult children
+    And he understands infrastructure needs across lifecycle
+    And municipal aging infrastructure often inadequate
+    When municipal_elohim supports aging infrastructure advocacy
+    Then it should connect Robert to municipal aging policy development
+    And help him advocate for adult day care, senior centers, home health support, and transportation
+    And surface gaps in current municipal aging infrastructure
+    And support him in testifying about infrastructure needs
+    And build municipal systems that support aging with dignity
+    And demonstrate that aging infrastructure benefits entire community
+    And create municipalities where aging is supported, not hidden

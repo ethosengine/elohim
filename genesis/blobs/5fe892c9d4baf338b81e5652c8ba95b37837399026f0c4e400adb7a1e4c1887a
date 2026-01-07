@@ -1,0 +1,11 @@
+Scenario: Coordinating household participation across multiple contexts
+    Given Frank volunteers with Habitat and serves on council
+    And his wife has her own community participation
+    And both provide family care across generations
+    When the household_elohim coordinates participation
+    Then it should integrate both partners' schedules and commitments
+    And it should prevent household overcommitment
+    And it should ensure both partners have rest and personal time
+    And it should support diverse participation that serves flourishing
+    And coordination should enable rather than constrain engagement
+    And household should function as base for community contribution

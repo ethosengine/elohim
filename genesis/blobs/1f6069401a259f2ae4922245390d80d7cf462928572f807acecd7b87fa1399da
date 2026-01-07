@@ -1,0 +1,10 @@
+Scenario: Participating in neighborhood care economy with limited resources
+    Given Kenji has severe resource constraints
+    And he cannot contribute financially to neighborhood projects
+    When the neighborhood_elohim tracks care contributions
+    Then it should recognize non-financial contributions Kenji can make
+    And it should value his labor, time, and presence
+    And it should show "Kenji helped neighbor carry groceries: 2 care tokens"
+    And participation should not require money
+    And the system should enable care economy participation at all resource levels
+    And students should contribute to neighborhood based on capacity

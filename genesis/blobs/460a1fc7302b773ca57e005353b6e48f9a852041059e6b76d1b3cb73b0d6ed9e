@@ -1,0 +1,12 @@
+Scenario: Tracking personal goals and progress during crisis recovery
+    Given I am rebuilding my life after leaving an abusive relationship
+    And I have set personal goals for stability and independence
+    When I make progress toward my goals (even small steps)
+    Then the Value Scanner celebrates my achievements
+    And tracks my progress without imposing external timelines
+    And helps me identify next steps at my pace
+    And recognizes setbacks as normal parts of recovery
+    And maintains my focus on my vision for my future
+    And counters institutional pressure to recover "faster" or "properly"
+    And my personal_agent reminds me of how far I've come
+    And validates that my timeline is the right timeline

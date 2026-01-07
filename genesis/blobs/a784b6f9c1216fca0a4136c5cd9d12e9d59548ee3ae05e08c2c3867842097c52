@@ -1,0 +1,9 @@
+Scenario: Developer relationship transparency creates ethical incentives
+    Given a developer has made campaign donations to three council members
+    And those members must vote on the developer's project
+    When the Observer makes relationships visible
+    Then constituents see donation patterns and voting correlations
+    And the developer faces scrutiny about influence versus merit
+    And council members face accountability for conflicts of interest
+    And transparency creates pressure for decisions based on community benefit
+    And legitimate projects must stand on merits not political relationships

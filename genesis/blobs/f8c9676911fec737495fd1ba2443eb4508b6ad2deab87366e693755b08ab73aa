@@ -1,0 +1,10 @@
+Scenario: Balancing learning work with survival work
+    Given Kenji must work 15 hours/week to afford basic expenses
+    And work hours compete with study time
+    When the educational_elohim helps Kenji balance competing demands
+    Then it should recognize the impossible tension between learning and survival
+    And it should help him optimize limited time across demands
+    And it should validate that he cannot do everything perfectly
+    And it should advocate for better institutional support for working students
+    And the system should recognize structural unfairness in student economics
+    And Kenji should not be blamed for constraints created by inadequate support

@@ -1,0 +1,10 @@
+Scenario: Senior knowledge of neighborhood history and patterns
+    Given Margaret has lived in the neighborhood for years/decades
+    And she has institutional knowledge about local patterns
+    When neighborhood decisions are being made
+    Then Margaret's knowledge should inform decision-making
+    And her historical perspective should be valued
+    And she should have standing in neighborhood governance
+    And long-term residents' wisdom should shape neighborhood future
+    And Margaret's experience should be treated as valuable resource
+    And neighborhood planning should benefit from senior knowledge

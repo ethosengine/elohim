@@ -1,0 +1,10 @@
+Scenario: Pre-specify alert preferences after appeal experience
+    Given Marcus's appeal has been reviewed by Constitutional Council
+    And the council affirmed the agent's decision but recommended enhancements
+    When Marcus wants to prevent future unilateral interventions
+    Then the system allows Marcus to pre-specify his alert preferences
+    And Marcus configures family alerts to require 3-day pattern instead of immediate
+    And Marcus confirms emergency services contact only for imminent danger
+    And the preferences are cryptographically stored and verifiable
+    And future Family Elohim decisions must respect these preferences
+    And Marcus retains ability to update preferences at any time

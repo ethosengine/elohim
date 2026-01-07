@@ -1,0 +1,9 @@
+Scenario: Teaching next generation that ecological care is care work
+    Given Sarah is raising children in care economy
+    And environmental crisis requires cultural transformation
+    When Sarah teaches children about environmental care
+    Then the bioregional_elohim should support ecological education
+    And children should learn that care for planet is care work
+    And environmental stewardship should be integrated into value literacy
+    And next generation should assume ecological care creates value
+    And cultural transformation should include environmental care

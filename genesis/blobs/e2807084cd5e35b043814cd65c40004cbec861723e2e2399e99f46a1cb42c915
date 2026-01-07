@@ -1,0 +1,9 @@
+Scenario: Activist coordinates neighborhood tenant association
+    Given multiple tenants face similar landlord issues
+    And the activist is organizing tenant power
+    When the Observer facilitates secure coordination
+    Then tenants can connect without landlord surveillance
+    And see patterns across different units and buildings
+    And coordinate collective bargaining for repairs
+    And track landlord compliance with commitments
+    And individual tenant struggles become collective action

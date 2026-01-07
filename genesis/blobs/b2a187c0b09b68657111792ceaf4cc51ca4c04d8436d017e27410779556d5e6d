@@ -1,0 +1,9 @@
+Scenario: Supplier networks transfer to democratic worker management
+    Given Rosa negotiated with parts suppliers and built distributor relationships
+    And these networks are essential for business operations
+    When supplier relationship transition occurs
+    Then Rosa introduces workers to her supplier contacts personally
+    And relationship trust transfers through Rosa's endorsement
+    And workers learn negotiation strategies and supplier quality assessment
+    And EAE network provides volume purchasing power Rosa never had
+    And supplier relationships professionalize under democratic governance

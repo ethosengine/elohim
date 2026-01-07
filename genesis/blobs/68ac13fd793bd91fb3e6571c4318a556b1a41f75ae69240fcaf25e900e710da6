@@ -1,0 +1,10 @@
+Scenario: Facilitate inter-neighborhood dialogue on shared challenges
+    Given neighborhoods have conflicting priorities
+    And downtown wants nightlife economy
+    And residential areas want noise reduction
+    When Municipal Elohim identifies the conflict
+    Then Jamal convenes inter-neighborhood deliberative assembly
+    And assembly uses Polis-style clustering to find common ground
+    And assembly develops solution: nightlife district with sound barriers
+    And neighborhoods collaborate rather than compete
+    And municipal scale enables solutions impossible at neighborhood level

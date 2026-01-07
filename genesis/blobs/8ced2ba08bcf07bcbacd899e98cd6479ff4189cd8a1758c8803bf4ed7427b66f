@@ -1,0 +1,10 @@
+Scenario: Learning new technology to stay connected
+    Given Margaret needs technology skills for modern life
+    And digital divide affects seniors disproportionately
+    When the educational_elohim provides technology education
+    Then senior-appropriate technology training should be available
+    And teaching should be patient and non-patronizing
+    And Margaret should learn at her own pace
+    And technology should be taught as tool for connection and autonomy
+    And digital literacy should be senior right, not privilege
+    And education should prevent technology-based isolation

@@ -1,0 +1,8 @@
+Scenario: Council member exposes budget priorities misaligned with constituent needs
+    Given the politician suspects budget doesn't reflect community priorities
+    When the Observer analyzes municipal spending patterns
+    Then they see infrastructure investment concentrated in affluent neighborhoods
+    And identify underinvestment in working-class areas
+    And calculate service delivery disparities by district
+    And present evidence-based budget amendments
+    And advocate for equitable resource distribution

@@ -1,0 +1,7 @@
+Scenario: Building neighborhood resilience through worker solidarity
+    Given many neighbors are also workers with similar constraints
+    When workers connect and support each other
+    Then the protocol should facilitate worker mutual aid networks
+    And coordinate support systems designed for workers' schedules
+    And build neighborhood culture of worker solidarity
+    And demonstrate that care economy serves workers' needs

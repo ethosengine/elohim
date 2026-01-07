@@ -1,0 +1,11 @@
+Scenario: Participating in neighborhood informal care economy
+    Given Jordan's elderly neighbor sometimes needs help bringing in groceries
+    And Jordan is capable of carrying light bags
+    When the neighbor needs assistance
+    Then Jordan can offer help at their capability level
+    And the neighbor accepts Jordan's help graciously
+    And Jordan's care contribution is real and meaningful
+    And the Value Scanner records Jordan's caregiving
+    And Jordan accumulates care tokens for helping neighbor
+    And Jordan experiences being a care provider, not just recipient
+    And the neighborhood care economy includes Jordan as contributor

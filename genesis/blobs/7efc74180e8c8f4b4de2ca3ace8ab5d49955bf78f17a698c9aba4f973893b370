@@ -1,0 +1,10 @@
+Scenario: Teaching grandchildren sustainable living practices
+    Given Margaret teaches Tommy and Emma to reduce waste and value resources
+    And she models careful use of food, water, energy, materials
+    When Margaret provides ecological education
+    Then the bioregional_elohim should recognize environmental teaching
+    And it should value transmission of sustainable living practices
+    And it should track grandchildren's ecological learning
+    And environmental education should accumulate care tokens
+    And Margaret's teaching should be recognized as essential for sustainability
+    And next generation should learn resource stewardship from elders

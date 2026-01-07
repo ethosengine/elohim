@@ -1,0 +1,9 @@
+Scenario: Parent tracks playground repair commitments
+    Given the community council promised playground equipment repairs in 60 days
+    And the parent reported broken equipment their child uses
+    When 60 days pass without repairs being completed
+    Then the Observer alerts the parent about the missed deadline
+    And provides evidence from the original meeting commitment
+    And facilitates coordinated follow-up with other affected parents
+    And institutional memory extends beyond administrator turnover
+    And accountability prevents promises from being forgotten

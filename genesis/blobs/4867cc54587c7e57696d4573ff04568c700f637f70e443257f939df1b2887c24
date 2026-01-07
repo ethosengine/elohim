@@ -1,0 +1,11 @@
+Scenario: Appealing community resource allocation decision
+    Given Community Elohim denied my small business loan application
+    And I believe the criteria were unfairly applied
+    When I appeal the economic decision
+    Then Community Constitutional Council reviews the resource allocation
+    And They evaluate if constitutional principles of care and equity were followed
+    And They examine if I had meaningful opportunity to present my case
+    And They consider community economic context and priorities
+    And They assess if the agent's risk analysis was sound or biased
+    And The appeal can result in decision reversal or modified evaluation criteria
+    And Local economic priorities are clarified through appeal precedents

@@ -1,0 +1,12 @@
+Scenario: Family privacy boundaries negotiated across generations
+    Given family coordination requires information sharing
+    And family members have legitimate need for privacy
+    And Robert manages sensitive information about parents and children
+    When family_elohim manages privacy
+    Then it should enable coordination while protecting privacy
+    And Robert should control what information he shares about his household
+    And parents should maintain privacy about their health and finances
+    And adult children should control their own information sharing
+    And siblings should have access to parent care information
+    And family care coordination should not violate individual privacy
+    And privacy boundaries should be negotiable and respectful

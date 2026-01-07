@@ -1,0 +1,11 @@
+Scenario: Mother's oversight calibrated to preteen's capability
+    Given Sarah works two jobs with limited time
+    And she needs to trust Marcus while maintaining responsibility
+    When Sarah monitors Marcus's scanner usage
+    Then she should have full visibility into his activities
+    And the family_elohim should alert her when Marcus needs support
+    And she should be informed of nutrition concerns or budget crises
+    And routine successes should be summarized to build her confidence
+    And the system should help her calibrate autonomy levels appropriately
+    And she should not experience constant anxiety about delegating responsibility
+    And trust should be built through visible competence

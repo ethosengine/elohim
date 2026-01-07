@@ -1,0 +1,11 @@
+Scenario: Receiving performance feedback with dignity
+    Given Jordan's supervisor conducts annual performance reviews
+    And feedback helps employees grow professionally
+    When Jordan has their performance review
+    Then feedback is delivered respectfully and constructively
+    And strengths are celebrated authentically (not patronizingly)
+    And growth areas are identified with specific, achievable goals
+    And the personal_agent helps Jordan understand and process feedback
+    And Jordan's performance is evaluated fairly by actual job standards
+    And Jordan experiences professional growth through honest feedback
+    And Jordan is treated as a real employee, not a perpetual trainee

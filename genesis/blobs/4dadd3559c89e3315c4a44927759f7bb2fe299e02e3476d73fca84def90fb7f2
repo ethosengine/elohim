@@ -1,0 +1,10 @@
+Scenario: Learning self-advocacy skills for empowerment
+    Given Jordan wants to speak up for their needs and preferences
+    And self-advocacy skills support autonomy and dignity
+    When Jordan participates in self-advocacy training
+    Then Jordan learns to identify and express their needs
+    And the training uses accessible methods (visual aids, role-play, practice)
+    And Jordan practices advocating in low-stakes situations
+    And Jordan's advocacy voice grows stronger over time
+    And support workers honor Jordan's self-advocacy
+    And Jordan experiences empowerment through skill development

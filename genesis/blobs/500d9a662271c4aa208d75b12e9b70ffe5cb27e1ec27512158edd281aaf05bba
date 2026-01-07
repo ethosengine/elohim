@@ -1,0 +1,7 @@
+Scenario: Participating in neighborhood emergency response
+    Given neighborhoods need mutual aid during emergencies
+    When crisis occurs and I am not working
+    Then the protocol should help me contribute to emergency response
+    And coordinate with neighbors for mutual support
+    And recognize my contribution to neighborhood resilience
+    And ensure I can also access support during my emergencies

@@ -1,0 +1,9 @@
+Scenario: Parent discovers coalition for school bus safety
+    Given the parent's child rides Route 17 with chronic delays
+    And 13 other parents along Route 17 report the same safety concerns
+    When the Observer detects the alignment pattern
+    Then the parent receives opt-in coalition notification
+    And can see aggregated data on delay patterns and incidents
+    And can coordinate testimony with other affected parents
+    And isolated frustration becomes documented collective concern
+    And 14 coordinated parents change the transportation meeting outcome

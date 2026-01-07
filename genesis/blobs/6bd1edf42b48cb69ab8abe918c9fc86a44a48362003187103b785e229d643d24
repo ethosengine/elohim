@@ -1,0 +1,10 @@
+Scenario: Economic development board member tracks promised jobs from past incentives
+    Given board previously approved incentive packages for business attraction
+    And businesses promised specific job creation targets as incentive condition
+    And board wants to know if incentives produced promised economic benefits
+    When the board member uses Observer accountability tracking
+    Then they see actual job creation versus promises for past incentive deals
+    And discover many businesses created fewer jobs than committed
+    And find weak enforcement mechanisms allowing businesses to keep incentives despite failures
+    And access fiscal impact analysis showing poor return on incentive investment
+    And accountability tracking reveals incentive outcomes diverged from projections

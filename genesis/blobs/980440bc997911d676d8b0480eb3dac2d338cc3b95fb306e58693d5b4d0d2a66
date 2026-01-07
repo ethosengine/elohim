@@ -1,0 +1,9 @@
+Scenario: Farm equipment investment decisions become democratically governed
+    Given equipment purchases previously were Tom's sole decision
+    And workers who use equipment daily had no input on purchases
+    When democratic governance includes workers in equipment decisions
+    Then farmworkers evaluate equipment options based on usability and safety
+    And purchases prioritize worker wellbeing alongside productivity
+    And equipment maintenance improves through worker ownership and care
+    And investment decisions reflect users' expertise and long-term thinking
+    And workplace_elohim facilitates democratic equipment planning and budgeting

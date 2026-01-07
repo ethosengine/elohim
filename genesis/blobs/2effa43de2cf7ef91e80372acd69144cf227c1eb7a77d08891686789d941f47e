@@ -1,0 +1,8 @@
+Scenario: Board member monitors discipline disparities and pushes for equity
+    Given the politician committed to equitable school climate
+    When the Observer tracks discipline outcomes by demographics
+    Then they see Black students suspended at 3x rate of white students
+    And learn similar behaviors result in different consequences by race
+    And identify which schools have restorative practices versus zero-tolerance
+    And compare district patterns to best-practice districts
+    And champion policy reform for equitable discipline

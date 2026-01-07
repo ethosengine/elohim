@@ -1,0 +1,10 @@
+Scenario: Training Constitutional Council members on technical literacy
+    Given new council members need technical foundations
+    And I contribute to their 3-week training program
+    When I teach about AI systems and cryptographic verification
+    Then I provide: conceptual understanding without overwhelming detail
+    And I enable: critical engagement with technical testimony
+    And I avoid: indoctrination about "correct" technical approaches
+    And I develop: their capacity to question experts
+    And I empower: them to judge despite not being specialists
+    And I demonstrate: how ordinary citizens can govern complex technology

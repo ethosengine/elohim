@@ -1,0 +1,9 @@
+Scenario: Neighborhood economic circulation increases through distributed ownership
+    Given Rosa's profit ($40K annually) left the neighborhood for her personal use
+    And value extraction limited community benefit despite Rosa's generosity
+    When democratic ownership distributes value throughout community
+    Then worker wage increases ($14 → $18/hour) circulate in neighborhood economy
+    And community programs receive dedicated funding from value circulation
+    And workers spend locally, supporting other neighborhood businesses
+    And multiplier effects amplify as spending cascades through community
+    And community_elohim documents wealth circulation vs. previous extraction

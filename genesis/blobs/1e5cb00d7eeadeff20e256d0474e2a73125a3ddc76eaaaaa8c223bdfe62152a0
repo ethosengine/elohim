@@ -1,0 +1,10 @@
+Scenario: Coordinating shared household with roommates
+    Given Aisha has two roommates
+    And the household needs equitable resource distribution
+    When the household_elohim coordinates shared responsibilities
+    Then it should track each person's contributions
+    And it should help distribute household labor fairly
+    And it should manage shared grocery purchases
+    And it should coordinate cleaning and maintenance tasks
+    And the system should make invisible household work visible
+    And equity should be maintained through transparent tracking

@@ -1,0 +1,10 @@
+Scenario: Teen learns family economic realities through transparency
+    Given Jasmine is preparing for adult independence
+    And understanding family economics is essential preparation
+    When the family_elohim provides family economic information
+    Then Jasmine should have age-appropriate access to family financial realities
+    And understand household income, expenses, and budget constraints
+    And learn how the family makes financial tradeoffs
+    And develop realistic expectations about adult economic life
+    And understand the economic value of household labor
+    And learn that all families engage in care economy, whether they use that language or not

@@ -1,0 +1,10 @@
+Scenario: Scheduling personal time with cognitive support
+    Given Jordan wants to plan their weekend activities
+    When Jordan opens the schedule planner
+    Then the interface shows time visually (morning/afternoon/evening pictures)
+    And activity options appear as large icons with simple labels
+    And the system guides Jordan step-by-step ("What do you want Saturday morning?")
+    And Jordan can select activities they enjoy (park, movies, friends)
+    And the personal_agent helps coordinate support if needed
+    And Jordan's schedule reflects their genuine choices
+    And Jordan maintains decision-making authority

@@ -1,0 +1,9 @@
+Scenario: Politician exposes corporate wage theft patterns requiring enforcement
+    Given worker advocates report systematic wage theft
+    And enforcement resources are limited
+    When the Observer analyzes wage and hour violations
+    Then they see violation patterns by industry and employer
+    And identify employers with repeated wage theft violations
+    And understand which worker populations most affected
+    And calculate economic impact of wage theft on working families
+    And demand enforcement resources targeting systematic violators

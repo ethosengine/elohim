@@ -1,0 +1,9 @@
+Scenario: Caregiver advocacy when medical system fails patient
+    Given medical systems sometimes fail patients with complex needs
+    And James must advocate for David's appropriate care
+    When the healthcare_elohim detects inadequate care
+    Then it should alert James to system failures
+    And it should provide information for advocacy
+    And it should help James escalate concerns effectively
+    And caregiver should be empowered to demand appropriate care
+    And healthcare system should be accountable to patient and caregiver

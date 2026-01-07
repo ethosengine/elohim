@@ -1,0 +1,9 @@
+Scenario: Community recognition of family caregiving as professional-grade work
+    Given James provides skilled care equivalent to professional nursing
+    And his work is invisible because he cares for family
+    When the community_elohim evaluates caregiving contributions
+    Then James's care should be valued at professional rates
+    And community should recognize family caregiving as essential infrastructure
+    And care token accumulation should reflect professional-grade value
+    And invisibility of family care should be systematically addressed
+    And community care economy should make family caregiving visible

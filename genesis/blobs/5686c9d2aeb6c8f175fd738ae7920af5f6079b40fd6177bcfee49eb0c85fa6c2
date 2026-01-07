@@ -1,0 +1,7 @@
+Scenario: Documenting family care for workplace advocacy
+    Given family care responsibilities are real and ongoing
+    When I need to advocate for family-friendly workplace policies
+    Then the protocol should help me document family care demands
+    And provide evidence of work-family conflict
+    And support me in requesting accommodations or policy changes
+    And empower me to advocate for care-economy-aligned employment

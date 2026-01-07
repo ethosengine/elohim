@@ -1,0 +1,10 @@
+Scenario: Expressing food preferences with visual support
+    Given Jordan has specific food likes and dislikes
+    And the group home is planning weekly meals
+    When Jordan uses the meal preference feature
+    Then the interface shows pictures of food options
+    And Jordan can indicate preferences using simple icons (thumbs up/down)
+    And the system uses simple language ("Do you like chicken?")
+    And Jordan's choices are communicated to household meal planning
+    And Jordan experiences their preferences being honored
+    And the personal_agent provides encouragement throughout

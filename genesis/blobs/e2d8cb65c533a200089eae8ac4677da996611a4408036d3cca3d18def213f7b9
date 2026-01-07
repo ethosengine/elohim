@@ -1,0 +1,12 @@
+Scenario: Neighborhood council service recognized as civic care contribution
+    Given Frank serves on his neighborhood council
+    And he attends meetings, participates in decisions, and contributes expertise
+    And council service requires time, knowledge, and commitment
+    When the neighborhood_elohim tracks civic participation
+    Then Frank's council service should be quantified as care labor
+    And meeting attendance and preparation time should be valued
+    And his construction expertise contributions should be recognized
+    And governance participation should accumulate care tokens
+    And Frank should experience himself as valued neighborhood leader
+    And civic engagement should be recognized as care economy contribution
+    And his voice in neighborhood governance should carry appropriate weight

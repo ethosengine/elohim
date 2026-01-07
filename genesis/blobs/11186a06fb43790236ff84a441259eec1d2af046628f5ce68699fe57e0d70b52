@@ -1,0 +1,11 @@
+Scenario: Documenting community-specific calibration process
+    Given Riverside calibrated privacy thresholds higher than protocol default
+    And this reflected community values and history
+    When I document how community calibration happened
+    Then I capture: deliberation process that led to calibration decision
+    And I analyze: how community exercised sovereignty within constitutional bounds
+    And I examine: role of community leader in facilitating values discussion
+    And I track: whether calibration actually served community better
+    And I study: how local diversity strengthens rather than fragments protocol
+    And My research demonstrates: subsidiarity in practice
+    And Findings support: community autonomy as democratic AI principle

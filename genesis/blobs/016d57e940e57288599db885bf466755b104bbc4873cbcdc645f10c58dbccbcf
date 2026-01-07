@@ -1,0 +1,9 @@
+Scenario: Track appeal status and progress
+    Given Marcus has submitted an appeal
+    When Marcus checks his appeal status
+    Then he sees current review stage clearly displayed
+    And he sees estimated timeline for each stage
+    And he receives notifications at key milestones
+    And he can compare his case to similar anonymized appeals
+    And he can access precedent cases involving mental health interventions
+    And the tracking interface is accessible on all his devices

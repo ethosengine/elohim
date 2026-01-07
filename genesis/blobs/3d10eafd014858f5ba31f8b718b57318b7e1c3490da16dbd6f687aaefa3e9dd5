@@ -1,0 +1,9 @@
+Scenario: Developer environmental compliance becomes state accountability issue
+    Given a developer's projects consistently violate state environmental standards
+    But receives minimal enforcement from state regulators
+    When the Observer documents violation patterns and regulatory response
+    Then analysis shows: 67 violations across 8 projects over 5 years
+    And penalties total $180K while profits exceed $40M
+    And state regulators approve new permits despite violation history
+    And regulatory capture becomes statistically undeniable
+    And developer faces pressure for genuine environmental compliance

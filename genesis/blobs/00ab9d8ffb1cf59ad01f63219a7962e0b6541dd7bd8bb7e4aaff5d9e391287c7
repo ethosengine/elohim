@@ -1,0 +1,11 @@
+Scenario: Support worker scheduling coordinated efficiently
+    Given Alex requires assistance with specific physical tasks
+    And support workers have their own schedules
+    When Alex needs to coordinate support services
+    Then the household_elohim should help schedule support worker visits efficiently
+    And it should match Alex's needs with worker availability
+    And Alex should be able to communicate requirements clearly
+    And schedule changes should be accommodated flexibly
+    And coordination should reduce Alex's cognitive load
+    And Alex should maintain authority over when and how support is provided
+    And the system should serve Alex's independence, not create dependence

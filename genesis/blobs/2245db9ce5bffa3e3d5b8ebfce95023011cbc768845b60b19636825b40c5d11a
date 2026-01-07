@@ -1,0 +1,9 @@
+Scenario: Politician tracks accountability for education reform implementation
+    Given the politician championed reading improvement initiative
+    And allocated funding for evidence-based interventions
+    When the Observer monitors implementation and outcomes
+    Then they see which schools implement reforms with fidelity
+    And track reading proficiency changes after intervention
+    And identify schools where implementation stalled or failed
+    And understand barriers to effective implementation
+    And intervene to ensure funding translates to student outcomes

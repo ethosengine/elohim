@@ -1,0 +1,10 @@
+Scenario: Seasonal and local food availability at neighborhood level
+    Given Marcus shops in specific geographic area
+    And seasonal local food is often cheaper
+    When Marcus plans meals
+    Then the personal_agent should highlight seasonal local options
+    And it should show what's available from neighborhood sources
+    And it should help him find affordable local produce
+    And neighborhood farmers' markets should be integrated
+    And local food systems should benefit Marcus's budget
+    And bioregional awareness should develop through practice

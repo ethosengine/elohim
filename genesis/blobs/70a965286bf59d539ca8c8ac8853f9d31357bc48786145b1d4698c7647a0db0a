@@ -1,0 +1,10 @@
+Scenario: Teen understands worker rights and labor protections
+    Given Jasmine is entitled to labor protections as a worker
+    And many young workers don't know their rights
+    When workplace_elohim provides education about worker rights
+    Then it should teach her about minimum wage, overtime, breaks, and safety regulations
+    And explain youth-specific labor protections
+    And inform her about right to organize and collective bargaining
+    And provide resources about reporting labor violations
+    And help her understand that worker rights exist to prevent exploitation
+    And build her expectation that labor deserves legal protection

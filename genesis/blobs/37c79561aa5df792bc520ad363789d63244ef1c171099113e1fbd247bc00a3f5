@@ -1,0 +1,11 @@
+Scenario: Explaining attack vectors from authoritarian and corporate actors
+    Given global protocol faces threats from powerful adversaries
+    And delegates need to understand vulnerabilities
+    When I present threat assessment to convention
+    Then I explain: how authoritarian regimes might compromise agents
+    And I describe: corporate strategies for regulatory capture
+    And I assess: resilience of distributed architecture
+    And I present: defense mechanisms and their limitations
+    And I avoid: either creating panic or false confidence
+    And I enable: informed deliberation about governance security
+    And I demonstrate: that technical design serves democratic protection

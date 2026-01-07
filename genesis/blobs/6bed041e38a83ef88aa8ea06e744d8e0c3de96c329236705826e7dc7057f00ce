@@ -1,0 +1,9 @@
+Scenario: Financial anxiety management with realistic resource planning
+    Given Maria constantly calculates whether she can afford necessities
+    And financial stress pervades every decision
+    When Maria faces financial decisions
+    Then the personal_agent should provide clear financial analysis
+    And it should help her see trade-offs and options
+    And it should reduce anxiety through better planning and visibility
+    And it should help her make informed choices within severe constraints
+    And Maria should feel more financial agency despite limited resources

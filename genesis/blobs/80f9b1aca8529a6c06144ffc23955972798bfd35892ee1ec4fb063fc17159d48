@@ -1,0 +1,161 @@
+@epic:value_scanner
+@user_type:senior
+@governance_layer:individual
+@related_users:middle_aged,elderly,grandparent,retired,caregiver
+@related_layers:household,family,neighborhood,community
+@elohim_agents:personal_agent
+
+Feature: Individual Layer Value Recognition for Senior
+  As a senior in early retirement (ages 65-74) in the value scanner system
+  Operating at the individual governance layer
+  I want my personal autonomy, dignity, and care contributions to be recognized
+  So that retirement is experienced as liberation for care work, not obsolescence
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the senior user "Margaret" is registered in the system
+    And Margaret is 68 years old, retired from nursing
+    And Margaret lives on fixed income of $32k/year
+    And the individual governance context is active
+    And Margaret's personal_agent is configured for dignity preservation
+    And the interface is optimized for accessibility needs
+
+  Scenario: Accessible interface design respects aging-related needs
+    Given Margaret is using the Value Scanner
+    And she has age-related vision and dexterity changes
+    When Margaret opens the scanner application
+    Then the interface should display large, high-contrast fonts
+    And touch targets should be large and forgiving
+    And voice interface options should be available
+    And navigation should be simple and consistent
+    And no time-limited interactions should be required
+    And the pace should be patient without being patronizing
+    And the interface should feel respectful and empowering
+    And cognitive load should be minimized
+
+  Scenario: Managing fixed income with dignity and sophistication
+    Given Margaret has a $150/week grocery budget
+    And her income is fixed and cannot be increased through employment
+    When Margaret plans her shopping
+    Then her personal_agent should provide sophisticated budgeting tools
+    And it should identify sales and optimize value per dollar
+    And it should track spending across weeks for pattern analysis
+    And it should suggest resource optimization without stigma
+    And it should help her maintain quality of life within constraints
+    And the framing should be dignity-preserving, not scarcity-shaming
+    And Margaret should experience agency, not deprivation
+
+  Scenario: Tracking changing nutritional needs for health management
+    Given Margaret is managing early-stage diabetes
+    And she needs more protein and calcium, less sodium
+    And medications affect her appetite and digestion
+    When Margaret shops for groceries
+    Then her personal_agent should track nutrition across time
+    And it should suggest foods appropriate for her health conditions
+    And it should flag items high in sodium or sugar
+    And it should highlight protein and calcium-rich options
+    And it should help her balance health needs with budget constraints
+    And nutritional guidance should feel supportive, not controlling
+    And Margaret should maintain agency over food choices
+
+  Scenario: Making retirement care contributions visible at individual level
+    Given Margaret provides 15 hours/week grandchild care
+    And she volunteers 10 hours/week in community
+    And she provides 8 hours/week elder care for her mother
+    When Margaret's care contributions are tracked
+    Then her personal_agent should quantify all care labor
+    And it should calculate market value (~$15k/year grandchild care)
+    And it should accumulate care tokens for all contributions
+    And it should make visible that she's highly productive
+    And Margaret should experience herself as valuable contributor
+    And the data should counter cultural narrative of retired as "not working"
+    And her contributions should be recognized, not invisible
+
+  Scenario: Personal agent serves Margaret's autonomy without infantilizing
+    Given Margaret is a capable adult with decades of life experience
+    And the interface uses AI assistance
+    When the personal_agent interacts with Margaret
+    Then it must preserve her full autonomy and dignity
+    And it must never be patronizing or infantilizing
+    And it must respect her expertise and judgment
+    And it must provide information, not directives
+    And it must acknowledge her nursing background and competence
+    And the relationship should be respectful partnership
+    And Margaret should feel empowered, never managed
+
+  Scenario: Building care economy capital for future aging needs
+    Given Margaret is watching her 92-year-old mother navigate advanced aging
+    And Margaret recognizes her own future care needs
+    When Margaret makes care contributions now
+    Then care tokens should accumulate to her individual account
+    And these tokens should represent future care economy resources
+    And the system should help her build reciprocal relationships
+    And she should be preparing for increased care needs in 10-20 years
+    And current contributions should create future security
+    And Margaret should experience agency in planning her own aging
+
+  Scenario: Privacy control remains with Margaret as autonomous adult
+    Given Margaret's care contribution data is being tracked
+    And health information is particularly sensitive
+    When Margaret determines data sharing preferences
+    Then she must have complete control over all her data
+    And she should choose what's shared with family, doctors, or community
+    And she can demonstrate care value to family if she wishes
+    And she can maintain complete privacy if she prefers
+    And health data sharing must be explicitly consented
+    And Margaret's autonomy over her information must be absolute
+
+  Scenario: Medication interactions and dietary considerations tracked
+    Given Margaret takes multiple medications
+    And medications interact with certain foods
+    When Margaret shops for groceries
+    Then her personal_agent should be aware of medication interactions
+    And it should flag potentially problematic food-drug combinations
+    And it should suggest foods that support medication effectiveness
+    And medication data should remain private and encrypted
+    And the system should support her health management
+    And Margaret should feel supported in complex health navigation
+
+  Scenario: Reducing food waste with fixed income constraints
+    Given Margaret's budget requires maximizing every dollar
+    And food waste represents meaningful lost resources
+    When Margaret plans meals and shopping
+    Then her personal_agent should help minimize waste
+    And it should suggest appropriate portion sizes for one or two people
+    And it should track perishables and suggest usage timing
+    And it should recommend preservation techniques Margaret knows from experience
+    And waste reduction should align with both budget and values
+    And Margaret's generation's knowledge of frugality should be honored
+
+  Scenario: Maintaining independence through effective resource management
+    Given Margaret values her independence
+    And she wants to avoid becoming "a burden"
+    When Margaret uses the Value Scanner over time
+    Then it should help her maintain self-sufficiency
+    And it should optimize her resources for maximum independence
+    And it should connect her to community resources without stigma
+    And it should make her care contributions visible
+    And Margaret should experience continued agency and autonomy
+    And the system should support her in aging on her own terms
+
+  Scenario: Recognition of unpaid care labor builds self-worth
+    Given Margaret's care contributions are substantial but unpaid
+    And traditional economics labels her as "not working"
+    When Margaret reviews her care contribution data
+    Then she should see quantified value of her labor
+    And she should understand her economic contribution is significant
+    And she should experience herself as productive member of society
+    And the narrative of retirement as obsolescence should be countered
+    And Margaret should have data to assert her value
+    And her dignity and self-worth should be affirmed
+
+  Scenario: Right to disconnect maintained throughout system
+    Given Margaret participates in the Value Scanner
+    And constitutional constraints apply at all layers
+    When Margaret chooses to disconnect from the system
+    Then her choice must be honored immediately
+    And all data retention must follow minimal legal requirements
+    And no manipulative patterns to retain usage should be employed
+    And Margaret's right to not participate must be absolute
+    And her autonomy over technology use must be respected
+    And disconnection should be simple and complete

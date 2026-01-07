@@ -1,0 +1,10 @@
+Scenario: Supporting other IDD community members as peer
+    Given Jordan has learned strategies for various daily challenges
+    And a newer group home resident is struggling with similar issues
+    When Jordan offers peer support
+    Then Jordan shares what has helped them
+    And the new resident benefits from Jordan's lived experience wisdom
+    And Jordan's peer support is recognized as valuable care work
+    And Jordan accumulates care tokens for peer support contribution
+    And Jordan experiences being a care provider and mentor
+    And IDD peer support is recognized as essential care infrastructure

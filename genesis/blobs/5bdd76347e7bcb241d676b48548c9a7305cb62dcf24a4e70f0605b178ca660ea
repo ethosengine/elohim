@@ -1,0 +1,9 @@
+Scenario: Municipal economic development metrics expand beyond job quantity to job quality
+    Given cities typically measure economic development by jobs created
+    And job quality (wages, benefits, dignity, ownership) is often ignored
+    When Rosa's conversion demonstrates high-quality job creation
+    Then municipality tracks worker ownership, living wages, and benefits in economic development data
+    And democratic conversions score highly on job quality metrics
+    And city economic development strategy prioritizes quality over quantity
+    And officials recognize one living-wage worker-owner job exceeds three poverty-wage positions
+    And municipality_elohim provides quality-focused metrics and documentation

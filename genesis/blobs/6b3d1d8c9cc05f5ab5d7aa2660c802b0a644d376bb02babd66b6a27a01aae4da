@@ -1,0 +1,12 @@
+Scenario: Health monitoring as Robert recognizes his own aging
+    Given Robert is experiencing early signs of aging
+    And he watches his parents navigate health challenges
+    And he recognizes his own future care needs
+    When Robert tracks his health through his personal_agent
+    Then it should monitor age-related health indicators
+    And help him establish preventive health practices
+    And connect his parents' health patterns to his own future
+    And support planning for his own eventual care needs
+    And recognize: "Regular exercise now reduces future care burden"
+    And help him build health practices that will serve him as he ages
+    And prepare him for the transition from care provider to care receiver

@@ -1,0 +1,9 @@
+Scenario: Developer affordable housing benefits school stability
+    Given a responsible developer builds genuinely affordable housing
+    And prioritizes families over luxury apartments
+    When the Observer tracks educational community impacts
+    Then analysis shows: stable affordable housing reduces student mobility
+    And children in affordable housing have better educational outcomes
+    And schools benefit from stable enrollment not constant turnover
+    And affordable development creates educational community benefit
+    And genuine affordability serves families not just developer profit

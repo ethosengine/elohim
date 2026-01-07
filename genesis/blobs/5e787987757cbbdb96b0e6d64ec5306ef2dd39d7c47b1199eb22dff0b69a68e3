@@ -1,0 +1,10 @@
+Scenario: Privacy preserved while participating in neighborhood networks
+    Given Marcus's household circumstances are sensitive
+    And participation in neighborhood networks requires some visibility
+    When Marcus's data contributes to neighborhood coordination
+    Then his specific situation must remain private
+    And only anonymized aggregate data should be used
+    And neighborhood support should flow without stigmatizing exposure
+    And his dignity should be protected while receiving benefits
+    And privacy should be balanced with community participation
+    And the protocol should enable solidarity without surveillance

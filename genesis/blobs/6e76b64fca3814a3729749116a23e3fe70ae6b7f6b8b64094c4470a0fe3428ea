@@ -1,0 +1,11 @@
+Scenario: Medical care coordination ensures dignity in healthcare system
+    Given Helen navigates complex medical systems
+    And elderly patients often experience dehumanization
+    When Helen interacts with healthcare providers
+    Then her personal_agent should advocate for her preferences
+    And her advance directives should be communicated to all providers
+    And the community_elohim should coordinate across specialists
+    And her values should guide medical decisions
+    And she should be treated as person, not patient number
+    And the protocol should prevent the dehumanization common in elder care
+    And medical system should serve Helen's dignity and autonomy

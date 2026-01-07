@@ -1,0 +1,9 @@
+Scenario: Managing 14-year-old's teen complexity and emerging adulthood
+    Given her oldest is navigating adolescence with all its challenges
+    And teens need parent as secure base while pushing for independence
+    When Maria parents her teenager
+    Then the family_elohim should provide teen development guidance
+    And it should help her maintain connection despite natural teen separation
+    And it should remind her to stay engaged even when teen seems not to want her
+    And it should help her navigate discipline, boundaries, and growing autonomy
+    And Maria should successfully parent a teen without co-parent support

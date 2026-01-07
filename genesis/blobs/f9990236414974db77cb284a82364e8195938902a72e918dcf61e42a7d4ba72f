@@ -1,0 +1,11 @@
+Scenario: Individual identity protected amid overwhelming care demands
+    Given Robert's care responsibilities could consume all available time
+    And he risks losing individual identity to caregiver role
+    When Robert's personal_agent monitors his wellbeing
+    Then it should protect space for his own flourishing
+    And flag if care demands are eliminating personal time
+    And surface when he needs rest, recreation, or personal development
+    And recognize: "You haven't had time for yourself in 17 days"
+    And help him understand that his own wellbeing enables sustainable care
+    And validate that maintaining individual identity is not selfishness
+    And support him in setting boundaries that preserve his personhood

@@ -1,0 +1,9 @@
+Scenario: Neighborhood resilience built through care economy practices
+    Given traditional economic systems leave neighborhoods vulnerable
+    And Sarah wants her neighborhood to be resilient
+    When neighborhood adopts care economy practices
+    Then the neighborhood_elohim should coordinate resource sharing
+    And it should build mutual aid capacity
+    And it should create social capital through care exchanges
+    And neighborhood should become more resilient to crises
+    And care economy should strengthen community fabric

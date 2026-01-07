@@ -1,0 +1,10 @@
+Scenario: Environmental care literacy appropriate to concrete operations
+    Given care economy extends to ecological relationships
+    And Emma can understand concrete environmental concepts
+    When Emma learns about environmental impact through scanner
+    Then ecological care should be presented at age-appropriate level
+    And the agent should say "This packaging can be recycled" (concrete)
+    And abstract sustainability concepts should be avoided
+    And connections between caring for people and planet should begin
+    And Emma should develop environmental consciousness
+    And ecological stewardship foundations should be laid for future development

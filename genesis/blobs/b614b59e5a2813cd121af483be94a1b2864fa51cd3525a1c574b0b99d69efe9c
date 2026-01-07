@@ -1,0 +1,9 @@
+Scenario: Owner chooses transition steward role over complete exit
+    Given Rosa wants to support workers through conversion
+    And she has knowledge essential for smooth transition
+    When Rosa selects two-year transition steward option
+    Then Rosa earns $55K salary for coordination and knowledge transfer
+    And Rosa facilitates workers' growing governance capacity
+    And Rosa's role gradually decreases as workers gain capability
+    And after two years, Rosa exits gracefully or stays as equal participant
+    And workplace_elohim ensures steward role doesn't recreate hierarchy

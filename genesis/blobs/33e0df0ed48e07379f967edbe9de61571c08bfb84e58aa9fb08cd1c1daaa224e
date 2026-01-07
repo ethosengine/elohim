@@ -1,0 +1,9 @@
+Scenario: Recognition of self-care as care work
+    Given Aisha tends to prioritize work over personal needs
+    And burnout would undermine all her capabilities
+    When the personal_agent monitors her well-being
+    Then it should recognize self-care as legitimate care work
+    And it should flag when self-care is being neglected
+    And it should help her understand that caring for herself enables other contributions
+    And the system should validate rest and nutrition as valuable
+    And Aisha should learn that personal stewardship is foundational

@@ -1,0 +1,10 @@
+Scenario: Elder shares cultural knowledge across generations
+    Given Rose is second-generation Italian American
+    And she knows traditional recipes and cultural practices
+    When she joins a cultural preservation affinity network
+    And she documents her grandmother's recipes with stories
+    Then her contributions reach others interested in Italian American heritage
+    And younger generations learn traditional knowledge
+    And her cultural memory is preserved for future generations
+    And Rose experiences pride in cultural contribution
+    And intergenerational cultural transmission succeeds

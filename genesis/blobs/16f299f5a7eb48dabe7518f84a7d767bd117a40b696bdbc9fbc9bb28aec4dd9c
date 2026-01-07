@@ -1,0 +1,9 @@
+Scenario: Ecological care contributions recognized in care token economy
+    Given Sarah makes environmentally conscious choices
+    And ecological care is care work that benefits everyone
+    When Sarah's care contributions are tracked
+    Then environmental care choices should generate care tokens
+    And Sarah should be recognized for ecological stewardship
+    And care for planet should be valued alongside care for people
+    And care tokens should incentivize environmental care
+    And ecological care should be integrated into care economy

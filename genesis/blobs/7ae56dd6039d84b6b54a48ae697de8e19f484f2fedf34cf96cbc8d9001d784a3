@@ -1,0 +1,9 @@
+Scenario: Employer education about caregiver employee realities
+    Given employers often don't understand caregiver demands
+    And ignorance leads to policies that exclude caregivers
+    When the workplace_elohim advocates for caregiver employees
+    Then it should educate employers about caregiving intensity
+    And it should demonstrate caregivers are valuable employees
+    And it should show accommodation benefits retention
+    And employers should understand caregiving as widespread need
+    And workplace culture should become caregiver-friendly

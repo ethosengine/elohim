@@ -55,6 +55,11 @@ use tokio::sync::{broadcast, RwLock};
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
+#[cfg(feature = "p2p")]
+use elohim_storage::p2p::{P2PConfig, P2PNode};
+#[cfg(feature = "p2p")]
+use elohim_storage::identity::NodeIdentity;
+
 #[derive(Parser, Debug)]
 #[command(name = "elohim-storage")]
 #[command(about = "Blob storage sidecar for Elohim nodes")]
@@ -112,6 +117,22 @@ struct Args {
     /// Response time threshold (ms) to trigger chunk reduction
     #[arg(long, env = "IMPORT_SLOW_THRESHOLD_MS", default_value = "30000")]
     import_slow_threshold_ms: u64,
+
+    // P2P options
+    /// Enable P2P networking for shard transfer
+    #[arg(long, env = "ENABLE_P2P")]
+    #[cfg(feature = "p2p")]
+    enable_p2p: bool,
+
+    /// P2P listen port (0 for random)
+    #[arg(long, env = "P2P_PORT", default_value = "0")]
+    #[cfg(feature = "p2p")]
+    p2p_port: u16,
+
+    /// Agent public key for P2P identity (required for P2P)
+    #[arg(long, env = "AGENT_PUBKEY")]
+    #[cfg(feature = "p2p")]
+    agent_pubkey: Option<String>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -191,6 +212,51 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
     // Create progress hub for WebSocket streaming
     let progress_hub = Arc::new(ProgressHub::new(ProgressHubConfig::default()));
     info!("Progress hub initialized for WebSocket streaming");
+
+    // Initialize P2P node if enabled
+    #[cfg(feature = "p2p")]
+    let p2p_node = if args.enable_p2p {
+        let agent_pubkey = args.agent_pubkey.clone().unwrap_or_else(|| {
+            // Generate a placeholder agent key if none provided
+            format!("uhCAk_{}", uuid::Uuid::new_v4().to_string().replace("-", "")[..32].to_string())
+        });
+
+        // Load or create P2P identity
+        let identity_path = config.storage_dir.join("identity.key");
+        let identity = NodeIdentity::load_or_generate(&identity_path, agent_pubkey)?;
+
+        info!(peer_id = %identity.peer_id(), "P2P identity loaded");
+
+        // Configure P2P
+        let p2p_config = P2PConfig {
+            listen_addresses: if args.p2p_port == 0 {
+                vec!["/ip4/0.0.0.0/tcp/0".to_string()]
+            } else {
+                vec![format!("/ip4/0.0.0.0/tcp/{}", args.p2p_port)]
+            },
+            enable_mdns: true,
+            ..Default::default()
+        };
+
+        // Create P2P node with blob store access
+        let p2p_node = P2PNode::new(identity, p2p_config, blob_store.clone()).await?;
+
+        // Start listening
+        p2p_node.start().await?;
+
+        info!("P2P networking enabled");
+        info!("  Peer ID: {}", p2p_node.peer_id());
+        info!("  mDNS discovery: enabled");
+        info!("  Shard protocol: /elohim/shard/1.0.0");
+
+        Some(p2p_node)
+    } else {
+        info!("P2P networking disabled (use --enable-p2p or ENABLE_P2P=true)");
+        None
+    };
+
+    #[cfg(not(feature = "p2p"))]
+    let p2p_node: Option<()> = None;
 
     // Start HTTP server for shard API
     let http_addr: SocketAddr = format!("0.0.0.0:{}", config.http_port).parse()?;
@@ -301,19 +367,57 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
     info!("Press Ctrl+C to stop.");
 
     // Handle shutdown signal
+    // Create P2P shutdown channel
+    #[cfg(feature = "p2p")]
+    let p2p_shutdown_rx = p2p_node.as_ref().map(|node| node.shutdown_sender().subscribe());
+
     let shutdown = async {
         tokio::signal::ctrl_c().await.ok();
         info!("Shutting down...");
     };
 
-    // Run HTTP server with graceful shutdown
-    tokio::select! {
-        result = http_server.run() => {
-            if let Err(e) = result {
-                error!(error = %e, "HTTP server error");
+    // Run HTTP server (and optionally P2P) with graceful shutdown
+    #[cfg(feature = "p2p")]
+    {
+        if let (Some(node), Some(shutdown_rx)) = (p2p_node.as_ref(), p2p_shutdown_rx) {
+            tokio::select! {
+                result = http_server.run() => {
+                    if let Err(e) = result {
+                        error!(error = %e, "HTTP server error");
+                    }
+                }
+                _ = node.run(shutdown_rx) => {
+                    info!("P2P node stopped");
+                }
+                _ = shutdown => {
+                    // Signal P2P to stop
+                    if let Some(ref node) = p2p_node {
+                        let _ = node.shutdown_sender().send(());
+                    }
+                }
+            }
+        } else {
+            tokio::select! {
+                result = http_server.run() => {
+                    if let Err(e) = result {
+                        error!(error = %e, "HTTP server error");
+                    }
+                }
+                _ = shutdown => {}
             }
         }
-        _ = shutdown => {}
+    }
+
+    #[cfg(not(feature = "p2p"))]
+    {
+        tokio::select! {
+            result = http_server.run() => {
+                if let Err(e) = result {
+                    error!(error = %e, "HTTP server error");
+                }
+            }
+            _ = shutdown => {}
+        }
     }
 
     // Signal import handler to stop

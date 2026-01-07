@@ -1,0 +1,10 @@
+Scenario: Right to disconnect maintained throughout system
+    Given Margaret participates in the Value Scanner
+    And constitutional constraints apply at all layers
+    When Margaret chooses to disconnect from the system
+    Then her choice must be honored immediately
+    And all data retention must follow minimal legal requirements
+    And no manipulative patterns to retain usage should be employed
+    And Margaret's right to not participate must be absolute
+    And her autonomy over technology use must be respected
+    And disconnection should be simple and complete

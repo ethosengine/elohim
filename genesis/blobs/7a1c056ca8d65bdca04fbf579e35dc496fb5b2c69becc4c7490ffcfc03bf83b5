@@ -1,0 +1,9 @@
+Scenario: Child blocked from exposure to harmful content
+    Given Emma's uncle shares a news article about violence
+    And the content is appropriate for adults but not children
+    When the article is contributed to the family space
+    Then the guardian agent evaluates age-appropriateness
+    And Emma's view is automatically filtered or summarized
+    And her parents can choose to discuss the topic with her directly
+    And Emma never sees graphic or traumatizing content
+    And family communication continues without disruption

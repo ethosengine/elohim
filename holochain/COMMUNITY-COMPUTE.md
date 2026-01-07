@@ -629,6 +629,117 @@ Elohim values aren't imposed top-down. They're aligned **to** the layer of opera
 
 When values are sufficiently aligned to the layer they operate in, mutually beneficial outcomes emerge. Not perfect happiness — but **explainable outcomes** that participants can understand, verify, and work to change.
 
+## Technical Implementation Mapping
+
+This section maps the vision above to concrete implementation in the codebase.
+
+> **See also**: [P2P-DATAPLANE.md](./P2P-DATAPLANE.md) for the comprehensive P2P architecture.
+
+### Family Node Layers → elohim-storage Sovereignty Modes
+
+| Family Node Layer | Sovereignty Mode | Implementation |
+|-------------------|-----------------|----------------|
+| Layer 1: SOVEREIGN | `private` | Encrypted at rest, only my devices |
+| Layer 2: RECIPROCAL | `invited` / `local` | Shared with named agents / family cluster |
+| Layer 3: INVESTED | `neighborhood` | Community replication pools |
+| Layer 4: GIFT | `commons` | Anyone willing to store |
+
+```rust
+// elohim-storage/src/reach.rs
+pub enum Reach {
+    Private,      // Layer 1: only creator
+    Invited,      // Layer 2: named relationships
+    Local,        // Layer 2: family cluster
+    Neighborhood, // Layer 3: extended community
+    Municipal,    // Layer 3+: regional
+    Commons,      // Layer 4: public
+}
+```
+
+### Replication Follows Relationship → Reach-Based Distribution
+
+The vision "you preserve what you value" maps to reach-based gating:
+
+```rust
+// Who can receive this content?
+fn can_replicate_to(&self, peer: &PeerId, content: &BlobMetadata) -> bool {
+    match content.reach {
+        Reach::Private => self.is_my_device(peer),
+        Reach::Invited => self.has_relationship(peer, content.owner),
+        Reach::Local => self.in_same_cluster(peer),
+        Reach::Neighborhood => self.in_trust_network(peer),
+        Reach::Commons => true,
+    }
+}
+```
+
+### Community Mesh → libp2p Peer Network
+
+The community mesh diagram maps directly to libp2p:
+
+| Vision | Implementation |
+|--------|----------------|
+| Node connections | libp2p streams |
+| No center | Kademlia DHT |
+| Geographic distribution | mDNS + relay nodes |
+| Offline resilience | Local-first Automerge |
+
+### Sync Engine → Automerge Integration
+
+The vision's sync engine uses Automerge 3.0:
+
+| Feature | Implementation |
+|---------|----------------|
+| "Changes you made" | Automerge local mutations |
+| "Changes others made" | Automerge remote sync |
+| "Conflicts resolve" | CRDT automatic merge |
+| "State converges" | Eventual consistency |
+
+See [SYNC-ENGINE.md](./SYNC-ENGINE.md) for detailed design.
+
+### Discovery Layer → ContentLocation DHT
+
+The lightweight DHT for discovery:
+
+```rust
+// dna/infrastructure/zomes/infrastructure/src/lib.rs
+#[hdk_entry_helper]
+pub struct ContentLocation {
+    pub content_hash: String,
+    pub holders: Vec<PeerId>,
+    pub reach: Reach,
+    pub replication_count: u32,
+}
+```
+
+### Creator's View → Replication Health API
+
+The creator dashboard maps to elohim-storage APIs:
+
+```typescript
+// sdk/src/replication-health.ts
+interface ReplicationHealth {
+  contentId: string;
+  supporters: number;      // Community nodes storing this
+  totalAllocated: number;  // Total GB committed
+  replicationPercent: number;
+  geographicDistribution: Map<string, number>;
+  resilienceScore: 'weak' | 'moderate' | 'strong';
+}
+```
+
+### Key Implementation Files
+
+| Component | Primary Files |
+|-----------|---------------|
+| Reach enforcement | `elohim-storage/src/reach.rs` (planned) |
+| P2P networking | `elohim-storage/src/p2p/mod.rs` |
+| Sync protocol | `elohim-storage/src/sync/` (planned) |
+| Content location | `dna/infrastructure/` |
+| Bootstrap | `doorway/src/routes/signal.rs` |
+
+---
+
 ## Open Questions
 
 1. **Incentive Bootstrapping** — How do early supporters get rewarded?

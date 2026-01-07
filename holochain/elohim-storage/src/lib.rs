@@ -64,6 +64,9 @@ pub mod content_server;
 #[cfg(feature = "p2p")]
 pub mod p2p;
 
+// CRDT sync module (always available, P2P transport requires p2p feature)
+pub mod sync;
+
 // Sovereignty and cluster modules
 pub mod sovereignty;
 #[cfg(feature = "p2p")]
@@ -86,3 +89,8 @@ pub use content_server::{ContentServerBridge, ContentServerConfig, PublisherInfo
 
 #[cfg(feature = "p2p")]
 pub use identity::NodeIdentity;
+#[cfg(feature = "p2p")]
+pub use p2p::{P2PConfig, P2PNode};
+
+// Sync re-exports
+pub use sync::{DocStore, DocStoreConfig, StoredDocument, StreamPosition, StreamTracker, SyncManager};

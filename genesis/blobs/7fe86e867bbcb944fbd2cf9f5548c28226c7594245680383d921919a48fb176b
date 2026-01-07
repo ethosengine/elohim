@@ -1,0 +1,9 @@
+Scenario: Investor participates in community investment pool governance
+    Given traditional investing gives shareholders plutocratic pseudo-democracy
+    And Patricia wants genuine participation, not capital-weighted control
+    When community investment pool has democratic governance structure
+    Then she participates in pool governance as one voice among equals
+    And investment decisions consider community benefit alongside financial returns
+    And pool priorities are set democratically by investors, workers, and community representatives
+    And governance prevents capital from dominating democratic enterprises
+    And community_elohim manages investment pool democratic governance

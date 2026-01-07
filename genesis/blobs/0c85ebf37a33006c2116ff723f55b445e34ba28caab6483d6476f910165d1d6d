@@ -1,0 +1,9 @@
+Scenario: Workplace understanding prevents caregiver discrimination
+    Given caregivers often face employment discrimination
+    And James might be seen as less committed or reliable
+    When the workplace_elohim monitors for discrimination
+    Then it should recognize caregiver discrimination patterns
+    And it should educate employers about caregiver rights
+    And it should advocate when James faces unfair treatment
+    And workplace should not penalize caregiving responsibilities
+    And caregiver status should be protected like other statuses

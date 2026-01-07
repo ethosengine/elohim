@@ -1,0 +1,10 @@
+Scenario: Testifying to National Constitutional Council on policy needs
+    Given National Council reviewing case with policy implications
+    And they request my perspective as policy maker
+    When I testify about legislative context
+    Then I explain: existing law and its limitations
+    And I describe: policy challenges protocol helps address
+    And I clarify: how council precedent would affect legislation
+    And I don't advocate: for particular constitutional interpretation
+    And I inform: their deliberation with policy expertise
+    And I demonstrate: collaboration between sortition and representative democracy

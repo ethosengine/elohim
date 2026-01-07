@@ -1,0 +1,10 @@
+Scenario: Planning commissioner evaluates environmental impacts of large development
+    Given developer proposes major commercial development on vacant land
+    And environmental impact report prepared by developer's consultants
+    And staff recommendation supports approval with mitigation measures
+    When the planning commissioner requests Observer independent analysis
+    Then they receive assessment of impact report methodology and limitations
+    And see comparison to development impacts documented in peer jurisdictions
+    And access air quality, water, and habitat impact analysis independent of developer framing
+    And discover mitigation measures less effective than presented
+    And independent analysis reveals environmental impacts developer report minimized

@@ -1,0 +1,11 @@
+Scenario: Advising on ecological standing amendment technical implications
+    Given delegates consider granting ecosystems constitutional personhood
+    And technical implementation is uncertain
+    When I explain how agents would implement ecological standing
+    Then I clarify: how ecosystem "voice" would be technically represented
+    And I explore: methods for translating ecological data into constitutional claims
+    And I assess: challenges in balancing human and ecological rights
+    And I present: what's technically possible vs what requires research
+    And I avoid: either dismissing as impossible or ignoring challenges
+    And I enable: delegates to choose values given technical reality
+    And I serve: constitutional innovation with technical honesty

@@ -1,0 +1,11 @@
+Scenario: Volunteer work recognized as valuable care economy contribution
+    Given Margaret volunteers 10 hours/week in community
+    And she serves at food bank, library, or community health clinic
+    When the community_elohim tracks volunteer contributions
+    Then it should quantify Margaret's volunteer hours
+    And it should calculate economic value of her skilled labor
+    And it should accumulate care tokens for community service
+    And volunteer work should be recognized as substantial contribution
+    And Margaret should see herself as productive community member
+    And retirement should be liberation for care work, not obsolescence
+    And community should value and appreciate her service

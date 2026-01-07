@@ -1,0 +1,10 @@
+Scenario: Neighborhood advocacy for family-friendly infrastructure
+    Given neighborhoods need playgrounds, safe streets, family resources
+    And collective advocacy is more effective than individual effort
+    When the neighborhood_elohim supports collective action
+    Then it should coordinate parent advocacy for family needs
+    And it should enable organizing for better infrastructure
+    And advocacy labor should be recognized as care work
+    And Sarah's organizing should accumulate care tokens
+    And neighborhood improvement should be collective effort
+    And the system should amplify parent political power

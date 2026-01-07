@@ -1,0 +1,7 @@
+Scenario: Advocating for industry-wide living wage standards
+    Given current food service wages are systematically too low to live on
+    When workers organize for living wage campaigns
+    Then the protocol should support industry-wide living wage advocacy
+    And provide evidence of inadequate current wages
+    And help workers coordinate collective demands
+    And build movement for mandatory living wage in food service

@@ -1,0 +1,10 @@
+Scenario: Family care tokens acknowledge teen's economic contribution
+    Given the family participates in care token economy
+    And Jasmine contributes substantial household labor, childcare, and coordination
+    When family care tokens are calculated
+    Then Jasmine's contributions should be valued appropriately
+    And her care work should be recognized as genuine economic contribution
+    And tokens should accumulate to her individual account within the family system
+    And she should have voice in how family care tokens are used
+    And her standing in family economic decisions should reflect her contribution
+    And the token system should make visible what traditional economics renders invisible

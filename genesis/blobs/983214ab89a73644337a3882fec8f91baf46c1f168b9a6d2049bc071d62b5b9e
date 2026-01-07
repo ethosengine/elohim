@@ -1,0 +1,11 @@
+Scenario: Child makes genuine autonomous decision with real consequences
+    Given Emma is selecting cereal in the store aisle
+    And she is using the Value Scanner independently
+    And her family will actually eat the cereal she chooses
+    When Emma compares store brand and name brand cereals
+    Then her personal_agent should present factual information
+    And the agent should say "The store brand has the same protein as the name brand, and it's $2 less"
+    And Emma should make the final choice herself
+    And her choice should be what the family purchases
+    And the consequences should be real but age-appropriate
+    And Emma should experience the weight of genuine decision-making

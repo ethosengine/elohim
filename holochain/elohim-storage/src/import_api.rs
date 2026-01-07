@@ -150,25 +150,34 @@ pub enum ImportStatus {
 
 /// Response from zome's process_import_chunk call
 /// Must match the Rust struct in content_store zome
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ZomeChunkResponse {
     /// Batch ID
+    #[serde(default)]
     pub batch_id: String,
     /// Items processed in this chunk
+    #[serde(default)]
     pub chunk_processed: u32,
     /// Errors in this chunk
+    #[serde(default)]
     pub chunk_errors: u32,
     /// Items skipped (already existed)
+    #[serde(default)]
     pub chunk_skipped: u32,
     /// Total processed so far (across all chunks)
+    #[serde(default)]
     pub total_processed: u32,
     /// Total errors so far (across all chunks)
+    #[serde(default)]
     pub total_errors: u32,
     /// IDs that failed with error messages
+    #[serde(default)]
     pub failed_ids: Vec<(String, String)>,
     /// IDs that were skipped (already existed)
+    #[serde(default)]
     pub skipped_ids: Vec<String>,
     /// Current batch status
+    #[serde(default)]
     pub status: String,
 }
 

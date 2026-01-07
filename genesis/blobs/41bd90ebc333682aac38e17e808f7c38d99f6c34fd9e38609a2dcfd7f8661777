@@ -1,0 +1,11 @@
+Scenario: Neighborhood businesses learn accessibility from Alex
+    Given local businesses often lack accessibility awareness
+    And Alex's feedback could improve business accessibility
+    When Alex interacts with neighborhood businesses
+    Then the neighborhood_elohim should facilitate Alex providing accessibility feedback
+    And businesses should receive Alex's expertise as valuable service
+    And improvements should be tracked and celebrated
+    And Alex should be compensated for consultation when appropriate
+    And accessible businesses benefit from disability community patronage
+    And the neighborhood should become more accessible through Alex's guidance
+    And Alex's care work includes making local economy accessible

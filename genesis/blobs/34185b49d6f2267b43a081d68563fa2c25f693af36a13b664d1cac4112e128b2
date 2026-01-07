@@ -1,0 +1,8 @@
+Scenario: Citizen connects to regional environmental patterns
+    Given tree canopy loss is occurring in the citizen's neighborhood
+    When the Observer surfaces regional ecological data
+    Then the citizen learns this is part of citywide pattern
+    And sees which areas retain or lose environmental quality
+    And discovers other neighborhoods facing similar concerns
+    And can join broader environmental coalition
+    And local environmental concerns connect to systemic patterns

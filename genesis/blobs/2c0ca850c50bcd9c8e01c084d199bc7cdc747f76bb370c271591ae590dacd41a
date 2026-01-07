@@ -1,0 +1,9 @@
+Scenario: Teacher coalition challenges harmful curriculum mandate
+    Given district mandates scripted curriculum contradicting best practices
+    And individual teacher objections are dismissed as "resistance"
+    When 180 teachers coordinate through Observer platform
+    Then collective professional voice becomes undeniable
+    And teachers present research on curriculum approach
+    And document student engagement declining since mandate
+    And propose evidence-based alternative approaches
+    And collective expertise creates pressure for policy reconsideration

@@ -1,0 +1,9 @@
+Scenario: Politician evaluates workplace safety regulations with evidence
+    Given business lobby opposes workplace safety regulations
+    And claims compliance costs will harm competitiveness
+    When the Observer analyzes workplace safety data and regulatory impacts
+    Then they see injury and fatality rates in regulated versus unregulated contexts
+    And understand compliance costs versus worker compensation and healthcare costs
+    And identify which safety regulations most effectively prevent harm
+    And review enforcement patterns and violation rates
+    And make evidence-based decisions prioritizing worker safety

@@ -1,0 +1,10 @@
+Scenario: Tracking self-care achievements despite exhaustion
+    Given I am exhausted after double shifts
+    And self-care feels impossible
+    When I manage to cook a nutritious meal for myself
+    Or maintain my living space
+    Or get adequate sleep
+    Then the protocol should recognize these achievements
+    And validate that caring for myself is valuable work
+    And celebrate small victories in maintaining well-being
+    And build evidence that I deserve conditions that make self-care possible

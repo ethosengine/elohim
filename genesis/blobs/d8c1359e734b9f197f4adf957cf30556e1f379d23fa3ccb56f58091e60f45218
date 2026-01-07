@@ -1,0 +1,10 @@
+Scenario: Employer care economy responsibility to student workers
+    Given Kenji is vulnerable worker with limited experience and options
+    And employers have care economy responsibility to workers
+    When the workplace_elohim evaluates Kenji's workplace
+    Then it should assess whether employer provides fair wages, safe conditions, and flexibility
+    And it should recognize good employers who support student success
+    And it should flag exploitative practices or toxic culture
+    And it should help Kenji identify better employment if current job is harmful
+    And the system should hold employers accountable to care economy standards
+    And workplaces should support student worker flourishing

@@ -1,0 +1,9 @@
+Scenario: City procurement policies begin prioritizing democratic businesses
+    Given municipality purchases vehicles and services from private vendors
+    And public procurement can support democratic economy development
+    When Rosa's Auto bids for city fleet maintenance contracts
+    Then municipal procurement gives preference to worker-owned businesses
+    And democratic enterprises compete successfully for public contracts
+    And taxpayer money supports living wages and community wealth, not corporate extraction
+    And procurement policy changes demonstrate municipal commitment to economic democracy
+    And municipality_elohim tracks procurement impacts on democratic business viability

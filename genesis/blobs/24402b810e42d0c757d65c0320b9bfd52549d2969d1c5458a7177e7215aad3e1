@@ -1,0 +1,10 @@
+Scenario: Developing critical thinking about consumption and marketing
+    Given consumer marketing targets young adults intensively
+    And Aisha needs media literacy
+    When Aisha encounters marketing messages
+    Then the personal_agent should help her think critically
+    And it should explain marketing tactics and manipulation
+    And it should teach distinguishing needs from manufactured wants
+    And consumer education should support autonomous decision-making
+    And she should learn to resist exploitative marketing
+    And critical consumption literacy should be developed

@@ -1,0 +1,10 @@
+Scenario: Planning commissioner evaluates large residential development proposal
+    Given developer proposes 500-unit development with affordable housing component
+    And staff recommendation supports approval citing housing needs
+    And developer presentation emphasizes economic benefits and community amenities
+    When the planning commissioner requests Observer independent analysis
+    Then they receive comparison of promised versus delivered benefits from developer's past projects
+    And see affordable housing calculation showing units actually affordable to local residents
+    And access traffic, school, and infrastructure impact analysis
+    And discover developer donated $5000 to commissioner's recent campaign
+    And independent analysis reveals information staff presentation omitted

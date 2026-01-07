@@ -1,0 +1,10 @@
+Scenario: Planning across time with sophisticated coordination tools
+    Given Marcus plans weekly meals for himself and Keisha
+    And he must coordinate ingredients across multiple meals
+    When Marcus uses planning features
+    Then he should have access to meal planning with nutritional analysis
+    And budget tracking should project across weeks
+    And shopping list optimization should be available
+    And inventory management should prevent waste
+    And multi-store price comparison should support best value finding
+    And planning tools should be professional-grade but accessible

@@ -1,0 +1,12 @@
+Scenario: Family communication facilitated across generations and geography
+    Given family members are distributed across states
+    And communication about care needs is essential but complex
+    And family discussions about care can be emotionally difficult
+    When family_elohim supports family communication
+    Then it should provide structured communication tools
+    And facilitate difficult conversations about elder care, finances, and support
+    And ensure all relevant family members have voice
+    And help family navigate emotional complexity of care discussions
+    And support family in making collaborative decisions
+    And prevent communication breakdowns that harm care coordination
+    And maintain family cohesion amid care demands

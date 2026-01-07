@@ -1,0 +1,10 @@
+Scenario: Climate-displaced community maintains cohesion across distance
+    Given a coastal town is gradually becoming uninhabitable due to flooding
+    And families are relocating to various inland communities over several years
+    When displaced community members use Elohim to stay connected
+    And they create a diaspora community space for their town
+    Then families scattered across multiple cities maintain relationships
+    And community memory and culture are preserved
+    And mutual aid flows between dispersed community members
+    And collective decision-making continues about remaining community assets
+    And the community maintains identity despite geographic dispersal

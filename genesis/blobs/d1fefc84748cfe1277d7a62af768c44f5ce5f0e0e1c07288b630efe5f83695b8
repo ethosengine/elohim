@@ -1,0 +1,10 @@
+Scenario: Escalating appeal when initial review doesn't satisfy
+    Given my Community Elohim review upheld the original decision
+    And I still believe my constitutional rights were violated
+    When I choose to escalate to peer agent review
+    Then three randomly-selected Family Elohim agents from other families review my case
+    And A Constitutional Council observer monitors the peer review
+    And The peer agents investigate deeper than the original review
+    And They can override, modify, or affirm the original decision
+    And I receive their judgment within one week
+    And I retain the right to escalate further to Constitutional Council if needed

@@ -1,0 +1,9 @@
+Scenario: Activist campaigns for municipal living wage ordinance
+    Given workers in the city struggle with poverty wages
+    And the activist advocates for living wage policy
+    When the Observer documents local wage patterns
+    Then the activist shows median wage is $14/hour in city with $22/hour living wage
+    And sees public subsidies go to employers paying poverty wages
+    And calculates economic impact of low wages on families and communities
+    And mobilizes workers and community supporters for policy campaign
+    And labor advocacy gains economic evidence foundation

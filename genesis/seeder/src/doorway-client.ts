@@ -7,17 +7,67 @@
  * - Validating cache availability
  *
  * Architecture:
- * - Doorway exposes /store/{hash} for blob serving
+ * - Doorway exposes /store/{address} for blob serving (CID or hash)
  * - Seeding uses admin API to push blobs
  * - Cache is eventually consistent with DHT
+ *
+ * Content Addressing:
+ * - CID (IPFS-compatible): bafkrei... - preferred, future-proof
+ * - SHA256 prefixed: sha256-abc123... - legacy compatibility
+ * - Raw SHA256 hex: abc123... - legacy compatibility
  *
  * Usage:
  *   const client = new DoorwayClient({ baseUrl: 'https://doorway.example.com', apiKey: 'xxx' });
  *   await client.checkHealth();
- *   await client.pushBlob(hash, blob, mimeType);
+ *   const result = await client.pushBlob(hash, blob, metadata);
+ *   console.log(result.cid); // bafkrei...
  */
 
 import { BlobMetadata } from './blob-manager.js';
+import { CID } from 'multiformats/cid';
+import { sha256 } from 'multiformats/hashes/sha2';
+import * as raw from 'multiformats/codecs/raw';
+
+// =============================================================================
+// CID Utilities
+// =============================================================================
+
+/**
+ * Compute a CID (Content Identifier) for raw data.
+ *
+ * Uses CIDv1 with raw codec (0x55) and SHA256 multihash.
+ * This is IPFS-compatible for raw binary content.
+ *
+ * @param data - Raw bytes to compute CID for
+ * @returns CID string (e.g., "bafkreihdwdcefgh...")
+ */
+export async function computeCid(data: Uint8Array): Promise<string> {
+  const hash = await sha256.digest(data);
+  const cid = CID.create(1, raw.code, hash);
+  return cid.toString();
+}
+
+/**
+ * Compute both CID and SHA256 hash for backward compatibility.
+ *
+ * @param data - Raw bytes
+ * @returns Object with cid and hash strings
+ */
+export async function computeContentAddresses(data: Uint8Array): Promise<{
+  cid: string;
+  hash: string;
+}> {
+  const hash = await sha256.digest(data);
+  const cid = CID.create(1, raw.code, hash);
+
+  // Extract raw SHA256 bytes from multihash and format as sha256-{hex}
+  const hashHex = Buffer.from(hash.digest).toString('hex');
+
+  return {
+    cid: cid.toString(),
+    hash: `sha256-${hashHex}`,
+  };
+}
 
 // =============================================================================
 // Types
@@ -79,6 +129,9 @@ export interface DoorwayStatus {
 
 export interface PushResult {
   success: boolean;
+  /** CID (Content Identifier) - IPFS-compatible, preferred */
+  cid: string;
+  /** SHA256 hash - legacy format for backward compatibility */
   hash: string;
   cached: boolean;
   error?: string;
@@ -302,21 +355,35 @@ export class DoorwayClient {
    * Push a blob to the projection cache.
    *
    * Uses the admin seed endpoint which accepts blobs for caching.
+   * Computes CID (Content Identifier) for the data and returns it.
+   *
+   * @param hash - Legacy SHA256 hash (sha256-... or raw hex)
+   * @param data - Blob data as Buffer
+   * @param metadata - Blob metadata including mime type
+   * @returns PushResult with both cid and hash
    */
   async pushBlob(
     hash: string,
     data: Buffer,
     metadata: BlobMetadata
   ): Promise<PushResult> {
+    // Compute CID for the data
+    const addresses = await computeContentAddresses(new Uint8Array(data));
+    const cid = addresses.cid;
+
     if (this.config.dryRun) {
-      console.log(`[DRY RUN] Would push blob: ${hash} (${data.length} bytes)`);
-      return { success: true, hash, cached: false };
+      console.log(`[DRY RUN] Would push blob: ${cid} (${data.length} bytes)`);
+      return { success: true, cid, hash, cached: false };
     }
 
-    // Check if already cached
-    const exists = await this.blobExists(hash);
-    if (exists) {
-      return { success: true, hash, cached: true };
+    // Check if already cached (try CID first, then legacy hash)
+    const existsByCid = await this.blobExists(cid);
+    if (existsByCid) {
+      return { success: true, cid, hash, cached: true };
+    }
+    const existsByHash = await this.blobExists(hash);
+    if (existsByHash) {
+      return { success: true, cid, hash, cached: true };
     }
 
     try {
@@ -325,6 +392,7 @@ export class DoorwayClient {
         headers: {
           'Content-Type': metadata.mimeType,
           'X-Blob-Hash': hash,
+          'X-Blob-Cid': cid,
           'X-Blob-Size': String(metadata.sizeBytes),
           ...(metadata.entryPoint && { 'X-Entry-Point': metadata.entryPoint }),
           ...(metadata.fallbackUrl && { 'X-Fallback-Url': metadata.fallbackUrl }),
@@ -336,16 +404,18 @@ export class DoorwayClient {
         const errorText = await response.text();
         return {
           success: false,
+          cid,
           hash,
           cached: false,
           error: `HTTP ${response.status}: ${errorText}`,
         };
       }
 
-      return { success: true, hash, cached: false };
+      return { success: true, cid, hash, cached: false };
     } catch (error) {
       return {
         success: false,
+        cid,
         hash,
         cached: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -357,6 +427,7 @@ export class DoorwayClient {
    * Push multiple blobs in batch.
    *
    * Processes blobs sequentially to avoid overwhelming the cache.
+   * Returns CIDs for all successfully pushed blobs.
    */
   async pushBlobs(
     blobs: Array<{ hash: string; data: Buffer; metadata: BlobMetadata }>
@@ -371,14 +442,14 @@ export class DoorwayClient {
       if (result.success) {
         success++;
         if (result.cached) {
-          console.log(`  ✓ ${blob.hash} (already cached)`);
+          console.log(`  ✓ ${result.cid} (already cached)`);
         } else {
-          console.log(`  ✓ ${blob.hash} (pushed ${blob.data.length} bytes)`);
+          console.log(`  ✓ ${result.cid} (pushed ${blob.data.length} bytes)`);
         }
       } else {
         failed++;
         errors.push({ hash: blob.hash, error: result.error || 'Unknown error' });
-        console.error(`  ✗ ${blob.hash}: ${result.error}`);
+        console.error(`  ✗ ${result.cid || blob.hash}: ${result.error}`);
       }
     }
 
@@ -479,20 +550,45 @@ export class DoorwayClient {
     const retryDelay = 5000;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const requestBody = JSON.stringify(request);
+
+      // IMPORT_DEBUG: Log request
+      if (process.env.IMPORT_DEBUG) {
+        console.log(`[IMPORT_DEBUG] seeder -> doorway request:`);
+        console.log(`  URL: POST /import/${batchType}`);
+        console.log(`  Body: ${requestBody.slice(0, 2000)}${requestBody.length > 2000 ? '...' : ''}`);
+      }
+
       const response = await this.fetch(`/import/${batchType}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(request),
+        body: requestBody,
       });
 
       if (response.ok) {
-        return await response.json();
+        const responseBody = await response.json();
+
+        // IMPORT_DEBUG: Log response
+        if (process.env.IMPORT_DEBUG) {
+          console.log(`[IMPORT_DEBUG] doorway -> seeder response:`);
+          console.log(`  Status: ${response.status}`);
+          console.log(`  Body: ${JSON.stringify(responseBody).slice(0, 2000)}`);
+        }
+
+        return responseBody;
       }
 
       // Read body once
       const responseText = await response.text();
+
+      // IMPORT_DEBUG: Log error response
+      if (process.env.IMPORT_DEBUG) {
+        console.log(`[IMPORT_DEBUG] doorway -> seeder ERROR response:`);
+        console.log(`  Status: ${response.status}`);
+        console.log(`  Body: ${responseText.slice(0, 2000)}`);
+      }
 
       // Handle 503 (discovery in progress) with retry
       if (response.status === 503) {

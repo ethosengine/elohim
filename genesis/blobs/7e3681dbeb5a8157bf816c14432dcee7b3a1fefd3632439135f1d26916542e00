@@ -1,0 +1,10 @@
+Scenario: Professional nursing skills contribute to community health
+    Given Margaret is a retired nurse with valuable expertise
+    And community health initiatives need skilled volunteers
+    When Margaret provides health education or clinic support
+    Then the community_elohim should recognize her professional skills
+    And it should value skilled labor more highly than unskilled
+    And her nursing background should be leveraged for community benefit
+    And professional retirees should be seen as community resources
+    And Margaret's expertise should serve community health
+    And skilled volunteering should accumulate significant care tokens

@@ -1,0 +1,11 @@
+Scenario: Managing healthcare costs and coordination for two aging partners
+    Given Frank and his wife both have aging-related healthcare needs
+    And healthcare costs are significant on fixed income
+    And medication management becomes more complex with age
+    When the household_elohim coordinates healthcare
+    Then it should track both partners' medical appointments and needs
+    And it should help manage medication schedules and interactions
+    And it should coordinate healthcare spending with household budget
+    And it should support both partners in advocating for each other
+    And healthcare navigation should be simplified and supported
+    And household should maintain health within economic constraints

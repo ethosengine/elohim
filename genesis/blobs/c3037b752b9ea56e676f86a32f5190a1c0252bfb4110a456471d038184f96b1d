@@ -1,0 +1,10 @@
+Scenario: Maintaining household dignity and quality despite constraints
+    Given Margaret's household operates on limited resources
+    And she has decades of experience making homes
+    When the household_elohim supports Margaret's household management
+    Then it should honor her expertise and knowledge
+    And it should help her maintain the home she wants
+    And it should preserve household dignity and beauty
+    And financial constraints should not mean deprivation
+    And Margaret's household should reflect her values and taste
+    And quality of life should be supported within resource limits

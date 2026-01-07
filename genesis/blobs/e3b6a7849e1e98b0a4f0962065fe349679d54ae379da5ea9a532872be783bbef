@@ -1,0 +1,11 @@
+Scenario: Workplace culture education reduces ableism
+    Given workplace culture often reflects ableist assumptions
+    And coworkers may lack disability awareness
+    When the workplace_elohim detects cultural issues
+    Then it should help Alex identify patterns of workplace ableism
+    And it should provide Alex tools to educate coworkers when Alex chooses
+    And it should support Alex in advocating for cultural change
+    And workplace should be prompted toward disability inclusion training
+    And Alex should be compensated if providing disability education
+    And the protocol should recognize that cultural change is ongoing work
+    And Alex should not bear sole responsibility for workplace education

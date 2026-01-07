@@ -1,0 +1,11 @@
+Scenario: Alex maintains authority over their own body and treatment
+    Given medical providers often assume they know what's best for disabled patients
+    And Alex has deep expertise about their own body and disability
+    When Alex interacts with medical providers
+    Then the personal_agent should help Alex assert bodily autonomy
+    And it should support Alex in refusing unwanted treatments
+    And it should remind providers that Alex is expert on their own needs
+    And medical decisions should remain under Alex's control
+    And the protocol should structurally defend Alex's medical self-determination
+    And informed consent should be meaningful, not coerced
+    And Alex's authority over their own body should be absolute

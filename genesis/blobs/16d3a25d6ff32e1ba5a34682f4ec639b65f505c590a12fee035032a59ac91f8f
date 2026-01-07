@@ -1,0 +1,10 @@
+Scenario: Continued learning and growth acknowledged at advanced age
+    Given Helen participates in senior learning programs
+    And she shares ecological wisdom from decades of experience
+    When Helen engages with educational content
+    Then the system should recognize that learning continues until death
+    And her accumulated knowledge should be valued
+    And opportunities to share wisdom should be surfaced
+    And she should experience ongoing growth and contribution
+    And the protocol should reject notion that personhood ends with productivity decline
+    And Helen should be supported in remaining engaged with life

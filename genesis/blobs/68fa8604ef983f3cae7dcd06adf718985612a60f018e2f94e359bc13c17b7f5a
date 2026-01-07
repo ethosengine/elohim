@@ -1,0 +1,11 @@
+Scenario: Integrating protocol with existing city governance
+    Given city council still passes ordinances and makes policy
+    And Elohim Protocol augments rather than replaces government
+    When I coordinate protocol with traditional civic structures
+    Then Community Elohim: provides information for council decisions
+    And city council: maintains authority over policy
+    And planning commission: still reviews developments (with agent input)
+    And existing institutions: work alongside protocol
+    And I clarify: boundaries and responsibilities
+    And we avoid: conflicts between agent decisions and local law
+    And integration strengthens: both democratic governance and AI support

@@ -1,0 +1,10 @@
+Scenario: Different pedagogical approaches for different children
+    Given Tommy (5) needs wonder-preservation pedagogy
+    And Emma (8) needs autonomy-building instruction
+    When Sarah teaches her children with different approaches
+    Then the educational_elohim should recognize pedagogical sophistication
+    And it should value Sarah's ability to differentiate instruction
+    And teaching multiple children at different stages should be recognized as complex
+    And Sarah's educational expertise should be documented
+    And the system should recognize professional-grade teaching capability
+    And differentiated instruction should be valued as advanced skill

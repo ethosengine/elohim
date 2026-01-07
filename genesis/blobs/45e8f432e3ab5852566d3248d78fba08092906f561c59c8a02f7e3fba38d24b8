@@ -1,0 +1,10 @@
+Scenario: Tool sharing and maintenance reduces consumption and waste
+    Given Frank has accumulated quality tools over decades
+    And tool sharing reduces unnecessary consumption
+    When the bioregional_elohim coordinates tool libraries
+    Then it should facilitate Frank sharing tools with community
+    And help him teach tool maintenance and care
+    And recognize tool sharing as ecological and community contribution
+    And reduce tool consumption through shared resources
+    And Frank's tool knowledge should serve community self-sufficiency
+    And his participation should model sharing economy practices

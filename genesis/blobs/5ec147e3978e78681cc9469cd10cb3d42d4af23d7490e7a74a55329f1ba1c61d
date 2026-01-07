@@ -1,0 +1,10 @@
+Scenario: Municipal recognition of informal care work in economic indicators
+    Given Frank provides substantial unpaid care work
+    And traditional municipal economic indicators ignore care economy
+    When the municipal_elohim tracks economic activity
+    Then it should include care work in municipal economic reporting
+    And Frank's volunteer labor should be counted in economic indicators
+    And municipal GDP should reflect care economy contributions
+    And retirement should be understood as economic participation
+    And policy should be based on complete economic picture
+    And Frank's contributions should be visible in municipal economics

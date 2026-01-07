@@ -1,0 +1,10 @@
+Scenario: School curriculum integration supports value literacy
+    Given Emma's school may integrate Value Scanner data
+    And educational layer includes formal learning contexts
+    When Emma's anonymized scanner data is shared with school (with family permission)
+    Then data should support curriculum in nutrition, math, social studies
+    And learning should be reinforced across contexts
+    And family permission should be required for school integration
+    And Emma's privacy should be protected in educational use
+    And formal education should complement experiential learning
+    And value literacy should be built across multiple contexts

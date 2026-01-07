@@ -1,0 +1,10 @@
+Scenario: Community education and skill-sharing workshops
+    Given Margaret has skills accumulated over lifetime
+    And community members could benefit from her knowledge
+    When the educational_elohim coordinates community education
+    Then Margaret should be able to teach workshops
+    And her teaching labor should be tracked as care contribution
+    And skills like cooking, budgeting, health literacy should be shared
+    And community capacity should grow through senior teaching
+    And Margaret's knowledge should strengthen community resilience
+    And teaching should be recognized as valuable community service

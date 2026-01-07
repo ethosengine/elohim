@@ -1,0 +1,12 @@
+Scenario: Bioregional food systems participation supports care and ecology
+    Given Robert's household needs food
+    And food choices affect ecological health and care economy
+    And bioregional food systems can serve both
+    When bioregional_elohim supports food system participation
+    Then it should connect Robert to bioregional food networks
+    And surface opportunities for local food sourcing, community gardens, and food cooperatives
+    And recognize that supporting regional farmers is care economy participation
+    And help him understand food system ecological impact
+    And support food choices that serve bioregional health and care economy
+    And demonstrate that eating is care for people and planet
+    And build bioregional food resilience through participation

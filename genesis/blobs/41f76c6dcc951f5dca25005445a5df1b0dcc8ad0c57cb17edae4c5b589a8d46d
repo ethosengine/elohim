@@ -1,0 +1,9 @@
+Scenario: Bioregional crop diversity protects against climate disruption
+    Given monoculture agriculture is vulnerable to climate shocks
+    And bioregional food security requires diverse production
+    When democratic farms coordinate bioregional crop diversity
+    Then multiple farms grow complementary crops reducing systemic risk
+    And crop failures at one farm are buffered by others' success
+    And regional food security is protected through diversity
+    And climate resilience increases through bioregional coordination
+    And bioregional_elohim coordinates crop diversity planning across farms

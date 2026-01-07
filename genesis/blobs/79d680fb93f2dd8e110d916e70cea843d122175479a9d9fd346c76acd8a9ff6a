@@ -1,0 +1,11 @@
+Scenario: Creator produces quality educational content that earns reach
+    Given Jordan creates a video explaining climate feedback loops
+    And the content includes verified scientific sources
+    And it's accessible to general audience without oversimplification
+    When Jordan contributes the content to climate education affinity network
+    Then the verification agent validates the scientific claims
+    And the content is offered to climate education communities
+    And educators and learners can review and appreciate the content
+    And genuine appreciation causes the content to spread to related networks
+    And Jordan receives community support for valuable educational work
+    And reach is earned through demonstrated value, not algorithms

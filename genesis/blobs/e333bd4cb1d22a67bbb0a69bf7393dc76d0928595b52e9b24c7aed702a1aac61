@@ -1,0 +1,9 @@
+Scenario: Corporate quality standards are exceeded through worker ownership and pride
+    Given franchise corporate claimed standardization ensured quality
+    And workers had no stake in quality beyond avoiding discipline
+    When democratic ownership gives workers direct stake in quality outcomes
+    Then food quality improves because workers care about product they own
+    And customer service excellence emerges from genuine worker engagement
+    And cleanliness and maintenance improve through ownership pride
+    And quality exceeds previous franchise corporate standards
+    And workplace_elohim documents quality improvements post-conversion

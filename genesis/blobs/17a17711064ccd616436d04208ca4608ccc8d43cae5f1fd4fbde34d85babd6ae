@@ -1,0 +1,10 @@
+Scenario: Receiving workplace accommodations as right, not favor
+    Given Jordan needs extra time to learn new library procedures
+    And reasonable accommodations are legally required
+    When new cataloging software is introduced
+    Then the library provides extended training time for Jordan
+    And instruction is adapted to Jordan's learning style
+    And accommodations are provided matter-of-factly, not begrudgingly
+    And Jordan's right to accessibility is honored
+    And Jordan can perform job with appropriate support
+    And Jordan experiences workplace inclusion through accommodation

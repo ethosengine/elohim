@@ -1,0 +1,11 @@
+Scenario: Municipal Constitutional Council handles city-level appeals
+    Given some appeals affect multiple neighborhoods or city as whole
+    And community-layer councils referred case to municipal level
+    When Municipal Constitutional Council reviews the appeal
+    Then I provide: city-wide context for their deliberation
+    And they evaluate: if decision aligns with city's constitutional interpretation
+    And they consider: effects across all Riverside neighborhoods
+    And they create: municipal-level precedent
+    And they may recommend: city council policy action
+    And I implement: their recommendations respecting their authority
+    And municipal governance: maintains democratic accountability

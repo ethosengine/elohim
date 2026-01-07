@@ -1,0 +1,10 @@
+Scenario: Contributing to neighborhood care economy as newcomer
+    Given Aisha is new and has few connections
+    And she wants to establish herself in the community
+    When Aisha contributes to neighborhood initiatives
+    Then the neighborhood_elohim should track her contributions
+    And it should make her care work visible to neighbors
+    And it should help her build social capital through care
+    And early contributions should establish her as community participant
+    And the system should help newcomers integrate through care economy
+    And belonging should be earned through reciprocal care

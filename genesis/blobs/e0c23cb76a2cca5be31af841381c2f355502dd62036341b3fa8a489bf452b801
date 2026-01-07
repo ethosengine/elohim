@@ -1,0 +1,9 @@
+Scenario: Politician surfaces worker priorities beyond business lobby
+    Given the politician hears from business groups on labor policy
+    But limited direct contact with worker constituents
+    When the Observer aggregates worker constituent input
+    Then they see workers prioritize healthcare access and paid sick leave
+    And identify childcare costs as barrier to workforce participation
+    And understand workplace safety concerns in specific industries
+    And learn wage theft affects significant worker population
+    And align labor policy with worker constituent needs

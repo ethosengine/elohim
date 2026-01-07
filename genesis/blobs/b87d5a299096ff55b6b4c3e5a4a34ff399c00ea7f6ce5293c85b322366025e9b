@@ -1,0 +1,10 @@
+Scenario: Household labor distribution made visible
+    Given Aisha does most of the cooking
+    And her roommate does most of the cleaning
+    When household care contributions are tracked
+    Then the household_elohim should make all labor visible
+    And it should show time invested by each person
+    And it should recognize different forms of household care
+    And invisible work should receive equal recognition
+    And the system should prevent exploitation through transparency
+    And household equity should be data-informed

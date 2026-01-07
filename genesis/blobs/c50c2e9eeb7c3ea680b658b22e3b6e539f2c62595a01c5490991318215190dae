@@ -1,0 +1,12 @@
+Scenario: Grandparent care valued as substantial family contribution
+    Given Frank provides occasional care for grandchildren
+    And this care enables his adult children to work
+    And grandparent care provides developmental benefits beyond childcare
+    When family_elohim tracks grandparent care contributions
+    Then Frank's care labor should be quantified specifically
+    And the market value of childcare should be calculated
+    And developmental benefits of grandparent relationship should be recognized
+    And care should be valued, not assumed as "leisure time with grandkids"
+    And Frank's contributions should create legitimate family care tokens
+    And his care work should be visible to adult children
+    And grandparenting should be recognized as valuable care economy participation

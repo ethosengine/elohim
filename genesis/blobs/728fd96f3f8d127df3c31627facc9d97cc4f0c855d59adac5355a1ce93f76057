@@ -1,0 +1,9 @@
+Scenario: Food waste prevention driven by economic necessity
+    Given Maria cannot afford to waste food on $175/week grocery budget
+    And she carefully plans meals, uses leftovers, and minimizes spoilage
+    When household food waste is tracked
+    Then the bioregional_elohim should quantify her minimal food waste
+    And it should recognize that she achieves what environmental advocates aim for
+    And her food waste prevention should be valued as ecological contribution
+    And economic necessity should be honored as environmental effectiveness
+    And Maria should be recognized as food sustainability leader

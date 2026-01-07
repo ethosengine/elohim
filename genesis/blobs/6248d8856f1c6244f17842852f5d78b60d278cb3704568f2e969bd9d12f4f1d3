@@ -1,0 +1,9 @@
+Scenario: Contributing to aging parent care from distance
+    Given my parents are aging and need increasing support
+    And I work full-time with unpredictable schedule
+    And I cannot provide hands-on daily care
+    When the family coordinates parent care
+    Then the protocol should help me contribute within my capacity
+    And identify non-time-intensive ways I can support
+    And coordinate with siblings who may have different availability
+    And recognize my contributions even when limited by employment

@@ -1,0 +1,11 @@
+Scenario: Identifying technical error that strengthens appellant's case
+    Given I audit agent reasoning for appeal
+    And I discover genuine technical mistake (like Wisconsin address confusion)
+    When I report the error to Constitutional Council
+    Then I explain: clearly what went wrong
+    And I assess: impact on the decision
+    And I recommend: whether decision should be overturned
+    And I serve: truth-telling over defending agents
+    And I strengthen: appellant's case when agent erred
+    And I demonstrate: that technical oversight is genuine
+    And my independence: makes expertise credible

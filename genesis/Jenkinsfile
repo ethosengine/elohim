@@ -207,6 +207,43 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
+        stage('Generate Schema Types') {
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
+            steps {
+                container('builder') {
+                    script {
+                        sh '''#!/bin/bash
+                            set -euo pipefail
+                            echo "Generating TypeScript types from DNA schema..."
+
+                            # Export validation constants from Rust DNA
+                            holochain/target/release/hc-rna-schema \
+                                -i holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs \
+                                --constants-file holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs \
+                                -o genesis/seeder/src/generated/schema-enums.json \
+                                --export-enums -v || {
+                                    # If binary not found, build it
+                                    echo "Building hc-rna-schema..."
+                                    cd holochain/rna/rust
+                                    RUSTFLAGS="" cargo build --release --features cli --bin hc-rna-schema
+                                    cd ../../..
+                                    holochain/target/release/hc-rna-schema \
+                                        -i holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs \
+                                        --constants-file holochain/dna/elohim/zomes/content_store_integrity/src/healing.rs \
+                                        -o genesis/seeder/src/generated/schema-enums.json \
+                                        --export-enums -v
+                                }
+
+                            # Generate TypeScript from JSON
+                            cd genesis/seeder
+                            npx tsx src/generate-schema-types.ts --input src/generated/schema-enums.json
+                            echo "✅ Schema types generated"
+                        '''
+                    }
+                }
+            }
+        }
+
 
         stage('Verify Target Health') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
@@ -377,6 +414,36 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                 echo ""
                                 echo "═══════════════════════════════════════════════════════════"
                                 echo "✅ DATABASE SEEDED SUCCESSFULLY"
+                                echo "═══════════════════════════════════════════════════════════"
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Verify Seeding') {
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
+            steps {
+                container('builder') {
+                    script {
+                        def internalDoorway = env.INTERNAL_DOORWAY_URL
+
+                        dir('genesis/seeder') {
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "🔍 VERIFYING SEEDING"
+                                echo "═══════════════════════════════════════════════════════════"
+
+                                # Verify data was actually written
+                                HOLOCHAIN_ADMIN_URL="ws://${internalDoorway}?apiKey=dev-elohim-auth-2024" \
+                                    npx tsx src/verify-seed.ts
+
+                                echo ""
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "✅ SEEDING VERIFIED"
                                 echo "═══════════════════════════════════════════════════════════"
                             """
                         }

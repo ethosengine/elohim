@@ -1,0 +1,10 @@
+Scenario: Influencing municipal policy on senior services and care economy
+    Given Margaret has lived experience of retirement and care economy
+    And municipal policy affects senior quality of life
+    When the municipality_elohim facilitates policy engagement
+    Then Margaret should be connected to policy-making processes
+    And her voice should inform municipal senior services
+    And care economy principles should be brought to municipal governance
+    And seniors should organize to shape policy
+    And Margaret's contributions should give her authority in policy discussions
+    And municipal planning should reflect senior input

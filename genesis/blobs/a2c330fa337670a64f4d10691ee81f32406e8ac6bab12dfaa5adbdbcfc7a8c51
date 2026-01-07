@@ -1,0 +1,9 @@
+Scenario: Elder protected from Medicare scam
+    Given scammers are running fake Medicare enrollment campaigns
+    When a scammer tries to contact Rose about "urgent" Medicare changes
+    And the message requests personal information and payment
+    Then the guardian agent identifies the scam pattern
+    And the fraudulent message never reaches Rose
+    And Rose is protected without awareness of the threat
+    And legitimate Medicare communications work normally
+    And her real healthcare connections remain intact

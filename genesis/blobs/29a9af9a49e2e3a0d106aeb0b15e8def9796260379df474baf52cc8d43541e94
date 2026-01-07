@@ -1,0 +1,11 @@
+Scenario: Household accessibility increases with declining mobility
+    Given Helen's mobility is gradually declining
+    And her household needs ongoing adaptation
+    When accessibility needs change over time
+    Then the household_elohim should proactively suggest adaptations
+    And Helen should be consulted on all modifications
+    And her home should evolve to support her changing capabilities
+    And the goal should be maximum independence at home
+    And dignity should be preserved throughout adaptation
+    And the protocol should enable aging in place with grace
+    And her ability to remain home should be extended as long as possible

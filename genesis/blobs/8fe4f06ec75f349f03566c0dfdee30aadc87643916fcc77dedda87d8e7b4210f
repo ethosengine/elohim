@@ -1,0 +1,9 @@
+Scenario: Developer negotiates regional community benefits agreement
+    Given a developer's project has significant regional impacts
+    And multiple communities demand input and benefits
+    When the Observer facilitates regional benefit negotiations
+    Then the developer engages stakeholders from all affected jurisdictions
+    And negotiates benefits addressing regional not just local impacts
+    And commits to workforce development benefiting regional residents
+    And Observer tracks delivery across jurisdictional boundaries
+    And regional accountability prevents divide-and-conquer tactics

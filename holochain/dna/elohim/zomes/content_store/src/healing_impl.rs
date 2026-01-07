@@ -62,6 +62,10 @@ pub fn transform_content_v1_to_v2(v1: ContentV1Export) -> Content {
         updated_at: v1.updated_at,
         schema_version: 2,  // Current version
         validation_status: "Migrated".to_string(),
+        // V1 content has body in content field, no blob storage
+        blob_cid: None,
+        content_size_bytes: None,
+        content_hash: None,
     }
 }
 

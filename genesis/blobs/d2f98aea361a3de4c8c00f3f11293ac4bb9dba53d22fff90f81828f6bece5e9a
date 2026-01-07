@@ -1,0 +1,9 @@
+Scenario: Monitor municipal wellbeing indicators for policy improvement
+    Given Riverside has baseline data on wellbeing before protocol
+    When Jamal reviews municipal dashboard annually
+    Then dashboard shows life satisfaction trends across neighborhoods
+    And dashboard reveals loneliness patterns and interventions
+    And dashboard tracks economic resilience indicators
+    And dashboard identifies neighborhoods struggling despite protocol
+    And Jamal uses data to target policy interventions
+    And evidence-based governance improves outcomes

@@ -1,0 +1,10 @@
+Scenario: Blended family and step-family care recognition
+    Given many families include step-parents and half-siblings
+    And Sarah may have step-family relationships
+    When the family_elohim tracks blended family care
+    Then it should recognize care across non-biological relationships
+    And step-parent care should be valued equally
+    And half-sibling care should be recognized
+    And diverse family structures should be fully supported
+    And care economy should serve all family configurations
+    And the system should not privilege nuclear biological family

@@ -1,0 +1,10 @@
+Scenario: Teen builds professional relationships through community engagement
+    Given Jasmine volunteers at community center under director Marcus
+    And this relationship could support her future career
+    When she demonstrates capability and reliability over time
+    Then the community_elohim should track these professional relationship developments
+    And surface when relationships could support her goals
+    And help her understand that she's building professional networks
+    And recognize that community engagement creates social capital
+    And support her in developing adult professional relationships
+    And demonstrate that care economy participation builds career pathways

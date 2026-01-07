@@ -1,0 +1,8 @@
+Scenario: Recognizing food systems care work from field to table
+    Given my restaurant work is one link in food systems care chain
+    And farmers, distributors, and preparers all contribute care labor
+    When I view food systems through care economy lens
+    Then the protocol should make visible the care work in entire food chain
+    And help me understand my connection to farmers and food producers
+    And recognize that all food work is care labor serving human nourishment
+    And build consciousness about care economy in food systems

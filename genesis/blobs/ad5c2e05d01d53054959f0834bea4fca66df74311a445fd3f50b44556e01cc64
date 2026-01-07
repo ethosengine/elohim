@@ -1,0 +1,11 @@
+Scenario: Personal flourishing recognized as legitimate goal
+    Given Alex has the right to pursue their own flourishing
+    And society often treats disabled lives as tragedies
+    When the personal_agent supports Alex's well-being
+    Then it should frame Alex's flourishing as inherent right
+    And it should support Alex's self-determined goals
+    And disability should not be assumed to diminish quality of life
+    And Alex's life should be treated as valuable as anyone's
+    And personal goals should be respected, not pitied
+    And the protocol should embody belief in Alex's full humanity
+    And Alex should experience affirmation of their worth

@@ -1,0 +1,11 @@
+Scenario: Elderly person's continued contributions made visible to family
+    Given Helen shares family stories with great-grandchildren
+    And she provides wisdom from 82 years of experience
+    When Helen contributes to family flourishing
+    Then her contributions should be visible in care economy tracking
+    And family should see that Helen still gives, not just receives
+    And care tokens should reflect her mentoring and wisdom sharing
+    And reciprocity should be visible even when care flows are asymmetric
+    And Helen should experience herself as valued contributor, not burden
+    And younger generations should learn that elders have worth
+    And the protocol should make visible what market economics erases

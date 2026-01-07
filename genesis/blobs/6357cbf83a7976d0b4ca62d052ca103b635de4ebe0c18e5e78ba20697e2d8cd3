@@ -1,0 +1,9 @@
+Scenario: Journalist fact-checks mayor's budget claims in real-time
+    Given the mayor gives state of city address with budget claims
+    And the journalist watches speech with deadline pressure
+    When the Observer provides instant fact-checking against city records
+    Then the journalist verifies mayor claims crime is down (true by 3%)
+    And fact-checks claim of record affordable housing investment (false - down 12%)
+    And checks police budget claim against actual spending (misleading framing)
+    And publishes real-time fact-check during speech
+    And rhetoric meets evidence-based accountability immediately

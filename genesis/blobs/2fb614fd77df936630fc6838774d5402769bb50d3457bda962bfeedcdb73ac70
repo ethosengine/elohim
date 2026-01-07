@@ -1,0 +1,10 @@
+Scenario: Informal neighborhood care and mutual aid provision
+    Given Margaret helps neighbors with various small needs
+    And she receives help from neighbors when needed
+    When the neighborhood_elohim tracks mutual aid
+    Then it should recognize Margaret's care contributions to neighbors
+    And it should track reciprocal neighborhood support
+    And small acts of care should accumulate as care tokens
+    And neighborhood care economy should be visible and valued
+    And mutual aid should strengthen neighborhood bonds
+    And Margaret should build neighborhood care relationships

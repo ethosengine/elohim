@@ -1,0 +1,10 @@
+Scenario: Privacy maintained while participating in neighborhood networks
+    Given Margaret's financial situation is sensitive
+    And neighborhood participation requires some visibility
+    When Margaret's data contributes to neighborhood coordination
+    Then her specific circumstances must remain private
+    And only aggregated anonymized data should be shared
+    And she should receive benefits without stigmatizing exposure
+    And dignity should be preserved in all interactions
+    And privacy should be balanced with community participation
+    And the protocol should enable solidarity without surveillance

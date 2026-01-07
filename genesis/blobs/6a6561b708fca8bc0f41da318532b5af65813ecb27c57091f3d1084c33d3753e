@@ -1,0 +1,10 @@
+Scenario: Journalist develops teacher sources on unsafe conditions
+    Given teachers report unsafe building conditions
+    And fear retaliation for speaking publicly
+    When the Observer provides secure anonymous channel
+    Then teachers share evidence of mold, failing HVAC, and structural issues
+    And journalist investigates without exposing individual sources
+    And verifies claims through building inspection records
+    And documents district knowledge and inaction
+    And publishes investigation forcing accountability
+    And source protection enables teachers to speak truth

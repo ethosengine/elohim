@@ -1,0 +1,9 @@
+Scenario: Neighborhood care contributions visible across households
+    Given Sarah contributes to neighborhood care economy
+    And neighbors also contribute in various ways
+    When neighborhood care patterns are tracked
+    Then the neighborhood_elohim should make contributions visible
+    And it should show who's contributing what
+    And it should identify imbalances in participation
+    And it should prompt recognition of neighbors' care work
+    And visibility should enable fair neighborhood participation

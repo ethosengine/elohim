@@ -1,0 +1,9 @@
+Scenario: Community mutual aid network provides support during crisis
+    Given Sarah or community members may face crises
+    And traditional systems often fail to provide adequate support
+    When Sarah experiences job loss, health emergency, or family crisis
+    Then the community_elohim should connect her to mutual aid network
+    And support should be immediate, dignified, and effective
+    And community should function as safety net
+    And Sarah's previous contributions should enable access to help
+    And mutual aid should be reciprocal and community-based

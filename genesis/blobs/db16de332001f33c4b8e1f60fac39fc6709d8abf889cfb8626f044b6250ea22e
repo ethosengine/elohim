@@ -1,0 +1,11 @@
+Scenario: Alex's presence shifts neighborhood culture toward inclusion
+    Given neighborhoods often lack disability awareness
+    And Alex's participation educates neighbors about disability
+    When Alex engages in neighborhood activities
+    Then the neighborhood_elohim should track cultural shifts toward inclusion
+    And neighbors should learn about accessibility through relationship with Alex
+    And disability should become normalized in neighborhood culture
+    And Alex's expertise should be sought and valued
+    And the neighborhood should become more accessible over time
+    And cultural transformation should be recognized as Alex's contribution
+    And Alex's care work includes disability education through presence

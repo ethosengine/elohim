@@ -1,0 +1,10 @@
+Scenario: Balancing neighborhood participation with student time constraints
+    Given Kenji has limited time between school and work
+    And neighborhood participation requires time investment
+    When the neighborhood_elohim helps Kenji manage participation
+    Then it should help him identify high-impact, low-time contributions
+    And it should validate that he can't participate in everything
+    And it should show: "30 minutes at neighborhood meeting = valuable contribution"
+    And participation should be realistic for student schedules
+    And the system should enable partial participation as valid
+    And students should participate at sustainable levels

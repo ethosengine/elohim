@@ -1,0 +1,10 @@
+Scenario: Teaching younger generations about resource conservation
+    Given Margaret has decades of conservation knowledge
+    And younger generations need sustainable living skills
+    When the bioregional_elohim coordinates knowledge sharing
+    Then Margaret should teach conservation practices
+    And her knowledge should be transmitted to younger people
+    And teaching should be recognized as ecological care contribution
+    And intergenerational knowledge transfer should strengthen sustainability
+    And senior wisdom should inform bioregional practices
+    And ecological education should flow from elder experience

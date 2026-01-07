@@ -1,0 +1,9 @@
+Scenario: Farm supports community food sovereignty and cultural food preservation
+    Given corporate food system homogenizes diets and erases cultural food traditions
+    And immigrant and indigenous communities lose access to traditional foods
+    When democratic farm responds to community cultural food needs
+    Then farm grows culturally specific crops (Latino vegetables, Asian greens, indigenous varieties)
+    And traditional food knowledge is valued and incorporated into farm planning
+    And community food sovereignty increases through local diverse production
+    And cultural food preservation becomes farm mission alongside nutrition
+    And community_elohim documents and supports cultural food sovereignty initiatives

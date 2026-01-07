@@ -1,0 +1,10 @@
+Scenario: Family privacy controls for independent adult
+    Given Aisha has adult autonomy
+    And she maintains some privacy from family
+    When Aisha configures family data sharing
+    Then she should control what family sees
+    And she should choose what care contributions to share
+    And her financial details should remain private unless she shares
+    And personal life decisions should be hers to disclose
+    And the system should support healthy adult family boundaries
+    And privacy should coexist with care economy participation

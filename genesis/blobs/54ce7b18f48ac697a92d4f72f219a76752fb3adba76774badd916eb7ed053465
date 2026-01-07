@@ -1,0 +1,9 @@
+Scenario: Manager's community visibility shifts from corporate enforcer to democratic participant
+    Given Marcus was previously invisible corporate manager
+    And community only saw corporate brand, not individual manager
+    When democratic conversion makes governance visible
+    Then community knows Marcus as democratic coordinator, not owner or boss
+    And community sees him at stakeholder meetings, farmers markets, neighborhood events
+    And community recognizes him as community member serving institution
+    And his role transformation from extraction to service becomes community narrative
+    And community_elohim helps tell story of individual and structural transformation

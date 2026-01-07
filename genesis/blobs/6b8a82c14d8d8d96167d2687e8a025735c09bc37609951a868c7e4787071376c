@@ -1,0 +1,10 @@
+Scenario: Teacher evaluates state education funding formula
+    Given state funding formula determines district resources
+    And formula appears complex and technical
+    When the Observer analyzes state funding impacts
+    Then teachers see their district gets $8,500 per student
+    And neighboring district gets $12,000 per student from same formula
+    And understand which formula factors create disparities
+    And learn which legislators champion funding equity
+    And coordinate with underfunded districts for reform coalition
+    And education funding becomes teacher advocacy priority

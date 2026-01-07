@@ -1,0 +1,10 @@
+Scenario: Learning connection between budget constraints and farm labor
+    Given Marcus experiences severe budget constraints
+    And cheap food often reflects exploited farm labor
+    When Marcus chooses affordable foods
+    Then the personal_agent should help him understand pricing
+    And it should explain that low prices often mean low wages for workers
+    And it should build empathy for farm workers' care labor
+    And Marcus should understand his scarcity connects to their scarcity
+    And economic justice awareness should develop
+    And care economy should include care for food system workers

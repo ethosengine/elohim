@@ -1,0 +1,7 @@
+Scenario: Organizing for universal benefits in food service
+    Given many food service workers lack health insurance, paid leave, or retirement
+    When workers advocate for universal benefits
+    Then the protocol should support campaigns for mandatory benefits
+    And help workers articulate need for healthcare, sick leave, and security
+    And coordinate advocacy for industry-wide benefit requirements
+    And push for decoupling essential benefits from individual employer provision

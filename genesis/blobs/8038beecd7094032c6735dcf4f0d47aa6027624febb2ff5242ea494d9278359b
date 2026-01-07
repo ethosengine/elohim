@@ -1,0 +1,11 @@
+Scenario: Access to healthy food as disability and environmental justice
+    Given food systems often fail disabled people and harm environment
+    And Alex navigates both food access barriers and ecological concerns
+    When food systems are reformed
+    Then the bioregional_elohim should connect food justice to disability access
+    And sustainable food should be accessible to disabled people
+    And Alex should be able to participate in local food systems
+    And accessibility should be integrated into food justice work
+    And the protocol should recognize food as both disability and ecological issue
+    And Alex's perspective should inform food system design
+    And local food networks should include disabled people

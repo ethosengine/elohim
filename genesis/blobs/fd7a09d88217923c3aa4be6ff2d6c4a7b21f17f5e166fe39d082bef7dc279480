@@ -1,0 +1,10 @@
+Scenario: Roommate coordination for shared meals vs individual cooking
+    Given some meals are shared and some are individual
+    And coordination requires planning around different schedules
+    When the household_elohim manages meal coordination
+    Then it should track who's eating shared meals vs cooking separately
+    And it should help schedule shared dinners when roommates are available
+    And it should recognize Kenji's labor preparing shared meals
+    And it should calculate fair cost sharing for shared food
+    And the system should make coordination easy rather than burdensome
+    And shared meals should build household community

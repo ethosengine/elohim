@@ -1,0 +1,9 @@
+Scenario: Family member appeals on behalf of vulnerable member
+    Given my elderly parent cannot file appeal themselves due to cognitive limitations
+    And I believe Family Elohim's decision doesn't serve their best interests
+    When I file an appeal as their representative
+    Then I must demonstrate my authority to represent them
+    And The appeal process ensures I'm serving their interests not mine
+    And The Constitutional Council evaluates if the agent properly considered vulnerability
+    And They examine if dignity was preserved despite cognitive limitations
+    And The appeal includes safeguards against family members exploiting representation

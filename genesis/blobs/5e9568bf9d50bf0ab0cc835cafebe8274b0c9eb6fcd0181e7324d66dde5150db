@@ -1,0 +1,9 @@
+Scenario: Investor advocacy spreads community investment model to neighbors
+    Given most community members don't know democratic investment options exist
+    And Patricia's neighbors invest in stock market by default
+    When she shares community investment experience
+    Then neighbors learn about values-aligned local investment opportunities
+    And some redirect capital from stock market to community investment pool
+    And investment pool grows enabling more democratic conversions
+    And movement builds through investor advocacy and demonstration
+    And community_elohim supports investor education and community outreach

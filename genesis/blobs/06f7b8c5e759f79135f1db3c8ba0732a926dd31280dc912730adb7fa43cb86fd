@@ -1,0 +1,10 @@
+Scenario: Workers demonstrate transparency building community trust
+    Given community members want to understand democratic business model
+    And workers value transparency about operations and values
+    When workers publish quarterly community impact report
+    Then report shows wages paid to workers ($72K quarterly)
+    And report documents community programs funded ($3K senior meals)
+    And report shares environmental benefits (1,200 lbs local produce)
+    And report includes challenges and learnings honestly
+    And community_elohim makes report accessible and understandable
+    And transparency builds community trust and support

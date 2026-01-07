@@ -1,0 +1,9 @@
+Scenario: Carbon sequestration through farming is measured and valued
+    Given industrial agriculture is net carbon emitter through fossil inputs and soil degradation
+    And regenerative agriculture sequesters carbon through soil building
+    When democratic network values and compensates carbon sequestration
+    Then soil carbon is measured showing annual sequestration increases
+    And carbon sequestration is compensated through premium pricing or carbon credits
+    And farm becomes climate solution, not climate problem
+    And documented carbon impacts inform bioregional climate strategy
+    And bioregional_elohim tracks carbon sequestration across democratic farm network

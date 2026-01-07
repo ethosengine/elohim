@@ -1,0 +1,8 @@
+Scenario: Managing shared household budget
+    Given household members share rent and utilities
+    And my income is limited and variable
+    When we manage shared expenses
+    Then the protocol should track contributions transparently
+    And accommodate my tight budget constraints
+    And facilitate fair cost distribution
+    And help us optimize shared household economics

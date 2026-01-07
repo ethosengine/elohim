@@ -1,0 +1,10 @@
+Scenario: Parks commissioner learns accessible expertise on green infrastructure
+    Given parks department proposes converting traditional landscaping to green infrastructure
+    And proposal includes technical concepts like bioswales, permeable pavement, native plantings
+    And commissioner has no environmental engineering background but must approve plan
+    When the commissioner uses Observer accessible expertise
+    Then they receive plain-language explanation of green infrastructure approaches
+    And see examples from peer cities with implementation outcomes and costs
+    And access key questions to ask staff about maintenance and performance
+    And understand climate adaptation and water quality benefits
+    And accessible expertise enables informed judgment on technical proposal

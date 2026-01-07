@@ -1,0 +1,10 @@
+Scenario: Municipal health care access and coordination
+    Given Margaret has changing health needs with aging
+    And she navigates complex health care systems
+    When the municipality_elohim coordinates health access
+    Then municipal health programs should be accessible
+    And senior health clinics should be available and affordable
+    And navigation support should help Margaret access care
+    And preventive health should be prioritized for seniors
+    And municipal health policy should support senior wellness
+    And Margaret should be able to age healthily in community

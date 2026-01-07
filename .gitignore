@@ -44,3 +44,4 @@ output/
 target/
 *.happ
 *.dna
+research/matrix/pinecone

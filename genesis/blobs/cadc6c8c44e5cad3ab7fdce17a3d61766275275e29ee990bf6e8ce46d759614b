@@ -1,0 +1,9 @@
+Scenario: Teacher exposes planning time inequities across schools
+    Given some schools provide adequate planning time while others don't
+    And teachers don't know if their conditions are typical or problematic
+    When the Observer documents planning time across district
+    Then teachers see stark disparities (30 min vs 90 min daily planning)
+    And identify which principals prioritize teacher planning time
+    And understand patterns (wealthy schools get more planning time)
+    And coordinate advocacy for district-wide planning time standards
+    And working conditions comparison drives equity

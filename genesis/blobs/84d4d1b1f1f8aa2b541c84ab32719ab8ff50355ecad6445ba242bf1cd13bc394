@@ -1,0 +1,9 @@
+Scenario: Journalist develops sources through community surveillance
+    Given the journalist needs community perspectives on proposed development
+    And doesn't know who has relevant knowledge
+    When the Observer identifies community members affected by issue
+    Then the journalist sees residents who testified at past meetings
+    And identifies homeowners on blocks facing displacement
+    And finds small business owners who will lose customers
+    And contacts informed sources with lived experience
+    And community journalism reflects actual community voices

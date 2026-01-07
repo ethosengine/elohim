@@ -1,0 +1,10 @@
+Scenario: Building identity around care contribution and capability
+    Given Jasmine has made substantial care contributions over months
+    And she balances multiple demanding contexts successfully
+    When she reflects on her Value Scanner usage and care economy participation
+    Then she should experience herself as a capable, contributing adult
+    And her identity should be forming around care for others and community
+    And she should understand that her work has genuine economic value
+    And she should expect to be taken seriously in economic conversations
+    And she should internalize that care economy principles are normal
+    And her self-concept should reflect her actual capability and contribution

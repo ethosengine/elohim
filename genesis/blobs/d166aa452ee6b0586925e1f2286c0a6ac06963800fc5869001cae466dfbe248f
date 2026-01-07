@@ -1,0 +1,9 @@
+Scenario: Organizer tracks accountability for paid sick leave implementation
+    Given city passed paid sick leave ordinance
+    And the organizer's worker-community coalition won the policy
+    When the Observer tracks implementation and enforcement
+    Then the organizer monitors employer compliance rates
+    And sees enforcement actions and penalties for violations
+    And identifies industries with systematic non-compliance
+    And documents workers actually receiving sick leave
+    And policy victory leads to implementation accountability ensuring real impact

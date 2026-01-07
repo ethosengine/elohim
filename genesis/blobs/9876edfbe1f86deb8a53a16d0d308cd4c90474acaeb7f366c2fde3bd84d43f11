@@ -1,0 +1,10 @@
+Scenario: Understanding labor rights as student worker
+    Given Kenji has same labor rights as any employee
+    And many students don't know their workplace rights
+    When the workplace_elohim educates Kenji about labor law
+    Then it should teach him about breaks, overtime, workplace safety
+    And it should inform him of right to organize and unionize
+    And it should help him recognize illegal employer practices
+    And it should empower him to advocate for fair treatment
+    And the system should build Kenji's labor rights literacy
+    And student workers should know and exercise their rights

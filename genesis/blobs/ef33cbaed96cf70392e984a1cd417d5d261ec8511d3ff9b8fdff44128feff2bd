@@ -1,0 +1,9 @@
+Scenario: Study whether children growing up with protocol develop different capacities
+    Given Tommy was 12 when Riverside adopted protocol
+    And James tracks cohort of adolescents through development
+    When James compares protocol-exposed youth to control group
+    Then he measures civic engagement, constitutional literacy, and deliberative skills
+    And he finds protocol-exposed youth have stronger democratic capacities
+    And he documents different relationship to AI than parents' generation
+    And he examines whether effects persist into young adulthood
+    And generational analysis reveals transformative potential

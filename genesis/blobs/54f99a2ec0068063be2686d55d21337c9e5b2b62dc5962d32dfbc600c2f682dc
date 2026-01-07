@@ -1,0 +1,10 @@
+Scenario: Board member compares district performance to jurisdictional peers
+    Given board reviews annual student achievement and equity data
+    And superintendent presents results emphasizing positive trends
+    And board wants to understand if district is truly serving all students well
+    When the board member uses Observer cross-district comparison
+    Then they see district's achievement gaps larger than similar districts
+    And discover other districts closed equity gaps while this one widened
+    And access specific practices peer districts used to improve outcomes
+    And identify areas where staff presentation masked concerning patterns
+    And independent analysis helps board exercise meaningful oversight

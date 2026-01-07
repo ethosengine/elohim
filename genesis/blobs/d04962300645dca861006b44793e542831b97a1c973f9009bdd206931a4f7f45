@@ -1,0 +1,10 @@
+Scenario: Participating in family decisions as adult member
+    Given Jordan's family is planning a vacation together
+    And Jordan is invited to join the family trip
+    When the family discusses vacation options
+    Then Jordan participates in the planning with accessible support
+    And the personal_agent presents destination options visually
+    And Jordan can express preferences about activities and timing
+    And Jordan's vote counts in family decision-making
+    And the family treats Jordan as an adult participant, not a child
+    And Jordan experiences being a valued family member with voice

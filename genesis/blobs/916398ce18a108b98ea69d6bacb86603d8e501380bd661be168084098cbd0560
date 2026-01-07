@@ -1,0 +1,10 @@
+Scenario: Learning contributes to collective knowledge without exploitation
+    Given Emma's learning patterns generate educational data
+    And this data could improve pedagogy for other children
+    When Emma's anonymized learning data is collected
+    Then it must only be used to improve educational outcomes
+    And Emma's privacy must be absolutely protected
+    And no commercial exploitation should occur
+    And data should serve collective learning, not surveillance capitalism
+    And educational data must never be monetized
+    And community benefit must not compromise individual privacy

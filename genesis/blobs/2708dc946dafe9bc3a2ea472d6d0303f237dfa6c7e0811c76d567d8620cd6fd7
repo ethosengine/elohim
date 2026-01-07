@@ -1,0 +1,9 @@
+Scenario: Care token standing qualifies Maria for community support without means-testing
+    Given Maria has accumulated substantial care tokens from solo parenting work
+    And she needs access to community resources due to resource constraints
+    When Maria seeks community support
+    Then her care contributions should qualify her for support with dignity
+    And support should be based on demonstrated care work, not proving neediness
+    And Maria should access resources as care economy participant, not charity recipient
+    And community support should recognize her contributions, not pity her circumstances
+    And care economy should frame assistance as reciprocity, not welfare

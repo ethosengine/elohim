@@ -1,0 +1,10 @@
+Scenario: Right to disconnect maintained for teen autonomy
+    Given Jasmine has been using the Value Scanner extensively
+    And constitutional constraints protect her agency
+    When Jasmine chooses to disconnect from the system
+    Then the disconnection must be honored immediately
+    And no data retention beyond legal requirements should occur
+    And no manipulative patterns to retain usage should be employed
+    And her right to not participate must be respected
+    And her care contributions should be exportable in standard format
+    And she should maintain full control over her participation

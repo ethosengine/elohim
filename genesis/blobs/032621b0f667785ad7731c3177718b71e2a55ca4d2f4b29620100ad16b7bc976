@@ -1,0 +1,9 @@
+Scenario: Caregiver's sleep protected as essential resource
+    Given James is often awakened by David's nighttime needs
+    And chronic sleep deprivation threatens his ability to provide care
+    When the personal_agent monitors James's sleep patterns
+    Then it should recognize dangerous sleep deprivation
+    And it should prompt solutions for better sleep
+    And it should suggest respite care for nighttime support
+    And it should treat sleep as essential care infrastructure
+    And James's rest should be protected for sustainable caregiving

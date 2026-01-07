@@ -1,0 +1,9 @@
+Scenario: Workplace recognizes Maria's professional care work in medical field
+    Given Maria's medical assistant work is professional caregiving
+    And she provides paid care work while also doing unpaid care at home
+    When Maria's professional contributions are assessed
+    Then the workplace_elohim should recognize her medical work as care labor
+    And her professional caregiving should be valued in care economy framework
+    And she should see her career as care economy participation, not separate from it
+    And care economy should include professional care work, not just household labor
+    And Maria's dual care roles should both be recognized and valued

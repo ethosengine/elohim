@@ -1,0 +1,10 @@
+Scenario: Municipal food security programs recognize retired residents on fixed income
+    Given Frank lives on $28k/year fixed income
+    And food costs are significant portion of limited budget
+    When the municipal_elohim coordinates food security
+    Then Frank should access municipal food programs without stigma
+    And his care contributions should be visible in program eligibility
+    And food assistance should be framed as reciprocity, not charity
+    And municipal programs should recognize his volunteer contributions
+    And care economy should connect to food security infrastructure
+    And Frank should experience dignity in accessing food resources

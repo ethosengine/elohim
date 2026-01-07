@@ -1,0 +1,9 @@
+Scenario: Responsible developer benefits from positive labor reputation
+    Given a responsible developer treats workers well consistently
+    And has track record of fair wages, safe conditions, and respect
+    When the Observer makes labor reputation visible
+    Then the developer shows: zero labor violations across 12 projects
+    And worker testimonials describe positive treatment and fair practices
+    And unions support developer's projects because of good labor relations
+    And positive labor reputation creates advantages in competitive approvals
+    And responsible employment practices strengthen business success

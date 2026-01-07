@@ -1,0 +1,10 @@
+Scenario: Family care token economy includes child contributions
+    Given the family participates in care token system
+    And Emma makes multiple types of care contributions
+    When family care tokens are calculated weekly
+    Then Emma's economic decisions should generate tokens
+    And her care for Tommy should be valued
+    And her household contributions should be recognized
+    And tokens should reflect genuine value created
+    And Emma should have age-appropriate awareness of her economic impact
+    And care token distribution should teach that care creates value

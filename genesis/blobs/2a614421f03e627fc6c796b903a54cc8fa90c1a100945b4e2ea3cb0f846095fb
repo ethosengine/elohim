@@ -1,0 +1,11 @@
+Scenario: Advising council without dominating their judgment
+    Given I have deep knowledge council lacks
+    And I could easily dominate deliberation if I pushed too hard
+    When I testify about technical implications of constitutional interpretations
+    Then I explain: what's technically possible and impossible
+    And I clarify: tradeoffs between different approaches
+    And I stop: before crossing into values judgment
+    And I respect: council's authority to choose among technically viable options
+    And I accept: when they choose values over optimization
+    And I honor: the boundary between expertise and democratic judgment
+    And I demonstrate: how expertise serves rather than replaces democracy

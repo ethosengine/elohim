@@ -1,0 +1,12 @@
+Scenario: Municipal tax policy connects to care economy investment
+    Given Robert pays substantial property and income taxes
+    And taxes should support care infrastructure
+    And he has voice in how tax revenue is used
+    When municipal_elohim connects taxation to care economy
+    Then it should help him understand how his taxes fund care infrastructure
+    And surface opportunities to advocate for care economy tax priorities
+    And connect him to municipal revenue and taxation policy discussions
+    And support advocacy for progressive taxation that funds care
+    And build municipal tax policy that supports care economy
+    And demonstrate that taxation is community investment in care
+    And recognize that taxpayers should shape spending priorities

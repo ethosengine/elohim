@@ -1,0 +1,12 @@
+Scenario: Sector-wide care leave and flexibility policies advocated
+    Given individual companies can be limited in policy innovation
+    And sector-wide policy creates competitive equity
+    And Robert's experience qualifies him to advocate
+    When industry_elohim supports sector policy advocacy
+    Then it should connect Robert to sector policy development processes
+    And help him advocate for industry-wide care leave standards
+    And support proposals for sector flexibility norms
+    And provide evidence about competitive advantage of care-friendly sectors
+    And build industry policy that supports all workers' care needs
+    And prevent individual companies from being penalized for care-friendly practices
+    And advance care economy at scale through sector transformation

@@ -1,0 +1,10 @@
+Scenario: Building community care networks across generations
+    Given Margaret connects with community members of all ages
+    And she participates in various community activities
+    When the community_elohim tracks social capital building
+    Then it should recognize Margaret's role in community connection
+    And it should value relationship-building as care work
+    And it should show how her connections strengthen community resilience
+    And intergenerational community building should be recognized
+    And Margaret should help create inclusive, connected community
+    And social capital creation should accumulate care tokens

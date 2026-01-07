@@ -1,0 +1,10 @@
+Scenario: Manager mediates conflict without imposing judgment
+    Given two workers have disagreement about task allocation
+    And corporate model had Marcus impose solution or discipline both
+    When workers bring conflict to Marcus for mediation
+    Then Marcus facilitates structured conversation between parties
+    And Marcus helps each worker express their perspective and needs
+    And Marcus proposes potential compromise solutions
+    And workers, not Marcus, decide on resolution
+    And workplace_elohim documents process ensuring fairness
+    And conflict resolves through dialogue, not managerial authority

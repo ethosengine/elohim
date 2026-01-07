@@ -1,0 +1,9 @@
+Scenario: Displaced community coordinates managed retreat
+    Given the coastal community is planning managed retreat over 10 years
+    When the community uses Elohim to coordinate the transition
+    And they make collective decisions about timing and destination
+    Then families can coordinate moves to stay near each other
+    And community assets are managed collectively during transition
+    And mutual aid supports families through the displacement
+    And the community maintains agency and cohesion through the crisis
+    And managed retreat happens with dignity rather than chaos

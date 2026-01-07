@@ -1,0 +1,11 @@
+Scenario: Testing agent behavior in isolated environment
+    Given council needs to understand counterfactual scenarios
+    And I can run agents in test environments
+    When I conduct controlled experiments for council
+    Then I test: what agent would decide if input X were different
+    And I verify: robustness of constitutional alignment
+    And I explore: boundary cases and edge conditions
+    And I provide: evidence grounded in testing not speculation
+    And I avoid: affecting production systems
+    And testing enables: informed judgment about agent behavior
+    And council decisions: rest on verified evidence

@@ -1,0 +1,10 @@
+Scenario: Teaching practical life skills and competencies
+    Given Margaret has lifetime of practical knowledge
+    And grandchildren need to learn cooking, cleaning, budgeting, self-care
+    When Margaret teaches practical skills
+    Then the educational_elohim should recognize life skills teaching
+    And it should value practical education as essential learning
+    And it should track skills development over time
+    And life skills teaching should accumulate care tokens
+    And Margaret's practical wisdom should be recognized as education
+    And informal skill development should be valued alongside academic learning

@@ -1,0 +1,9 @@
+Scenario: Activist fights harmful discipline policies
+    Given suspension and expulsion rates seem racially disparate
+    And the activist advocates for restorative justice
+    When the Observer tracks discipline outcomes by race
+    Then the activist shows Black students suspended at 3x rate
+    And for same behaviors as white students who receive warnings
+    And zero-tolerance policies fuel school-to-prison pipeline
+    And presents evidence-based alternatives from other districts
+    And policy reform campaign gains statistical backbone

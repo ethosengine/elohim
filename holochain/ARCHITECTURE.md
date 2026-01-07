@@ -1,5 +1,7 @@
 # Architecture: Technical Lay of the Land
 
+> **See also**: [P2P-DATAPLANE.md](./P2P-DATAPLANE.md) for the comprehensive P2P architecture vision, including layer separation, technology choices, and bootstrap flow.
+
 ## Directory Structure
 
 ```
@@ -23,7 +25,7 @@ holochain/
 ├── crates/                # Shared Rust libraries
 │   └── doorway-client/   # Client for doorway APIs
 │
-├── edgenode/             # Kubernetes deployment
+├── edgenode/             # Kubernetes deployment (legacy)
 │
 ├── manifests/            # K8s manifests
 │
@@ -32,26 +34,37 @@ holochain/
 
 ## Separation of Concerns
 
-### Control Plane vs Data Plane
+### Trust Layer vs Data Layer
+
+The DHT stores **coordination data**, not content. This is critical because:
+- DHT chokes at ~3000 entries
+- DHT has 200-2000ms gossip latency
+- DHT has no query capability
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                 │
-│   CONTROL PLANE (Holochain)       DATA PLANE (elohim-storage)  │
+│   TRUST LAYER (Holochain)          DATA LAYER (elohim-storage) │
 │   ┌─────────────────────┐         ┌─────────────────────┐      │
-│   │ • Who owns what     │         │ • Actual bytes      │      │
-│   │ • Permissions       │         │ • Fast R/W          │      │
-│   │ • Manifests/hashes  │         │ • P2P transfer      │      │
-│   │ • Agent identity    │         │ • RS shards         │      │
+│   │ • Agent identity    │         │ • Actual content    │      │
+│   │ • Attestations      │         │ • Blob storage      │      │
+│   │ • Trust graph       │         │ • RS shards         │      │
+│   │ • Content location  │         │ • P2P replication   │      │
+│   │   (hash → peers)    │         │                     │      │
 │   │                     │         │                     │      │
-│   │ SLOW but TRUSTED    │         │ FAST but SIMPLE     │      │
+│   │ COORDINATION only   │         │ CONTENT storage     │      │
 │   └─────────────────────┘         └─────────────────────┘      │
+│                                                                 │
+│   The DHT stores WHO HAS WHAT, not WHAT.                       │
+│   Content flows through the P2P data plane.                    │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-- **Holochain DHT**: Identity, provenance, permissions, small metadata
-- **elohim-storage**: Blob storage, streaming, Reed-Solomon encoding
+- **Holochain DHT**: Identity, attestations, trust links, content location index
+- **elohim-storage**: Actual bytes, P2P transfer, Reed-Solomon sharding
+
+See [P2P-DATAPLANE.md](./P2P-DATAPLANE.md) for full architecture details.
 
 ### Web2 Path vs P2P Path
 
@@ -83,6 +96,23 @@ The source of truth. DNAs define:
 - Zome functions (the API)
 
 **Key DNA**: `dna/elohim/` - the main application DNA
+
+### elohim-node/ - Infrastructure Runtime
+
+> **Note**: elohim-node lives at the project root (`/elohim-node/`), not in this directory.
+
+The always-on daemon that runs on family hardware (plug-and-play blades).
+
+**Does**:
+- Device-to-node sync (phones/laptops → family node)
+- Cluster-to-cluster sync (family → family)
+- Backup and replication based on reach levels
+- Automerge CRDT conflict resolution
+- libp2p P2P networking
+
+**Key insight**: Devices are ephemeral (minutes to hours), nodes are stable (months to years). elohim-node is the stable anchor that's always there when your devices aren't.
+
+See [elohim-node/ARCHITECTURE.md](../elohim-node/ARCHITECTURE.md) for implementation details.
 
 ### doorway/ - Web2 Gateway
 
@@ -212,6 +242,7 @@ GeoDNS     ┌─────────────────┐   DHT
 | File | Purpose |
 |------|---------|
 | `dna/elohim/elohim.happ` | Compiled Holochain application |
+| `../elohim-node/src/main.rs` | Infrastructure runtime entry point |
 | `doorway/src/main.rs` | Gateway entry point |
 | `elohim-storage/src/main.rs` | Blob storage entry point |
 | `holochain-cache-core/src/lib.rs` | Cache primitives |
@@ -219,10 +250,19 @@ GeoDNS     ┌─────────────────┐   DHT
 
 ## Related Documentation
 
+### Architecture Vision
+- [P2P-DATAPLANE.md](./P2P-DATAPLANE.md) - **Master P2P architecture document**
+- [COMMUNITY-COMPUTE.md](./COMMUNITY-COMPUTE.md) - Community-scaled compute vision
+- [ARCHITECTURE-GAP.md](./ARCHITECTURE-GAP.md) - Why DHT alone doesn't scale
+- [SYNC-ENGINE.md](./SYNC-ENGINE.md) - Automerge sync design
+
+### Component Documentation
 - [DEVELOPMENT.md](./DEVELOPMENT.md) - Local dev setup
 - [DEPLOYMENT-RUNTIMES.md](./DEPLOYMENT-RUNTIMES.md) - Deployment modes
+- [elohim-node/ARCHITECTURE.md](../elohim-node/ARCHITECTURE.md) - Infrastructure runtime details
 - [doorway/ARCHITECTURE.md](./doorway/ARCHITECTURE.md) - Gateway details
-- [doorway/FEDERATION.md](./doorway/FEDERATION.md) - Multi-doorway topology
-- [elohim-storage/EDGE-ARCHITECTURE.md](./elohim-storage/EDGE-ARCHITECTURE.md) - Performance architecture
-- [elohim-storage/P2P-ARCHITECTURE.md](./elohim-storage/P2P-ARCHITECTURE.md) - Blob replication
+- [doorway/FEDERATION.md](./doorway/FEDERATION.md) - Multi-doorway + P2P bootstrap
+- [doorway/REACH.md](./doorway/REACH.md) - Doorway reach enforcement
+- [elohim-storage/REACH.md](./elohim-storage/REACH.md) - Storage reach enforcement
+- [elohim-storage/P2P-ARCHITECTURE.md](./elohim-storage/P2P-ARCHITECTURE.md) - Storage P2P implementation
 - [dna/NETWORK_UPGRADES.md](./dna/NETWORK_UPGRADES.md) - DNA migration strategy

@@ -1,0 +1,9 @@
+Scenario: Community accountability mechanisms ensure democratic governance serves neighborhood
+    Given business operates in and depends on community
+    And community has legitimate interest in business practices and impacts
+    When community governance structures enable neighborhood voice
+    Then community stakeholder meetings provide input on business direction
+    And neighbors can raise concerns about environmental impacts or labor practices
+    And workers consider community feedback in democratic decision-making
+    And accountability is transparent and bidirectional (community and workers both accountable)
+    And community_elohim facilitates stakeholder participation while protecting worker autonomy

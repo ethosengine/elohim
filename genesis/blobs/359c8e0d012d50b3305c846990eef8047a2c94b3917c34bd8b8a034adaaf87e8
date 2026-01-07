@@ -1,0 +1,11 @@
+Scenario: Hearing testimony from Mayor Jamal about implementation reality
+    Given I need ground truth about protocol in practice
+    And Riverside provides three years of experience
+    When Mayor Jamal testifies about community implementation
+    Then he shares: what works (community calibration, constitutional oversight)
+    And he describes: what struggles (elderly accessibility, controversy)
+    And he explains: factors predicting adoption success
+    And he provides: evidence countering corporate lobbyist claims
+    And his testimony: grounds policy in lived reality
+    And I learn: from practitioners not just theory
+    And community voices: inform state legislation

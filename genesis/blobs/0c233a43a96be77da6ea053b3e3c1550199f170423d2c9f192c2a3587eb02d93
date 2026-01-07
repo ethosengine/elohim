@@ -1,0 +1,10 @@
+Scenario: Municipal youth advisory board includes teen care economy participants
+    Given the municipality is establishing youth civic engagement structures
+    And Jasmine has demonstrated leadership through care contributions
+    When the municipal_elohim identifies candidates for youth advisory board
+    Then Jasmine should be surfaced as a potential participant
+    And her care economy track record should demonstrate her capability
+    And selection should be based on demonstrated contribution, not just academic achievement
+    And diverse youth voices should be included in municipal governance
+    And teens should participate in decisions that affect their lives
+    And youth advisory structures should have real power, not just token representation

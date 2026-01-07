@@ -1,0 +1,10 @@
+Scenario: Coordinating bulk buying to maximize household budget efficiency
+    Given Kenji and roommates each have limited grocery budgets
+    And bulk buying saves money but requires coordination
+    When Kenji proposes coordinated bulk purchase of rice, beans, and cooking oil
+    Then the household_elohim should facilitate group buying coordination
+    And it should track who pays what and how costs are divided
+    And it should calculate savings: "Bulk rice saves each person $8/month"
+    And it should help roommates see financial benefit of coordination
+    And the system should reduce friction in shared purchasing
+    And collective buying should be easy and fair

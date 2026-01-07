@@ -1,0 +1,9 @@
+Scenario: Franchise termination negotiation succeeds through EAE network support
+    Given franchise corporations resist terminations protecting extraction revenue
+    And individual operators have limited leverage against corporate legal resources
+    When EAE network coordinates multi-location conversion support
+    Then legal expertise is shared across conversions reducing costs
+    And coordinated multi-location terminations increase negotiating leverage
+    And public narrative (corporate bullying democratic workplaces) pressures franchise corporate
+    And termination succeeds protecting workers and enabling democratic ownership
+    And workplace_elohim coordinates franchise termination strategy across network

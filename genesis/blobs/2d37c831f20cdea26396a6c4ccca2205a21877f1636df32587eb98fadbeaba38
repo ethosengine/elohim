@@ -1,0 +1,9 @@
+Scenario: Investor receives transparent impact reports showing measurable community benefits
+    Given stock market investing provides opaque financial returns with invisible social impacts
+    And Patricia couldn't verify her portfolio's real effects
+    When community investment provides radical transparency
+    Then quarterly reports show: 12 workers received ownership and wage increases ($11→$18/hour)
+    And 340 community meals served to isolated seniors
+    And 1,200 lbs regenerative produce sourced from Johnson Farm
+    And $40K circulating locally vs. extracting to distant shareholders
+    And community_elohim provides detailed, verifiable impact documentation

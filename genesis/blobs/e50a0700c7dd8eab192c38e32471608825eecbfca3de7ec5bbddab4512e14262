@@ -1,0 +1,12 @@
+Scenario: Community participation builds resources for Robert's own aging
+    Given Robert is preparing for his own eventual care needs
+    And community participation now builds networks for later
+    And care economy operates on long-term reciprocity
+    When community_elohim helps Robert plan for aging
+    Then it should help him see that current community participation builds future support
+    And recognize that relationships now will remain as he ages
+    And surface how care tokens accumulate toward future care
+    And support him in building community that will serve his aging
+    And demonstrate that care economy investment pays forward
+    And help him prepare for aging with dignity through community connection
+    And recognize that community care is lifecycle reciprocity

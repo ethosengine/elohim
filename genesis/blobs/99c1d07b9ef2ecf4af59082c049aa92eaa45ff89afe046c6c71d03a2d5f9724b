@@ -1,0 +1,10 @@
+Scenario: Right to be imperfect parent without shame
+    Given Sarah cannot possibly meet all demands perfectly
+    And parenting culture enforces impossible standards
+    When Sarah makes suboptimal choices under constraint
+    Then the personal_agent should never shame or guilt
+    And it should validate "You're doing your best with available resources"
+    And it should recognize that good-enough parenting is actually good
+    And perfectionism should be rejected as harmful
+    And Sarah should be supported in sustainable imperfection
+    And the system should counteract toxic parenting culture

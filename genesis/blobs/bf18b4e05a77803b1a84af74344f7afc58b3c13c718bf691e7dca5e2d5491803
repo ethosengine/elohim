@@ -1,0 +1,11 @@
+Scenario: Activist shares evidence across borders under repression
+    Given an activist documents human rights violations in their country
+    And sharing this evidence locally would endanger them and their community
+    When they contribute documentation to international human rights network
+    And the evidence is verified through multiple independent sources
+    Then the evidence reaches international solidarity organizations
+    And it bypasses national censorship through distributed architecture
+    And the activist's identity is protected through cryptographic anonymity
+    And international pressure can be mobilized while protecting sources
+    And the network coordinates advocacy at UN and regional bodies
+    And documentation is preserved for future accountability processes

@@ -1,0 +1,11 @@
+Scenario: Community memory projects value elderly wisdom
+    Given Helen holds decades of lived experience
+    And community memory has cultural value
+    When community memory projects are organized
+    Then Helen should be invited to participate as valued contributor
+    And her stories should be captured for community archive
+    And her participation should be recognized as contribution
+    And care tokens should reflect her memory-keeping work
+    And the community_elohim should facilitate intergenerational knowledge transfer
+    And the protocol should make visible that elders contribute to collective knowledge
+    And community should benefit from elder wisdom

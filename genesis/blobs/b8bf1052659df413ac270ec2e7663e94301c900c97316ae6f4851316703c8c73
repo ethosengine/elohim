@@ -1,0 +1,11 @@
+Scenario: Building care economy leadership through accumulated experience
+    Given Robert has decades of care economy participation
+    And he has learned what works and what doesn't
+    And his position gives him influence
+    When Robert considers care economy leadership opportunities
+    Then his personal_agent should recognize his accumulated expertise
+    And surface opportunities: community boards, policy advocacy, mentoring
+    And help him understand that his experience is valuable wisdom
+    And connect him to platforms where his voice can influence systems
+    And support him in translating personal experience into system improvement
+    And recognize that his generation can drive care economy transformation

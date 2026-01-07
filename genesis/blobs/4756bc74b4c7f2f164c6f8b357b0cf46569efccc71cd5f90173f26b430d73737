@@ -1,0 +1,9 @@
+Scenario: Preventing work-care conflict that causes burnout
+    Given Sarah faces constant conflict between work and care demands
+    And this conflict drives burnout in working parents
+    When the workplace_elohim monitors Sarah's situation
+    Then it should detect when work-care conflicts are unsustainable
+    And it should alert Sarah before burnout occurs
+    And it should suggest interventions (boundaries, policy advocacy, job changes)
+    And it should help Sarah maintain long-term career sustainability
+    And burnout prevention should be proactive, not reactive

@@ -1,0 +1,9 @@
+Scenario: Serving 6-year-old's wonder needs while managing two other children
+    Given her youngest child is at peak wonder and exploration stage
+    And this age needs substantial parental engagement and presence
+    When Maria serves her 6-year-old's developmental needs
+    Then the family_elohim should remind her of age-appropriate activities
+    And it should help her protect wonder time despite other demands
+    And it should prevent youngest from being neglected due to older siblings' needs
+    And it should help her be present for this critical developmental stage
+    And Maria should successfully nurture her youngest despite impossible time constraints

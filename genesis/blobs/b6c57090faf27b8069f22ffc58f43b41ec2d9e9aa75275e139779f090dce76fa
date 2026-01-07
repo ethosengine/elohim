@@ -1,0 +1,10 @@
+Scenario: Neighborhood care economy connects families across community
+    Given multiple families in neighborhood participate in Value Scanner
+    And Emma's family is part of neighborhood network
+    When Emma makes care contributions through shopping
+    Then her contributions should feed into neighborhood care economy
+    And the neighborhood_elohim should track community care patterns
+    And Emma should learn care extends beyond her household
+    And she should see her family as part of larger community
+    And neighborhood-level recognition should be age-appropriate
+    And community belonging should be built through care visibility

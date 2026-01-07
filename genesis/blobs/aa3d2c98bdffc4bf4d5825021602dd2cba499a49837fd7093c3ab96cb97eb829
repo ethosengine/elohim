@@ -1,0 +1,9 @@
+Scenario: Workers provide mutual aid across businesses during crisis
+    Given ChickenMax experiences unexpected staffing shortage
+    And Garden Bowl Express has capacity to help
+    When ChickenMax requests temporary worker support
+    Then industry_sector_elohim coordinates cross-entity worker loan
+    And Garden Bowl workers volunteer to help ChickenMax for two weeks
+    And compensation is shared fairly between entities
+    And Maria trains Garden Bowl workers on ChickenMax operations
+    And sector solidarity prevents individual business failures

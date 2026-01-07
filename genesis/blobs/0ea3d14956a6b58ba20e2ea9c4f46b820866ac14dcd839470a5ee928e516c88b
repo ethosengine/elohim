@@ -1,0 +1,10 @@
+Scenario: Community board and committee participation
+    Given Margaret has time to attend meetings and do board work
+    And community organizations need committed board members
+    When Margaret participates in community governance
+    Then her board service should be tracked as significant labor
+    And the time, preparation, and decision-making should be quantified
+    And community leadership contributions should be visible
+    And Margaret's governance participation should be valued
+    And seniors should be recognized as having capacity for leadership
+    And her contributions should build community governance systems

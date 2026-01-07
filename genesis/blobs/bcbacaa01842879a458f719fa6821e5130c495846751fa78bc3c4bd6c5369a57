@@ -1,0 +1,9 @@
+Scenario: Franchise extraction to distant shareholders is replaced by local wealth circulation
+    Given franchise locations extracted $120K annually to corporate (fees and markups across three locations)
+    And profits beyond operator's modest take also left community
+    When conversion eliminates corporate extraction and distributes value locally
+    Then $120K annually circulates in neighborhood economies instead of extracting
+    And workers earning higher wages spend locally, multiplying community benefit
+    And community programs receive funding from value previously extracted
+    And wealth circulation is documented showing dramatic shift from extraction to community benefit
+    And community_elohim tracks neighborhood economic impact of conversion

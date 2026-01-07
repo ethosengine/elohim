@@ -1,0 +1,11 @@
+Scenario: Managing medical appointments with accessibility considerations
+    Given medical facilities are often inaccessible
+    And appointment logistics are complex with disability
+    When Alex schedules medical appointments
+    Then the personal_agent should help verify facility accessibility
+    And it should coordinate transportation and support services
+    And it should prepare accessibility information for providers in advance
+    And it should track appointment schedules across multiple providers
+    And logistics coordination should reduce Alex's burden
+    And the protocol should make medical access less stressful
+    And barriers should be identified and addressed proactively

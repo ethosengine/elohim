@@ -1,0 +1,11 @@
+Scenario: Privacy protection with emerging concept of data awareness
+    Given Emma's choices and decision patterns are being tracked
+    And she is beginning to understand privacy concepts
+    When Emma's data is collected
+    Then all data must stay encrypted on family devices
+    And no commercial exploitation should occur
+    And Emma should receive age-appropriate education about privacy
+    And she should learn why data protection matters
+    And the agent should explain "Your information is private and protected"
+    And Emma should begin understanding data as something to steward
+    And consent education should begin at this developmental stage

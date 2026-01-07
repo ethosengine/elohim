@@ -32,7 +32,10 @@ pub enum StorageError {
     Json(#[from] serde_json::Error),
 
     #[error("Database error: {0}")]
-    Database(#[from] sled::Error),
+    DatabaseSled(#[from] sled::Error),
+
+    #[error("Database error: {0}")]
+    Database(String),
 
     #[error("Holochain client error: {0}")]
     HolochainClient(String),
@@ -73,4 +76,14 @@ pub enum StorageError {
 
     #[error("Replication failed: {0}")]
     Replication(String),
+
+    #[error("Invalid content address: {0}")]
+    InvalidContentAddress(String),
+
+    // Sync-related errors
+    #[error("Sync error: {0}")]
+    Sync(String),
+
+    #[error("Serialization error: {0}")]
+    Serialization(String),
 }

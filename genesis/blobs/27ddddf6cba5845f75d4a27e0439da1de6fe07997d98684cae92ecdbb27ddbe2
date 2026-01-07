@@ -1,0 +1,11 @@
+Scenario: Financial planning coordinates household resources across generations
+    Given Robert and Jennifer support children, care for parents, and plan for retirement
+    And they have $95k/year to allocate across competing needs
+    When household_elohim supports financial planning
+    Then it should help them balance generational financial demands
+    And surface tradeoffs: "Increasing parent care support by $500/month reduces retirement savings"
+    And provide scenarios for different allocation strategies
+    And help them understand long-term implications of current choices
+    And support transparent decision-making about resource allocation
+    And ensure both partners understand and agree to financial priorities
+    And protect their own financial security while supporting generations

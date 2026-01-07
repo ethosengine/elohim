@@ -1,0 +1,9 @@
+Scenario: Business legacy transforms from individual ownership to community institution
+    Given Rosa built more than business—she created community institution
+    And neighbors trust her shop because they trust her personally
+    When conversion to democratic ownership formalizes community commitment
+    Then Rosa's 15 years of community stewardship is honored and documented
+    And sponsorships (youth soccer, school fundraisers) continue under democratic governance
+    And informal credit for struggling families becomes formalized support program
+    And community institution is preserved beyond Rosa's personal involvement
+    And legacy becomes "founder who chose community over individual wealth"

@@ -1,0 +1,10 @@
+Scenario: Privacy boundaries negotiated as teen develops autonomy
+    Given Jasmine has legitimate need for privacy from family
+    And the family has legitimate need for coordination and safety
+    When Jasmine configures privacy settings
+    Then she should control what family data is shared about her
+    And family-relevant information (schedule, household responsibilities) should be accessible to family_elohim
+    And her personal information (friendships, private purchases, reflections) should be protected
+    And privacy boundaries should be negotiable as she demonstrates capability
+    And the system should support healthy family relationships that respect growing autonomy
+    And Maya should not experience anxiety about granting Jasmine appropriate privacy

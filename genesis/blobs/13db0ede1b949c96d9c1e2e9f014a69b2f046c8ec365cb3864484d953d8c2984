@@ -1,0 +1,12 @@
+Scenario: Managing household energy and time amid extreme depletion
+    Given I am traumatized, stressed, and exhausted
+    And household operations require consistent energy and attention
+    When I allocate my limited capacity across household demands
+    Then the Value Scanner helps me identify what's truly essential vs. what can wait
+    And provides realistic expectations for what's achievable in my state
+    And suggests efficiency strategies that reduce cognitive load
+    And validates that "good enough" is genuinely good enough right now
+    And helps me ask for and coordinate household help
+    And my personal_agent prevents me from over-committing my depleted resources
+    And recognizes that managing household while traumatized is extraordinary
+    And celebrates my household care work under extreme constraint

@@ -1,0 +1,11 @@
+Scenario: Crisis response for disability community during emergencies
+    Given emergencies disproportionately harm disabled people
+    And Alex coordinates disability community emergency response
+    When community faces crisis (pandemic, disaster, etc.)
+    Then Alex's crisis organizing should be recognized as essential care work
+    And the community_elohim should support disability-led emergency response
+    And Alex's work protecting vulnerable community members should be highly valued
+    And care tokens should reflect the lifesaving nature of crisis work
+    And the protocol should enable rapid mutual aid coordination
+    And disability community expertise should guide emergency systems
+    And Alex's leadership should be supported with resources

@@ -1,0 +1,10 @@
+Scenario: Accessing community resources as independent adult
+    Given Aisha is now an independent adult community member
+    And community resources are available based on contribution
+    When Aisha accesses community care economy resources
+    Then the community_elohim should recognize her adult status
+    And she should access resources based on care contributions
+    And her participation should be tracked at community level
+    And she should have different access than dependent children
+    And the system should treat her as autonomous adult participant
+    And community resources should support her independence

@@ -1,0 +1,10 @@
+Scenario: Bioregional knowledge transmitted across generations
+    Given Jasmine learns from elders about local ecology and seasonal patterns
+    And indigenous and long-term residents hold bioregional knowledge
+    When she engages with bioregional wisdom holders
+    Then bioregional_elohim should recognize knowledge transmission
+    And value elder teaching as care work for ecological literacy
+    And support intergenerational ecological knowledge sharing
+    And help her understand that bioregional care includes cultural practices
+    And connect her to deep knowledge about living in her specific place
+    And demonstrate that care economy includes indigenous wisdom and ecological tradition

@@ -1,0 +1,10 @@
+Scenario: Community board member evaluates local business district proposal
+    Given neighborhood association considers supporting business district designation
+    And designation would create additional fees and services
+    And board wants to understand community sentiment and likely impacts
+    When the board member requests Observer analysis
+    Then they receive survey data from local businesses on designation interest
+    And see examples from peer neighborhoods with outcomes and lessons
+    And access analysis of which businesses would benefit versus be burdened
+    And discover resident concerns about gentrification impacts not mentioned by advocates
+    And independent analysis reveals trade-offs beyond promoter presentation

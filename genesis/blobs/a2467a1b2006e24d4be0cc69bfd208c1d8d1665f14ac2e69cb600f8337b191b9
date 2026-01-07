@@ -1,0 +1,9 @@
+Scenario: Organizer mobilizes parents against school closure targeting low-income neighborhoods
+    Given district proposes closing three schools in working-class areas
+    And claims it's necessary for "efficiency"
+    When the organizer uses Observer to analyze closure impacts
+    Then they show closures increase commute times for low-income families
+    And demonstrate stable enrollment contradicting district claims
+    And calculate cost of closure to affected communities
+    And organize parents to demand community-based solutions
+    And education organizing prevents harm to vulnerable students

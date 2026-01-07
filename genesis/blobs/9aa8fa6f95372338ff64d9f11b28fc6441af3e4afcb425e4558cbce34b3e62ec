@@ -1,0 +1,12 @@
+Scenario: Navigating neighborhood safety concerns as vulnerable person
+    Given I have heightened safety concerns due to domestic violence
+    And I am learning a new neighborhood's safety landscape
+    When I assess and navigate neighborhood safety
+    Then the Value Scanner helps me identify safe routes and spaces
+    And surfaces information about neighborhood safety patterns
+    And connects me to neighbors who can provide safety support
+    And helps me teach children neighborhood safety practices
+    And tracks safety concerns and incidents
+    And my personal_agent alerts me to potential safety issues
+    And recognizes safety navigation as constant cognitive labor
+    And validates that my vigilance is appropriate

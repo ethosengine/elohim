@@ -1,0 +1,9 @@
+Scenario: Organizer generates accessible materials for citywide campaign
+    Given the coalition is campaigning against developer tax breaks
+    And needs to explain complex tax increment financing to residents
+    When the organizer requests education materials from Observer
+    Then they receive plain-language explanation of TIF mechanics
+    And see actual dollar flows (who benefits, who pays)
+    And get talking points for testimony and media
+    And access fact-checking data to counter developer claims
+    And technical policy becomes accessible community education

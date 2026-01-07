@@ -1,0 +1,11 @@
+Scenario: Sustainable living adapted for disability access
+    Given sustainable practices are often designed without disability consideration
+    And inaccessible sustainability excludes disabled people
+    When sustainable living practices are promoted
+    Then the bioregional_elohim should ensure practices are disability-accessible
+    And composting, gardening, conservation should be adaptable for various capabilities
+    And Alex should be able to participate in ecological practices
+    And sustainable living should work for diverse bodies and minds
+    And the protocol should advocate for inclusive environmental practices
+    And disability expertise should improve sustainability design
+    And Alex's participation should be welcomed and supported

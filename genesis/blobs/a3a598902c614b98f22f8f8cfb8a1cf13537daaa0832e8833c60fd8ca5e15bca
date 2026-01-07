@@ -1,0 +1,9 @@
+Scenario: Operator chooses dignified exit over continued extraction role
+    Given James is exhausted from 70-hour weeks and moral injury of implementing exploitation
+    And complete exit is valid choice deserving support
+    When James decides to exit rather than stay as transition steward
+    Then he receives acquisition payment plus six months consulting compensation
+    And workers appreciate his choice to enable democratic ownership
+    And exit is graceful with community gratitude, not corporate-style termination
+    And he leaves with dignity, financial security, and moral peace
+    And workplace_elohim facilitates knowledge transfer during dignified exit

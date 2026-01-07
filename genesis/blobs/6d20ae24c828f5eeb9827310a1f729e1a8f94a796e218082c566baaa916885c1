@@ -1,0 +1,10 @@
+Scenario: Access to community resources during extreme scarcity
+    Given Kenji lives on $180/week and might face emergencies
+    And community food banks, clothing closets, and support services exist
+    When Kenji needs community resources
+    Then the community_elohim should connect him to available support
+    And it should reduce shame and barriers to access
+    And it should frame receiving support as participating in care economy
+    And it should recognize that receiving care is part of reciprocity
+    And the system should normalize community resource sharing
+    And students should access community support with dignity

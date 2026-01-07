@@ -1,0 +1,10 @@
+Scenario: Participating in peer-led educational workshops
+    Given IDD community members teach each other valuable skills
+    And peer education is powerful and relatable
+    When Jordan attends a peer-led workshop on public transportation
+    Then the peer educator teaches from lived experience
+    And instruction is naturally accessible (IDD peer teaching IDD peer)
+    And Jordan learns strategies that actually work in practice
+    And Jordan accumulates care tokens for participating in peer learning community
+    And the peer educator accumulates tokens for teaching contribution
+    And Jordan experiences IDD community as source of knowledge and support

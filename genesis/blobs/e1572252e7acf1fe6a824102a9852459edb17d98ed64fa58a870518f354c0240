@@ -1,0 +1,7 @@
+Scenario: Supporting neighborhood care infrastructure
+    Given neighborhood has community spaces, gardens, or shared resources
+    When I have time to contribute to maintaining shared infrastructure
+    Then the protocol should recognize this as care contribution
+    And coordinate volunteer opportunities that fit my schedule
+    And accumulate care tokens for infrastructure support
+    And help build neighborhood commons that benefit all residents

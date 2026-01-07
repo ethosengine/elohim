@@ -1,0 +1,11 @@
+Scenario: Home maintenance coordinated with dignity preservation
+    Given Helen can no longer manage all household tasks independently
+    And she needs help with cleaning, repairs, and maintenance
+    When the household_elohim coordinates support services
+    Then Helen should remain the authority in her own home
+    And support workers should be coordinated around her preferences
+    And the household should feel like hers, not an institution
+    And her choices about how things are done should be respected
+    And assistance should enhance her ability to stay home
+    And she should not feel like a guest in her own space
+    And the protocol should preserve the dignity of "this is my home"

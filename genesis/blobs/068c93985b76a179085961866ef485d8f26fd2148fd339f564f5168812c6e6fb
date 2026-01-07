@@ -1,0 +1,9 @@
+Scenario: Understanding water usage in food production
+    Given food production uses significant water resources
+    And water scarcity is increasing
+    When the bioregional_elohim displays environmental data
+    Then it should include water usage in impact assessment
+    And it should explain water costs of different foods
+    And it should help her choose lower water-impact options
+    And bioregional water context should inform recommendations
+    And she should understand food-water connections

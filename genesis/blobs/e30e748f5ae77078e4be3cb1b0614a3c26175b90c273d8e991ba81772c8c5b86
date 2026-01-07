@@ -1,0 +1,11 @@
+Scenario: Family care boundaries prevent burnout and exploitation
+    Given Robert carries substantial family care burden
+    And family care can become exploitative even with good intentions
+    When family_elohim monitors care burden
+    Then it should flag when Robert's care contributions exceed sustainable levels
+    And recognize if siblings are not contributing equitably
+    And surface if parents' needs are overwhelming family capacity
+    And prompt discussion when external support is needed
+    And protect Robert from being expected to handle everything
+    And support family in recognizing when professional care is appropriate
+    And ensure family care operates on reciprocity, not exploitation

@@ -1,0 +1,9 @@
+Scenario: Household care economy supplements for financial strain
+    Given household income is severely reduced by caregiving
+    And care expenses are high and increasing
+    When household economic status is assessed
+    Then care token supplements should be available
+    And household should receive care economy financial support
+    And access should be dignified and non-stigmatizing
+    And care economy should function as household safety net
+    And financial support should recognize caregiving economic impact

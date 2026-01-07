@@ -1,0 +1,10 @@
+Scenario: Learning cooking skills progressively through recipe suggestions
+    Given Aisha has minimal cooking experience
+    And she wants to develop culinary capability
+    When the personal_agent suggests recipes
+    Then recommendations should match her current skill level
+    And difficulty should increase gradually as she learns
+    And it should teach techniques through practice
+    And it should explain why certain methods work
+    And cooking education should be progressive and achievable
+    And she should build confidence and competence incrementally

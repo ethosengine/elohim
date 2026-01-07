@@ -1,0 +1,9 @@
+Scenario: Developer faces accountability for state policy capture
+    Given a developer lobbies for state law preempting local control
+    And funds astroturf "affordability advocacy" groups
+    When the Observer reveals developer funding and advocacy patterns
+    Then citizens see: "housing advocates" are developer-funded front groups
+    And state preemption bill eliminates local affordable housing requirements
+    And policy serves developer profit not affordable housing
+    And manufactured grassroots campaigns face exposure
+    And policy debate gains transparency about real interests

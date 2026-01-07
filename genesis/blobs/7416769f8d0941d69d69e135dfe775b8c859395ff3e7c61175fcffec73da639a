@@ -1,0 +1,10 @@
+Scenario: Future career aligned with ecological care economy
+    Given Kenji studies environmental science for future career
+    And he wants work that serves ecological flourishing
+    When the bioregional_elohim supports career development
+    Then it should help him identify care economy environmental careers
+    And it should connect his learning to ecological stewardship work
+    And it should validate environmental work as care economy contribution
+    And it should support him developing career serving planetary flourishing
+    And the system should recognize ecological professions as care work
+    And Kenji's career should serve care economy at planetary scale

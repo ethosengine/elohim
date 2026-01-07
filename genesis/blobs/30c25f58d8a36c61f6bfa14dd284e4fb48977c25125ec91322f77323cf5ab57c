@@ -1,0 +1,10 @@
+Scenario: Connection to land through understanding food origins
+    Given Marcus eats food grown in soil by farmers
+    And connection to land is part of ecological literacy
+    When Marcus learns about his food sources
+    Then the personal_agent should teach bioregional geography
+    And it should help him understand local agricultural landscape
+    And it should build relationship between Marcus and the land feeding him
+    And he should develop sense of place and bioregional identity
+    And care economy should include care for ecological systems
+    And stewardship should extend beyond human relationships

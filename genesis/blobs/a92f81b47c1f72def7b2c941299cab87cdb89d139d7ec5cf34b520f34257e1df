@@ -1,0 +1,9 @@
+Scenario: Organizer creates accessible materials on environmental permit process
+    Given residents want to oppose toxic facility
+    But permit process is technical and intimidating
+    When the organizer requests education materials from Observer
+    Then they receive plain-language explanation of permit requirements
+    And get templates for submitting public comments
+    And see examples of successful community opposition
+    And access data residents can cite in testimony
+    And complex regulatory process becomes accessible to community

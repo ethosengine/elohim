@@ -1,0 +1,10 @@
+Scenario: Recognizing when work serves vs. exploits community needs
+    Given Kenji works in service industry
+    And service work can serve community care or extract from workers
+    When the workplace_elohim helps Kenji analyze his work
+    Then it should help him see whether his work contributes to community flourishing
+    And it should teach him to distinguish care work from extractive labor
+    And it should recognize that serving food can be care economy work
+    And it should help him evaluate whether his workplace aligns with care values
+    And the system should build critical awareness of workplace care economy
+    And Kenji should understand his labor through care economy lens

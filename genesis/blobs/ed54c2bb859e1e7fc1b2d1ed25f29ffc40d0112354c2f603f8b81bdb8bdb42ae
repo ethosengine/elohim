@@ -1,0 +1,9 @@
+Scenario: Community policy advocacy based on caregiver data
+    Given caregivers need employment protections and support policies
+    And policy requires data to demonstrate need
+    When the community_elohim aggregates caregiver data
+    Then it should demonstrate caregiving scope in community
+    And data should support advocacy for caregiver leave policies
+    And it should show economic impact of unsupported caregiving
+    And community should advocate for caregivers at policy level
+    And care economy data should drive systemic change

@@ -1,0 +1,9 @@
+Scenario: Customer benefits from community programs funded by democratic value distribution
+    Given corporate extraction left minimal resources for community benefit
+    And neighborhood needed senior support, youth employment, community space
+    When democratic businesses allocate 30% of revenue to community programs
+    Then Ms. Johnson accesses subsidized senior meals (sliding scale pricing)
+    And neighbors' youth gain employment with dignity and ownership pathway
+    And community space is available for organizing and mutual aid
+    And her patronage funds programs benefiting entire neighborhood
+    And community_elohim manages community benefit distribution ensuring equity

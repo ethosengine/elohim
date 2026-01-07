@@ -1,0 +1,9 @@
+Scenario: Organizer detects opportunity in school board budget priorities
+    Given school board will vote on budget reallocation next month
+    And proposal shifts resources away from Title I schools
+    When the Observer surfaces the organizing opportunity
+    Then the organizer sees equity impact analysis by school
+    And identifies which parent communities are affected
+    And gets breakdown of resource distribution changes
+    And receives alert early enough to organize parent response
+    And district budget becomes organizing opportunity for equity

@@ -1,0 +1,11 @@
+Scenario: Tracking medical care quality and provider competence
+    Given medical providers vary widely in disability competence
+    And poor care from ableist providers causes harm
+    When Alex receives medical care
+    Then the personal_agent should help Alex track care quality
+    And it should document which providers respect Alex's autonomy
+    And it should identify patterns of ableist treatment
+    And Alex should be able to rate providers on disability competence
+    And quality tracking should help Alex find better providers
+    And the protocol should make provider accountability visible
+    And Alex should have data to advocate for better care

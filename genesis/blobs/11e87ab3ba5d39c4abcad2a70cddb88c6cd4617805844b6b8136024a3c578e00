@@ -1,0 +1,9 @@
+Scenario: Activist exposes charter school segregation and under-performance
+    Given charter schools claim to serve disadvantaged students
+    But the activist sees segregation and selective enrollment
+    When the Observer tracks charter school demographics and outcomes
+    Then the activist shows charters are more segregated than district schools
+    And suspension rates for Black students are even higher
+    And test score gains evaporate when controlling for selective enrollment
+    And charter expansion drains resources from district schools
+    And privatization agenda meets evidence-based critique

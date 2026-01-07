@@ -1,0 +1,9 @@
+Scenario: Child prevented from exposure to inappropriate content
+    Given Emma participates in the manga community
+    When an older teen posts art with mature themes
+    And the content is not appropriate for younger members
+    Then the guardian agent prevents Emma from seeing the mature content
+    And the moderator is notified to evaluate the post
+    And age-appropriate content guidelines are reinforced
+    And Emma's experience remains safe and appropriate to her development
+    And the older teen receives guidance about age-appropriate spaces

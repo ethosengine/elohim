@@ -1,0 +1,10 @@
+Scenario: Personal agent teaches value literacy as foundational life skill
+    Given Kenji is shopping for groceries on his $50/week budget
+    And he struggles to identify best nutritional value per dollar
+    When Kenji's personal_agent analyzes his shopping choices
+    Then the agent should teach him to compare nutrition per cost
+    And it should explain "Brown rice gives you 8 servings for $3, while instant rice gives 4 for $4"
+    And it should help him identify efficient protein sources
+    And the agent should build Kenji's capability to make informed choices
+    And value literacy should be taught through practice, not lectures
+    And Kenji should develop skills that serve him throughout adult life

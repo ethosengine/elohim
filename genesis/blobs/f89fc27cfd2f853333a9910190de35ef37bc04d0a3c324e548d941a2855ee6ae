@@ -1,0 +1,11 @@
+Scenario: Connecting disability rights to environmental justice organizing
+    Given both movements challenge systems that devalue certain lives
+    And both require recognizing interdependence and collective care
+    When Alex participates in environmental organizing
+    Then the bioregional_elohim should facilitate cross-movement solidarity
+    And it should help Alex build bridges between disability and environmental movements
+    And it should make visible shared principles and goals
+    And coalition-building should be supported and valued
+    And Alex's work connecting movements should accumulate care tokens
+    And the protocol should recognize that these justices are interconnected
+    And Alex's bridge-building strengthens both movements

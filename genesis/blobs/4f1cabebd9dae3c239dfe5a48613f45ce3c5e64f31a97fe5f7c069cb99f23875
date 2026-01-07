@@ -1,0 +1,9 @@
+Scenario: Household food security supported through care token supplements
+    Given household income is $65k/year
+    And food costs are rising
+    When household's economic status qualifies for support
+    Then care token supplements should be available
+    And the Value Scanner should remain accessible
+    And household should not face food insecurity
+    And care economy should function as economic support system
+    And access should be dignified, not stigmatizing

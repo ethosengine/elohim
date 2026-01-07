@@ -1,0 +1,116 @@
+Feature: Ecological and Bioregional Care Work for Workers in Food Systems
+  As a worker in food preparation and service
+  I need to understand and participate in ecological care within food systems
+  So that my labor contributes to bioregional food sovereignty and environmental flourishing
+
+  Background:
+    Given I work in food preparation and see food systems directly
+    And I understand the care labor embedded in growing and preparing food
+    And the bioregion has food production and distribution systems
+    And the protocol recognizes ecological care as part of care economy
+
+  Scenario: Recognizing food systems care work from field to table
+    Given my restaurant work is one link in food systems care chain
+    And farmers, distributors, and preparers all contribute care labor
+    When I view food systems through care economy lens
+    Then the protocol should make visible the care work in entire food chain
+    And help me understand my connection to farmers and food producers
+    And recognize that all food work is care labor serving human nourishment
+    And build consciousness about care economy in food systems
+
+  Scenario: Witnessing food waste and understanding ecological cost
+    Given I see significant food waste in restaurant operations
+    And food waste represents wasted care labor and ecological resources
+    When I observe food system inefficiencies
+    Then the protocol should help me understand ecological and care economy costs
+    And support me in advocating for waste reduction
+    And connect me to food rescue or composting initiatives
+    And recognize that reducing waste is care work for ecology
+
+  Scenario: Understanding ingredient sourcing and bioregional food
+    Given my restaurant uses ingredients from various sources
+    And some may be local/seasonal while others are industrial/imported
+    When I want to understand food sourcing
+    Then the protocol should provide information about ingredient origins
+    And help me understand bioregional vs. industrial food systems
+    And recognize that bioregional food supports local ecology and economy
+    And build consciousness about care economy implications of sourcing
+
+  Scenario: Advocating for sustainable food practices at work
+    Given my workplace makes decisions about sourcing and operations
+    When I want to advocate for more sustainable and care-aligned practices
+    Then the protocol should help me propose sustainable improvements
+    Such as local sourcing, waste reduction, composting, sustainable packaging
+    And provide evidence for ecological and economic benefits
+    And support me in advocating for care-economy-aligned food operations
+
+  Scenario: Connecting with local food producers and farmers
+    Given local farmers are doing care work to grow food
+    And I am doing care work to prepare food
+    When I want to connect with bioregional food producers
+    Then the protocol should facilitate connections between workers and farmers
+    And support relationships that strengthen local food systems
+    And help me understand farming as care labor deserving dignity and fair compensation
+    And build solidarity between farm workers and food service workers
+
+  Scenario: Participating in food sovereignty initiatives
+    Given corporate food systems extract from workers and communities
+    And alternative food systems can support local care economy
+    When I want to participate in food sovereignty organizing
+    Then the protocol should connect me to food justice initiatives
+    And support participation in food co-ops, community agriculture, or food policy
+    And recognize my expertise as food worker in food systems transformation
+    And build bioregional food systems aligned with care economy
+
+  Scenario: Understanding ecological impact of food systems work
+    Given food systems have significant ecological footprint
+    And my work is embedded in these systems
+    When I want to understand ecological implications
+    Then the protocol should provide information about food systems ecology
+    And help me see connections between my work and environmental impact
+    And support me in making choices that reduce ecological harm
+    And recognize that ecological care is part of my care economy participation
+
+  Scenario: Advocating for worker and environmental justice together
+    Given worker exploitation and environmental exploitation are connected
+    When I organize for worker dignity and fair compensation
+    Then the protocol should help me connect labor justice to ecological justice
+    And recognize that care economy serves both human and ecological flourishing
+    And support advocacy that addresses both worker conditions and environmental sustainability
+    And build movements connecting labor rights and environmental protection
+
+  Scenario: Learning about regenerative food systems
+    Given current industrial food systems are extractive
+    And regenerative agriculture can restore ecological health
+    When I want to understand alternatives to industrial food
+    Then the protocol should provide education about regenerative food systems
+    And connect me to regenerative food initiatives in bioregion
+    And help me envision food work that contributes to ecological restoration
+    And support transformation toward care-economy-aligned food systems
+
+  Scenario: Participating in composting and food waste reduction
+    Given restaurants generate significant compostable waste
+    And composting returns nutrients to soil and supports local ecology
+    When I want to participate in composting initiatives
+    Then the protocol should connect me to composting programs
+    And recognize participation in waste reduction as care work
+    And support workplace implementation of composting
+    And contribute to bioregional nutrient cycling and soil health
+
+  Scenario: Supporting bioregional food security and resilience
+    Given bioregions need resilient local food systems
+    And my food preparation skills contribute to food security
+    When I want to support bioregional food resilience
+    Then the protocol should connect me to community food security initiatives
+    And help me contribute skills to mutual aid food programs
+    And recognize that local food systems support community and ecological resilience
+    And build bioregional capacity for food sovereignty
+
+  Scenario: Making visible that food work is care for people and planet
+    Given all food work serves human nourishment and ecological cycles
+    And food workers are caring for people and participating in bioregional systems
+    When the broader culture treats food work as low-value service
+    Then the protocol should make visible that food work is essential care labor
+    And reframe food service as care work for human and ecological flourishing
+    And advocate that food workers deserve dignity, fair compensation, and care-aligned conditions
+    And build consciousness that care economy includes ecological care and all food work serves life

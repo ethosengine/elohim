@@ -1,0 +1,10 @@
+Scenario: Sibling care relationships built through value recognition
+    Given Tommy regularly selects items for his sister Emma
+    And Emma is 7 years old
+    When Tommy makes care contributions targeting Emma
+    Then the family_elohim should track sibling care patterns
+    And positive feedback loops should be created
+    And Tommy's personal_agent should reference past successes: "Emma loved the strawberries you picked last time"
+    And Emma should be prompted to recognize Tommy's care
+    And sibling relationships should be based on mutual care, not competition
+    And the protocol should build family bonds through care visibility

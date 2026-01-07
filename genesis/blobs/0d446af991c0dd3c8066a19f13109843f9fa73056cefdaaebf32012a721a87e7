@@ -1,0 +1,10 @@
+Scenario: Environmental commissioner evaluates watershed protection policy
+    Given commission considers strengthening regulations on development near waterways
+    And staff presents complex hydrology analysis and regulatory considerations
+    And development interests argue restrictions are excessive
+    When the commissioner requests Observer environmental policy analysis
+    Then they receive comparison of proposed protections to peer jurisdictions' standards
+    And see water quality trend data showing current protections insufficient
+    And access analysis of development impacts on downstream water quality
+    And get examples of how other communities balanced development and protection
+    And independent analysis helps commissioner evaluate competing claims

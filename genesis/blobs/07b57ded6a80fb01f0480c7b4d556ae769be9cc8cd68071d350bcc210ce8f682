@@ -1,0 +1,11 @@
+Scenario: Calibrating protocol to community-specific values
+    Given Riverside has distinct cultural values and history
+    And we want protocol to reflect our community identity
+    When we engage in community calibration process
+    Then we deliberate: about privacy thresholds (we value privacy highly)
+    And we discuss: resource sharing norms (indigenous heritage influences us)
+    And we consider: how our history affects trust (government betrayal in past)
+    And we vote: on calibrations within constitutional bounds
+    And we implement: community-specific settings
+    And protocol respects: local sovereignty and cultural specificity
+    And we exercise: meaningful self-governance within shared principles

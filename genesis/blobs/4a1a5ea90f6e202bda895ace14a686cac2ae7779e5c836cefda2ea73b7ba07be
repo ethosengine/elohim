@@ -1,0 +1,11 @@
+Scenario: Contributing to global public discourse on AI governance
+    Given public understanding shapes political will for democratic AI
+    And I have findings that matter for global deliberation
+    When I engage in global public education and discourse
+    Then I write: accessible articles for general audiences
+    And I give: public lectures explaining research findings
+    And I participate: in media discussions with honesty about uncertainties
+    And I contribute: to democratic deliberation about governance alternatives
+    And I explain: what's at stake, what options exist, what evidence shows
+    And I avoid: false certainty or ideological advocacy
+    And My public engagement serves: informed democratic choice about AI governance

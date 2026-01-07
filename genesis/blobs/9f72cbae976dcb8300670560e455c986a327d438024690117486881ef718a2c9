@@ -1,0 +1,13 @@
+Scenario: Personal agent coordinates overwhelming complexity across four generations
+    Given Robert manages care responsibilities across four generations
+    And he tracks his parents' medical appointments and medications
+    And he provides financial support and guidance to his adult children
+    And he maintains his own household with his spouse
+    And he occasionally provides care for his grandchild
+    When Robert uses his personal_agent for coordination
+    Then the agent should maintain awareness of all contexts simultaneously
+    And surface conflicts: "Your father's cardiology appointment conflicts with your work presentation"
+    And help him prioritize: "Jordan's apartment deposit is due before your mother's prescription refill"
+    And reduce cognitive load by holding details he can't track alone
+    And provide sophisticated decision support across multiple time horizons
+    And function as genuine coordination partner for managing extreme complexity

@@ -1,0 +1,12 @@
+Scenario: Coordinating educational planning for children's long-term development
+    Given crisis is temporary but children's educational trajectory is long-term
+    And current educational decisions affect future opportunities
+    When I make educational choices considering children's futures
+    Then the Value Scanner helps me consider long-term educational implications
+    And balances immediate stability needs with future development
+    And tracks children's educational progress and trajectory
+    And ensures crisis doesn't permanently derail educational opportunities
+    And validates that my educational planning serves children's futures
+    And my personal_agent surfaces educational opportunities supporting development
+    And recognizes long-term educational planning as sophisticated parenting
+    And celebrates my investment in children's educational futures despite crisis

@@ -1,0 +1,10 @@
+Scenario: Time management for competing demands
+    Given Kenji must balance 15 hours work, full academic load, and household responsibilities
+    And time is his most constrained resource
+    When the personal_agent helps Kenji manage his schedule
+    Then it should teach realistic time budgeting
+    And it should help him prioritize among competing demands
+    And it should recognize time spent on care work as real constraint
+    And the agent should validate that he cannot do everything
+    And it should help him make conscious trade-offs
+    And Kenji should learn sustainable pacing for long-term success

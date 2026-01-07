@@ -1,0 +1,10 @@
+Scenario: Constitutional amendment from appellant-driven insights
+    Given recurring appeals reveal "developing autonomy is undervalued"
+    And adolescent appellants worldwide report dignity violations from overprotection
+    When Constitutional Convention deliberates on adolescent autonomy amendment
+    Then the amendment proposal is drafted based on appellant experiences
+    And the amendment states "developing autonomy is itself a constitutional value"
+    And the amendment passes with 85% consensus
+    And global protocol is updated to balance safety with growth
+    And appellants see their suffering contributed to constitutional evolution
+    And future adolescents benefit from improved framework

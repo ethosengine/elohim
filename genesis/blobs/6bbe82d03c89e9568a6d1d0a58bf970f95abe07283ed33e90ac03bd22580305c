@@ -1,0 +1,9 @@
+Scenario: Workers transfer between EAE entities with portable expertise recognition
+    Given DeShawn has accumulated 3 years of documented expertise at ChickenMax
+    And he wants to move to Garden Bowl Express for career growth
+    When DeShawn applies for position at Garden Bowl
+    Then his ChickenMax REA profile is recognized across network
+    And his skill tokens are valid at Garden Bowl
+    And his seniority partially transfers based on sector contribution
+    And Garden Bowl workers welcome him as proven contributor
+    And industry_sector_elohim facilitates fair transition for both entities

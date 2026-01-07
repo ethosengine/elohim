@@ -1,0 +1,10 @@
+Scenario: Teen learns to recognize fair compensation
+    Given Jasmine earns $15/hour at her retail job
+    And the local living wage is $18/hour
+    When her personal_agent analyzes her compensation
+    Then it should help her understand whether pay is fair
+    And show how her wages compare to living wage standards
+    And help her calculate the real value of her labor
+    And teach her to recognize when work is undercompensated
+    And build her expectation that labor deserves fair compensation
+    And prepare her to advocate for fair wages as an adult worker

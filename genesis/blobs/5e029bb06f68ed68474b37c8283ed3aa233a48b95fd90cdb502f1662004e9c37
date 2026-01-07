@@ -1,0 +1,10 @@
+Scenario: Advancing skills and taking on new responsibilities
+    Given Jordan has mastered the shelving duties
+    And Jordan wants to learn more advanced library tasks
+    When Jordan expresses interest in additional responsibilities
+    Then supervisors take Jordan's career growth seriously
+    And the library provides training for new tasks
+    And Jordan's capacity for growth is assumed, not denied
+    And Jordan can take on cataloging support with proper training
+    And Jordan's career advancement is supported like any employee
+    And Jordan experiences professional development and growth

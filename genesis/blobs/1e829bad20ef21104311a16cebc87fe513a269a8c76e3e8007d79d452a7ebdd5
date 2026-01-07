@@ -1,0 +1,12 @@
+Scenario: Municipal accountability to care economy principles
+    Given Robert and others participate in municipal care economy
+    And municipalities should be accountable to care principles
+    And municipal decisions affect care economy functioning
+    When municipal_elohim monitors municipal accountability
+    Then it should track whether municipal policy supports care economy
+    And surface when municipal decisions harm caregivers
+    And help Robert hold municipality accountable to care principles
+    And provide tools for monitoring municipal care economy performance
+    And support resident advocacy for accountability
+    And build municipal governance that serves care economy
+    And demonstrate that municipalities should be accountable to residents' care needs

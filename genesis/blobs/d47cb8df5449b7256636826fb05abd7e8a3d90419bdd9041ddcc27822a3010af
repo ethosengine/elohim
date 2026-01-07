@@ -1,0 +1,10 @@
+Scenario: Family care tokens reflect preteen's substantial contributions
+    Given the family participates in care token economy
+    And Marcus performs significant household labor
+    When family care tokens are calculated
+    Then Marcus's contributions should be valued at realistic rates
+    And tokens should reflect that his work would be compensated if adult performed it
+    And family care token total should include his contributions
+    And tokens should qualify family for community resource access
+    And Marcus's demonstrated stewardship should be evidence of family capability
+    And care economy should channel support to families like Marcus's

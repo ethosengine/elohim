@@ -1,0 +1,9 @@
+Scenario: Mandatory franchise purchasing is replaced by democratic supplier relationships
+    Given franchise agreement required purchasing from corporate-approved vendors at markup
+    And local suppliers offering better quality and prices were prohibited
+    When purchasing autonomy is restored through franchise termination
+    Then workers establish direct relationships with Johnson Farm and local distributors
+    And supply costs decrease 30% through eliminating corporate markup
+    And quality improves through local sourcing and worker choice
+    And supplier relationships become partnerships, not corporate-mandated transactions
+    And workplace_elohim coordinates supply chain across EAE network

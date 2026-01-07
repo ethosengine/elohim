@@ -1,0 +1,9 @@
+Scenario: School involvement recognized as substantial care work
+    Given Sarah is actively involved in her children's school
+    And she volunteers in classrooms, organizes events, advocates for policies
+    When community care contributions are tracked
+    Then the community_elohim should quantify Sarah's school involvement
+    And volunteer hours should be valued as care work
+    And parent advocacy should be recognized as community contribution
+    And school participation should give Sarah voice in educational governance
+    And care for education should be visible and valued

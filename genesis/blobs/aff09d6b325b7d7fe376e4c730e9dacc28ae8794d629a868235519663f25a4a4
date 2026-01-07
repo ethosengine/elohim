@@ -1,0 +1,11 @@
+Scenario: Identifying implementation challenges through participant observation
+    Given I am embedded in Riverside for six months
+    And I observe daily reality of protocol implementation
+    When I encounter challenges residents and leaders face
+    Then I document: elderly residents struggling with technology
+    And I note: three Constitutional Council decisions that residents opposed
+    And I observe: recurring tension around adolescent autonomy
+    And I identify: gaps between theory and practice
+    And I analyze: what enables some communities to thrive while others struggle
+    And My research reveals: practical wisdom about implementation
+    And Findings help other communities avoid pitfalls Riverside encountered

@@ -1,0 +1,10 @@
+Scenario: Collective advocacy for student needs and rights
+    Given students face systemic challenges (inadequate financial aid, housing costs, food insecurity)
+    And collective action can create change
+    When Kenji participates in student organizing
+    Then the community_elohim should recognize advocacy as care contribution
+    And it should value organizing work, protest participation, and policy advocacy
+    And it should accumulate care tokens for working toward collective flourishing
+    And advocacy labor should be recognized as community care work
+    And the system should support student collective action
+    And organizing for justice should be valued as care economy participation

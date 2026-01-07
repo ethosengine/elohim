@@ -1,0 +1,10 @@
+Scenario: Developing cooking skills as care economy capability
+    Given Kenji is learning to cook efficiently on tight budget
+    And cooking is new skill he's developing as independent adult
+    When the personal_agent teaches Kenji cooking techniques
+    Then it should provide patient, practical instruction
+    And it should teach him to plan meals that use ingredients efficiently
+    And it should help him learn techniques that reduce prep time
+    And the agent should recognize cooking as care economy skill
+    And it should validate his progress: "You can now make 5 meals confidently"
+    And Kenji should experience cooking as capability, not chore

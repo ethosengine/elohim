@@ -1,0 +1,10 @@
+Scenario: Learning value literacy through concrete application
+    Given abstract economic theory is less effective than practice
+    And Aisha learns best through direct experience
+    When Aisha uses the Value Scanner
+    Then value education should happen through application
+    And concepts should be taught in context of real decisions
+    And theory should emerge from practice
+    And learning should be concrete and immediately applicable
+    And value literacy should develop through lived experience
+    And education should be embodied, not abstract

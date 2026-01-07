@@ -8,6 +8,8 @@
     "validate:verbose": "npx tsx src/schema-validation.ts ../data/lamad/content --verbose",
     "bootstrap": "npx tsx src/bootstrap.ts",
     "seed": "npx tsx src/seed.ts",
+    "genesis:pack": "npx tsx src/genesis-pack.ts",
+    "genesis:pack:dry": "npx tsx src/genesis-pack.ts --dry",
     "seed:validate": "npx tsx src/seed.ts --validate-only",
     "seed:dry-run": "npx tsx src/seed.ts --dry-run",
     "seed:dev": "DOORWAY_URL='https://doorway-dev.elohim.host' DOORWAY_API_KEY='dev-elohim-auth-2024' HOLOCHAIN_ADMIN_URL='wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024' npx tsx src/seed.ts",
@@ -31,6 +33,7 @@
   },
   "dependencies": {
     "@holochain/client": "^0.20.1",
+    "multiformats": "^13.4.1",
     "ws": "^8.16.0"
   },
   "devDependencies": {

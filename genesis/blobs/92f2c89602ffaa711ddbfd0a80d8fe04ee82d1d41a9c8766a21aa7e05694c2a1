@@ -1,0 +1,10 @@
+Scenario: Navigating sibling relationships as equals
+    Given Jordan has two younger siblings who are now adults
+    And sibling relationships are evolving
+    When Jordan's siblings gather for a family event
+    Then Jordan participates as a peer adult sibling
+    And the Value Scanner helps coordinate sibling care exchanges
+    And Jordan's contributions to siblings are recognized (encouragement, presence)
+    And siblings treat Jordan as brother/sister, not as someone to manage
+    And the family_elohim helps siblings navigate appropriate support
+    And Jordan experiences adult sibling relationships

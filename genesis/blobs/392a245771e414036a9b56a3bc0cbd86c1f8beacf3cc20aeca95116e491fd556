@@ -1,0 +1,9 @@
+Scenario: Politician surfaces teacher and parent priorities at scale
+    Given the politician hears from organized advocacy groups
+    But suspects classroom realities differ from political narratives
+    When the Observer aggregates teacher and parent input
+    Then they see teachers prioritize classroom resources and planning time
+    And learn parents want smaller class sizes and mental health support
+    And identify disconnect between political fights and family priorities
+    And understand professional educator perspectives on policy proposals
+    And align education policy with teaching and learning needs

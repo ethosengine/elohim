@@ -1,0 +1,10 @@
+Scenario: Community education and skill-sharing led by retired residents
+    Given Frank has decades of construction knowledge
+    And community members need practical skills
+    When the community_elohim coordinates education
+    Then it should facilitate Frank teaching construction workshops
+    And coordinate skill-sharing sessions utilizing retired residents' expertise
+    And recognize teaching as valuable community care contribution
+    And enable knowledge transmission from experienced to learning members
+    And build community capacity through elder knowledge sharing
+    And Frank should experience meaningful teaching role

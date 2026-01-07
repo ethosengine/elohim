@@ -1,0 +1,9 @@
+Scenario: Activist tracks state legislation across session
+    Given hundreds of bills move through state legislature
+    And the activist cannot attend all hearings
+    When the Observer monitors state education legislation
+    Then the activist receives alerts on relevant bills
+    And sees analysis of policy impacts on students
+    And identifies opportunities for testimony
+    And tracks which legislators support or oppose
+    And statewide advocacy becomes sustainable

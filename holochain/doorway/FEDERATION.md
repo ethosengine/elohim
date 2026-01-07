@@ -1,5 +1,7 @@
 # Doorway Federation: Fediverse Patterns on P2P Infrastructure
 
+> **See also**: [P2P-DATAPLANE.md](../P2P-DATAPLANE.md) for the overall P2P architecture
+
 ## The Bridge Problem
 
 Web 2.0 clients (browsers, mobile apps) need:
@@ -266,6 +268,103 @@ content is rejected by the DHT itself, not just by doorways.
 
 ---
 
+## Doorway Discovery via DIDs
+
+Doorways use W3C Decentralized Identifiers (DIDs) to discover each other and locate content across the network.
+
+### The Content Location Problem
+
+When a doorway receives a request for content it doesn't have locally:
+
+```
+Browser → Doorway A → "GET /api/v1/blobs/sha256-abc123..."
+                    → Local cache? MISS
+                    → Local Holochain? Has manifest, but not the blob
+                    → Where are the actual bytes?
+```
+
+The Holochain manifest knows *who owns* the content, but not *where to fetch* the bytes.
+
+### Solution: DIDs as Location Pointers
+
+Holochain manifests include `storage_dids` - a list of DIDs that have the blob:
+
+```rust
+#[hdk_entry_helper]
+pub struct BlobManifest {
+    pub hash: String,                    // Content hash
+    pub owner: AgentPubKey,              // Who created it
+    pub size_bytes: u64,
+    pub content_type: Option<String>,
+    pub storage_dids: Vec<String>,       // Who has the bytes
+    pub created_at: Timestamp,
+}
+```
+
+DIDs resolve to service endpoints:
+
+| DID | Resolves To |
+|-----|-------------|
+| `did:web:doorway-a.elohim.host` | HTTPS fetch `/.well-known/did.json` → service endpoints |
+| `did:key:z6Mk...` | Decode ed25519 pubkey → lookup in P2P DHT |
+
+### DID Document
+
+Each doorway serves its DID Document at `/.well-known/did.json`:
+
+```json
+{
+  "@context": ["https://www.w3.org/ns/did/v1"],
+  "id": "did:web:doorway-a.elohim.host",
+  "verificationMethod": [{
+    "id": "did:web:doorway-a.elohim.host#signing-key",
+    "type": "Ed25519VerificationKey2020",
+    "publicKeyMultibase": "z6Mkq..."
+  }],
+  "service": [
+    {
+      "id": "did:web:doorway-a.elohim.host#blobs",
+      "type": "ElohimBlobStore",
+      "serviceEndpoint": "https://doorway-a.elohim.host/api/v1/blobs"
+    },
+    {
+      "id": "did:web:doorway-a.elohim.host#holochain",
+      "type": "HolochainGateway",
+      "serviceEndpoint": "wss://doorway-a.elohim.host/app/4445"
+    }
+  ],
+  "elohim:capabilities": ["blob-storage", "gateway", "seeding"],
+  "elohim:region": "us-west-2"
+}
+```
+
+### Federated Content Fetch
+
+```
+1. Browser requests blob from Doorway A
+2. Doorway A: cache miss
+3. Doorway A queries Holochain for BlobManifest
+4. Manifest.storage_dids = ["did:web:doorway-b...", "did:key:z6..."]
+5. Doorway A resolves did:web:doorway-b...
+   → GET https://doorway-b.elohim.host/.well-known/did.json
+   → Extract ElohimBlobStore endpoint
+6. Doorway A fetches blob from Doorway B
+7. Doorway A caches locally + returns to browser
+```
+
+### Endpoint Selection
+
+When multiple storage locations are available, select based on:
+
+| Factor | Weight | Notes |
+|--------|--------|-------|
+| Latency | High | Ping endpoint before selection |
+| Region affinity | Medium | Prefer same region (from `elohim:region`) |
+| Protocol | Low | Prefer HTTPS for web clients, libp2p for P2P |
+| Trust tier | Context | Steward nodes preferred for sensitive content |
+
+---
+
 ## Configuration
 
 Doorway identity for federation is configured via CLI/environment:
@@ -387,6 +486,151 @@ The same validation rules that govern content govern infrastructure:
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## P2P Bootstrap Role
+
+Doorway serves a critical role in bootstrapping the native P2P network. The existing signal server for Holochain extends naturally to support libp2p peer discovery.
+
+### The Bootstrap Problem
+
+Native nodes need to find each other before they can sync:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      THE BOOTSTRAP PROBLEM                               │
+│                                                                          │
+│   Native Node A                                Native Node B             │
+│   ┌──────────────────┐                        ┌──────────────────┐      │
+│   │                  │                        │                  │      │
+│   │  "I want to join │         ???            │  "I'm part of    │      │
+│   │   the network"   │ ─────────────────────► │   the network"   │      │
+│   │                  │                        │                  │      │
+│   │  But how do I    │                        │                  │      │
+│   │  find anyone?    │                        │                  │      │
+│   │                  │                        │                  │      │
+│   └──────────────────┘                        └──────────────────┘      │
+│                                                                          │
+│   Without a known starting point, P2P networks can't form.              │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Solution: Signal Server as P2P Bootstrap
+
+Doorway already provides `/signal/{pubkey}` for WebRTC signaling in Holochain networks. This extends naturally to libp2p peer exchange:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     SIGNAL SERVER BOOTSTRAP                              │
+│                                                                          │
+│   Native Node A                Doorway                 Native Node B     │
+│   ┌────────────────┐      ┌────────────────┐      ┌────────────────┐    │
+│   │                │      │                │      │                │    │
+│   │  1. Connect    │─────►│  Signal Server │◄─────│  1. Connect    │    │
+│   │     to signal  │      │                │      │     to signal  │    │
+│   │                │      │  /signal/:id   │      │                │    │
+│   │  2. Announce   │─────►│                │      │                │    │
+│   │     peer_id    │      │  Maintains     │◄─────│  2. Announce   │    │
+│   │     multiaddrs │      │  peer registry │      │     peer_id    │    │
+│   │                │      │                │      │     multiaddrs │    │
+│   │  3. Request    │─────►│                │      │                │    │
+│   │     peer list  │      │  Returns       │      │                │    │
+│   │                │◄─────│  active peers  │      │                │    │
+│   │                │      │                │      │                │    │
+│   │  4. Direct P2P │      │  (step aside)  │      │                │    │
+│   │     connection │──────────────────────────────│  4. Direct P2P │    │
+│   │                │      │                │      │     connection │    │
+│   └────────────────┘      └────────────────┘      └────────────────┘    │
+│                                                                          │
+│   Once nodes find each other, they connect directly.                    │
+│   Doorway only helps with initial discovery.                            │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Protocol Extension
+
+The existing signal endpoint extends to support libp2p:
+
+```
+Existing (Holochain WebRTC):
+  POST /signal/{agent_pubkey}
+  Body: WebRTC signaling message
+
+Extended (libp2p bootstrap):
+  POST /signal/p2p/announce
+  Body: {
+    "peer_id": "12D3KooW...",
+    "multiaddrs": [
+      "/ip4/192.168.1.5/tcp/4001",
+      "/ip4/98.42.23.1/tcp/4001"
+    ],
+    "protocols": ["/elohim/sync/1.0.0", "/elohim/shard/1.0.0"],
+    "capabilities": ["storage", "sync"]
+  }
+
+  GET /signal/p2p/peers
+  Response: {
+    "peers": [
+      {
+        "peer_id": "12D3KooW...",
+        "multiaddrs": [...],
+        "last_seen": "2025-01-04T12:00:00Z"
+      }
+    ]
+  }
+```
+
+### Bootstrap Flow
+
+```
+1. Native node starts
+2. Node contacts well-known doorway signal server
+3. Announces own peer_id and multiaddrs
+4. Receives list of active peers
+5. Connects directly to peers via libp2p
+6. Joins P2P sync network
+7. Periodically re-announces to signal server (heartbeat)
+```
+
+### NAT Traversal
+
+For nodes behind NAT, doorway can facilitate hole-punching:
+
+| Situation | Solution |
+|-----------|----------|
+| Both nodes have public IPs | Direct connection |
+| One node behind NAT | STUN-style hole punch |
+| Both behind NAT | Relay through doorway (temporary) |
+| Symmetric NAT | Use doorway as relay until direct path found |
+
+The goal is always to establish a direct P2P connection. Doorway relaying is a fallback, not the default.
+
+### Multiple Bootstrap Nodes
+
+For resilience, native nodes can use multiple doorways as bootstrap:
+
+```rust
+const BOOTSTRAP_NODES: &[&str] = &[
+    "https://doorway.elohim.host/signal/p2p",
+    "https://doorway-eu.elohim.host/signal/p2p",
+    "https://doorway-asia.elohim.host/signal/p2p",
+];
+```
+
+Any doorway can bootstrap any native node. No lock-in.
+
+### Relationship to DHT
+
+Once bootstrapped, native nodes can discover each other through:
+
+1. **Signal server** - Quick bootstrap, always works
+2. **Kademlia DHT** - Decentralized, works without doorway
+3. **mDNS** - Local network discovery (same WiFi)
+
+The signal server is the training wheels. As the network matures, DHT and mDNS take over.
 
 ---
 

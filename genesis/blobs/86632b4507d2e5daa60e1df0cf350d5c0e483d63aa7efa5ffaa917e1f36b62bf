@@ -1,0 +1,10 @@
+Scenario: Family shopping as shared care experience
+    Given Tommy is shopping with parent Sarah
+    And multiple family members have different needs
+    When they use the Value Scanner together
+    Then Tommy should be learning from Sarah's modeling
+    And Sarah should be teaching Tommy value literacy through action
+    And the family_elohim should coordinate their different roles
+    And Tommy's contributions should be recognized alongside Sarah's
+    And shopping should be experienced as family care work, not consumption
+    And care economy principles should be transmitted through relationship

@@ -1,0 +1,60 @@
+# Appreciation: The Gift Economy Module
+
+## Beyond Exchange: Recognition
+
+Most economic systems assume **exchange**: I give you X, you give me Y.
+
+But much of human value creation is **gift**: I give because giving is good.
+
+hREA's Appreciation module supports this.
+
+## What is Appreciation?
+
+From hREA docs:
+> "An Appreciation ties an economic event given in loose fulfilment for another economic event, **without commitments or expectations**. It is a key component for supporting gift economies."
+
+```
+Appreciation:
+├── appreciationOf: nurse_care_event (what's being appreciated)
+├── appreciationWith: care_token_grant (the gift given)
+└── note: "Thank you for your compassionate care"
+```
+
+## Appreciation vs. Exchange
+
+| Exchange | Appreciation |
+|----------|--------------|
+| Quid pro quo | Gift |
+| Obligation | Gratitude |
+| Transactional | Relational |
+| Expected | Voluntary |
+| Balanced | Asymmetric is okay |
+
+## Care Economy Applications
+
+Appreciation enables:
+
+**Community Care Recognition**:
+- Neighbors appreciate each other's help
+- No expectation of return
+- Builds social capital
+
+**Creator Recognition**:
+- Users appreciate open-source contributions
+- No licensing required
+- Voluntary support accumulates
+
+**Invisible Labor Visibility**:
+- Family members appreciate caregiving
+- Work that was unseen becomes recognized
+- Care tokens flow to care providers
+
+## The Elohim Connection
+
+In the Elohim Protocol:
+- **Care tokens** are appreciation made tangible
+- Events of care are **witnessed**
+- Appreciation **accumulates** over time
+- The network **sees** your contribution
+
+This transforms the gift economy from invisible to visible, from unrecognized to appreciated.

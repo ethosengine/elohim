@@ -1,0 +1,9 @@
+Scenario: Parent discovers teacher coalition on class size
+    Given the board proposes increasing class sizes to save money
+    And the parent opposes this for their child's learning
+    When the Observer shows teacher union position on class sizes
+    Then the parent sees teachers oppose increase for same reasons
+    And understands research on class size impacts on learning
+    And natural parent-teacher alliance against harmful policy becomes visible
+    And coordinated parent-teacher testimony defeats the proposal
+    And board cannot divide parents and teachers

@@ -1,0 +1,10 @@
+Scenario: Balancing nutritional needs with environmental impact
+    Given Aisha needs adequate nutrition
+    And environmental sustainability is also important
+    When she makes food decisions
+    Then the personal_agent should help balance priorities
+    And it should optimize for both nutrition and environmental impact
+    And it should never compromise her health for environmental goals
+    And human flourishing and ecological health should both matter
+    And the system should find win-win solutions when possible
+    And trade-offs should be explained transparently

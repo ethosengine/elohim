@@ -1,0 +1,10 @@
+Scenario: Managing financial oversight with dignity
+    Given Jordan's parents have financial guardianship
+    And Jordan is learning money management skills
+    When Jordan makes purchases with their allowance
+    Then the personal_agent helps Jordan track spending
+    And parents can monitor for safety without controlling every choice
+    And Jordan has autonomy within appropriate boundaries
+    And the family_elohim balances oversight with independence
+    And Jordan's financial learning is supported, not prevented
+    And Jordan experiences growing financial autonomy

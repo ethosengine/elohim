@@ -1,0 +1,9 @@
+Scenario: Individual care token accumulation reflects care work value
+    Given James provides care worth $50k+/year professionally
+    And his work is invisible because he cares for his spouse
+    When care tokens are calculated for James
+    Then tokens should reflect professional-grade care value
+    And his care work should accumulate significant tokens
+    And tokens should give him standing in care economy
+    And invisible spousal care should become economically visible
+    And care economy should recognize family caregiving at professional value

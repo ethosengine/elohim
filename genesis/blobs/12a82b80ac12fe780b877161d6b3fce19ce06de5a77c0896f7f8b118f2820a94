@@ -1,0 +1,9 @@
+Scenario: Skill sharing network for household tasks Maria cannot do alone
+    Given some household tasks are difficult or impossible for one person
+    And Maria cannot afford to hire professionals for everything
+    When Maria needs help with household tasks requiring multiple people or specialized skills
+    Then the neighborhood_elohim should coordinate skill sharing network
+    And neighbors should exchange help based on different capabilities
+    And Maria should access household help through reciprocal labor exchange
+    And skill sharing should enable household maintenance without money or partner
+    And neighborhood cooperation should solve single-parent capability gaps

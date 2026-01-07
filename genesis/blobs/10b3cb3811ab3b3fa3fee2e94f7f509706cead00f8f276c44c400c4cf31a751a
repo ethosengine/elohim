@@ -1,0 +1,8 @@
+Scenario: Building individual resilience through care work visibility
+    Given the protocol tracks all my care contributions
+    Including my paid labor and household self-care
+    When I review my care economy participation
+    Then I should see comprehensive evidence of my contributions
+    And understand that I am providing valuable service to community
+    And recognize that I deserve better compensation and conditions
+    And feel empowered to advocate for my needs

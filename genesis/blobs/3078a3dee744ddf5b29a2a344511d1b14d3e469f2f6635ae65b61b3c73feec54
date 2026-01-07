@@ -1,0 +1,9 @@
+Scenario: Activist fights for paid sick leave policy
+    Given workers lack basic workplace protections
+    And the activist campaigns for paid sick leave ordinance
+    When the Observer shows public health and economic impacts
+    Then the activist demonstrates workers go to work sick
+    And spread illness because they can't afford to stay home
+    And public health costs of no sick leave
+    And presents evidence from cities with successful sick leave policies
+    And worker protection becomes public health imperative

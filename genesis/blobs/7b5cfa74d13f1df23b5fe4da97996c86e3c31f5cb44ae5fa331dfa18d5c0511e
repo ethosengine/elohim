@@ -1,0 +1,9 @@
+Scenario: Business adapts to worker priorities through democratic governance
+    Given Rosa's priorities as owner shaped business direction
+    And workers' priorities may differ in important ways
+    When workers gain governance voice during transition
+    Then schedule flexibility increases based on workers' family needs
+    And service offerings adapt to worker expertise and interests
+    And workplace improvements workers suggested previously get implemented
+    And compensation equity is addressed through democratic value distribution
+    And business becomes genuinely responsive to worker flourishing, not just profit

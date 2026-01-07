@@ -1,0 +1,12 @@
+Scenario: Managing household privacy and safety boundaries
+    Given I have safety concerns about my abuser finding me
+    And household information could compromise our safety
+    When I manage household information sharing
+    Then the Value Scanner helps me control what information exists about household location
+    And supports necessary anonymity with service providers
+    And helps me teach children appropriate privacy practices
+    And tracks who has what information about our household
+    And alerts me to potential privacy/safety breaches
+    And my personal_agent reminds me of safety protocols
+    And recognizes that managing safety is constant cognitive and emotional labor
+    And validates that my vigilance is appropriate and necessary

@@ -1,0 +1,9 @@
+Scenario: Making Sarah's care contributions visible to extended family
+    Given Sarah performs enormous care labor across family contexts
+    And extended family may not see the full scope
+    When family care contributions are tracked
+    Then Sarah's care for children should be quantified
+    And her care for aging parents should be visible
+    And her household coordination should be recognized
+    And extended family should see Sarah's contributions specifically
+    And visibility should enable fair family labor distribution

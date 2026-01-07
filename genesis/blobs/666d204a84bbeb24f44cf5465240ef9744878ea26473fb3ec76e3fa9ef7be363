@@ -1,0 +1,11 @@
+Scenario: Identity preserved through memory challenges
+    Given Helen's dementia causes increasing memory difficulties
+    And her sense of self needs support and continuity
+    When her personal_agent interacts with her over time
+    Then it should help maintain her identity continuity
+    And it should reference her history: "You worked as a teacher for 30 years"
+    And it should support her self-concept despite cognitive changes
+    And it should remind her of relationships and accomplishments
+    And her personhood should remain intact even as memory fades
+    And the protocol should serve the human being she remains
+    And dignity should be preserved regardless of cognitive capacity

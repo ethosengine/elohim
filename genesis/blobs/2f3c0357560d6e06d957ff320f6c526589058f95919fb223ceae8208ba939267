@@ -1,0 +1,9 @@
+Scenario: Journalist develops whistleblower source in state agency
+    Given a state employee witnesses fraud in contract process
+    And fears career retaliation for exposing misconduct
+    When the Observer provides secure protected channel
+    Then the whistleblower shares evidence of fraudulent contracts
+    And journalist investigates without exposing source
+    And verifies claims through additional reporting and records
+    And publishes investigation leading to official inquiry
+    And source protection enables accountability journalism

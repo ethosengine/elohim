@@ -1,0 +1,9 @@
+Scenario: Educational governance includes parent and teacher voices
+    Given Sarah is both parent and teacher
+    And educational governance affects her professionally and personally
+    When educational policy decisions are made
+    Then Sarah should have voice from both perspectives
+    And parent care contributions should influence school policy
+    And teacher care contributions should shape education governance
+    And educational democracy should include those who do education care work
+    And Sarah's dual perspective should be valued in governance

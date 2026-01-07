@@ -1,0 +1,10 @@
+Scenario: Coordinating home learning with school curriculum
+    Given Emma is learning math at school
+    And Sarah reinforces and extends learning at home
+    When the educational_elohim coordinates home and school
+    Then it should share relevant learning information between contexts
+    And it should help Sarah support Emma's school learning
+    And it should recognize Sarah's home teaching as essential to school success
+    And home and school should be integrated educational environment
+    And the system should facilitate coordination between parents and teachers
+    And Sarah's educational labor should be visible to Emma's school

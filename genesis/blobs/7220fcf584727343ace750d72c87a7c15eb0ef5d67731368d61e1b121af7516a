@@ -1,0 +1,10 @@
+Scenario: Journalist develops worker sources on retaliation
+    Given workers face retaliation for organizing or complaining
+    And fear job loss for speaking to journalist
+    When the Observer provides secure anonymous channel
+    Then workers share evidence of retaliation and illegal firings
+    And journalist investigates without exposing individual sources
+    And aggregates worker experiences to show pattern
+    And verifies claims through labor board records
+    And publishes investigation protecting sources while exposing employer
+    And source protection enables workers to speak truth

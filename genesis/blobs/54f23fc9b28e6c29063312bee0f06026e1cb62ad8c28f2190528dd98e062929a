@@ -1,0 +1,10 @@
+Scenario: Teaching value literacy as core educational content
+    Given Sarah is raising Tommy and Emma in care economy framework
+    And she teaches them to recognize and value care work
+    When the educational_elohim tracks value literacy education
+    Then it should recognize this as essential educational content
+    And teaching care economy principles should be valued as academic instruction
+    And Sarah's value literacy teaching should accumulate care tokens
+    And preparing children for care-based economy should be educational priority
+    And the system should support parents teaching alternative economic values
+    And value literacy should be recognized as critical life skill

@@ -1,0 +1,10 @@
+Scenario: Teen voice included in neighborhood decision-making
+    Given the neighborhood is making decisions about shared spaces
+    And Jasmine uses neighborhood facilities and public spaces
+    When neighborhood_elohim facilitates decision processes
+    Then Jasmine's input should be solicited and valued
+    And youth voice should be recognized as legitimate in neighborhood governance
+    And her care contributions should give her standing in community decisions
+    And she should not be dismissed due to age
+    And the neighborhood should model inclusive governance that values all members
+    And Jasmine should learn that she has legitimate voice in shaping her community

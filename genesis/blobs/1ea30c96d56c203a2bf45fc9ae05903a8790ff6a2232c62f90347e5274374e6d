@@ -1,0 +1,9 @@
+Scenario: Preventing isolation through connection to support networks
+    Given solo parenting is profoundly isolating
+    And Maria has no co-parent for adult connection and support
+    When the personal_agent monitors Maria's social connections
+    Then it should detect isolation and loneliness
+    And it should help her connect to other single parents
+    And it should facilitate community support without requiring more labor from her
+    And it should treat social connection as essential, not optional
+    And Maria should have pathways out of isolation despite time constraints

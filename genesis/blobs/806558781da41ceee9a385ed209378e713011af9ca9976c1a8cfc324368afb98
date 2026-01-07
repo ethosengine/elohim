@@ -1,0 +1,37 @@
+Feature: Doorway Hosting Flow
+  As a visitor to Elohim
+  I want to access the platform and become a hosted user
+  So that I can participate in the community
+
+  @smoke @doorway @navigation
+  Scenario: Visitor can access the home page
+    Given I am on the home page
+    Then the page should load successfully
+    And the hero section should be visible
+    And the main navigation should be visible
+
+  @smoke @doorway @navigation
+  Scenario: Main navigation is functional
+    Given I am on the home page
+    When I click on "Lamad" in the navigation
+    Then I should be on the "/lamad" page
+    And the page should load successfully
+
+  @smoke @doorway @api
+  Scenario: Doorway API health check
+    Given the Doorway API is accessible
+    When I request content stats from the API
+    Then the response should be successful
+    And the content stats should show data exists
+
+  @doorway @workflow
+  Scenario: Footer displays build information
+    Given I am on the home page
+    Then the footer should be present
+    And the footer should display the git hash
+
+  @doorway @navigation
+  Scenario: Site logo returns to home
+    Given I am on the "/lamad" page
+    When I click on the site logo
+    Then I should be on the home page

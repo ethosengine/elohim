@@ -1,0 +1,11 @@
+Scenario: Wisdom and experience sharing valued as family contribution
+    Given Frank has 70 years of life experience and decades of construction expertise
+    And his knowledge is valuable family resource
+    When family_elohim tracks knowledge sharing
+    Then Frank's guidance to adult children should be recognized
+    And teaching grandchildren life and practical skills should be valued
+    And sharing construction knowledge should be quantified
+    And wisdom transmission should count as care contribution
+    And family should experience Frank as source of valuable knowledge
+    And his expertise should be actively utilized, not patronized
+    And knowledge sharing should be reciprocal across generations

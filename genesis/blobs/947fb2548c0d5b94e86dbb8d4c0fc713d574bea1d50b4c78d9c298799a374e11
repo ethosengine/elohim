@@ -1,0 +1,9 @@
+Scenario: Community education recognizes invisible care economy scale
+    Given community members don't understand family caregiver reality
+    And invisibility perpetuates lack of support
+    When the community_elohim demonstrates care economy scale
+    Then it should show family caregivers provide $470 billion/year nationally
+    And it should quantify caregiving in local community specifically
+    And community should recognize dependence on invisible care work
+    And education should transform attitudes toward family caregiving
+    And visibility should drive policy changes supporting caregivers

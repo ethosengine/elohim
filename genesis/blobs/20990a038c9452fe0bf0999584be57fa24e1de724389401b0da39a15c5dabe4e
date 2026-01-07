@@ -1,0 +1,9 @@
+Scenario: Skill-building and education support for economic advancement
+    Given Maria is stuck in low-wage medical assistant work
+    And she wants to advance economically but has no time or resources for education
+    When Maria seeks opportunities for economic advancement
+    Then the community_elohim should connect her to education and training programs
+    And it should identify programs compatible with single parent constraints
+    And it should help her access support for education costs and childcare during training
+    And skill-building should be realistic pathway to better wages
+    And Maria should have community support for economic mobility despite solo parent limitations

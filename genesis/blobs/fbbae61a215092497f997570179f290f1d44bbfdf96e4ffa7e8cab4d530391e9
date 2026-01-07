@@ -1,0 +1,11 @@
+Scenario: Alex's life choices respected by family without ableist judgment
+    Given Alex makes life choices that family might not understand
+    And ableism might lead family to question Alex's decisions
+    When Alex makes choices about work, living situation, relationships, etc.
+    Then family should respect Alex's choices as they would any adult's
+    And the family_elohim should affirm Alex's right to self-determination
+    And disability should not be treated as reason to override Alex's autonomy
+    And Alex should not have to justify choices more than non-disabled siblings
+    And the protocol should protect Alex from family paternalism
+    And Alex's sovereignty should be structurally defended
+    And family should be prompted to examine their ableist assumptions

@@ -1,0 +1,10 @@
+Scenario: Board member evaluates budget allocating resources across schools
+    Given superintendent proposes budget with significant changes to school staffing
+    And budget presentation emphasizes district-wide efficiency and priorities
+    And board wants to understand impacts on different schools and student populations
+    When the board member requests Observer resource equity analysis
+    Then they receive per-pupil spending comparison across all district schools
+    And see staffing changes impact by school demographics and current performance
+    And access analysis of which students gain versus lose resources under proposal
+    And discover budget concentrates cuts in already-struggling schools
+    And equity analysis reveals disparate impacts staff presentation minimized

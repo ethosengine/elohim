@@ -1,0 +1,11 @@
+Scenario: Right to reduce or discontinue care provision with dignity
+    Given Margaret's care contributions are substantial but voluntary
+    And her capacity may change with health or life circumstances
+    When Margaret needs to reduce or stop grandparenting
+    Then the system should support this decision without stigma
+    And accumulated care tokens should remain hers regardless
+    And the family should have data showing her past contributions
+    And Margaret should be able to transition care with dignity
+    And she should not feel guilty for setting boundaries
+    And the protocol should enable graceful changes in care arrangements
+    And her autonomy over care provision must be absolute

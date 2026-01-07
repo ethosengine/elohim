@@ -1,0 +1,10 @@
+Scenario: Parent advocacy for better educational policies
+    Given Sarah understands education from both sides
+    And she advocates for family-friendly school policies
+    When Sarah participates in educational policy discussions
+    Then her dual perspective should be recognized as valuable
+    And advocacy labor should accumulate care tokens
+    And parent organizing for educational improvement should be valued
+    And Sarah's work to improve schools should be community contribution
+    And the system should recognize education advocacy as care labor
+    And parent voices should be amplified in education governance

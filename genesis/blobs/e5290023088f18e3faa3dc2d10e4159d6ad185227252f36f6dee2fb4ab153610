@@ -1,0 +1,9 @@
+Scenario: Municipal civic engagement increased through care economy participation
+    Given Sarah participates actively in municipal care economy
+    And civic engagement is strengthened by care work recognition
+    When municipal civic participation is measured
+    Then care economy participants should show higher engagement
+    And Sarah's care work should connect her to civic processes
+    And municipal democracy should be strengthened by care economy
+    And voter participation should increase among care economy members
+    And care creates civic engagement, not just economic value

@@ -1,0 +1,10 @@
+Scenario: Sustainable protein choices within budget
+    Given protein production has varied environmental impact
+    And Aisha wants to make sustainable choices
+    When Aisha selects protein sources
+    Then the bioregional_elohim should show environmental impact differences
+    And it should highlight lower-impact protein options
+    And it should help her access affordable sustainable proteins
+    And plant-based options should be presented when cheaper
+    And environmental impact should inform protein decisions
+    And sustainable nutrition should be achievable on her budget

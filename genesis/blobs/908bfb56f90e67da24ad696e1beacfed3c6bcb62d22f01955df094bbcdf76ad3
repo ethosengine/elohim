@@ -1,0 +1,10 @@
+Scenario: Identifying toxic workplace patterns early
+    Given Aisha is inexperienced with workplace dynamics
+    And toxic workplaces can be normalizing
+    When the workplace_elohim monitors organizational patterns
+    Then it should flag exploitative practices
+    And it should identify when workplace violates care principles
+    And it should help her recognize red flags
+    And the system should protect her from normalizing abuse
+    And she should learn what healthy workplace care looks like
+    And early warning should enable protective action

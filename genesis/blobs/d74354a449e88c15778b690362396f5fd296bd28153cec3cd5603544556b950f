@@ -1,0 +1,9 @@
+Scenario: Parent advocates for school safety investments
+    Given the parent worries about school safety and emergency preparedness
+    And board discusses "safety measures" in vague terms
+    When the parent reviews Observer's safety policy analysis
+    Then they see which safety measures are evidence-based vs security theater
+    And understand budget allocations for counselors vs surveillance
+    And learn about trauma-informed approaches to school safety
+    And can advocate for measures that actually protect children
+    And school safety policy centers student wellbeing not punishment

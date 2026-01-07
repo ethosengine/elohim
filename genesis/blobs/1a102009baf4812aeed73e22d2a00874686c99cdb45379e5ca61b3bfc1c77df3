@@ -1,0 +1,10 @@
+Scenario: Senior-to-senior support and community building
+    Given Margaret is in "younger" senior cohort (65-74)
+    And older seniors (75+) need support and connection
+    When the community_elohim coordinates senior support
+    Then Margaret should be part of senior mutual aid networks
+    And her peer support should be recognized as care contribution
+    And senior-to-senior care should prevent isolation
+    And age-matched support should be valued alongside intergenerational
+    And senior community should be strengthened through care economy
+    And Margaret should build relationships with peers

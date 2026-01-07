@@ -1,0 +1,9 @@
+Scenario: Workers balance community benefit with business sustainability
+    Given community requests subsidized meals for more low-income residents
+    And workers want to serve community while maintaining living wages
+    When workers analyze financial capacity for expanded subsidies
+    Then workers transparently share financial constraints with community
+    And workers propose sliding scale pricing for community meals
+    And community investors offer additional funding for subsidy program
+    And workers democratically approve expanded program with community support
+    And workplace_elohim ensures business sustainability is maintained

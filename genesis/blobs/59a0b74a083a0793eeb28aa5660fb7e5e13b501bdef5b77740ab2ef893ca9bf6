@@ -1,0 +1,9 @@
+Scenario: Teacher advocates for evidence-based special education practices
+    Given students with learning differences need specialized support
+    And current special education approach is compliance-focused not learning-focused
+    When teachers coordinate around special education reform through Observer
+    Then teachers document what actually helps students with diverse needs
+    And share successful inclusive practices across schools
+    And identify barriers to effective special education (caseloads, resources, training)
+    And build coalition with parents of students with disabilities
+    And special education becomes about student learning not just paperwork

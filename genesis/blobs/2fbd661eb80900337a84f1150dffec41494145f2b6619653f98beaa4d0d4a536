@@ -1,0 +1,10 @@
+Scenario: Economic development board member evaluates workforce development program
+    Given board considers funding proposal for job training program
+    And program providers present enrollment projections and success stories
+    And board wants evidence that program will effectively serve unemployed workers
+    When the board member requests Observer workforce program analysis
+    Then they receive outcome data from similar programs including job placement and wages
+    And see analysis of whether program serves populations with greatest need
+    And discover some training programs have poor employment outcomes despite good marketing
+    And access best practices from effective workforce development initiatives
+    And evidence-based analysis helps board invest in programs that actually work

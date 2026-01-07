@@ -1,0 +1,9 @@
+Scenario: Flexible scheduling accommodates care economy participation
+    Given Sarah needs to manage children's schedules, parent appointments, household tasks
+    And rigid work schedules create impossible conflicts
+    When Sarah's work schedule is determined
+    Then the workplace_elohim should coordinate with personal_agent
+    And flexible scheduling should accommodate care responsibilities
+    And Sarah should be able to handle family emergencies without job risk
+    And workplace should enable sustainable work-care balance
+    And flexibility should be policy, not personal favor

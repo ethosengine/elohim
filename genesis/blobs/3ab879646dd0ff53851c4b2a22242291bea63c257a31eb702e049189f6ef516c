@@ -1,0 +1,9 @@
+Scenario: Flexible scheduling enables caregiving and employment simultaneously
+    Given James's caregiving demands vary unpredictably
+    And rigid schedules would make employment impossible
+    When James negotiates work arrangements
+    Then the workplace_elohim should advocate for flexibility
+    And scheduling should accommodate caregiving emergencies
+    And James should be able to work around care demands
+    And flexibility should be policy, not just employer goodwill
+    And workplace should recognize caregivers need scheduling flexibility

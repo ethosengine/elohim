@@ -1,0 +1,144 @@
+@epic:value_scanner
+@user_type:adult
+@governance_layer:individual
+@related_users:young_adult,middle_aged,parent,worker,caregiver
+@related_layers:household,family,workplace_organizational
+@elohim_agents:personal_agent
+
+Feature: Individual Layer Value Recognition for Adult
+  As an adult in prime working/parenting years (ages 26-45)
+  Operating at the individual governance layer
+  I want my personal choices and care contributions to be recognized
+  So that I can maintain my own flourishing while caring for others
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the adult user "Sarah" is registered in the system
+    And Sarah is 34 years old
+    And the individual governance context is active
+    And Sarah's personal_agent is configured for complexity management
+    And Sarah is mother of Tommy (5) and Emma (8)
+    And Sarah works full-time as a teacher
+
+  Scenario: Personal agent serves as cognitive partner for overwhelming complexity
+    Given Sarah is managing multiple care contexts simultaneously
+    And Sarah is planning Tuesday evening meals
+    And she must coordinate children's developmental needs, budget, allergies, schedule, and community obligations
+    When Sarah opens the Value Scanner
+    Then her personal_agent should present integrated complexity overview
+    And the agent should surface conflicts before they become crises
+    And it should suggest solutions balancing competing needs
+    And it should track factors Sarah can't hold simultaneously
+    And Sarah should experience genuine cognitive partnership
+    And the agent should reduce mental load, not add to it
+
+  Scenario: Maintaining personal flourishing under care responsibilities
+    Given Sarah has been prioritizing everyone else's needs
+    And her personal_agent monitors her well-being patterns
+    And Sarah's nutrition, exercise, and social connection are declining
+    When two weeks pass without self-care
+    Then the personal_agent should recognize unsustainable sacrifice
+    And it should prompt "You've prioritized everyone else's needs for two weeks—what would support your flourishing?"
+    And it should frame self-care as essential stewardship, not selfishness
+    And it should recognize that care for self enables care for others
+    And Sarah should receive support in maintaining her own capacity
+
+  Scenario: Adult exercises full autonomy over life decisions
+    Given Sarah has competing demands on her time and resources
+    And she must balance professional work, parenting, partnership, and self-care
+    When Sarah makes decisions about resource allocation
+    Then she should have complete autonomy over her choices
+    And her personal_agent should provide decision support without manipulation
+    And she should maintain full decision-making authority
+    And the protocol should serve her values, not impose external priorities
+    And her agency should be respected as a competent adult
+
+  Scenario: Recognition of invisible care labor in personal identity
+    Given Sarah performs enormous amounts of invisible care work
+    And traditional economics don't recognize meal planning, schedule management, emotional labor
+    When Sarah reviews her care contributions
+    Then the Value Scanner should make all care labor visible
+    And her personal_agent should quantify meal planning, shopping, cooking, coordination, kin-keeping
+    And care tokens should accumulate reflecting her actual contributions
+    And Sarah's self-understanding should shift from "not working" to "performing essential care labor"
+    And visibility should transform how Sarah sees herself
+
+  Scenario: Personal data privacy under adult's complete control
+    Given Sarah's care contributions generate detailed personal data
+    And this data reveals intimate patterns of her life
+    When Sarah's data is collected and stored
+    Then she must have complete control over all data sharing
+    And she should decide what partner sees, what children see, what community sees
+    And workplace should never access personal care economy data
+    And her privacy must be absolute unless she chooses to share
+    And she should manage family members' privacy while maintaining oversight of children
+
+  Scenario: Personal agent prevents burnout through proactive monitoring
+    Given Sarah is at high risk for burnout
+    And she tends to sacrifice herself unsustainably
+    When her personal_agent detects warning signs
+    Then it should watch for nutrition suffering, exercise disappearing, social connection eroding
+    And it should proactively surface help options before crisis
+    And it should connect Sarah to community support resources
+    And it should recognize that her capacity to care depends on her well-being
+    And intervention should be timely, dignified, and effective
+
+  Scenario: Adult's complex scheduling requires sophisticated coordination
+    Given Sarah manages professional schedule, children's schedules, household tasks, community commitments
+    And conflicts arise constantly
+    When Sarah plans her week
+    Then the personal_agent should integrate with calendars, school systems, work tools
+    And it should identify scheduling conflicts automatically
+    And it should suggest realistic solutions within constraints
+    And it should coordinate across family members' needs
+    And scheduling should support Sarah's effectiveness, not overwhelm her
+
+  Scenario: Personal financial management integrated with care economy
+    Given Sarah manages household finances on $65k/year combined income
+    And budgeting is complex across multiple care contexts
+    When Sarah makes purchasing decisions
+    Then her personal_agent should track budget in real-time
+    And it should integrate financial constraints with nutritional needs, developmental appropriateness, family values
+    And it should help Sarah make informed trade-offs
+    And financial tools should serve care economy goals, not just spending tracking
+    And budget management should feel supportive, not restrictive
+
+  Scenario: Adult learns to recognize and value her own care contributions
+    Given Sarah has internalized that parenting is "not working"
+    And society devalues the care labor she performs
+    When Sarah uses the Value Scanner over time
+    Then she should develop new understanding of her contributions
+    And she should see meal planning, emotional labor, household coordination as valuable work
+    And quantified care contributions should shift her self-concept
+    And she should gain language to articulate her care work to others
+    And cultural transformation should begin with Sarah's own understanding
+
+  Scenario: Personal agent adapts to Sarah's individual values and culture
+    Given Sarah has specific cultural background and personal values
+    And her family has chosen value frameworks
+    When the personal_agent provides guidance
+    Then it should align with Sarah's cultural context
+    And it should respect her personal value priorities
+    And it should serve her chosen framework, not impose external values
+    And diverse cultural approaches to care should be honored
+    And the protocol should be culturally adaptive, not prescriptive
+
+  Scenario: Right to disconnect maintained with full data portability
+    Given Sarah has been using the Value Scanner
+    And constitutional constraints apply at all layers
+    When Sarah chooses to disconnect from the system
+    Then the system must honor disconnection immediately
+    And she should receive complete data export of all her information
+    And no manipulative retention patterns should be employed
+    And her right to not participate must be absolute
+    And data portability should enable switching to alternative systems
+
+  Scenario: Personal crisis support provides immediate dignified assistance
+    Given Sarah encounters a crisis—job loss, health emergency, family breakdown
+    And she needs immediate support
+    When the personal_agent detects crisis indicators
+    Then it should connect her to appropriate resources immediately
+    And support should be dignified, not stigmatizing
+    And she should access community mutual aid networks
+    And crisis response should be effective under extreme stress
+    And the protocol should function as safety net during vulnerability

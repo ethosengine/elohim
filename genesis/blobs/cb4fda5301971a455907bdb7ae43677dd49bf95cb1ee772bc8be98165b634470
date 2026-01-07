@@ -1,0 +1,10 @@
+Scenario: Building social capital through community contributions
+    Given Aisha is new to the community
+    And she wants to establish herself
+    When Aisha contributes to community initiatives
+    Then the community_elohim should track her contributions
+    And care tokens should accumulate at community level
+    And her care work should build social capital
+    And contributions should establish her community standing
+    And the system should recognize that social capital must be earned
+    And community position should reflect actual care provided

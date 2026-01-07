@@ -1,0 +1,12 @@
+Scenario: Managing fixed income with dignity and sophisticated tools
+    Given Frank has $140/week grocery budget for two people
+    And his income is fixed at ~$28k/year and cannot be increased through employment
+    And he needs to maintain nutrition as dietary needs change with age
+    When Frank plans his household shopping
+    Then his personal_agent should provide sophisticated budgeting tools
+    And it should identify sales and optimize value per dollar
+    And it should track spending patterns across weeks and months
+    And it should suggest resource optimization without stigma or shame
+    And it should help maintain quality of life within real constraints
+    And the framing should be dignity-preserving, not scarcity-shaming
+    And Frank should experience agency and resourcefulness, not deprivation

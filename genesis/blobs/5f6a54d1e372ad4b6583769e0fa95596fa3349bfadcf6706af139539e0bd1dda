@@ -1,0 +1,10 @@
+Scenario: Teaching family history and intergenerational storytelling
+    Given Margaret carries family stories, history, and identity
+    And grandchildren learn who they are through family narrative
+    When Margaret shares family stories and history
+    Then the educational_elohim should recognize this as cultural education
+    And it should value storytelling as teaching and identity formation
+    And it should track intergenerational knowledge transmission
+    And family history education should accumulate care tokens
+    And Margaret's role as family historian should be recognized
+    And narrative education should be valued as developmental care

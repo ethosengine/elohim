@@ -1,0 +1,9 @@
+Scenario: Secondhand and sharing economy participation
+    Given Maria purchases secondhand when possible to reduce costs
+    And she participates in sharing networks to avoid unnecessary purchases
+    When household acquisition patterns are analyzed
+    Then the bioregional_elohim should recognize her secondhand economy participation
+    And it should value sharing networks as resource efficiency
+    And her practices should be celebrated as circular economy leadership
+    And economic constraint should be honored as environmental wisdom
+    And Maria should be recognized as sustainability practitioner

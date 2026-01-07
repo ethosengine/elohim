@@ -1,0 +1,10 @@
+Scenario: Preventing employer pressure to prioritize work over education
+    Given some employers pressure students to work more hours
+    And employer interests can conflict with student educational needs
+    When employer requests Kenji increase hours or skip classes for work
+    Then the workplace_elohim should help Kenji maintain boundaries
+    And it should validate his right to prioritize education
+    And it should provide language for declining inappropriate requests
+    And it should recognize that education is his primary work
+    And the system should support students resisting employer overreach
+    And Kenji should have agency to protect his educational investment

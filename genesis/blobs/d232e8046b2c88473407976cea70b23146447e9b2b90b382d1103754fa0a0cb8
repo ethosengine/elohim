@@ -1,0 +1,8 @@
+Scenario: Coordinating with neighbors for transportation
+    Given I may not have reliable transportation
+    And neighbors might share rides or have vehicles available
+    When I need transportation for work, shopping, or other needs
+    Then the protocol should help coordinate neighborhood ride-sharing
+    And track reciprocal transportation support
+    And reduce individual costs through sharing
+    And build neighborhood care economy through mutual aid

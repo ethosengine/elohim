@@ -1,0 +1,12 @@
+Scenario: Industry research and data collection includes care economy metrics
+    Given industry research shapes understanding of workforce needs
+    And care economy metrics are often missing from industry data
+    And better data would support care-friendly policy advocacy
+    When industry_elohim advocates for data collection
+    Then it should help Robert advocate for industry research on care economy
+    And support inclusion of caregiving metrics in workforce studies
+    And help industry understand impact of care responsibilities on productivity and retention
+    And provide data that supports care-friendly policy business case
+    And build industry knowledge base that includes care economy
+    And demonstrate that industry advancement requires care economy understanding
+    And create evidence base for sector transformation

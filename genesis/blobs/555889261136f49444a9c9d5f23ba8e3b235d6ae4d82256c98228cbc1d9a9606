@@ -1,0 +1,9 @@
+Scenario: Journalist tracks school board member voting patterns
+    Given a board member campaigns on equity platform
+    And the journalist investigates whether actions match rhetoric
+    When the Observer analyzes 3 years of board voting records
+    Then the journalist sees board member voted against equity funding 7 times
+    And approved budget cutting programs serving disadvantaged students
+    And voted for charter expansion draining district resources
+    And identifies pattern of rhetoric contradicting voting record
+    And publishes accountability profile exposing hypocrisy

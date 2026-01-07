@@ -1,0 +1,9 @@
+Scenario: Developer environmental review gains honest analysis
+    Given a developer's environmental impact report claims minimal impacts
+    And used consultant known for developer-friendly assessments
+    When the Observer provides independent environmental analysis
+    Then comparison shows: wetland impacts understated by 60%
+    And habitat loss affects threatened species not mentioned
+    And stormwater runoff calculations omit downstream impacts
+    And independent assessment reveals actual environmental costs
+    And rubber-stamp reviews face evidence-based scrutiny

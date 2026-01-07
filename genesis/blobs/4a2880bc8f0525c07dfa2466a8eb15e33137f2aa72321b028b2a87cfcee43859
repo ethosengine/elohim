@@ -1,0 +1,9 @@
+Scenario: Activist documents industrial pollution concentration pattern
+    Given the activist works on environmental justice
+    And suspects systematic pollution burden on communities of color
+    When the Observer maps pollution sources and demographics
+    Then the activist sees industrial permits cluster in Black and Latino neighborhoods
+    And parks and trees concentrate in white affluent areas
+    And asthma hospitalizations correlate with pollution exposure
+    And environmental racism pattern becomes statistically undeniable
+    And legal and regulatory action gains evidentiary foundation

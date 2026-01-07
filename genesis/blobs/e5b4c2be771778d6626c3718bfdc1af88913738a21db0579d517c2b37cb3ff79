@@ -1,0 +1,11 @@
+Scenario: Elderly person's neighborhood contributions made visible
+    Given Helen has contributed to neighborhood for decades
+    And she still participates in community memory-keeping
+    When Helen shares neighborhood history
+    Then her contributions should be recognized by neighborhood_elohim
+    And neighbors should see that Helen still gives to community
+    And her knowledge of neighborhood history should be valued
+    And care tokens should reflect her ongoing contributions
+    And she should experience herself as valued neighbor, not burden
+    And the protocol should make visible that care flows both ways
+    And longtime residents should have standing based on accumulated contributions

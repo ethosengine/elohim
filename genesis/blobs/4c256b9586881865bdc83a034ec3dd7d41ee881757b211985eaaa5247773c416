@@ -1,0 +1,11 @@
+Scenario: Grandchildren learning to value elders through relationship
+    Given Margaret's care work builds deep bonds with grandchildren
+    And she teaches them to respect and value older adults
+    When Tommy and Emma interact with Margaret over years
+    Then the family_elohim should track relationship development
+    And it should recognize Margaret's role in shaping their attitudes toward elders
+    And children should learn that aging doesn't diminish worth
+    And they should see Margaret as capable, wise, and valuable
+    And this learning will matter when Margaret needs care herself
+    And next generation is being prepared to value and care for elders
+    And intergenerational relationships should be mutually enriching

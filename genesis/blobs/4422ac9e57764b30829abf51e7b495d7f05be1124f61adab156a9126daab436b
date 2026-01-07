@@ -1,0 +1,9 @@
+Scenario: Customer becomes community investor supporting democratic conversions
+    Given Ms. Johnson has modest savings wanting to support community values-aligned
+    And community investment opportunities in democratic businesses exist
+    When she learns neighbors invested in Maria's Kitchen conversion
+    Then she considers investing in next democratic conversion (Rosa's Auto Repair)
+    And investment would provide fair return (5% annually) plus social benefit
+    And her capital would enable worker ownership and community wealth
+    And customer role can expand to investor role if desired
+    And community_elohim manages community investment accessible to customers

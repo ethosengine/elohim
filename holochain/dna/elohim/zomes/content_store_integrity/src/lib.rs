@@ -449,6 +449,18 @@ pub const CATEGORY_ACCESS_LEVELS: [&str; 4] = [
 
 /// Content entry representing a content node (matches ContentNode from elohim-service)
 /// This is the atomic unit of knowledge in the Lamad system.
+///
+/// ## Content Storage Strategy (Phase 0 Refactor)
+///
+/// The DHT is for sparse metadata, not dense content. Large content bodies should be
+/// stored in elohim-storage and referenced by `blob_cid`.
+///
+/// - **Legacy entries**: `content` field holds full body, `blob_cid` is None
+/// - **New entries**: `blob_cid` points to elohim-storage, `content` holds hash or empty
+/// - **Read path**: If `blob_cid` exists, fetch from storage; otherwise use `content`
+///
+/// This follows Holochain's agent-centric design: DHT stores *proofs* (manifests),
+/// not *data* (content bodies).
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct Content {
@@ -457,7 +469,7 @@ pub struct Content {
     pub title: String,
     pub description: String,
     pub summary: Option<String>,         // Short preview text for cards/lists (AI-generated)
-    pub content: String,
+    pub content: String,                 // Legacy: full body. New: hash or empty if blob_cid set
     pub content_format: String,          // markdown, html, video, audio, interactive, external
     pub tags: Vec<String>,
     pub source_path: Option<String>,     // Original source file path if imported
@@ -477,6 +489,18 @@ pub struct Content {
     pub schema_version: u32,             // Increment when Content schema changes
     #[serde(default)]
     pub validation_status: String,       // Valid, Migrated, Degraded, Healing
+    // Content manifest fields (Phase 0 refactor)
+    /// CID pointing to content body in elohim-storage.
+    /// When set, `content` field should be empty or contain the content hash.
+    /// Read path: if blob_cid exists, fetch from elohim-storage; otherwise use content field.
+    #[serde(default)]
+    pub blob_cid: Option<String>,
+    /// Size of content body in bytes (for manifest mode)
+    #[serde(default)]
+    pub content_size_bytes: Option<u64>,
+    /// SHA256 hash of content body (for integrity verification when using blob_cid)
+    #[serde(default)]
+    pub content_hash: Option<String>,
 }
 
 impl Cacheable for Content {

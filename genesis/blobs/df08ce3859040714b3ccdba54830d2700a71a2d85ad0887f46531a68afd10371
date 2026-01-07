@@ -1,0 +1,10 @@
+Scenario: Board member tracks implementation of equity-focused discipline policy
+    Given board adopted restorative justice policy to reduce suspensions two years ago
+    And superintendent reported successful implementation at board meetings
+    And community members report ongoing disparate discipline of students of color
+    When the board member uses Observer implementation tracking
+    Then they see suspension rates by school, race, and disability status over time
+    And discover overall suspensions declined but disparities remained or widened
+    And find some schools implemented restorative practices while others didn't
+    And access teacher training data showing incomplete implementation
+    And impact tracking reveals gap between board policy and actual outcomes

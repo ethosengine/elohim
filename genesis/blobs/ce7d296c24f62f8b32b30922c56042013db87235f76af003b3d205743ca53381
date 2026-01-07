@@ -1,0 +1,9 @@
+Scenario: Bioregional care economy connects households to land stewardship
+    Given Sarah's household depends on bioregional ecological health
+    And land stewardship is collective care work
+    When Sarah participates in bioregional care economy
+    Then the bioregional_elohim should connect her to land stewardship opportunities
+    And it should link food purchases to regenerative agriculture
+    And it should enable Sarah to support ecological restoration
+    And care for land should be recognized as care work
+    And bioregional care should extend beyond human relationships

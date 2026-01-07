@@ -1,0 +1,9 @@
+Scenario: Local food systems supported through care economy purchases
+    Given Sarah's bioregion has local food producers
+    And supporting local agriculture has environmental and community benefits
+    When Sarah makes food purchasing decisions
+    Then the bioregional_elohim should highlight local options
+    And it should show environmental benefits of local food
+    And it should facilitate connections to local producers
+    And Sarah's purchases should support bioregional food security
+    And care economy should strengthen local food systems

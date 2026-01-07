@@ -1,0 +1,12 @@
+Scenario: Community care economy education delivered by experienced practitioners
+    Given Robert has decades of care economy participation
+    And many community members don't understand care economy principles
+    And his experience makes him credible educator
+    When community_elohim identifies education opportunities
+    Then it should connect Robert to community education initiatives
+    And recognize him as qualified to teach care economy practices
+    And support him in leading workshops, presentations, or courses
+    And value his teaching as community care contribution
+    And help community members learn from practitioners, not just theorists
+    And build community care economy literacy through peer education
+    And demonstrate that care economy spreads through experienced advocates

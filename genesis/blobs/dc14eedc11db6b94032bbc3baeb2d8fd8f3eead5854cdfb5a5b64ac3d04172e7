@@ -1,0 +1,9 @@
+Scenario: Decision fatigue support when every choice drains limited capacity
+    Given Maria makes hundreds of decisions daily with no co-parent
+    And decision fatigue is real and debilitating
+    When the personal_agent detects decision fatigue
+    Then it should simplify choices where possible
+    And it should provide clear recommendations based on her values and constraints
+    And it should reduce decision burden without removing her autonomy
+    And it should help her conserve decision-making capacity for critical choices
+    And Maria should experience reduced cognitive drain from constant choices

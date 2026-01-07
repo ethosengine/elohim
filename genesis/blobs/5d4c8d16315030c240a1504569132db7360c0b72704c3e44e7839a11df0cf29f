@@ -1,0 +1,9 @@
+Scenario: Franchise brand transition occurs with community communication
+    Given locations were known as ChickenMax #247, #248, #249
+    And brand change could confuse or alienate customers
+    When democratic governance decides on rebranding strategy
+    Then some locations may de-brand (ChickenMax → Maria's Kitchen)
+    And others may maintain brand temporarily during transition
+    And customers are informed: same workers, democratic ownership, community commitment
+    And brand transition communicates values shift from corporate to community
+    And workplace_elohim manages customer communication during rebranding

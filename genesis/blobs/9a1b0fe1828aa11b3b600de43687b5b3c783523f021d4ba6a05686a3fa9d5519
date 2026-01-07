@@ -1,0 +1,10 @@
+Scenario: Activist detects surveillance attempt and activates sanctuary
+    Given the activist is organizing a climate justice campaign
+    And they have shared organizing documents with their local group
+    When the system detects repeated unauthorized access attempts to their node
+    And the protection agent identifies a pattern indicating state surveillance
+    Then the activist receives immediate alert with threat assessment
+    And sanctuary protocol options are presented
+    And the activist can choose to fragment data across sanctuary institutions
+    And organizing continues through secure channels
+    And the community is alerted to heightened security measures

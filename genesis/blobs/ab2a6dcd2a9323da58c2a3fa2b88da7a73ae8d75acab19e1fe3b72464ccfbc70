@@ -1,0 +1,10 @@
+Scenario: Contributing care work to family despite being student
+    Given Kenji provides emotional support to stressed parents
+    And he helps younger siblings with homework and advice remotely
+    When the family_elohim tracks Kenji's care contributions to family
+    Then it should recognize emotional labor supporting family members
+    And it should value advice and mentorship provided to siblings
+    And it should accumulate care tokens for family support work
+    And students should be recognized as care contributors, not just recipients
+    And the system should make Kenji's family contributions visible
+    And reciprocal care should be recognized even when receiving financial support

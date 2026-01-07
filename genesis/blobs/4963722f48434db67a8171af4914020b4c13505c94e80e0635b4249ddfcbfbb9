@@ -1,0 +1,10 @@
+Scenario: Planning commissioner detects astroturf campaign supporting development
+    Given commission faces decision on controversial mall redevelopment
+    And receives hundreds of emails and petition signatures supporting project
+    And commission wants to understand if support is authentic community sentiment
+    When the commissioner uses Observer to analyze advocacy campaign
+    Then they discover emails use identical language suggesting coordinated campaign
+    And find petition signatures include many from outside the municipality
+    And see analysis showing campaign funded and organized by developer
+    And access authentic community sentiment data showing more mixed views
+    And capture protection helps commissioner distinguish grassroots from astroturf

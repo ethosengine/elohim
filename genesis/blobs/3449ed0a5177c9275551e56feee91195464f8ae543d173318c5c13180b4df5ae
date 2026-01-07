@@ -1,0 +1,10 @@
+Scenario: Neighborhood environmental stewardship
+    Given Kenji is studying environmental science
+    And neighborhoods are environmental governance units
+    When Kenji participates in neighborhood environmental care
+    Then the neighborhood_elohim should recognize his stewardship work
+    And it should value his participation in neighborhood cleanup
+    And it should recognize his knowledge contributions about sustainability
+    And environmental care should accumulate care tokens
+    And the system should connect academic learning to neighborhood action
+    And students should contribute environmental expertise to neighborhoods

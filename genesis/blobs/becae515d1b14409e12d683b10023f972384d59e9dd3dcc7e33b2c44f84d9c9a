@@ -1,0 +1,11 @@
+Scenario: Professional identity maintained alongside disability identity
+    Given Alex is a skilled data analyst with professional expertise
+    And disability is part of Alex's identity but doesn't define professional capability
+    When workplace interactions occur
+    Then the workplace_elohim should help Alex be seen as competent professional
+    And it should support Alex in asserting expertise and professional standing
+    And disability should not overshadow Alex's professional contributions
+    And Alex should be respected for skills and knowledge
+    And the protocol should help balance disability advocacy with professional identity
+    And Alex should not have to choose between being professional and being disabled
+    And both identities should be honored simultaneously

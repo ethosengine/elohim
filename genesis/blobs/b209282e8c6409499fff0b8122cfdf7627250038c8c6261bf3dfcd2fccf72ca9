@@ -1,0 +1,9 @@
+Scenario: Neighborhood care economy scales to municipal level
+    Given Sarah's neighborhood successfully implements care economy
+    And multiple neighborhoods could coordinate similarly
+    When neighborhood care patterns are established
+    Then the neighborhood_elohim should connect to municipal systems
+    And it should enable scaling of successful practices
+    And neighborhood should serve as building block for municipal care economy
+    And local success should inform broader policy
+    And care economy should grow from neighborhood up, not top-down

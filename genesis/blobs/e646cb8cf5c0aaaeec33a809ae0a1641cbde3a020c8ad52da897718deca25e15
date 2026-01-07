@@ -1,0 +1,10 @@
+Scenario: Care tokens flow between independent adult and family
+    Given Aisha both contributes to and receives from family
+    And care flows in multiple directions
+    When family care tokens are calculated
+    Then Aisha's contributions should generate tokens
+    And she should be able to use tokens for family support when needed
+    And parents' ongoing care should be recognized
+    And reciprocal care should be tracked transparently
+    And the family care economy should adapt to her independence
+    And adult family relationships should involve mutual care

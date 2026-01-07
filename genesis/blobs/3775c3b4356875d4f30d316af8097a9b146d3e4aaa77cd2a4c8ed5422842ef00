@@ -1,0 +1,11 @@
+Scenario: Organizing collective action for systems change
+    Given individual advocacy often fails against systemic ableism
+    And collective power is necessary for disability justice
+    When Alex organizes disabled people for collective action
+    Then organizing labor should be recognized as care work
+    And the community_elohim should track Alex's movement-building contributions
+    And collective action that wins improvements should be valued highly
+    And Alex's organizing strengthens disability community power
+    And care tokens should reflect the sophistication of organizing work
+    And the protocol should recognize that justice work is care work
+    And Alex's leadership builds capacity for entire community

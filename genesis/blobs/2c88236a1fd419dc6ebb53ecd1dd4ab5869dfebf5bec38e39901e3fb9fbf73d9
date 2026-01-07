@@ -1,0 +1,10 @@
+Scenario: Retirement planning affected by grandparenting commitments
+    Given Margaret and Robert had retirement plans and dreams
+    And substantial grandparenting changes household capacity for travel and activities
+    When the household plans retirement lifestyle
+    Then the household_elohim should help balance care and retirement goals
+    And it should ensure grandparenting doesn't entirely subsume retirement plans
+    And it should help negotiate sustainable care arrangements
+    And both partners should be able to enjoy retirement
+    And household should maintain autonomy over retirement choices
+    And grandparenting should enhance rather than replace retirement

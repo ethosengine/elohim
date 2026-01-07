@@ -1,0 +1,10 @@
+Scenario: Transitioning between jobs with care economy continuity
+    Given Aisha may change jobs during her young adult years
+    And job transitions are stressful
+    When Aisha considers changing positions
+    Then the workplace_elohim should support transition planning
+    And it should help her assess new opportunities through care lens
+    And it should maintain record of skills and contributions
+    And career development should be continuous across jobs
+    And the system should support healthy professional mobility
+    And care economy principles should guide job transitions

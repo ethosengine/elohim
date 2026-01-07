@@ -1,0 +1,10 @@
+Scenario: Household care tokens reflect both partners' contributions
+    Given both Sarah and her partner contribute to household
+    And contributions are currently very unequal
+    When household care tokens are calculated
+    Then they should reflect actual labor performed
+    And Sarah's 75% contribution should yield 75% of household tokens
+    And tokens should give standing in household resource decisions
+    And economic equity should follow labor equity
+    And care contributions should determine household governance power
+    And the partner should understand that tokens reflect actual work

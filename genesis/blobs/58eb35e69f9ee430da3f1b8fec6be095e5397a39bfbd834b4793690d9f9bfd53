@@ -1,0 +1,9 @@
+Scenario: Activist coordinates statewide organizing campaign
+    Given housing justice activists across 15 cities face same state policy barrier
+    And coordination is exhausting without infrastructure
+    When the Observer facilitates statewide activist network
+    Then activists can share tactics and research
+    And coordinate testimony across multiple legislative hearings
+    And track campaign progress and legislator commitments
+    And distributed organizing becomes coordinated movement
+    And state-level power builds through network effects

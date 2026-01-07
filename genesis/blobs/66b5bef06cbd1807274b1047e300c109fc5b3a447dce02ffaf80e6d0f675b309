@@ -1,0 +1,11 @@
+Scenario: Personal agent provides cognitive support without replacement
+    Given Helen experiences memory challenges from early-stage dementia
+    And she needs reminders for medications and appointments
+    When Helen's personal_agent provides cognitive assistance
+    Then it should support her memory without replacing her agency
+    And medication reminders should be gentle: "Helen, time for your heart medication"
+    And appointment notifications should give adequate lead time
+    And the agent should repeat information patiently when needed
+    And support should feel like partnership, not management
+    And Helen should remain the decision-maker about her own life
+    And the agent must never make choices for Helen without explicit delegation

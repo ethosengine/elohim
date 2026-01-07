@@ -1,0 +1,114 @@
+# Appeals Process: Individual Recourse Against AI Decisions
+
+## The Problem: AI Decisions Without Recourse
+
+An AI denies your loan application. An algorithm flags your content as misinformation. A hiring system filters out your resume. A recommendation system buries your business.
+
+What can you do about it?
+
+**Current answer**: Usually nothing meaningful.
+- Customer service scripts that can't override algorithms
+- Appeals processes designed to exhaust, not resolve
+- "The system says no" as final authority
+
+## Why Appeals Matter
+
+Appeals aren't just about individual cases. They're a governance mechanism:
+
+### For Individuals
+- Recourse when systems make mistakes
+- Dignity: being treated as a person, not just data
+- Protection against systematic bias
+
+### For Systems
+- Feedback loop that identifies failures
+- Cases that reveal edge conditions
+- Pressure toward accuracy and fairness
+
+### For Society
+- Precedents that guide future decisions
+- Visibility into how AI actually operates
+- Democratic accountability for automated power
+
+## The Appeals Framework
+
+### Level 1: Automated Review
+**Purpose**: Catch obvious errors quickly
+- Request reconsideration with same or updated information
+- System checks for data errors, processing failures
+- Fast, low-cost first filter
+
+**Example**: "The system didn't have my most recent income data. Here's documentation."
+
+### Level 2: Human Review
+**Purpose**: Apply judgment where algorithms fall short
+- Trained human reviewer examines case
+- Can override algorithm with documented reasoning
+- Access to context algorithms can't capture
+
+**Example**: "I have unusual circumstances that the model doesn't account for. Here's my situation."
+
+### Level 3: Panel Review
+**Purpose**: Handle complex cases, set precedents
+- Multi-person panel with diverse perspectives
+- Considers systemic implications, not just individual case
+- Decisions become reference for similar cases
+
+**Example**: "This affects many people in my situation. The rule itself needs reconsideration."
+
+### Level 4: Constitutional Council
+**Purpose**: Challenge the rules themselves
+- Review of whether constraints are appropriate
+- Can modify system parameters or policies
+- Highest level of appeal within system
+
+**Example**: "This system systematically disadvantages my community. The design needs to change."
+
+## Design Principles for Fair Appeals
+
+### Accessibility
+- Clear explanation of how to appeal
+- No requirement for legal expertise
+- Available in languages of affected communities
+- Reasonable timelines
+
+### Substantive Review
+- Not just "we looked at it again"
+- Explanation of reasoning
+- Response to appellant's specific arguments
+- Meaningful possibility of different outcome
+
+### Independence
+- Reviewers not beholden to system operators
+- Protection against retaliation
+- Conflicts of interest disclosed and managed
+
+### Feedback Integration
+- Patterns in appeals inform system improvement
+- Successful appeals trigger review of similar cases
+- Transparency about systemic changes
+
+## For Policy Makers
+
+Appeals processes need:
+- Legal standing for AI-affected individuals
+- Mandatory response timelines
+- Public reporting on appeal outcomes
+- Resources for under-represented appellants
+
+## For Developers
+
+Build appeals into your architecture:
+- Decision logging that supports review
+- Override mechanisms for human reviewers
+- Feedback loops from appeals to model updates
+- Clear documentation of what can and cannot be appealed
+
+## The Connection to Councils
+
+Appeals and councils form a feedback loop:
+- Individual appeals surface systemic issues
+- Councils review patterns and set policy
+- Policy changes flow back to individual cases
+
+This isn't bureaucracy—it's learning. Systems that can't learn from mistakes are systems that repeat them.

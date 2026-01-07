@@ -1,0 +1,10 @@
+Scenario: Building personal identity and self-expression
+    Given Jordan is developing their sense of self
+    And Jordan has interests, values, and preferences
+    When Jordan uses the personal profile feature
+    Then the interface helps Jordan express who they are
+    And Jordan can select interests from visual options (music, sports, art)
+    And Jordan can share what matters to them using simple language support
+    And the system celebrates Jordan's unique identity
+    And Jordan's self-expression is honored, not corrected to fit norms
+    And Jordan experiences being seen as a full person

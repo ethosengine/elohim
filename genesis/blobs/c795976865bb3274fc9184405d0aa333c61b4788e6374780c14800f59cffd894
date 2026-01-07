@@ -1,0 +1,11 @@
+Scenario: Testifying about technical feasibility of constitutional minimums
+    Given delegates establish universal constitutional minimums
+    And technical implementation varies by context
+    When I assess whether minimums are technically achievable globally
+    Then I evaluate: what infrastructure different minimums require
+    And I identify: barriers in low-resource contexts
+    And I explore: how to enable universal implementation
+    And I avoid: either blocking good governance or ignoring challenges
+    And I provide: honest assessment of feasibility
+    And I enable: delegates to set minimums wisely
+    And I serve: global justice through technical honesty

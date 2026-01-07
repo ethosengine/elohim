@@ -1,5 +1,9 @@
 # elohim-storage: P2P Architecture
 
+> **See also**:
+> - [P2P-DATAPLANE.md](../P2P-DATAPLANE.md) - Overall architecture vision
+> - [SYNC-ENGINE.md](../SYNC-ENGINE.md) - Automerge sync design
+
 ## The Problem: Holochain DHT Performance
 
 Holochain's DHT is designed for provenance and validation, not bulk data transfer. Every DHT write involves:
@@ -255,9 +259,9 @@ Async replication creates a window where data exists on one node but isn't repli
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## P2P Layer Options
+## P2P Layer: libp2p
 
-### Option A: libp2p (Holochain's foundation)
+**Decision**: Use libp2p (already integrated, dormant).
 
 ```rust
 use libp2p::{
@@ -270,33 +274,71 @@ use libp2p::{
 };
 ```
 
-**Pros**: Same stack as Holochain, battle-tested, all P2P primitives
-**Cons**: Significant implementation work
+**Why libp2p**:
+- Same stack as Holochain (consistent ecosystem)
+- Already integrated in elohim-storage (needs activation)
+- Multi-transport: QUIC, WebRTC, TCP, UDP
+- NAT traversal: relay, DCUTR, AutoNAT
+- Multi-language: Rust, Go, JS
 
-### Option B: iroh (Modern Rust IPFS)
+### Bootstrap via Signal Server
+
+Nodes discover each other using the existing doorway signal server:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PEER DISCOVERY FLOW                                       │
+│                                                                              │
+│   1. New node starts                                                         │
+│      ┌─────────────┐                                                         │
+│      │  Native App │                                                         │
+│      └──────┬──────┘                                                         │
+│             │                                                                │
+│   2. Connect to signal server                                                │
+│             │                                                                │
+│             ▼                                                                │
+│      ┌──────────────────────────────────────┐                               │
+│      │  Doorway Signal Server               │                               │
+│      │  GET /signal/{agent_pubkey}          │                               │
+│      │                                      │                               │
+│      │  Returns: multiaddrs of known peers  │                               │
+│      └──────────────────────────────────────┘                               │
+│             │                                                                │
+│   3. Direct P2P connection                                                   │
+│             │                                                                │
+│             ├───────────────────────────────┐                                │
+│             ▼                               ▼                                │
+│      ┌─────────────┐                 ┌─────────────┐                        │
+│      │   Node A    │◄───────────────►│   Node B    │                        │
+│      └─────────────┘    libp2p       └─────────────┘                        │
+│                                                                              │
+│   4. After initial connection, use Kademlia DHT for discovery               │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+The doorway already has `/signal/{pubkey}` for WebRTC signaling. We extend it for libp2p peer exchange.
+
+### Content Discovery via DHT
+
+Holochain DHT stores content location entries:
 
 ```rust
-use iroh::{
-    blobs::{store::Store, Hash},
-    net::{Endpoint, NodeAddr},
-};
+// Entry in Holochain DHT (infrastructure DNA)
+#[hdk_entry]
+pub struct ContentLocation {
+    pub content_hash: String,           // SHA256 of content
+    pub holders: Vec<AgentPubKey>,      // Agents who have it
+    pub reach: String,                  // Access level
+    pub updated_at: Timestamp,
+}
 ```
 
-**Pros**: Already does P2P, content routing, NAT traversal; modern QUIC-based
-**Cons**: Another dependency, different identity model
-
-### Option C: HTTP Mesh (Simplest)
-
-Storage nodes talk directly via HTTP:
-
-```
-POST /shard/{hash}     // Accept a shard from peer
-GET  /shard/{hash}     // Serve a shard to peer
-GET  /have/{hash}      // Check if peer has shard
-```
-
-**Pros**: Works today, no new dependencies
-**Cons**: Need public URLs or tunneling for NAT
+When fetching content:
+1. Query Holochain DHT: "Who has hash X?"
+2. Get list of holder agents
+3. Look up their P2P multiaddrs
+4. Connect via libp2p and fetch shard
 
 ## Reed-Solomon Distribution
 
@@ -365,3 +407,70 @@ This allows:
 | **Holochain DHT** | Provenance, permissions | ~10 ops/sec (small data) |
 
 **Key principle**: P2P is for **durability and distribution**, not **performance**. Fast paths stay local; P2P happens in the background.
+
+---
+
+## Automerge Sync Integration
+
+Content metadata syncs via Automerge CRDT (see [SYNC-ENGINE.md](../SYNC-ENGINE.md) for details):
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    elohim-storage + Sync Engine                              │
+│                                                                              │
+│   ┌─────────────────────────┐      ┌─────────────────────────┐              │
+│   │     Blob Storage        │      │     Sync Engine         │              │
+│   │                         │      │     (Automerge)         │              │
+│   │  • Large files (media)  │      │                         │              │
+│   │  • RS shards            │      │  • Content metadata     │              │
+│   │  • Shard protocol       │      │  • Path definitions     │              │
+│   │                         │      │  • User progress        │              │
+│   └────────────┬────────────┘      └────────────┬────────────┘              │
+│                │                                 │                           │
+│                │ refs blobs by hash              │ syncs docs via CRDT      │
+│                └─────────────────────────────────┤                           │
+│                                                  │                           │
+│   ┌──────────────────────────────────────────────┴────────────┐              │
+│   │                    P2P Network (libp2p)                    │              │
+│   │                                                            │              │
+│   │   /elohim/shard/1.0.0  - Blob shard transfer              │              │
+│   │   /elohim/sync/1.0.0   - Automerge sync protocol          │              │
+│   │                                                            │              │
+│   └────────────────────────────────────────────────────────────┘              │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### What Goes Where
+
+| Data Type | Storage | Transport |
+|-----------|---------|-----------|
+| Media files | Blob (RS shards) | Shard protocol |
+| Content metadata | Automerge doc | Sync protocol |
+| Path definitions | Automerge doc | Sync protocol |
+| User progress | Automerge doc | Sync protocol |
+| Attestations | Holochain DHT | Holochain gossip |
+| Content location | Holochain DHT | Holochain gossip |
+
+---
+
+## Implementation Status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Blob storage | ✅ Complete | `blob_store.rs` |
+| RS sharding | ✅ Complete | `sharding.rs` |
+| libp2p foundation | ⚠️ Dormant | `p2p/mod.rs` - needs activation |
+| Shard protocol | ⚠️ Dormant | `p2p/shard_protocol.rs` - needs wiring |
+| Signal server bootstrap | ❌ Missing | Extend doorway `/signal` |
+| ContentLocation DHT | ❌ Missing | New entry in infrastructure DNA |
+| Automerge sync | ❌ Missing | Add automerge dependency |
+| Replication worker | ❌ Missing | Background shard distribution |
+
+---
+
+## Related Documentation
+
+- [P2P-DATAPLANE.md](../P2P-DATAPLANE.md) - Overall P2P architecture
+- [SYNC-ENGINE.md](../SYNC-ENGINE.md) - Automerge sync design
+- [REACH.md](./REACH.md) - Reach-based access control

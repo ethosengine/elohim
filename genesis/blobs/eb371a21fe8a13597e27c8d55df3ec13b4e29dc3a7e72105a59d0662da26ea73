@@ -1,0 +1,12 @@
+Scenario: Producing comprehensive written opinion for landmark case
+    Given our case has major national implications
+    And it will be studied for generations
+    When we craft our written opinion
+    Then we explain: constitutional reasoning in accessible language
+    And we address: major arguments and counterarguments
+    And we examine: long-term implications of our interpretation
+    And we include: dissenting opinions with their reasoning
+    And we document: our deliberation process and considerations
+    And we create: precedent that serves legal clarity and public education
+    And we demonstrate: how citizen governance produces constitutional law
+    And we fulfill: responsibility to those affected by our judgment

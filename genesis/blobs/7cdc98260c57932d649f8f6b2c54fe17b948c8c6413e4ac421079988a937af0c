@@ -1,0 +1,12 @@
+Scenario: Performance evaluation recognizes whole-person contribution
+    Given Robert's professional performance should be evaluated fairly
+    And care responsibilities shouldn't be seen as professional liability
+    And his care skills enhance his professional effectiveness
+    When workplace_elohim supports performance evaluation
+    Then it should advocate for evaluation that recognizes whole-person contribution
+    And help Robert articulate how care responsibilities develop professional capability
+    And surface when evaluation processes penalize caregiving
+    And support him in documenting productivity and value creation
+    And build evaluation frameworks that value care skills
+    And prevent caregivers from being passed over for advancement
+    And demonstrate that fair evaluation includes care economy perspective

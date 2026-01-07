@@ -1,7 +1,20 @@
 //! Content-addressed blob storage
 //!
-//! Stores blobs in a local directory structure using SHA256 hashes as filenames.
+//! Stores blobs in a local directory structure using content addressing.
+//! Supports both CID (IPFS-compatible) and legacy SHA256 hash formats.
 //! Supports chunked storage for large files.
+//!
+//! ## Content Addressing
+//!
+//! This module supports two content addressing formats:
+//! - **CID (Content Identifier)**: IPFS-compatible, self-describing format
+//!   - Format: `bafkrei...` (base32-encoded CIDv1 with raw codec)
+//!   - Future-proof: includes hash algorithm, version, codec
+//! - **Legacy SHA256**: For backward compatibility
+//!   - Format: `sha256-{64 hex chars}` or raw 64 hex chars
+//!
+//! Internally, blobs are stored using SHA256 hex for filesystem paths regardless
+//! of input format. This allows both formats to resolve to the same blob.
 //!
 //! ## P2P Announcement
 //!
@@ -10,11 +23,17 @@
 
 use crate::error::StorageError;
 use crate::content_server::{ContentServerBridge, StorageEndpointInput};
+use cid::Cid;
+use multihash_codetable::{Code, MultihashDigest};
 use sha2::{Sha256, Digest};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{debug, info, warn};
+
+/// Raw codec for CID (raw bytes, no structure)
+const RAW_CODEC: u64 = 0x55;
 
 /// Chunk size for large blobs (1MB)
 pub const CHUNK_SIZE: usize = 1024 * 1024;
@@ -25,7 +44,9 @@ pub const MAX_INLINE_SIZE: usize = 16 * 1024 * 1024;
 /// Result of storing a blob
 #[derive(Debug, Clone)]
 pub struct StoreResult {
-    /// SHA256 hash of the blob
+    /// CID (Content Identifier) of the blob - IPFS-compatible
+    pub cid: String,
+    /// SHA256 hash of the blob (for backward compatibility)
     pub hash: String,
     /// Total size in bytes
     pub size_bytes: u64,
@@ -76,12 +97,74 @@ impl BlobStore {
         Self { root_dir: temp_dir }
     }
 
-    /// Compute SHA256 hash of data
+    /// Compute SHA256 hash of data (legacy format)
     pub fn compute_hash(data: &[u8]) -> String {
         let mut hasher = Sha256::new();
         hasher.update(data);
         let result = hasher.finalize();
         format!("sha256-{}", hex::encode(result))
+    }
+
+    /// Compute CID (Content Identifier) for data
+    ///
+    /// Creates a CIDv1 with raw codec and SHA256 multihash.
+    /// Format: `bafkrei...` (base32-encoded)
+    pub fn compute_cid(data: &[u8]) -> Cid {
+        let hash = Code::Sha2_256.digest(data);
+        Cid::new_v1(RAW_CODEC, hash)
+    }
+
+    /// Compute both CID and legacy hash for data
+    pub fn compute_addresses(data: &[u8]) -> (Cid, String) {
+        let cid = Self::compute_cid(data);
+        let hash = Self::compute_hash(data);
+        (cid, hash)
+    }
+
+    /// Parse a content address (CID or legacy hash) and return the SHA256 hex
+    ///
+    /// Accepts:
+    /// - CID string (e.g., `bafkreig...`)
+    /// - SHA256 with prefix (e.g., `sha256-a7ffc6f8...`)
+    /// - Raw SHA256 hex (64 chars)
+    ///
+    /// Returns the SHA256 hex string (without prefix) for filesystem lookup.
+    pub fn parse_content_address(addr: &str) -> Result<String, StorageError> {
+        // Try parsing as CID first
+        if let Ok(cid) = Cid::from_str(addr) {
+            // Extract the multihash digest (SHA256 bytes)
+            let digest = cid.hash().digest();
+            return Ok(hex::encode(digest));
+        }
+
+        // Try SHA256 with prefix
+        if let Some(hex_part) = addr.strip_prefix("sha256-") {
+            if hex_part.len() == 64 && hex_part.chars().all(|c| c.is_ascii_hexdigit()) {
+                return Ok(hex_part.to_string());
+            }
+        }
+
+        // Try raw SHA256 hex
+        if addr.len() == 64 && addr.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Ok(addr.to_string());
+        }
+
+        Err(StorageError::InvalidContentAddress(addr.to_string()))
+    }
+
+    /// Convert SHA256 hex to CID
+    pub fn hash_to_cid(sha256_hex: &str) -> Result<Cid, StorageError> {
+        let hex_part = sha256_hex.strip_prefix("sha256-").unwrap_or(sha256_hex);
+        let bytes = hex::decode(hex_part)
+            .map_err(|_| StorageError::InvalidContentAddress(sha256_hex.to_string()))?;
+
+        // Create multihash from raw SHA256 bytes
+        // Code::Sha2_256 expects to hash data, but we have the hash already
+        // Use multihash directly
+        let mh = multihash_codetable::Multihash::wrap(0x12, &bytes) // 0x12 = SHA256 code
+            .map_err(|_| StorageError::InvalidContentAddress(sha256_hex.to_string()))?;
+
+        Ok(Cid::new_v1(RAW_CODEC, mh))
     }
 
     /// Get path for a blob by hash
@@ -97,17 +180,19 @@ impl BlobStore {
         self.blob_path(hash).with_extension("chunks")
     }
 
-    /// Store a blob, returning its hash
+    /// Store a blob, returning its CID and hash
     ///
     /// For large blobs (>16MB), automatically chunks and stores pieces.
     pub async fn store(&self, data: &[u8]) -> Result<StoreResult, StorageError> {
-        let hash = Self::compute_hash(data);
+        let (cid, hash) = Self::compute_addresses(data);
+        let cid_str = cid.to_string();
         let blob_path = self.blob_path(&hash);
 
         // Check if already exists
         if fs::metadata(&blob_path).await.is_ok() {
-            debug!(hash = %hash, "Blob already exists");
+            debug!(cid = %cid_str, hash = %hash, "Blob already exists");
             return Ok(StoreResult {
+                cid: cid_str,
                 hash,
                 size_bytes: data.len() as u64,
                 chunk_count: 1, // TODO: read from chunk index if exists
@@ -125,9 +210,10 @@ impl BlobStore {
             // Store as single file
             fs::write(&blob_path, data).await?;
 
-            info!(hash = %hash, size = data.len(), "Stored blob");
+            info!(cid = %cid_str, hash = %hash, size = data.len(), "Stored blob");
 
             Ok(StoreResult {
+                cid: cid_str,
                 hash,
                 size_bytes: data.len() as u64,
                 chunk_count: 1,
@@ -136,7 +222,7 @@ impl BlobStore {
             })
         } else {
             // Store as chunks
-            self.store_chunked(&hash, data).await
+            self.store_chunked(&hash, &cid_str, data).await
         }
     }
 
@@ -198,7 +284,7 @@ impl BlobStore {
     }
 
     /// Store a large blob as chunks
-    async fn store_chunked(&self, hash: &str, data: &[u8]) -> Result<StoreResult, StorageError> {
+    async fn store_chunked(&self, hash: &str, cid: &str, data: &[u8]) -> Result<StoreResult, StorageError> {
         let blob_path = self.blob_path(hash);
         let chunk_dir = blob_path.with_extension("d");
 
@@ -218,6 +304,7 @@ impl BlobStore {
         // Write chunk index file
         let index_path = self.chunk_index_path(hash);
         let index_json = serde_json::json!({
+            "cid": cid,
             "hash": hash,
             "size_bytes": data.len(),
             "chunk_count": chunk_count,
@@ -230,6 +317,7 @@ impl BlobStore {
         fs::write(&blob_path, b"CHUNKED").await?;
 
         info!(
+            cid = %cid,
             hash = %hash,
             size = data.len(),
             chunks = chunk_count,
@@ -237,6 +325,7 @@ impl BlobStore {
         );
 
         Ok(StoreResult {
+            cid: cid.to_string(),
             hash: hash.to_string(),
             size_bytes: data.len() as u64,
             chunk_count: chunk_count as u32,
@@ -245,9 +334,45 @@ impl BlobStore {
         })
     }
 
-    /// Check if a blob exists
+    /// Check if a blob exists by legacy hash
     pub async fn exists(&self, hash: &str) -> bool {
         fs::metadata(self.blob_path(hash)).await.is_ok()
+    }
+
+    /// Check if a blob exists by CID or hash
+    ///
+    /// Accepts CID, sha256-prefixed hash, or raw hex hash.
+    pub async fn exists_by_address(&self, addr: &str) -> Result<bool, StorageError> {
+        let hex = Self::parse_content_address(addr)?;
+        let hash = format!("sha256-{}", hex);
+        Ok(self.exists(&hash).await)
+    }
+
+    /// Retrieve a blob by CID or hash
+    ///
+    /// Accepts CID, sha256-prefixed hash, or raw hex hash.
+    pub async fn get_by_address(&self, addr: &str) -> Result<Vec<u8>, StorageError> {
+        let hex = Self::parse_content_address(addr)?;
+        let hash = format!("sha256-{}", hex);
+        self.get(&hash).await
+    }
+
+    /// Get blob size by CID or hash
+    ///
+    /// Accepts CID, sha256-prefixed hash, or raw hex hash.
+    pub async fn size_by_address(&self, addr: &str) -> Result<u64, StorageError> {
+        let hex = Self::parse_content_address(addr)?;
+        let hash = format!("sha256-{}", hex);
+        self.size(&hash).await
+    }
+
+    /// Get a range of bytes by CID or hash
+    ///
+    /// Accepts CID, sha256-prefixed hash, or raw hex hash.
+    pub async fn get_range_by_address(&self, addr: &str, start: u64, end: u64) -> Result<Vec<u8>, StorageError> {
+        let hex = Self::parse_content_address(addr)?;
+        let hash = format!("sha256-{}", hex);
+        self.get_range(&hash, start, end).await
     }
 
     /// Get blob size (without loading data)
@@ -426,13 +551,20 @@ mod tests {
         let data = b"Hello, Elohim!";
         let result = store.store(data).await.unwrap();
 
+        // Should return both CID and hash
+        assert!(result.cid.starts_with("bafkrei")); // CIDv1 with raw codec
         assert!(result.hash.starts_with("sha256-"));
         assert_eq!(result.size_bytes, data.len() as u64);
         assert!(!result.chunked);
         assert!(!result.already_existed);
 
+        // Retrieve by hash (legacy)
         let retrieved = store.get(&result.hash).await.unwrap();
         assert_eq!(retrieved, data);
+
+        // Retrieve by CID
+        let retrieved_by_cid = store.get_by_address(&result.cid).await.unwrap();
+        assert_eq!(retrieved_by_cid, data);
     }
 
     #[tokio::test]
@@ -445,6 +577,7 @@ mod tests {
         let result2 = store.store(data).await.unwrap();
 
         assert_eq!(result1.hash, result2.hash);
+        assert_eq!(result1.cid, result2.cid);
         assert!(!result1.already_existed);
         assert!(result2.already_existed);
     }
@@ -454,5 +587,63 @@ mod tests {
         let hash = BlobStore::compute_hash(b"test");
         assert!(hash.starts_with("sha256-"));
         assert_eq!(hash.len(), 7 + 64); // "sha256-" + 64 hex chars
+    }
+
+    #[tokio::test]
+    async fn test_compute_cid() {
+        let cid = BlobStore::compute_cid(b"test");
+        let cid_str = cid.to_string();
+        assert!(cid_str.starts_with("bafkrei")); // CIDv1 raw codec
+    }
+
+    #[tokio::test]
+    async fn test_parse_content_address() {
+        // Test CID parsing
+        let cid = BlobStore::compute_cid(b"test");
+        let cid_str = cid.to_string();
+        let hex = BlobStore::parse_content_address(&cid_str).unwrap();
+        assert_eq!(hex.len(), 64); // SHA256 = 32 bytes = 64 hex chars
+
+        // Test sha256-prefixed hash parsing
+        let hash = BlobStore::compute_hash(b"test");
+        let hex2 = BlobStore::parse_content_address(&hash).unwrap();
+        assert_eq!(hex, hex2); // Same data should produce same hex
+
+        // Test raw hex parsing
+        let raw_hex = hash.strip_prefix("sha256-").unwrap();
+        let hex3 = BlobStore::parse_content_address(raw_hex).unwrap();
+        assert_eq!(hex, hex3);
+
+        // Test invalid input
+        assert!(BlobStore::parse_content_address("invalid").is_err());
+    }
+
+    #[tokio::test]
+    async fn test_hash_to_cid_roundtrip() {
+        let data = b"roundtrip test";
+        let (original_cid, hash) = BlobStore::compute_addresses(data);
+
+        // Convert hash back to CID
+        let reconstructed_cid = BlobStore::hash_to_cid(&hash).unwrap();
+
+        assert_eq!(original_cid.to_string(), reconstructed_cid.to_string());
+    }
+
+    #[tokio::test]
+    async fn test_exists_by_address() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = BlobStore::new(temp_dir.path()).await.unwrap();
+
+        let data = b"Existence test";
+        let result = store.store(data).await.unwrap();
+
+        // Check existence by CID
+        assert!(store.exists_by_address(&result.cid).await.unwrap());
+
+        // Check existence by hash
+        assert!(store.exists_by_address(&result.hash).await.unwrap());
+
+        // Check non-existent
+        assert!(!store.exists_by_address("bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").await.unwrap_or(false));
     }
 }

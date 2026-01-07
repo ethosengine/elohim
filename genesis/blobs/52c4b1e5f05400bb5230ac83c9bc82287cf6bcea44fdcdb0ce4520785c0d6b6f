@@ -1,0 +1,11 @@
+Scenario: Medical privacy protects Alex from unauthorized disclosure
+    Given medical information is highly sensitive
+    And disability status can lead to discrimination if disclosed
+    When Alex's medical information is collected
+    Then the personal_agent should ensure strict medical privacy
+    And it should control what medical information is shared with whom
+    And workplace should never receive medical details
+    And family should only access what Alex permits
+    And insurance should receive minimum necessary information
+    And Alex's medical privacy should be maximally protected
+    And the protocol should prevent unauthorized medical disclosure systematically

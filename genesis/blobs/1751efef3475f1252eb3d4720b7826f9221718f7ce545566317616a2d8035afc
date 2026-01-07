@@ -1,0 +1,10 @@
+Scenario: Planning commissioner tracks developer's environmental commitments from past project
+    Given same developer seeking approval for new project
+    And past project approved with environmental mitigation commitments
+    And commissioner wants to know if developer followed through on previous promises
+    When the commissioner uses Observer implementation tracking
+    Then they see developer's past project mitigation commitments versus implementation
+    And discover tree planting and habitat restoration commitments not fully delivered
+    And find stormwater management systems performing below promised levels
+    And access documentation showing enforcement gaps by municipality
+    And impact tracking reveals developer's track record diverged from promises

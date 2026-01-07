@@ -1,0 +1,7 @@
+Scenario: Advocating for community support of workers
+    Given workers are systematically underpaid and overworked
+    When I want to advocate for community support of workers
+    Then the protocol should help me organize advocacy
+    And connect me with other workers for collective action
+    And support pushing for living wage campaigns and worker protections
+    And build community culture that values worker dignity

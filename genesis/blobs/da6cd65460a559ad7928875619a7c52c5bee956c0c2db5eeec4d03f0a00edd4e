@@ -1,0 +1,10 @@
+Scenario: Responding to constituent concerns about AI governance
+    Given residents contact me about protocol experiences
+    And I am accountable through elections
+    When I maintain constituent engagement on AI governance
+    Then I hold: town halls in communities like Riverside
+    And I offer: office hours for people like Marcus to share experiences
+    And I conduct: surveys gathering feedback on legislation
+    And I respond: to concerns showing I'm listening
+    And I maintain: constituent services for protocol-related issues
+    And I remain: democratically accountable for policy choices

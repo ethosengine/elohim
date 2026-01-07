@@ -1,0 +1,12 @@
+Scenario: Community care infrastructure advocacy based on user needs
+    Given Robert uses community care services and sees gaps
+    And he understands what infrastructure would help families like his
+    And community planning should be informed by user experience
+    When community_elohim connects user experience to infrastructure planning
+    Then it should channel Robert's feedback to community planning processes
+    And surface gaps: "No adult day care available for aging parents in this community"
+    And help him advocate for infrastructure that serves caregivers
+    And connect his voice to community decision-makers
+    And ensure community care systems are designed by those who use them
+    And build care infrastructure based on actual caregiver needs
+    And demonstrate that users should shape systems

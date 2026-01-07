@@ -1,0 +1,9 @@
+Scenario: Organizer develops community leader for public testimony
+    Given a tenant has never spoken at public meetings
+    And they want to testify about rent burden at city council
+    When the organizer uses Observer to support leadership development
+    Then the tenant receives accessible data on local rent patterns
+    And gets sample testimony framework personalized to their experience
+    And sees common questions and effective response strategies
+    And practices using Observer's preparation tools
+    And emerges as powerful community voice not dependent on organizer

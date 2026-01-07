@@ -1,0 +1,10 @@
+Scenario: Family care burden monitoring prevents Margaret's burnout
+    Given Margaret provides care across three generations
+    And she has limited time and energy
+    When the family_elohim monitors total care burden
+    Then it should track cumulative care hours across all relationships
+    And it should flag when burden becomes unsustainable
+    And it should surface need for family conversation about distribution
+    And Margaret's own needs should be protected
+    And the system should prevent exploitation disguised as family care
+    And burnout prevention should be built into family coordination

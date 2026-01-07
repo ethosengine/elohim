@@ -1,0 +1,8 @@
+Scenario: Navigating workplace power dynamics
+    Given employers have significant power over workers
+    And I may fear retaliation for advocating for my needs
+    When I need to navigate workplace advocacy carefully
+    Then the protocol should help me understand my protections
+    And provide strategies for advocacy that minimize retaliation risk
+    And connect me with legal resources if needed
+    And support me in exercising my rights despite power imbalance

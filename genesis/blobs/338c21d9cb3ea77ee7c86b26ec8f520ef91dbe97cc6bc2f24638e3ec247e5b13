@@ -1,0 +1,9 @@
+Scenario: Household privacy protected from external surveillance
+    Given household care economy generates detailed family data
+    And this data reveals intimate household patterns
+    When household data is collected
+    Then it must remain under household members' control
+    And no external entities should access household data without consent
+    And workplace should never see household care patterns
+    And community should only see what household chooses to share
+    And household privacy should be absolutely protected

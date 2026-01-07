@@ -1,0 +1,53 @@
+# Agents: Economic Actors in hREA
+
+## What is an Agent?
+
+In hREA (Holochain REA), an Agent is any economic actor who can:
+- **Provide** resources to others
+- **Receive** resources from others
+- **Commit** to future economic activity
+- **Observe** and witness events
+
+Agents can be individuals, organizations, or communities.
+
+## Agent Relationships
+
+Agents don't exist in isolation. They have relationships:
+
+```
+Agent: Adaeze (Nurse)
+├── Relationships as Provider:
+│   ├── Care provider → Hospital patients
+│   ├── Mentor → Junior nurses
+│   └── Family supporter → Okonkwo household
+├── Relationships as Receiver:
+│   ├── Employee ← Hospital
+│   ├── Network member ← Lagos Health Collective
+│   └── Learner ← Continuing education
+└── Scope Memberships:
+    ├── Lagos Health Collective
+    ├── Ikeja Community Network
+    └── Okonkwo Family
+```
+
+## Agent Capabilities in hREA
+
+From the hREA GraphQL API, agents can:
+
+| Capability | Description |
+|------------|-------------|
+| `commitments` | Promises to provide or receive resources |
+| `intents` | Desired economic activity (offers/requests) |
+| `economicEvents` | Observed value flows |
+| `inventoriedResources` | Resources the agent stewards |
+| `proposals` | Offers to exchange value |
+
+## Agents and Care Recognition
+
+In a care economy, agent identity includes:
+- **Care tokens accumulated**: Recognition of care work
+- **Skill attestations**: Witnessed competencies
+- **Creator presence**: Contributions to shared knowledge
+- **Reputation**: Trust built through consistent contribution
+
+The network sees what you create, who you help, and how you contribute.

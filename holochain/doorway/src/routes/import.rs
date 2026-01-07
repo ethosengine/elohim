@@ -237,6 +237,15 @@ async fn forward_queue_import(
         "chunk_delay_ms": import_req.chunk_delay_ms,
     });
 
+    // IMPORT_DEBUG: Log full request body
+    if std::env::var("IMPORT_DEBUG").is_ok() {
+        debug!(
+            incoming_body = %String::from_utf8_lossy(&body).chars().take(2000).collect::<String>(),
+            outgoing_body = %serde_json::to_string_pretty(&storage_req).unwrap_or_default(),
+            "[IMPORT_DEBUG] doorway -> elohim-storage request"
+        );
+    }
+
     // Forward to elohim-storage
     let storage_endpoint = format!("{}/import/queue", storage_url.trim_end_matches('/'));
 
@@ -266,6 +275,16 @@ async fn forward_queue_import(
                         status = %status,
                         "elohim-storage queue response"
                     );
+
+                    // IMPORT_DEBUG: Log response body
+                    if std::env::var("IMPORT_DEBUG").is_ok() {
+                        debug!(
+                            response_status = %status,
+                            response_body = %body.chars().take(2000).collect::<String>(),
+                            "[IMPORT_DEBUG] elohim-storage -> doorway response"
+                        );
+                    }
+
                     Response::builder()
                         .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
                         .header("Content-Type", "application/json")

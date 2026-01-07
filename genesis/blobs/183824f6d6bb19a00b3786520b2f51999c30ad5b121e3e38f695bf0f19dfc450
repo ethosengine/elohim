@@ -1,0 +1,10 @@
+Scenario: Community environmental projects and collective action
+    Given ecological challenges require collective response
+    And Sarah participates in community environmental initiatives
+    When the ecological_elohim tracks Sarah's environmental activism
+    Then it should recognize organizing as ecological care work
+    And it should value her participation in community environmental projects
+    And activism labor should accumulate care tokens
+    And the system should support parent environmental advocacy
+    And Sarah's work to build sustainable community should be recognized
+    And collective ecological action should be valued as care contribution

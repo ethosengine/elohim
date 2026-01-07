@@ -1,0 +1,10 @@
+Scenario: Community-level insights appropriate for child understanding
+    Given neighborhood_elohim aggregates community data
+    And Emma is old enough to understand patterns
+    When Emma receives neighborhood-level information
+    Then insights should be concrete and age-appropriate
+    And the agent should say "Your neighborhood buys a lot of fresh vegetables"
+    And abstract data should not be presented
+    And community patterns should be framed in care terms
+    And Emma should learn about collective behavior through simple examples
+    And complexity should be appropriately filtered for age 8

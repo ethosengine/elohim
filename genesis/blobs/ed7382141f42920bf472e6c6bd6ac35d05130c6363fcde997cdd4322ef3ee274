@@ -1,0 +1,10 @@
+Scenario: Community provides safety net when teen faces crisis
+    Given Jasmine encounters a family crisis or household instability
+    And she has been a consistent community contributor
+    When the crisis occurs and she needs support
+    Then the community_elohim should surface available resources
+    And her care contributions should give her standing to access support
+    And community institutions should respond to protect her wellbeing
+    And the system should preserve her autonomy and dignity
+    And demonstrate that care economy operates as mutual aid
+    And show that communities care for members who have cared for community

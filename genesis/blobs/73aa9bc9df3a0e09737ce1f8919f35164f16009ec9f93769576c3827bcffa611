@@ -1,0 +1,10 @@
+Scenario: Knowledge and skill sharing in student community
+    Given Kenji has environmental science knowledge
+    And other students have different expertise
+    When students share knowledge freely
+    Then the community_elohim should recognize teaching as care work
+    And it should value Kenji explaining organic chemistry to struggling peer
+    And it should track peer tutoring as community contribution
+    And knowledge sharing should accumulate care tokens
+    And the system should foster culture of generous knowledge exchange
+    And intellectual support should be recognized as care labor

@@ -1,0 +1,12 @@
+Scenario: Accessing neighborhood services while managing transportation barriers
+    Given I don't have reliable transportation
+    And many neighborhood resources require travel
+    When I need to access services across the neighborhood
+    Then the Value Scanner optimizes my travel for efficiency
+    And identifies services accessible by walking or public transit
+    And helps me batch errands to minimize trips
+    And surfaces transportation assistance programs
+    And coordinates with neighbors for ride-sharing when appropriate
+    And my personal_agent plans routes considering my constraints
+    And recognizes transportation navigation as significant invisible labor
+    And validates that lack of transportation makes everything harder

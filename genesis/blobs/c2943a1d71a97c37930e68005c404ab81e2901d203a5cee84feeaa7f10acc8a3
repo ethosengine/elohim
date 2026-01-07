@@ -1,0 +1,10 @@
+Scenario: Reducing food waste with fixed income constraints
+    Given Margaret's budget requires maximizing every dollar
+    And food waste represents meaningful lost resources
+    When Margaret plans meals and shopping
+    Then her personal_agent should help minimize waste
+    And it should suggest appropriate portion sizes for one or two people
+    And it should track perishables and suggest usage timing
+    And it should recommend preservation techniques Margaret knows from experience
+    And waste reduction should align with both budget and values
+    And Margaret's generation's knowledge of frugality should be honored

@@ -1,0 +1,11 @@
+Scenario: Activist creates cross-geographic climate justice network
+    Given activists in 40 cities are working on climate action
+    And they share commitment to Indigenous leadership and just transition
+    When a founding group creates a climate justice affinity network
+    And they establish network charter emphasizing subsidiarity and equity
+    And they invite activists from participating communities
+    Then the affinity network space is created
+    And participants maintain connection to their local communities
+    And the network provides coordination without centralized control
+    And local autonomy is preserved while enabling collective action
+    And shared resources, tactics, and patterns flow through the network

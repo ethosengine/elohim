@@ -1,0 +1,9 @@
+Scenario: Council member distinguishes grassroots from astroturf campaign
+    Given the politician receives flood of emails opposing rent control
+    And campaigns look like authentic constituent concern
+    When the Observer analyzes communication patterns
+    Then they see template messages from industry lobbying firm
+    And identify coordinated timing and identical language
+    And distinguish 5 genuine constituent concerns from 200 manufactured messages
+    And understand actual constituent sentiment versus manipulation
+    And make decisions based on real community needs

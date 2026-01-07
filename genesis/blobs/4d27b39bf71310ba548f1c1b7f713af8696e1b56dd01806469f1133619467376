@@ -1,0 +1,9 @@
+Scenario: Parent translates education-ese to real child impacts
+    Given the school board discusses "instructional efficiency optimization"
+    And the parent reviews meeting while child does homework
+    When the Observer translates the education jargon
+    Then the parent learns this means eliminating teaching assistants
+    And understands impact is class size increases from 24 to 32 students
+    And sees real effect on their child's individual attention
+    And can respond to actual impacts vs bureaucratic language
+    And education policy becomes accessible to working parents

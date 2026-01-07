@@ -1,0 +1,9 @@
+Scenario: Schedule flexibility for solo parent managing complex logistics
+    Given Maria coordinates three children's schools, activities, and appointments alone
+    And rigid work schedules create impossible conflicts for single parents
+    When Maria's work schedule is determined
+    Then the workplace_elohim should advocate for flexible scheduling options
+    And Maria should have ability to adjust hours for critical parenting needs
+    And flexibility should be policy, not personal favor requiring explanation
+    And schedule should enable sustainable work-parenting integration
+    And single parents should access flexibility without career penalty

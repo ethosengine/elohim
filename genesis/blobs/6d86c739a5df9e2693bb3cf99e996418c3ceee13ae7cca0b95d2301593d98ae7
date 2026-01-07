@@ -1,0 +1,9 @@
+Scenario: Farm labor practices improve through worker democratic control
+    Given Tom paid farmworkers as well as possible but margins were thin
+    And workers lacked voice in schedule, breaks, safety, or working conditions
+    When farmworkers gain democratic ownership and governance
+    Then wages increase to $18/hour minimum from increased farm revenue (direct sales, fair pricing)
+    And work schedules accommodate workers' family and health needs
+    And safety equipment and protocols improve through worker input
+    And agricultural labor transforms from exploited work to dignified livelihood
+    And workplace_elohim ensures democratic governance protects farmworker dignity

@@ -1,0 +1,9 @@
+Scenario: Single parent representation in school governance and decision-making
+    Given single parents have specific needs and perspectives
+    And they are often underrepresented in school governance due to time constraints
+    When schools form parent councils or governance bodies
+    Then the educational_elohim should facilitate single parent participation
+    And schools should make governance accessible to time-constrained parents
+    And single parent voices should inform school policies
+    And Maria should be able to contribute to school governance despite constraints
+    And educational policy should reflect single-parent family realities

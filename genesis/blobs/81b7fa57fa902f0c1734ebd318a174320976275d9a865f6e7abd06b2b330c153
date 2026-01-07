@@ -1,0 +1,9 @@
+Scenario: Activist identifies affected community members for organizing
+    Given a city policy will impact 300 residents in the neighborhood
+    And the activist needs to build organized base
+    When the Observer detects affected residents
+    Then the activist can see community impact patterns
+    And identify residents most affected by the issue
+    And facilitate grassroots testimony development
+    And build coalition grounded in lived experience
+    And transform policy analysis into community power

@@ -1,0 +1,8 @@
+Scenario: Managing self-care with unpredictable work schedule
+    Given my work schedule changes weekly with different shift patterns
+    And I need to maintain basic nutrition and rest
+    When my personal_agent detects schedule changes
+    Then it should adapt my meal planning to available time slots
+    And suggest efficient meal prep strategies for my schedule
+    And protect time blocks for essential self-care
+    And remind me that my well-being matters despite work demands

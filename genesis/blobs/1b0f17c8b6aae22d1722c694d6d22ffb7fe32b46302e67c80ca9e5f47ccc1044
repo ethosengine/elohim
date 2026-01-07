@@ -1,0 +1,11 @@
+Scenario: Municipal transparency dashboard for public accountability
+    Given residents deserve visibility into city governance
+    And I am accountable through democratic elections
+    When we provide municipal transparency dashboard
+    Then residents see: resource flows across neighborhoods
+    And they access: appeal patterns and council decisions
+    And they view: city budget allocation and outcomes
+    And they compare: promised benefits with actual results
+    And they hold me accountable: with evidence not just rhetoric
+    And transparency strengthens: democratic governance
+    And I cannot hide: behind "algorithm decided" or "trust me"

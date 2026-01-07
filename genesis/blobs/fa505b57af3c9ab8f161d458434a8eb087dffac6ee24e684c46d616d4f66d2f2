@@ -1,0 +1,10 @@
+Scenario: Including family in milestone celebrations appropriately
+    Given Jordan is celebrating one year at their library job
+    And Jordan wants family to recognize this achievement
+    When Jordan plans a celebration
+    Then Jordan decides who to invite from family
+    And the personal_agent helps Jordan send invitations
+    And the celebration honors Jordan's accomplishment as a worker
+    And family celebrates Jordan's success, not just their participation
+    And Jordan experiences family recognizing their adult achievements
+    And Jordan's contributions are valued, not just their effort

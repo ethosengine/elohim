@@ -1,0 +1,7 @@
+Scenario: Building community solidarity with other workers
+    Given workers across community face similar exploitation
+    When we want to organize collective support and advocacy
+    Then the protocol should connect workers across industries
+    And facilitate worker mutual aid and solidarity networks
+    And support collective action for better conditions
+    And build worker power through community organization

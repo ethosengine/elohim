@@ -121,6 +121,18 @@ pub const COMPLETION_CRITERIA: &[&str] = &[
     "view-content",     // Just view content
 ];
 
+/// Engagement types for mastery tracking
+pub const ENGAGEMENT_TYPES: &[&str] = &[
+    "view",       // Passive viewing
+    "quiz",       // Took assessment
+    "practice",   // Practice exercise
+    "discuss",    // Participated in discussion
+    "create",     // Created content
+    "peer",       // Peer interaction
+    "teach",      // Teaching/mentoring
+    "apply",      // Real-world application
+];
+
 // ============================================================================
 // Content Self-Healing Implementation
 // ============================================================================

@@ -1,0 +1,9 @@
+Scenario: Right to disconnect and data sovereignty maintained
+    Given Marcus uses the system for critical household functions
+    And constitutional constraints apply at all governance layers
+    When Marcus or his family choose to disconnect
+    Then the system must honor disconnection immediately
+    And alternative methods for household management must remain viable
+    And no dependency should be created that makes disconnection harmful
+    And data sovereignty must be preserved
+    And Marcus's right to not participate must be absolute

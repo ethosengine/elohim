@@ -1,0 +1,10 @@
+Scenario: Neighborhood council member understands displacement pressures in community
+    Given neighborhood experiencing rapid housing cost increases
+    And longtime residents express concerns about ability to stay
+    And council wants to understand scope of displacement threat
+    When the council member uses Observer community impact analysis
+    Then they receive data on rent increases and eviction rates over time
+    And see demographic changes showing displacement patterns
+    And access analysis of displacement risk for different household types
+    And discover specific buildings and blocks with highest vulnerability
+    And hyperlocal data informs advocacy for tenant protections and affordable housing

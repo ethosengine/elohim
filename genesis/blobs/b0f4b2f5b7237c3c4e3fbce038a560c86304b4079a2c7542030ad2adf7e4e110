@@ -1,0 +1,12 @@
+Scenario: Navigating community relationships with people at different vulnerability levels
+    Given community includes people in various circumstances (crisis, stability, privilege)
+    And relationships cross different resource and vulnerability levels
+    When I interact with community members from different positions
+    Then the community_elohim facilitates cross-difference relationships
+    And validates that I am peer regardless of current circumstances
+    And helps me navigate power dynamics in community relationships
+    And prevents exploitation while enabling genuine connection
+    And recognizes that care economy includes people in various situations
+    And my personal_agent supports me in authentic relationships across difference
+    And tracks care economy participation beyond simplistic "giver/receiver" binary
+    And celebrates diverse community including vulnerable and privileged members

@@ -1,0 +1,10 @@
+Scenario: Young child contributes to family decision making appropriately
+    Given the family is making decisions about meals
+    And Tommy has preferences and care intentions
+    When Tommy's input is solicited through the scanner
+    Then his preferences should be honored age-appropriately
+    And his care intentions (choosing for others) should carry weight
+    And the family_elohim should balance Tommy's input with family needs
+    And Tommy should experience having voice in family governance
+    And his participation should be genuine, not token
+    And family decisions should reflect that all members contribute

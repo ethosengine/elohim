@@ -1,0 +1,10 @@
+Scenario: Teen identifies neighborhood needs and initiates responses
+    Given Jasmine notices the neighborhood lacks safe spaces for younger children
+    And she has capacity and interest to address this need
+    When she proposes organizing a neighborhood play supervision rotation
+    Then the neighborhood_elohim should support her initiative
+    And facilitate coordination with other neighbors
+    And recognize her leadership and care contribution
+    And provide tools for organizing collective action
+    And demonstrate that teens can initiate community improvements
+    And build her capability for civic leadership and community organizing

@@ -1,0 +1,10 @@
+Scenario: Neighborhood collective resources accessible to teen based on contribution
+    Given the neighborhood has established collective resources
+    And Jasmine has accumulated substantial care contributions
+    When she needs to access neighborhood resources
+    Then her care contributions should give her standing to access shared resources
+    And she should be able to use neighborhood tool library, shared equipment, or collective resources
+    And access should be based on demonstrated participation, not age
+    And the neighborhood_elohim should recognize her as a contributor with legitimate access
+    And she should learn that care economy operates on reciprocity, not charity
+    And her care tokens should be valid currency in neighborhood exchanges

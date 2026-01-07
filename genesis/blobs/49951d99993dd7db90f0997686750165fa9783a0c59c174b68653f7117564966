@@ -1,0 +1,9 @@
+Scenario: Adult learning about care economy through practice and reflection
+    Given Sarah is learning care economy principles while teaching them
+    And adult learning happens through experience and reflection
+    When Sarah uses the Value Scanner over time
+    Then she should deepen her own value literacy continuously
+    And the educational_elohim should support her learning journey
+    And she should gain insights from teaching children
+    And her understanding should evolve through practice
+    And adults should learn care economy alongside children

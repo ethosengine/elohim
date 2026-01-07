@@ -1,0 +1,9 @@
+Scenario: Care economy data supports worker advocacy for policy changes
+    Given Sarah and colleagues want better workplace care policies
+    And employers may not understand workers' care burdens
+    When Sarah advocates for workplace policy changes
+    Then the workplace_elohim should provide aggregated care economy data
+    And advocacy should be strengthened by quantified evidence
+    And Sarah should show that care responsibilities are substantial
+    And policy discussions should be informed by actual care patterns
+    And workers should use care economy data to win policy improvements

@@ -1,0 +1,9 @@
+Scenario: State legislator understands local impacts of statewide policy
+    Given the politician represents specific legislative district
+    And considers statewide legislation
+    When the Observer analyzes district-specific impacts
+    Then they see how legislation affects their constituents specifically
+    And identify trade-offs between district and statewide interests
+    And understand which constituent communities benefit versus harmed
+    And explain vote to constituents with local impact data
+    And balance representation of district versus state interests

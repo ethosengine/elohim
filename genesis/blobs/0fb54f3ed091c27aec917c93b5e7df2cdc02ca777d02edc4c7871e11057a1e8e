@@ -1,0 +1,11 @@
+Scenario: Young child makes autonomous care decision within boundaries
+    Given Tommy is selecting fruit for his sister Emma
+    And Emma has nut allergies configured in the system
+    And the family budget constraints are active
+    When Tommy scans strawberries for Emma
+    Then his personal_agent should recognize the care intention
+    And the agent should say "Remember, Emma loves the red ones"
+    And the choice should be recorded as a care contribution
+    And Tommy should experience genuine autonomy
+    And invisible guardrails should prevent allergen selection
+    And Tommy should not be aware of the protective boundaries

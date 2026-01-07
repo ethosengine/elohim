@@ -1,0 +1,10 @@
+Scenario: Caregiver's emotional labor recognized as valuable work
+    Given James grieves David's progressive decline daily
+    And he manages profound emotional labor constantly
+    And he maintains David's dignity through devastating loss
+    When the personal_agent tracks James's emotional work
+    Then this labor should be recognized as skilled care work
+    And emotional support should be valued alongside physical care
+    And the weight of ongoing grief should be acknowledged
+    And emotional caregiving should accumulate care tokens
+    And society should see that caregiving is emotionally devastating work

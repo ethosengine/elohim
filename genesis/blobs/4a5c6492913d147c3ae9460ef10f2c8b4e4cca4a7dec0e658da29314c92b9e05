@@ -1,0 +1,9 @@
+Scenario: Caregiver health monitoring as part of care recipient's care plan
+    Given James's health directly affects his ability to care for David
+    And caregiver health collapse creates patient crisis
+    When the healthcare_elohim monitors caregiver health
+    Then James's health should be tracked as part of care plan
+    And providers should ask about caregiver well-being
+    And caregiver health problems should trigger intervention
+    And James should be required to attend his own medical appointments
+    And healthcare system should recognize caregiver health as patient health infrastructure

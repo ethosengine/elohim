@@ -1,0 +1,10 @@
+Scenario: Neighborhood care during family crisis
+    Given families sometimes face crisis (illness, job loss, emergency)
+    And neighbors can provide crucial support during crisis
+    When a neighborhood family faces crisis
+    Then the neighborhood_elohim should coordinate mutual aid
+    And it should identify who has capacity to help
+    And it should organize meal trains, childcare, practical support
+    And crisis care should be specially recognized and valued
+    And neighborhood resilience should be built through mutual aid
+    And the system should enable rapid community response

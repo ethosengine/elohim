@@ -1,0 +1,9 @@
+Scenario: Investor diversifies across multiple democratic enterprises reducing risk
+    Given individual business investment is high-risk
+    And Patricia needs diversification for financial security
+    When community investment pool spreads capital across multiple conversions
+    Then her $10K in pool supports Maria's Kitchen, Rosa's Auto, and neighborhood retail
+    And portfolio diversification reduces single-business failure risk
+    And democratic network mutual support further reduces risk
+    And risk management is transparent and community-governed
+    And community_elohim coordinates portfolio diversification and risk management

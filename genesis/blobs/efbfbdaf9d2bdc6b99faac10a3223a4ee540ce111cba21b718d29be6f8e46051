@@ -1,0 +1,10 @@
+Scenario: Household decision-making about grandparenting commitments
+    Given grandparenting commitments affect both household members
+    And decisions should be made jointly
+    When the family requests additional care or changes
+    Then the household_elohim should facilitate joint decision-making
+    And both Margaret and Robert should agree on care commitments
+    And household should speak with one voice to family
+    And care arrangements should serve household needs and capacity
+    And neither partner should unilaterally commit to care
+    And household governance should be respected by extended family

@@ -1,0 +1,10 @@
+Scenario: Professional development coordinated with parenting constraints
+    Given Sarah wants to pursue professional growth
+    And she has limited time due to parenting responsibilities
+    When Sarah considers professional development opportunities
+    Then the workplace_elohim should help her assess feasibility
+    And it should integrate family constraints into planning
+    And it should help her find development opportunities compatible with parenting
+    And professional growth should be possible despite parenting demands
+    And the system should support career development for working parents
+    And Sarah should not have to choose between career and family

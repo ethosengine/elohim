@@ -1,0 +1,9 @@
+Scenario: Extended family support coordination with maintained boundaries
+    Given Maria may receive support from her own parents or siblings
+    And extended family help can be complicated by distance or family dynamics
+    When extended family contributes to children's care
+    Then the family_elohim should track and coordinate extended family involvement
+    And it should help Maria maintain boundaries around parenting authority
+    And it should recognize extended family contributions without ceding control
+    And it should prevent grandparents or others from overstepping
+    And Maria should retain parental sovereignty while accepting help

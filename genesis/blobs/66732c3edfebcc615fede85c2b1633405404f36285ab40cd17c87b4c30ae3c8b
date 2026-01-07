@@ -1,0 +1,11 @@
+Scenario: Recognition as capable contributor not just cute helper
+    Given Emma has made a budget-conscious choice
+    And she selected store brand cereal to save money
+    When the transaction is complete
+    Then the recognition should be specific and substantive
+    And her personal_agent should say "Your choice saved $2, which helped the family stay within budget"
+    And the feedback should acknowledge real impact
+    And Emma should not receive patronizing praise
+    And her contribution should be valued as genuine stewardship
+    And she should build identity as capable resource manager
+    And recognition should reflect that her work actually matters

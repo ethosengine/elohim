@@ -1,0 +1,9 @@
+Scenario: Activist connects local impacts to state policy
+    Given state education funding formula harms the activist's district
+    And needs to build pressure for reform
+    When the Observer calculates local impacts of state policy
+    Then the activist shows how formula shortchanges their district by $4M
+    And documents impacts on class sizes and programs
+    And connects families affected by funding gaps
+    And state policy debate becomes grounded in local reality
+    And abstract policy becomes personal stakes

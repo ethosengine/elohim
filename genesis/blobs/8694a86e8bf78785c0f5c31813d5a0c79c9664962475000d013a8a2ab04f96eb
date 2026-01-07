@@ -1,0 +1,12 @@
+Scenario: Neighborhood emergency preparedness builds resilience
+    Given emergencies and crises happen
+    And neighborhoods with strong connections respond better to crisis
+    And Robert has professional skills useful in emergencies
+    When neighborhood_elohim supports emergency preparedness
+    Then it should coordinate neighborhood emergency planning
+    And map neighborhood skills and resources
+    And recognize Robert's management and coordination capabilities
+    And connect neighbors who can support each other in crisis
+    And build neighborhood resilience through known relationships
+    And ensure isolated residents are included in emergency networks
+    And demonstrate that care economy creates crisis resilience

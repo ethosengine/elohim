@@ -1,0 +1,10 @@
+Scenario: Activist shares successful tactic that spreads through trust
+    Given a community successfully pressured a bank to divest from fossil fuels
+    And the activist documents the strategy with evidence of impact
+    When they contribute the tactic to the climate justice network
+    And other activists review and validate the approach
+    Then the tactic enters the network's pattern library
+    And it surfaces for communities facing similar challenges
+    And 23 communities adapt the tactic to their local context
+    And improvements flow back into the pattern library
+    And the network tracks collective impact across implementations

@@ -1,0 +1,9 @@
+Scenario: Politician navigates high-stakes testing debate with outcome focus
+    Given testing requirements create political controversy
+    And both supporters and critics make competing claims
+    When the Observer analyzes testing data and educational impacts
+    Then they see how much instructional time testing consumes
+    And understand what testing reveals versus distorts about learning
+    And identify schools where testing drives harmful practices
+    And review alternative assessment models in other states
+    And balance accountability needs with teaching and learning quality

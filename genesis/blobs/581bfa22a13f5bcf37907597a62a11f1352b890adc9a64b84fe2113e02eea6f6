@@ -1,0 +1,10 @@
+Scenario: Activist recovers data after device seizure
+    Given the activist's device was confiscated during a protest
+    And their data was pre-distributed to sanctuary institutions
+    When the activist obtains new hardware and initiates recovery
+    And they authenticate through biometric and social verification
+    And the sanctuary institutions verify the activist's safety and free will
+    Then all organizing data, contacts, and history are restored
+    And the compromised device's access is permanently revoked
+    And the activist resumes organizing with full digital sovereignty
+    And the network logs the rights violation for documentation

@@ -1,0 +1,9 @@
+Scenario: Teaching children environmental stewardship through shopping
+    Given Sarah is raising Tommy (5) and Emma (8)
+    And she wants them to learn ecological care
+    When Sarah uses the Value Scanner with children
+    Then the bioregional_elohim should provide age-appropriate environmental education
+    And Tommy should learn concrete care for food (not abstract sustainability)
+    And Emma should learn connections between care for people and planet
+    And shopping should be teaching moment for ecological stewardship
+    And children should internalize environmental care as care work

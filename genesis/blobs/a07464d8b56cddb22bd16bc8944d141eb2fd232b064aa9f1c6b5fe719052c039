@@ -1,0 +1,9 @@
+Scenario: Organizer builds coalition for culturally responsive curriculum
+    Given families want curriculum reflecting their communities' histories
+    And multiple cultural groups share this interest
+    When the organizer uses Observer to facilitate coalition building
+    Then they identify parents from different backgrounds with aligned goals
+    And coordinate around shared demands for curriculum inclusion
+    And help families develop specific proposals with supporting evidence
+    And organize testimony showcasing diverse community voices
+    And coalition transforms individual requests into collective power

@@ -1,0 +1,10 @@
+Scenario: Documenting community care contributions for future recognition
+    Given Kenji's community care work is currently invisible to traditional economy
+    And his care tokens accumulate throughout college
+    When Kenji graduates and enters workforce
+    Then his care token history should document community leadership and care skills
+    And it should translate community organizing to "proven leadership capability"
+    And it should show mutual aid coordination as "project management expertise"
+    And community care work should be valuable on employment terms
+    And the system should help Kenji articulate care economy participation professionally
+    And student community work should be recognized as career-relevant experience

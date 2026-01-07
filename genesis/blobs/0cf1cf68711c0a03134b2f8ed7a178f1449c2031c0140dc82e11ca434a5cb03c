@@ -1,0 +1,10 @@
+Scenario: Parent knowledge of child's learning needs informs IEP and accommodations
+    Given Sarah knows Tommy's and Emma's learning patterns intimately
+    And children may need educational accommodations
+    When schools develop individualized education plans
+    Then Sarah's expertise should be central to planning
+    And parent observations should drive accommodation decisions
+    And the educational_elohim should document Sarah's knowledge
+    And schools should recognize parents as essential IEP partners
+    And the system should position parent knowledge as authoritative
+    And Sarah's advocacy for children's needs should be valued and supported

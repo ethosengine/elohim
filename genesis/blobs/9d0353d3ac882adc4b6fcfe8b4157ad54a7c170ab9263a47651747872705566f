@@ -1,0 +1,10 @@
+Scenario: Learning to recognize own needs and ask for help
+    Given Kenji is navigating adult independence for first time
+    And college culture often treats struggling as weakness
+    When Kenji faces challenges beyond his current capacity
+    Then the personal_agent should teach him to recognize when he needs help
+    And it should normalize asking for support as strength, not failure
+    And it should connect him to available resources (food bank, counseling, emergency aid)
+    And the agent should validate that everyone needs help sometimes
+    And the system should counteract toxic independence culture
+    And Kenji should learn that care economy includes receiving care

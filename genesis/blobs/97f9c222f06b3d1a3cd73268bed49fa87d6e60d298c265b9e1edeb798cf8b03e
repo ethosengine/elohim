@@ -1,0 +1,9 @@
+Scenario: Solo household labor tracking shows work of two parents
+    Given Maria performs all household labor alone
+    And she does cooking, cleaning, laundry, maintenance, logistics, planning
+    When household labor is tracked
+    Then the household_elohim should quantify all of Maria's work
+    And it should make visible that she's doing work normally split between two adults
+    And tracking should validate that solo parenting is literally double the labor
+    And Maria's care token accumulation should reflect superhuman household contribution
+    And society should see quantified proof of single parents' extraordinary work

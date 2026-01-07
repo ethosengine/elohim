@@ -1,0 +1,7 @@
+Scenario: Sharing meal prep to reduce individual burden
+    Given cooking for one is inefficient and exhausting
+    When household members batch cook or share meals
+    Then the protocol should coordinate shared meal preparation
+    And track who cooks, who cleans, and who benefits
+    And help us establish sustainable shared cooking rhythms
+    And recognize this cooperation as care economy practice

@@ -1,0 +1,11 @@
+Scenario: Protecting disability community from institutional harm
+    Given institutions often harm disabled people systematically
+    And Alex advocates against institutional ableism
+    When Alex works to protect disability community from harm
+    Then this protective advocacy should be recognized as care work
+    And the community_elohim should track Alex's watchdog activities
+    And preventing harm is as valuable as providing support
+    And Alex's work defending community rights should accumulate tokens
+    And the protocol should value both defensive and generative care work
+    And Alex's advocacy prevents suffering at scale
+    And community protection should be appropriately compensated

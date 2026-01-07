@@ -1,0 +1,9 @@
+Scenario: Displaced community coordinates with climate adaptation network
+    Given multiple coastal communities face similar climate displacement
+    When they form a climate displacement affinity network
+    And they share strategies for community preservation
+    Then communities learn from each other's experiences
+    And successful resettlement patterns are documented and shared
+    And coordinated advocacy for climate displacement support emerges
+    And the network coordinates with climate justice activists
+    And systemic support for climate migrants is organized

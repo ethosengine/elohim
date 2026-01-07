@@ -1,0 +1,12 @@
+Scenario: Managing workplace disclosure about domestic violence or crisis circumstances
+    Given employers may ask about gaps, circumstances, or background
+    And disclosure could lead to discrimination or could generate support
+    When I decide what to disclose to employers
+    Then the workplace_elohim helps me evaluate disclosure risks and benefits
+    And provides guidance on legal protections against discrimination
+    And suggests strategic disclosure approaches when disclosure is beneficial
+    And validates my right to privacy about personal circumstances
+    And helps me navigate background checks or verification issues
+    And my personal_agent reminds me of what I've decided to disclose vs. protect
+    And recognizes disclosure decisions as complex risk assessment
+    And supports my autonomy in disclosure choices

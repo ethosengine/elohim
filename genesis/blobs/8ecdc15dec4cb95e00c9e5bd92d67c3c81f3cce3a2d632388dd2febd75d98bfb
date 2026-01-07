@@ -1,0 +1,7 @@
+Scenario: Recognizing my labor as care contribution
+    Given I prepare food that nourishes people and serves community
+    When I view my work through care economy lens
+    Then the protocol should help me understand my work as care labor
+    And accumulate care tokens reflecting my contribution to community well-being
+    And reframe my relationship to work from pure exploitation to meaningful service
+    And build consciousness that my labor deserves dignity and fair compensation

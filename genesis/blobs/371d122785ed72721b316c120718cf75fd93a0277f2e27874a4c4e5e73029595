@@ -1,0 +1,12 @@
+Scenario: Elder care planning anticipates increasing needs
+    Given Robert's parents are ages 78 and 75
+    And their care needs will likely increase
+    And family should plan proactively rather than react to crises
+    When family_elohim supports elder care planning
+    Then it should help family anticipate future care needs
+    And surface: "Medical patterns suggest increased care needs likely within 2-3 years"
+    And support family in discussing long-term care options
+    And help siblings plan for potential crisis scenarios
+    And ensure parents are included in planning with dignity
+    And coordinate financial, medical, and housing planning
+    And prevent family crisis from lack of preparation

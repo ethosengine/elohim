@@ -1,0 +1,11 @@
+Scenario: Coordinating multiple specialists while maintaining integrated care
+    Given Alex sees multiple medical specialists
+    And specialists often don't communicate with each other
+    When Alex navigates specialist care
+    Then the personal_agent should help Alex coordinate across providers
+    And it should maintain integrated medical history across specialties
+    And it should help Alex communicate between providers
+    And it should identify care gaps or contradictions
+    And Alex should experience coherent care despite system fragmentation
+    And the protocol should serve as Alex's medical coordination hub
+    And integrated perspective should be maintained by Alex, not system

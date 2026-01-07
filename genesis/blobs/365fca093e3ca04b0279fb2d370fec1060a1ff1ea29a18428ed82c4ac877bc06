@@ -1,0 +1,11 @@
+Scenario: Environmental toxins and disability intersection
+    Given environmental pollution causes and exacerbates disabilities
+    And disabled people are particularly vulnerable to environmental toxins
+    When environmental health is addressed
+    Then the bioregional_elohim should recognize disability-environment connections
+    And it should track how environmental factors affect disabled people
+    And Alex's experience should inform environmental health advocacy
+    And environmental justice should include preventing disability from toxins
+    And the protocol should connect environmental and disability health
+    And Alex's advocacy should strengthen environmental health protections
+    And prevention of environmentally-caused disability should be prioritized

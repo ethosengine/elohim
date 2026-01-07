@@ -1,0 +1,9 @@
+Scenario: Teacher coordinates with parents on class sizes
+    Given increasing class sizes harm individualized attention
+    And parents don't realize it's a policy choice not teacher preference
+    When the Observer connects teacher insights with parent concerns
+    Then parents learn class sizes increased from 22 to 28 this year
+    And teachers provide evidence on learning impacts
+    And teacher-parent coalition advocates to principal and district
+    And shared understanding replaces parent-teacher tension
+    And cross-stakeholder coalition creates accountability pressure

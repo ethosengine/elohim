@@ -1,0 +1,11 @@
+Scenario: Neighborhood mutual aid networks include Alex as full participant
+    Given Alex participates in neighborhood mutual aid
+    And Alex both gives and receives support
+    When neighborhood care flows are tracked
+    Then Alex should be recognized as mutual aid contributor
+    And Alex provides support to neighbors (advice, connection, skills)
+    And Alex receives support from neighbors (physical assistance, rides, help)
+    And reciprocity should be visible and valued
+    And the neighborhood_elohim should track care flows in multiple directions
+    And Alex should experience genuine mutuality, not charity
+    And interdependence should be normalized as neighborhood practice

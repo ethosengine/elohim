@@ -1,0 +1,10 @@
+Scenario: Building community across identity and affinity groups
+    Given student community includes diverse identity groups
+    And Kenji might participate in environmental student org, cultural groups, academic communities
+    When Kenji bridges across different student communities
+    Then the community_elohim should recognize bridge-building as care work
+    And it should value work connecting different student networks
+    And it should show how diverse relationships strengthen overall community
+    And coalition building should accumulate care tokens
+    And the system should foster inclusive, interconnected community
+    And students should learn to build community across difference

@@ -1,0 +1,11 @@
+Scenario: Personal agent serves Margaret's autonomy without infantilizing
+    Given Margaret is a capable adult with decades of life experience
+    And the interface uses AI assistance
+    When the personal_agent interacts with Margaret
+    Then it must preserve her full autonomy and dignity
+    And it must never be patronizing or infantilizing
+    And it must respect her expertise and judgment
+    And it must provide information, not directives
+    And it must acknowledge her nursing background and competence
+    And the relationship should be respectful partnership
+    And Margaret should feel empowered, never managed

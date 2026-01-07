@@ -1,0 +1,9 @@
+Scenario: Responsible developer partners with district for school capacity
+    Given a developer understands project will strain school capacity
+    And wants to genuinely address educational impacts
+    When the Observer facilitates developer-district partnership
+    Then the developer negotiates: $3M contribution to school expansion
+    And commits land for future school site if district needs it
+    And provides temporary modular classrooms during construction of expansion
+    And partnership creates genuine school capacity not just promises
+    And responsible development addresses community needs

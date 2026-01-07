@@ -1,0 +1,9 @@
+Scenario: Municipal care economy connects to regional and state levels
+    Given Sarah's municipality successfully implements care economy
+    And larger governance scales could benefit from similar approaches
+    When municipal care economy is established
+    Then the municipal_elohim should connect to regional systems
+    And successful municipal practices should inform state policy
+    And care economy should scale beyond municipal boundaries
+    And Sarah's local success should contribute to broader transformation
+    And municipal level should be stepping stone to larger scale change

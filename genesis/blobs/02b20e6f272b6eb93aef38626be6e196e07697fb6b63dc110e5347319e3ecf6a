@@ -1,0 +1,9 @@
+Scenario: Parent tracks afterschool program changes
+    Given the parent relies on community afterschool program for childcare
+    And works until 6 PM making program essential for family functioning
+    When the community discusses cutting program hours or funding
+    Then the parent receives immediate alert about the threat
+    And sees which council members support vs oppose the cuts
+    And connects with other parents dependent on the program
+    And submits testimony explaining family economic impacts
+    And childcare infrastructure doesn't disappear without parent input

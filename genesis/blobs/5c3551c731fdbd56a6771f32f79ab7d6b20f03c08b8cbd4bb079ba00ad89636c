@@ -1,0 +1,9 @@
+Scenario: Pesticide reduction improves ecosystem and human health bioregionally
+    Given pesticide use harms pollinators, water quality, farmworker health, and ecosystems
+    And individual farms face pest pressure requiring coordinated management
+    When democratic farms coordinate integrated pest management bioregionally
+    Then pesticide use decreases through ecological pest control methods
+    And farmworker health improves from reduced chemical exposure
+    And pollinator populations recover from pesticide reduction
+    And ecosystem health improves measurably across bioregion
+    And bioregional_elohim tracks pesticide reduction and ecosystem health indicators

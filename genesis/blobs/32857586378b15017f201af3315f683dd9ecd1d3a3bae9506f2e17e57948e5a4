@@ -1,0 +1,10 @@
+Scenario: Reducing food waste to minimize environmental impact
+    Given food waste has significant ecological costs
+    And Aisha sometimes buys more than she can use
+    When the personal_agent tracks waste patterns
+    Then it should identify environmental impact of waste
+    And it should suggest waste reduction strategies
+    And it should help her buy appropriate quantities
+    And waste reduction should be framed as environmental care
+    And the system should help her minimize ecological harm
+    And practical waste reduction should be taught

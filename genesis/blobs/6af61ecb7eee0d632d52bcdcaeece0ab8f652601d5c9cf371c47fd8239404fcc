@@ -1,0 +1,9 @@
+Scenario: Farm owner transitions from sole proprietor to worker cooperative facilitator
+    Given Tom has owned and operated Johnson Farm individually for 20 years
+    And farmworkers have been employees without ownership or governance voice
+    When Tom considers converting farm to worker-owned cooperative
+    Then he sees how democratic restaurant conversions empowered workers
+    And EAE network offers acquisition support for farm democratic conversion
+    And Tom can transition from sole owner to cooperative member or honored exit
+    And farmworkers gain ownership pathway transforming agricultural labor
+    And workplace_elohim facilitates farm conversion following restaurant model

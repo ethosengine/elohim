@@ -1,0 +1,10 @@
+Scenario: Community care economy connects Aisha to opportunity
+    Given Aisha is building her adult life
+    And community networks provide opportunities
+    When Aisha participates actively in community care
+    Then the community_elohim should surface relevant opportunities
+    And it should connect her to job leads, housing, or collaborations
+    And her care contributions should give her access to community resources
+    And the system should recognize that care builds networks
+    And community care economy should create opportunity pathways
+    And participation should tangibly improve her life prospects

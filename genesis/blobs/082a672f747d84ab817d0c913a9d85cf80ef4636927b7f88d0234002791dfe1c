@@ -1,0 +1,8 @@
+Scenario: Contributing care tokens to community initiatives
+    Given I accumulate care tokens through my work and participation
+    And community initiatives need resource pooling
+    When I want to support community projects or people in need
+    Then the protocol should enable me to contribute care tokens
+    And facilitate care economy resource distribution
+    And recognize that even workers with limited money can contribute meaningfully
+    And build community care economy beyond cash transactions

@@ -1,0 +1,9 @@
+Scenario: Teacher compares compensation across districts
+    Given teacher salaries vary significantly across nearby districts
+    And teachers lack comparative compensation information
+    When the Observer analyzes teacher compensation regionally
+    Then teachers see their district pays $8,000 below regional average
+    And understand total compensation including benefits and workload
+    And learn which districts have better contracts and why
+    And use evidence in contract negotiations and recruitment crisis advocacy
+    And compensation transparency drives labor market awareness

@@ -1,0 +1,9 @@
+Scenario: Investor participation in municipal economic development planning
+    Given economic development planning typically excludes community voices
+    And Patricia has expertise from community investment experience
+    When municipal planning includes community investor participation
+    Then she serves on economic development advisory committees
+    And community investment perspective informs municipal strategy
+    And policy development benefits from investor practical knowledge
+    And democratic economy becomes recognized municipal economic development approach
+    And municipality_elohim facilitates community investor participation in municipal planning

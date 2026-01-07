@@ -1,0 +1,11 @@
+Scenario: Preventing medical gaslighting and dismissal of symptoms
+    Given medical providers often dismiss disabled patients' symptom reports
+    And medical gaslighting is common experience for disabled people
+    When Alex reports new symptoms or health concerns
+    Then the personal_agent should help Alex document symptom patterns
+    And it should track which providers take Alex's reports seriously
+    And it should support Alex in insisting on appropriate investigation
+    And it should help Alex distinguish new symptoms from existing disability
+    And Alex's expertise about their own body should be validated
+    And the protocol should help Alex advocate against medical dismissal
+    And symptom documentation should support Alex in being believed

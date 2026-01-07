@@ -1,0 +1,7 @@
+Scenario: Resolving household care conflicts
+    Given household care distribution may become imbalanced
+    When conflicts arise about who is contributing fairly
+    Then the protocol should provide objective contribution data
+    And facilitate conversations about fairness and capacity
+    And help us identify solutions that work for everyone
+    And support negotiation toward sustainable arrangements

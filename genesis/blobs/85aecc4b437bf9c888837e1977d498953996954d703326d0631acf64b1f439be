@@ -1,0 +1,10 @@
+Scenario: Managing professional identity alongside parent identity
+    Given Sarah is both teacher and mother
+    And these identities sometimes conflict or compete
+    When Sarah navigates professional and parenting identities
+    Then the personal_agent should help her integrate both roles
+    And it should recognize she is complete person with multiple identities
+    And it should support her wholeness across contexts
+    And the system should help her maintain both professional and parent identity
+    And neither role should consume total identity
+    And Sarah should be supported in being both teacher and mother

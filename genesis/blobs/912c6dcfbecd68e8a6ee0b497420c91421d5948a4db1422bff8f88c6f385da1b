@@ -1,0 +1,10 @@
+Scenario: Right to genuine autonomy within developmentally appropriate scope
+    Given Emma deserves real agency not simulated choice
+    And she is capable of meaningful decision-making at age 8
+    When Emma uses the Value Scanner
+    Then her choices must be genuinely honored
+    And she must have actual decision-making power
+    And the autonomy must be real within appropriate boundaries
+    And she must experience that her agency matters
+    And constitutional protections apply to her dignity
+    And her humanity requires genuine respect for her capability

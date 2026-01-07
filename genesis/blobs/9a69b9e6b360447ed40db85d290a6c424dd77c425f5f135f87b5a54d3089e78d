@@ -1,0 +1,11 @@
+Scenario: Family support coordinated without undermining Alex's independence
+    Given Alex sometimes needs support from family members
+    And family might conflate providing support with having authority
+    When family provides assistance to Alex
+    Then support should flow with full respect for Alex's autonomy
+    And family should provide help Alex requests, not help they think Alex needs
+    And Alex should maintain decision-making authority
+    And the family_elohim should structure relationships to protect Alex's agency
+    And offering help should never imply Alex is incapable
+    And interdependence should be normalized, not pathologized
+    And family support should strengthen, not undermine, Alex's independence

@@ -1,0 +1,10 @@
+Scenario: Building judgment before adolescence raises stakes
+    Given Emma is practicing value decisions ages 8-10
+    And adolescence will bring higher-stakes choices
+    When Emma develops decision-making skills through scanner
+    Then she should build capacity while consequences are manageable
+    And judgment should be practiced in low-risk context
+    And she should develop value literacy before teen years
+    And safe practice should prepare her for Real Responsibility phase (11-13)
+    And developmental progression should scaffold increasing autonomy
+    And early practice should enable later capability

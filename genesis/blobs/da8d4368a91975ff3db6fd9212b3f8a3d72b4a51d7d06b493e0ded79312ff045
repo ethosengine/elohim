@@ -1,0 +1,10 @@
+Scenario: Receiving family inheritance and gifts with agency
+    Given Jordan's grandmother passed away and left Jordan an inheritance
+    And Jordan has the right to benefit from the inheritance
+    When the family discusses the inheritance
+    Then Jordan participates in decisions about the money
+    And the personal_agent helps Jordan understand inheritance options
+    And if guardianship requires oversight, it's done with dignity
+    And Jordan has voice in how the money is used for their benefit
+    And Jordan's personhood and rights are fully respected
+    And the family_elohim ensures Jordan's interests are protected

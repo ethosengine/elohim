@@ -1,0 +1,11 @@
+Scenario: Voice-primary interface adapts to cognitive and physical limitations
+    Given Helen has difficulty with small text and complex navigation
+    And her mobility makes precise touch targets challenging
+    When Helen opens the Value Scanner application
+    Then the interface should use voice-primary interaction
+    And visual elements should have large fonts and high contrast
+    And touch targets should be large and forgiving
+    And navigation should be simple with minimal steps
+    And the pace should be slow with no time pressure
+    And error recovery should be patient and supportive
+    And the interface should preserve Helen's dignity throughout

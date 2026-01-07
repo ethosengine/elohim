@@ -1,0 +1,10 @@
+Scenario: Recognition of invisible care labor by 5-year-old
+    Given Tommy has chosen strawberries for his sister Emma
+    And the care contribution has been recorded
+    When the transaction is complete
+    Then Tommy's care work should be made visible to the family
+    And his personal_agent should provide warm recognition
+    And the agent should say "You helped. Your care matters. You made Emma happy."
+    And the recognition should feel like love, not data extraction
+    And care tokens should be allocated to reflect his contribution
+    And no transactional language should be used

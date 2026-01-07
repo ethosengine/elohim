@@ -1,0 +1,12 @@
+Scenario: Appeal family intervention that strained trust
+    Given Family Elohim alerted my partner about my behavioral changes
+    And this intervention strained trust in our relationship
+    And my partner now worries I'm being monitored
+    When I file an appeal about the family impact of the intervention
+    And I explain how "care" felt like "control" in our relationship
+    Then the appeal is reviewed with family dynamics in mind
+    And The Constitutional Council considers relationship impacts
+    And They evaluate whether the intervention balanced individual autonomy with family care
+    And They examine if less invasive options were considered
+    And The family is offered mediation support to rebuild trust
+    And Protocol recommendations address relationship preservation

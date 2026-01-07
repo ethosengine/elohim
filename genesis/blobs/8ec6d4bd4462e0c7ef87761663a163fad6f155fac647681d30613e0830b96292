@@ -1,0 +1,11 @@
+Scenario: Technology literacy education adapted for elderly learners
+    Given Helen needs technology skills for daily functioning
+    And technology education often ignores elderly learners
+    When Helen learns to use new technologies
+    Then instruction should be adapted to her learning pace
+    And age-appropriate pedagogy should be employed
+    And no assumption of prior tech knowledge should be made
+    And patient repetition should be available
+    And learning should serve her actual needs, not abstract skills
+    And the protocol should ensure elderly inclusion in digital literacy
+    And Helen should be empowered, not left behind by technology

@@ -1,0 +1,9 @@
+Scenario: Energy efficiency motivated by utility bill constraints
+    Given Maria carefully manages utility costs on tight budget
+    And she minimizes energy use to keep bills affordable
+    When household energy consumption is tracked
+    Then the bioregional_elohim should recognize her low energy footprint
+    And it should celebrate her energy efficiency as climate contribution
+    And her utility management should be valued as environmental stewardship
+    And economic necessity should be reframed as climate leadership
+    And Maria should see her household as energy efficiency exemplar

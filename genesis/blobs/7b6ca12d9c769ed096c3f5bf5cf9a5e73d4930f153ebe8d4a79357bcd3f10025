@@ -1,0 +1,10 @@
+Scenario: Distinguishing ecological care from greenwashing
+    Given many products and institutions claim environmental responsibility falsely
+    And Kenji needs to distinguish genuine ecological care from marketing
+    When the bioregional_elohim helps Kenji evaluate environmental claims
+    Then it should teach him to recognize greenwashing
+    And it should help him identify genuinely sustainable practices
+    And it should build critical ecological literacy
+    And it should protect him from false environmental marketing
+    And the system should teach sophisticated ecological analysis
+    And Kenji should distinguish real care economy from extractive economy in green clothing

@@ -1,0 +1,8 @@
+Scenario: Legislator monitors state agency implementation across departments
+    Given the politician passed legislation affecting multiple agencies
+    When the Observer tracks implementation statewide
+    Then they see which agencies comply with legislative intent
+    And identify bureaucratic resistance to policy changes
+    And understand regional variation in policy implementation
+    And learn where additional legislative oversight is needed
+    And ensure legislative authority translates to executive action

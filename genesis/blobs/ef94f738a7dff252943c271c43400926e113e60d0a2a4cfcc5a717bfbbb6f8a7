@@ -1,0 +1,13 @@
+Scenario: Multigenerational care coordination across distributed family
+    Given Robert's parents live in Florida
+    And his children attend college in different states
+    And his grandchild occasionally needs care
+    And Robert's siblings share parent care responsibilities
+    When family_elohim coordinates care across geography
+    Then it should track care needs across multiple households
+    And coordinate with Robert's siblings on parent care distribution
+    And help Robert support his children remotely
+    And manage occasional grandchild care
+    And surface conflicts across generational needs
+    And provide sophisticated coordination across distance
+    And ensure no household or person is overwhelmed

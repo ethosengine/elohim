@@ -1,0 +1,9 @@
+Scenario: Parent challenges harmful discipline policies
+    Given the school implements zero-tolerance discipline policy
+    And the parent's child has been suspended for minor incident
+    When the parent reviews Observer's discipline data
+    Then they see suspension rates and disparate racial impacts
+    And learn about restorative justice alternatives
+    And discover other parents whose children face similar treatment
+    And understand policy alternatives from other districts
+    And parent coalition advocates for evidence-based discipline reform

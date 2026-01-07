@@ -2,7 +2,7 @@
 
 ## Context
 
-We've established that the Holochain DHT cannot serve as our primary data plane:
+We think we've established that the Holochain DHT cannot serve as our primary data plane:
 - Chokes at ~3000 entries
 - Gossip latency of 200-2000ms
 - No query capability
@@ -20,8 +20,8 @@ But we want to preserve what Holochain IS good at:
 
 - **Ephemeral sovereignty**: Your device is sovereign, but that sovereignty is made real through community
 - **Offline-first native experience**: Full app on your device, sync when connected, fully distributed mesh
-- **Family nodes**: Layered storage (sovereign → reciprocal → invested → gift)
-- **hREA economics**: Value flows for compute contribution, constitutional rates, commons fund
+- **Family nodes**: Layered storage (sovereign → reciprocal → invested → gift) see nacient @elohim-node/
+- **hREA economics**: Value flows for compute contribution, constitutional rates, commons fund (where are the events stored/aggregated?)
 - **Explainability**: Decisions are traceable, education over compliance
 - **Negotiated values**: Each layer's values aligned TO its operational reality
 

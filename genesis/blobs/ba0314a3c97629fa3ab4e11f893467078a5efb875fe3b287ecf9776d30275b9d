@@ -1,0 +1,9 @@
+Scenario: Parent discovers teacher coalition opposing same policy
+    Given the district proposes eliminating planning periods for teachers
+    And the parent sees this will harm their child's education quality
+    When the Observer shows teacher union concerns about the policy
+    Then the parent understands teachers oppose it for same reasons
+    And natural parent-teacher alliance becomes visible
+    And parent and teacher testimonies reinforce each other
+    And coordinated advocacy prevents divide-and-conquer tactics
+    And district can't pit parents against teachers

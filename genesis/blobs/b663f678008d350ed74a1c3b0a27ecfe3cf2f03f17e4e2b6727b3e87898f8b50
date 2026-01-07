@@ -1,0 +1,10 @@
+Scenario: Shifting from dependent to junior contributor role
+    Given Emma has increasing capability at age 8
+    And her family role is evolving
+    When Emma makes care contributions through the scanner
+    Then she should be recognized as junior contributor, not just helper
+    And her voice in family decisions should carry real weight
+    And the family_elohim should track her growing capability
+    And Sarah should be supported in granting appropriate autonomy
+    And Emma should experience increasing responsibility
+    And family dynamics should reflect her developmental transition

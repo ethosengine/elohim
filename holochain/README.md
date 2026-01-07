@@ -88,7 +88,39 @@ For development setup, see [DEVELOPMENT.md](./DEVELOPMENT.md).
 
 For deployment options, see [DEPLOYMENT-RUNTIMES.md](./DEPLOYMENT-RUNTIMES.md).
 
-For understanding the architecture:
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - Technical component overview
-- [ARCHITECTURE-GAP.md](./ARCHITECTURE-GAP.md) - Agentic vs client vs community compute
-- [COMMUNITY-COMPUTE.md](./COMMUNITY-COMPUTE.md) - The model we're building toward
+## Documentation Guide
+
+### Architecture Vision
+
+| Document | Purpose |
+|----------|---------|
+| [P2P-DATAPLANE.md](./P2P-DATAPLANE.md) | **Start here** - Master P2P architecture, layer separation, technology choices |
+| [COMMUNITY-COMPUTE.md](./COMMUNITY-COMPUTE.md) | Vision: family nodes, community replication, sovereignty model |
+| [ARCHITECTURE-GAP.md](./ARCHITECTURE-GAP.md) | Why pure agent-centric DHT doesn't scale |
+| [SYNC-ENGINE.md](./SYNC-ENGINE.md) | Automerge CRDT sync design, stream positions |
+
+### Technical Reference
+
+| Document | Purpose |
+|----------|---------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Component overview, data flow, deployment topologies |
+| [elohim-node/ARCHITECTURE.md](../elohim-node/ARCHITECTURE.md) | Infrastructure runtime: sync, cluster, P2P |
+| [doorway/FEDERATION.md](./doorway/FEDERATION.md) | Doorway federation, DIDs, P2P bootstrap role |
+| [doorway/ARCHITECTURE.md](./doorway/ARCHITECTURE.md) | Doorway internals, routes, caching |
+| [elohim-storage/P2P-ARCHITECTURE.md](./elohim-storage/P2P-ARCHITECTURE.md) | Storage P2P implementation, shard protocol |
+
+### Implementation Guides
+
+| Document | Purpose |
+|----------|---------|
+| [DEVELOPMENT.md](./DEVELOPMENT.md) | Local development setup |
+| [DEPLOYMENT-RUNTIMES.md](./DEPLOYMENT-RUNTIMES.md) | Deployment modes and options |
+| [dna/NETWORK_UPGRADES.md](./dna/NETWORK_UPGRADES.md) | DNA migration strategy |
+
+### Reading Order (Recommended)
+
+1. **P2P-DATAPLANE.md** - Understand the 4-layer architecture
+2. **COMMUNITY-COMPUTE.md** - Understand the vision and values
+3. **SYNC-ENGINE.md** - Understand how sync works
+4. **ARCHITECTURE.md** - Understand the components
+5. **doorway/FEDERATION.md** - Understand doorway's role

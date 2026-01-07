@@ -1,0 +1,11 @@
+Scenario: Navigating family history of medical trauma
+    Given Alex may have experienced medical trauma in childhood
+    And family might have painful history around Alex's disability
+    When family discusses disability-related topics
+    Then the family_elohim should recognize potential trauma triggers
+    And it should support Alex in managing difficult family dynamics
+    And Alex should have tools to redirect unhelpful conversations
+    And family should be prompted toward disability justice frameworks
+    And the protocol should help family shift from medical to social model
+    And Alex should be supported in processing family history
+    And healing should be possible through better frameworks

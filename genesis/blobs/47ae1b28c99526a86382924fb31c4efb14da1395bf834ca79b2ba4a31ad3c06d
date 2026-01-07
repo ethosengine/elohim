@@ -1,0 +1,9 @@
+Scenario: Personal financial management integrated with care economy
+    Given Sarah manages household finances on $65k/year combined income
+    And budgeting is complex across multiple care contexts
+    When Sarah makes purchasing decisions
+    Then her personal_agent should track budget in real-time
+    And it should integrate financial constraints with nutritional needs, developmental appropriateness, family values
+    And it should help Sarah make informed trade-offs
+    And financial tools should serve care economy goals, not just spending tracking
+    And budget management should feel supportive, not restrictive

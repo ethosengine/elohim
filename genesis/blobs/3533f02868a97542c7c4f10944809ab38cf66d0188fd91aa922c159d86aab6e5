@@ -1,0 +1,10 @@
+Scenario: Neighborhood presence and availability as care contribution
+    Given Margaret is present in the neighborhood during working hours
+    And she can respond to neighborhood needs in real-time
+    When the neighborhood_elohim tracks presence-based care
+    Then Margaret's availability should be recognized as valuable
+    And her ability to receive packages for working neighbors should be tracked
+    And her presence during emergencies should be valued
+    And the care contribution of simply being present should be visible
+    And neighborhood benefits from retiree presence should be quantified
+    And Margaret should understand her availability has real value

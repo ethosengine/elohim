@@ -1,0 +1,10 @@
+Scenario: Teaching children family care economy principles
+    Given Sarah is raising Tommy and Emma in care economy framework
+    And she wants them to understand family care relationships
+    When Sarah teaches children about family care
+    Then the family_elohim should support value literacy education
+    And children should learn that grandparents' help is valuable work
+    And they should understand that Sarah cares for her parents too
+    And they should see care as reciprocal across generations
+    And the next generation should internalize care economy principles
+    And family culture should be transformed through children's education

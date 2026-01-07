@@ -326,6 +326,112 @@ const __filename = fileURLToPath(import.meta.url);
 const SEEDER_DIR = path.dirname(path.dirname(__filename)); // Go up from src/ to seeder/
 const GENESIS_DIR = path.resolve(SEEDER_DIR, '..'); // Go up from seeder/ to genesis/
 const DATA_DIR = process.env.DATA_DIR || path.join(GENESIS_DIR, 'data', 'lamad');
+const BLOBS_DIR = path.join(GENESIS_DIR, 'blobs');
+const GENESIS_MANIFEST_PATH = path.join(BLOBS_DIR, 'manifest.json');
+
+// Genesis blob pack manifest (pre-computed content addresses)
+interface GenesisManifestEntry {
+  cid: string;
+  hash: string;
+  size_bytes: number;
+  content_format: string;
+}
+interface GenesisManifest {
+  version: number;
+  entries: Record<string, GenesisManifestEntry>;
+}
+let genesisManifest: GenesisManifest | null = null;
+
+/**
+ * Load genesis blob pack manifest if available
+ * This enables sparse DHT entries by pre-computing blob CIDs
+ */
+function loadGenesisManifest(): GenesisManifest | null {
+  if (genesisManifest !== null) return genesisManifest;
+
+  if (fs.existsSync(GENESIS_MANIFEST_PATH)) {
+    try {
+      genesisManifest = JSON.parse(fs.readFileSync(GENESIS_MANIFEST_PATH, 'utf-8'));
+      console.log(`   📦 Loaded genesis blob manifest: ${Object.keys(genesisManifest!.entries).length} entries`);
+      return genesisManifest;
+    } catch (err) {
+      console.warn(`   ⚠️ Failed to load genesis manifest: ${err}`);
+    }
+  }
+  return null;
+}
+
+/**
+ * Sync genesis blobs to elohim-storage.
+ * Ensures all content bodies are available before creating DHT manifests.
+ *
+ * Uses STORAGE_URL environment variable or falls back to doorway's storage endpoint.
+ */
+async function syncGenesisBlobs(storageUrl: string): Promise<{ synced: number; skipped: number; failed: number }> {
+  const manifest = loadGenesisManifest();
+  if (!manifest) {
+    console.log('   ⏭️ No genesis manifest found, skipping blob sync');
+    return { synced: 0, skipped: 0, failed: 0 };
+  }
+
+  const entries = Object.entries(manifest.entries);
+  console.log(`   📦 Syncing ${entries.length} genesis blobs to ${storageUrl}...`);
+
+  let synced = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  // Batch check and upload
+  const BATCH_SIZE = 50;
+  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+    const batch = entries.slice(i, i + BATCH_SIZE);
+
+    for (const [id, entry] of batch) {
+      try {
+        // Check if blob exists
+        const checkRes = await fetch(`${storageUrl}/shard/${entry.hash}`, { method: 'HEAD' });
+        if (checkRes.ok) {
+          skipped++;
+          continue;
+        }
+
+        // Read blob from genesis pack
+        const blobPath = path.join(BLOBS_DIR, entry.hash);
+        if (!fs.existsSync(blobPath)) {
+          console.warn(`   ⚠️ Missing blob file: ${blobPath}`);
+          failed++;
+          continue;
+        }
+
+        const blobData = fs.readFileSync(blobPath);
+
+        // Upload to storage
+        const uploadRes = await fetch(`${storageUrl}/shard/${entry.hash}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: blobData,
+        });
+
+        if (uploadRes.ok) {
+          synced++;
+        } else {
+          console.warn(`   ⚠️ Failed to upload ${id}: ${uploadRes.status}`);
+          failed++;
+        }
+      } catch (err) {
+        console.warn(`   ⚠️ Error syncing ${id}: ${err}`);
+        failed++;
+      }
+    }
+
+    // Progress
+    if ((i + BATCH_SIZE) % 500 === 0 || i + BATCH_SIZE >= entries.length) {
+      console.log(`   📤 Progress: ${Math.min(i + BATCH_SIZE, entries.length)}/${entries.length} (${synced} synced, ${skipped} existed, ${failed} failed)`);
+    }
+  }
+
+  return { synced, skipped, failed };
+}
 
 // Parse command-line arguments
 const args = process.argv.slice(2);
@@ -358,9 +464,13 @@ const CONTENT_ONLY = args.includes('--content-only') || process.env.SEED_CONTENT
 const DOORWAY_URL = process.env.DOORWAY_URL; // e.g., 'https://doorway-dev.elohim.host'
 const HOLOCHAIN_ADMIN_URL = process.env.HOLOCHAIN_ADMIN_URL; // e.g., 'wss://doorway-dev.elohim.host?apiKey=...'
 const SKIP_VERIFICATION = process.env.SKIP_VERIFICATION === 'true';
+const SKIP_BLOB_SYNC = process.env.SKIP_BLOB_SYNC === 'true';
 const APP_ID = 'elohim';
 const ZOME_NAME = 'content_store';
 const DOORWAY_API_KEY = process.env.DOORWAY_API_KEY;
+
+// Storage URL for blob sync (defaults to doorway + /storage path)
+const STORAGE_URL = process.env.STORAGE_URL || (DOORWAY_URL ? `${DOORWAY_URL}/storage` : null);
 
 /**
  * Clean up error messages by truncating long byte arrays
@@ -381,7 +491,7 @@ interface CreateContentInput {
   title: string;
   description: string;
   summary: string | null;           // Short preview text for cards/lists
-  content: string;
+  content: string;                  // Legacy: full body. New: empty/hash if blob_cid set
   content_format: string;
   tags: string[];
   source_path: string | null;
@@ -390,6 +500,10 @@ interface CreateContentInput {
   estimated_minutes: number | null; // Reading/viewing time
   thumbnail_url: string | null;     // Preview image for visual cards
   metadata_json: string;
+  // Content manifest fields (Phase 0 refactor - sparse DHT)
+  blob_cid: string | null;          // CID pointing to elohim-storage blob
+  content_size_bytes: number | null; // Size of content body
+  content_hash: string | null;      // SHA256 of content body
 }
 
 interface ContentOutput {
@@ -588,6 +702,9 @@ function loadJson<T>(filePath: string): T | null {
 /**
  * Convert concept JSON to Holochain input
  * Supports both simple schema (from MCP tools) and rich schema (from legacy import)
+ *
+ * If genesis manifest is available, uses pre-computed blob CID for sparse DHT entries.
+ * Otherwise, falls back to embedding full content in DHT entry (legacy behavior).
  */
 function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContentInput {
   // Get related IDs - check both formats
@@ -609,13 +726,22 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
   const summary = concept.summary ||
     (description.length > 150 ? description.slice(0, 150) + '...' : description);
 
+  // Check genesis manifest for pre-computed blob address
+  const manifest = loadGenesisManifest();
+  const blobEntry = manifest?.entries[concept.id];
+
+  // If blob entry exists, use sparse DHT pattern (just metadata + CID reference)
+  // Otherwise, embed full content in DHT entry (legacy behavior)
+  const useSparsePattern = blobEntry !== undefined;
+
   return {
     id: concept.id,
     content_type: concept.contentType || 'concept',
     title: concept.title,
     description: description,
     summary: summary,
-    content: contentString,
+    // Sparse: store hash reference, Full: store entire content
+    content: useSparsePattern ? `sha256:${blobEntry.hash}` : contentString,
     content_format: concept.contentFormat || 'markdown',
     tags: concept.tags || [],
     source_path: sourcePathValue,
@@ -632,6 +758,10 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
       linkedData: concept.linkedData,
       ...concept.metadata,
     }),
+    // Content manifest fields for sparse DHT
+    blob_cid: blobEntry?.cid ?? null,
+    content_size_bytes: blobEntry?.size_bytes ?? null,
+    content_hash: blobEntry?.hash ?? null,
   };
 }
 
@@ -1481,6 +1611,14 @@ async function seed() {
   if (IDS.length > 0) console.log(`🎯 Filtering to IDs: ${IDS.join(', ')}`);
   if (LIMIT > 0) console.log(`📊 Limit: ${LIMIT}`);
 
+  // Load genesis manifest for sparse DHT pattern
+  const manifest = loadGenesisManifest();
+  if (manifest) {
+    console.log(`   Using sparse DHT pattern (manifest has ${Object.keys(manifest.entries).length} blob entries)`);
+  } else {
+    console.log(`   Using legacy pattern (full content in DHT entries)`);
+  }
+
   // ========================================
   // VERIFICATION SETUP
   // ========================================
@@ -1529,6 +1667,22 @@ async function seed() {
     }
   } else {
     console.log('\n⚠️ Verification skipped (SKIP_VERIFICATION=true)');
+  }
+
+  // ========================================
+  // GENESIS BLOB SYNC (if manifest available)
+  // ========================================
+  if (!SKIP_BLOB_SYNC && STORAGE_URL) {
+    console.log('\n📦 Syncing genesis blobs...');
+    const blobSyncResult = await syncGenesisBlobs(STORAGE_URL);
+    console.log(`   ✅ Blob sync complete: ${blobSyncResult.synced} synced, ${blobSyncResult.skipped} existed, ${blobSyncResult.failed} failed`);
+    if (blobSyncResult.failed > 0) {
+      console.warn(`   ⚠️ ${blobSyncResult.failed} blobs failed to sync - DHT entries will embed full content`);
+    }
+  } else if (!STORAGE_URL) {
+    console.log('\n⚠️ No STORAGE_URL configured, skipping blob sync (DHT entries will embed full content)');
+  } else {
+    console.log('\n⚠️ Blob sync skipped (SKIP_BLOB_SYNC=true)');
   }
 
   // ========================================

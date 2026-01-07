@@ -1,0 +1,8 @@
+Scenario: Making visible that food work is care for people and planet
+    Given all food work serves human nourishment and ecological cycles
+    And food workers are caring for people and participating in bioregional systems
+    When the broader culture treats food work as low-value service
+    Then the protocol should make visible that food work is essential care labor
+    And reframe food service as care work for human and ecological flourishing
+    And advocate that food workers deserve dignity, fair compensation, and care-aligned conditions
+    And build consciousness that care economy includes ecological care and all food work serves life

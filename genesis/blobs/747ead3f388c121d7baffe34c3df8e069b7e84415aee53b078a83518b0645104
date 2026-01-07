@@ -1,0 +1,9 @@
+Scenario: Developer local hiring commitment gains enforcement
+    Given a developer promised 60% local hiring as approval condition
+    And community counted on jobs for neighborhood residents
+    When the Observer tracks hiring outcomes
+    Then analysis shows: only 22% of jobs went to local residents
+    And most workers came from outside region
+    And community that bore development impacts didn't receive promised jobs
+    And accountability creates consequences for broken employment commitments
+    And future commitments require enforceable mechanisms

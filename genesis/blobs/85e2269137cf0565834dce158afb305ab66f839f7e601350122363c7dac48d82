@@ -1,0 +1,9 @@
+Scenario: Journalist monitors environmental permits across multiple agencies
+    Given the journalist covers regional environmental issues
+    And must track city, county, state, and federal environmental agencies
+    When the Observer monitors all environmental agencies simultaneously
+    Then the journalist reviews all permit applications and approvals
+    And receives alerts for controversial permits and violations
+    And tracks cumulative environmental impacts across jurisdictions
+    And comprehensive environmental surveillance becomes sustainable
+    And polluters cannot hide in bureaucratic complexity

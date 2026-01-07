@@ -1,0 +1,9 @@
+Scenario: Parent evaluates school board candidate positions
+    Given school board election is approaching
+    And three candidates claim to "support children and families"
+    When the parent reviews Observer's candidate comparison
+    Then they see each candidate's voting record on key issues
+    And understand positions on class sizes, teacher pay, program funding
+    And view candidates' funding sources and potential conflicts
+    And can make informed vote in 15 minutes during lunch break
+    And parent participation strengthens education democracy

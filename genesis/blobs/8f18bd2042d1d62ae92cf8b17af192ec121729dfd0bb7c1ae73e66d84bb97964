@@ -1,0 +1,10 @@
+Scenario: Board member detects potential conflict of interest in vendor contract
+    Given district staff recommends multi-million dollar contract with education technology vendor
+    And superintendent emphasizes vendor's qualifications and student benefit claims
+    And board will vote on contract at next meeting
+    When the board member uses Observer capture protection analysis
+    Then they discover vendor hired former district administrator as consultant
+    And see vendor's student outcome claims not supported by independent research
+    And find contract terms more favorable to vendor than peer district contracts
+    And access alternative vendors with better evidence and more standard terms
+    And capture protection makes relationships and manipulation tactics visible

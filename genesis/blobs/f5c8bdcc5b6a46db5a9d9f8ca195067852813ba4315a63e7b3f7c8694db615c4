@@ -1,0 +1,7 @@
+Scenario: Documenting industry-wide exploitation patterns
+    Given low wages and poor conditions are systemic across food service
+    When the protocol aggregates data from workers across the industry
+    Then it should identify widespread exploitation patterns
+    And make visible that individual workplace problems are systemic
+    And provide evidence for industry-level policy advocacy
+    And demonstrate need for sector transformation

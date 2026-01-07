@@ -1,0 +1,11 @@
+Scenario: Celebrating neighborhood milestones as full member
+    Given the neighborhood is celebrating its 50th anniversary
+    And there's a celebration planning committee
+    When Jordan expresses interest in helping plan
+    Then the neighborhood_elohim facilitates Jordan's participation
+    And Jordan contributes ideas at their capability level
+    And committee members include Jordan as a peer planner
+    And Jordan's suggestions are considered alongside others'
+    And Jordan helps create celebration that includes everyone
+    And Jordan experiences being an active neighborhood citizen
+    And Jordan's community membership is fully honored

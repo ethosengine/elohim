@@ -1,0 +1,8 @@
+Scenario: Contributing skills to neighborhood when available
+    Given I have food preparation skills from my restaurant work
+    And neighbors might benefit from these skills
+    When I have rare free time
+    Then the protocol should help me share skills with neighborhood
+    And coordinate skill-sharing or teaching opportunities
+    And accumulate care tokens for skill contribution
+    And build neighborhood capacity through skill distribution

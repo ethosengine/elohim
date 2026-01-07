@@ -1,0 +1,9 @@
+Scenario: Family leave policies support care during critical periods
+    Given Sarah may need time for childbirth, child illness, parent care, family emergencies
+    And traditional leave policies are inadequate
+    When family care needs arise
+    Then workplace should provide adequate paid family leave
+    And leave should not require Sarah to sacrifice career advancement
+    And the workplace_elohim should coordinate leave with care needs
+    And family leave should be dignified and sufficient
+    And policies should recognize care emergencies are inevitable

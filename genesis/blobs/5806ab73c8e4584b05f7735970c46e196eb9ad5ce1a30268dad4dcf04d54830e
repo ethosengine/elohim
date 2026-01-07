@@ -1,0 +1,9 @@
+Scenario: Citizen understands city budget trade-offs
+    Given the city council is deciding the annual budget
+    And a 300-page budget document was released
+    When the citizen reviews the Observer summary
+    Then they see clear spending priorities in plain language
+    And understand which neighborhoods get infrastructure investment
+    And view trade-offs between services (parks vs roads vs libraries)
+    And can submit position on budget priorities in 10 minutes
+    And complex civic decisions become comprehensible

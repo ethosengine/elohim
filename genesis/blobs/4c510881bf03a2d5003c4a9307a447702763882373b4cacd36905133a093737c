@@ -1,0 +1,11 @@
+Scenario: Neighborhood social cohesion work valued as care contribution
+    Given Frank builds relationships across the neighborhood
+    And he organizes informal gatherings and supports connections
+    And social cohesion is essential neighborhood infrastructure
+    When the neighborhood_elohim tracks relationship-building work
+    Then Frank's social cohesion labor should be recognized
+    And organizing gatherings, welcoming newcomers, maintaining connections should be valued
+    And the invisible work of community-building should be quantified
+    And Frank should experience his relationship work as valuable contribution
+    And neighborhood resilience should be understood as built through care labor
+    And his decades of relationship investment should be visible

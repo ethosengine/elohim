@@ -1,0 +1,11 @@
+Scenario: Appeal escalates to national level due to fundamental constitutional tension
+    Given my case couldn't be resolved at regional level
+    And it reveals fundamental tension in constitutional principles
+    And regional councils have reached conflicting interpretations
+    When my appeal reaches National Constitutional Council
+    Then randomly-selected citizens from across the nation deliberate
+    And They serve 6-month terms given the gravity of national precedent
+    And They address question "does mental health intervention ever justify privacy breach at constitutional level?"
+    And They create precedent affecting millions of people
+    And They produce comprehensive written opinion with deep reasoning
+    And The national precedent guides all lower-layer councils going forward

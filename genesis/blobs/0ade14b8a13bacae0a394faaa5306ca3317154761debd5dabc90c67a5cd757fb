@@ -1,0 +1,11 @@
+Scenario: Participating in UN discussions on AI governance standards
+    Given United Nations addresses global AI governance
+    And standards will affect billions of people
+    When I represent my nation in UN deliberations
+    Then I share: experience with protocol in my country
+    And I advocate: for constitutional minimums as global standard
+    And I present: evidence about sortition governance effectiveness
+    And I promote: transparency and recourse as universal requirements
+    And I resist: standards that advantage authoritarian control
+    And I support: interoperability enabling coordination
+    And I work: toward global framework respecting diversity

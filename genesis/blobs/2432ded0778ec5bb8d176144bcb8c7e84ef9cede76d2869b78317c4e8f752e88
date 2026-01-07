@@ -1,0 +1,11 @@
+Scenario: Household care token accumulation includes Alex's contributions
+    Given Alex participates in care token economy
+    And Alex contributes to household through management and coordination
+    When household care tokens are calculated
+    Then Alex's household management labor should be valued appropriately
+    And Alex's cognitive work of coordinating support should count
+    And care tokens should accumulate from Alex's contributions
+    And Alex should receive care token supplements based on household income level
+    And the scanner should be accessible regardless of economic status
+    And Alex should be positioned as contributor, not just recipient
+    And economic standing should reflect Alex's actual care work

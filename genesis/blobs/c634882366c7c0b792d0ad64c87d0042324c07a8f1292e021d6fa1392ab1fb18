@@ -1,0 +1,11 @@
+Scenario: Family boundaries protect Alex from ableist assumptions
+    Given family members might have internalized ableist beliefs
+    And some might make assumptions about Alex's quality of life or capabilities
+    When family interactions occur
+    Then the family_elohim should help Alex maintain boundaries
+    And it should support Alex in responding to ableist comments
+    And it should document patterns of disrespect or boundary violations
+    And Alex should have tools to protect themselves from family ableism
+    And the system should recognize that family can be source of harm
+    And Alex's right to distance from harmful family dynamics should be supported
+    And protection should be available even within family relationships

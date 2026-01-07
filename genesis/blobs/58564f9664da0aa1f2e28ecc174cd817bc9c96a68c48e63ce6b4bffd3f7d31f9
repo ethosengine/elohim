@@ -1,0 +1,9 @@
+Scenario: Business operations maintain continuity during ownership transition
+    Given customers depend on reliable auto repair service
+    And continuity protects both community institution and workers' livelihoods
+    When ownership structure transforms from individual to democratic
+    Then customer relationships are systematically introduced to workers as new decision-makers
+    And service quality remains consistent through documented procedures
+    And supplier relationships transfer with Rosa introducing workers personally
+    And equipment maintenance knowledge is shared and documented
+    And no disruption occurs to daily operations or customer service

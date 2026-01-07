@@ -1,0 +1,8 @@
+Scenario: Meal prepping efficiently with limited energy
+    Given I have only 2 hours between shifts to prepare meals
+    And I am already exhausted from work
+    When I need to prep food for the next several days
+    Then the protocol should suggest maximum-efficiency meal prep strategies
+    And provide step-by-step guidance requiring minimal cognitive load
+    And optimize for nutritional value, cost, and preparation time
+    And recognize this household labor as valuable care work

@@ -1,0 +1,10 @@
+Scenario: Journalist fact-checks regional economic development claims
+    Given county officials tout major economic development success
+    And claim massive job creation and tax revenue
+    When the Observer analyzes economic development outcomes
+    Then the journalist verifies jobs created are lower-wage than promised
+    And finds tax incentives cost more than revenue generated
+    And sees environmental violations and labor law violations
+    And tracks development firm's record in other regions
+    And publishes accountability story on corporate welfare
+    And instant research exposes exaggerated claims

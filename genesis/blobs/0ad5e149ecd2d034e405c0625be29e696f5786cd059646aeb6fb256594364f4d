@@ -1,0 +1,9 @@
+Scenario: Manager participates in democratic ownership as worker-peer
+    Given Marcus's coordinator role doesn't exclude him from worker-ownership
+    And his governance weight reflects his facilitation contribution
+    When major strategic decisions are made (profit distribution, reinvestment, etc.)
+    Then Marcus participates as worker-owner with weighted voice
+    And his coordination role is valued but doesn't grant special ownership privilege
+    And his tokens accumulate based on witnessed contribution like all workers
+    And he benefits from collective success he helps facilitate
+    And workplace_elohim prevents coordinator role from becoming ownership concentration

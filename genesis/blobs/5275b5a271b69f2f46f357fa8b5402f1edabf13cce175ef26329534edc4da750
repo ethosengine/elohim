@@ -1,0 +1,9 @@
+Scenario: Journalist fact-checks industry claims on pollution reduction
+    Given a corporation claims environmental leadership
+    And the journalist investigates actual environmental record
+    When the Observer analyzes company's violations and emissions
+    Then the journalist finds 23 violations in past 5 years
+    And verifies emissions increased despite efficiency claims
+    And shows company lobbied against stronger pollution regulations
+    And identifies millions in fines that were never paid
+    And publishes investigation exposing greenwashing

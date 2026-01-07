@@ -1,0 +1,9 @@
+Scenario: Household privacy protected amid care intimacy
+    Given James provides intimate personal care for David
+    And household care generates extremely private data
+    When household care is documented
+    Then privacy must be absolutely protected
+    And David's dignity must be preserved in all data
+    And intimate care details should never be exposed
+    And household data should remain under James's control
+    And privacy protection should be comprehensive and inviolable

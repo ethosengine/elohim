@@ -1,0 +1,11 @@
+Scenario: Explaining cryptographic constitutional proof to global assembly
+    Given delegates need to understand how constitutional verification works
+    And many come from contexts without technical infrastructure
+    When I explain cryptographic alignment proof accessibly
+    Then I use: universal analogies and visual demonstrations
+    And I ensure: translation into dozens of languages
+    And I check: comprehension across educational backgrounds
+    And I avoid: assuming Western technical education
+    And I honor: diverse ways of understanding verification
+    And I enable: informed global deliberation despite technical complexity
+    And I demonstrate: that anyone can understand enough to govern

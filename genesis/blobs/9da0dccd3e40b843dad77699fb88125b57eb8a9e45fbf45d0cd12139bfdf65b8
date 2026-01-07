@@ -1,0 +1,9 @@
+Scenario: Household waste reduction on limited budget
+    Given Aisha wants to reduce waste
+    And she has limited resources to invest in sustainability
+    When the personal_agent analyzes household waste patterns
+    Then it should identify specific reduction opportunities
+    And it should suggest affordable waste reduction strategies
+    And it should track improvement over time
+    And recommendations should balance sustainability and budget constraints
+    And Aisha should build sustainable household practices within her means

@@ -1,0 +1,12 @@
+Scenario: Offering specialized knowledge or skills to community despite crisis circumstances
+    Given I have professional skills, knowledge, or experience that could help others
+    And crisis circumstances don't erase my capabilities
+    When community members could benefit from my expertise
+    Then the Value Scanner surfaces opportunities to share my knowledge
+    And facilitates skill-sharing and mentorship relationships
+    And recognizes my expertise contributions with care tokens
+    And validates that crisis doesn't eliminate my competence
+    And helps me contribute in ways that match my current capacity
+    And my personal_agent identifies good matches for my skills
+    And tracks my knowledge contributions to community
+    And celebrates that I am valuable community resource

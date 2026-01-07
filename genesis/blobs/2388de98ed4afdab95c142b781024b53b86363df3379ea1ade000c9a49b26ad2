@@ -1,0 +1,11 @@
+Scenario: Insurance navigation and benefits advocacy
+    Given disability-related medical costs are substantial
+    And insurance systems are complex and often deny coverage
+    When Alex navigates insurance systems
+    Then the personal_agent should help Alex understand insurance benefits
+    And it should track what's covered and what's been denied
+    And it should support Alex in appeals processes
+    And it should document medical necessity for needed services
+    And Alex should have support in fighting insurance denials
+    And the protocol should reduce insurance navigation burden
+    And Alex should be able to access needed care despite insurance barriers

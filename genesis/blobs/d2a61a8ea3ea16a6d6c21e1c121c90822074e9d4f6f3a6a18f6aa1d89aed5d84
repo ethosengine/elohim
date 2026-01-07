@@ -1,0 +1,10 @@
+Scenario: Coordinating care for aging parents across distance
+    Given Sarah's parents are in their 60s
+    And they live in a different location
+    And they're beginning to need support
+    When Sarah provides care to her parents
+    Then the family_elohim should track care contributions across distance
+    And it should coordinate with siblings if present
+    And it should help Sarah balance care for parents with care for children
+    And elder care should be recognized as substantial care work
+    And Sarah should not be overwhelmed by competing family demands

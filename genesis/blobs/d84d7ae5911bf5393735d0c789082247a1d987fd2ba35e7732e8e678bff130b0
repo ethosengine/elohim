@@ -1,0 +1,10 @@
+Scenario: Activist prevents infiltration attempt
+    Given the housing justice space has 50 active community members
+    When a new member joins and immediately tries to promote violent tactics
+    And they create multiple inflammatory contributions
+    Then the earned reach system prevents wide distribution
+    And the community_moderator is alerted to potential infiltration
+    And existing members see community trust analysis
+    And the space can collectively decide on appropriate response
+    And the protection agent documents the incident for pattern recognition
+    And organizing continues safely without disruption

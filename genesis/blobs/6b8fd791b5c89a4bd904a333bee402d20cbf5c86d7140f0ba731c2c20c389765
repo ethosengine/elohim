@@ -1,0 +1,10 @@
+Scenario: Privacy and consent in community data sharing
+    Given community coordination requires some information sharing
+    And Kenji has full privacy rights
+    When the community_elohim manages community information
+    Then Kenji must control what community data is shared
+    And his participation should be visible only with his consent
+    And community care should not require surveillance
+    And privacy should be protected while enabling coordination
+    And the system should balance community connection with individual privacy
+    And Kenji should participate in community on his own terms

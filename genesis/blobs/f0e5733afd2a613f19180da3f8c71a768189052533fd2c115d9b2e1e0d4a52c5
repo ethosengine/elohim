@@ -1,0 +1,12 @@
+Scenario: Navigating family judgment and stigma about my circumstances
+    Given some family members judge me for leaving, for being "difficult," for accessing assistance
+    And I am vulnerable to internalizing family shame and blame
+    When family members express stigmatizing attitudes
+    Then the family_elohim helps me recognize and resist family stigma
+    And validates that leaving abuse was right and necessary
+    And provides supportive reframing of stigmatizing narratives
+    And helps me set boundaries with judgmental family members
+    And connects me to peer support from others who understand
+    And my personal_agent reminds me that my choices were brave and appropriate
+    And recognizes resisting family judgment as emotional labor
+    And supports my right to distance from unsupportive family

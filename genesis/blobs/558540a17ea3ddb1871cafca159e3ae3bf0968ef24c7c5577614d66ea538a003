@@ -1,0 +1,11 @@
+Scenario: Accumulated wisdom recognized as valuable knowledge
+    Given Helen has 82 years of lived experience
+    And this accumulated wisdom has educational value
+    When Helen shares her knowledge with others
+    Then her contributions should be recognized as teaching
+    And care tokens should reflect her educational labor
+    And wisdom sharing should be valued alongside formal education
+    And the protocol should make visible that elders are teachers
+    And Helen should experience herself as knowledge contributor
+    And educational systems should recognize experiential learning
+    And lifetime of experience should be treated as legitimate expertise

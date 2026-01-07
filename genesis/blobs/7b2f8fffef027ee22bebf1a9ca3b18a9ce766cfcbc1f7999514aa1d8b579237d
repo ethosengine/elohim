@@ -1,0 +1,10 @@
+Scenario: Household emergency support and mutual aid
+    Given one roommate might face financial crisis or sudden need
+    And students often live very close to financial edge
+    When a household member experiences emergency
+    Then the household_elohim should facilitate mutual aid
+    And it should help coordinate support: "Can roommates each contribute $20 to help Jordan?"
+    And it should track emergency help as care tokens
+    And it should build culture of reciprocal support
+    And the system should recognize households as safety nets
+    And roommate mutual aid should be valued and visible

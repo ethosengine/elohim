@@ -1,0 +1,9 @@
+Scenario: Household budget management with care economy principles
+    Given household operates on $65k/year budget
+    And resources must cover housing, food, children's needs, healthcare, saving
+    When Sarah makes purchasing decisions
+    Then the household_elohim should track spending against budget
+    And it should integrate financial constraints with family needs
+    And it should help Sarah and partner make informed trade-offs
+    And budget should reflect care priorities, not just consumption
+    And financial management should serve household flourishing

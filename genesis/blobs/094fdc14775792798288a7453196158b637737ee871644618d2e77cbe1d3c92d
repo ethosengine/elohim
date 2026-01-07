@@ -1,0 +1,9 @@
+Scenario: Anonymous franchise locations become known community institutions
+    Given ChickenMax #247, #248, #249 were corporate outposts without local identity
+    And community members saw them as extractive chains, not neighborhood businesses
+    When conversion makes locations democratically-governed community institutions
+    Then neighborhoods learn their franchise locations chose democratic ownership
+    And locations develop distinct community identities (possibly rebranding with local names)
+    And community members recognize workers as co-owners, not exploited employees
+    And institutions become sources of neighborhood pride instead of corporate extraction symbols
+    And community_elohim communicates conversion story building community ownership

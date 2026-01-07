@@ -1,0 +1,9 @@
+Scenario: Citizen discovers coalition around shared community concern
+    Given 14 neighbors are concerned about playground safety
+    And the citizen has reported the same concern
+    When the Public Observer detects the alignment pattern
+    Then the citizen receives an opt-in coalition notification
+    And they can coordinate with other concerned residents
+    And they see aggregated data on playground conditions
+    And they can participate in coordinated advocacy
+    And isolation becomes collective action

@@ -1,0 +1,11 @@
+Scenario: Preregistration of hypotheses to prevent cherry-picking results
+    Given I want my research to be scientifically credible
+    And I know publication bias favors positive findings
+    When I design my regional study
+    Then I preregister: hypotheses before seeing the data
+    And I commit: to reporting all results not just flattering ones
+    And I plan: analysis methods in advance to prevent p-hacking
+    And I document: any deviations from preregistered plan with justification
+    And I publish: null results and failures alongside successes
+    And My methodological rigor maintains: scientific integrity over advocacy
+    And Credibility comes from: honesty about what works and what doesn't

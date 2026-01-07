@@ -50,10 +50,7 @@ impl MetadataDb {
     pub fn put(&self, metadata: &BlobMetadata) -> Result<(), StorageError> {
         let key = metadata.hash.as_bytes();
         let value = rmp_serde::to_vec(metadata)
-            .map_err(|e| StorageError::Database(sled::Error::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e.to_string(),
-            ))))?;
+            .map_err(|e| StorageError::Database(format!("Serialization error: {}", e)))?;
         self.db.insert(key, value)?;
         Ok(())
     }
@@ -62,10 +59,7 @@ impl MetadataDb {
     pub fn get(&self, hash: &str) -> Result<Option<BlobMetadata>, StorageError> {
         if let Some(value) = self.db.get(hash.as_bytes())? {
             let metadata: BlobMetadata = rmp_serde::from_slice(&value)
-                .map_err(|e| StorageError::Database(sled::Error::Io(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e.to_string(),
-                ))))?;
+                .map_err(|e| StorageError::Database(format!("Deserialization error: {}", e)))?;
             Ok(Some(metadata))
         } else {
             Ok(None)
@@ -128,10 +122,7 @@ impl MetadataDb {
         for item in self.db.iter() {
             let (_, value) = item?;
             let metadata: BlobMetadata = rmp_serde::from_slice(&value)
-                .map_err(|e| StorageError::Database(sled::Error::Io(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e.to_string(),
-                ))))?;
+                .map_err(|e| StorageError::Database(format!("Deserialization error: {}", e)))?;
             if !metadata.dna_registered {
                 result.push(metadata);
             }
@@ -145,10 +136,7 @@ impl MetadataDb {
         for item in self.db.iter() {
             let (_, value) = item?;
             let metadata: BlobMetadata = rmp_serde::from_slice(&value)
-                .map_err(|e| StorageError::Database(sled::Error::Io(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e.to_string(),
-                ))))?;
+                .map_err(|e| StorageError::Database(format!("Deserialization error: {}", e)))?;
             all.push(metadata);
         }
 
@@ -169,10 +157,7 @@ impl MetadataDb {
         for item in self.db.iter() {
             let (_, value) = item?;
             let metadata: BlobMetadata = rmp_serde::from_slice(&value)
-                .map_err(|e| StorageError::Database(sled::Error::Io(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e.to_string(),
-                ))))?;
+                .map_err(|e| StorageError::Database(format!("Deserialization error: {}", e)))?;
 
             total_blobs += 1;
             total_bytes += metadata.size_bytes;

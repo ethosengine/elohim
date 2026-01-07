@@ -1,0 +1,10 @@
+Scenario: Community resource allocation recognizes volunteer contributions
+    Given Frank provides substantial volunteer labor
+    And community resources are limited
+    When the community_elohim influences resource allocation
+    Then Frank's contributions should be visible in allocation decisions
+    And his care tokens should provide access to community resources
+    And volunteers should not face additional burden from low income
+    And community resources should flow to contributors equitably
+    And Frank's volunteer work should be recognized through material support
+    And care economy should function as mutual aid, not charity

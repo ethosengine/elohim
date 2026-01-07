@@ -1,0 +1,12 @@
+Scenario: Supporting children's learning at home amid crisis and instability
+    Given children need home learning support and homework help
+    And I am traumatized, stressed, and have limited time and energy
+    When I try to support children's learning despite constraints
+    Then the Value Scanner provides appropriate learning support strategies
+    And helps me access homework help resources (libraries, tutoring, online support)
+    And suggests realistic expectations for home learning support given my capacity
+    And validates that my limited bandwidth is reasonable given circumstances
+    And tracks children's learning progress and needs
+    And my personal_agent reminds me of important school deadlines and events
+    And recognizes home learning support as valuable educational labor
+    And celebrates my children's learning engagement despite crisis

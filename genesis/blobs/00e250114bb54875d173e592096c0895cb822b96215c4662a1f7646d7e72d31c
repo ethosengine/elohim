@@ -1,0 +1,11 @@
+Scenario: Accessing community services with dignity
+    Given Jordan needs to use public transportation
+    And the bus system has accessibility features
+    When Jordan rides the bus to community destinations
+    Then the personal_agent provides route navigation support
+    And the interface shows visual bus schedules and stops
+    And bus drivers treat Jordan with respect as a regular passenger
+    And Jordan can travel increasingly independently with support
+    And Jordan's community mobility contributes to social participation
+    And Jordan experiences freedom and autonomy through accessible transit
+    And Jordan's right to community access is honored

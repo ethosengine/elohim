@@ -1,0 +1,11 @@
+Scenario: Workplace exploitation flagged and resources provided
+    Given Jasmine's employer violates labor laws
+    And she is asked to work off the clock
+    When workplace_elohim detects the violation
+    Then it should flag the exploitation to Jasmine
+    And explain that this is illegal and not acceptable
+    And provide resources about reporting labor violations
+    And connect her to worker advocacy organizations
+    And support her in addressing the problem
+    And protect her from accepting exploitation as normal
+    And demonstrate that care economy includes protecting workers from harm

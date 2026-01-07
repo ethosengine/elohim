@@ -1,0 +1,10 @@
+Scenario: Care contributions qualify family for community resources
+    Given Marcus performs substantial household labor
+    And his care contributions are tracked and valued
+    When community resource allocation is determined
+    Then Marcus's demonstrated stewardship should qualify his family
+    And his care tokens should provide access to community support programs
+    And access should be based on care contributions, not means testing
+    And the framework should be reciprocity: he gives care, community gives care
+    And his household labor should be recognized as community contribution
+    And resource access should preserve dignity through reciprocity

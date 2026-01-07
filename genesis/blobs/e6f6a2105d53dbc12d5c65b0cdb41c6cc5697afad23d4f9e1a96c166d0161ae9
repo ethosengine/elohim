@@ -1,0 +1,7 @@
+Scenario: Accessing family support during work crisis
+    Given my work demands sometimes become overwhelming
+    When I need family support during difficult work periods
+    Then the protocol should help me ask for help
+    And coordinate family support when I am struggling
+    And enable reciprocity when my situation improves
+    And recognize that care flows both ways in family systems

@@ -1,0 +1,10 @@
+Scenario: Workers implement community meal program responding to local need
+    Given Ms. Johnson mentions isolated seniors need meal program
+    And community stakeholder meeting includes customer input
+    When workers deliberate on community meal program proposal
+    Then workers investigate partnership with senior center
+    And workers analyze costs and benefits of subsidized meals
+    And workers democratically vote to implement senior meal program
+    And workers allocate funding from eliminated franchise fee savings
+    And community_elohim facilitates connection with senior center
+    And 340 community meals are served in first quarter

@@ -1,0 +1,11 @@
+Scenario: Integrating municipal services with protocol coordination
+    Given city provides services (water, waste, transit, parks)
+    And these need coordination with protocol resource flows
+    When I integrate municipal services with Elohim coordination
+    Then city departments: share data with agents appropriately
+    And Municipal Elohim: helps optimize service delivery
+    And environmental services: coordinate with Ecosystem Elohim
+    And social services: work with Community Elohim for crisis response
+    And integration respects: department professional judgment
+    And agents augment: not replace city workers
+    And public services improve: through better coordination

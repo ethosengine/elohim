@@ -1,0 +1,9 @@
+Scenario: Owner transitions identity from sole owner to community elder
+    Given Rosa's identity was tied to business ownership
+    And exit could mean loss of meaning and social isolation
+    When EAE offers transition support
+    Then Rosa receives counseling for identity transition
+    And Rosa explores new roles: advisor, retiree, community elder
+    And Rosa's expertise is valued through consulting compensation
+    And transition is honored as life stage, not failure
+    And Rosa discovers purpose beyond ownership burden

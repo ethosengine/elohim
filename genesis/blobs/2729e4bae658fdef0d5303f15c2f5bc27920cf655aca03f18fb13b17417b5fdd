@@ -1,0 +1,10 @@
+Scenario: Participating in neighborhood sustainability initiatives
+    Given the neighborhood has sustainability projects
+    And Aisha wants to reduce environmental impact
+    When Aisha joins local sustainability efforts
+    Then the neighborhood_elohim should coordinate her participation
+    And it should connect her to composting, recycling, or garden projects
+    And it should recognize her environmental care work
+    And neighborhood-level sustainability should be more effective than individual
+    And collective action should be facilitated through care economy
+    And environmental stewardship should build community

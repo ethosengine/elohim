@@ -1,0 +1,9 @@
+Scenario: Politician monitors special education compliance and outcomes
+    Given the politician has legal obligation to serve students with disabilities
+    And families report barriers to appropriate services
+    When the Observer tracks special education implementation
+    Then they see evaluation and IEP compliance rates by school
+    And identify which students wait longest for evaluations
+    And understand resource allocation for special education services
+    And learn where families face pushback on service requests
+    And ensure legal obligations and student needs are met

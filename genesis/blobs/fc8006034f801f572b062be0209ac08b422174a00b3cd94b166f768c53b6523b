@@ -1,0 +1,8 @@
+Scenario: Legislator exposes statewide funding formula creating district inequities
+    Given education funding formula creates disparities
+    When the Observer analyzes statewide funding patterns
+    Then they see low-income districts receive $3,000 less per student
+    And identify property tax base driving inequitable outcomes
+    And connect families in underfunded districts across state
+    And compare state formula to more equitable models in other states
+    And champion funding reform with comprehensive evidence

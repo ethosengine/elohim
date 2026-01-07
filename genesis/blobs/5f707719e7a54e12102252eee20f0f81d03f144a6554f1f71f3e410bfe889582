@@ -1,0 +1,10 @@
+Scenario: Retired residents build care economy infrastructure through organizing
+    Given Frank and other retired residents have time for organizing
+    And care economy requires coordination and infrastructure
+    When the community_elohim supports infrastructure building
+    Then it should enable retired residents to organize care economy systems
+    And coordinate tool libraries, skill shares, mutual aid networks
+    And facilitate care coordination that benefits all community members
+    And recognize organizing labor as valuable care contribution
+    And retired residents should be understood as infrastructure builders
+    And Frank should help establish care economy as normal community practice

@@ -1,0 +1,10 @@
+Scenario: Making invisible household care labor visible to roommates
+    Given Kenji cooks meals for all four roommates regularly
+    And he plans menus, shops for ingredients, and manages kitchen
+    When the household_elohim tracks Kenji's household contributions
+    Then it should quantify his cooking labor in care tokens
+    And it should make visible that he provides nutrition care for four people
+    And his roommates should see "Kenji cooked 18 meals this week for household"
+    And invisible care work should become undeniably visible
+    And the system should prevent resentment from invisible labor
+    And fair household coordination requires visibility

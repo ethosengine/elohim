@@ -1,0 +1,11 @@
+Scenario: Family care labor made visible to prevent invisible burden
+    Given Helen's daughter Sarah provides substantial weekly care
+    And Sarah also works and has her own children
+    When Sarah assists Helen with shopping, appointments, and household tasks
+    Then the family_elohim should make this care work visible
+    And Sarah's care labor should be recognized with care tokens
+    And the family should see Sarah's contribution quantified
+    And Sarah should not feel guilty about needing recognition
+    And Helen should understand the care Sarah provides
+    And the protocol should prevent invisible exploitation of family caregivers
+    And care work should be valued, not taken for granted

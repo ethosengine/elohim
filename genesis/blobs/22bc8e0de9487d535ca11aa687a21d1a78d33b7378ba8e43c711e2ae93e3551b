@@ -1,0 +1,9 @@
+Scenario: Community organizations coordinate through care economy principles
+    Given Sarah participates in multiple community organizations
+    And these organizations share care economy values
+    When community organizations coordinate activities
+    Then the community_elohim should facilitate coordination
+    And it should prevent Sarah from being overcommitted
+    And it should enable meaningful contribution across organizations
+    And community sector should adopt care economy practices
+    And organizational effectiveness should improve through coordination

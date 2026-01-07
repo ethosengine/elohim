@@ -1,0 +1,9 @@
+Scenario: Household coordination during crisis maintains stability
+    Given household faces crisis—job loss, illness, emergency
+    And normal operations are disrupted
+    When the household_elohim detects crisis conditions
+    Then it should shift to crisis support mode
+    And it should help household prioritize essential functions
+    And it should connect household to emergency resources
+    And it should maintain household stability under stress
+    And the protocol should serve as household safety net

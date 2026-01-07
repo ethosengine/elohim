@@ -1,0 +1,11 @@
+Scenario: Being recognized for work contributions publicly
+    Given the library celebrates Employee Appreciation Week
+    And all staff members are recognized for their contributions
+    When Jordan is recognized for their work
+    Then the recognition celebrates Jordan's genuine contributions
+    And Jordan is honored as a valued employee, not a charity case
+    And specific accomplishments are named (not just "trying hard")
+    And Jordan's work helping organize library is highlighted
+    And Jordan experiences authentic professional recognition
+    And colleagues see Jordan as contributing peer
+    And Jordan's worker identity is affirmed and celebrated

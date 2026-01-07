@@ -1,0 +1,10 @@
+Scenario: Community-level food justice advocacy informed by preteen experience
+    Given Marcus's experience reveals food system failures
+    And his data shows food access inequities
+    When community food policy is developed
+    Then Marcus's anonymized experience should inform advocacy
+    And the community_elohim should aggregate data about food insecurity
+    And community should advocate for systemic change
+    And Marcus's struggles should fuel collective political action
+    And care economy should connect individual experience to community organizing
+    And his burden should contribute to changing systems that create it

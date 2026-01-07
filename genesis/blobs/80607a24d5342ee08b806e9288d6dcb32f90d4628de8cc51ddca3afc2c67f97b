@@ -1,0 +1,9 @@
+Scenario: Activist exposes systematic school resource inequities
+    Given the activist campaigns for education equity
+    And suspects systematic under-resourcing of schools serving students of color
+    When the Observer analyzes district resource distribution
+    Then the activist sees experienced teachers concentrate in white affluent schools
+    And gifted programs and AP courses cluster in privileged areas
+    And facility quality and maintenance vary by neighborhood
+    And per-student spending disparities reach thousands of dollars
+    And segregation pattern becomes legally actionable

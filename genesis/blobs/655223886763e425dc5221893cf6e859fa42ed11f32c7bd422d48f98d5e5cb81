@@ -1,0 +1,9 @@
+Scenario: Community-supported agriculture (CSA) program provides affordable local food
+    Given fresh, organic produce is often unaffordable for low-income community members
+    And food access inequality creates health disparities
+    When democratic farm implements sliding-scale CSA program
+    Then weekly produce boxes are affordable across income levels
+    And payment flexibility (sliding scale, work-trade, subsidized) ensures access
+    And direct farm-to-community distribution reduces costs increasing affordability
+    And food access improves while supporting fair farmworker wages
+    And community_elohim manages CSA program ensuring equitable food access

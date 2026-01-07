@@ -1,0 +1,9 @@
+Scenario: School fee and activity cost assistance for single-income families
+    Given Maria's single income must support household of four
+    And she struggles to afford school fees, field trips, sports, and activities
+    When schools require fees or activity payments
+    Then the educational_elohim should connect Maria to fee assistance programs
+    And schools should provide cost support without stigmatizing single-parent families
+    And all children should access educational opportunities regardless of single-parent economics
+    And fee assistance should be available and accessible
+    And Maria's children should participate fully without financial exclusion

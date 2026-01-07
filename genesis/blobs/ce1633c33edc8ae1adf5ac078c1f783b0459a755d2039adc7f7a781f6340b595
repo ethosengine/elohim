@@ -1,0 +1,9 @@
+Scenario: Investor receives education on bioregional ecology and sustainable economics
+    Given most investors lack understanding of bioregional ecological systems
+    And Patricia wants to make ecologically-informed investment decisions
+    When investment network provides bioregional ecology education
+    Then she learns about watershed dynamics, soil health, biodiversity, climate impacts
+    And investment decisions are informed by ecological understanding
+    And investor community develops ecological literacy and stewardship values
+    And education strengthens commitment to sustainable investment
+    And bioregional_elohim provides ecological education and investment guidance

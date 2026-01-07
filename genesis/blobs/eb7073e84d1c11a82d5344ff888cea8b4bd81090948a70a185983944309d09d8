@@ -1,0 +1,9 @@
+Scenario: Recognition of invisible care labor in personal identity
+    Given Sarah performs enormous amounts of invisible care work
+    And traditional economics don't recognize meal planning, schedule management, emotional labor
+    When Sarah reviews her care contributions
+    Then the Value Scanner should make all care labor visible
+    And her personal_agent should quantify meal planning, shopping, cooking, coordination, kin-keeping
+    And care tokens should accumulate reflecting her actual contributions
+    And Sarah's self-understanding should shift from "not working" to "performing essential care labor"
+    And visibility should transform how Sarah sees herself

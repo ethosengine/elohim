@@ -1,0 +1,10 @@
+Scenario: Coordinate with county and state on cross-boundary issues
+    Given Riverside is part of larger regional ecosystem
+    And watershed management crosses municipal boundaries
+    When Jamal works on water allocation issues
+    Then he coordinates with upstream and downstream municipalities
+    And Municipal Elohim shares data with regional agents
+    And multi-municipal deliberative assembly convenes
+    And solution serves multiple jurisdictions
+    And municipal leaders demonstrate lateral coordination
+    And subsidiarity enables appropriate-scale problem solving

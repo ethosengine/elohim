@@ -1,0 +1,9 @@
+Scenario: Neighborhood conflict resolution supported by care economy data
+    Given neighbors sometimes have conflicts
+    And disputes can damage neighborhood cohesion
+    When neighborhood conflicts arise
+    Then the neighborhood_elohim should provide context from care patterns
+    And it should show each party's contributions to neighborhood
+    And it should facilitate resolution based on mutual care
+    And conflicts should be addressed before they escalate
+    And care economy should support neighborhood harmony

@@ -1,0 +1,10 @@
+Scenario: Neighborhood council member understands local conditions for district advocacy
+    Given neighborhood has concerns about park maintenance and safety
+    And council wants to advocate to city parks department for improvements
+    And needs data to support request competing with other neighborhoods
+    When the council member uses Observer hyperlocal analysis
+    Then they receive documentation of park condition deterioration over time
+    And see usage data showing high community demand despite poor conditions
+    And access comparison to park investment in other neighborhoods
+    And get demographic analysis showing environmental justice dimensions
+    And hyperlocal data strengthens advocacy to broader governance levels

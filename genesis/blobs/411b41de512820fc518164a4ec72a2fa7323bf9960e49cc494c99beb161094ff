@@ -1,0 +1,10 @@
+Scenario: Campus environmental advocacy as ecological care work
+    Given Kenji's college has environmental impact and policies
+    And students can advocate for institutional sustainability
+    When Kenji participates in campus environmental organizing
+    Then the bioregional_elohim should recognize advocacy as ecological care work
+    And it should accumulate care tokens for environmental activism
+    And it should value organizing for institutional change
+    And it should recognize that systemic change requires collective action
+    And the system should support student environmental advocacy
+    And campus organizing should be understood as ecological care economy work

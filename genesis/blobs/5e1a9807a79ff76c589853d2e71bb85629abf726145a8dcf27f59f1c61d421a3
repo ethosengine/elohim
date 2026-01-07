@@ -1,0 +1,11 @@
+Scenario: Performing job duties with accessible support
+    Given Jordan is responsible for shelving returned books
+    And the library has organized the system for accessibility
+    When Jordan completes their shelving tasks
+    Then the personal_agent provides visual sorting guidance if needed
+    And the shelving system uses color-coding and clear labels
+    And Jordan can complete most tasks independently
+    And supervisors provide support for complex situations
+    And Jordan's work directly helps library patrons find books
+    And Jordan accumulates care tokens for library care contribution
+    And Jordan experiences competence and work satisfaction

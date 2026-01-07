@@ -231,6 +231,10 @@ pub fn import_migrated_content(content_list: Vec<Content>) -> ExternResult<Migra
             estimated_minutes: transformed.estimated_minutes,
             thumbnail_url: transformed.thumbnail_url,
             metadata_json: transformed.metadata_json,
+            // Legacy migration - content body stays in content field
+            blob_cid: None,
+            content_size_bytes: None,
+            content_hash: None,
         };
 
         match create_content(input) {

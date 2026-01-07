@@ -1,0 +1,11 @@
+Scenario: Connection to place through decades of residence
+    Given Helen has lived in same bioregion for 82 years
+    And deep place-based knowledge develops over lifetime
+    When bioregional governance makes land use decisions
+    Then Helen's intimate knowledge of place should inform planning
+    And longtime residents should have standing in ecological governance
+    And her connection to land should be valued in decision-making
+    And the protocol should elevate voices of those with deep place-knowledge
+    And bioregional stewardship should prioritize those who've observed place over time
+    And Helen's decades of residence should give her ecological authority
+    And land use should consider those who remember land's history

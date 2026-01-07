@@ -1,0 +1,11 @@
+Scenario: Alex's disability expertise recognized as valuable family knowledge
+    Given Alex has deep expertise about disability, accessibility, and ableism
+    And this knowledge benefits entire family
+    When family engages with disability-related topics
+    Then Alex should be recognized as the family expert
+    And family should seek Alex's guidance on accessibility matters
+    And Alex's advocacy work should be valued as contribution
+    And Alex's perspective should shape family understanding
+    And the family_elohim should position Alex as knowledge source
+    And Alex's disability experience should be treated as expertise, not deficit
+    And family should learn from Alex, not pity Alex

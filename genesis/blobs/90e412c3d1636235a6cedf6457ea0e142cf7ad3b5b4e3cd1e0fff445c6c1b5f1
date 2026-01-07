@@ -1,0 +1,11 @@
+Scenario: Disability culture and identity respected and affirmed
+    Given Alex's disability is part of their identity
+    And disabled people have distinct culture and community
+    When the Value Scanner represents disability
+    Then it should use identity-first or person-first language per Alex's preference
+    And it should present disability as difference, not deficit
+    And it should connect Alex to disability community resources
+    And disability culture should be recognized as valuable
+    And Alex should see positive representation of disability
+    And the protocol should embody social model, not medical model
+    And Alex's disabled identity should be affirmed, not erased

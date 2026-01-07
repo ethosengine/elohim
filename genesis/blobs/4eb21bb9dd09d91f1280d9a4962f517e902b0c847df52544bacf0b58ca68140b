@@ -1,0 +1,11 @@
+Scenario: Shopping at local stores as recognized customer
+    Given Jordan regularly shops at the neighborhood grocery store
+    And Jordan knows several store employees by name
+    When Jordan visits the store to buy items
+    Then the personal_agent provides shopping support (list, budget, navigation)
+    And store employees greet Jordan warmly as a regular customer
+    And Jordan can complete simple purchases independently
+    And Jordan's patronage contributes to local business economy
+    And the Value Scanner records Jordan's economic contribution
+    And Jordan experiences being a valued community member
+    And Jordan's presence enriches the store's community atmosphere

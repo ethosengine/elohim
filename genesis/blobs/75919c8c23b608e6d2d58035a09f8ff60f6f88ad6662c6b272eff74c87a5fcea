@@ -1,0 +1,10 @@
+Scenario: Family food sharing and meal provision as care contribution
+    Given Margaret sometimes cooks meals for her daughter's family
+    And she hosts family dinners and holiday meals
+    When Margaret's food provision is tracked as care
+    Then meal preparation and hosting should be recognized as labor
+    And the economic value of meals provided should be calculated
+    And family food sharing should be visible care contribution
+    And Margaret's cooking and hospitality should be valued
+    And food as care should be part of family care economy
+    And invisible domestic labor should become visible
