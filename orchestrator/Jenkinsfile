@@ -717,7 +717,7 @@ spec:
 
     post {
         always {
-            container('builder') {
+            node('builder') {
                 script {
                     def results = readJSON(text: env.BUILD_RESULTS ?: '{}')
                     def preflight = readJSON(text: env.PREFLIGHT_HEALTH ?: '{}')
@@ -806,8 +806,8 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                     writeJSON file: 'ci-summary.json', json: ciSummary, pretty: 2
                     archiveArtifacts artifacts: 'ci-summary.json', allowEmptyArchive: false
                     echo "📋 CI Summary archived: ${env.BUILD_URL}artifact/ci-summary.json"
+                }
+            }
         }
-    }
-}
     }
 }
