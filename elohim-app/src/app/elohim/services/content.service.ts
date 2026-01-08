@@ -255,28 +255,76 @@ export class ContentService {
 
   /**
    * Transform raw data to LearningPath model
+   *
+   * Handles two response formats:
+   * 1. Flat: { id, title, steps, chapters, ... }
+   * 2. Nested: { path: {...}, chapters: [...], ungrouped_steps: [...] }
    */
   private transformPath(data: any): LearningPath {
+    // Handle nested response format from elohim-storage
+    const pathData = data.path || data;
+    const rawChapters = data.chapters || pathData.chapters || [];
+    const ungroupedSteps = data.ungrouped_steps || [];
+
+    // Transform chapters with their steps
+    const chapters = rawChapters.map((ch: any) => ({
+      id: ch.id,
+      title: ch.title || '',
+      description: ch.description || '',
+      orderIndex: ch.order_index ?? ch.orderIndex ?? 0,
+      estimatedDuration: ch.estimated_duration || ch.estimatedDuration,
+      steps: (ch.steps || []).map((s: any) => this.transformStep(s)),
+    }));
+
+    // Collect all steps from chapters + ungrouped
+    const allSteps = [
+      ...chapters.flatMap((ch: any) => ch.steps),
+      ...ungroupedSteps.map((s: any) => this.transformStep(s)),
+    ];
+
     return {
-      id: data.id || data.doc_id,
-      version: data.version || '1.0.0',
-      title: data.title || '',
-      description: data.description || '',
-      purpose: data.purpose || '',
-      difficulty: data.difficulty || 'beginner',
-      estimatedDuration: data.estimated_duration || data.estimatedDuration,
-      visibility: data.visibility || 'public',
-      pathType: data.path_type || data.pathType || 'course',
-      tags: data.tags || [],
-      createdBy: data.created_by || data.createdBy || '',
-      contributors: data.contributors || [],
-      steps: data.steps || [],
-      chapters: data.chapters || [],
-      stepCount: data.step_count || data.stepCount || 0,
-      chapterCount: data.chapter_count || data.chapterCount || 0,
-      createdAt: data.created_at || data.createdAt,
-      updatedAt: data.updated_at || data.updatedAt,
+      id: pathData.id || pathData.doc_id,
+      version: pathData.version || '1.0.0',
+      title: pathData.title || '',
+      description: pathData.description || '',
+      purpose: pathData.purpose || '',
+      difficulty: pathData.difficulty || 'beginner',
+      estimatedDuration: pathData.estimated_duration || pathData.estimatedDuration,
+      visibility: pathData.visibility || 'public',
+      pathType: pathData.path_type || pathData.pathType || 'course',
+      tags: pathData.tags || [],
+      createdBy: pathData.created_by || pathData.createdBy || '',
+      contributors: pathData.contributors || [],
+      steps: allSteps,
+      chapters,
+      stepCount: pathData.step_count || pathData.stepCount || allSteps.length,
+      chapterCount: pathData.chapter_count || pathData.chapterCount || chapters.length,
+      createdAt: pathData.created_at || pathData.createdAt,
+      updatedAt: pathData.updated_at || pathData.updatedAt,
     } as LearningPath;
+  }
+
+  /**
+   * Transform a step from snake_case to camelCase
+   */
+  private transformStep(step: any): any {
+    return {
+      id: step.id,
+      pathId: step.path_id || step.pathId,
+      chapterId: step.chapter_id || step.chapterId,
+      // Map to both 'title' and 'stepTitle' for compatibility
+      title: step.title || '',
+      stepTitle: step.title || '',
+      stepNarrative: step.description || '',
+      description: step.description || '',
+      stepType: step.step_type || step.stepType || 'learn',
+      resourceId: step.resource_id || step.resourceId || '',
+      resourceType: step.resource_type || step.resourceType || 'content',
+      order: step.order_index ?? step.orderIndex ?? 0,
+      orderIndex: step.order_index ?? step.orderIndex ?? 0,
+      estimatedDuration: step.estimated_duration || step.estimatedDuration,
+      metadata: step.metadata_json ? JSON.parse(step.metadata_json) : step.metadata,
+    };
   }
 
   /**
