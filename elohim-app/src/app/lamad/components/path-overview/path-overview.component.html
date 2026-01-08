@@ -206,7 +206,7 @@
                                 <!-- Concepts -->
                                 @if (sec.concepts.length > 0) {
                                   <ul class="concept-list">
-                                    @for (concept of sec.concepts; track concept.conceptId) {
+                                    @for (concept of sec.concepts; track concept.conceptId || $index) {
                                       <li class="concept-item"
                                           [class.completed]="concept.isCompleted"
                                           [class.global-complete]="concept.isGlobalCompletion"
@@ -334,7 +334,7 @@
         <section class="concepts-section">
           <h3>Concept Mastery</h3>
           <div class="concepts-grid">
-            @for (concept of conceptProgress; track concept.conceptId) {
+            @for (concept of conceptProgress; track concept.conceptId || $index) {
               <div class="concept-chip" [class.mastered]="concept.completionPercentage === 100">
                 <div class="concept-header">
                   <span class="concept-title">{{ concept.title }}</span>
