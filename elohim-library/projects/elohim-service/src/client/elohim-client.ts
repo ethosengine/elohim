@@ -367,7 +367,10 @@ export class ElohimClient {
     contentType: ContentType,
     id: string
   ): Promise<T | null> {
-    const url = `${mode.doorway.url}/api/v1/cache/${contentType}/${id}`;
+    // Map content type to elohim-storage route
+    // 'content' → /db/content/, 'path' → /db/paths/
+    const route = contentType === 'path' ? 'paths' : contentType;
+    const url = `${mode.doorway.url}/db/${route}/${id}`;
 
     const headers: Record<string, string> = {};
     if (mode.doorway.apiKey) {
@@ -392,14 +395,19 @@ export class ElohimClient {
     mode: BrowserMode,
     query: ContentQuery
   ): Promise<T[]> {
+    // Map content type to elohim-storage route
+    // Default to 'content' if not specified
+    const contentType = query.contentType ?? 'content';
+    const route = contentType === 'path' ? 'paths' : contentType;
+
     const params = new URLSearchParams();
-    if (query.contentType) params.set('type', query.contentType);
+    if (query.contentType) params.set('content_type', query.contentType);
     if (query.tags?.length) params.set('tags', query.tags.join(','));
-    if (query.search) params.set('q', query.search);
+    if (query.search) params.set('search', query.search);
     if (query.limit) params.set('limit', String(query.limit));
     if (query.offset) params.set('offset', String(query.offset));
 
-    const url = `${mode.doorway.url}/api/v1/cache/query?${params}`;
+    const url = `${mode.doorway.url}/db/${route}?${params}`;
 
     const headers: Record<string, string> = {};
     if (mode.doorway.apiKey) {
@@ -412,7 +420,9 @@ export class ElohimClient {
       throw new Error(`HTTP ${response.status} - ${body}`);
     }
 
-    return response.json() as Promise<T[]>;
+    // elohim-storage returns { items: [...], count, limit, offset }
+    const result = await response.json() as { items: T[], count: number };
+    return result.items ?? [];
   }
 
   private async flushToProjection(mode: BrowserMode, batch: WriteOp[]): Promise<void> {
@@ -432,7 +442,10 @@ export class ElohimClient {
     }
 
     for (const [contentType, ops] of byType) {
-      const url = `${mode.doorway.url}/db/${contentType}/bulk`;
+      // Map content type to elohim-storage route
+      // 'content' → /db/content/, 'path' → /db/paths/
+      const route = contentType === 'path' ? 'paths' : contentType;
+      const url = `${mode.doorway.url}/db/${route}/bulk`;
       const items = ops.map(op => op.data);
 
       const response = await fetch(url, {

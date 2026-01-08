@@ -5,6 +5,7 @@ pub mod api;
 pub mod auth_routes;
 pub mod blob;
 pub mod dashboard_ws;
+pub mod db;
 pub mod debug_stream;
 pub mod health;
 pub mod identity;
@@ -27,6 +28,7 @@ pub use blob::{
 pub use dashboard_ws::handle_dashboard_ws;
 pub use health::{health_check, readiness_check, version_info};
 pub use identity::{handle_did_document, handle_did_endpoint};
+pub use db::handle_db_request;
 pub use import::{handle_import_request, match_import_route};
 pub use import_ws::handle_import_progress_ws;
 pub use seed::{handle_seed_blob, handle_check_blob, BlobUploadResponse};
