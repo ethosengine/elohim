@@ -185,6 +185,21 @@ function formatCount(n: number): string {
   return n.toLocaleString();
 }
 
+/**
+ * Format a concept ID into a human-readable title.
+ * Converts kebab-case to Title Case.
+ * Examples:
+ *   "manifesto" → "Manifesto"
+ *   "quiz-manifesto-foundations" → "Quiz Manifesto Foundations"
+ *   "elohim-lamad" → "Elohim Lamad"
+ */
+function formatConceptTitle(conceptId: string): string {
+  return conceptId
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 // ============================================================================
 // Content Loading
 // ============================================================================
@@ -319,7 +334,9 @@ function transformPath(json: PathJson): CreatePathInput {
                     id: `${json.id}-step-${stepIndex}`,
                     path_id: json.id,
                     chapter_id: chapter.id,
-                    title: section.title || conceptId,
+                    // Use concept ID as title - each step gets unique title
+                    // Section title is stored in metadata for grouping context
+                    title: formatConceptTitle(conceptId),
                     description: section.description,
                     step_type: 'learn',
                     resource_id: conceptId,
@@ -328,6 +345,11 @@ function transformPath(json: PathJson): CreatePathInput {
                     estimated_duration: section.estimatedMinutes
                       ? `${section.estimatedMinutes} minutes`
                       : undefined,
+                    // Store section context in metadata for UI grouping
+                    metadata_json: JSON.stringify({
+                      sectionTitle: section.title,
+                      sectionOrder: section.order,
+                    }),
                   });
                 }
               }
@@ -343,7 +365,7 @@ function transformPath(json: PathJson): CreatePathInput {
             id: `${json.id}-step-${stepIndex}`,
             path_id: json.id,
             chapter_id: chapter.id,
-            title: conceptId,
+            title: formatConceptTitle(conceptId),
             step_type: 'learn',
             resource_id: conceptId,
             resource_type: 'content',
@@ -395,7 +417,7 @@ function transformPath(json: PathJson): CreatePathInput {
     const defaultSteps: CreateStepInput[] = json.conceptIds.map((conceptId, i) => ({
       id: `${json.id}-step-${i}`,
       path_id: json.id,
-      title: conceptId,
+      title: formatConceptTitle(conceptId),
       step_type: 'learn',
       resource_id: conceptId,
       resource_type: 'content',
