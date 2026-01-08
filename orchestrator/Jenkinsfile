@@ -717,7 +717,7 @@ spec:
 
     post {
         always {
-            node {
+            node('') {
                 script {
                     def results = readJSON(text: env.BUILD_RESULTS ?: '{}')
                     def preflight = readJSON(text: env.PREFLIGHT_HEALTH ?: '{}')
