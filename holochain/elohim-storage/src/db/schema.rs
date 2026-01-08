@@ -6,7 +6,7 @@ use tracing::info;
 use crate::error::StorageError;
 
 /// Current schema version for migrations
-pub const SCHEMA_VERSION: i32 = 1;
+pub const SCHEMA_VERSION: i32 = 2;
 
 /// Initialize the database schema
 pub fn init_schema(conn: &Connection) -> Result<(), StorageError> {
@@ -68,19 +68,24 @@ fn create_tables(conn: &Connection) -> Result<(), StorageError> {
 /// Migrate schema from older version
 fn migrate_schema(conn: &Connection, from_version: i32) -> Result<(), StorageError> {
     // Add migration steps here as schema evolves
-    match from_version {
-        // Example: 1 -> 2 migration would go here
-        _ => {}
+    let mut current = from_version;
+
+    // Migration: v1 -> v2: Add content_body column
+    if current == 1 {
+        info!("Migrating v1 -> v2: Adding content_body column");
+        conn.execute("ALTER TABLE content ADD COLUMN content_body TEXT", [])
+            .map_err(|e| StorageError::Internal(format!("Failed to add content_body column: {}", e)))?;
+        current = 2;
     }
 
-    set_schema_version(conn, SCHEMA_VERSION)?;
+    set_schema_version(conn, current)?;
     Ok(())
 }
 
 /// Content table schema
 const CONTENT_SCHEMA: &str = r#"
 -- Content metadata table
--- Actual content body is stored in blob_store, referenced by blob_hash
+-- Content body can be stored inline (content_body) or in blob_store (blob_hash)
 CREATE TABLE IF NOT EXISTS content (
     id TEXT PRIMARY KEY NOT NULL,
     title TEXT NOT NULL,
@@ -88,7 +93,10 @@ CREATE TABLE IF NOT EXISTS content (
     content_type TEXT NOT NULL DEFAULT 'concept',
     content_format TEXT NOT NULL DEFAULT 'markdown',
 
-    -- Blob reference (content body in blob_store)
+    -- Inline content body (for text: markdown, JSON, etc.)
+    content_body TEXT,
+
+    -- Blob reference (for large/binary content in blob_store)
     blob_hash TEXT,
     blob_cid TEXT,
     content_size_bytes INTEGER,

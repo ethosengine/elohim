@@ -238,7 +238,8 @@ export class ContentService {
       contentType: data.content_type || data.contentType,
       title: data.title || '',
       description: data.description || '',
-      content: data.content || '',
+      // content_body is inline storage, content is legacy/direct format
+      content: data.content_body || data.content || '',
       contentFormat: data.content_format || data.contentFormat || 'markdown',
       tags: data.tags || [],
       relatedNodeIds: data.related_node_ids || data.relatedNodeIds || [],

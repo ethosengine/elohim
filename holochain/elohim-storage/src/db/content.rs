@@ -14,6 +14,8 @@ pub struct ContentRow {
     pub description: Option<String>,
     pub content_type: String,
     pub content_format: String,
+    /// Inline content body (markdown, JSON, etc.)
+    pub content_body: Option<String>,
     pub blob_hash: Option<String>,
     pub blob_cid: Option<String>,
     pub content_size_bytes: Option<i64>,
@@ -35,6 +37,7 @@ impl ContentRow {
             description: row.get("description")?,
             content_type: row.get("content_type")?,
             content_format: row.get("content_format")?,
+            content_body: row.get("content_body")?,
             blob_hash: row.get("blob_hash")?,
             blob_cid: row.get("blob_cid")?,
             content_size_bytes: row.get("content_size_bytes")?,
@@ -60,6 +63,9 @@ pub struct CreateContentInput {
     pub content_type: String,
     #[serde(default = "default_content_format")]
     pub content_format: String,
+    /// Inline content body (markdown, JSON quiz data, etc.)
+    #[serde(default)]
+    pub content_body: Option<String>,
     #[serde(default)]
     pub blob_hash: Option<String>,
     #[serde(default)]
@@ -212,9 +218,9 @@ pub fn create_content(conn: &mut Connection, input: CreateContentInput) -> Resul
         r#"
         INSERT INTO content (
             id, title, description, content_type, content_format,
-            blob_hash, blob_cid, content_size_bytes, metadata_json,
+            content_body, blob_hash, blob_cid, content_size_bytes, metadata_json,
             reach, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#,
         params![
             input.id,
@@ -222,6 +228,7 @@ pub fn create_content(conn: &mut Connection, input: CreateContentInput) -> Resul
             input.description,
             input.content_type,
             input.content_format,
+            input.content_body,
             input.blob_hash,
             input.blob_cid,
             input.content_size_bytes,
@@ -272,9 +279,9 @@ pub fn bulk_create_content(conn: &mut Connection, items: Vec<CreateContentInput>
             r#"
             INSERT INTO content (
                 id, title, description, content_type, content_format,
-                blob_hash, blob_cid, content_size_bytes, metadata_json,
+                content_body, blob_hash, blob_cid, content_size_bytes, metadata_json,
                 reach, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             params![
                 input.id,
@@ -282,6 +289,7 @@ pub fn bulk_create_content(conn: &mut Connection, items: Vec<CreateContentInput>
                 input.description,
                 input.content_type,
                 input.content_format,
+                input.content_body,
                 input.blob_hash,
                 input.blob_cid,
                 input.content_size_bytes,

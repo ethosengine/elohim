@@ -42,6 +42,8 @@ interface CreateContentInput {
   description?: string;
   content_type: string;
   content_format: string;
+  /** Inline content body (markdown, JSON quiz data, etc.) */
+  content_body?: string;
   blob_hash?: string;
   blob_cid?: string;
   content_size_bytes?: number;
@@ -239,13 +241,14 @@ function loadContentFiles(): ConceptJson[] {
 }
 
 function transformContent(json: ConceptJson): CreateContentInput {
-  // Compute content size if content is present
+  // Serialize content body to string
+  let contentBody: string | undefined;
   let contentSizeBytes: number | undefined;
   if (json.content) {
-    const contentStr = typeof json.content === 'string'
+    contentBody = typeof json.content === 'string'
       ? json.content
       : JSON.stringify(json.content);
-    contentSizeBytes = Buffer.byteLength(contentStr, 'utf-8');
+    contentSizeBytes = Buffer.byteLength(contentBody, 'utf-8');
   }
 
   // Build metadata JSON
@@ -262,6 +265,7 @@ function transformContent(json: ConceptJson): CreateContentInput {
     description: json.description || undefined,
     content_type: json.contentType || 'concept',
     content_format: json.contentFormat || 'markdown',
+    content_body: contentBody,
     content_size_bytes: contentSizeBytes,
     metadata_json: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
     reach: 'public',

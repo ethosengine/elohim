@@ -157,6 +157,8 @@ pub struct Content {
     pub description: Option<String>,
     pub content_type: String,
     pub content_format: String,
+    /// Inline content body (markdown, JSON quiz data, etc.)
+    pub content_body: Option<String>,
     pub blob_hash: Option<String>,
     pub blob_cid: Option<String>,
     pub content_size_bytes: Option<i64>,
@@ -181,6 +183,9 @@ pub struct CreateContentInput {
     pub content_type: String,
     #[serde(default = "default_content_format")]
     pub content_format: String,
+    /// Inline content body (markdown, JSON quiz data, etc.)
+    #[serde(default)]
+    pub content_body: Option<String>,
     #[serde(default)]
     pub blob_hash: Option<String>,
     #[serde(default)]
