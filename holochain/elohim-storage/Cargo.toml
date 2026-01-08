@@ -55,9 +55,12 @@ serde_json = "1"
 # Local database for metadata
 sled = "0.34"
 
-# SQLite for structured content storage (paths, steps, tags)
-# Must match holochain_client's rusqlite version (via holo_hash)
-# SQLite connections are lightweight - use mutex instead of pool
+# SQLite via Diesel ORM - compile-time verified queries
+# r2d2 for connection pooling (replaces single mutex pattern)
+diesel = { version = "2.2", features = ["sqlite", "r2d2"] }
+
+# Keep rusqlite for transition period - will be removed once Diesel migration complete
+# Also required by holochain_client (via holo_hash)
 rusqlite = { version = "0.37", features = ["bundled", "serde_json"] }
 
 # CRDT sync - Automerge for offline-first document sync

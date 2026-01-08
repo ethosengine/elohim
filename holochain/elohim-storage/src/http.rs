@@ -984,6 +984,35 @@ impl HttpServer {
     /// - GET /db/paths/{id} - Get path by ID with steps
     /// - POST /db/paths - Create single path
     /// - POST /db/paths/bulk - Bulk create paths
+    /// Extract app context from path, supporting both:
+    /// - New: /db/{app_id}/content/... -> AppContext(app_id)
+    /// - Legacy: /db/content/... -> AppContext("lamad") for backwards compatibility
+    fn extract_app_context(sub_path: &str) -> (db::AppContext, &str) {
+        // Check if path starts with a known resource type (legacy route)
+        let legacy_prefixes = ["content", "paths", "stats"];
+        for prefix in &legacy_prefixes {
+            if sub_path == *prefix || sub_path.starts_with(&format!("{}/", prefix)) {
+                // Legacy route: default to 'lamad' for learning content
+                return (db::AppContext::default_lamad(), sub_path);
+            }
+        }
+
+        // New route: /db/{app_id}/...
+        if let Some(slash_pos) = sub_path.find('/') {
+            let app_id = &sub_path[..slash_pos];
+            let resource_path = &sub_path[slash_pos + 1..];
+            return (db::AppContext::new(app_id), resource_path);
+        }
+
+        // Just app_id with no resource (e.g., /db/lamad -> stats for that app)
+        if !sub_path.is_empty() && !legacy_prefixes.contains(&sub_path) {
+            return (db::AppContext::new(sub_path), "stats");
+        }
+
+        // Fallback to default
+        (db::AppContext::default_lamad(), sub_path)
+    }
+
     async fn handle_db_request(
         &self,
         req: Request<Incoming>,
@@ -994,32 +1023,38 @@ impl HttpServer {
         // Strip /db/ prefix
         let sub_path = path.strip_prefix("/db/").unwrap_or("");
 
+        // Extract app context (supports both legacy and new routes)
+        let (app_ctx, resource_path) = Self::extract_app_context(sub_path);
+        debug!(app_id = %app_ctx.app_id, resource_path = %resource_path, "DB request routing");
+
         // Route to specific handlers
-        if sub_path == "stats" {
+        // Note: Handlers currently use legacy rusqlite code.
+        // They will be updated to use Diesel with app_ctx in a future phase.
+        if resource_path == "stats" {
             return self.handle_db_stats(method, &content_db).await;
         }
 
-        if sub_path == "content" {
+        if resource_path == "content" {
             return self.handle_db_content_list(req, method, &content_db).await;
         }
 
-        if sub_path == "content/bulk" {
+        if resource_path == "content/bulk" {
             return self.handle_db_content_bulk(req, method, &content_db).await;
         }
 
-        if let Some(content_id) = sub_path.strip_prefix("content/") {
+        if let Some(content_id) = resource_path.strip_prefix("content/") {
             return self.handle_db_content_by_id(req, method, content_id, &content_db).await;
         }
 
-        if sub_path == "paths" {
+        if resource_path == "paths" {
             return self.handle_db_paths_list(req, method, &content_db).await;
         }
 
-        if sub_path == "paths/bulk" {
+        if resource_path == "paths/bulk" {
             return self.handle_db_paths_bulk(req, method, &content_db).await;
         }
 
-        if let Some(path_id) = sub_path.strip_prefix("paths/") {
+        if let Some(path_id) = resource_path.strip_prefix("paths/") {
             return self.handle_db_path_by_id(req, method, path_id, &content_db).await;
         }
 

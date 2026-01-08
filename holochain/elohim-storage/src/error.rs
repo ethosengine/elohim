@@ -4,6 +4,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum StorageError {
+    #[error("Diesel error: {0}")]
+    Diesel(#[from] diesel::result::Error),
+
     #[error("Blob not found: {0}")]
     NotFound(String),
 

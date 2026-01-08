@@ -242,6 +242,236 @@ impl StorageClient {
         self.handle_response(response).await
     }
 
+    // ==================== Database API: Content ====================
+
+    /// List content with optional filters
+    pub async fn list_content(&self, options: ContentListOptions) -> Result<ContentListResponse> {
+        let mut url = format!(
+            "{}/db/{}/content",
+            self.config.base_url, self.config.app_id
+        );
+
+        let mut params = Vec::new();
+        if let Some(ref ct) = options.content_type {
+            params.push(format!("content_type={}", urlencoding::encode(ct)));
+        }
+        if let Some(ref cf) = options.content_format {
+            params.push(format!("content_format={}", urlencoding::encode(cf)));
+        }
+        if let Some(ref search) = options.search {
+            params.push(format!("search={}", urlencoding::encode(search)));
+        }
+        for tag in &options.tags {
+            params.push(format!("tags={}", urlencoding::encode(tag)));
+        }
+        if options.limit != 100 {
+            params.push(format!("limit={}", options.limit));
+        }
+        if options.offset != 0 {
+            params.push(format!("offset={}", options.offset));
+        }
+        if !params.is_empty() {
+            url.push('?');
+            url.push_str(&params.join("&"));
+        }
+
+        let response = self.client.get(&url).send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Get a single content item by ID
+    pub async fn get_content(&self, id: &str) -> Result<Content> {
+        let url = format!(
+            "{}/db/{}/content/{}",
+            self.config.base_url,
+            self.config.app_id,
+            urlencoding::encode(id)
+        );
+
+        let response = self.client.get(&url).send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Create a new content item
+    pub async fn create_content(&self, input: CreateContentInput) -> Result<Content> {
+        let url = format!(
+            "{}/db/{}/content",
+            self.config.base_url, self.config.app_id
+        );
+
+        let response = self
+            .client
+            .post(&url)
+            .header(header::CONTENT_TYPE, "application/json")
+            .json(&input)
+            .send()
+            .await?;
+
+        self.handle_response(response).await
+    }
+
+    /// Bulk create content items (for seeding)
+    pub async fn bulk_create_content(&self, items: Vec<CreateContentInput>) -> Result<BulkResult> {
+        let url = format!(
+            "{}/db/{}/content/bulk",
+            self.config.base_url, self.config.app_id
+        );
+
+        let response = self
+            .client
+            .post(&url)
+            .header(header::CONTENT_TYPE, "application/json")
+            .json(&items)
+            .send()
+            .await?;
+
+        self.handle_response(response).await
+    }
+
+    /// Delete a content item
+    pub async fn delete_content(&self, id: &str) -> Result<bool> {
+        let url = format!(
+            "{}/db/{}/content/{}",
+            self.config.base_url,
+            self.config.app_id,
+            urlencoding::encode(id)
+        );
+
+        let response = self.client.delete(&url).send().await?;
+
+        if response.status() == StatusCode::NOT_FOUND {
+            return Ok(false);
+        }
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let body = response.text().await.unwrap_or_default();
+            return Err(StorageError::Server { status, message: body });
+        }
+        Ok(true)
+    }
+
+    /// Check which content IDs exist
+    pub async fn check_content_exists(&self, ids: &[String]) -> Result<Vec<String>> {
+        let url = format!(
+            "{}/db/{}/content/exists",
+            self.config.base_url, self.config.app_id
+        );
+
+        let response = self
+            .client
+            .post(&url)
+            .header(header::CONTENT_TYPE, "application/json")
+            .json(&ids)
+            .send()
+            .await?;
+
+        self.handle_response(response).await
+    }
+
+    // ==================== Database API: Paths ====================
+
+    /// List paths with pagination
+    pub async fn list_paths(&self, options: PathListOptions) -> Result<PathListResponse> {
+        let mut url = format!(
+            "{}/db/{}/paths",
+            self.config.base_url, self.config.app_id
+        );
+
+        let mut params = Vec::new();
+        if options.limit != 100 {
+            params.push(format!("limit={}", options.limit));
+        }
+        if options.offset != 0 {
+            params.push(format!("offset={}", options.offset));
+        }
+        if !params.is_empty() {
+            url.push('?');
+            url.push_str(&params.join("&"));
+        }
+
+        let response = self.client.get(&url).send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Get a path by ID (basic info only)
+    pub async fn get_path(&self, id: &str) -> Result<Path> {
+        let url = format!(
+            "{}/db/{}/paths/{}",
+            self.config.base_url,
+            self.config.app_id,
+            urlencoding::encode(id)
+        );
+
+        let response = self.client.get(&url).send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Get a path with full details (chapters, steps, tags)
+    pub async fn get_path_with_details(&self, id: &str) -> Result<PathWithDetails> {
+        let url = format!(
+            "{}/db/{}/paths/{}/details",
+            self.config.base_url,
+            self.config.app_id,
+            urlencoding::encode(id)
+        );
+
+        let response = self.client.get(&url).send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Create a new path with chapters and steps
+    pub async fn create_path(&self, input: CreatePathInput) -> Result<PathWithDetails> {
+        let url = format!(
+            "{}/db/{}/paths",
+            self.config.base_url, self.config.app_id
+        );
+
+        let response = self
+            .client
+            .post(&url)
+            .header(header::CONTENT_TYPE, "application/json")
+            .json(&input)
+            .send()
+            .await?;
+
+        self.handle_response(response).await
+    }
+
+    /// Delete a path (cascades to chapters and steps)
+    pub async fn delete_path(&self, id: &str) -> Result<bool> {
+        let url = format!(
+            "{}/db/{}/paths/{}",
+            self.config.base_url,
+            self.config.app_id,
+            urlencoding::encode(id)
+        );
+
+        let response = self.client.delete(&url).send().await?;
+
+        if response.status() == StatusCode::NOT_FOUND {
+            return Ok(false);
+        }
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let body = response.text().await.unwrap_or_default();
+            return Err(StorageError::Server { status, message: body });
+        }
+        Ok(true)
+    }
+
+    // ==================== Database API: Stats ====================
+
+    /// Get database statistics for this app
+    pub async fn get_db_stats(&self) -> Result<DbStats> {
+        let url = format!(
+            "{}/db/{}/stats",
+            self.config.base_url, self.config.app_id
+        );
+
+        let response = self.client.get(&url).send().await?;
+        self.handle_response(response).await
+    }
+
     // ==================== Helper Methods ====================
 
     async fn handle_response<T: serde::de::DeserializeOwned>(
