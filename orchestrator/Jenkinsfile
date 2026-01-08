@@ -144,7 +144,7 @@ def analyzeChangeset() {
         ).trim().split('\n').findAll { it }
     } else {
         // Fallback: look at last 10 commits to be safe
-        echo "No previous successful build found, analyzing last 10 commits"
+        echo 'No previous successful build found, analyzing last 10 commits'
         changedFiles = sh(
             script: 'git diff --name-only HEAD~10 2>/dev/null || git diff --name-only HEAD',
             returnStdout: true
@@ -283,10 +283,10 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
  * Print a decision matrix showing what will be built and why
  */
 def printDecisionMatrix(analysis, pipelines) {
-    echo """
+    echo '''
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                          DEPLOYMENT DECISION MATRIX                           ║
-╠══════════════════════════════════════════════════════════════════════════════╣"""
+╠══════════════════════════════════════════════════════════════════════════════╣'''
 
     PIPELINES.each { name, config ->
         def info = analysis[name]
@@ -303,7 +303,7 @@ def printDecisionMatrix(analysis, pipelines) {
         }
     }
 
-    echo """╚══════════════════════════════════════════════════════════════════════════════╝"""
+    echo '''╚══════════════════════════════════════════════════════════════════════════════╝'''
 }
 
 /**
@@ -325,7 +325,7 @@ def printDeploymentVerification(commit, results) {
         }
     }
 
-    echo """╚══════════════════════════════════════════════════════════════════════════════╝"""
+    echo '''╚══════════════════════════════════════════════════════════════════════════════╝'''
 }
 
 // =============================================================================
@@ -445,10 +445,10 @@ spec:
             steps {
                 container('builder') {
                     script {
-                        echo """
+                        echo '''
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                           PRE-FLIGHT HEALTH CHECK                             │
-└──────────────────────────────────────────────────────────────────────────────┘"""
+└──────────────────────────────────────────────────────────────────────────────┘'''
 
                         def healthResults = [:]
                         HEALTH_ENDPOINTS.each { name, url ->
@@ -511,7 +511,7 @@ spec:
                         printDecisionMatrix(analysis, ordered)
 
                         if (ordered.isEmpty() && params.MODE == 'auto') {
-                            echo "ℹ️  No pipelines need to run for these changes"
+                            echo 'ℹ️  No pipelines need to run for these changes'
                             currentBuild.description = "No builds needed (${changedFiles.size()} files)"
                         } else {
                             currentBuild.description = "Building: ${ordered.join(', ')}"
@@ -577,7 +577,7 @@ spec:
                         def results = [:]
 
                         if (pipelines.isEmpty()) {
-                            echo "ℹ️  No pipelines to execute"
+                            echo 'ℹ️  No pipelines to execute'
                             return
                         }
 
@@ -595,10 +595,10 @@ spec:
                                 return
                             }
 
-                            echo ""
-                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo ''
+                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
                             echo "🔨 Building: ${name}"
-                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
                             def result = triggerPipeline(name, env.BRANCH_NAME, true)
                             results[name] = result
@@ -623,19 +623,19 @@ spec:
 
                         // Run genesis if requested
                         if (pipelines.contains('elohim-genesis')) {
-                            echo ""
-                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                            echo "🌱 Running Genesis (seed + test)"
-                            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                            echo ''
+                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                            echo '🌱 Running Genesis (seed + test)'
+                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
                             def genesisResult = triggerPipeline('elohim-genesis', env.BRANCH_NAME, true)
                             results['elohim-genesis'] = genesisResult
 
                             if (genesisResult.success) {
-                                echo "✅ elohim-genesis: SUCCESS"
+                                echo '✅ elohim-genesis: SUCCESS'
                             } else {
                                 echo "❌ elohim-genesis: ${genesisResult.result}"
-                                unstable("Genesis failed - seeding or tests may have issues")
+                                unstable('Genesis failed - seeding or tests may have issues')
                             }
 
                             env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
@@ -654,13 +654,13 @@ spec:
             steps {
                 container('builder') {
                     script {
-                        echo """
+                        echo '''
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                          POST-DEPLOYMENT VERIFICATION                         │
-└──────────────────────────────────────────────────────────────────────────────┘"""
+└──────────────────────────────────────────────────────────────────────────────┘'''
 
                         // Wait for deployments to stabilize
-                        echo "⏳ Waiting 30s for deployments to stabilize..."
+                        echo '⏳ Waiting 30s for deployments to stabilize...'
                         sleep(30)
 
                         def verificationResults = [:]
@@ -677,10 +677,10 @@ spec:
                         def mismatches = verificationResults.findAll { k, v -> !v.match }
                         if (mismatches.size() > 0) {
                             echo "⚠️  WARNING: ${mismatches.size()} deployment(s) may not have the expected version"
-                            echo "   This could mean:"
-                            echo "   - Deployment is still rolling out"
-                            echo "   - Version endpoint not implemented"
-                            echo "   - Deployment failed silently"
+                            echo '   This could mean:'
+                            echo '   - Deployment is still rolling out'
+                            echo '   - Version endpoint not implemented'
+                            echo '   - Deployment failed silently'
                         }
                     }
                 }
@@ -691,10 +691,10 @@ spec:
             steps {
                 container('builder') {
                     script {
-                        echo """
+                        echo '''
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                          POST-FLIGHT HEALTH CHECK                             │
-└──────────────────────────────────────────────────────────────────────────────┘"""
+└──────────────────────────────────────────────────────────────────────────────┘'''
 
                         def healthResults = [:]
                         HEALTH_ENDPOINTS.each { name, url ->
@@ -717,20 +717,21 @@ spec:
 
     post {
         always {
-            script {
-                def results = readJSON(text: env.BUILD_RESULTS ?: '{}')
-                def preflight = readJSON(text: env.PREFLIGHT_HEALTH ?: '{}')
-                def postflight = readJSON(text: env.POSTFLIGHT_HEALTH ?: '{}')
-                def verification = readJSON(text: env.VERIFICATION_RESULTS ?: '{}')
+            container('builder') {
+                script {
+                    def results = readJSON(text: env.BUILD_RESULTS ?: '{}')
+                    def preflight = readJSON(text: env.PREFLIGHT_HEALTH ?: '{}')
+                    def postflight = readJSON(text: env.POSTFLIGHT_HEALTH ?: '{}')
+                    def verification = readJSON(text: env.VERIFICATION_RESULTS ?: '{}')
 
-                def successCount = results.count { k, v -> v?.success }
-                def failCount = results.count { k, v -> !v?.success }
-                def healthyCount = postflight.count { k, v -> v?.healthy }
-                def verifiedCount = verification.count { k, v -> v?.match }
+                    def successCount = results.count { k, v -> v?.success }
+                    def failCount = results.count { k, v -> !v?.success }
+                    def healthyCount = postflight.count { k, v -> v?.healthy }
+                    def verifiedCount = verification.count { k, v -> v?.match }
 
-                echo """
+                    echo """
 ═══════════════════════════════════════════════════════════════════════════════
-                          📊 ORCHESTRATOR SUMMARY
+                              📊 ORCHESTRATOR SUMMARY
 ═══════════════════════════════════════════════════════════════════════════════
 
   Commit:       ${env.GIT_COMMIT_SHORT}
@@ -745,67 +746,68 @@ ${failCount > 0 ? '  ⚠️  ATTENTION: Build failures detected!' : '  ✅ All b
 ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealthy!' : ''}
 
 ═══════════════════════════════════════════════════════════════════════════════
-                """
+                    """
 
-                if (failCount > 0) {
-                    echo "Failed pipelines:"
-                    results.findAll { k, v -> !v?.success }.each { name, result ->
-                        echo "  ❌ ${name}: ${result?.result ?: 'UNKNOWN'}"
-                        if (result?.url) echo "     ${result.url}"
+                    if (failCount > 0) {
+                        echo 'Failed pipelines:'
+                        results.findAll { k, v -> !v?.success }.each { name, result ->
+                            echo "  ❌ ${name}: ${result?.result ?: 'UNKNOWN'}"
+                            if (result?.url) echo "     ${result.url}"
                     }
                 }
 
-                // Generate machine-readable CI summary for Claude consumption
-                def unhealthyCount = postflight.count { k, v -> !v?.healthy }
-                def ciSummary = [
-                    schema_version: "1.0.0",
-                    timestamp: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
-                    orchestration: [
-                        build_number: env.BUILD_NUMBER,
-                        build_url: env.BUILD_URL,
-                        branch: env.BRANCH_NAME,
-                        commit: env.GIT_COMMIT_SHORT ?: 'unknown',
-                        mode: params.MODE,
-                        duration_seconds: (System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000
-                    ],
-                    pipelines: results.collect { name, r ->
-                        [
-                            name: name,
-                            status: r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE'),
-                            url: r?.url,
-                            duration_ms: r?.duration,
-                            category: r?.success ? null : categorizeFailure(name),
-                            remediation_hint: r?.success ? null : getRemediationHint(name)
+                    // Generate machine-readable CI summary for Claude consumption
+                    def unhealthyCount = postflight.count { k, v -> !v?.healthy }
+                    def ciSummary = [
+                        schema_version: '1.0.0',
+                        timestamp: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+                        orchestration: [
+                            build_number: env.BUILD_NUMBER,
+                            build_url: env.BUILD_URL,
+                            branch: env.BRANCH_NAME,
+                            commit: env.GIT_COMMIT_SHORT ?: 'unknown',
+                            mode: params.MODE,
+                            duration_seconds: (System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000
+                        ],
+                        pipelines: results.collect { name, r ->
+                            [
+                                name: name,
+                                status: r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE'),
+                                url: r?.url,
+                                duration_ms: r?.duration,
+                                category: r?.success ? null : categorizeFailure(name),
+                                remediation_hint: r?.success ? null : getRemediationHint(name)
+                            ]
+                        },
+                        health: [
+                            preflight: preflight,
+                            postflight: postflight,
+                            degraded_services: postflight.findAll { k, v -> !v?.healthy }.keySet().toList()
+                        ],
+                        deployment: [
+                            verified: verification.every { k, v -> v?.match },
+                            verification_results: verification,
+                            mismatches: verification.findAll { k, v -> !v?.match }.keySet().toList()
+                        ],
+                        summary: [
+                            overall_status: failCount > 0 ? 'FAILURE' : (unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
+                            builds_succeeded: successCount,
+                            builds_failed: failCount,
+                            services_healthy: healthyCount,
+                            services_total: postflight.size(),
+                            failed_pipelines: results.findAll { k, v -> !v?.success }.keySet().toList(),
+                            triage_priority: calculateTriagePriority(failCount, unhealthyCount),
+                            action_required: failCount > 0 ? results.findAll { k, v -> !v?.success }.collect { name, r ->
+                                "${name}: ${getRemediationHint(name)}"
+                            } : []
                         ]
-                    },
-                    health: [
-                        preflight: preflight,
-                        postflight: postflight,
-                        degraded_services: postflight.findAll { k, v -> !v?.healthy }.keySet().toList()
-                    ],
-                    deployment: [
-                        verified: verification.every { k, v -> v?.match },
-                        verification_results: verification,
-                        mismatches: verification.findAll { k, v -> !v?.match }.keySet().toList()
-                    ],
-                    summary: [
-                        overall_status: failCount > 0 ? 'FAILURE' : (unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
-                        builds_succeeded: successCount,
-                        builds_failed: failCount,
-                        services_healthy: healthyCount,
-                        services_total: postflight.size(),
-                        failed_pipelines: results.findAll { k, v -> !v?.success }.keySet().toList(),
-                        triage_priority: calculateTriagePriority(failCount, unhealthyCount),
-                        action_required: failCount > 0 ? results.findAll { k, v -> !v?.success }.collect { name, r ->
-                            "${name}: ${getRemediationHint(name)}"
-                        } : []
                     ]
-                ]
 
-                writeJSON file: 'ci-summary.json', json: ciSummary, pretty: 2
-                archiveArtifacts artifacts: 'ci-summary.json', allowEmptyArchive: false
-                echo "📋 CI Summary archived: ${env.BUILD_URL}artifact/ci-summary.json"
-            }
+                    writeJSON file: 'ci-summary.json', json: ciSummary, pretty: 2
+                    archiveArtifacts artifacts: 'ci-summary.json', allowEmptyArchive: false
+                    echo "📋 CI Summary archived: ${env.BUILD_URL}artifact/ci-summary.json"
         }
+    }
+}
     }
 }
