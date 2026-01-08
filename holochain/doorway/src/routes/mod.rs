@@ -2,6 +2,7 @@
 
 pub mod admin;
 pub mod api;
+pub mod apps;
 pub mod auth_routes;
 pub mod blob;
 pub mod dashboard_ws;
@@ -20,6 +21,7 @@ pub use admin::{
     handle_resources, handle_custodians,
 };
 pub use api::handle_api_request;
+pub use apps::handle_app_request;
 pub use auth_routes::handle_auth_request;
 pub use blob::{
     handle_blob_request, handle_blob_request_with_fallback,

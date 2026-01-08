@@ -233,21 +233,43 @@ export class BlobManager {
 
   /**
    * Extract blob from HTML5 app content.
-   * Looks for:
-   * 1. A corresponding zip file in the content directory
-   * 2. A blob_file reference in the content
-   * 3. External URL that can be fetched
+   * Looks for (in order):
+   * 1. metadata.localZipPath - relative to genesis directory
+   * 2. A corresponding zip file in the content directory ({id}.zip)
+   * 3. A blob_file reference in the content
    */
   private async extractHtml5AppBlob(
     content: ContentFile,
     contentDir: string
-  ): Promise<{ blob: Buffer; entryPoint?: string } | null> {
-    // Try to find a zip file with same ID
+  ): Promise<{ blob: Buffer; entryPoint?: string; appId?: string } | null> {
+    // Get appId from content.content object (for html5-app format)
+    const contentObj = typeof content.content === 'object' ? content.content as Record<string, unknown> : null;
+    const appId = contentObj?.appId as string | undefined;
+    const entryPoint = contentObj?.entryPoint as string | undefined || (content.entry_point as string) || 'index.html';
+
+    // Try metadata.localZipPath first (relative to genesis directory)
+    const metadata = content.metadata as Record<string, unknown> | undefined;
+    if (metadata?.localZipPath) {
+      // Genesis directory is parent of seeder directory
+      const genesisDir = path.resolve(path.dirname(path.dirname(contentDir)));
+      const zipPath = path.join(genesisDir, metadata.localZipPath as string);
+      if (fs.existsSync(zipPath)) {
+        console.log(`   📦 Found ZIP via metadata.localZipPath: ${metadata.localZipPath}`);
+        return {
+          blob: fs.readFileSync(zipPath),
+          entryPoint,
+          appId,
+        };
+      }
+    }
+
+    // Try to find a zip file with same ID in content directory
     const zipPath = path.join(contentDir, `${content.id}.zip`);
     if (fs.existsSync(zipPath)) {
       return {
         blob: fs.readFileSync(zipPath),
-        entryPoint: (content.entry_point as string) || 'index.html',
+        entryPoint,
+        appId,
       };
     }
 
@@ -257,7 +279,8 @@ export class BlobManager {
       if (fs.existsSync(blobPath)) {
         return {
           blob: fs.readFileSync(blobPath),
-          entryPoint: (content.entry_point as string) || 'index.html',
+          entryPoint,
+          appId,
         };
       }
     }

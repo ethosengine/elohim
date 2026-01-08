@@ -719,6 +719,19 @@ async fn handle_request(
             ));
         }
 
+        // HTML5 App serving routes (proxied to elohim-storage)
+        // GET /apps/{app_id}/{path} - Serve files from HTML5 app ZIPs
+        (Method::GET, p) if p.starts_with("/apps/") => {
+            debug!(path = %p, "Forwarding app request to elohim-storage");
+            return Ok(to_boxed(
+                routes::handle_app_request(
+                    req,
+                    state.args.storage_url.clone(),
+                    p,
+                ).await
+            ));
+        }
+
         // Not found
         _ => to_boxed(not_found_response(&path)),
     };

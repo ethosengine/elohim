@@ -86,6 +86,9 @@ reed-solomon-erasure = "6"
 # Timestamps
 chrono = { version = "0.4", features = ["serde"] }
 
+# ZIP extraction for HTML5 apps
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+
 # rust-libp2p - same P2P foundation as Holochain (via kitsune_p2p)
 # https://github.com/libp2p/rust-libp2p
 libp2p = { version = "0.54", features = [

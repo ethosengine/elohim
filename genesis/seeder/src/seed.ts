@@ -46,6 +46,7 @@ import * as path from 'path';
 import { AdminWebsocket, AppWebsocket, type CellId } from '@holochain/client';
 import DoorwayClient, { ImportStatusResponse } from './doorway-client.js';
 import StorageClient from './storage-client.js'; // Used for computing blob hash
+import BlobManager from './blob-manager.js';
 import { validateBatch, logValidationErrors, isStrictValidation } from './validators.js';
 import { ProgressClient, waitForBatchCompletion, waitWithFallback, type ProgressMessage } from './progress-client.js';
 import { SeedingVerification, type ExpectedCounts } from './verification.js';
@@ -504,6 +505,8 @@ interface CreateContentInput {
   blob_cid: string | null;          // CID pointing to elohim-storage blob
   content_size_bytes: number | null; // Size of content body
   content_hash: string | null;      // SHA256 of content body
+  // HTML5 app blob reference (ZIP stored in elohim-storage)
+  blob_hash?: string;               // SHA256 hash of ZIP blob for html5-app content
 }
 
 interface ContentOutput {
@@ -543,7 +546,7 @@ interface ConceptJson {
   id: string;
   title: string;
   content: string | object;  // Can be string (markdown) or object (quiz-json, etc.)
-  contentFormat?: 'markdown' | 'html' | 'plain' | 'perseus-quiz-json' | 'gherkin';
+  contentFormat?: 'markdown' | 'html' | 'plain' | 'perseus-quiz-json' | 'gherkin' | 'html5-app';
   // Simple schema fields
   sourceDoc?: string;
   relationships?: { target: string; type: string }[];
@@ -1012,6 +1015,89 @@ async function seedViaDoorway(): Promise<SeedResult> {
   timer.endPhase('Content Loading');
 
   // ========================================
+  // UPLOAD HTML5 APP ZIPS
+  // ========================================
+  timer.startPhase('HTML5 App Blobs');
+  console.log('\n📦 Processing HTML5 app content...');
+
+  // Initialize blob manager for HTML5 app processing
+  const blobManager = new BlobManager({
+    doorwayUrl: DOORWAY_URL!,
+    apiKey: DOORWAY_API_KEY,
+    minBlobSize: 0, // Always extract html5-app ZIPs regardless of size
+    cacheDir: path.join(GENESIS_DIR, '.blob-cache'),
+  });
+
+  // Map to store blob_hash for each html5-app content ID
+  const html5AppBlobHashes = new Map<string, { hash: string; appId: string; entryPoint: string }>();
+
+  // Find and process all html5-app content
+  const html5Apps = filteredConcepts.filter(({ concept }) =>
+    concept.contentFormat === 'html5-app'
+  );
+
+  if (html5Apps.length > 0) {
+    console.log(`   Found ${html5Apps.length} HTML5 app(s) to process`);
+
+    for (const { concept, file } of html5Apps) {
+      try {
+        // Process with BlobManager to extract ZIP
+        const contentDir = path.join(DATA_DIR, 'content');
+        const processed = await blobManager.processContent(concept as any, contentDir);
+
+        if (processed.extracted && processed.blob && processed.blobMetadata) {
+          console.log(`   📦 Uploading ${concept.id}: ${(processed.blob.length / 1024 / 1024).toFixed(2)} MB`);
+
+          // Upload ZIP to storage via doorway
+          const uploadResult = await timer.timeOperation('html5_app_upload', () =>
+            doorwayClient.pushBlob(processed.blobMetadata!.hash, processed.blob!, {
+              hash: processed.blobMetadata!.hash,
+              mimeType: 'application/zip',
+              sizeBytes: processed.blob!.length,
+              entryPoint: processed.blobMetadata!.entryPoint,
+              fallbackUrl: processed.blobMetadata!.fallbackUrl,
+            })
+          );
+
+          if (uploadResult.success) {
+            // Extract appId from content object
+            const contentObj = typeof concept.content === 'object' ? concept.content as Record<string, unknown> : null;
+            const appId = contentObj?.appId as string || concept.id;
+            const entryPoint = contentObj?.entryPoint as string || 'index.html';
+
+            html5AppBlobHashes.set(concept.id, {
+              hash: processed.blobMetadata.hash,
+              appId,
+              entryPoint,
+            });
+
+            console.log(`   ✅ ${concept.id}: ${uploadResult.cached ? 'already cached' : 'uploaded'} (appId: ${appId})`);
+          } else {
+            console.error(`   ❌ ${concept.id}: upload failed - ${uploadResult.error}`);
+          }
+        } else {
+          // No local ZIP found - check if content has fallback URL
+          const contentObj = typeof concept.content === 'object' ? concept.content as Record<string, unknown> : null;
+          if (contentObj?.fallbackUrl) {
+            console.log(`   ⚠️ ${concept.id}: no local ZIP, will use fallbackUrl`);
+          } else {
+            console.warn(`   ⚠️ ${concept.id}: no local ZIP and no fallbackUrl`);
+            timer.recordSkipped(path.basename(file), 'html5-app without local ZIP');
+          }
+        }
+      } catch (err) {
+        console.error(`   ❌ ${concept.id}: processing error - ${err}`);
+      }
+    }
+
+    console.log(`   📊 Processed ${html5AppBlobHashes.size}/${html5Apps.length} HTML5 apps`);
+  } else {
+    console.log('   No HTML5 app content found');
+  }
+
+  timer.endPhase('HTML5 App Blobs');
+
+  // ========================================
   // UPLOAD & IMPORT CONTENT
   // ========================================
   if (filteredConcepts.length > 0) {
@@ -1021,7 +1107,22 @@ async function seedViaDoorway(): Promise<SeedResult> {
     // Convert to zome inputs
     const allInputs = filteredConcepts.map(({ concept, file }) => {
       const relativePath = file.replace(DATA_DIR + '/', '');
-      return conceptToInput(concept, relativePath);
+      const input = conceptToInput(concept, relativePath);
+
+      // For HTML5 apps, add the blob_hash from uploaded ZIP
+      const appInfo = html5AppBlobHashes.get(concept.id);
+      if (appInfo) {
+        // Set blob_hash to point to the uploaded ZIP
+        input.blob_hash = appInfo.hash;
+
+        // Add appId to metadata_json so elohim-storage can look it up
+        const metadata = input.metadata_json ? JSON.parse(input.metadata_json) : {};
+        metadata.appId = appInfo.appId;
+        metadata.entryPoint = appInfo.entryPoint;
+        input.metadata_json = JSON.stringify(metadata);
+      }
+
+      return input;
     });
 
     // Pre-flight validation - catch issues before blob upload

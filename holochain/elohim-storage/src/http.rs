@@ -267,6 +267,21 @@ impl HttpServer {
                 }
             }
 
+            // HTML5 App serving: /apps/{app_id}/{file_path}
+            (Method::GET, p) if p.starts_with("/apps/") => {
+                if let Some(ref content_db) = self.content_db {
+                    self.handle_app_request(&path, content_db.clone()).await
+                } else {
+                    Ok(Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error": "Content database not enabled"}"#
+                        )))
+                        .unwrap())
+                }
+            }
+
             // Not found
             _ => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
@@ -1534,6 +1549,290 @@ impl HttpServer {
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
                 .unwrap()),
+        }
+    }
+
+    // =========================================================================
+    // HTML5 App serving handlers
+    // =========================================================================
+
+    /// Handle HTML5 app file requests
+    ///
+    /// Route: GET /apps/{app_id}/{file_path}
+    ///
+    /// 1. Look up content by appId (contentFormat=html5-app)
+    /// 2. Get blob_hash from content record
+    /// 3. Fetch ZIP from blob store
+    /// 4. Extract requested file
+    /// 5. Return with appropriate Content-Type
+    async fn handle_app_request(
+        &self,
+        path: &str,
+        content_db: Arc<ContentDb>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        use std::io::Read;
+        use zip::ZipArchive;
+
+        // Parse path: /apps/{app_id}/{file_path}
+        let remainder = path.strip_prefix("/apps/").unwrap_or("");
+        let (app_id, file_path) = match remainder.find('/') {
+            Some(pos) => (&remainder[..pos], &remainder[pos + 1..]),
+            None => (remainder, "index.html"),
+        };
+
+        if app_id.is_empty() {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Missing app_id"}"#)))
+                .unwrap());
+        }
+
+        // Validate file_path for path traversal
+        if file_path.contains("..") || file_path.contains('\0') || file_path.starts_with('/') {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Invalid file path"}"#)))
+                .unwrap());
+        }
+
+        debug!(app_id = %app_id, file_path = %file_path, "App file request");
+
+        // Query content by appId (look for html5-app with matching content.appId)
+        let content_record = content_db.with_conn(|conn| {
+            // Query all html5-app content and find one with matching appId
+            let query = ContentQuery {
+                content_format: Some("html5-app".to_string()),
+                limit: 100,
+                ..Default::default()
+            };
+
+            match db::content::list_content(conn, &query) {
+                Ok(items) => {
+                    for item in items {
+                        // Parse content_body field as JSON and check appId
+                        if let Some(ref content_body) = item.content_body {
+                            if let Ok(content_obj) = serde_json::from_str::<serde_json::Value>(content_body) {
+                                if let Some(content_app_id) = content_obj.get("appId").and_then(|v| v.as_str()) {
+                                    if content_app_id == app_id {
+                                        return Ok(Some(item));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Ok(None)
+                }
+                Err(e) => Err(e),
+            }
+        })?;
+
+        let content = match content_record {
+            Some(c) => c,
+            None => {
+                return Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error": "App not found: {}"}}"#,
+                        app_id
+                    ))))
+                    .unwrap());
+            }
+        };
+
+        // Get blob_hash from content record
+        let blob_hash = match &content.blob_hash {
+            Some(hash) if !hash.is_empty() => hash.clone(),
+            _ => {
+                // Try metadata.blobHash or metadata.blob_hash
+                let metadata: serde_json::Value = content.metadata_json.as_ref()
+                    .and_then(|s| serde_json::from_str(s).ok())
+                    .unwrap_or(serde_json::json!({}));
+
+                metadata.get("blobHash")
+                    .or_else(|| metadata.get("blob_hash"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_default()
+            }
+        };
+
+        if blob_hash.is_empty() {
+            // Get fallback URL if available
+            let content_obj: serde_json::Value = content.content_body.as_ref()
+                .and_then(|s| serde_json::from_str(s).ok())
+                .unwrap_or(serde_json::json!({}));
+            let fallback = content_obj.get("fallbackUrl").and_then(|v| v.as_str());
+
+            return Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(
+                    if let Some(url) = fallback {
+                        format!(r#"{{"error": "App ZIP not available", "fallback": "{}"}}"#, url)
+                    } else {
+                        r#"{"error": "App ZIP not available (no blob_hash)"}"#.to_string()
+                    }
+                )))
+                .unwrap());
+        }
+
+        debug!(app_id = %app_id, blob_hash = %blob_hash, "Found blob hash");
+
+        // Fetch ZIP from blob store
+        let zip_data = match self.blob_store.get(&blob_hash).await {
+            Ok(data) => data,
+            Err(StorageError::NotFound(_)) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error": "App ZIP blob not found: {}"}}"#,
+                        blob_hash
+                    ))))
+                    .unwrap());
+            }
+            Err(e) => return Err(e),
+        };
+
+        debug!(app_id = %app_id, zip_size = zip_data.len(), "Fetched ZIP blob");
+
+        // Extract file from ZIP
+        let cursor = std::io::Cursor::new(&zip_data);
+        let mut archive = match ZipArchive::new(cursor) {
+            Ok(a) => a,
+            Err(e) => {
+                warn!(error = %e, "Invalid ZIP archive");
+                return Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error": "Invalid ZIP archive: {}"}}"#,
+                        e
+                    ))))
+                    .unwrap());
+            }
+        };
+
+        // Normalize file path
+        let normalized_path = file_path.trim_start_matches('/');
+
+        // Find the file in the archive
+        // First, try to find an exact match or a suffix match in the file list
+        let file_index = {
+            let mut exact_idx = None;
+            let mut suffix_idx = None;
+
+            for i in 0..archive.len() {
+                if let Ok(f) = archive.by_index(i) {
+                    let name = f.name();
+                    if name == normalized_path {
+                        exact_idx = Some(i);
+                        break;
+                    }
+                    if suffix_idx.is_none() &&
+                       (name.ends_with(normalized_path) || name.ends_with(&format!("/{}", normalized_path))) {
+                        suffix_idx = Some(i);
+                    }
+                }
+            }
+
+            exact_idx.or(suffix_idx)
+        };
+
+        let file_index = match file_index {
+            Some(idx) => idx,
+            None => {
+                return Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error": "File not found in app: {}"}}"#,
+                        normalized_path
+                    ))))
+                    .unwrap());
+            }
+        };
+
+        let mut file = match archive.by_index(file_index) {
+            Ok(f) => f,
+            Err(e) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error": "Failed to read file from ZIP: {}"}}"#,
+                        e
+                    ))))
+                    .unwrap());
+            }
+        };
+
+        // Read file contents
+        let mut contents = Vec::new();
+        if let Err(e) = file.read_to_end(&mut contents) {
+            return Ok(Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(format!(
+                    r#"{{"error": "Failed to read file contents: {}"}}"#,
+                    e
+                ))))
+                .unwrap());
+        }
+
+        // Determine content type from file extension
+        let content_type = Self::get_mime_type(file_path);
+
+        info!(
+            app_id = %app_id,
+            file_path = %file_path,
+            content_type = %content_type,
+            size = contents.len(),
+            "Serving app file"
+        );
+
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, content_type)
+            .header(header::CONTENT_LENGTH, contents.len())
+            .header(header::CACHE_CONTROL, "public, max-age=3600")
+            .header("X-App-Id", app_id)
+            .body(Full::new(Bytes::from(contents)))
+            .unwrap())
+    }
+
+    /// Get MIME type for a file path based on extension
+    fn get_mime_type(path: &str) -> &'static str {
+        match path.rsplit('.').next() {
+            Some("html") | Some("htm") => "text/html; charset=utf-8",
+            Some("js") | Some("mjs") => "application/javascript; charset=utf-8",
+            Some("css") => "text/css; charset=utf-8",
+            Some("json") => "application/json; charset=utf-8",
+            Some("png") => "image/png",
+            Some("jpg") | Some("jpeg") => "image/jpeg",
+            Some("gif") => "image/gif",
+            Some("svg") => "image/svg+xml",
+            Some("ico") => "image/x-icon",
+            Some("woff") => "font/woff",
+            Some("woff2") => "font/woff2",
+            Some("ttf") => "font/ttf",
+            Some("otf") => "font/otf",
+            Some("eot") => "application/vnd.ms-fontobject",
+            Some("wasm") => "application/wasm",
+            Some("mp3") => "audio/mpeg",
+            Some("mp4") => "video/mp4",
+            Some("webm") => "video/webm",
+            Some("ogg") => "audio/ogg",
+            Some("wav") => "audio/wav",
+            Some("txt") => "text/plain; charset=utf-8",
+            Some("xml") => "application/xml",
+            Some("pdf") => "application/pdf",
+            Some("zip") => "application/zip",
+            Some("map") => "application/json", // source maps
+            _ => "application/octet-stream",
         }
     }
 }
