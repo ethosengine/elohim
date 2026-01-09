@@ -1,7 +1,9 @@
-<div class="path-player-container" [class.sidebar-collapsed]="!sidebarOpen">
+<div class="path-player-container focused-view-container"
+     [class.sidebar-collapsed]="!sidebarOpen"
+     [class.focused-view-active]="isFocusedView">
 
   <!-- PATH TOOLING: Mobile Toggle -->
-  <button class="sidebar-toggle" (click)="toggleSidebar()" aria-label="Toggle Navigation">
+  <button class="sidebar-toggle" (click)="toggleSidebar()" aria-label="Toggle Navigation" [hidden]="isFocusedView">
     <span class="icon">{{ sidebarOpen ? '✕' : '☰' }}</span>
   </button>
 
@@ -110,19 +112,25 @@
 
       <!-- PATH TOOLING: Breadcrumbs (Chapter > Module > Section > Concept) -->
       <nav class="breadcrumbs main-breadcrumbs" aria-label="Breadcrumb navigation">
-        <a routerLink="/lamad">Territory</a>
-        <span class="separator">/</span>
-        <a [routerLink]="['/lamad/path', pathId]">{{ path?.title }}</a>
-        @if (lessonContext) {
+        <div class="breadcrumb-trail">
+          <a routerLink="/lamad">Territory</a>
           <span class="separator">/</span>
-          <span class="crumb">{{ lessonContext.chapter.title }}</span>
+          <a [routerLink]="['/lamad/path', pathId]">{{ path?.title }}</a>
+          @if (lessonContext) {
+            <span class="separator">/</span>
+            <span class="crumb">{{ lessonContext.chapter.title }}</span>
+            <span class="separator">/</span>
+            <span class="crumb">{{ lessonContext.module.title }}</span>
+            <span class="separator">/</span>
+            <span class="crumb">{{ lessonContext.section.title }}</span>
+          }
           <span class="separator">/</span>
-          <span class="crumb">{{ lessonContext.module.title }}</span>
-          <span class="separator">/</span>
-          <span class="crumb">{{ lessonContext.section.title }}</span>
-        }
-        <span class="separator">/</span>
-        <span class="crumb current">{{ stepView.step.stepTitle }}</span>
+          <span class="crumb current">{{ stepView.step.stepTitle }}</span>
+        </div>
+        <app-focused-view-toggle
+          [isActive]="isFocusedView"
+          (toggled)="onFocusedViewToggle($event)">
+        </app-focused-view-toggle>
       </nav>
 
       <div class="content-scroll-container">
@@ -163,6 +171,7 @@
               <app-lesson-view
                 [content]="stepView.content"
                 [pathContext]="buildPathContext()"
+                [refreshKey]="contentRefreshKey"
                 explorationMode="path"
                 (exploreContent)="onExploreContent($event)"
                 (exploreInGraph)="onExploreInGraph()"

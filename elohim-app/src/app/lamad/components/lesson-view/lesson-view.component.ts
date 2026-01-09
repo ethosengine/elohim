@@ -519,6 +519,9 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
   /** Whether to show inline quiz after content */
   @Input() showInlineQuiz = false;
 
+  /** Refresh key - when changed, triggers content reload (for focused view) */
+  @Input() refreshKey?: number;
+
   /** Emitted when user clicks on related content to explore */
   @Output() exploreContent = new EventEmitter<string>();
 
@@ -556,6 +559,10 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['content'] && this.content) {
       // Load renderer after view updates
+      setTimeout(() => this.loadRenderer(), 0);
+    }
+    // Handle refresh trigger (for focused view mode)
+    if (changes['refreshKey'] && !changes['refreshKey'].firstChange) {
       setTimeout(() => this.loadRenderer(), 0);
     }
   }

@@ -2,6 +2,57 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
+  position: relative; /* Anchor for positioned elements */
+}
+
+/* =============================================================================
+   Content Toolbar (houses focus toggle)
+   ============================================================================= */
+
+.content-toolbar {
+  display: none; /* Hidden by default on mobile */
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: var(--lamad-surface, #ffffff);
+  border-bottom: 1px solid var(--lamad-border, #f3f4f6);
+}
+
+@media (min-width: 768px) {
+  .content-toolbar {
+    display: flex;
+  }
+}
+
+/* =============================================================================
+   Focused View Mode
+   ============================================================================= */
+
+.content-viewer-container.focused-view-active {
+  max-width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.content-viewer-container.focused-view-active .content-body {
+  max-width: 100%;
+  width: 100%;
+  height: calc(100vh - 3rem); /* Account for toolbar */
+  min-height: calc(100vh - 3rem);
+  margin: 0;
+  border-radius: 0;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+/* Hide non-essential sections in focused view */
+.content-viewer-container.focused-view-active .content-header,
+.content-viewer-container.focused-view-active .viewer-tabs,
+.content-viewer-container.focused-view-active .affinity-panel,
+.content-viewer-container.focused-view-active .paths-section,
+.content-viewer-container.focused-view-active .related-section,
+.content-viewer-container.focused-view-active .feedback-section {
+  display: none !important;
 }
 
 /* Breadcrumb Navigation */

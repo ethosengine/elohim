@@ -6,9 +6,11 @@ import {
   ViewContainerRef,
   ComponentRef,
   inject,
-  AfterViewChecked
+  AfterViewChecked,
+  HostListener,
+  Inject
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Subject, Subscription, forkJoin, of } from 'rxjs';
 import { takeUntil, catchError } from 'rxjs/operators';
@@ -56,6 +58,9 @@ import {
   createProfileFromTemplate,
 } from '@app/lamad/models/feedback-profile.model';
 
+// Focused view toggle for immersive content
+import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
+
 @Component({
   selector: 'app-content-viewer',
   standalone: true,
@@ -66,6 +71,7 @@ import {
     MiniGraphComponent,
     ReactionBarComponent,
     GraduatedFeedbackComponent,
+    FocusedViewToggleComponent,
   ],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],
@@ -108,6 +114,10 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   pathContext: PathContext | null = null;
   hasReturnPath = false;
 
+  // Focused view (immersive mode) state
+  isFocusedView = false;
+  private readonly TRANSITION_DURATION = 300; // Match CSS transition duration
+
   // Dynamic renderer hosting
   @ViewChild('rendererHost', { read: ViewContainerRef, static: false })
   rendererHost!: ViewContainerRef;
@@ -136,7 +146,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     private readonly editorService: ContentEditorService,
     private readonly pathContextService: PathContextService,
     private readonly governanceService: GovernanceService,
-    private readonly signalService: GovernanceSignalService
+    private readonly signalService: GovernanceSignalService,
+    @Inject(DOCUMENT) private readonly document: Document
   ) {}
 
   ngOnInit(): void {
@@ -171,6 +182,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     this.destroy$.next();
     this.destroy$.complete();
     this.destroyRenderer();
+    // Clean up focused view mode if active
+    this.document.body.classList.remove('focused-view-mode');
   }
 
   ngAfterViewChecked(): void {
@@ -833,5 +846,53 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
         } : {})
       }
     });
+  }
+
+  // =========================================================================
+  // Focused View (Immersive Mode) Methods
+  // =========================================================================
+
+  /**
+   * Handle escape key to exit focused view mode.
+   */
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.isFocusedView) {
+      this.onFocusedViewToggle(false);
+    }
+  }
+
+  /**
+   * Toggle focused view mode.
+   * Waits for CSS transition to complete before reloading content
+   * so iframes can measure the new viewport dimensions correctly.
+   */
+  onFocusedViewToggle(active: boolean): void {
+    this.isFocusedView = active;
+
+    // Toggle body class for global effects (hide navigation, lock scroll)
+    if (active) {
+      this.document.body.classList.add('focused-view-mode');
+    } else {
+      this.document.body.classList.remove('focused-view-mode');
+    }
+
+    // Wait for CSS transition to complete, then reload content
+    // This ensures iframes get the correct viewport dimensions
+    setTimeout(() => {
+      this.reloadRenderer();
+    }, this.TRANSITION_DURATION);
+  }
+
+  /**
+   * Reload the renderer to refresh content with new dimensions.
+   * Destroys and recreates the renderer component.
+   */
+  private reloadRenderer(): void {
+    if (this.node && this.rendererHost) {
+      this.destroyRenderer();
+      this.rendererHost.clear();
+      this.loadRenderer();
+    }
   }
 }

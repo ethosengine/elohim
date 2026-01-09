@@ -1,5 +1,5 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject, HostListener, Inject } from '@angular/core';
+import { CommonModule, DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -13,6 +13,7 @@ import { PathContext } from '../../models/exploration-context.model';
 import { PathContextService } from '../../services/path-context.service';
 import { LessonViewComponent } from '../lesson-view/lesson-view.component';
 import { RendererCompletionEvent } from '../../renderers/renderer-registry.service';
+import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 
 /**
  * Concept item in the lesson sidebar - represents one concept within the current section/lesson
@@ -55,7 +56,7 @@ interface LessonContext {
 @Component({
   selector: 'app-path-navigator',
   standalone: true,
-  imports: [CommonModule, RouterModule, LessonViewComponent],
+  imports: [CommonModule, RouterModule, LessonViewComponent, FocusedViewToggleComponent],
   templateUrl: './path-navigator.component.html',
   styleUrls: ['./path-navigator.component.css']
 })
@@ -89,6 +90,11 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   error: string | null = null;
   sidebarOpen = true; // Default open, click backdrop to dismiss on mobile
 
+  // Focused view (immersive mode) state
+  isFocusedView = false;
+  contentRefreshKey = 0; // Increment to trigger content reload
+  private readonly TRANSITION_DURATION = 300; // Match CSS transition duration
+
   private readonly destroy$ = new Subject<void>();
   private readonly seoService = inject(SeoService);
 
@@ -102,7 +108,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     private readonly agentService: AgentService,
     private readonly governanceSignalService: GovernanceSignalService,
     private readonly pathContextService: PathContextService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    @Inject(DOCUMENT) private readonly document: Document
   ) {}
 
   ngOnInit(): void {
@@ -122,6 +129,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
     // Exit path context when leaving the navigator
     this.pathContextService.exitPath();
+    // Clean up focused view mode if active
+    this.document.body.classList.remove('focused-view-mode');
   }
 
   /**
@@ -736,5 +745,43 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     }
 
     this.contentViewStartTime = null;
+  }
+
+  // =========================================================================
+  // Focused View (Immersive Mode) Methods
+  // =========================================================================
+
+  /**
+   * Handle escape key to exit focused view mode.
+   */
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.isFocusedView) {
+      this.onFocusedViewToggle(false);
+    }
+  }
+
+  /**
+   * Toggle focused view mode.
+   * Waits for CSS transition to complete before reloading content
+   * so iframes can measure the new viewport dimensions correctly.
+   */
+  onFocusedViewToggle(active: boolean): void {
+    this.isFocusedView = active;
+
+    // Hide sidebar in focused view
+    if (active) {
+      this.sidebarOpen = false;
+      this.document.body.classList.add('focused-view-mode');
+    } else {
+      this.document.body.classList.remove('focused-view-mode');
+    }
+
+    // Wait for CSS transition to complete, then trigger content reload
+    // This ensures iframes get the correct viewport dimensions
+    setTimeout(() => {
+      this.contentRefreshKey = Date.now();
+      this.cdr.detectChanges();
+    }, this.TRANSITION_DURATION);
   }
 }

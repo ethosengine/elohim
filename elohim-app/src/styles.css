@@ -750,3 +750,43 @@ body[data-theme="dark"] .cta-button:hover {
         scroll-behavior: auto !important;
     }
 }
+
+/* ============================================================================
+   Focused View Mode (Immersive Content Display)
+   ============================================================================
+   CSS-based fullscreen mode for distraction-free content viewing.
+   Activated via .focused-view-active class on container elements.
+   Uses fixed positioning to fill viewport while hiding app navigation.
+   ============================================================================ */
+
+.focused-view-container {
+    position: relative;
+}
+
+.focused-view-active {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 1000;
+    background: var(--lamad-bg-primary, #ffffff);
+    overflow: auto;
+    transition: all 0.3s ease;
+}
+
+/* Lock body scroll when focused view is active */
+body.focused-view-mode {
+    overflow: hidden;
+}
+
+/* Hide app navigation elements in focused view */
+body.focused-view-mode .elohim-navigator,
+body.focused-view-mode .app-navigation,
+body.focused-view-mode .lamad-nav,
+body.focused-view-mode app-header,
+body.focused-view-mode .site-header {
+    display: none !important;
+}

@@ -1,4 +1,6 @@
-<div class="content-viewer-container">
+<div class="content-viewer-container focused-view-container"
+     [class.focused-view-active]="isFocusedView">
+
   <!-- Loading state -->
   <div *ngIf="isLoading" class="loading-state">
     <div class="spinner"></div>
@@ -123,7 +125,15 @@
 
     <!-- Tab Content -->
     <div [ngSwitch]="activeTab" class="tab-content">
-      
+
+      <!-- Content Toolbar (fixed at top in focused view) -->
+      <div class="content-toolbar">
+        <app-focused-view-toggle
+          [isActive]="isFocusedView"
+          (toggled)="onFocusedViewToggle($event)">
+        </app-focused-view-toggle>
+      </div>
+
       <!-- Content Tab -->
       <section *ngSwitchCase="'content'">
         <!-- Main content -->

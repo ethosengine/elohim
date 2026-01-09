@@ -34,6 +34,83 @@
 }
 
 /* =============================================================================
+   Focused View Toggle & Mode
+   ============================================================================= */
+
+/* Toggle button is now inside breadcrumbs - no absolute positioning needed */
+
+/* Focused view mode overrides */
+.path-player-container.focused-view-active {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Hide sidebar and tooling in focused view */
+.path-player-container.focused-view-active .path-sidebar,
+.path-player-container.focused-view-active .sidebar-toggle,
+.path-player-container.focused-view-active .sidebar-expand-btn,
+.path-player-container.focused-view-active .sidebar-backdrop {
+  display: none !important;
+}
+
+/* Hide path tooling elements in focused view */
+.path-player-container.focused-view-active .path-content-header,
+.path-player-container.focused-view-active .path-content-footer,
+.path-player-container.focused-view-active .learning-objectives,
+.path-player-container.focused-view-active .reflection-prompts {
+  display: none !important;
+}
+
+/* Hide breadcrumb trail text but keep toolbar visible in focused view */
+.path-player-container.focused-view-active .breadcrumb-trail {
+  display: none;
+}
+
+/* Main content takes full width in focused view */
+.path-player-container.focused-view-active .main-content {
+  padding: 0 !important;
+}
+
+/* Content fills viewport in focused view */
+.path-player-container.focused-view-active .content-scroll-container {
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.path-player-container.focused-view-active .content {
+  padding: 0;
+  margin: 0;
+}
+
+.path-player-container.focused-view-active .content-inner {
+  max-width: 100%;
+  width: 100%;
+  height: calc(100vh - 3rem); /* Account for breadcrumbs toolbar */
+  min-height: calc(100vh - 3rem);
+  padding: 0;
+  margin: 0;
+}
+
+/* LessonView fills available space in focused mode */
+.path-player-container.focused-view-active app-lesson-view {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.path-player-container.focused-view-active .lesson-view {
+  height: 100% !important;
+}
+
+.path-player-container.focused-view-active .lesson-main {
+  height: 100% !important;
+  padding: 1rem !important;
+}
+
+/* =============================================================================
    PATH TOOLING: Sidebar
    Left sidebar with path navigation, chapters, and progress
    ============================================================================= */
@@ -332,14 +409,23 @@
 
 /* Breadcrumbs */
 .breadcrumbs {
-  padding: 1rem 2rem;
+  padding: 0.75rem 2rem;
   background-color: var(--lamad-surface, #ffffff);
   border-bottom: 1px solid var(--lamad-border, #f3f4f6);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  gap: 1rem;
   font-size: 0.875rem;
   color: var(--lamad-text-secondary, #6b7280);
+}
+
+.breadcrumb-trail {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0; /* Allow truncation */
 }
 
 /* Breadcrumb Visibility logic */
