@@ -76,8 +76,25 @@ describe('SearchService', () => {
     lastUpdated: '2025-01-06T00:00:00.000Z'
   };
 
+  const mockPathIndex = {
+    paths: [
+      {
+        id: 'path-1',
+        title: 'Governance Learning Path',
+        description: 'Learn about governance',
+        tags: ['governance'],
+        difficulty: 'intermediate' as const,
+        estimatedDuration: '2h',
+        stepCount: 5,
+        createdAt: '2025-01-01T00:00:00.000Z'
+      }
+    ],
+    totalCount: 1,
+    lastUpdated: '2025-01-06T00:00:00.000Z'
+  };
+
   beforeEach(() => {
-    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', ['getContentIndex']);
+    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', ['getContentIndex', 'getPathIndex']);
     const trustBadgeSpyObj = jasmine.createSpyObj('TrustBadgeService', ['getTrustBadges']);
 
     TestBed.configureTestingModule({
@@ -92,6 +109,7 @@ describe('SearchService', () => {
     trustBadgeSpy = TestBed.inject(TrustBadgeService) as jasmine.SpyObj<TrustBadgeService>;
 
     dataLoaderSpy.getContentIndex.and.returnValue(of(mockContentIndex));
+    dataLoaderSpy.getPathIndex.and.returnValue(of(mockPathIndex));
 
     service = TestBed.inject(SearchService);
   });
@@ -107,8 +125,9 @@ describe('SearchService', () => {
   describe('search', () => {
     it('should return all results when no text query', (done) => {
       service.search({ text: '' }).subscribe(results => {
-        expect(results.totalCount).toBe(5);
-        expect(results.results.length).toBe(5);
+        // 5 content nodes + 1 path = 6 total
+        expect(results.totalCount).toBe(6);
+        expect(results.results.length).toBe(6);
         done();
       });
     });
@@ -368,7 +387,8 @@ describe('SearchService', () => {
     it('should count tags correctly', (done) => {
       service.search({ text: '' }).subscribe(results => {
         const governanceTag = results.facets.byTag.find(f => f.value === 'governance');
-        expect(governanceTag?.count).toBe(3); // 3 items have governance tag
+        // 3 content items + 1 path have governance tag = 4 total
+        expect(governanceTag?.count).toBe(4);
         done();
       });
     });
@@ -376,7 +396,8 @@ describe('SearchService', () => {
     it('should count flag status', (done) => {
       service.search({ text: '' }).subscribe(results => {
         expect(results.facets.byFlagStatus.flagged).toBe(1);
-        expect(results.facets.byFlagStatus.unflagged).toBe(4);
+        // 4 content items + 1 path are unflagged = 5 total
+        expect(results.facets.byFlagStatus.unflagged).toBe(5);
         done();
       });
     });
@@ -518,6 +539,7 @@ describe('SearchService', () => {
 
     it('should handle undefined nodes', (done) => {
       dataLoaderSpy.getContentIndex.and.returnValue(of({}));
+      dataLoaderSpy.getPathIndex.and.returnValue(of({ paths: [], totalCount: 0, lastUpdated: '' }));
 
       service.search({ text: '' }).subscribe(results => {
         expect(results.totalCount).toBe(0);

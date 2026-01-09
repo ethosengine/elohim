@@ -309,12 +309,21 @@ describe('DataLoaderService', () => {
   });
 
   describe('getContentIndex', () => {
-    it('should return stats from Holochain', (done) => {
-      mockHolochainContent.getStats.and.returnValue(of({ total_count: 5, by_type: { concept: 3, exercise: 2 } }));
+    it('should return content index from ContentService', (done) => {
+      // Mock content nodes with different types (cast to any to avoid full interface)
+      const mockNodes = [
+        { id: '1', title: 'A', contentType: 'concept', tags: [] },
+        { id: '2', title: 'B', contentType: 'concept', tags: [] },
+        { id: '3', title: 'C', contentType: 'concept', tags: [] },
+        { id: '4', title: 'D', contentType: 'exercise', tags: [] },
+        { id: '5', title: 'E', contentType: 'exercise', tags: [] },
+      ] as any[];
+      mockContentService.queryContent.and.returnValue(of(mockNodes));
 
       service.getContentIndex().subscribe(index => {
         expect(index.totalCount).toBe(5);
-        expect(index.byType).toEqual({ concept: 3, exercise: 2 });
+        expect(index.byType.concept).toBe(3);
+        expect(index.byType.exercise).toBe(2);
         done();
       });
     });
