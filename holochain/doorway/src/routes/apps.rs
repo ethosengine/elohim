@@ -104,7 +104,9 @@ async fn forward_app_request(
                     let mut builder = Response::builder()
                         .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
                         .header("Content-Type", content_type)
-                        .header("Access-Control-Allow-Origin", "*");
+                        .header("Access-Control-Allow-Origin", "*")
+                        // Required for COEP: require-corp in Angular app
+                        .header("Cross-Origin-Resource-Policy", "cross-origin");
 
                     if let Some(cc) = cache_control {
                         builder = builder.header("Cache-Control", cc);
