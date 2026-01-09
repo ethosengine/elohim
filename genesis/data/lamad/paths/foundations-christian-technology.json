@@ -88,7 +88,7 @@
       "title": "Chapter 2: Setting the Stage",
       "description": "Scaling wisdom and building trust in the digital age",
       "order": 1,
-      "estimatedDuration": "45-60 minutes",
+      "estimatedDuration": "1-1.5 hours",
       "steps": [
         {
           "order": 3,
@@ -108,6 +108,27 @@
             "trust-evolution",
             "systems-thinking"
           ]
+        },
+        {
+          "order": 4,
+          "resourceId": "simulation-evolution-of-trust",
+          "stepTitle": "Interactive: The Evolution of Trust",
+          "stepNarrative": "Experience how trust evolves (or breaks down) through Nicky Case's acclaimed interactive simulation. This game-theory exploration demonstrates why cooperation emerges and what conditions destroy it - essential insights for building trustworthy technology.",
+          "learningObjectives": [
+            "Experience game theory principles through interactive play",
+            "Understand conditions that foster or destroy trust",
+            "Connect trust dynamics to technology design choices"
+          ],
+          "optional": true,
+          "completionCriteria": [
+            "Complete the interactive simulation"
+          ],
+          "estimatedTime": "30 minutes",
+          "sharedConcepts": [
+            "trust-evolution",
+            "game-theory",
+            "cooperation"
+          ]
         }
       ]
     },
@@ -119,7 +140,7 @@
       "estimatedDuration": "1.5-2 hours",
       "steps": [
         {
-          "order": 4,
+          "order": 5,
           "resourceId": "fct-module-05-respecting-human-nature",
           "stepTitle": "Respecting Human Nature",
           "stepNarrative": "CHT Module: Module 2 - Christian perspective on technology ethics",
@@ -138,7 +159,7 @@
           ]
         },
         {
-          "order": 5,
+          "order": 6,
           "resourceId": "fct-module-06-harmful-consequences",
           "stepTitle": "Minimizing Harmful Consequences",
           "stepNarrative": "CHT Module: Module 3 - Christian perspective on technology ethics",
@@ -165,7 +186,7 @@
       "estimatedDuration": "2-3 hours",
       "steps": [
         {
-          "order": 6,
+          "order": 7,
           "resourceId": "fct-module-07-regeneration",
           "stepTitle": "Regeneration and Reconciliation",
           "stepNarrative": "CHT Module: Module 3 - Christian perspective on technology ethics",
@@ -183,7 +204,7 @@
           ]
         },
         {
-          "order": 7,
+          "order": 8,
           "resourceId": "fct-module-08-centering-love",
           "stepTitle": "Centering Values: Love",
           "stepNarrative": "CHT Module: Module 4 - Christian perspective on technology ethics",
@@ -201,7 +222,7 @@
           ]
         },
         {
-          "order": 8,
+          "order": 9,
           "resourceId": "fct-module-09-fruits-of-spirit",
           "stepTitle": "Centering Values: Fruits of the Spirit",
           "stepNarrative": "CHT Module: Module 4 - Christian perspective on technology ethics",
@@ -228,7 +249,7 @@
       "estimatedDuration": "1.5-2 hours",
       "steps": [
         {
-          "order": 9,
+          "order": 10,
           "resourceId": "fct-module-10-recognize-distortions",
           "stepTitle": "Creating Shared Understanding: Recognize Distortions",
           "stepNarrative": "CHT Module: Module 5 - Christian perspective on technology ethics",
@@ -246,7 +267,7 @@
           ]
         },
         {
-          "order": 10,
+          "order": 11,
           "resourceId": "fct-module-11-collaboration-sensemaking",
           "stepTitle": "Creating Shared Understanding: Collaboration",
           "stepNarrative": "CHT Module: Module 5 - Christian perspective on technology ethics",
@@ -273,7 +294,7 @@
       "estimatedDuration": "2-3 hours",
       "steps": [
         {
-          "order": 11,
+          "order": 12,
           "resourceId": "fct-module-12-fairness-justice",
           "stepTitle": "Supporting Fairness and Justice",
           "stepNarrative": "CHT Module: Module 6 - Christian perspective on technology ethics",
@@ -291,7 +312,7 @@
           ]
         },
         {
-          "order": 12,
+          "order": 13,
           "resourceId": "fct-module-13-helping-thrive",
           "stepTitle": "Helping People Thrive",
           "stepNarrative": "CHT Module: Module 7 - Christian perspective on technology ethics",
@@ -309,7 +330,7 @@
           ]
         },
         {
-          "order": 13,
+          "order": 14,
           "resourceId": "fct-module-14-ready-to-act",
           "stepTitle": "Ready To Act: Embodying Christ in the Digital Age",
           "stepNarrative": "CHT Module: Module 8 - Christian perspective on technology ethics",
@@ -328,7 +349,7 @@
           ]
         },
         {
-          "order": 14,
+          "order": 15,
           "resourceId": "fct-module-15-retrospective",
           "stepTitle": "Digital Discipleship Retrospective",
           "stepNarrative": "CHT Module: Conclusion - Christian perspective on technology ethics",
@@ -407,6 +428,21 @@
     },
     {
       "order": 4,
+      "resourceId": "simulation-evolution-of-trust",
+      "stepTitle": "Interactive: The Evolution of Trust",
+      "stepNarrative": "Experience trust dynamics through interactive play",
+      "learningObjectives": [
+        "Experience game theory principles through interactive play",
+        "Understand conditions that foster or destroy trust"
+      ],
+      "optional": true,
+      "completionCriteria": [
+        "Complete the interactive simulation"
+      ],
+      "estimatedTime": "30 minutes"
+    },
+    {
+      "order": 5,
       "resourceId": "fct-module-05-respecting-human-nature",
       "stepTitle": "Respecting Human Nature",
       "stepNarrative": "CHT Module: Module 2",
@@ -420,7 +456,7 @@
       "estimatedTime": "30-45 minutes"
     },
     {
-      "order": 5,
+      "order": 6,
       "resourceId": "fct-module-06-harmful-consequences",
       "stepTitle": "Minimizing Harmful Consequences",
       "stepNarrative": "CHT Module: Module 3",
@@ -434,7 +470,7 @@
       "estimatedTime": "30-45 minutes"
     },
     {
-      "order": 6,
+      "order": 7,
       "resourceId": "fct-module-07-regeneration",
       "stepTitle": "Regeneration and Reconciliation",
       "stepNarrative": "CHT Module: Module 3",
@@ -448,7 +484,7 @@
       "estimatedTime": "30-45 minutes"
     },
     {
-      "order": 7,
+      "order": 8,
       "resourceId": "fct-module-08-centering-love",
       "stepTitle": "Centering Values: Love",
       "stepNarrative": "CHT Module: Module 4",
@@ -462,7 +498,7 @@
       "estimatedTime": "30-45 minutes"
     },
     {
-      "order": 8,
+      "order": 9,
       "resourceId": "fct-module-09-fruits-of-spirit",
       "stepTitle": "Centering Values: Fruits of the Spirit",
       "stepNarrative": "CHT Module: Module 4",
@@ -476,7 +512,7 @@
       "estimatedTime": "30-45 minutes"
     },
     {
-      "order": 9,
+      "order": 10,
       "resourceId": "fct-module-10-recognize-distortions",
       "stepTitle": "Creating Shared Understanding: Recognize Distortions",
       "stepNarrative": "CHT Module: Module 5",
@@ -490,7 +526,7 @@
       "estimatedTime": "30-45 minutes"
     },
     {
-      "order": 10,
+      "order": 11,
       "resourceId": "fct-module-11-collaboration-sensemaking",
       "stepTitle": "Creating Shared Understanding: Collaboration",
       "stepNarrative": "CHT Module: Module 5",
@@ -504,7 +540,7 @@
       "estimatedTime": "30-45 minutes"
     },
     {
-      "order": 11,
+      "order": 12,
       "resourceId": "fct-module-12-fairness-justice",
       "stepTitle": "Supporting Fairness and Justice",
       "stepNarrative": "CHT Module: Module 6",
@@ -518,7 +554,7 @@
       "estimatedTime": "30-45 minutes"
     },
     {
-      "order": 12,
+      "order": 13,
       "resourceId": "fct-module-13-helping-thrive",
       "stepTitle": "Helping People Thrive",
       "stepNarrative": "CHT Module: Module 7",
@@ -532,7 +568,7 @@
       "estimatedTime": "30-45 minutes"
     },
     {
-      "order": 13,
+      "order": 14,
       "resourceId": "fct-module-14-ready-to-act",
       "stepTitle": "Ready To Act: Embodying Christ in the Digital Age",
       "stepNarrative": "CHT Module: Module 8",
@@ -546,7 +582,7 @@
       "estimatedTime": "30-45 minutes"
     },
     {
-      "order": 14,
+      "order": 15,
       "resourceId": "fct-module-15-retrospective",
       "stepTitle": "Digital Discipleship Retrospective",
       "stepNarrative": "CHT Module: Conclusion",
