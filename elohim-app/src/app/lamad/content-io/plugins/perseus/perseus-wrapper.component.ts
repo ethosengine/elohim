@@ -175,9 +175,15 @@ export class PerseusWrapperComponent implements AfterViewInit, OnDestroy, OnChan
         });
 
         if (itemToApply) {
-          console.log('[PerseusWrapper] Setting item:', itemToApply.id);
+          console.log('[PerseusWrapper] Setting item:', itemToApply.id, {
+            hasQuestion: !!itemToApply.question,
+            hasWidgets: !!itemToApply.question?.widgets,
+            fullItem: itemToApply
+          });
           this.perseusElement.item = itemToApply;
           this.hasPendingItemChange = false;
+          // Verify item was set
+          console.log('[PerseusWrapper] After setting, element.item:', this.perseusElement.item?.id || 'null');
         } else {
           console.log('[PerseusWrapper] No item to set');
         }

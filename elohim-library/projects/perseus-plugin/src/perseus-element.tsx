@@ -72,6 +72,17 @@ function PerseusItemWrapper({
   const [error, setError] = useState<string | null>(null);
   const rendererRef = useRef<PerseusRendererAPI | null>(null);
 
+  // Debug: log render state
+  console.log('[PerseusItemWrapper] Render:', {
+    hasItem: !!item,
+    itemId: item?.id || 'null',
+    hasQuestion: !!item?.question,
+    hasWidgets: !!item?.question?.widgets,
+    loading,
+    hasPerseusModule: !!PerseusModule,
+    error,
+  });
+
   // Dynamic import of Perseus to avoid SSR issues
   useEffect(() => {
     let mounted = true;
@@ -242,6 +253,12 @@ class PerseusQuestionElement extends HTMLElement {
    * Set the Perseus item to render.
    */
   set item(value: PerseusItem | null) {
+    console.log('[PerseusQuestionElement] set item:', {
+      hasValue: !!value,
+      valueId: value?.id || 'null',
+      hasQuestion: !!value?.question,
+      hasRoot: !!this.root
+    });
     this._item = value;
     this.render();
   }
@@ -339,8 +356,12 @@ class PerseusQuestionElement extends HTMLElement {
   // Private Methods
 
   private render(): void {
-    if (!this.root) return;
+    if (!this.root) {
+      console.log('[PerseusQuestionElement] render: no root, skipping');
+      return;
+    }
 
+    console.log('[PerseusQuestionElement] render: calling root.render with item:', this._item?.id || 'null');
     this.root.render(
       <PerseusItemWrapper
         item={this._item}

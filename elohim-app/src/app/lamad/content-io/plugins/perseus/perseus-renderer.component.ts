@@ -534,6 +534,18 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
     }
 
     console.log(`[PerseusRenderer] Loaded ${this.questions.length} question(s)`);
+    // Debug: log first question structure
+    if (this.questions.length > 0) {
+      const q = this.questions[0];
+      console.log('[PerseusRenderer] First question structure:', {
+        id: q.id,
+        hasQuestion: !!q.question,
+        hasWidgets: !!q.question?.widgets,
+        widgetCount: q.question?.widgets ? Object.keys(q.question.widgets).length : 0,
+        contentPreview: q.question?.content?.substring(0, 100) || 'no content',
+        fullQuestion: q  // Log the entire question object
+      });
+    }
   }
 
   private initializeStreakTracking(): void {
