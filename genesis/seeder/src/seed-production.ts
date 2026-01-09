@@ -332,7 +332,7 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
       for (const blob of blobsToPush) {
         // Determine reach based on content metadata
         const content = processedContents.find(c => c.metadata.blob_hash === blob.hash);
-        const reach = content?.metadata.reach || 'commons';
+        const reach = (content?.metadata.reach as string) || 'commons';
 
         const result = await storageClient.pushBlob(blob.data, blob.metadata.mimeType, reach);
 

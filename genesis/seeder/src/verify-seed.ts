@@ -72,7 +72,10 @@ async function main(): Promise<void> {
   try {
     // Connect to admin WebSocket
     console.log('\n1. Connecting to conductor...');
-    adminWs = await AdminWebsocket.connect(ADMIN_URL, { timeout: 30000 });
+    adminWs = await AdminWebsocket.connect({
+      url: new URL(ADMIN_URL),
+      defaultTimeout: 30000,
+    });
     console.log('   ✓ Admin connection established');
 
     // Get app info
@@ -94,7 +97,7 @@ async function main(): Promise<void> {
       process.exit(2);
     }
 
-    const cellId = roleCell.provisioned.cell_id as CellId;
+    const cellId = (roleCell as { provisioned: { cell_id: CellId } }).provisioned.cell_id;
     console.log(`   ✓ Cell ID: ${Buffer.from(cellId[0]).toString('hex').slice(0, 12)}...`);
 
     // Attach app interface
@@ -104,13 +107,16 @@ async function main(): Promise<void> {
     if (appInterfaces.length > 0) {
       appPort = appInterfaces[0].port;
     } else {
-      const attached = await adminWs.attachAppInterface({ port: 0 });
+      const attached = await adminWs.attachAppInterface({ port: 0, allowed_origins: '*' });
       appPort = attached.port;
     }
 
     // Connect app WebSocket
     const appUrl = ADMIN_URL.replace(/:\d+/, `:${appPort}`);
-    appWs = await AppWebsocket.connect(appUrl, { timeout: 30000 });
+    appWs = await AppWebsocket.connect({
+      url: new URL(appUrl),
+      defaultTimeout: 30000,
+    });
     console.log(`   ✓ App connection established (port ${appPort})`);
 
     // Run verification

@@ -143,6 +143,19 @@ export interface BatchPushResult {
   errors: Array<{ hash: string; error: string }>;
 }
 
+/** Result from bulk content/path creation */
+export interface BulkCreateResult {
+  inserted: number;
+  skipped: number;
+  errors: string[];
+}
+
+/** Result from bulk relationship creation */
+export interface BulkRelationshipResult {
+  created: number;
+  errors: string[];
+}
+
 // =============================================================================
 // Import API Types
 // =============================================================================
@@ -703,6 +716,145 @@ export class DoorwayClient {
     }
 
     throw new Error(`Import timed out after ${timeout}ms`);
+  }
+
+  // ===========================================================================
+  // Direct Bulk Operations - Calls elohim-storage via Doorway's /api/db/* proxy
+  // ===========================================================================
+
+  /**
+   * Bulk create content items directly via storage service.
+   *
+   * This bypasses the queue-based import flow and directly calls the
+   * elohim-storage bulk endpoint through Doorway's API proxy.
+   *
+   * @param items - Content items to create (with content_body field, not content)
+   * @returns BulkCreateResult with inserted/skipped counts
+   */
+  async bulkCreateContent(
+    items: Array<{
+      id: string;
+      title: string;
+      content_type?: string;
+      content_format?: string;
+      content_body?: string;
+      description?: string;
+      blob_hash?: string;
+      blob_cid?: string;
+      metadata_json?: string;
+      reach?: string;
+      tags?: string[];
+    }>
+  ): Promise<BulkCreateResult> {
+    if (this.config.dryRun) {
+      console.log(`[DRY RUN] Would bulk create ${items.length} content items`);
+      return { inserted: items.length, skipped: 0, errors: [] };
+    }
+
+    const response = await this.fetch('/api/db/content/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(items),
+      timeout: 120000, // 2 min for bulk ops
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Bulk create content failed: HTTP ${response.status}: ${errorText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Bulk create paths directly via storage service.
+   *
+   * @param items - Path items to create (with nested chapters/steps)
+   * @returns BulkCreateResult with inserted/skipped counts
+   */
+  async bulkCreatePaths(
+    items: Array<{
+      id: string;
+      title: string;
+      description?: string;
+      path_type?: string;
+      difficulty?: string;
+      estimated_duration?: string;
+      visibility?: string;
+      metadata_json?: string;
+      tags?: string[];
+      chapters?: Array<{
+        id: string;
+        title: string;
+        description?: string;
+        order_index: number;
+        steps?: Array<{
+          id: string;
+          path_id: string;
+          chapter_id?: string;
+          title: string;
+          step_type?: string;
+          resource_id?: string;
+          order_index: number;
+          metadata_json?: string;
+        }>;
+      }>;
+    }>
+  ): Promise<BulkCreateResult> {
+    if (this.config.dryRun) {
+      console.log(`[DRY RUN] Would bulk create ${items.length} paths`);
+      return { inserted: items.length, skipped: 0, errors: [] };
+    }
+
+    const response = await this.fetch('/api/db/paths/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(items),
+      timeout: 120000,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Bulk create paths failed: HTTP ${response.status}: ${errorText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Bulk create relationships directly via storage service.
+   *
+   * @param items - Relationship items to create
+   * @returns BulkCreateResult with created count
+   */
+  async bulkCreateRelationships(
+    items: Array<{
+      source_id: string;
+      target_id: string;
+      relationship_type: string;
+      confidence?: number;
+      inference_source?: string;
+      metadata_json?: string;
+    }>
+  ): Promise<BulkRelationshipResult> {
+    if (this.config.dryRun) {
+      console.log(`[DRY RUN] Would bulk create ${items.length} relationships`);
+      return { created: items.length, errors: [] };
+    }
+
+    const response = await this.fetch('/api/db/relationships/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(items),
+      timeout: 120000,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Bulk create relationships failed: HTTP ${response.status}: ${errorText}`);
+    }
+
+    return await response.json();
   }
 
   /**

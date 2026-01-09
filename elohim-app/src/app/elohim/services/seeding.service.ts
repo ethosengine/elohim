@@ -25,7 +25,7 @@
  */
 
 import { Injectable, inject, OnDestroy } from '@angular/core';
-import { BehaviorSubject, Subject } from 'rxjs';
+import { BehaviorSubject, Subject, firstValueFrom } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
 import {
@@ -35,7 +35,7 @@ import {
   type WriteBatch,
   type WriteBufferStats,
 } from './write-buffer.service';
-import { HolochainContentService } from './holochain-content.service';
+import { StorageClientService } from './storage-client.service';
 import { ContentNode } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
 
@@ -76,7 +76,7 @@ export type SeedingServiceState = 'idle' | 'seeding' | 'error';
 @Injectable({ providedIn: 'root' })
 export class SeedingService implements OnDestroy {
   private readonly writeBuffer = inject(WriteBufferService);
-  private readonly holochainContent = inject(HolochainContentService);
+  private readonly storageClient = inject(StorageClientService);
 
   private readonly stateSubject = new BehaviorSubject<SeedingServiceState>('idle');
   private readonly progressSubject = new BehaviorSubject<SeedingProgress | null>(null);
@@ -358,7 +358,9 @@ export class SeedingService implements OnDestroy {
   }
 
   /**
-   * Execute a batch of write operations.
+   * Execute a batch of write operations via StorageClientService.
+   *
+   * Uses the bulk HTTP endpoints through Doorway → elohim-storage.
    */
   private async executeBatch(batch: WriteBatch): Promise<void> {
     // Group operations by type
@@ -367,15 +369,38 @@ export class SeedingService implements OnDestroy {
     );
 
     if (contentOps.length > 0) {
-      // Parse payloads and call batch create
-      const entries = contentOps.map((op) => JSON.parse(op.payload));
+      // Parse payloads and transform to backend format
+      const entries = contentOps.map((op) => {
+        const parsed = JSON.parse(op.payload);
+        // Transform to backend format: content → content_body
+        return {
+          id: parsed.id,
+          content_type: parsed.content_type,
+          title: parsed.title,
+          description: parsed.description,
+          content_body: parsed.content, // Backend expects content_body, not content
+          content_format: parsed.content_format,
+          tags: parsed.tags || [],
+          metadata_json: parsed.metadata_json,
+          reach: 'public',
+        };
+      });
 
-      // Use the batch create function if available
-      if (this.holochainContent.isAvailable()) {
-        await this.holochainContent.batchCreateContent(entries);
-      } else {
-        throw new Error('Holochain conductor not available');
+      // Call bulk create via HTTP (through Doorway)
+      const result = await firstValueFrom(
+        this.storageClient.bulkCreateContent(entries)
+      );
+
+      // Log result for debugging
+      if (result.errors && result.errors.length > 0) {
+        console.warn(
+          `[SeedingService] ${result.errors.length} errors:`,
+          result.errors.slice(0, 3)
+        );
       }
+      console.log(
+        `[SeedingService] Bulk create: ${result.inserted} inserted, ${result.skipped} skipped`
+      );
     }
   }
 

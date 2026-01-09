@@ -1,54 +1,44 @@
 /**
  * Holochain Content Seeder
  *
- * Seeds pre-structured JSON content from /data/lamad into Holochain.
+ * Seeds pre-structured JSON content from /data/lamad into elohim-storage.
  * This is a deterministic script that loads JSON files created by Claude + MCP tools.
  *
- * Pipeline: docs/ → Claude + MCP → data/lamad/ → seeder → Holochain DHT
+ * Pipeline: docs/ → Claude + MCP → data/lamad/ → seeder → Doorway → elohim-storage
  *
- * ## Diagnosing Failed Seeds
+ * ## Architecture
  *
- * When a seed operation fails or times out, use these endpoints to investigate:
+ * The seeder calls Doorway's bulk HTTP endpoints which proxy to elohim-storage:
+ * - POST /api/db/content/bulk - Bulk create content nodes
+ * - POST /api/db/paths/bulk - Bulk create learning paths
+ * - POST /api/db/relationships/bulk - Bulk create relationships
  *
- * ### 1. Get Batch Diagnostics
- * Shows overall batch state including failed items and progress:
- * ```bash
- * curl https://doorway-dev.elohim.host/import/diagnostics/<batch_id>
- * ```
- * Returns: remaining_count, last_completed_chunk, failed_items with error reasons
+ * These are synchronous operations that return immediately with results.
  *
- * ### 2. Get Remaining Items
- * Re-reads the original blob and shows what wasn't successfully processed:
- * ```bash
- * curl https://doorway-dev.elohim.host/import/remaining/<batch_id>
- * ```
- * Returns: list of items with reasons ("not_attempted" or actual zome error)
+ * ## Diagnosing Issues
  *
- * ### 3. Common Issues
- * - **Schema mismatches**: Check error messages for "invalid content_format" etc.
- * - **Timeouts**: Items marked "not_attempted" were in chunks that timed out
- * - **Validation errors**: Zome error messages show what validation failed
+ * Check elohim-storage logs for validation errors or database issues.
+ * The seeder reports errors inline during execution.
  *
- * ### 4. Finding the batch_id
- * The batch_id is printed in the seeder output, e.g.:
- *   "📤 Queuing import "seed-content-1704307200000"..."
+ * ## Environment Variables
  *
- * Or check all batches:
- * ```bash
- * curl https://doorway-dev.elohim.host/import/batches
- * ```
+ * - DOORWAY_URL (required): Doorway endpoint (e.g., https://doorway-dev.elohim.host)
+ * - STORAGE_URL (optional): Direct storage URL for blob sync
+ * - SKIP_VERIFICATION: Skip pre/post-flight conductor checks
+ * - SKIP_BLOB_SYNC: Skip genesis blob sync
+ * - LIMIT: Limit number of items to seed
+ * - IDS: Comma-separated list of specific IDs to seed
  *
- * @version 2024-12-24 - Trigger seeder after seed data migration
+ * @version 2025-01-09 - Simplified to use direct bulk HTTP endpoints
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { AdminWebsocket, AppWebsocket, type CellId } from '@holochain/client';
-import DoorwayClient, { ImportStatusResponse } from './doorway-client.js';
-import StorageClient from './storage-client.js'; // Used for computing blob hash
+import DoorwayClient from './doorway-client.js';
+import StorageClient from './storage-client.js'; // Used for computing blob hash (thumbnails, HTML5 apps)
 import BlobManager from './blob-manager.js';
 import { validateBatch, logValidationErrors, isStrictValidation } from './validators.js';
-import { ProgressClient, waitForBatchCompletion, waitWithFallback, type ProgressMessage } from './progress-client.js';
 import { SeedingVerification, type ExpectedCounts } from './verification.js';
 
 // ========================================
@@ -1169,227 +1159,152 @@ async function seedViaDoorway(): Promise<SeedResult> {
     ].filter((i, idx, arr) => i < itemsToSeed.length && arr.indexOf(i) === idx);  // dedupe
     result.sampleIds = sampleIndices.map(i => itemsToSeed[i].id);
 
-    // Step 1: Upload items as blob
-    const itemsJson = JSON.stringify(itemsToSeed);
-    const itemsBuffer = Buffer.from(itemsJson, 'utf-8');
-    console.log(`   📦 Uploading content blob: ${(itemsBuffer.length / 1024 / 1024).toFixed(2)} MB`);
+    // Transform items to backend format (content → content_body)
+    // Coerce null values to undefined for optional fields (TypeScript compatibility)
+    const transformedItems = itemsToSeed.map(item => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      content_type: item.content_type,
+      content_format: item.content_format,
+      content_body: item.content,  // Backend expects content_body, not content
+      blob_hash: item.blob_hash ?? undefined,
+      blob_cid: item.blob_cid ?? undefined,
+      metadata_json: item.metadata_json,
+      reach: item.reach || 'public',
+      tags: item.tags || [],
+    }));
 
-    const blobHash = StorageClient.computeHash(itemsBuffer);
-    const uploadResult = await timer.timeOperation('content_blob_upload', () =>
-      doorwayClient.pushBlob(blobHash, itemsBuffer, {
-        hash: blobHash,
-        mimeType: 'application/json',
-        sizeBytes: itemsBuffer.length,
-      })
-    );
+    // Bulk create content via direct HTTP call (through Doorway's /api/db proxy)
+    console.log(`   📤 Bulk creating ${transformedItems.length} content items...`);
+    const startTime = Date.now();
 
-    if (!uploadResult.success) {
-      console.error(`   ❌ Blob upload failed: ${uploadResult.error}`);
-      process.exit(1);
-    }
-    console.log(`   ✅ Blob uploaded: ${blobHash.slice(0, 30)}...${uploadResult.cached ? ' (cached)' : ''}`);
+    try {
+      const bulkResult = await timer.timeOperation('bulk_create_content', () =>
+        doorwayClient.bulkCreateContent(transformedItems)
+      );
 
-    // Step 2: Queue import
-    const batchId = `seed-content-${Date.now()}`;
-    console.log(`   📤 Queuing import "${batchId}"...`);
+      const elapsed = Date.now() - startTime;
+      const rate = transformedItems.length / (elapsed / 1000);
 
-    const queueResult = await timer.timeOperation('content_queue_import', () =>
-      doorwayClient.queueImport('content', {
-        batch_id: batchId,
-        blob_hash: blobHash,
-        total_items: itemsToSeed.length,
-        schema_version: 1,
-      })
-    ) as ImportStatusResponse & { batch_id: string; queued_count?: number; total_items?: number; processing: boolean };
+      // Track for verification
+      result.contentSucceeded = bulkResult.inserted;
 
-    // Handle both response formats (queued_count from doorway, total_items from storage)
-    const queuedCount = queueResult.queued_count ?? queueResult.total_items ?? itemsToSeed.length;
-    console.log(`   ✅ Import queued: ${queueResult.batch_id} (${queuedCount} items)`);
-
-    // Step 3: Wait for completion with real-time progress
-    const USE_WEBSOCKET = process.env.SEED_USE_WEBSOCKET !== 'false';
-    const POLL_STATUS = process.env.SEED_POLL_STATUS !== 'false';
-    const POLL_INTERVAL_MS = parseInt(process.env.SEED_POLL_INTERVAL || '5000', 10);
-    const POLL_TIMEOUT_MS = parseInt(process.env.SEED_POLL_TIMEOUT || '5400000', 10); // 90 min default
-
-    if (POLL_STATUS) {
-      console.log(`   ⏳ Waiting for import to complete...`);
-
-      if (USE_WEBSOCKET) {
-        // WebSocket-based real-time progress streaming
-        console.log(`      (Using WebSocket progress stream)`);
-
-        try {
-          const finalStatus = await waitWithFallback(
-            DOORWAY_URL!,
-            batchId,
-            {
-              timeoutMs: POLL_TIMEOUT_MS,
-              pollIntervalMs: POLL_INTERVAL_MS,
-              onProgress: (update) => {
-                if (update.processed_count !== undefined && update.total_items !== undefined) {
-                  const pct = ((update.processed_count / update.total_items) * 100).toFixed(1);
-                  const rate = update.items_per_second ? ` (${update.items_per_second.toFixed(1)}/s)` : '';
-                  console.log(`      Progress: ${update.processed_count}/${update.total_items} (${pct}%)${rate} - ${update.status}`);
-                }
-              }
-            },
-            async (pollBatchId) => {
-              // Fallback polling function
-              const status = await doorwayClient.getImportStatus('content', pollBatchId);
-              if (!status) return null;
-              return {
-                type: 'progress' as const,
-                batch_id: pollBatchId,
-                status: status.status,
-                total_items: status.total_items,
-                processed_count: status.processed_count,
-                error_count: status.error_count,
-                errors: status.errors,
-              };
-            }
-          );
-
-          // Handle final status - CHECK FOR ACTUAL FAILURE
-          const succeeded = (finalStatus.processed_count ?? 0) - (finalStatus.error_count ?? 0);
-          result.contentSucceeded = succeeded;  // Track for verification
-          const elapsed = finalStatus.elapsed_ms ? ` (${(finalStatus.elapsed_ms / 1000).toFixed(1)}s` : '';
-          const rate = finalStatus.items_per_second ? `, ${finalStatus.items_per_second.toFixed(0)} items/sec)` : elapsed ? ')' : '';
-
-          // Check for batch failure (failed status or all items errored)
-          if (finalStatus.status === 'failed') {
-            console.error(`   ❌ Content import FAILED`);
-            if (finalStatus.errors?.length) {
-              console.error(`   Errors:`);
-              for (const err of finalStatus.errors.slice(0, 10)) {
-                console.error(`      • ${err}`);
-              }
-              if (finalStatus.errors.length > 10) {
-                console.error(`      ... and ${finalStatus.errors.length - 10} more`);
-              }
-            }
-            console.error(`\n❌ SEEDING FAILED: Batch import failed. Check elohim-storage logs.`);
-            process.exit(1);
-          }
-
-          // Check for partial success with significant errors
-          if (finalStatus.error_count && finalStatus.error_count > 0) {
-            console.log(`   ⚠️ ${finalStatus.error_count} errors during import:`);
-            if (finalStatus.errors?.length) {
-              for (const err of finalStatus.errors.slice(0, 5)) {
-                console.error(`      • ${err}`);
-              }
-              if (finalStatus.errors.length > 5) {
-                console.error(`      ... and ${finalStatus.errors.length - 5} more`);
-              }
-            }
-
-            // Fail if more than 10% of items errored
-            const errorRate = (finalStatus.error_count / (finalStatus.total_items ?? 1)) * 100;
-            if (errorRate > 10) {
-              console.error(`\n❌ SEEDING FAILED: Too many errors (${errorRate.toFixed(1)}%). Check elohim-storage logs.`);
-              process.exit(1);
-            }
-          }
-
-          // Verify we actually processed items (not silent skip!)
-          if (succeeded === 0 && (finalStatus.total_items ?? 0) > 0) {
-            console.error(`\n❌ SEEDING FAILED: 0 items succeeded out of ${finalStatus.total_items}!`);
-            console.error(`   This likely means cell_id discovery failed or conductor rejected all items.`);
-            console.error(`   Check elohim-storage logs for "CELL_DISCOVERY" or "CHUNK_ERROR" messages.`);
-            process.exit(1);
-          }
-
-          console.log(`   ✅ Content import ${finalStatus.status}: ${succeeded} succeeded, ${finalStatus.error_count ?? 0} failed${elapsed}${rate}`);
-
-        } catch (wsError) {
-          console.error(`   ❌ Import wait failed: ${wsError}`);
-          console.error(`\n❌ SEEDING FAILED: Could not confirm batch completion. Exiting.`);
-          process.exit(1);
+      // Report errors if any
+      if (bulkResult.errors.length > 0) {
+        console.log(`   ⚠️ ${bulkResult.errors.length} errors during import:`);
+        for (const err of bulkResult.errors.slice(0, 5)) {
+          console.error(`      • ${err}`);
+        }
+        if (bulkResult.errors.length > 5) {
+          console.error(`      ... and ${bulkResult.errors.length - 5} more`);
         }
 
-      } else {
-        // HTTP polling fallback (legacy behavior, SEED_USE_WEBSOCKET=false)
-        console.log(`      (HTTP polling: interval=${POLL_INTERVAL_MS}ms, timeout=${POLL_TIMEOUT_MS}ms)`);
-
-        const startTime = Date.now();
-        let lastProcessed = 0;
-        let finalStatus: ImportStatusResponse | null = null;
-
-        while (Date.now() - startTime < POLL_TIMEOUT_MS) {
-          await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
-
-          const status = await doorwayClient.getImportStatus('content', batchId);
-          if (!status) {
-            console.warn(`      ⚠️ Batch ${batchId} not found`);
-            break;
-          }
-
-          if (status.processed_count !== lastProcessed) {
-            const pct = ((status.processed_count / status.total_items) * 100).toFixed(1);
-            console.log(`      Progress: ${status.processed_count}/${status.total_items} (${pct}%) - ${status.status}`);
-            lastProcessed = status.processed_count;
-          }
-
-          if (status.status === 'completed' || status.status === 'failed') {
-            finalStatus = status;
-            break;
-          }
-        }
-
-        if (finalStatus) {
-          const succeeded = finalStatus.processed_count - finalStatus.error_count;
-          result.contentSucceeded = succeeded;  // Track for verification
-
-          // Check for batch failure
-          if (finalStatus.status === 'failed') {
-            console.error(`   ❌ Content import FAILED`);
-            if (finalStatus.errors.length > 0) {
-              for (const err of finalStatus.errors.slice(0, 10)) {
-                console.error(`      • ${err}`);
-              }
-            }
-            console.error(`\n❌ SEEDING FAILED: Batch import failed. Check elohim-storage logs.`);
-            process.exit(1);
-          }
-
-          // Check for partial success with significant errors
-          if (finalStatus.error_count > 0) {
-            console.log(`   ⚠️ ${finalStatus.errors.length} errors during import:`);
-            for (const err of finalStatus.errors.slice(0, 5)) {
-              console.error(`      • ${err}`);
-            }
-            if (finalStatus.errors.length > 5) {
-              console.error(`      ... and ${finalStatus.errors.length - 5} more`);
-            }
-
-            // Fail if more than 10% of items errored
-            const errorRate = (finalStatus.error_count / finalStatus.total_items) * 100;
-            if (errorRate > 10) {
-              console.error(`\n❌ SEEDING FAILED: Too many errors (${errorRate.toFixed(1)}%). Check elohim-storage logs.`);
-              process.exit(1);
-            }
-          }
-
-          // Verify we actually processed items (not silent skip!)
-          if (succeeded === 0 && finalStatus.total_items > 0) {
-            console.error(`\n❌ SEEDING FAILED: 0 items succeeded out of ${finalStatus.total_items}!`);
-            console.error(`   This likely means cell_id discovery failed or conductor rejected all items.`);
-            console.error(`   Check elohim-storage logs for "CELL_DISCOVERY" or "CHUNK_ERROR" messages.`);
-            process.exit(1);
-          }
-
-          console.log(`   ✅ Content import ${finalStatus.status}: ${succeeded} succeeded, ${finalStatus.error_count} failed`);
-        } else {
-          console.error(`   ❌ Polling timeout - batch completion could not be confirmed`);
-          console.error(`\n❌ SEEDING FAILED: Timeout waiting for batch. Check status manually:`);
-          console.error(`      GET ${DOORWAY_URL}/import/content/${batchId}`);
+        // Fail if more than 10% of items errored
+        const errorRate = (bulkResult.errors.length / transformedItems.length) * 100;
+        if (errorRate > 10) {
+          console.error(`\n❌ SEEDING FAILED: Too many errors (${errorRate.toFixed(1)}%). Check elohim-storage logs.`);
           process.exit(1);
         }
       }
-    } else {
-      console.log(`   ℹ️ Not polling - batch queued for background processing`);
-      console.log(`      Check status: GET ${DOORWAY_URL}/import/content/${batchId}`);
+
+      console.log(`   ✅ Content import complete: ${bulkResult.inserted} inserted, ${bulkResult.skipped} skipped (${elapsed}ms, ${rate.toFixed(1)} items/sec)`);
+
+      // ========================================
+      // EXTRACT & CREATE RELATIONSHIPS
+      // ========================================
+      timer.startPhase('Relationship Import');
+      console.log(`\n🔗 Extracting relationships from content...`);
+
+      // Extract relationships from content items
+      const relationships: Array<{
+        source_id: string;
+        target_id: string;
+        relationship_type: string;
+        confidence: number;
+        inference_source: string;
+      }> = [];
+
+      // Track seen relationships to avoid duplicates
+      const seen = new Set<string>();
+
+      for (const item of itemsToSeed) {
+        // Extract from relatedNodeIds array (simple RELATES_TO relationships)
+        if (item.related_node_ids && item.related_node_ids.length > 0) {
+          for (const targetId of item.related_node_ids) {
+            const key = `${item.id}:${targetId}:RELATES_TO`;
+            if (!seen.has(key) && item.id !== targetId) {
+              seen.add(key);
+              relationships.push({
+                source_id: item.id,
+                target_id: targetId,
+                relationship_type: 'RELATES_TO',
+                confidence: 1.0,
+                inference_source: 'explicit',
+              });
+            }
+          }
+        }
+
+        // Extract from relationships array in metadata (typed relationships)
+        if (item.metadata_json) {
+          try {
+            const metadata = JSON.parse(item.metadata_json);
+            if (metadata.relationships && Array.isArray(metadata.relationships)) {
+              for (const rel of metadata.relationships) {
+                const targetId = rel.target || rel.targetId || rel.target_id;
+                const relType = rel.type || rel.relationship_type || 'RELATES_TO';
+                if (targetId && item.id !== targetId) {
+                  const key = `${item.id}:${targetId}:${relType}`;
+                  if (!seen.has(key)) {
+                    seen.add(key);
+                    relationships.push({
+                      source_id: item.id,
+                      target_id: targetId,
+                      relationship_type: relType.toUpperCase(),
+                      confidence: rel.confidence ?? 1.0,
+                      inference_source: rel.inference_source || 'explicit',
+                    });
+                  }
+                }
+              }
+            }
+          } catch {
+            // Ignore JSON parse errors
+          }
+        }
+      }
+
+      if (relationships.length > 0) {
+        console.log(`   Found ${relationships.length} relationships to create`);
+        console.log(`   📤 Bulk creating relationships...`);
+
+        try {
+          const relResult = await timer.timeOperation('bulk_create_relationships', () =>
+            doorwayClient.bulkCreateRelationships(relationships)
+          );
+
+          console.log(`   ✅ Relationships import complete: ${relResult.created} created`);
+          if (relResult.errors.length > 0) {
+            console.log(`   ⚠️ ${relResult.errors.length} relationship errors:`);
+            for (const err of relResult.errors.slice(0, 3)) {
+              console.error(`      • ${err}`);
+            }
+          }
+        } catch (relErr: any) {
+          console.warn(`   ⚠️ Relationships bulk create failed: ${relErr.message}`);
+          // Don't exit - relationship failure shouldn't abort seeding
+        }
+      } else {
+        console.log(`   No relationships found in content`);
+      }
+
+      timer.endPhase('Relationship Import');
+
+    } catch (error) {
+      console.error(`   ❌ Bulk create failed: ${error}`);
+      console.error(`\n❌ SEEDING FAILED: Content bulk create failed. Check elohim-storage logs.`);
+      process.exit(1);
     }
 
     timer.endPhase('Content Import');
@@ -1647,100 +1562,75 @@ async function seedViaDoorway(): Promise<SeedResult> {
     }
     result.pathsAttempted = pathInputs.length;  // Track for verification
 
-    // Upload paths blob
-    const pathsJson = JSON.stringify(pathInputs);
-    const pathsBuffer = Buffer.from(pathsJson, 'utf-8');
-    console.log(`   📦 Uploading paths blob: ${(pathsBuffer.length / 1024).toFixed(2)} KB`);
+    // Transform paths to backend format (flat steps → nested chapters)
+    const transformedPaths = pathInputs.map(pathInput => {
+      // Convert flat steps array to nested chapters structure
+      // Backend expects: chapters[].steps[], not flat steps[]
+      const defaultChapter = {
+        id: `${pathInput.id}-chapter-1`,
+        title: pathInput.title || 'Main Content',
+        description: pathInput.description || '',
+        order_index: 0,
+        steps: (pathInput.steps || []).map((step: any, idx: number) => ({
+          id: `${pathInput.id}-step-${idx + 1}`,
+          path_id: pathInput.id,
+          chapter_id: `${pathInput.id}-chapter-1`,
+          title: step.step_title || step.title || `Step ${idx + 1}`,
+          step_type: step.step_type || 'learn',
+          resource_id: step.resource_id || null,
+          order_index: step.order_index ?? idx,
+          metadata_json: step.metadata_json || null,
+        })),
+      };
 
-    const pathsBlobHash = StorageClient.computeHash(pathsBuffer);
-    const pathsUploadResult = await doorwayClient.pushBlob(pathsBlobHash, pathsBuffer, {
-      hash: pathsBlobHash,
-      mimeType: 'application/json',
-      sizeBytes: pathsBuffer.length,
+      return {
+        id: pathInput.id,
+        title: pathInput.title,
+        description: pathInput.description,
+        path_type: pathInput.path_type === 'linear' ? 'guided' : (pathInput.path_type || 'guided'),
+        difficulty: pathInput.difficulty,
+        estimated_duration: pathInput.estimated_duration,
+        visibility: pathInput.visibility || 'public',
+        metadata_json: pathInput.metadata_json,
+        tags: pathInput.tags || [],
+        thumbnail_url: pathInput.thumbnail_url,
+        thumbnail_blob_hash: pathInput.thumbnail_blob_hash,
+        chapters: [defaultChapter],
+      };
     });
 
-    if (!pathsUploadResult.success) {
-      console.error(`   ❌ Paths blob upload failed: ${pathsUploadResult.error}`);
-    } else {
-      console.log(`   ✅ Paths blob uploaded: ${pathsBlobHash.slice(0, 30)}...`);
+    // Bulk create paths via direct HTTP call
+    console.log(`   📤 Bulk creating ${transformedPaths.length} paths...`);
+    const pathsStartTime = Date.now();
 
-      // Queue paths import
-      const pathsBatchId = `seed-paths-${Date.now()}`;
-      console.log(`   📤 Queuing paths import "${pathsBatchId}"...`);
+    try {
+      const pathsBulkResult = await timer.timeOperation('bulk_create_paths', () =>
+        doorwayClient.bulkCreatePaths(transformedPaths)
+      );
 
-      try {
-        const pathsQueueResult = await doorwayClient.queueImport('paths', {
-          batch_id: pathsBatchId,
-          blob_hash: pathsBlobHash,
-          total_items: pathInputs.length,
-          schema_version: 1,
-          // Process 1 path per chunk - paths create many steps/links internally
-          // elohim-protocol alone has 56 steps, each requiring DHT operations
-          chunk_size: 1,
-          chunk_delay_ms: 500, // More breathing room between paths
-        });
-        console.log(`   ✅ Paths import queued: ${pathsQueueResult.batch_id}`);
+      const pathsElapsed = Date.now() - pathsStartTime;
+      const pathsRate = transformedPaths.length / (pathsElapsed / 1000);
 
-        // Wait for paths import to complete (like content import)
-        const POLL_TIMEOUT_MS = parseInt(process.env.SEED_POLL_TIMEOUT || '5400000', 10); // 90 min default
-        const POLL_INTERVAL_MS = parseInt(process.env.SEED_POLL_INTERVAL || '5000', 10);
+      result.pathsSucceeded = pathsBulkResult.inserted;
 
-        console.log(`   ⏳ Waiting for paths import to complete...`);
-
-        try {
-          const finalStatus = await waitWithFallback(
-            DOORWAY_URL!,
-            pathsBatchId,
-            {
-              timeoutMs: POLL_TIMEOUT_MS,
-              pollIntervalMs: POLL_INTERVAL_MS,
-              onProgress: (update) => {
-                if (update.processed_count !== undefined && update.total_items !== undefined) {
-                  const pct = ((update.processed_count / update.total_items) * 100).toFixed(1);
-                  const rate = update.items_per_second ? ` (${update.items_per_second.toFixed(1)}/s)` : '';
-                  console.log(`      Progress: ${update.processed_count}/${update.total_items} (${pct}%)${rate} - ${update.status}`);
-                }
-              }
-            },
-            async (pollBatchId) => {
-              const status = await doorwayClient.getImportStatus('paths', pollBatchId);
-              if (!status) return null;
-              return {
-                type: 'progress' as const,
-                batch_id: pollBatchId,
-                status: status.status,
-                total_items: status.total_items,
-                processed_count: status.processed_count,
-                error_count: status.error_count,
-                errors: status.errors,
-              };
-            }
-          );
-
-          const succeeded = (finalStatus.processed_count ?? 0) - (finalStatus.error_count ?? 0);
-          result.pathsSucceeded = succeeded;
-
-          if (finalStatus.status === 'failed') {
-            console.error(`   ❌ Paths import FAILED`);
-            if (finalStatus.errors?.length) {
-              for (const err of finalStatus.errors.slice(0, 5)) {
-                console.error(`      • ${err}`);
-              }
-            }
-          } else if (finalStatus.error_count && finalStatus.error_count > 0) {
-            console.log(`   ⚠️ ${finalStatus.error_count} path errors during import`);
-            console.log(`   ✅ Paths import ${finalStatus.status}: ${succeeded} succeeded, ${finalStatus.error_count} failed`);
-          } else {
-            console.log(`   ✅ Paths import ${finalStatus.status}: ${succeeded} paths created`);
-          }
-        } catch (waitErr) {
-          console.warn(`   ⚠️ Paths import wait failed: ${waitErr}`);
-          console.log(`      Check status: GET ${DOORWAY_URL}/import/paths/${pathsBatchId}`);
+      // Report errors if any
+      if (pathsBulkResult.errors.length > 0) {
+        console.log(`   ⚠️ ${pathsBulkResult.errors.length} path errors during import:`);
+        for (const err of pathsBulkResult.errors.slice(0, 5)) {
+          console.error(`      • ${err}`);
         }
-      } catch (pathErr: any) {
-        console.warn(`   ⚠️ Paths import queue failed: ${pathErr.message}`);
-        console.log(`      (Paths import may not be implemented yet in the zome)`);
+        if (pathsBulkResult.errors.length > 5) {
+          console.error(`      ... and ${pathsBulkResult.errors.length - 5} more`);
+        }
       }
+
+      console.log(`   ✅ Paths import complete: ${pathsBulkResult.inserted} inserted, ${pathsBulkResult.skipped} skipped (${pathsElapsed}ms, ${pathsRate.toFixed(1)} paths/sec)`);
+
+    } catch (pathErr: any) {
+      console.error(`   ❌ Paths bulk create failed: ${pathErr.message}`);
+      console.error(`\n❌ SEEDING FAILED: Paths bulk create failed. Check elohim-storage logs.`);
+      // Don't exit - paths failure shouldn't abort if content succeeded
+      result.pathsSucceeded = 0;
     }
 
     timer.endPhase('Path Import');

@@ -45,6 +45,11 @@ export interface CreateContentInput {
   estimated_minutes: number | null;
   thumbnail_url: string | null;
   metadata_json: string;
+  // Content manifest fields (sparse DHT - blob storage)
+  blob_cid: string | null;           // CID pointing to elohim-storage blob
+  content_size_bytes: number | null; // Size of content body
+  content_hash: string | null;       // SHA256 of content body
+  blob_hash?: string;                // SHA256 hash of ZIP blob for html5-app content
 }
 
 export interface CreateLearningPathInput {
