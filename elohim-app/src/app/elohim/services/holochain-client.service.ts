@@ -109,16 +109,6 @@ export class HolochainClientService {
   }
 
   /**
-   * Get blob storage URL for a given hash.
-   * Routes to appropriate storage based on connection mode:
-   * - Doorway: https://doorway-dev.elohim.host/api/blob/{hash}
-   * - Direct: http://localhost:8090/store/{hash}
-   */
-  getBlobUrl(blobHash: string): string {
-    return this.strategy.getBlobStorageUrl(this.buildConnectionConfig(), blobHash);
-  }
-
-  /**
    * Get content sources for ContentResolver based on connection strategy.
    */
   getContentSources() {

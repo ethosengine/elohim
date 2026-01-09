@@ -162,6 +162,14 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     return `${baseUrl}/api/blob/${encodeURIComponent(blobHash)}${apiKeyParam}`;
   }
 
+  getStorageBaseUrl(config: ConnectionConfig): string {
+    // Convert WebSocket URL to HTTPS for API access
+    return config.adminUrl
+      .replace('wss://', 'https://')
+      .replace('ws://', 'http://')
+      .replace(/\/$/, '');
+  }
+
   // ==========================================================================
   // Content Source Configuration
   // ==========================================================================

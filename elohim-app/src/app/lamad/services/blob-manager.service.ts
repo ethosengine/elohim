@@ -21,8 +21,8 @@ import {
   UrlHealth,
 } from './blob-fallback.service';
 
-// Import HolochainClientService for strategy-aware blob URLs
-import { HolochainClientService } from '../../elohim/services/holochain-client.service';
+// Import StorageClientService for strategy-aware blob URLs
+import { StorageClientService } from '../../elohim/services/storage-client.service';
 
 /**
  * Full result of blob download and verification
@@ -127,8 +127,8 @@ export class BlobManagerService {
   /** Serialization lock for concurrent cache operations (FIX for race condition) */
   private cacheLock = Promise.resolve();
 
-  /** Holochain client for strategy-aware blob URLs (lazy injected) */
-  private holochainClient: HolochainClientService | null = null;
+  /** Storage client for strategy-aware blob URLs (lazy injected) */
+  private storageClient: StorageClientService | null = null;
 
   constructor(
     private verificationService: BlobVerificationService,
@@ -143,7 +143,7 @@ export class BlobManagerService {
   /**
    * Get blob storage URL based on connection strategy.
    *
-   * Uses the HolochainClientService's connection strategy to determine
+   * Uses the StorageClientService's connection strategy to determine
    * the appropriate blob storage endpoint:
    *
    * - **Doorway mode**: `https://doorway-dev.elohim.host/api/blob/{hash}`
@@ -153,7 +153,7 @@ export class BlobManagerService {
    * @returns URL string for the blob storage endpoint
    */
   getBlobUrl(blobHash: string): string {
-    const client = this.getHolochainClient();
+    const client = this.getStorageClient();
     return client.getBlobUrl(blobHash);
   }
 
@@ -163,8 +163,9 @@ export class BlobManagerService {
    * @returns 'doorway' or 'direct'
    */
   get connectionMode(): 'doorway' | 'direct' {
-    const client = this.getHolochainClient();
-    return client.connectionMode;
+    // Connection mode is determined by the environment
+    const env = (globalThis as any).__env || {};
+    return (env.connectionMode as 'doorway' | 'direct') || 'doorway';
   }
 
   /**
@@ -188,13 +189,13 @@ export class BlobManagerService {
   }
 
   /**
-   * Lazy-inject HolochainClientService to avoid circular dependency.
+   * Lazy-inject StorageClientService to avoid circular dependency.
    */
-  private getHolochainClient(): HolochainClientService {
-    if (!this.holochainClient) {
-      this.holochainClient = this.injector.get(HolochainClientService);
+  private getStorageClient(): StorageClientService {
+    if (!this.storageClient) {
+      this.storageClient = this.injector.get(StorageClientService);
     }
-    return this.holochainClient;
+    return this.storageClient;
   }
 
   /**

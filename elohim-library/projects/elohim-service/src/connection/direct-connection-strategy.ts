@@ -113,6 +113,11 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
     return `${storageUrl}/store/${encodeURIComponent(blobHash)}`;
   }
 
+  getStorageBaseUrl(config: ConnectionConfig): string {
+    // Direct to elohim-storage sidecar
+    return config.storageUrl || `http://localhost:${DEFAULT_STORAGE_PORT}`;
+  }
+
   // ==========================================================================
   // Content Source Configuration
   // ==========================================================================

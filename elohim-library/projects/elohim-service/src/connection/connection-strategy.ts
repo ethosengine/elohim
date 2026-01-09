@@ -212,6 +212,15 @@ export interface IConnectionStrategy {
    */
   getBlobStorageUrl(config: ConnectionConfig, blobHash: string): string;
 
+  /**
+   * Get the base URL for storage API operations.
+   *
+   * Used by StorageClientService for blob and metadata operations.
+   * - Doorway: https://doorway-dev.elohim.host (HTTP base from adminUrl)
+   * - Direct: http://localhost:8090 (elohim-storage sidecar)
+   */
+  getStorageBaseUrl(config: ConnectionConfig): string;
+
   // ==========================================================================
   // Content Source Configuration
   // ==========================================================================
