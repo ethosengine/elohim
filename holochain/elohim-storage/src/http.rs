@@ -38,6 +38,7 @@ use crate::error::StorageError;
 use crate::import_api::ImportApi;
 use crate::progress_hub::ProgressHub;
 use crate::progress_ws;
+use crate::services::{response, Services};
 use crate::sharding::{ShardEncoder, ShardManifest};
 use crate::sync::SyncManager;
 use bytes::Bytes;
@@ -67,6 +68,8 @@ pub struct HttpServer {
     sync_manager: Option<Arc<SyncManager>>,
     /// SQLite content database for structured data
     content_db: Option<Arc<ContentDb>>,
+    /// Service layer for business logic
+    services: Option<Arc<Services>>,
 }
 
 impl HttpServer {
@@ -80,6 +83,7 @@ impl HttpServer {
             progress_hub: None,
             sync_manager: None,
             content_db: None,
+            services: None,
         }
     }
 
@@ -104,6 +108,12 @@ impl HttpServer {
     /// Set the SQLite Content Database
     pub fn with_content_db(mut self, content_db: Arc<ContentDb>) -> Self {
         self.content_db = Some(content_db);
+        self
+    }
+
+    /// Set the Service layer for business logic
+    pub fn with_services(mut self, services: Arc<Services>) -> Self {
+        self.services = Some(services);
         self
     }
 
@@ -1137,6 +1147,16 @@ impl HttpServer {
         method: Method,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Service-based handling (uses response helpers)
+        if self.services.is_some() {
+            if method != Method::GET {
+                return Ok(response::method_not_allowed());
+            }
+            // Stats come from content_db directly - it's a database-level operation
+            return Ok(response::from_result(content_db.stats()));
+        }
+
+        // Legacy fallback
         if method != Method::GET {
             return Ok(Response::builder()
                 .status(StatusCode::METHOD_NOT_ALLOWED)
@@ -1174,29 +1194,30 @@ impl HttpServer {
         method: Method,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        match method {
-            Method::GET => {
-                // Parse query params
-                let query_str = req.uri().query().unwrap_or("");
-                let params: std::collections::HashMap<String, String> =
-                    url::form_urlencoded::parse(query_str.as_bytes())
-                        .into_owned()
-                        .collect();
+        // Parse query params (needed for both service and legacy paths)
+        let query_str = req.uri().query().unwrap_or("");
+        let params: std::collections::HashMap<String, String> =
+            url::form_urlencoded::parse(query_str.as_bytes())
+                .into_owned()
+                .collect();
 
-                let query = ContentQuery {
-                    content_type: params.get("content_type").cloned(),
-                    content_format: params.get("content_format").cloned(),
-                    tags: params
-                        .get("tags")
-                        .map(|s| s.split(',').map(|t| t.trim().to_string()).collect())
-                        .unwrap_or_default(),
-                    search: params.get("search").cloned(),
-                    limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
-                    offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
-                };
+        let query = ContentQuery {
+            content_type: params.get("content_type").cloned(),
+            content_format: params.get("content_format").cloned(),
+            tags: params
+                .get("tags")
+                .map(|s| s.split(',').map(|t| t.trim().to_string()).collect())
+                .unwrap_or_default(),
+            search: params.get("search").cloned(),
+            limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
+            offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+        };
 
-                content_db.with_conn(|conn| {
-                    match db::content::list_content(conn, &query) {
+        // Use service layer if available
+        if let Some(ref services) = self.services {
+            match method {
+                Method::GET => {
+                    match services.content.list(&query) {
                         Ok(items) => {
                             let body = serde_json::json!({
                                 "items": items,
@@ -1204,62 +1225,93 @@ impl HttpServer {
                                 "limit": query.limit,
                                 "offset": query.offset,
                             });
-
-                            Ok(Response::builder()
-                                .status(StatusCode::OK)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(body.to_string())))
-                                .unwrap())
+                            Ok(response::ok(&body))
                         }
-                        Err(e) => {
-                            error!(error = %e, "Failed to list content");
-                            Ok(Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                                .unwrap())
-                        }
+                        Err(e) => Ok(response::error_response(e)),
                     }
-                })
+                }
+                Method::POST => {
+                    let body = req.collect().await.map_err(|e| {
+                        StorageError::Internal(format!("Failed to read body: {}", e))
+                    })?;
+                    let body_bytes = body.to_bytes();
+
+                    let input: db::content::CreateContentInput = serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+                    Ok(response::from_create_result(services.content.create(input)))
+                }
+                _ => Ok(response::method_not_allowed()),
             }
-            Method::POST => {
-                // Parse body
-                let body = req.collect().await.map_err(|e| {
-                    StorageError::Internal(format!("Failed to read body: {}", e))
-                })?;
-                let body_bytes = body.to_bytes();
+        } else {
+            // Fallback to direct repository calls (legacy)
+            match method {
+                Method::GET => {
+                    content_db.with_conn(|conn| {
+                        match db::content::list_content(conn, &query) {
+                            Ok(items) => {
+                                let body = serde_json::json!({
+                                    "items": items,
+                                    "count": items.len(),
+                                    "limit": query.limit,
+                                    "offset": query.offset,
+                                });
 
-                let input: db::content::CreateContentInput = serde_json::from_slice(&body_bytes)
-                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
-
-                content_db.with_conn_mut(|conn| {
-                    match db::content::create_content(conn, input) {
-                        Ok(content) => {
-                            let body = serde_json::to_string(&content)
-                                .map_err(|e| StorageError::Internal(e.to_string()))?;
-
-                            Ok(Response::builder()
-                                .status(StatusCode::CREATED)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(body)))
-                                .unwrap())
+                                Ok(Response::builder()
+                                    .status(StatusCode::OK)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(body.to_string())))
+                                    .unwrap())
+                            }
+                            Err(e) => {
+                                error!(error = %e, "Failed to list content");
+                                Ok(Response::builder()
+                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                    .unwrap())
+                            }
                         }
-                        Err(e) => {
-                            error!(error = %e, "Failed to create content");
-                            Ok(Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                                .unwrap())
+                    })
+                }
+                Method::POST => {
+                    let body = req.collect().await.map_err(|e| {
+                        StorageError::Internal(format!("Failed to read body: {}", e))
+                    })?;
+                    let body_bytes = body.to_bytes();
+
+                    let input: db::content::CreateContentInput = serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+                    content_db.with_conn_mut(|conn| {
+                        match db::content::create_content(conn, input) {
+                            Ok(content) => {
+                                let body = serde_json::to_string(&content)
+                                    .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                                Ok(Response::builder()
+                                    .status(StatusCode::CREATED)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(body)))
+                                    .unwrap())
+                            }
+                            Err(e) => {
+                                error!(error = %e, "Failed to create content");
+                                Ok(Response::builder()
+                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                    .unwrap())
+                            }
                         }
-                    }
-                })
+                    })
+                }
+                _ => Ok(Response::builder()
+                    .status(StatusCode::METHOD_NOT_ALLOWED)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                    .unwrap()),
             }
-            _ => Ok(Response::builder()
-                .status(StatusCode::METHOD_NOT_ALLOWED)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
-                .unwrap()),
         }
     }
 
@@ -1271,11 +1323,7 @@ impl HttpServer {
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         if method != Method::POST {
-            return Ok(Response::builder()
-                .status(StatusCode::METHOD_NOT_ALLOWED)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
-                .unwrap());
+            return Ok(response::method_not_allowed());
         }
 
         let body = req.collect().await.map_err(|e| {
@@ -1284,35 +1332,41 @@ impl HttpServer {
         let body_bytes = body.to_bytes();
 
         let items: Vec<db::content::CreateContentInput> = serde_json::from_slice(&body_bytes)
-            .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+            .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
 
         let count = items.len();
         info!(count = count, "Bulk creating content");
 
-        content_db.with_conn_mut(|conn| {
-            match db::content::bulk_create_content(conn, items) {
-                Ok(result) => {
-                    info!(inserted = result.inserted, skipped = result.skipped, "Bulk content creation complete");
+        // Use service layer if available
+        if let Some(ref services) = self.services {
+            Ok(response::from_result(services.content.bulk_create(items)))
+        } else {
+            // Fallback to direct repository calls (legacy)
+            content_db.with_conn_mut(|conn| {
+                match db::content::bulk_create_content(conn, items) {
+                    Ok(result) => {
+                        info!(inserted = result.inserted, skipped = result.skipped, "Bulk content creation complete");
 
-                    let body = serde_json::to_string(&result)
-                        .map_err(|e| StorageError::Internal(e.to_string()))?;
+                        let body = serde_json::to_string(&result)
+                            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-                    Ok(Response::builder()
-                        .status(StatusCode::OK)
-                        .header(header::CONTENT_TYPE, "application/json")
-                        .body(Full::new(Bytes::from(body)))
-                        .unwrap())
+                        Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(body)))
+                            .unwrap())
+                    }
+                    Err(e) => {
+                        error!(error = %e, "Failed to bulk create content");
+                        Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                            .unwrap())
+                    }
                 }
-                Err(e) => {
-                    error!(error = %e, "Failed to bulk create content");
-                    Ok(Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .header(header::CONTENT_TYPE, "application/json")
-                        .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                        .unwrap())
-                }
-            }
-        })
+            })
+        }
     }
 
     /// GET/DELETE /db/content/{id} - Get or delete content by ID
@@ -1323,70 +1377,87 @@ impl HttpServer {
         content_id: &str,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        match method {
-            Method::GET => {
-                content_db.with_conn(|conn| {
-                    match db::content::get_content(conn, content_id) {
-                        Ok(Some(content)) => {
-                            let body = serde_json::to_string(&content)
-                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+        // Use service layer if available
+        if let Some(ref services) = self.services {
+            match method {
+                Method::GET => {
+                    let result = services.content.get(content_id);
+                    Ok(response::from_option(result, &format!("Content not found: {}", content_id)))
+                }
+                Method::DELETE => {
+                    // Use cascade delete to also remove relationships
+                    let result = services.content.delete_cascade(content_id);
+                    Ok(response::from_delete_bool_result(result, &format!("Content not found: {}", content_id)))
+                }
+                _ => Ok(response::method_not_allowed()),
+            }
+        } else {
+            // Fallback to direct repository calls (legacy)
+            match method {
+                Method::GET => {
+                    content_db.with_conn(|conn| {
+                        match db::content::get_content(conn, content_id) {
+                            Ok(Some(content)) => {
+                                let body = serde_json::to_string(&content)
+                                    .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-                            Ok(Response::builder()
-                                .status(StatusCode::OK)
+                                Ok(Response::builder()
+                                    .status(StatusCode::OK)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(body)))
+                                    .unwrap())
+                            }
+                            Ok(None) => Ok(Response::builder()
+                                .status(StatusCode::NOT_FOUND)
                                 .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(body)))
-                                .unwrap())
+                                .body(Full::new(Bytes::from(format!(
+                                    r#"{{"error": "Content not found: {}"}}"#,
+                                    content_id
+                                ))))
+                                .unwrap()),
+                            Err(e) => {
+                                error!(error = %e, content_id = %content_id, "Failed to get content");
+                                Ok(Response::builder()
+                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                    .unwrap())
+                            }
                         }
-                        Ok(None) => Ok(Response::builder()
-                            .status(StatusCode::NOT_FOUND)
-                            .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(
-                                r#"{{"error": "Content not found: {}"}}"#,
-                                content_id
-                            ))))
-                            .unwrap()),
-                        Err(e) => {
-                            error!(error = %e, content_id = %content_id, "Failed to get content");
-                            Ok(Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    })
+                }
+                Method::DELETE => {
+                    content_db.with_conn_mut(|conn| {
+                        match db::content::delete_content(conn, content_id) {
+                            Ok(true) => Ok(Response::builder()
+                                .status(StatusCode::NO_CONTENT)
+                                .body(Full::new(Bytes::new()))
+                                .unwrap()),
+                            Ok(false) => Ok(Response::builder()
+                                .status(StatusCode::NOT_FOUND)
                                 .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                                .unwrap())
+                                .body(Full::new(Bytes::from(format!(
+                                    r#"{{"error": "Content not found: {}"}}"#,
+                                    content_id
+                                ))))
+                                .unwrap()),
+                            Err(e) => {
+                                error!(error = %e, content_id = %content_id, "Failed to delete content");
+                                Ok(Response::builder()
+                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                    .unwrap())
+                            }
                         }
-                    }
-                })
+                    })
+                }
+                _ => Ok(Response::builder()
+                    .status(StatusCode::METHOD_NOT_ALLOWED)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                    .unwrap()),
             }
-            Method::DELETE => {
-                content_db.with_conn_mut(|conn| {
-                    match db::content::delete_content(conn, content_id) {
-                        Ok(true) => Ok(Response::builder()
-                            .status(StatusCode::NO_CONTENT)
-                            .body(Full::new(Bytes::new()))
-                            .unwrap()),
-                        Ok(false) => Ok(Response::builder()
-                            .status(StatusCode::NOT_FOUND)
-                            .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(
-                                r#"{{"error": "Content not found: {}"}}"#,
-                                content_id
-                            ))))
-                            .unwrap()),
-                        Err(e) => {
-                            error!(error = %e, content_id = %content_id, "Failed to delete content");
-                            Ok(Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                                .unwrap())
-                        }
-                    }
-                })
-            }
-            _ => Ok(Response::builder()
-                .status(StatusCode::METHOD_NOT_ALLOWED)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
-                .unwrap()),
         }
     }
 
@@ -1397,19 +1468,20 @@ impl HttpServer {
         method: Method,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        match method {
-            Method::GET => {
-                let query_str = req.uri().query().unwrap_or("");
-                let params: std::collections::HashMap<String, String> =
-                    url::form_urlencoded::parse(query_str.as_bytes())
-                        .into_owned()
-                        .collect();
+        let query_str = req.uri().query().unwrap_or("");
+        let params: std::collections::HashMap<String, String> =
+            url::form_urlencoded::parse(query_str.as_bytes())
+                .into_owned()
+                .collect();
 
-                let limit: u32 = params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100);
-                let offset: u32 = params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0);
+        let limit: u32 = params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100);
+        let offset: u32 = params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0);
 
-                content_db.with_conn(|conn| {
-                    match db::paths::list_paths(conn, limit, offset) {
+        // Use service layer if available
+        if let Some(ref services) = self.services {
+            match method {
+                Method::GET => {
+                    match services.path.list(limit, offset) {
                         Ok(paths) => {
                             let body = serde_json::json!({
                                 "items": paths,
@@ -1417,61 +1489,93 @@ impl HttpServer {
                                 "limit": limit,
                                 "offset": offset,
                             });
-
-                            Ok(Response::builder()
-                                .status(StatusCode::OK)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(body.to_string())))
-                                .unwrap())
+                            Ok(response::ok(&body))
                         }
-                        Err(e) => {
-                            error!(error = %e, "Failed to list paths");
-                            Ok(Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                                .unwrap())
-                        }
+                        Err(e) => Ok(response::error_response(e)),
                     }
-                })
+                }
+                Method::POST => {
+                    let body = req.collect().await.map_err(|e| {
+                        StorageError::Internal(format!("Failed to read body: {}", e))
+                    })?;
+                    let body_bytes = body.to_bytes();
+
+                    let input: db::paths::CreatePathInput = serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+                    Ok(response::from_create_result(services.path.create(input)))
+                }
+                _ => Ok(response::method_not_allowed()),
             }
-            Method::POST => {
-                let body = req.collect().await.map_err(|e| {
-                    StorageError::Internal(format!("Failed to read body: {}", e))
-                })?;
-                let body_bytes = body.to_bytes();
+        } else {
+            // Fallback to direct repository calls (legacy)
+            match method {
+                Method::GET => {
+                    content_db.with_conn(|conn| {
+                        match db::paths::list_paths(conn, limit, offset) {
+                            Ok(paths) => {
+                                let body = serde_json::json!({
+                                    "items": paths,
+                                    "count": paths.len(),
+                                    "limit": limit,
+                                    "offset": offset,
+                                });
 
-                let input: db::paths::CreatePathInput = serde_json::from_slice(&body_bytes)
-                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
-
-                content_db.with_conn_mut(|conn| {
-                    match db::paths::create_path(conn, input) {
-                        Ok(path) => {
-                            let body = serde_json::to_string(&path)
-                                .map_err(|e| StorageError::Internal(e.to_string()))?;
-
-                            Ok(Response::builder()
-                                .status(StatusCode::CREATED)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(body)))
-                                .unwrap())
+                                Ok(Response::builder()
+                                    .status(StatusCode::OK)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(body.to_string())))
+                                    .unwrap())
+                            }
+                            Err(e) => {
+                                error!(error = %e, "Failed to list paths");
+                                Ok(Response::builder()
+                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                    .unwrap())
+                            }
                         }
-                        Err(e) => {
-                            error!(error = %e, "Failed to create path");
-                            Ok(Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                                .unwrap())
+                    })
+                }
+                Method::POST => {
+                    let body = req.collect().await.map_err(|e| {
+                        StorageError::Internal(format!("Failed to read body: {}", e))
+                    })?;
+                    let body_bytes = body.to_bytes();
+
+                    let input: db::paths::CreatePathInput = serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+                    content_db.with_conn_mut(|conn| {
+                        match db::paths::create_path(conn, input) {
+                            Ok(path) => {
+                                let body = serde_json::to_string(&path)
+                                    .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                                Ok(Response::builder()
+                                    .status(StatusCode::CREATED)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(body)))
+                                    .unwrap())
+                            }
+                            Err(e) => {
+                                error!(error = %e, "Failed to create path");
+                                Ok(Response::builder()
+                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                    .unwrap())
+                            }
                         }
-                    }
-                })
+                    })
+                }
+                _ => Ok(Response::builder()
+                    .status(StatusCode::METHOD_NOT_ALLOWED)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                    .unwrap()),
             }
-            _ => Ok(Response::builder()
-                .status(StatusCode::METHOD_NOT_ALLOWED)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
-                .unwrap()),
         }
     }
 
@@ -1482,6 +1586,27 @@ impl HttpServer {
         method: Method,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Service-based handling
+        if let Some(ref services) = self.services {
+            if method != Method::POST {
+                return Ok(response::method_not_allowed());
+            }
+
+            let body = req.collect().await.map_err(|e| {
+                StorageError::Internal(format!("Failed to read body: {}", e))
+            })?;
+            let body_bytes = body.to_bytes();
+
+            let paths: Vec<db::paths::CreatePathInput> = serde_json::from_slice(&body_bytes)
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            let count = paths.len();
+            info!(count = count, "Bulk creating paths via service");
+
+            return Ok(response::from_result(services.path.bulk_create(paths)));
+        }
+
+        // Legacy fallback
         if method != Method::POST {
             return Ok(Response::builder()
                 .status(StatusCode::METHOD_NOT_ALLOWED)
@@ -1535,6 +1660,22 @@ impl HttpServer {
         path_id: &str,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Service-based handling
+        if let Some(ref services) = self.services {
+            match method {
+                Method::GET => {
+                    let result = services.path.get_with_steps(path_id);
+                    return Ok(response::from_option(result, &format!("Path not found: {}", path_id)));
+                }
+                Method::DELETE => {
+                    let result = services.path.delete(path_id);
+                    return Ok(response::from_delete_bool_result(result, &format!("Path not found: {}", path_id)));
+                }
+                _ => return Ok(response::method_not_allowed()),
+            }
+        }
+
+        // Legacy fallback
         match method {
             Method::GET => {
                 content_db.with_conn(|conn| {
@@ -1614,6 +1755,51 @@ impl HttpServer {
         method: Method,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Service-based handling
+        if let Some(ref services) = self.services {
+            let query_str = req.uri().query().unwrap_or("");
+            let params: std::collections::HashMap<String, String> =
+                url::form_urlencoded::parse(query_str.as_bytes())
+                    .into_owned()
+                    .collect();
+
+            let query = db::relationships::RelationshipQuery {
+                content_id: params.get("content_id").cloned(),
+                direction: params.get("direction").cloned(),
+                relationship_type: params.get("relationship_type").cloned(),
+                limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
+                offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+            };
+
+            match method {
+                Method::GET => {
+                    match services.relationship.list(&query) {
+                        Ok(items) => {
+                            let body = serde_json::json!({
+                                "items": items,
+                                "count": items.len(),
+                                "limit": query.limit,
+                                "offset": query.offset,
+                            });
+                            return Ok(response::ok(&body));
+                        }
+                        Err(e) => return Ok(response::error_response(e)),
+                    }
+                }
+                Method::POST => {
+                    let body = req.collect().await.map_err(|e| {
+                        StorageError::Internal(format!("Failed to read body: {}", e))
+                    })?;
+                    let body_bytes = body.to_bytes();
+                    let input: db::relationships::CreateRelationshipInput = serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    return Ok(response::from_create_result(services.relationship.create(input)));
+                }
+                _ => return Ok(response::method_not_allowed()),
+            }
+        }
+
+        // Legacy fallback
         match method {
             Method::GET => {
                 let query_str = req.uri().query().unwrap_or("");
@@ -1704,6 +1890,24 @@ impl HttpServer {
         method: Method,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Service-based handling
+        if let Some(ref services) = self.services {
+            if method != Method::POST {
+                return Ok(response::method_not_allowed());
+            }
+
+            let body = req.collect().await.map_err(|e| {
+                StorageError::Internal(format!("Failed to read body: {}", e))
+            })?;
+            let body_bytes = body.to_bytes();
+
+            let inputs: Vec<db::relationships::CreateRelationshipInput> = serde_json::from_slice(&body_bytes)
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+            return Ok(response::from_result(services.relationship.bulk_create(inputs)));
+        }
+
+        // Legacy fallback
         if method != Method::POST {
             return Ok(Response::builder()
                 .status(StatusCode::METHOD_NOT_ALLOWED)
@@ -1752,6 +1956,25 @@ impl HttpServer {
         content_id: &str,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Service-based handling
+        if let Some(ref services) = self.services {
+            if method != Method::GET {
+                return Ok(response::method_not_allowed());
+            }
+
+            let query_str = req.uri().query().unwrap_or("");
+            let params: std::collections::HashMap<String, String> =
+                url::form_urlencoded::parse(query_str.as_bytes())
+                    .into_owned()
+                    .collect();
+
+            let relationship_types: Option<Vec<String>> = params.get("types")
+                .map(|s| s.split(',').map(|t| t.trim().to_string()).collect());
+
+            return Ok(response::from_result(services.relationship.get_graph(content_id, relationship_types.as_deref())));
+        }
+
+        // Legacy fallback
         if method != Method::GET {
             return Ok(Response::builder()
                 .status(StatusCode::METHOD_NOT_ALLOWED)
@@ -1801,6 +2024,22 @@ impl HttpServer {
         rel_id: &str,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Service-based handling
+        if let Some(ref services) = self.services {
+            match method {
+                Method::GET => {
+                    let result = services.relationship.get(rel_id);
+                    return Ok(response::from_option(result, &format!("Relationship not found: {}", rel_id)));
+                }
+                Method::DELETE => {
+                    let result = services.relationship.delete(rel_id);
+                    return Ok(response::from_delete_bool_result(result, &format!("Relationship not found: {}", rel_id)));
+                }
+                _ => return Ok(response::method_not_allowed()),
+            }
+        }
+
+        // Legacy fallback
         match method {
             Method::GET => {
                 content_db.with_conn(|conn| {
@@ -1879,6 +2118,52 @@ impl HttpServer {
         method: Method,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Service-based handling
+        if let Some(ref services) = self.services {
+            let query_str = req.uri().query().unwrap_or("");
+            let params: std::collections::HashMap<String, String> =
+                url::form_urlencoded::parse(query_str.as_bytes())
+                    .into_owned()
+                    .collect();
+
+            let query = db::knowledge_maps::KnowledgeMapQuery {
+                owner_id: params.get("owner_id").cloned(),
+                map_type: params.get("map_type").cloned(),
+                subject_id: params.get("subject_id").cloned(),
+                visibility: params.get("visibility").cloned(),
+                limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
+                offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+            };
+
+            match method {
+                Method::GET => {
+                    match services.knowledge.list_knowledge_maps(&query) {
+                        Ok(items) => {
+                            let body = serde_json::json!({
+                                "items": items,
+                                "count": items.len(),
+                                "limit": query.limit,
+                                "offset": query.offset,
+                            });
+                            return Ok(response::ok(&body));
+                        }
+                        Err(e) => return Ok(response::error_response(e)),
+                    }
+                }
+                Method::POST => {
+                    let body = req.collect().await.map_err(|e| {
+                        StorageError::Internal(format!("Failed to read body: {}", e))
+                    })?;
+                    let body_bytes = body.to_bytes();
+                    let input: db::knowledge_maps::CreateKnowledgeMapInput = serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    return Ok(response::from_create_result(services.knowledge.create_knowledge_map(input)));
+                }
+                _ => return Ok(response::method_not_allowed()),
+            }
+        }
+
+        // Legacy fallback
         match method {
             Method::GET => {
                 let query_str = req.uri().query().unwrap_or("");
@@ -1971,6 +2256,31 @@ impl HttpServer {
         map_id: &str,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Service-based handling
+        if let Some(ref services) = self.services {
+            match method {
+                Method::GET => {
+                    let result = services.knowledge.get_knowledge_map(map_id);
+                    return Ok(response::from_option(result, &format!("Knowledge map not found: {}", map_id)));
+                }
+                Method::PUT => {
+                    let body = req.collect().await.map_err(|e| {
+                        StorageError::Internal(format!("Failed to read body: {}", e))
+                    })?;
+                    let body_bytes = body.to_bytes();
+                    let input: db::knowledge_maps::CreateKnowledgeMapInput = serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    return Ok(response::from_result(services.knowledge.update_knowledge_map(map_id, input)));
+                }
+                Method::DELETE => {
+                    let result = services.knowledge.delete_knowledge_map(map_id);
+                    return Ok(response::from_delete_bool_result(result, &format!("Knowledge map not found: {}", map_id)));
+                }
+                _ => return Ok(response::method_not_allowed()),
+            }
+        }
+
+        // Legacy fallback
         match method {
             Method::GET => {
                 content_db.with_conn(|conn| {
@@ -2089,6 +2399,52 @@ impl HttpServer {
         method: Method,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Service-based handling
+        if let Some(ref services) = self.services {
+            let query_str = req.uri().query().unwrap_or("");
+            let params: std::collections::HashMap<String, String> =
+                url::form_urlencoded::parse(query_str.as_bytes())
+                    .into_owned()
+                    .collect();
+
+            let query = db::path_extensions::PathExtensionQuery {
+                base_path_id: params.get("base_path_id").cloned(),
+                extended_by: params.get("extended_by").cloned(),
+                visibility: params.get("visibility").cloned(),
+                forked_from: params.get("forked_from").cloned(),
+                limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
+                offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+            };
+
+            match method {
+                Method::GET => {
+                    match services.knowledge.list_path_extensions(&query) {
+                        Ok(items) => {
+                            let body = serde_json::json!({
+                                "items": items,
+                                "count": items.len(),
+                                "limit": query.limit,
+                                "offset": query.offset,
+                            });
+                            return Ok(response::ok(&body));
+                        }
+                        Err(e) => return Ok(response::error_response(e)),
+                    }
+                }
+                Method::POST => {
+                    let body = req.collect().await.map_err(|e| {
+                        StorageError::Internal(format!("Failed to read body: {}", e))
+                    })?;
+                    let body_bytes = body.to_bytes();
+                    let input: db::path_extensions::CreatePathExtensionInput = serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    return Ok(response::from_create_result(services.knowledge.create_path_extension(input)));
+                }
+                _ => return Ok(response::method_not_allowed()),
+            }
+        }
+
+        // Legacy fallback
         match method {
             Method::GET => {
                 let query_str = req.uri().query().unwrap_or("");
@@ -2181,6 +2537,31 @@ impl HttpServer {
         ext_id: &str,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        // Service-based handling
+        if let Some(ref services) = self.services {
+            match method {
+                Method::GET => {
+                    let result = services.knowledge.get_path_extension(ext_id);
+                    return Ok(response::from_option(result, &format!("Path extension not found: {}", ext_id)));
+                }
+                Method::PUT => {
+                    let body = req.collect().await.map_err(|e| {
+                        StorageError::Internal(format!("Failed to read body: {}", e))
+                    })?;
+                    let body_bytes = body.to_bytes();
+                    let input: db::path_extensions::CreatePathExtensionInput = serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    return Ok(response::from_result(services.knowledge.update_path_extension(ext_id, input)));
+                }
+                Method::DELETE => {
+                    let result = services.knowledge.delete_path_extension(ext_id);
+                    return Ok(response::from_delete_bool_result(result, &format!("Path extension not found: {}", ext_id)));
+                }
+                _ => return Ok(response::method_not_allowed()),
+            }
+        }
+
+        // Legacy fallback
         match method {
             Method::GET => {
                 content_db.with_conn(|conn| {

@@ -46,7 +46,7 @@
 
 use clap::Parser;
 use elohim_storage::{BlobStore, Config, ContentDb, HttpServer, ImportHandler, ImportHandlerConfig};
-use elohim_storage::{ProgressHub, ProgressHubConfig};
+use elohim_storage::{ProgressHub, ProgressHubConfig, Services};
 use elohim_storage::import_api::{ImportApi, ImportApiConfig};
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -355,9 +355,14 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
         http_server = http_server.with_import_api(Arc::clone(api));
     }
 
-    // Attach ContentDb to HttpServer if enabled
+    // Attach ContentDb and Services to HttpServer if enabled
     if let Some(ref db) = content_db {
         http_server = http_server.with_content_db(Arc::clone(db));
+
+        // Initialize service layer
+        let services = Arc::new(Services::new(Arc::clone(db)));
+        http_server = http_server.with_services(services);
+
         info!("Database API:");
         info!("  GET  /db/stats           - Database statistics");
         info!("  GET  /db/content         - List content");

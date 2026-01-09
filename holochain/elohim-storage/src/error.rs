@@ -55,6 +55,9 @@ pub enum StorageError {
     #[error("Authentication error: {0}")]
     Auth(String),
 
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+
     #[error("Configuration error: {0}")]
     Config(String),
 

@@ -56,6 +56,7 @@ pub mod progress_hub;
 pub mod progress_ws;
 pub mod cell_discovery;
 pub mod debug_stream;
+pub mod services;
 
 // P2P identity and discovery (always available, but some types require p2p feature)
 pub mod identity;
@@ -98,3 +99,9 @@ pub use sync::{DocStore, DocStoreConfig, StoredDocument, StreamPosition, StreamT
 
 // SQLite re-exports
 pub use db::{ContentDb, DbStats, ContentRow, PathRow, StepRow};
+
+// Service re-exports
+pub use services::{
+    Services, ContentService, PathService, RelationshipService, KnowledgeService,
+    EventBus, StorageEvent,
+};

@@ -304,3 +304,13 @@ pub struct BulkRelationshipResult {
     pub created: usize,
     pub errors: Vec<String>,
 }
+
+/// Delete all relationships where content is source or target
+pub fn delete_relationships_for_content(conn: &mut Connection, content_id: &str) -> Result<usize, StorageError> {
+    let rows = conn.execute(
+        "DELETE FROM relationships WHERE source_id = ? OR target_id = ?",
+        params![content_id, content_id],
+    ).map_err(|e| StorageError::Internal(format!("Failed to delete relationships: {}", e)))?;
+
+    Ok(rows)
+}

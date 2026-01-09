@@ -482,3 +482,123 @@ pub fn get_steps_for_path(conn: &Connection, path_id: &str) -> Result<Vec<StepRo
 
     Ok(steps)
 }
+
+/// Get all chapters for a path
+pub fn get_chapters(conn: &Connection, path_id: &str) -> Result<Vec<ChapterRow>, StorageError> {
+    let mut stmt = conn
+        .prepare("SELECT * FROM chapters WHERE path_id = ? ORDER BY order_index")
+        .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
+
+    let chapter_rows = stmt
+        .query_map(params![path_id], |row| ChapterRow::from_row(row))
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
+
+    let mut chapters = vec![];
+    for row_result in chapter_rows {
+        let mut chapter = row_result
+            .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
+
+        // Load steps for this chapter
+        chapter.steps = get_steps_for_chapter_internal(conn, &chapter.id)?;
+        chapters.push(chapter);
+    }
+
+    Ok(chapters)
+}
+
+/// Get steps for a specific chapter (internal helper)
+fn get_steps_for_chapter_internal(conn: &Connection, chapter_id: &str) -> Result<Vec<StepRow>, StorageError> {
+    let mut stmt = conn
+        .prepare("SELECT * FROM steps WHERE chapter_id = ? ORDER BY order_index")
+        .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
+
+    let steps: Vec<StepRow> = stmt
+        .query_map(params![chapter_id], |row| StepRow::from_row(row))
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
+
+    Ok(steps)
+}
+
+/// Create a single step
+pub fn create_step(conn: &mut Connection, input: CreateStepInput) -> Result<StepRow, StorageError> {
+    conn.execute(
+        r#"
+        INSERT INTO steps (
+            id, path_id, chapter_id, title, description, step_type,
+            resource_id, resource_type, order_index, estimated_duration, metadata_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        "#,
+        params![
+            input.id,
+            input.path_id,
+            input.chapter_id,
+            input.title,
+            input.description,
+            input.step_type,
+            input.resource_id,
+            input.resource_type,
+            input.order_index,
+            input.estimated_duration,
+            input.metadata_json,
+        ],
+    ).map_err(|e| StorageError::Internal(format!("Insert step failed: {}", e)))?;
+
+    // Return the created step
+    let mut stmt = conn
+        .prepare("SELECT * FROM steps WHERE id = ?")
+        .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
+
+    stmt.query_row(params![input.id], |row| StepRow::from_row(row))
+        .map_err(|e| StorageError::Internal(format!("Step not found after insert: {}", e)))
+}
+
+/// Delete a step by ID
+pub fn delete_step(conn: &mut Connection, id: &str) -> Result<bool, StorageError> {
+    let changes = conn
+        .execute("DELETE FROM steps WHERE id = ?", params![id])
+        .map_err(|e| StorageError::Internal(format!("Delete step failed: {}", e)))?;
+
+    Ok(changes > 0)
+}
+
+/// Create a chapter
+pub fn create_chapter(conn: &mut Connection, path_id: &str, input: CreateChapterInput) -> Result<ChapterRow, StorageError> {
+    conn.execute(
+        r#"
+        INSERT INTO chapters (id, path_id, title, description, order_index, estimated_duration)
+        VALUES (?, ?, ?, ?, ?, ?)
+        "#,
+        params![
+            input.id,
+            path_id,
+            input.title,
+            input.description,
+            input.order_index,
+            input.estimated_duration,
+        ],
+    ).map_err(|e| StorageError::Internal(format!("Insert chapter failed: {}", e)))?;
+
+    // Return the created chapter
+    let mut stmt = conn
+        .prepare("SELECT * FROM chapters WHERE id = ?")
+        .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
+
+    stmt.query_row(params![input.id], |row| ChapterRow::from_row(row))
+        .map_err(|e| StorageError::Internal(format!("Chapter not found after insert: {}", e)))
+}
+
+/// Delete a chapter by ID (cascades to steps)
+pub fn delete_chapter(conn: &mut Connection, id: &str) -> Result<bool, StorageError> {
+    // First delete steps in this chapter
+    conn.execute("DELETE FROM steps WHERE chapter_id = ?", params![id])
+        .map_err(|e| StorageError::Internal(format!("Delete steps failed: {}", e)))?;
+
+    // Then delete the chapter
+    let changes = conn
+        .execute("DELETE FROM chapters WHERE id = ?", params![id])
+        .map_err(|e| StorageError::Internal(format!("Delete chapter failed: {}", e)))?;
+
+    Ok(changes > 0)
+}
