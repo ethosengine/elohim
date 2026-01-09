@@ -12,6 +12,7 @@
   "updatedAt": "2025-12-24T03:05:26.551Z",
   "thumbnailUrl": "/images/fct_cover.webp",
   "thumbnailAlt": "Foundations for Christian Technology course cover",
+  "localThumbnailPath": "assets/images/fct_cover.webp",
   "pathType": "expedition",
   "chapters": [
     {

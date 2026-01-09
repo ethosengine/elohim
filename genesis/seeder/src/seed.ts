@@ -528,6 +528,10 @@ interface CreatePathInput {
   tags: string[];
   /** Extensible metadata JSON (stores chapters for hierarchical paths) */
   metadata_json: string | null;
+  /** Thumbnail image URL (relative path or blob reference) */
+  thumbnail_url?: string;
+  /** SHA256 hash of thumbnail blob in elohim-storage */
+  thumbnail_blob_hash?: string;
 }
 
 interface AddPathStepInput {
@@ -583,6 +587,11 @@ interface PathJson {
   purpose?: string;
   visibility?: string;
   tags?: string[];
+  // Thumbnail image
+  thumbnailUrl?: string;
+  thumbnailAlt?: string;
+  /** Local path to thumbnail image (relative to genesis/) for blob upload */
+  localThumbnailPath?: string;
 }
 
 interface LegacyStepJson {
@@ -1410,6 +1419,70 @@ async function seedViaDoorway(): Promise<SeedResult> {
   console.log(`   Loaded ${allPaths.length} valid paths`);
   timer.endPhase('Path Loading');
 
+  // ========================================
+  // UPLOAD PATH THUMBNAIL BLOBS
+  // ========================================
+  timer.startPhase('Path Thumbnails');
+  console.log('\n🖼️  Processing path thumbnails...');
+
+  // Map to store blob_hash for each path ID
+  const pathThumbnailHashes = new Map<string, string>();
+
+  // Find paths with local thumbnails
+  const pathsWithThumbnails = allPaths.filter(({ pathData }) => pathData.localThumbnailPath);
+
+  if (pathsWithThumbnails.length > 0) {
+    console.log(`   Found ${pathsWithThumbnails.length} path(s) with local thumbnails`);
+
+    for (const { pathData } of pathsWithThumbnails) {
+      try {
+        const thumbnailPath = path.join(GENESIS_DIR, pathData.localThumbnailPath);
+        if (!fs.existsSync(thumbnailPath)) {
+          console.warn(`   ⚠️ ${pathData.id}: thumbnail not found at ${pathData.localThumbnailPath}`);
+          continue;
+        }
+
+        const imageData = fs.readFileSync(thumbnailPath);
+        const hash = StorageClient.computeHash(imageData);
+
+        // Determine MIME type from extension
+        const ext = path.extname(thumbnailPath).toLowerCase();
+        const mimeTypes: Record<string, string> = {
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.webp': 'image/webp',
+          '.gif': 'image/gif',
+          '.svg': 'image/svg+xml',
+        };
+        const mimeType = mimeTypes[ext] || 'application/octet-stream';
+
+        console.log(`   📦 Uploading ${pathData.id}: ${(imageData.length / 1024).toFixed(1)} KB (${mimeType})`);
+
+        const uploadResult = await doorwayClient.pushBlob(hash, imageData, {
+          hash,
+          mimeType,
+          sizeBytes: imageData.length,
+        });
+
+        if (uploadResult.success) {
+          pathThumbnailHashes.set(pathData.id, hash);
+          console.log(`   ✅ ${pathData.id}: ${uploadResult.cached ? 'already cached' : 'uploaded'}`);
+        } else {
+          console.error(`   ❌ ${pathData.id}: upload failed - ${uploadResult.error}`);
+        }
+      } catch (err) {
+        console.error(`   ❌ ${pathData.id}: processing error - ${err}`);
+      }
+    }
+
+    console.log(`   📊 Processed ${pathThumbnailHashes.size}/${pathsWithThumbnails.length} thumbnails`);
+  } else {
+    console.log('   No paths with local thumbnails found');
+  }
+
+  timer.endPhase('Path Thumbnails');
+
   if (allPaths.length > 0) {
     timer.startPhase('Path Import');
     console.log(`\n🚀 Importing ${allPaths.length} paths via doorway...`);
@@ -1538,26 +1611,35 @@ async function seedViaDoorway(): Promise<SeedResult> {
     }
 
     // Convert paths to zome inputs
-    const pathInputs = allPaths.map(({ pathData }) => ({
-      id: pathData.id,
-      version: pathData.version || '1.0.0',
-      title: pathData.title,
-      description: pathData.description || '',
-      purpose: pathData.purpose || null,
-      difficulty: pathData.difficulty || 'beginner',
-      estimated_duration: pathData.estimatedDuration || null,
-      visibility: pathData.visibility || 'public',
-      path_type: pathData.pathType || 'linear',
-      tags: pathData.tags || [],
-      // metadata_json must be an object with a `chapters` property for the UI to parse it
-      // The UI does: metadata.chapters (not just metadata as an array)
-      metadata_json: JSON.stringify(
-        pathData.chapters
-          ? { chapters: pathData.chapters, ...pathData.metadata }
-          : pathData.metadata || {}
-      ),
-      steps: extractStepsFromPath(pathData),
-    }));
+    const pathInputs = allPaths.map(({ pathData }) => {
+      const thumbnailHash = pathThumbnailHashes.get(pathData.id);
+
+      return {
+        id: pathData.id,
+        version: pathData.version || '1.0.0',
+        title: pathData.title,
+        description: pathData.description || '',
+        purpose: pathData.purpose || null,
+        difficulty: pathData.difficulty || 'beginner',
+        estimated_duration: pathData.estimatedDuration || null,
+        visibility: pathData.visibility || 'public',
+        path_type: pathData.pathType || 'linear',
+        tags: pathData.tags || [],
+        // metadata_json must be an object with a `chapters` property for the UI to parse it
+        // The UI does: metadata.chapters (not just metadata as an array)
+        metadata_json: JSON.stringify(
+          pathData.chapters
+            ? { chapters: pathData.chapters, ...pathData.metadata }
+            : pathData.metadata || {}
+        ),
+        steps: extractStepsFromPath(pathData),
+        // Thumbnail: use blob URL if we uploaded, otherwise keep original
+        thumbnail_url: thumbnailHash
+          ? `/blob/${thumbnailHash}`
+          : pathData.thumbnailUrl || null,
+        thumbnail_blob_hash: thumbnailHash || null,
+      };
+    });
 
     // Log step counts for debugging
     for (const path of pathInputs) {
