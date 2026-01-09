@@ -50,43 +50,130 @@ const processShim = `
       console.warn('[Perseus] Set polyfill test failed, may have initialization issues');
     }
   }
+
+  // jQuery/vmouse shim - graphie code uses vmouse for touch handling
+  // If jQuery isn't available, stub out the vmouse events
+  if (typeof window !== 'undefined' && typeof window.jQuery === 'undefined') {
+    console.log('[Perseus] No jQuery detected, stubbing vmouse...');
+    // Create minimal jQuery stub to prevent vmouse initialization errors
+    window.jQuery = window.$ = function(selector) {
+      return {
+        on: function() { return this; },
+        off: function() { return this; },
+        trigger: function() { return this; },
+        bind: function() { return this; },
+        unbind: function() { return this; },
+        each: function() { return this; },
+        length: 0
+      };
+    };
+    window.jQuery.fn = window.jQuery.prototype = {};
+    window.jQuery.extend = function(target) {
+      for (var i = 1; i < arguments.length; i++) {
+        var source = arguments[i];
+        for (var key in source) {
+          if (source.hasOwnProperty(key)) {
+            target[key] = source[key];
+          }
+        }
+      }
+      return target;
+    };
+    window.jQuery.event = {
+      special: {},
+      add: function() {},
+      remove: function() {},
+      // Props array used by vmouse for mouseEventProps = $.event.props.concat(mouseHookProps)
+      props: ['altKey', 'bubbles', 'cancelable', 'ctrlKey', 'currentTarget',
+              'eventPhase', 'metaKey', 'relatedTarget', 'shiftKey', 'target',
+              'timeStamp', 'view', 'which'],
+      mouseHooks: {
+        props: ['button', 'buttons', 'clientX', 'clientY', 'offsetX', 'offsetY',
+                'pageX', 'pageY', 'screenX', 'screenY', 'toElement']
+      }
+    };
+    // vmouse configuration
+    window.jQuery.vmouse = {
+      moveDistanceThreshold: 10,
+      clickDistanceThreshold: 10,
+      resetTimerDuration: 1500
+    };
+    // jQuery data storage
+    window.jQuery.data = function() { return {}; };
+    window.jQuery.Event = function(event) { return event; };
+    console.log('[Perseus] jQuery stub installed');
+  }
 })();
 `;
 
 // Wrapper to catch initialization errors gracefully
-// React DOM's event system can throw during feature detection in some environments
-// These errors are non-fatal - the plugin still works, but they pollute the console
+// We wrap the entire bundle content in a try-catch because some dependencies
+// have non-fatal initialization errors that would otherwise stop execution
 const errorBoundaryWrapper = `
+console.log('[Perseus] Bundle initialization starting...');
+try {
+`;
+
+// Footer to close the try-catch AND ensure registration happens
+const errorBoundaryFooter = `
+} catch (e) {
+  console.warn('[Perseus] Non-fatal initialization error caught:', e.message);
+  console.warn('[Perseus] Stack:', e.stack);
+}
+
+// Ensure custom element registration happens even after caught errors
+// This runs OUTSIDE the try-catch, so initialization errors don't block it
 (function() {
-  if (typeof window === 'undefined') return;
-
-  var _originalOnerror = window.onerror;
-  var _suppressedCount = 0;
-
-  // Temporarily catch TypeError related to concat during initialization
-  window.onerror = function(message, source, lineno, colno, error) {
-    // Check if this is the known React DOM initialization error
-    if (error instanceof TypeError &&
-        message && message.indexOf && message.indexOf("concat") !== -1) {
-      _suppressedCount++;
-      return true; // Suppress the error
-    }
-    // Pass through to original handler
-    if (_originalOnerror) {
-      return _originalOnerror.apply(window, arguments);
-    }
-    return false;
-  };
-
-  // Restore after a microtask (after sync initialization completes)
-  Promise.resolve().then(function() {
-    window.onerror = _originalOnerror;
-    if (_suppressedCount > 0) {
-      console.debug('[Perseus] Suppressed', _suppressedCount, 'non-fatal initialization error(s)');
-    }
-  });
+  console.log('[Perseus] Post-init registration check...');
+  if (typeof window !== 'undefined' && typeof customElements !== 'undefined') {
+    // Give the bundle a moment to settle, then register
+    setTimeout(function() {
+      if (!customElements.get('perseus-question')) {
+        console.log('[Perseus] Attempting fallback registration...');
+        // Access the PerseusPlugin global (UMD name)
+        if (typeof PerseusPlugin !== 'undefined' && PerseusPlugin.registerPerseusElement) {
+          try {
+            PerseusPlugin.registerPerseusElement();
+            console.log('[Perseus] Fallback registration succeeded');
+          } catch (err) {
+            console.error('[Perseus] Fallback registration failed:', err);
+          }
+        } else {
+          console.warn('[Perseus] PerseusPlugin not available for fallback registration');
+        }
+      } else {
+        console.log('[Perseus] Custom element already registered');
+      }
+    }, 0);
+  }
 })();
 `;
+
+// Plugin to patch bundled jQuery's event.props (removed in jQuery 3.x but needed by vmouse)
+const patchJQueryEventProps = () => ({
+  name: 'patch-jquery-event-props',
+  renderChunk(code) {
+    // Find the jQuery definition and inject the props patch right after it
+    const jqueryDefPattern = /var \$ = \/\*@__PURE__\*\/getDefaultExportFromCjs\$1\(jqueryExports\);/;
+    const match = code.match(jqueryDefPattern);
+    if (match) {
+      const patch = `
+// Patch jQuery event.props for vmouse compatibility (removed in jQuery 3.x)
+if ($ && $.event && !$.event.props) {
+  $.event.props = ['altKey', 'bubbles', 'cancelable', 'ctrlKey', 'currentTarget',
+    'eventPhase', 'metaKey', 'relatedTarget', 'shiftKey', 'target', 'timeStamp', 'view', 'which'];
+  $.event.mouseHooks = $.event.mouseHooks || {
+    props: ['button', 'buttons', 'clientX', 'clientY', 'offsetX', 'offsetY',
+            'pageX', 'pageY', 'screenX', 'screenY', 'toElement']
+  };
+  console.log('[Perseus] Patched bundled jQuery event.props');
+}
+`;
+      return code.replace(jqueryDefPattern, match[0] + patch);
+    }
+    return code;
+  }
+});
 
 export default {
   input: 'src/index.ts',
@@ -97,7 +184,14 @@ export default {
       name: 'PerseusPlugin',
       sourcemap: true,
       inlineDynamicImports: true,
-      intro: errorBoundaryWrapper + processShim
+      intro: errorBoundaryWrapper + processShim,
+      outro: errorBoundaryFooter,
+      globals: {
+        'react': 'React',
+        'react-dom': 'ReactDOM',
+        'react-dom/client': 'ReactDOM',
+        'react/jsx-runtime': 'React'
+      }
     },
     {
       file: 'dist/index.esm.js',
@@ -107,6 +201,8 @@ export default {
       intro: errorBoundaryWrapper + processShim
     }
   ],
+  // Mark only React core as external - jsx-runtime needs to be bundled
+  external: ['react', 'react-dom', 'react-dom/client'],
   plugins: [
     // Fix asap package browser resolution - the browser field mappings
     // in asap/package.json aren't being applied correctly by node-resolve
@@ -158,7 +254,9 @@ export default {
     commonjs({
       include: /node_modules/,
       transformMixedEsModules: true
-    })
+    }),
+    // Patch bundled jQuery event.props for vmouse compatibility
+    patchJQueryEventProps()
   ],
   onwarn(warning, warn) {
     // Suppress circular dependency warnings from React ecosystem

@@ -60,6 +60,35 @@ function loadScript(url: string): Promise<void> {
 }
 
 /**
+ * Load React from CDN if not already available.
+ */
+async function ensureReactLoaded(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const win = window as any;
+
+  if (win.React && win.ReactDOM) {
+    console.log('[Perseus] React already loaded');
+    return;
+  }
+
+  console.log('[Perseus] Loading React from CDN...');
+
+  // Load React first, then ReactDOM
+  await loadScript('https://unpkg.com/react@18/umd/react.production.min.js');
+  await loadScript('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
+
+  if (!win.React || !win.ReactDOM) {
+    throw new Error('Failed to load React from CDN');
+  }
+
+  // Verify createRoot is available (React 18)
+  console.log('[Perseus] React loaded from CDN');
+  console.log('[Perseus] React version:', win.React.version);
+  console.log('[Perseus] ReactDOM version:', win.ReactDOM.version);
+  console.log('[Perseus] ReactDOM.createRoot:', typeof win.ReactDOM.createRoot);
+}
+
+/**
  * Lazily register the Perseus custom element by loading the external bundle.
  *
  * This function loads the Perseus plugin UMD bundle from /assets/perseus-plugin/
@@ -81,8 +110,17 @@ export async function registerPerseusElement(): Promise<void> {
 
   loadPromise = (async () => {
     try {
+      // Load React from CDN first (Perseus bundle expects it as global)
+      await ensureReactLoaded();
+
       const pluginUrl = getPerseusPluginUrl();
       console.log('[Perseus] Loading plugin from:', pluginUrl);
+
+      // Double-check globals are set right before loading bundle
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g = globalThis as any;
+      console.log('[Perseus] Pre-load check - globalThis.React:', typeof g.React, g.React?.version);
+      console.log('[Perseus] Pre-load check - globalThis.ReactDOM:', typeof g.ReactDOM, g.ReactDOM?.version);
 
       // Load the UMD bundle - it auto-registers the custom element
       await loadScript(pluginUrl);
