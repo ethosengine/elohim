@@ -512,22 +512,63 @@ export class DataLoaderService {
     };
   }
 
+  /** Cached content index for search/discovery */
+  private contentIndexCache$: Observable<any> | null = null;
+
   /**
    * Load the content index for search/discovery.
    * Returns metadata only, not full content.
-   *
-   * TODO: Implement getContentIndex in HolochainContentService
+   * Uses ContentService (doorway) as the source.
+   * Cached with shareReplay(1) to prevent redundant calls.
    */
   getContentIndex(): Observable<any> {
-    // TODO: Implement content index via Holochain (get all content metadata)
-    return this.holochainContent.getStats().pipe(
-      map(stats => ({
-        nodes: [],  // TODO: Fetch actual content list
-        totalCount: stats.total_count,
-        byType: stats.by_type,
-        lastUpdated: new Date().toISOString()
-      }))
-    );
+    if (!this.contentIndexCache$) {
+      this.contentIndexCache$ = this.contentService.queryContent({ limit: 1000 }).pipe(
+        map(nodes => ({
+          nodes: nodes.map(node => ({
+            id: node.id,
+            title: node.title,
+            description: node.description || '',
+            contentType: node.contentType,
+            tags: node.tags || [],
+            reach: node.reach || 'commons',
+            trustScore: node.trustScore,
+            createdAt: node.createdAt,
+            updatedAt: node.updatedAt,
+          })),
+          totalCount: nodes.length,
+          byType: this.groupByType(nodes),
+          lastUpdated: new Date().toISOString()
+        })),
+        shareReplay(1),
+        catchError(err => {
+          this.logger.error('Failed to load content index', err);
+          // Clear cache on error so next call retries
+          this.contentIndexCache$ = null;
+          return of({ nodes: [], totalCount: 0, byType: {}, lastUpdated: new Date().toISOString() });
+        })
+      );
+    }
+    return this.contentIndexCache$;
+  }
+
+  /**
+   * Group content nodes by type for index statistics.
+   */
+  private groupByType(nodes: ContentNode[]): Record<string, number> {
+    const byType: Record<string, number> = {};
+    for (const node of nodes) {
+      byType[node.contentType] = (byType[node.contentType] || 0) + 1;
+    }
+    return byType;
+  }
+
+  /**
+   * Invalidate the content index cache.
+   * Call this after creating/updating/deleting content.
+   */
+  invalidateContentIndexCache(): void {
+    this.contentIndexCache$ = null;
   }
 
   /**
@@ -679,6 +720,7 @@ export class DataLoaderService {
     this.graphCache$ = null;
     this.relationshipByNodeCache.clear();
     this.pathIndexCache$ = null;
+    this.contentIndexCache$ = null;
     // Also clear Holochain content cache
     this.holochainContent.clearCache();
 
@@ -709,6 +751,7 @@ export class DataLoaderService {
     relationshipCacheSize: number;
     hasGraph: boolean;
     hasPathIndex: boolean;
+    hasContentIndex: boolean;
     indexedDBAvailable: boolean;
   } {
     return {
@@ -717,6 +760,7 @@ export class DataLoaderService {
       relationshipCacheSize: this.relationshipByNodeCache.size,
       hasGraph: this.graphCache$ !== null,
       hasPathIndex: this.pathIndexCache$ !== null,
+      hasContentIndex: this.contentIndexCache$ !== null,
       indexedDBAvailable: this.idbInitialized
     };
   }

@@ -1,11 +1,12 @@
 import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
+import { Observable, of, forkJoin } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
 import { ContentType, ContentReach } from '../models/content-node.model';
 import { TrustLevel, calculateTrustLevel } from '@app/elohim/models/trust-badge.model';
 import { ContentIndexEntry } from './content.service';
+import { LearningPath } from '../models/learning-path.model';
 import {
   SearchQuery,
   SearchResult,
@@ -62,23 +63,40 @@ export class SearchService {
   ) {}
 
   /**
-   * Search content with relevance scoring, filtering, and facets.
+   * Search content AND paths with relevance scoring, filtering, and facets.
+   *
+   * Searches both:
+   * - Content nodes (documents, articles, videos, etc.)
+   * - Learning paths (curated journeys)
+   *
+   * Results are merged and sorted by relevance.
    */
   search(query: SearchQuery): Observable<SearchResults> {
     const startTime = Date.now();
 
-    return this.dataLoader.getContentIndex().pipe(
-      map(index => {
-        const nodes = index.nodes ?? [];
+    // Search both content and paths in parallel
+    return forkJoin({
+      contentIndex: this.dataLoader.getContentIndex().pipe(catchError(() => of({ nodes: [] }))),
+      pathIndex: this.dataLoader.getPathIndex().pipe(catchError(() => of({ paths: [] })))
+    }).pipe(
+      map(({ contentIndex, pathIndex }) => {
+        const contentNodes = contentIndex.nodes ?? [];
+        const paths = pathIndex.paths ?? [];
 
-        // Score and filter all nodes
-        const scoredResults = this.scoreAndFilter(nodes, query);
+        // Score and filter content nodes
+        const scoredContentResults = this.scoreAndFilter(contentNodes, query);
+
+        // Score and filter paths (converted to search result format)
+        const scoredPathResults = this.scoreAndFilterPaths(paths, query);
+
+        // Merge results
+        const allResults = [...scoredContentResults, ...scoredPathResults];
 
         // Compute facets from ALL matching results (before pagination)
-        const facets = this.computeFacets(scoredResults, query);
+        const facets = this.computeFacets(allResults, query);
 
         // Sort results
-        const sortedResults = this.sortResults(scoredResults, query);
+        const sortedResults = this.sortResults(allResults, query);
 
         // Paginate
         const page = query.page ?? 1;
@@ -114,21 +132,87 @@ export class SearchService {
   }
 
   /**
+   * Score and filter paths, converting them to SearchResult format.
+   */
+  private scoreAndFilterPaths(paths: any[], query: SearchQuery): SearchResult[] {
+    const results: SearchResult[] = [];
+    const searchText = (query.text ?? '').toLowerCase().trim();
+    const searchWords = searchText.split(/\s+/).filter(w => w.length > 0);
+
+    // If filtering by content type and 'path' is not included, skip paths
+    if (query.contentTypes && query.contentTypes.length > 0 && !query.contentTypes.includes('path')) {
+      return [];
+    }
+
+    for (const path of paths) {
+      // Convert path to a node-like format for filtering
+      const pathAsNode = {
+        id: path.id,
+        title: path.title,
+        description: path.description ?? '',
+        contentType: 'path' as ContentType,
+        tags: path.tags ?? [],
+        reach: 'commons' as ContentReach, // Paths are typically commons
+        trustScore: 1.0,
+        createdAt: path.createdAt,
+        updatedAt: path.updatedAt,
+      };
+
+      // Apply filters (reuse existing filter logic)
+      if (!this.passesFilters(pathAsNode, query)) {
+        continue;
+      }
+
+      // Score the path
+      const { score, matchedFields, highlights } = this.scoreNode(pathAsNode, searchWords);
+
+      // If there's search text, require a minimum score
+      if (searchText && score === 0) {
+        continue;
+      }
+
+      results.push({
+        id: path.id,
+        title: path.title,
+        description: path.description ?? '',
+        contentType: 'path',
+        tags: path.tags ?? [],
+        reach: 'commons',
+        trustScore: 1.0,
+        trustLevel: 'trusted' as TrustLevel,
+        hasFlags: false,
+        relevanceScore: score,
+        matchedFields,
+        highlights,
+        createdAt: path.createdAt,
+        updatedAt: path.updatedAt
+      });
+    }
+
+    return results;
+  }
+
+  /**
    * Get autocomplete suggestions for partial query.
+   * Includes suggestions from both content nodes and learning paths.
    */
   suggest(partialQuery: string, limit: number = 10): Observable<SearchSuggestions> {
     if (!partialQuery || partialQuery.trim().length < 2) {
       return of({ query: partialQuery, suggestions: [] });
     }
 
-    return this.dataLoader.getContentIndex().pipe(
-      map(index => {
-        const nodes = index.nodes ?? [];
+    return forkJoin({
+      contentIndex: this.dataLoader.getContentIndex().pipe(catchError(() => of({ nodes: [] }))),
+      pathIndex: this.dataLoader.getPathIndex().pipe(catchError(() => of({ paths: [] })))
+    }).pipe(
+      map(({ contentIndex, pathIndex }) => {
+        const nodes = contentIndex.nodes ?? [];
+        const paths = pathIndex.paths ?? [];
         const query = partialQuery.toLowerCase().trim();
         const suggestions: SearchSuggestion[] = [];
         const seen = new Set<string>();
 
-        // Suggest matching titles
+        // Suggest matching content titles
         for (const node of nodes) {
           if (suggestions.length >= limit) break;
 
@@ -143,10 +227,32 @@ export class SearchService {
           }
         }
 
-        // Suggest matching tags
+        // Suggest matching path titles
+        for (const path of paths) {
+          if (suggestions.length >= limit) break;
+
+          const titleLower = path.title.toLowerCase();
+          if (titleLower.includes(query) && !seen.has(titleLower)) {
+            seen.add(titleLower);
+            suggestions.push({
+              text: path.title,
+              type: 'path',
+              highlight: this.highlightMatch(path.title, query)
+            });
+          }
+        }
+
+        // Suggest matching tags (from both content and paths)
         const tagCounts = new Map<string, number>();
         for (const node of nodes) {
           for (const tag of node.tags ?? []) {
+            if (tag.toLowerCase().includes(query)) {
+              tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+            }
+          }
+        }
+        for (const path of paths) {
+          for (const tag of path.tags ?? []) {
             if (tag.toLowerCase().includes(query)) {
               tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
             }

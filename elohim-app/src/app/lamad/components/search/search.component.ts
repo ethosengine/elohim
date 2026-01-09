@@ -93,11 +93,27 @@ export class SearchComponent implements OnInit {
   }
 
   getNodeRoute(result: SearchResult): string[] {
+    // Route paths to path overview, content to content viewer
+    if (result.contentType === 'path') {
+      return ['/lamad/paths', result.id];
+    }
     return ['/lamad/content', result.id];
   }
 
   getNodeTypeIcon(type: string): string {
-    const icons: Record<string, string> = { epic: '📖', feature: '⚡', scenario: '✓' };
+    const icons: Record<string, string> = {
+      epic: '📖',
+      feature: '⚡',
+      scenario: '✓',
+      path: '🛤️',
+      concept: '💡',
+      video: '🎬',
+      assessment: '📝',
+      organization: '🏢',
+      'book-chapter': '📚',
+      tool: '🔧',
+      role: '👤'
+    };
     return icons[type] || '📄';
   }
 }

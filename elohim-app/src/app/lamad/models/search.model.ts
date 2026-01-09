@@ -265,7 +265,7 @@ export interface SearchSuggestion {
   text: string;
 
   /** Type of suggestion */
-  type: 'query' | 'tag' | 'title' | 'contentType';
+  type: 'query' | 'tag' | 'title' | 'contentType' | 'path';
 
   /** Number of results this would return */
   resultCount?: number;
