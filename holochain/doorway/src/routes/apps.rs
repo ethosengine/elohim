@@ -106,7 +106,9 @@ async fn forward_app_request(
                         .header("Content-Type", content_type)
                         .header("Access-Control-Allow-Origin", "*")
                         // Required for COEP: require-corp in Angular app
-                        .header("Cross-Origin-Resource-Policy", "cross-origin");
+                        .header("Cross-Origin-Resource-Policy", "cross-origin")
+                        // Required for iframes embedded in COEP pages
+                        .header("Cross-Origin-Embedder-Policy", "credentialless");
 
                     if let Some(cc) = cache_control {
                         builder = builder.header("Cache-Control", cc);
