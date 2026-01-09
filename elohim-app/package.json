@@ -4,6 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --disable-host-check",
+    "stop": "pkill -f 'ng serve' 2>/dev/null && echo 'Stopped Angular dev server' || echo 'Angular dev server not running'",
     "start:staging": "ng serve --disable-host-check --configuration=staging",
     "build": "ng build",
     "lint": "eslint src --ext .ts,.html",
