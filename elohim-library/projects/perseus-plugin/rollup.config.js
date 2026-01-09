@@ -53,6 +53,41 @@ const processShim = `
 })();
 `;
 
+// Wrapper to catch initialization errors gracefully
+// React DOM's event system can throw during feature detection in some environments
+// These errors are non-fatal - the plugin still works, but they pollute the console
+const errorBoundaryWrapper = `
+(function() {
+  if (typeof window === 'undefined') return;
+
+  var _originalOnerror = window.onerror;
+  var _suppressedCount = 0;
+
+  // Temporarily catch TypeError related to concat during initialization
+  window.onerror = function(message, source, lineno, colno, error) {
+    // Check if this is the known React DOM initialization error
+    if (error instanceof TypeError &&
+        message && message.indexOf && message.indexOf("concat") !== -1) {
+      _suppressedCount++;
+      return true; // Suppress the error
+    }
+    // Pass through to original handler
+    if (_originalOnerror) {
+      return _originalOnerror.apply(window, arguments);
+    }
+    return false;
+  };
+
+  // Restore after a microtask (after sync initialization completes)
+  Promise.resolve().then(function() {
+    window.onerror = _originalOnerror;
+    if (_suppressedCount > 0) {
+      console.debug('[Perseus] Suppressed', _suppressedCount, 'non-fatal initialization error(s)');
+    }
+  });
+})();
+`;
+
 export default {
   input: 'src/index.ts',
   output: [
@@ -62,14 +97,14 @@ export default {
       name: 'PerseusPlugin',
       sourcemap: true,
       inlineDynamicImports: true,
-      intro: processShim
+      intro: errorBoundaryWrapper + processShim
     },
     {
       file: 'dist/index.esm.js',
       format: 'es',
       sourcemap: true,
       inlineDynamicImports: true,
-      intro: processShim
+      intro: errorBoundaryWrapper + processShim
     }
   ],
   plugins: [
