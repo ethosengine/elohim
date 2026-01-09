@@ -95,7 +95,17 @@ export class IframeRendererComponent implements OnChanges {
   }
 
   private configureIframe(): void {
-    const { contentFormat, content, metadata } = this.node;
+    const { contentFormat, metadata } = this.node;
+    let content = this.node.content;
+
+    // Parse JSON string content if needed (API returns content_body as string)
+    if (typeof content === 'string') {
+      try {
+        content = JSON.parse(content);
+      } catch {
+        // Not JSON, keep as string for URL mode below
+      }
+    }
 
     // HTML5 App mode: content is Html5AppContent object
     if (contentFormat === 'html5-app' && this.isHtml5AppContent(content)) {
@@ -133,15 +143,60 @@ export class IframeRendererComponent implements OnChanges {
    * Format: ${doorwayUrl}/apps/${appId}/${entryPoint}
    */
   private buildHtml5AppUrl(content: Html5AppContent): string {
-    const doorwayUrl = environment.doorwayUrl || '';
+    // Get doorway URL with Che environment detection
+    const doorwayUrl = this.resolveDoorwayUrl();
     const { appId, entryPoint } = content;
 
     // If no doorway URL configured, try fallback
     if (!doorwayUrl && content.fallbackUrl) {
+      console.warn('[IframeRenderer] No doorwayUrl configured, using fallbackUrl:', content.fallbackUrl);
       return content.fallbackUrl;
     }
 
-    return `${doorwayUrl}/apps/${appId}/${entryPoint}`;
+    const url = `${doorwayUrl}/apps/${appId}/${entryPoint}`;
+    console.log('[IframeRenderer] Built HTML5 app URL:', url);
+    return url;
+  }
+
+  /**
+   * Resolve the doorway base URL.
+   * In Eclipse Che: converts angular-dev hostname to hc-dev
+   * Otherwise: uses environment config
+   */
+  private resolveDoorwayUrl(): string {
+    // Check for Eclipse Che environment
+    if (this.isCheEnvironment()) {
+      const cheUrl = this.getCheDevProxyUrl();
+      if (cheUrl) {
+        console.log('[IframeRenderer] Using Che dev-proxy URL:', cheUrl);
+        return cheUrl;
+      }
+    }
+
+    // Fallback to environment config
+    return environment.client?.doorwayUrl
+      || environment.doorwayUrl
+      || '';
+  }
+
+  /**
+   * Detect if running in Eclipse Che environment.
+   */
+  private isCheEnvironment(): boolean {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.location.hostname.includes('.devspaces.') ||
+      window.location.hostname.includes('.code.ethosengine.com')
+    );
+  }
+
+  /**
+   * Get the dev proxy HTTP URL in Che environment.
+   * Converts angular-dev endpoint to hc-dev endpoint.
+   */
+  private getCheDevProxyUrl(): string | null {
+    const hostname = window.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
+    return `https://${hostname}`;
   }
 
   /**
