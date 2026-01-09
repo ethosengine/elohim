@@ -472,17 +472,30 @@ export class ContentService {
    * Transform raw data to ContentNode model
    */
   private transformContent(data: any): ContentNode {
+    const contentFormat = data.content_format || data.contentFormat || 'markdown';
+    const rawContent = data.content_body || data.content || '';
+
+    // Parse metadata_json if it's a string (from SQLite backend)
+    let metadata = data.metadata || {};
+    if (data.metadata_json && typeof data.metadata_json === 'string') {
+      try {
+        metadata = JSON.parse(data.metadata_json);
+      } catch {
+        // Keep default empty object
+      }
+    }
+
     return {
       id: data.id || data.doc_id,
       contentType: data.content_type || data.contentType,
       title: data.title || '',
       description: data.description || '',
-      // content_body is inline storage, content is legacy/direct format
-      content: data.content_body || data.content || '',
-      contentFormat: data.content_format || data.contentFormat || 'markdown',
+      // Parse content for structured formats (html5-app, perseus, quiz-json, etc.)
+      content: this.parseContentBody(rawContent, contentFormat),
+      contentFormat,
       tags: data.tags || [],
       relatedNodeIds: data.related_node_ids || data.relatedNodeIds || [],
-      metadata: data.metadata || {},
+      metadata,
       authorId: data.author_id || data.authorId,
       reach: data.reach || 'commons',
       trustScore: data.trust_score || data.trustScore,
@@ -491,6 +504,37 @@ export class ContentService {
       createdAt: data.created_at || data.createdAt,
       updatedAt: data.updated_at || data.updatedAt,
     } as ContentNode;
+  }
+
+  /**
+   * Parse content body for structured formats.
+   * Formats like html5-app, perseus, quiz-json store JSON objects as strings.
+   */
+  private parseContentBody(content: string, contentFormat: string): string | object {
+    // Formats that store structured JSON content
+    const structuredFormats = ['html5-app', 'perseus', 'quiz-json', 'assessment'];
+
+    if (!structuredFormats.includes(contentFormat) || !content) {
+      return content;
+    }
+
+    // If content is already an object (pre-parsed), return as-is
+    if (typeof content === 'object') {
+      return content;
+    }
+
+    // Try to parse as JSON
+    try {
+      const parsed = JSON.parse(content);
+      // Only return parsed object if it's actually an object
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
+    } catch {
+      // Not valid JSON, return as-is
+    }
+
+    return content;
   }
 
   /**
