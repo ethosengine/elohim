@@ -160,17 +160,25 @@ export class IframeRendererComponent implements OnChanges {
 
   /**
    * Resolve the doorway base URL.
-   * In Eclipse Che: converts angular-dev hostname to hc-dev
-   * Otherwise: uses environment config
+   * Priority:
+   * 1. Eclipse Che endpoint URL (if accessing via Che route)
+   * 2. Relative URL for localhost in dev (doorway on same origin via proxy)
+   * 3. Environment config (deployed environments)
    */
   private resolveDoorwayUrl(): string {
-    // Check for Eclipse Che environment
+    // Check for Eclipse Che environment via Che endpoint URL
     if (this.isCheEnvironment()) {
       const cheUrl = this.getCheDevProxyUrl();
       if (cheUrl) {
         console.log('[IframeRenderer] Using Che dev-proxy URL:', cheUrl);
         return cheUrl;
       }
+    }
+
+    // For localhost development, use relative URL (assumes ng serve proxy or same-origin doorway)
+    if (this.isLocalDevelopment()) {
+      console.log('[IframeRenderer] Using relative URL for local dev');
+      return '';  // Relative URL - /apps/... will be proxied
     }
 
     // Fallback to environment config
@@ -180,7 +188,7 @@ export class IframeRendererComponent implements OnChanges {
   }
 
   /**
-   * Detect if running in Eclipse Che environment.
+   * Detect if running in Eclipse Che environment (via Che endpoint URL).
    */
   private isCheEnvironment(): boolean {
     if (typeof window === 'undefined') return false;
@@ -188,6 +196,14 @@ export class IframeRendererComponent implements OnChanges {
       window.location.hostname.includes('.devspaces.') ||
       window.location.hostname.includes('.code.ethosengine.com')
     );
+  }
+
+  /**
+   * Detect local development environment.
+   */
+  private isLocalDevelopment(): boolean {
+    if (typeof window === 'undefined') return false;
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   }
 
   /**
