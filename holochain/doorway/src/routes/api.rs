@@ -98,6 +98,8 @@ fn json_response(data: Vec<u8>) -> Response<Full<Bytes>> {
         .header("Content-Type", "application/json")
         .header("Cache-Control", "public, max-age=60")
         .header("Access-Control-Allow-Origin", "*")
+        // Required for COEP: require-corp in Angular app
+        .header("Cross-Origin-Resource-Policy", "cross-origin")
         .body(Full::new(Bytes::from(data)))
         .unwrap()
 }

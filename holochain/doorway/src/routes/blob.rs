@@ -264,6 +264,8 @@ async fn handle_full_content(
         .header(header::ETAG, &entry.etag)
         .header(header::ACCEPT_RANGES, "bytes")
         .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+        // Required for COEP: require-corp in Angular app
+        .header("Cross-Origin-Resource-Policy", "cross-origin")
         .body(Full::new(Bytes::from(entry.data)))
         .unwrap())
 }
@@ -302,6 +304,8 @@ async fn handle_range_request(
         .header(header::ETAG, &etag)
         .header(header::ACCEPT_RANGES, "bytes")
         .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+        // Required for COEP: require-corp in Angular app
+        .header("Cross-Origin-Resource-Policy", "cross-origin")
         .body(Full::new(data))
         .unwrap())
 }
@@ -326,6 +330,8 @@ async fn handle_head_blob(
         .header(header::CONTENT_LENGTH, entry.data.len())
         .header(header::ETAG, &entry.etag)
         .header(header::ACCEPT_RANGES, "bytes")
+        // Required for COEP: require-corp in Angular app
+        .header("Cross-Origin-Resource-Policy", "cross-origin")
         .body(Full::new(Bytes::new()))
         .unwrap())
 }
@@ -499,6 +505,8 @@ async fn handle_head_blob_with_fallback(
             .header(header::CONTENT_LENGTH, entry.data.len())
             .header(header::ETAG, &entry.etag)
             .header(header::ACCEPT_RANGES, "bytes")
+            // Required for COEP: require-corp in Angular app
+            .header("Cross-Origin-Resource-Policy", "cross-origin")
             .body(Full::new(Bytes::new()))
             .unwrap());
     }
@@ -512,6 +520,8 @@ async fn handle_head_blob_with_fallback(
                 .header(header::CONTENT_TYPE, &manifest.mime_type)
                 .header(header::CONTENT_LENGTH, manifest.total_size as usize)
                 .header(header::ACCEPT_RANGES, "bytes")
+                // Required for COEP: require-corp in Angular app
+                .header("Cross-Origin-Resource-Policy", "cross-origin")
                 .body(Full::new(Bytes::new()))
                 .unwrap());
         }

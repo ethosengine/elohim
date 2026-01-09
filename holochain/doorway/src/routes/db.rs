@@ -165,6 +165,8 @@ async fn forward_db_request(
                         .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
                         .header("Content-Type", content_type)
                         .header("Access-Control-Allow-Origin", "*")
+                        // Required for COEP: require-corp in Angular app
+                        .header("Cross-Origin-Resource-Policy", "cross-origin")
                         .body(Full::new(Bytes::from(body.to_vec())))
                         .unwrap()
                 }
