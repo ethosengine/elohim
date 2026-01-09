@@ -6,7 +6,7 @@ use tracing::info;
 use crate::error::StorageError;
 
 /// Current schema version for migrations
-pub const SCHEMA_VERSION: i32 = 2;
+pub const SCHEMA_VERSION: i32 = 3;
 
 /// Initialize the database schema
 pub fn init_schema(conn: &Connection) -> Result<(), StorageError> {
@@ -76,6 +76,20 @@ fn migrate_schema(conn: &Connection, from_version: i32) -> Result<(), StorageErr
         conn.execute("ALTER TABLE content ADD COLUMN content_body TEXT", [])
             .map_err(|e| StorageError::Internal(format!("Failed to add content_body column: {}", e)))?;
         current = 2;
+    }
+
+    // Migration: v2 -> v3: Add relationships, knowledge_maps, path_extensions tables
+    if current == 2 {
+        info!("Migrating v2 -> v3: Adding graph/relationship tables");
+        conn.execute_batch(RELATIONSHIPS_SCHEMA)
+            .map_err(|e| StorageError::Internal(format!("Failed to create relationships table: {}", e)))?;
+        conn.execute_batch(KNOWLEDGE_MAPS_SCHEMA)
+            .map_err(|e| StorageError::Internal(format!("Failed to create knowledge_maps table: {}", e)))?;
+        conn.execute_batch(PATH_EXTENSIONS_SCHEMA)
+            .map_err(|e| StorageError::Internal(format!("Failed to create path_extensions table: {}", e)))?;
+        conn.execute_batch(GRAPH_INDEXES_SCHEMA)
+            .map_err(|e| StorageError::Internal(format!("Failed to create graph indexes: {}", e)))?;
+        current = 3;
     }
 
     set_schema_version(conn, current)?;
@@ -237,4 +251,99 @@ CREATE INDEX IF NOT EXISTS idx_steps_order ON steps(path_id, order_index);
 -- Chapter indexes
 CREATE INDEX IF NOT EXISTS idx_chapters_path_id ON chapters(path_id);
 CREATE INDEX IF NOT EXISTS idx_chapters_order ON chapters(path_id, order_index);
+"#;
+
+// =============================================================================
+// Schema V3: Graph/Relationship Tables
+// =============================================================================
+
+/// Relationships table schema - content graph edges
+const RELATIONSHIPS_SCHEMA: &str = r#"
+-- Content relationships (edges in the knowledge graph)
+CREATE TABLE IF NOT EXISTS relationships (
+    id TEXT PRIMARY KEY NOT NULL,
+    source_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    relationship_type TEXT NOT NULL,  -- RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
+    confidence REAL NOT NULL DEFAULT 1.0,  -- 0.0 - 1.0
+    inference_source TEXT NOT NULL DEFAULT 'explicit',  -- explicit, path, tag, semantic
+    metadata_json TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+    -- No FK constraint on source_id/target_id as content may be seeded separately
+    UNIQUE(source_id, target_id, relationship_type)
+);
+"#;
+
+/// Knowledge maps table schema - user's personalized domain maps
+const KNOWLEDGE_MAPS_SCHEMA: &str = r#"
+-- Knowledge maps (domain, self, person, collective)
+CREATE TABLE IF NOT EXISTS knowledge_maps (
+    id TEXT PRIMARY KEY NOT NULL,
+    map_type TEXT NOT NULL,  -- domain, self, person, collective
+    owner_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    subject_type TEXT NOT NULL,
+    subject_id TEXT NOT NULL,
+    subject_name TEXT NOT NULL,
+    visibility TEXT NOT NULL DEFAULT 'private',
+    shared_with_json TEXT,  -- Array of agent IDs
+    nodes_json TEXT NOT NULL,  -- Graph node data
+    path_ids_json TEXT,  -- Associated learning paths
+    overall_affinity REAL NOT NULL DEFAULT 0.0,
+    content_graph_id TEXT,  -- Reference to base content graph
+    mastery_levels_json TEXT,  -- Per-node mastery data
+    goals_json TEXT,  -- Learning goals
+    metadata_json TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+"#;
+
+/// Path extensions table schema - user customizations to paths
+const PATH_EXTENSIONS_SCHEMA: &str = r#"
+-- Path extensions (user customizations/forks)
+CREATE TABLE IF NOT EXISTS path_extensions (
+    id TEXT PRIMARY KEY NOT NULL,
+    base_path_id TEXT NOT NULL,
+    base_path_version TEXT NOT NULL,
+    extended_by TEXT NOT NULL,  -- Agent ID who created the extension
+    title TEXT NOT NULL,
+    description TEXT,
+    insertions_json TEXT,  -- Added steps
+    annotations_json TEXT,  -- Notes on steps
+    reorderings_json TEXT,  -- Step reordering
+    exclusions_json TEXT,  -- Removed steps
+    visibility TEXT NOT NULL DEFAULT 'private',
+    shared_with_json TEXT,  -- Array of agent IDs
+    forked_from TEXT,  -- Another extension this forked from
+    forks_json TEXT,  -- Extensions that forked from this
+    upstream_proposal_json TEXT,  -- Proposal to merge upstream
+    stats_json TEXT,  -- Usage statistics
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+    FOREIGN KEY (base_path_id) REFERENCES paths(id) ON DELETE CASCADE
+);
+"#;
+
+/// Indexes for graph tables
+const GRAPH_INDEXES_SCHEMA: &str = r#"
+-- Relationship indexes
+CREATE INDEX IF NOT EXISTS idx_relationships_source ON relationships(source_id);
+CREATE INDEX IF NOT EXISTS idx_relationships_target ON relationships(target_id);
+CREATE INDEX IF NOT EXISTS idx_relationships_type ON relationships(relationship_type);
+CREATE INDEX IF NOT EXISTS idx_relationships_source_type ON relationships(source_id, relationship_type);
+
+-- Knowledge map indexes
+CREATE INDEX IF NOT EXISTS idx_knowledge_maps_owner ON knowledge_maps(owner_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_maps_type ON knowledge_maps(map_type);
+CREATE INDEX IF NOT EXISTS idx_knowledge_maps_subject ON knowledge_maps(subject_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_maps_visibility ON knowledge_maps(visibility);
+
+-- Path extension indexes
+CREATE INDEX IF NOT EXISTS idx_path_extensions_base ON path_extensions(base_path_id);
+CREATE INDEX IF NOT EXISTS idx_path_extensions_extended_by ON path_extensions(extended_by);
+CREATE INDEX IF NOT EXISTS idx_path_extensions_visibility ON path_extensions(visibility);
 "#;

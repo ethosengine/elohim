@@ -349,6 +349,79 @@ export class ElohimClient {
     return this.writeBuffer.backpressure();
   }
 
+  // === Raw HTTP Operations ===
+
+  /**
+   * Make a raw HTTP request to elohim-storage
+   *
+   * Useful for endpoints not covered by the standard get/query methods.
+   * Automatically handles mode detection and authentication.
+   *
+   * @param path - API path (e.g., '/db/relationships')
+   * @param options - Optional fetch options
+   * @returns Parsed JSON response or null on 404
+   */
+  async fetch<T>(path: string, options?: RequestInit): Promise<T | null> {
+    switch (this.mode.type) {
+      case 'browser':
+        return this.fetchFromProjection<T>(this.mode, path, options);
+
+      case 'tauri':
+        return this.fetchFromTauri<T>(this.mode, path, options);
+    }
+  }
+
+  private async fetchFromProjection<T>(
+    mode: BrowserMode,
+    path: string,
+    options?: RequestInit
+  ): Promise<T | null> {
+    const url = `${mode.doorway.url}${path}`;
+
+    const headers: Record<string, string> = {
+      ...(options?.headers as Record<string, string>),
+    };
+    if (mode.doorway.apiKey) {
+      headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
+    }
+
+    const response = await fetch(url, { ...options, headers });
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`HTTP ${response.status} - ${body}`);
+    }
+
+    return response.json() as Promise<T>;
+  }
+
+  private async fetchFromTauri<T>(
+    mode: TauriMode,
+    path: string,
+    options?: RequestInit
+  ): Promise<T | null> {
+    // For Tauri mode, we call the local storage HTTP server
+    const storageUrl = mode.storageUrl ?? 'http://localhost:8090';
+    const url = `${storageUrl}${path}`;
+
+    const response = await fetch(url, options);
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`HTTP ${response.status} - ${body}`);
+    }
+
+    return response.json() as Promise<T>;
+  }
+
   // === Private Implementation ===
 
   private getDefaultBufferConfig(): WriteBufferConfig {

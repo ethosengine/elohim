@@ -999,6 +999,22 @@ impl HttpServer {
     /// - GET /db/paths/{id} - Get path by ID with steps
     /// - POST /db/paths - Create single path
     /// - POST /db/paths/bulk - Bulk create paths
+    /// - GET /db/relationships - List relationships (with query params)
+    /// - GET /db/relationships/{id} - Get relationship by ID
+    /// - POST /db/relationships - Create relationship
+    /// - POST /db/relationships/bulk - Bulk create relationships
+    /// - GET /db/relationships/graph/{content_id} - Get content graph
+    /// - GET /db/knowledge-maps - List knowledge maps
+    /// - GET /db/knowledge-maps/{id} - Get knowledge map by ID
+    /// - POST /db/knowledge-maps - Create knowledge map
+    /// - PUT /db/knowledge-maps/{id} - Update knowledge map
+    /// - DELETE /db/knowledge-maps/{id} - Delete knowledge map
+    /// - GET /db/path-extensions - List path extensions
+    /// - GET /db/path-extensions/{id} - Get path extension by ID
+    /// - POST /db/path-extensions - Create path extension
+    /// - PUT /db/path-extensions/{id} - Update path extension
+    /// - DELETE /db/path-extensions/{id} - Delete path extension
+    ///
     /// Extract app context from path, supporting both:
     /// - New: /db/{app_id}/content/... -> AppContext(app_id)
     /// - Legacy: /db/content/... -> AppContext("lamad") for backwards compatibility
@@ -1071,6 +1087,41 @@ impl HttpServer {
 
         if let Some(path_id) = resource_path.strip_prefix("paths/") {
             return self.handle_db_path_by_id(req, method, path_id, &content_db).await;
+        }
+
+        // Relationships routes
+        if resource_path == "relationships" {
+            return self.handle_db_relationships_list(req, method, &content_db).await;
+        }
+
+        if resource_path == "relationships/bulk" {
+            return self.handle_db_relationships_bulk(req, method, &content_db).await;
+        }
+
+        if let Some(rel_id) = resource_path.strip_prefix("relationships/graph/") {
+            return self.handle_db_content_graph(req, method, rel_id, &content_db).await;
+        }
+
+        if let Some(rel_id) = resource_path.strip_prefix("relationships/") {
+            return self.handle_db_relationship_by_id(req, method, rel_id, &content_db).await;
+        }
+
+        // Knowledge maps routes
+        if resource_path == "knowledge-maps" {
+            return self.handle_db_knowledge_maps_list(req, method, &content_db).await;
+        }
+
+        if let Some(map_id) = resource_path.strip_prefix("knowledge-maps/") {
+            return self.handle_db_knowledge_map_by_id(req, method, map_id, &content_db).await;
+        }
+
+        // Path extensions routes
+        if resource_path == "path-extensions" {
+            return self.handle_db_path_extensions_list(req, method, &content_db).await;
+        }
+
+        if let Some(ext_id) = resource_path.strip_prefix("path-extensions/") {
+            return self.handle_db_path_extension_by_id(req, method, ext_id, &content_db).await;
         }
 
         Ok(Response::builder()
@@ -1535,6 +1586,691 @@ impl HttpServer {
                             .unwrap()),
                         Err(e) => {
                             error!(error = %e, path_id = %path_id, "Failed to delete path");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap()),
+        }
+    }
+
+    // =========================================================================
+    // Relationship handlers
+    // =========================================================================
+
+    /// GET /db/relationships - List relationships, POST - Create relationship
+    async fn handle_db_relationships_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        match method {
+            Method::GET => {
+                let query_str = req.uri().query().unwrap_or("");
+                let params: std::collections::HashMap<String, String> =
+                    url::form_urlencoded::parse(query_str.as_bytes())
+                        .into_owned()
+                        .collect();
+
+                let query = db::relationships::RelationshipQuery {
+                    content_id: params.get("content_id").cloned(),
+                    direction: params.get("direction").cloned(),
+                    relationship_type: params.get("relationship_type").cloned(),
+                    limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
+                    offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+                };
+
+                content_db.with_conn(|conn| {
+                    match db::relationships::list_relationships(conn, &query) {
+                        Ok(items) => {
+                            let body = serde_json::json!({
+                                "items": items,
+                                "count": items.len(),
+                                "limit": query.limit,
+                                "offset": query.offset,
+                            });
+
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body.to_string())))
+                                .unwrap())
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to list relationships");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            Method::POST => {
+                let body = req.collect().await.map_err(|e| {
+                    StorageError::Internal(format!("Failed to read body: {}", e))
+                })?;
+                let body_bytes = body.to_bytes();
+
+                let input: db::relationships::CreateRelationshipInput = serde_json::from_slice(&body_bytes)
+                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+                content_db.with_conn_mut(|conn| {
+                    match db::relationships::create_relationship(conn, input) {
+                        Ok(rel) => {
+                            let body = serde_json::to_string(&rel)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                            Ok(Response::builder()
+                                .status(StatusCode::CREATED)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to create relationship");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap()),
+        }
+    }
+
+    /// POST /db/relationships/bulk - Bulk create relationships
+    async fn handle_db_relationships_bulk(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap());
+        }
+
+        let body = req.collect().await.map_err(|e| {
+            StorageError::Internal(format!("Failed to read body: {}", e))
+        })?;
+        let body_bytes = body.to_bytes();
+
+        let inputs: Vec<db::relationships::CreateRelationshipInput> = serde_json::from_slice(&body_bytes)
+            .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+        content_db.with_conn_mut(|conn| {
+            match db::relationships::bulk_create_relationships(conn, inputs) {
+                Ok(result) => {
+                    let body = serde_json::to_string(&result)
+                        .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                    Ok(Response::builder()
+                        .status(StatusCode::OK)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(body)))
+                        .unwrap())
+                }
+                Err(e) => {
+                    error!(error = %e, "Failed to bulk create relationships");
+                    Ok(Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                        .unwrap())
+                }
+            }
+        })
+    }
+
+    /// GET /db/relationships/graph/{content_id} - Get content graph
+    async fn handle_db_content_graph(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        content_id: &str,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap());
+        }
+
+        let query_str = req.uri().query().unwrap_or("");
+        let params: std::collections::HashMap<String, String> =
+            url::form_urlencoded::parse(query_str.as_bytes())
+                .into_owned()
+                .collect();
+
+        let relationship_types: Option<Vec<String>> = params.get("types")
+            .map(|s| s.split(',').map(|t| t.trim().to_string()).collect());
+
+        content_db.with_conn(|conn| {
+            match db::relationships::get_content_graph(conn, content_id, relationship_types.as_deref()) {
+                Ok(graph) => {
+                    let body = serde_json::to_string(&graph)
+                        .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                    Ok(Response::builder()
+                        .status(StatusCode::OK)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(body)))
+                        .unwrap())
+                }
+                Err(e) => {
+                    error!(error = %e, content_id = %content_id, "Failed to get content graph");
+                    Ok(Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                        .unwrap())
+                }
+            }
+        })
+    }
+
+    /// GET/DELETE /db/relationships/{id} - Get or delete relationship by ID
+    async fn handle_db_relationship_by_id(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        rel_id: &str,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        match method {
+            Method::GET => {
+                content_db.with_conn(|conn| {
+                    match db::relationships::get_relationship(conn, rel_id) {
+                        Ok(Some(rel)) => {
+                            let body = serde_json::to_string(&rel)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Ok(None) => Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "Relationship not found: {}"}}"#,
+                                rel_id
+                            ))))
+                            .unwrap()),
+                        Err(e) => {
+                            error!(error = %e, rel_id = %rel_id, "Failed to get relationship");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            Method::DELETE => {
+                content_db.with_conn_mut(|conn| {
+                    match db::relationships::delete_relationship(conn, rel_id) {
+                        Ok(true) => Ok(Response::builder()
+                            .status(StatusCode::NO_CONTENT)
+                            .body(Full::new(Bytes::new()))
+                            .unwrap()),
+                        Ok(false) => Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "Relationship not found: {}"}}"#,
+                                rel_id
+                            ))))
+                            .unwrap()),
+                        Err(e) => {
+                            error!(error = %e, rel_id = %rel_id, "Failed to delete relationship");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap()),
+        }
+    }
+
+    // =========================================================================
+    // Knowledge Map handlers
+    // =========================================================================
+
+    /// GET /db/knowledge-maps - List knowledge maps, POST - Create knowledge map
+    async fn handle_db_knowledge_maps_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        match method {
+            Method::GET => {
+                let query_str = req.uri().query().unwrap_or("");
+                let params: std::collections::HashMap<String, String> =
+                    url::form_urlencoded::parse(query_str.as_bytes())
+                        .into_owned()
+                        .collect();
+
+                let query = db::knowledge_maps::KnowledgeMapQuery {
+                    owner_id: params.get("owner_id").cloned(),
+                    map_type: params.get("map_type").cloned(),
+                    subject_id: params.get("subject_id").cloned(),
+                    visibility: params.get("visibility").cloned(),
+                    limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
+                    offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+                };
+
+                content_db.with_conn(|conn| {
+                    match db::knowledge_maps::list_knowledge_maps(conn, &query) {
+                        Ok(items) => {
+                            let body = serde_json::json!({
+                                "items": items,
+                                "count": items.len(),
+                                "limit": query.limit,
+                                "offset": query.offset,
+                            });
+
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body.to_string())))
+                                .unwrap())
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to list knowledge maps");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            Method::POST => {
+                let body = req.collect().await.map_err(|e| {
+                    StorageError::Internal(format!("Failed to read body: {}", e))
+                })?;
+                let body_bytes = body.to_bytes();
+
+                let input: db::knowledge_maps::CreateKnowledgeMapInput = serde_json::from_slice(&body_bytes)
+                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+                content_db.with_conn_mut(|conn| {
+                    match db::knowledge_maps::create_knowledge_map(conn, input) {
+                        Ok(map) => {
+                            let body = serde_json::to_string(&map)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                            Ok(Response::builder()
+                                .status(StatusCode::CREATED)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to create knowledge map");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap()),
+        }
+    }
+
+    /// GET/PUT/DELETE /db/knowledge-maps/{id} - Knowledge map by ID
+    async fn handle_db_knowledge_map_by_id(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        map_id: &str,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        match method {
+            Method::GET => {
+                content_db.with_conn(|conn| {
+                    match db::knowledge_maps::get_knowledge_map(conn, map_id) {
+                        Ok(Some(map)) => {
+                            let body = serde_json::to_string(&map)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Ok(None) => Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "Knowledge map not found: {}"}}"#,
+                                map_id
+                            ))))
+                            .unwrap()),
+                        Err(e) => {
+                            error!(error = %e, map_id = %map_id, "Failed to get knowledge map");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            Method::PUT => {
+                let body = req.collect().await.map_err(|e| {
+                    StorageError::Internal(format!("Failed to read body: {}", e))
+                })?;
+                let body_bytes = body.to_bytes();
+
+                let input: db::knowledge_maps::CreateKnowledgeMapInput = serde_json::from_slice(&body_bytes)
+                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+                content_db.with_conn_mut(|conn| {
+                    match db::knowledge_maps::update_knowledge_map(conn, map_id, input) {
+                        Ok(map) => {
+                            let body = serde_json::to_string(&map)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Err(StorageError::NotFound(_)) => Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "Knowledge map not found: {}"}}"#,
+                                map_id
+                            ))))
+                            .unwrap()),
+                        Err(e) => {
+                            error!(error = %e, map_id = %map_id, "Failed to update knowledge map");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            Method::DELETE => {
+                content_db.with_conn_mut(|conn| {
+                    match db::knowledge_maps::delete_knowledge_map(conn, map_id) {
+                        Ok(true) => Ok(Response::builder()
+                            .status(StatusCode::NO_CONTENT)
+                            .body(Full::new(Bytes::new()))
+                            .unwrap()),
+                        Ok(false) => Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "Knowledge map not found: {}"}}"#,
+                                map_id
+                            ))))
+                            .unwrap()),
+                        Err(e) => {
+                            error!(error = %e, map_id = %map_id, "Failed to delete knowledge map");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap()),
+        }
+    }
+
+    // =========================================================================
+    // Path Extension handlers
+    // =========================================================================
+
+    /// GET /db/path-extensions - List path extensions, POST - Create path extension
+    async fn handle_db_path_extensions_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        match method {
+            Method::GET => {
+                let query_str = req.uri().query().unwrap_or("");
+                let params: std::collections::HashMap<String, String> =
+                    url::form_urlencoded::parse(query_str.as_bytes())
+                        .into_owned()
+                        .collect();
+
+                let query = db::path_extensions::PathExtensionQuery {
+                    base_path_id: params.get("base_path_id").cloned(),
+                    extended_by: params.get("extended_by").cloned(),
+                    visibility: params.get("visibility").cloned(),
+                    forked_from: params.get("forked_from").cloned(),
+                    limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
+                    offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+                };
+
+                content_db.with_conn(|conn| {
+                    match db::path_extensions::list_path_extensions(conn, &query) {
+                        Ok(items) => {
+                            let body = serde_json::json!({
+                                "items": items,
+                                "count": items.len(),
+                                "limit": query.limit,
+                                "offset": query.offset,
+                            });
+
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body.to_string())))
+                                .unwrap())
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to list path extensions");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            Method::POST => {
+                let body = req.collect().await.map_err(|e| {
+                    StorageError::Internal(format!("Failed to read body: {}", e))
+                })?;
+                let body_bytes = body.to_bytes();
+
+                let input: db::path_extensions::CreatePathExtensionInput = serde_json::from_slice(&body_bytes)
+                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+                content_db.with_conn_mut(|conn| {
+                    match db::path_extensions::create_path_extension(conn, input) {
+                        Ok(ext) => {
+                            let body = serde_json::to_string(&ext)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                            Ok(Response::builder()
+                                .status(StatusCode::CREATED)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to create path extension");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
+                .unwrap()),
+        }
+    }
+
+    /// GET/PUT/DELETE /db/path-extensions/{id} - Path extension by ID
+    async fn handle_db_path_extension_by_id(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ext_id: &str,
+        content_db: &ContentDb,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        match method {
+            Method::GET => {
+                content_db.with_conn(|conn| {
+                    match db::path_extensions::get_path_extension(conn, ext_id) {
+                        Ok(Some(ext)) => {
+                            let body = serde_json::to_string(&ext)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Ok(None) => Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "Path extension not found: {}"}}"#,
+                                ext_id
+                            ))))
+                            .unwrap()),
+                        Err(e) => {
+                            error!(error = %e, ext_id = %ext_id, "Failed to get path extension");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            Method::PUT => {
+                let body = req.collect().await.map_err(|e| {
+                    StorageError::Internal(format!("Failed to read body: {}", e))
+                })?;
+                let body_bytes = body.to_bytes();
+
+                let input: db::path_extensions::CreatePathExtensionInput = serde_json::from_slice(&body_bytes)
+                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+                content_db.with_conn_mut(|conn| {
+                    match db::path_extensions::update_path_extension(conn, ext_id, input) {
+                        Ok(ext) => {
+                            let body = serde_json::to_string(&ext)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+                            Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Err(StorageError::NotFound(_)) => Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "Path extension not found: {}"}}"#,
+                                ext_id
+                            ))))
+                            .unwrap()),
+                        Err(e) => {
+                            error!(error = %e, ext_id = %ext_id, "Failed to update path extension");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
+                        }
+                    }
+                })
+            }
+            Method::DELETE => {
+                content_db.with_conn_mut(|conn| {
+                    match db::path_extensions::delete_path_extension(conn, ext_id) {
+                        Ok(true) => Ok(Response::builder()
+                            .status(StatusCode::NO_CONTENT)
+                            .body(Full::new(Bytes::new()))
+                            .unwrap()),
+                        Ok(false) => Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                r#"{{"error": "Path extension not found: {}"}}"#,
+                                ext_id
+                            ))))
+                            .unwrap()),
+                        Err(e) => {
+                            error!(error = %e, ext_id = %ext_id, "Failed to delete path extension");
                             Ok(Response::builder()
                                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                                 .header(header::CONTENT_TYPE, "application/json")

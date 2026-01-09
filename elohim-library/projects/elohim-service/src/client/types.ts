@@ -73,6 +73,11 @@ export interface TauriMode {
   /** Tauri invoke function for IPC calls to local elohim-storage */
   invoke: TauriInvoke;
   /**
+   * URL to local elohim-storage HTTP server (optional)
+   * Defaults to 'http://localhost:8090'
+   */
+  storageUrl?: string;
+  /**
    * Doorway config for public sync (optional)
    * Used when your personal nodes are unavailable.
    */

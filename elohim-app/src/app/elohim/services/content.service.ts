@@ -42,6 +42,123 @@ export interface PathFilters {
   offset?: number;
 }
 
+// =============================================================================
+// Relationship/Graph Types
+// =============================================================================
+
+/**
+ * Content relationship (edge in knowledge graph)
+ */
+export interface Relationship {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  relationshipType: string;  // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
+  confidence: number;
+  inferenceSource: string;   // explicit, path, tag, semantic
+  metadata?: Record<string, any>;
+  createdAt?: string;
+}
+
+/**
+ * Content graph node
+ */
+export interface ContentGraphNode {
+  contentId: string;
+  relationshipType: string;
+  confidence: number;
+  children: ContentGraphNode[];
+}
+
+/**
+ * Content graph from a root node
+ */
+export interface ContentGraph {
+  rootId: string;
+  related: ContentGraphNode[];
+  totalNodes: number;
+}
+
+// =============================================================================
+// Knowledge Map Types
+// =============================================================================
+
+/**
+ * Knowledge map (domain, self, person, collective)
+ */
+export interface KnowledgeMap {
+  id: string;
+  mapType: string;
+  ownerId: string;
+  title: string;
+  description?: string;
+  subjectType: string;
+  subjectId: string;
+  subjectName: string;
+  visibility: string;
+  sharedWith?: string[];
+  nodes: any;  // Graph node data
+  pathIds?: string[];
+  overallAffinity: number;
+  contentGraphId?: string;
+  masteryLevels?: Record<string, number>;
+  goals?: any[];
+  metadata?: Record<string, any>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Knowledge map query filters
+ */
+export interface KnowledgeMapFilters {
+  ownerId?: string;
+  mapType?: string;
+  subjectId?: string;
+  visibility?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// =============================================================================
+// Path Extension Types
+// =============================================================================
+
+/**
+ * Path extension (user customization/fork)
+ */
+export interface PathExtension {
+  id: string;
+  basePathId: string;
+  basePathVersion: string;
+  extendedBy: string;
+  title: string;
+  description?: string;
+  insertions?: any[];
+  annotations?: any[];
+  reorderings?: any[];
+  exclusions?: string[];
+  visibility: string;
+  sharedWith?: string[];
+  forkedFrom?: string;
+  forks?: string[];
+  upstreamProposal?: any;
+  stats?: any;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Path extension query filters
+ */
+export interface PathExtensionFilters {
+  basePathId?: string;
+  extendedBy?: string;
+  visibility?: string;
+  limit?: number;
+  offset?: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ContentService {
   private readonly client: ElohimClient = inject(ELOHIM_CLIENT);
@@ -179,6 +296,128 @@ export class ContentService {
    */
   getAllPaths(limit = 100): Observable<LearningPath[]> {
     return this.queryPaths({ visibility: 'public', limit });
+  }
+
+  // =========================================================================
+  // Relationship/Graph Operations
+  // =========================================================================
+
+  /**
+   * Get relationships for a content node
+   */
+  getRelationships(
+    contentId: string,
+    direction: 'outgoing' | 'incoming' | 'both' = 'both',
+    relationshipType?: string,
+  ): Observable<Relationship[]> {
+    const params = new URLSearchParams({
+      content_id: contentId,
+      direction,
+    });
+    if (relationshipType) {
+      params.set('relationship_type', relationshipType);
+    }
+
+    return from(this.client.fetch<{ items: any[] }>(`/db/relationships?${params}`)).pipe(
+      map(response => (response?.items || []).map(r => this.transformRelationship(r))),
+      catchError(err => {
+        console.debug('[ContentService] getRelationships failed:', err);
+        return of([]);
+      }),
+    );
+  }
+
+  /**
+   * Get content graph starting from a root node
+   */
+  getContentGraph(contentId: string, relationshipTypes?: string[]): Observable<ContentGraph | null> {
+    let url = `/db/relationships/graph/${contentId}`;
+    if (relationshipTypes?.length) {
+      url += `?types=${relationshipTypes.join(',')}`;
+    }
+
+    return from(this.client.fetch<any>(url)).pipe(
+      map(data => data ? this.transformContentGraph(data) : null),
+      catchError(err => {
+        console.debug(`[ContentService] getContentGraph(${contentId}) failed:`, err);
+        return of(null);
+      }),
+    );
+  }
+
+  // =========================================================================
+  // Knowledge Map Operations
+  // =========================================================================
+
+  /**
+   * Get a knowledge map by ID
+   */
+  getKnowledgeMap(id: string): Observable<KnowledgeMap | null> {
+    return from(this.client.fetch<any>(`/db/knowledge-maps/${id}`)).pipe(
+      map(data => data ? this.transformKnowledgeMap(data) : null),
+      catchError(err => {
+        console.debug(`[ContentService] getKnowledgeMap(${id}) failed:`, err);
+        return of(null);
+      }),
+    );
+  }
+
+  /**
+   * Query knowledge maps
+   */
+  queryKnowledgeMaps(filters: KnowledgeMapFilters): Observable<KnowledgeMap[]> {
+    const params = new URLSearchParams();
+    if (filters.ownerId) params.set('owner_id', filters.ownerId);
+    if (filters.mapType) params.set('map_type', filters.mapType);
+    if (filters.subjectId) params.set('subject_id', filters.subjectId);
+    if (filters.visibility) params.set('visibility', filters.visibility);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    if (filters.offset) params.set('offset', String(filters.offset));
+
+    return from(this.client.fetch<{ items: any[] }>(`/db/knowledge-maps?${params}`)).pipe(
+      map(response => (response?.items || []).map((m: any) => this.transformKnowledgeMap(m))),
+      catchError(err => {
+        console.debug('[ContentService] queryKnowledgeMaps failed:', err);
+        return of([]);
+      }),
+    );
+  }
+
+  // =========================================================================
+  // Path Extension Operations
+  // =========================================================================
+
+  /**
+   * Get a path extension by ID
+   */
+  getPathExtension(id: string): Observable<PathExtension | null> {
+    return from(this.client.fetch<any>(`/db/path-extensions/${id}`)).pipe(
+      map(data => data ? this.transformPathExtension(data) : null),
+      catchError(err => {
+        console.debug(`[ContentService] getPathExtension(${id}) failed:`, err);
+        return of(null);
+      }),
+    );
+  }
+
+  /**
+   * Query path extensions
+   */
+  queryPathExtensions(filters: PathExtensionFilters): Observable<PathExtension[]> {
+    const params = new URLSearchParams();
+    if (filters.basePathId) params.set('base_path_id', filters.basePathId);
+    if (filters.extendedBy) params.set('extended_by', filters.extendedBy);
+    if (filters.visibility) params.set('visibility', filters.visibility);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    if (filters.offset) params.set('offset', String(filters.offset));
+
+    return from(this.client.fetch<{ items: any[] }>(`/db/path-extensions?${params}`)).pipe(
+      map(response => (response?.items || []).map((e: any) => this.transformPathExtension(e))),
+      catchError(err => {
+        console.debug('[ContentService] queryPathExtensions failed:', err);
+        return of([]);
+      }),
+    );
   }
 
   // =========================================================================
@@ -363,5 +602,97 @@ export class ContentService {
     }
 
     return result;
+  }
+
+  /**
+   * Transform raw relationship data
+   */
+  private transformRelationship(data: any): Relationship {
+    return {
+      id: data.id,
+      sourceId: data.source_id || data.sourceId,
+      targetId: data.target_id || data.targetId,
+      relationshipType: data.relationship_type || data.relationshipType,
+      confidence: data.confidence ?? 1.0,
+      inferenceSource: data.inference_source || data.inferenceSource || 'explicit',
+      metadata: data.metadata_json ? JSON.parse(data.metadata_json) : data.metadata,
+      createdAt: data.created_at || data.createdAt,
+    };
+  }
+
+  /**
+   * Transform raw content graph data
+   */
+  private transformContentGraph(data: any): ContentGraph {
+    return {
+      rootId: data.root_id || data.rootId,
+      related: (data.related || []).map((node: any) => this.transformContentGraphNode(node)),
+      totalNodes: data.total_nodes || data.totalNodes || 0,
+    };
+  }
+
+  /**
+   * Transform content graph node recursively
+   */
+  private transformContentGraphNode(data: any): ContentGraphNode {
+    return {
+      contentId: data.content_id || data.contentId,
+      relationshipType: data.relationship_type || data.relationshipType,
+      confidence: data.confidence ?? 1.0,
+      children: (data.children || []).map((child: any) => this.transformContentGraphNode(child)),
+    };
+  }
+
+  /**
+   * Transform raw knowledge map data
+   */
+  private transformKnowledgeMap(data: any): KnowledgeMap {
+    return {
+      id: data.id,
+      mapType: data.map_type || data.mapType,
+      ownerId: data.owner_id || data.ownerId,
+      title: data.title || '',
+      description: data.description,
+      subjectType: data.subject_type || data.subjectType,
+      subjectId: data.subject_id || data.subjectId,
+      subjectName: data.subject_name || data.subjectName,
+      visibility: data.visibility || 'private',
+      sharedWith: data.shared_with_json ? JSON.parse(data.shared_with_json) : data.sharedWith,
+      nodes: data.nodes_json ? JSON.parse(data.nodes_json) : data.nodes,
+      pathIds: data.path_ids_json ? JSON.parse(data.path_ids_json) : data.pathIds,
+      overallAffinity: data.overall_affinity ?? data.overallAffinity ?? 0,
+      contentGraphId: data.content_graph_id || data.contentGraphId,
+      masteryLevels: data.mastery_levels_json ? JSON.parse(data.mastery_levels_json) : data.masteryLevels,
+      goals: data.goals_json ? JSON.parse(data.goals_json) : data.goals,
+      metadata: data.metadata_json ? JSON.parse(data.metadata_json) : data.metadata,
+      createdAt: data.created_at || data.createdAt,
+      updatedAt: data.updated_at || data.updatedAt,
+    };
+  }
+
+  /**
+   * Transform raw path extension data
+   */
+  private transformPathExtension(data: any): PathExtension {
+    return {
+      id: data.id,
+      basePathId: data.base_path_id || data.basePathId,
+      basePathVersion: data.base_path_version || data.basePathVersion,
+      extendedBy: data.extended_by || data.extendedBy,
+      title: data.title || '',
+      description: data.description,
+      insertions: data.insertions_json ? JSON.parse(data.insertions_json) : data.insertions,
+      annotations: data.annotations_json ? JSON.parse(data.annotations_json) : data.annotations,
+      reorderings: data.reorderings_json ? JSON.parse(data.reorderings_json) : data.reorderings,
+      exclusions: data.exclusions_json ? JSON.parse(data.exclusions_json) : data.exclusions,
+      visibility: data.visibility || 'private',
+      sharedWith: data.shared_with_json ? JSON.parse(data.shared_with_json) : data.sharedWith,
+      forkedFrom: data.forked_from || data.forkedFrom,
+      forks: data.forks_json ? JSON.parse(data.forks_json) : data.forks,
+      upstreamProposal: data.upstream_proposal_json ? JSON.parse(data.upstream_proposal_json) : data.upstreamProposal,
+      stats: data.stats_json ? JSON.parse(data.stats_json) : data.stats,
+      createdAt: data.created_at || data.createdAt,
+      updatedAt: data.updated_at || data.updatedAt,
+    };
   }
 }

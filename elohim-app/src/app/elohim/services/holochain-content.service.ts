@@ -1448,6 +1448,9 @@ export class HolochainContentService {
 
   /**
    * Get relationships for a content node.
+   *
+   * @deprecated Use ContentService.getRelationships() instead.
+   * This method will be removed in a future release.
    */
   async getRelationships(input: GetRelationshipsInput): Promise<HolochainRelationshipOutput[]> {
     const result = await this.holochainClient.callZome<HolochainRelationshipOutput[]>({
@@ -1465,6 +1468,9 @@ export class HolochainContentService {
 
   /**
    * Get content graph starting from a root node.
+   *
+   * @deprecated Use ContentService.getContentGraph() instead.
+   * This method will be removed in a future release.
    */
   async getContentGraph(contentId: string, relationshipTypes?: string[]): Promise<HolochainContentGraph | null> {
     const input: QueryRelatedContentInput = {
@@ -1491,6 +1497,9 @@ export class HolochainContentService {
 
   /**
    * Get a knowledge map by ID.
+   *
+   * @deprecated Use ContentService.getKnowledgeMap() instead.
+   * This method will be removed in a future release.
    */
   async getKnowledgeMapById(id: string): Promise<HolochainKnowledgeMapOutput | null> {
     const result = await this.holochainClient.callZome<HolochainKnowledgeMapOutput | null>({
@@ -1508,6 +1517,9 @@ export class HolochainContentService {
 
   /**
    * Query knowledge maps.
+   *
+   * @deprecated Use ContentService.queryKnowledgeMaps() instead.
+   * This method will be removed in a future release.
    */
   async queryKnowledgeMaps(input: QueryKnowledgeMapsInput): Promise<HolochainKnowledgeMapOutput[]> {
     const result = await this.holochainClient.callZome<HolochainKnowledgeMapOutput[]>({
@@ -1529,6 +1541,9 @@ export class HolochainContentService {
 
   /**
    * Get a path extension by ID.
+   *
+   * @deprecated Use ContentService.getPathExtension() instead.
+   * This method will be removed in a future release.
    */
   async getPathExtensionById(id: string): Promise<HolochainPathExtensionOutput | null> {
     const result = await this.holochainClient.callZome<HolochainPathExtensionOutput | null>({
@@ -1546,6 +1561,9 @@ export class HolochainContentService {
 
   /**
    * Query path extensions.
+   *
+   * @deprecated Use ContentService.queryPathExtensions() instead.
+   * This method will be removed in a future release.
    */
   async queryPathExtensions(input: QueryPathExtensionsInput): Promise<HolochainPathExtensionOutput[]> {
     const result = await this.holochainClient.callZome<HolochainPathExtensionOutput[]>({

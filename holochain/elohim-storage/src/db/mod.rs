@@ -26,6 +26,11 @@ pub mod schema;
 pub mod content;
 pub mod paths;
 
+// Graph/relationship modules (rusqlite, new in v3)
+pub mod relationships;
+pub mod knowledge_maps;
+pub mod path_extensions;
+
 // New Diesel modules with app scoping
 pub mod context;
 pub mod diesel_schema;
