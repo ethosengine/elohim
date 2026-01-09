@@ -33,6 +33,69 @@ const CONTENT_ONLY = args.includes('--content-only') || process.env.CONTENT_ONLY
 const PATHS_ONLY = args.includes('--paths-only') || process.env.PATHS_ONLY === 'true';
 
 // ============================================================================
+// Value Normalizers (map legacy/variant values to valid backend enums)
+// ============================================================================
+
+/** Valid content formats accepted by elohim-storage */
+const VALID_CONTENT_FORMATS = [
+  'markdown', 'html', 'json', 'text', 'perseus', 'gherkin',
+  'yaml', 'toml', 'latex', 'asciidoc', 'html5-app', 'iframe', 'embed'
+];
+
+/** Map legacy/variant content formats to valid values */
+function normalizeContentFormat(format: string | undefined): string {
+  if (!format) return 'markdown';
+
+  const normalized = format.toLowerCase();
+
+  // Map variants to canonical values
+  const mappings: Record<string, string> = {
+    'perseus-quiz-json': 'perseus',
+    'perseus-quiz': 'perseus',
+    'quiz-json': 'perseus',
+    'md': 'markdown',
+    'htm': 'html',
+    'txt': 'text',
+  };
+
+  if (mappings[normalized]) return mappings[normalized];
+  if (VALID_CONTENT_FORMATS.includes(normalized)) return normalized;
+
+  // Default to markdown for unknown formats
+  console.warn(`   ⚠️ Unknown content_format '${format}', defaulting to 'markdown'`);
+  return 'markdown';
+}
+
+/** Valid step types accepted by elohim-storage */
+const VALID_STEP_TYPES = [
+  'learn', 'practice', 'quiz', 'assessment', 'discussion',
+  'project', 'resource', 'video', 'reading', 'checkpoint'
+];
+
+/** Map legacy/variant step types to valid values */
+function normalizeStepType(stepType: string | undefined): string {
+  if (!stepType) return 'learn';
+
+  const normalized = stepType.toLowerCase();
+
+  // Map variants to canonical values
+  const mappings: Record<string, string> = {
+    'content': 'learn',
+    'assess': 'assessment',
+    'test': 'quiz',
+    'watch': 'video',
+    'read': 'reading',
+  };
+
+  if (mappings[normalized]) return mappings[normalized];
+  if (VALID_STEP_TYPES.includes(normalized)) return normalized;
+
+  // Default to learn for unknown types
+  console.warn(`   ⚠️ Unknown step_type '${stepType}', defaulting to 'learn'`);
+  return 'learn';
+}
+
+// ============================================================================
 // Types (matching elohim-storage db schema)
 // ============================================================================
 
@@ -264,7 +327,7 @@ function transformContent(json: ConceptJson): CreateContentInput {
     title: json.title,
     description: json.description || undefined,
     content_type: json.contentType || 'concept',
-    content_format: json.contentFormat || 'markdown',
+    content_format: normalizeContentFormat(json.contentFormat),
     content_body: contentBody,
     content_size_bytes: contentSizeBytes,
     metadata_json: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
@@ -387,7 +450,7 @@ function transformPath(json: PathJson): CreatePathInput {
             chapter_id: chapter.id,
             title: step.stepTitle || step.resourceId || `Step ${stepIndex + 1}`,
             description: step.stepNarrative,
-            step_type: step.stepType === 'content' ? 'learn' : (step.stepType || 'learn'),
+            step_type: normalizeStepType(step.stepType),
             resource_id: step.resourceId,
             resource_type: 'content',
             order_index: step.order ?? stepIndex,
