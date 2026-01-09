@@ -17,8 +17,9 @@ import { Observable, catchError, map, of, throwError, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import type { IConnectionStrategy, ConnectionConfig } from '@elohim/service/connection';
+import type { ListResponse, BulkCreateResult } from '../models/storage-response.model';
 
-/** Content node from storage */
+/** Content node from storage (matches backend ContentWithTags) */
 export interface StorageContentNode {
   id: string;
   content_type: string;
@@ -32,6 +33,11 @@ export interface StorageContentNode {
   tags: string[];
   created_at: string;
   updated_at: string;
+  // Additional fields from backend
+  reach?: string;              // visibility scope (commons, private, etc.)
+  validation_status?: string;  // draft, approved, etc.
+  created_by?: string;         // agent who created the content
+  content_size_bytes?: number; // size of blob content
 }
 
 /** Path from storage */
@@ -56,6 +62,19 @@ export interface ContentFilter {
   tags?: string[];
   limit?: number;
   offset?: number;
+}
+
+/** Relationship between content nodes */
+export interface StorageRelationship {
+  id?: string;               // Optional for creates
+  source_id: string;
+  target_id: string;
+  relationship_type: string; // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
+  confidence?: number;       // 0.0-1.0
+  inference_source?: string; // explicit, path, tag, semantic
+  metadata_json?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 @Injectable({
@@ -136,8 +155,10 @@ export class StorageClientService {
 
   /**
    * Query content nodes with filters.
+   * @endpoint GET /db/content
+   * @returns ListResponse with items, count, limit, offset
    */
-  queryContent(filter: ContentFilter = {}): Observable<StorageContentNode[]> {
+  queryContent(filter: ContentFilter = {}): Observable<ListResponse<StorageContentNode>> {
     const baseUrl = this.getStorageBaseUrl();
     const params = new URLSearchParams();
 
@@ -151,7 +172,7 @@ export class StorageClientService {
     const basePath = this.strategy.mode === 'direct' ? '/db/content' : '/api/db/content';
     const url = queryString ? `${baseUrl}${basePath}?${queryString}` : `${baseUrl}${basePath}`;
 
-    return this.http.get<StorageContentNode[]>(url).pipe(
+    return this.http.get<ListResponse<StorageContentNode>>(url).pipe(
       timeout(this.defaultTimeoutMs),
       catchError((error) => this.handleError('queryContent', error))
     );
@@ -181,14 +202,16 @@ export class StorageClientService {
 
   /**
    * Get all paths.
+   * @endpoint GET /db/paths
+   * @returns ListResponse with items, count, limit, offset
    */
-  getAllPaths(): Observable<StoragePath[]> {
+  getAllPaths(): Observable<ListResponse<StoragePath>> {
     const baseUrl = this.getStorageBaseUrl();
     const endpoint = this.strategy.mode === 'direct'
       ? `${baseUrl}/db/paths`
       : `${baseUrl}/api/db/paths`;
 
-    return this.http.get<StoragePath[]>(endpoint).pipe(
+    return this.http.get<ListResponse<StoragePath>>(endpoint).pipe(
       timeout(this.defaultTimeoutMs),
       catchError((error) => this.handleError('getAllPaths', error))
     );
@@ -248,10 +271,68 @@ export class StorageClientService {
 
   /**
    * Handle HTTP errors with consistent logging.
+   * Backend returns errors as: { "error": "message" }
    */
   private handleError(operation: string, error: HttpErrorResponse): Observable<never> {
-    const message = error.error?.message || error.message || 'Unknown error';
-    console.error(`StorageClient.${operation} failed:`, message);
+    const errorBody = error.error;
+    // Backend returns {"error": "..."}, not {"message": "..."}
+    const message = errorBody?.error || errorBody?.message || error.message || 'Request failed';
+    console.error(`StorageClient.${operation} failed:`, message, { status: error.status });
     return throwError(() => new Error(`${operation}: ${message}`));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Bulk Operations
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Bulk create content items.
+   * @endpoint POST /db/content/bulk
+   * @returns BulkCreateResult with inserted/skipped counts
+   */
+  bulkCreateContent(items: Partial<StorageContentNode>[]): Observable<BulkCreateResult> {
+    const baseUrl = this.getStorageBaseUrl();
+    const endpoint = this.strategy.mode === 'direct'
+      ? `${baseUrl}/db/content/bulk`
+      : `${baseUrl}/api/db/content/bulk`;
+
+    return this.http.post<BulkCreateResult>(endpoint, items).pipe(
+      timeout(120000), // 2 min for bulk ops
+      catchError((error) => this.handleError('bulkCreateContent', error))
+    );
+  }
+
+  /**
+   * Bulk create paths.
+   * @endpoint POST /db/paths/bulk
+   * @returns BulkCreateResult with inserted/skipped counts
+   */
+  bulkCreatePaths(items: Partial<StoragePath>[]): Observable<BulkCreateResult> {
+    const baseUrl = this.getStorageBaseUrl();
+    const endpoint = this.strategy.mode === 'direct'
+      ? `${baseUrl}/db/paths/bulk`
+      : `${baseUrl}/api/db/paths/bulk`;
+
+    return this.http.post<BulkCreateResult>(endpoint, items).pipe(
+      timeout(120000),
+      catchError((error) => this.handleError('bulkCreatePaths', error))
+    );
+  }
+
+  /**
+   * Bulk create relationships.
+   * @endpoint POST /db/relationships/bulk
+   * @returns BulkCreateResult with inserted/skipped counts
+   */
+  bulkCreateRelationships(items: StorageRelationship[]): Observable<BulkCreateResult> {
+    const baseUrl = this.getStorageBaseUrl();
+    const endpoint = this.strategy.mode === 'direct'
+      ? `${baseUrl}/db/relationships/bulk`
+      : `${baseUrl}/api/db/relationships/bulk`;
+
+    return this.http.post<BulkCreateResult>(endpoint, items).pipe(
+      timeout(120000),
+      catchError((error) => this.handleError('bulkCreateRelationships', error))
+    );
   }
 }
