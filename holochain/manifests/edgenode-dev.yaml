@@ -203,6 +203,8 @@ spec:
               value: "info,doorway=debug"
             - name: STORAGE_URL
               value: "http://localhost:8090"
+            - name: THRESHOLD_URL
+              value: "http://localhost:8081"
             - name: API_KEY_AUTHENTICATED
               valueFrom:
                 secretKeyRef:
@@ -422,15 +424,8 @@ spec:
     - host: doorway-dev.elohim.host
       http:
         paths:
-          # Operator dashboard (Angular SPA)
-          - path: /operator
-            pathType: Prefix
-            backend:
-              service:
-                name: elohim-edgenode-dev
-                port:
-                  number: 8081
-          # All other traffic to doorway gateway
+          # All traffic through doorway gateway
+          # Doorway handles routing: /threshold/* → doorway-app, /hc/* → conductor
           - path: /
             pathType: Prefix
             backend:

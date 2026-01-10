@@ -15,6 +15,7 @@ pub mod import_ws;
 pub mod seed;
 pub mod status;
 pub mod stream;
+pub mod threshold;
 
 pub use admin::{
     handle_nodes, handle_node_by_id, handle_cluster_metrics,
@@ -37,3 +38,4 @@ pub use seed::{handle_seed_blob, handle_check_blob, BlobUploadResponse};
 pub use status::status_check;
 pub use stream::handle_stream_request;
 pub use debug_stream::{handle_debug_stream, DebugHub, DebugEvent};
+pub use threshold::handle_threshold_request;

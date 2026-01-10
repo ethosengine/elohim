@@ -130,6 +130,12 @@ pub struct Args {
     #[arg(long, env = "STORAGE_URL")]
     pub storage_url: Option<String>,
 
+    /// URL of doorway-app for operator dashboard
+    /// (e.g., "http://localhost:8081")
+    /// Doorway proxies /threshold/* requests here
+    #[arg(long, env = "THRESHOLD_URL", default_value = "http://localhost:8081")]
+    pub threshold_url: String,
+
     /// Holochain installed app ID for projections and signal subscriptions
     #[arg(long, env = "INSTALLED_APP_ID", default_value = "elohim")]
     pub installed_app_id: String,

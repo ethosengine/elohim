@@ -507,18 +507,58 @@ async fn handle_request(
         // CORS preflight
         (Method::OPTIONS, _) => to_boxed(preflight_response()),
 
-        // WebSocket upgrade for admin interface
+        // ====================================================================
+        // Threshold (operator dashboard) - Angular SPA at /threshold/*
+        // ====================================================================
+        (Method::GET, p) if p.starts_with("/threshold") => {
+            to_boxed(routes::handle_threshold_request(req, &state.args.threshold_url, p).await)
+        }
+
+        // ====================================================================
+        // Holochain conductor WebSocket proxies
+        // New paths: /hc/admin, /hc/app/{port}
+        // Legacy paths: /, /admin, /app/{port} (kept for backwards compatibility)
+        // ====================================================================
+
+        // WebSocket upgrade for admin interface (NEW: /hc/admin)
+        (Method::GET, "/hc/admin") => {
+            if hyper_tungstenite::is_upgrade_request(&req) {
+                to_boxed(websocket::handle_admin_upgrade(state, req).await)
+            } else {
+                to_boxed(bad_request_response("WebSocket upgrade required for /hc/admin"))
+            }
+        }
+
+        // WebSocket upgrade for app interface (NEW: /hc/app/{port})
+        (Method::GET, p) if p.starts_with("/hc/app/") => {
+            if hyper_tungstenite::is_upgrade_request(&req) {
+                // Extract port from /hc/app/:port
+                let port_str = p.strip_prefix("/hc/app/").unwrap_or("");
+                match port_str.parse::<u16>() {
+                    Ok(port) if state.args.is_valid_app_port(port) => {
+                        to_boxed(websocket::handle_app_upgrade(state, req, port).await)
+                    }
+                    _ => to_boxed(bad_request_response("Invalid app port")),
+                }
+            } else {
+                to_boxed(bad_request_response("WebSocket upgrade required for /hc/app/{port}"))
+            }
+        }
+
+        // WebSocket upgrade for admin interface (LEGACY: /, /admin - deprecated, use /hc/admin)
         (Method::GET, "/") | (Method::GET, "/admin") => {
             if hyper_tungstenite::is_upgrade_request(&req) {
+                debug!("Legacy WebSocket path used - consider migrating to /hc/admin");
                 to_boxed(websocket::handle_admin_upgrade(state, req).await)
             } else {
                 to_boxed(not_found_response(&path))
             }
         }
 
-        // WebSocket upgrade for app interface
+        // WebSocket upgrade for app interface (LEGACY: /app/{port} - deprecated, use /hc/app/{port})
         (Method::GET, p) if p.starts_with("/app/") => {
             if hyper_tungstenite::is_upgrade_request(&req) {
+                debug!("Legacy WebSocket path used - consider migrating to /hc/app/{{port}}");
                 // Extract port from /app/:port
                 let port_str = p.strip_prefix("/app/").unwrap_or("");
                 match port_str.parse::<u16>() {

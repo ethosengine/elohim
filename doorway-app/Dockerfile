@@ -15,9 +15,9 @@ COPY package*.json ./
 # Install dependencies
 RUN npm ci --legacy-peer-deps
 
-# Copy source and build with /operator/ base href
+# Copy source and build with /threshold/ base href
 COPY . .
-RUN npm run build -- --configuration=production --base-href=/operator/
+RUN npm run build -- --configuration=production --base-href=/threshold/
 
 # Stage 2: Serve with nginx
 FROM nginx:alpine
