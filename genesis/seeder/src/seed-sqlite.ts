@@ -287,7 +287,7 @@ async function uploadBlob(data: Buffer, mimeType: string, description?: string):
       headers: {
         'Content-Type': mimeType,
       },
-      body: data,
+      body: new Uint8Array(data),
     });
 
     if (!response.ok) {

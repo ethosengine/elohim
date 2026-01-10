@@ -85,6 +85,145 @@ export interface ClusterConnection {
 }
 
 /**
+ * ClusterConnectionDetail - Full relationship metadata for cluster edges.
+ *
+ * Extends ClusterConnection with relationship data from the backend,
+ * enabling advanced graph sensemaking features:
+ * - Filter edges by relationship type
+ * - Color edges by confidence level
+ * - Show inference source breakdown
+ * - Identify bidirectional vs unidirectional links
+ *
+ * Used by HierarchicalGraphService for graph visualization.
+ */
+export interface ClusterConnectionDetail extends ClusterConnection {
+  /**
+   * Relationship summaries underlying this aggregated connection.
+   * Only populated when expanded/requested (lazy loading).
+   */
+  relationships: RelationshipSummary[];
+
+  /**
+   * Primary relationship type (most common among underlying relationships).
+   */
+  primaryRelationshipType: string;
+
+  /**
+   * Average confidence across all underlying relationships (0.0 - 1.0).
+   * Higher confidence = stronger/more certain connection.
+   */
+  averageConfidence: number;
+
+  /**
+   * Does this connection have bidirectional links?
+   * True if any underlying relationship is marked bidirectional.
+   */
+  hasBidirectionalLinks: boolean;
+
+  /**
+   * Breakdown of how relationships were inferred.
+   * Key: inference source, Value: count
+   * Useful for understanding connection provenance.
+   */
+  inferenceSourceCounts: Record<string, number>;
+
+  /**
+   * Minimum confidence among underlying relationships.
+   * Useful for filtering weak connections.
+   */
+  minConfidence: number;
+
+  /**
+   * Maximum confidence among underlying relationships.
+   */
+  maxConfidence: number;
+
+  /**
+   * Count of unique relationship types.
+   */
+  uniqueTypeCount: number;
+}
+
+/**
+ * RelationshipSummary - Lightweight summary of a relationship for aggregation.
+ *
+ * Contains enough data for visualization without full relationship payload.
+ */
+export interface RelationshipSummary {
+  /** Relationship ID */
+  id: string;
+
+  /** Source content node ID */
+  sourceId: string;
+
+  /** Target content node ID */
+  targetId: string;
+
+  /** Relationship type */
+  relationshipType: string;
+
+  /** Confidence score (0.0 - 1.0) */
+  confidence: number;
+
+  /** How this relationship was discovered */
+  inferenceSource: string;
+
+  /** Is this relationship bidirectional? */
+  isBidirectional: boolean;
+}
+
+/**
+ * Create a ClusterConnectionDetail from basic connection + relationships.
+ */
+export function createClusterConnectionDetail(
+  basic: ClusterConnection,
+  relationships: RelationshipSummary[]
+): ClusterConnectionDetail {
+  // Count inference sources
+  const inferenceSourceCounts: Record<string, number> = {};
+  for (const rel of relationships) {
+    inferenceSourceCounts[rel.inferenceSource] =
+      (inferenceSourceCounts[rel.inferenceSource] || 0) + 1;
+  }
+
+  // Count relationship types
+  const typeCounts: Record<string, number> = {};
+  for (const rel of relationships) {
+    typeCounts[rel.relationshipType] = (typeCounts[rel.relationshipType] || 0) + 1;
+  }
+
+  // Find primary type (most common)
+  let primaryType = basic.relationshipTypes[0] || 'RELATES_TO';
+  let maxCount = 0;
+  for (const [type, count] of Object.entries(typeCounts)) {
+    if (count > maxCount) {
+      maxCount = count;
+      primaryType = type;
+    }
+  }
+
+  // Calculate confidence stats
+  const confidences = relationships.map(r => r.confidence);
+  const avgConfidence = confidences.length > 0
+    ? confidences.reduce((a, b) => a + b, 0) / confidences.length
+    : 0;
+  const minConfidence = confidences.length > 0 ? Math.min(...confidences) : 0;
+  const maxConfidence = confidences.length > 0 ? Math.max(...confidences) : 0;
+
+  return {
+    ...basic,
+    relationships,
+    primaryRelationshipType: primaryType,
+    averageConfidence: avgConfidence,
+    hasBidirectionalLinks: relationships.some(r => r.isBidirectional),
+    inferenceSourceCounts,
+    minConfidence,
+    maxConfidence,
+    uniqueTypeCount: Object.keys(typeCounts).length,
+  };
+}
+
+/**
  * ClusterEdge for D3 force simulation.
  * Represents an edge between visible nodes (either clusters or concepts).
  */

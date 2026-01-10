@@ -80,6 +80,8 @@ def get_directory_type(file_path: str) -> Optional[str]:
         return "knowledge-map"
     elif "/meta/" in file_path:
         return "meta"
+    elif "/presences/" in file_path:
+        return "presence"
     return None
 
 
@@ -184,6 +186,32 @@ def validate_graph_data(data: dict, file_path: str) -> list[str]:
     return errors
 
 
+def validate_presence(data: dict, file_path: str) -> list[str]:
+    """Validate contributor presence data."""
+    errors = []
+    warnings = []
+
+    # Presences need id and displayName
+    if "id" not in data:
+        errors.append("Missing required field: 'id'")
+    if "displayName" not in data:
+        errors.append("Missing required field: 'displayName'")
+
+    # Check presenceState if present
+    valid_states = ["unclaimed", "stewarded", "claimed", "archived"]
+    if "presenceState" in data:
+        if data["presenceState"] not in valid_states:
+            warnings.append(f"Unrecognized presenceState: '{data['presenceState']}' (valid: {', '.join(valid_states)})")
+
+    # Check id matches filename convention
+    if "id" in data and data["id"]:
+        filename = Path(file_path).stem
+        if data["id"] != filename and filename != "index":
+            warnings.append(f"ID '{data['id']}' doesn't match filename '{filename}'")
+
+    return errors + warnings
+
+
 def validate_json_content(content: str, file_path: str) -> tuple[list[str], list[str]]:
     """Validate JSON content and return (errors, warnings)."""
     errors = []
@@ -212,6 +240,8 @@ def validate_json_content(content: str, file_path: str) -> tuple[list[str], list
         issues = validate_perseus_item(data, file_path)
     elif dir_type == "graph":
         issues = validate_graph_data(data, file_path)
+    elif dir_type == "presence":
+        issues = validate_presence(data, file_path)
     elif dir_type in ["assessment", "agent", "audience", "attestation", "extension", "governance", "knowledge-map"]:
         # These all follow content node structure
         issues = validate_content_node(data, file_path)

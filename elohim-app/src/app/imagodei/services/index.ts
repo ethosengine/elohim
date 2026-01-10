@@ -8,3 +8,4 @@ export { IdentityService } from './identity.service';
 export { PresenceService } from './presence.service';
 export { SessionMigrationService } from './session-migration.service';
 export { SovereigntyService } from './sovereignty.service';
+export { HumanRelationshipService } from './human-relationship.service';

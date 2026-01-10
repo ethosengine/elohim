@@ -1,0 +1,211 @@
+<div class="create-presence-container">
+  <div class="create-presence-card">
+    <!-- Header -->
+    <div class="card-header">
+      <h1>Create Contributor Presence</h1>
+      <p class="subtitle">
+        Attribute contributions to someone not yet in the network.
+        Recognition will accumulate until they claim their presence.
+      </p>
+    </div>
+
+    <!-- Error Display -->
+    @if (error()) {
+      <div class="error-banner" (click)="clearError()">
+        <span class="error-icon">!</span>
+        <span>{{ error() }}</span>
+        <button type="button" class="error-dismiss">Dismiss</button>
+      </div>
+    }
+
+    <!-- Form -->
+    <form class="presence-form" (ngSubmit)="onSubmit()">
+      <!-- Display Name -->
+      <div class="form-group">
+        <label for="displayName">Display Name *</label>
+        <input
+          id="displayName"
+          type="text"
+          [(ngModel)]="form.displayName"
+          name="displayName"
+          placeholder="e.g., Lynn Foster"
+          required
+          minlength="2"
+          maxlength="100"
+          [disabled]="isSubmitting()"
+        />
+        <span class="hint">How this contributor is known</span>
+      </div>
+
+      <!-- External Identifiers -->
+      <div class="form-group">
+        <label>External Identifiers</label>
+        <p class="hint">Link to external profiles for verification when claiming</p>
+
+        <!-- Existing identifiers -->
+        @if (identifiers().length > 0) {
+          <div class="identifiers-list">
+            @for (identifier of identifiers(); track identifier.id) {
+              <div class="identifier-tag">
+                <span class="material-icons identifier-icon">{{ getProviderIcon(identifier.provider) }}</span>
+                <span class="identifier-provider">{{ getProviderLabel(identifier.provider) }}:</span>
+                <span class="identifier-value">{{ identifier.value }}</span>
+                <button
+                  type="button"
+                  class="identifier-remove"
+                  (click)="removeIdentifier(identifier.id)"
+                  aria-label="Remove identifier"
+                >
+                  <span class="material-icons">close</span>
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Add new identifier -->
+        <div class="identifier-input-row">
+          <select
+            [value]="newIdentifier().provider"
+            (change)="setProvider($any($event.target).value)"
+            class="provider-select"
+            [disabled]="isSubmitting()"
+          >
+            @for (provider of providerOptions; track provider) {
+              <option [value]="provider">{{ getProviderLabel(provider) }}</option>
+            }
+          </select>
+          <input
+            type="text"
+            [value]="newIdentifier().value"
+            (input)="setIdentifierValue($any($event.target).value)"
+            placeholder="Username or URL"
+            class="identifier-value-input"
+            [disabled]="isSubmitting()"
+            (keydown.enter)="$event.preventDefault(); addIdentifier()"
+          />
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="addIdentifier()"
+            [disabled]="!newIdentifier().value.trim() || isSubmitting()"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+
+      <!-- Establishing Content -->
+      <div class="form-group">
+        <label>Establishing Content</label>
+        <p class="hint">Content that establishes this contributor (optional)</p>
+
+        <!-- Selected content -->
+        @if (establishingContentIds().length > 0) {
+          <div class="content-tags">
+            @for (contentId of establishingContentIds(); track contentId) {
+              <div class="content-tag">
+                <span>{{ contentId }}</span>
+                <button
+                  type="button"
+                  class="content-remove"
+                  (click)="removeEstablishingContent(contentId)"
+                  aria-label="Remove content"
+                >
+                  <span class="material-icons">close</span>
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Content search -->
+        @if (showContentSearch()) {
+          <div class="content-search">
+            <input
+              type="text"
+              [ngModel]="contentSearch()"
+              (ngModelChange)="contentSearch.set($event); searchContent()"
+              name="contentSearch"
+              placeholder="Search for content..."
+              class="content-search-input"
+              [disabled]="isSubmitting()"
+            />
+            @if (contentResults().length > 0) {
+              <div class="content-results">
+                @for (result of contentResults(); track result.id) {
+                  <button
+                    type="button"
+                    class="content-result-item"
+                    (click)="addEstablishingContent(result.id, result.title)"
+                  >
+                    <span class="result-title">{{ result.title }}</span>
+                    <span class="result-id">{{ result.id }}</span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        <button
+          type="button"
+          class="btn btn-link"
+          (click)="toggleContentSearch()"
+        >
+          {{ showContentSearch() ? 'Hide search' : 'Add content' }}
+        </button>
+      </div>
+
+      <!-- Note -->
+      <div class="form-group">
+        <label for="note">Note</label>
+        <textarea
+          id="note"
+          [(ngModel)]="form.note"
+          name="note"
+          placeholder="Why are you creating this presence? Any context for future claimers..."
+          rows="3"
+          maxlength="1000"
+          [disabled]="isSubmitting()"
+        ></textarea>
+        <span class="hint">Optional context about this contributor</span>
+      </div>
+
+      <!-- Actions -->
+      <div class="form-actions">
+        <button
+          type="button"
+          class="btn btn-secondary"
+          (click)="onCancel()"
+          [disabled]="isSubmitting()"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="btn btn-primary"
+          [disabled]="!isValid() || isSubmitting()"
+        >
+          @if (isSubmitting()) {
+            <span class="spinner"></span>
+            Creating...
+          } @else {
+            Create Presence
+          }
+        </button>
+      </div>
+    </form>
+
+    <!-- Info Section -->
+    <div class="info-section">
+      <h3>What happens next?</h3>
+      <ul>
+        <li>The presence is created in <strong>unclaimed</strong> state</li>
+        <li>You or others can steward it, caring for accumulated recognition</li>
+        <li>When the contributor joins, they can <strong>claim</strong> their presence</li>
+        <li>All accumulated recognition transfers to them upon verification</li>
+      </ul>
+    </div>
+  </div>
+</div>

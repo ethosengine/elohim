@@ -156,6 +156,25 @@ export interface BulkRelationshipResult {
   errors: string[];
 }
 
+/** Result from bulk presence creation */
+export interface BulkPresenceResult {
+  created: number;
+  errors: string[];
+}
+
+/** Result from bulk mastery upsert */
+export interface BulkMasteryResult {
+  created: number;
+  updated: number;
+  errors: string[];
+}
+
+/** Result from bulk event recording */
+export interface BulkEventResult {
+  recorded: number;
+  errors: string[];
+}
+
 // =============================================================================
 // Import API Types
 // =============================================================================
@@ -852,6 +871,121 @@ export class DoorwayClient {
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Bulk create relationships failed: HTTP ${response.status}: ${errorText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Bulk create contributor presences directly via storage service.
+   *
+   * @param items - Presence items to create
+   * @returns BulkPresenceResult with created count
+   */
+  async bulkCreatePresences(
+    items: Array<{
+      display_name: string;
+      presence_state?: string;
+      external_identifiers_json?: string;
+      establishing_content_ids_json: string;
+      affinity_total?: number;
+      unique_engagers?: number;
+      citation_count?: number;
+      recognition_score?: number;
+    }>
+  ): Promise<BulkPresenceResult> {
+    if (this.config.dryRun) {
+      console.log(`[DRY RUN] Would bulk create ${items.length} contributor presences`);
+      return { created: items.length, errors: [] };
+    }
+
+    const response = await this.fetch('/api/db/presences/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(items),
+      timeout: 120000,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Bulk create presences failed: HTTP ${response.status}: ${errorText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Bulk record economic events directly via storage service.
+   *
+   * @param items - Economic event items to record
+   * @returns BulkEventResult with recorded count
+   */
+  async bulkRecordEvents(
+    items: Array<{
+      action: string;
+      provider: string;
+      receiver: string;
+      resource_conforms_to?: string;
+      resource_quantity_value?: number;
+      resource_quantity_unit?: string;
+      lamad_event_type?: string;
+      content_id?: string;
+      contributor_presence_id?: string;
+      path_id?: string;
+      metadata_json?: string;
+    }>
+  ): Promise<BulkEventResult> {
+    if (this.config.dryRun) {
+      console.log(`[DRY RUN] Would bulk record ${items.length} economic events`);
+      return { recorded: items.length, errors: [] };
+    }
+
+    const response = await this.fetch('/api/db/events/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(items),
+      timeout: 120000,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Bulk record events failed: HTTP ${response.status}: ${errorText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Bulk upsert content mastery records directly via storage service.
+   *
+   * @param items - Mastery items to create/update
+   * @returns BulkMasteryResult with created/updated counts
+   */
+  async bulkUpsertMastery(
+    items: Array<{
+      human_id: string;
+      content_id: string;
+      mastery_level?: string;
+      mastery_level_index?: number;
+      freshness_score?: number;
+      engagement_count?: number;
+    }>
+  ): Promise<BulkMasteryResult> {
+    if (this.config.dryRun) {
+      console.log(`[DRY RUN] Would bulk upsert ${items.length} mastery records`);
+      return { created: items.length, updated: 0, errors: [] };
+    }
+
+    const response = await this.fetch('/api/db/mastery/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(items),
+      timeout: 120000,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Bulk upsert mastery failed: HTTP ${response.status}: ${errorText}`);
     }
 
     return await response.json();

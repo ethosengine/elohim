@@ -17,6 +17,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { SessionHumanService } from './session-human.service';
 import { IdentityService } from './identity.service';
+import { ContentMasteryService } from '../../lamad/services/content-mastery.service';
 import {
   type MigrationState,
   type MigrationStatus,
@@ -34,6 +35,7 @@ export class SessionMigrationService {
   private readonly holochainClient = inject(HolochainClientService);
   private readonly sessionHumanService = inject(SessionHumanService);
   private readonly identityService = inject(IdentityService);
+  private readonly contentMasteryService = inject(ContentMasteryService);
 
   // ==========================================================================
   // State
@@ -126,6 +128,16 @@ export class SessionMigrationService {
         await this.transferAffinity(migrationPackage.affinity);
       }
 
+      // Step 3b: Migrate content mastery (localStorage → backend)
+      this.updateState({ currentStep: 'Migrating learning progress...', progress: 75 });
+
+      let masteryCount = 0;
+      const masteryResult = await this.contentMasteryService.migrateToBackend();
+      if (!masteryResult.success) {
+        console.warn('[SessionMigration] Mastery migration had failures:', masteryResult.errors);
+      }
+      masteryCount = masteryResult.migrated;
+
       this.updateState({ currentStep: 'Finalizing...', progress: 90 });
 
       // Step 4: Clear session
@@ -141,6 +153,7 @@ export class SessionMigrationService {
           affinityCount,
           pathProgressCount: pathProgress.length,
           activityCount: migrationPackage.activities?.length ?? 0,
+          masteryCount,
         },
       };
     } catch (err) {

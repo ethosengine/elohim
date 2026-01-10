@@ -46,6 +46,13 @@ export { PathNegotiationService } from './path-negotiation.service';
 export { ContentMasteryService } from './content-mastery.service';
 export type { MigrationResult } from './content-mastery.service';
 
+// Mastery service (elohim-storage backend)
+export { MasteryService, MasteryLevels, MASTERY_LEVEL_ORDER } from './mastery.service';
+export type { MasteryLevelType } from './mastery.service';
+
+// Content relationships (elohim-storage backend)
+export { RelationshipService } from './relationship.service';
+
 // Practice pool and challenges (Khan Academy-style)
 export { PracticeService } from './practice.service';
 
@@ -58,6 +65,10 @@ export { ProgressMigrationService } from './progress-migration.service';
 // ============================================================================
 // LAMAD STEWARD ECONOMY SERVICES
 // ============================================================================
+
+// Stewardship allocations (one-to-many content stewardship)
+export { StewardshipAllocationService } from './stewardship-allocation.service';
+export type { StewardPortfolio, RecognitionDistribution } from './stewardship-allocation.service';
 
 // Contributor dashboard & impact tracking
 export { ContributorService } from './contributor.service';

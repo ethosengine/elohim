@@ -2,8 +2,8 @@
 # See https://diesel.rs/guides/configuring-diesel-cli
 
 [print_schema]
-# Where to generate the schema.rs file
-file = "src/db/schema.rs"
+# Where to generate the Diesel schema file (separate from legacy rusqlite schema)
+file = "src/db/diesel_schema.rs"
 
 # Additional derives for generated table types
 custom_type_derives = ["diesel::query_builder::QueryId"]

@@ -398,6 +398,7 @@ export interface MigrationResult {
     affinityCount: number;
     pathProgressCount: number;
     activityCount: number;
+    masteryCount: number;
   };
   /** Key migration details */
   keyMigration?: {

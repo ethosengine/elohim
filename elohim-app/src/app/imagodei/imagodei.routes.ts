@@ -6,6 +6,8 @@
  * - /identity/register - New user registration
  * - /identity/profile - View/edit user profile (requires auth)
  * - /identity/presences - Contributor presence list (requires auth)
+ * - /identity/presences/create - Create new contributor presence (requires auth)
+ * - /identity/stewardship - Stewardship dashboard (requires auth)
  */
 
 import { Routes } from '@angular/router';
@@ -33,6 +35,18 @@ export const IMAGODEI_ROUTES: Routes = [
     canActivate: [identityGuard],
     loadComponent: () =>
       import('./components/presence-list/presence-list.component').then(m => m.PresenceListComponent),
+  },
+  {
+    path: 'presences/create',
+    canActivate: [identityGuard],
+    loadComponent: () =>
+      import('./components/create-presence/create-presence.component').then(m => m.CreatePresenceComponent),
+  },
+  {
+    path: 'stewardship',
+    canActivate: [identityGuard],
+    loadComponent: () =>
+      import('./components/stewardship-dashboard/stewardship-dashboard.component').then(m => m.StewardshipDashboardComponent),
   },
   {
     path: '',

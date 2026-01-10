@@ -170,5 +170,8 @@ export {
 // LAMAD STEWARD ECONOMY MODELS
 // ============================================================================
 
+// Stewardship Allocation models - One-to-many content stewardship
+export * from './stewardship-allocation.model';
+
 // Steward Economy models - LAMAD-NATIVE
 export * from './steward-economy.model';

@@ -38,6 +38,14 @@ pub mod models;
 pub mod content_diesel;
 pub mod paths_diesel;
 
+// Diesel modules for graph relationships and domain models
+pub mod relationships_diesel;
+pub mod human_relationships;
+pub mod contributor_presences;
+pub mod economic_events;
+pub mod content_mastery;
+pub mod stewardship_allocations;
+
 use std::path::Path;
 use std::sync::Mutex;
 use std::time::Duration;

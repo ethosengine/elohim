@@ -747,3 +747,90 @@ export interface UnytEventAdapter {
   /** Get credit limit for an agent */
   getCreditLimit(agentId: string): Promise<Measure>;
 }
+
+// =============================================================================
+// Wire Format (Diesel Backend)
+// =============================================================================
+
+/**
+ * EconomicEventWire - Backend wire format (snake_case).
+ * Maps to the economic_events table in elohim-storage.
+ */
+export interface EconomicEventWire {
+  id: string;
+  app_id: string;
+  action: string;
+  provider: string;
+  receiver: string;
+  resource_conforms_to: string | null;
+  resource_quantity_value: number | null;
+  resource_quantity_unit: string | null;
+  has_point_in_time: string;
+  lamad_event_type: string | null;
+  content_id: string | null;
+  contributor_presence_id: string | null;
+  path_id: string | null;
+  state: string;
+  metadata_json: string | null;
+  created_at: string;
+}
+
+/**
+ * Transform wire format to EconomicEvent.
+ */
+export function transformEventFromWire(wire: EconomicEventWire): EconomicEvent {
+  let metadata: Record<string, unknown> | undefined;
+  try {
+    metadata = wire.metadata_json ? JSON.parse(wire.metadata_json) : undefined;
+  } catch {
+    // Ignore parse errors
+  }
+
+  // Extract lamad-specific metadata
+  if (metadata) {
+    metadata['lamadEventType'] = wire.lamad_event_type;
+    metadata['contentId'] = wire.content_id;
+    metadata['presenceId'] = wire.contributor_presence_id;
+    metadata['pathId'] = wire.path_id;
+  }
+
+  return {
+    id: wire.id,
+    action: wire.action as REAAction,
+    provider: wire.provider,
+    receiver: wire.receiver,
+    resourceConformsTo: wire.resource_conforms_to ?? undefined,
+    resourceQuantity: wire.resource_quantity_value != null ? {
+      hasNumericalValue: wire.resource_quantity_value,
+      hasUnit: wire.resource_quantity_unit ?? 'unit-each',
+    } : undefined,
+    hasPointInTime: wire.has_point_in_time,
+    state: wire.state as EventState,
+    metadata,
+  };
+}
+
+/**
+ * Transform EconomicEvent to wire format for backend.
+ */
+export function transformEventToWire(event: EconomicEvent, appId: string = 'shefa'): Omit<EconomicEventWire, 'created_at'> {
+  const metadata = event.metadata as Record<string, unknown> | undefined;
+
+  return {
+    id: event.id,
+    app_id: appId,
+    action: event.action,
+    provider: event.provider,
+    receiver: event.receiver,
+    resource_conforms_to: event.resourceConformsTo ?? null,
+    resource_quantity_value: event.resourceQuantity?.hasNumericalValue ?? null,
+    resource_quantity_unit: event.resourceQuantity?.hasUnit ?? null,
+    has_point_in_time: event.hasPointInTime,
+    lamad_event_type: (metadata?.['lamadEventType'] as string) ?? null,
+    content_id: (metadata?.['contentId'] as string) ?? null,
+    contributor_presence_id: (metadata?.['presenceId'] as string) ?? null,
+    path_id: (metadata?.['pathId'] as string) ?? null,
+    state: event.state,
+    metadata_json: event.metadata ? JSON.stringify(event.metadata) : null,
+  };
+}

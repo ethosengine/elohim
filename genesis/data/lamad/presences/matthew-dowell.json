@@ -1,0 +1,31 @@
+{
+  "id": "matthew-dowell",
+  "displayName": "Matthew Dowell",
+  "presenceState": "claimed",
+  "externalIdentifiers": [
+    {
+      "platform": "github",
+      "identifier": "mattdowell"
+    },
+    {
+      "platform": "email",
+      "identifier": "matt@elohim.host"
+    }
+  ],
+  "establishingContentIds": [
+    "manifesto",
+    "elohim-lamad",
+    "governance-epic",
+    "autonomous-entity-epic",
+    "public-observer-epic",
+    "social-medium-epic",
+    "value-scanner-epic"
+  ],
+  "claimedAgentId": "agent-matthew-dowell",
+  "note": "Bootstrap steward for Elohim Protocol genesis content. As the protocol creator, Matthew stewards all initial content until community stewards emerge through contribution and Elohim governance.",
+  "metadata": {
+    "bootstrapSteward": true,
+    "bootstrapDate": "2026-01-10",
+    "role": "protocol-founder"
+  }
+}

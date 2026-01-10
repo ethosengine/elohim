@@ -262,3 +262,61 @@ export function parseExternalIdentifiers(json: string): ExternalIdentifier[] {
 export function serializeExternalIdentifiers(identifiers: ExternalIdentifier[]): string {
   return JSON.stringify(identifiers);
 }
+
+// =============================================================================
+// Wire Format (Diesel Backend)
+// =============================================================================
+
+/**
+ * ContributorPresenceWire - Backend wire format (snake_case).
+ * Maps to the contributor_presences table in elohim-storage.
+ */
+export interface ContributorPresenceWire {
+  id: string;
+  app_id: string;
+  display_name: string;
+  presence_state: string;
+  external_identifiers_json: string | null;
+  establishing_content_ids_json: string;
+  affinity_total: number;
+  unique_engagers: number;
+  citation_count: number;
+  recognition_score: number;
+  steward_id: string | null;
+  stewardship_started_at: string | null;
+  claim_verified_at: string | null;
+  claimed_agent_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Transform wire format to ContributorPresenceView.
+ */
+export function transformPresenceFromWire(wire: ContributorPresenceWire): ContributorPresenceView {
+  return {
+    id: wire.id,
+    displayName: wire.display_name,
+    presenceState: wire.presence_state as PresenceState,
+    externalIdentifiers: parseExternalIdentifiers(wire.external_identifiers_json ?? ''),
+    establishingContentIds: JSON.parse(wire.establishing_content_ids_json || '[]'),
+    establishedAt: wire.created_at,
+    affinityTotal: wire.affinity_total,
+    uniqueEngagers: wire.unique_engagers,
+    citationCount: wire.citation_count,
+    recognitionScore: wire.recognition_score,
+    accumulatingSince: wire.created_at,
+    lastRecognitionAt: wire.updated_at,
+    stewardId: wire.steward_id,
+    stewardshipStartedAt: wire.stewardship_started_at,
+    stewardshipQualityScore: null, // Not in wire format
+    claimInitiatedAt: null, // Not in wire format
+    claimVerifiedAt: wire.claim_verified_at,
+    claimVerificationMethod: null, // Not in wire format
+    claimedAgentId: wire.claimed_agent_id,
+    note: null,
+    image: null,
+    createdAt: wire.created_at,
+    updatedAt: wire.updated_at,
+  };
+}

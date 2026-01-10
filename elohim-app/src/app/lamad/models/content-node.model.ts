@@ -755,3 +755,193 @@ export interface ContentGraphMetadata {
 }
 
 export type { ContentGraphMetadata as GraphMetadata };
+
+// =============================================================================
+// Content Relationship Detail (Diesel Backend)
+// =============================================================================
+// Full relationship model with metadata for graph sensemaking.
+// Maps to the relationships table in elohim-storage.
+
+/**
+ * ContentRelationshipDetail - Full relationship record from backend.
+ *
+ * Extends the basic ContentRelationship with:
+ * - Confidence scoring for inferred relationships
+ * - Inference source tracking (how was this relationship discovered?)
+ * - Bidirectionality and inverse relationship linking
+ * - Provenance chain for trust/audit
+ * - Reach/governance layers from protocol-core
+ */
+export interface ContentRelationshipDetail {
+  /** Unique relationship ID */
+  id: string;
+
+  /** App ID for multi-tenant scoping */
+  appId: string;
+
+  /** Source content node ID */
+  sourceNodeId: string;
+
+  /** Target content node ID */
+  targetNodeId: string;
+
+  /** Relationship type (from ContentRelationshipType enum) */
+  relationshipType: ContentRelationshipType | string;
+
+  /**
+   * Confidence score (0.0 - 1.0) for this relationship.
+   * - 1.0: Explicitly defined by author
+   * - 0.8-0.99: High confidence inference (structural analysis)
+   * - 0.5-0.79: Medium confidence (semantic similarity)
+   * - <0.5: Low confidence (speculative)
+   */
+  confidence: number;
+
+  /**
+   * How this relationship was discovered/created.
+   * - 'author': Explicitly defined by content author
+   * - 'structural': Inferred from path/chapter structure
+   * - 'semantic': Inferred from content similarity
+   * - 'usage': Inferred from user navigation patterns
+   * - 'citation': Extracted from references/links
+   * - 'system': System-generated (e.g., inverse relationships)
+   */
+  inferenceSource: RelationshipInferenceSource;
+
+  /** Is this relationship bidirectional? */
+  isBidirectional: boolean;
+
+  /**
+   * ID of the inverse relationship (for bidirectional pairs).
+   * If A→B is CONTAINS, B→A is BELONGS_TO with linked IDs.
+   */
+  inverseRelationshipId?: string;
+
+  /**
+   * Provenance chain - IDs of sources that contributed to this relationship.
+   * For citations: the source documents
+   * For inferences: the algorithm/model versions
+   */
+  provenanceChain?: string[];
+
+  /**
+   * Governance layer this relationship belongs to.
+   * Affects who can modify/delete it.
+   */
+  governanceLayer?: string;
+
+  /**
+   * Reach level for this relationship (who can see it).
+   * Inherits from the more restrictive of source/target nodes.
+   */
+  reach: ContentReach;
+
+  /** Additional metadata (JSON object) */
+  metadata?: Record<string, unknown>;
+
+  /** Creation timestamp */
+  createdAt: string;
+
+  /** Last updated timestamp */
+  updatedAt: string;
+}
+
+/**
+ * RelationshipInferenceSource - How a relationship was discovered.
+ */
+export type RelationshipInferenceSource =
+  | 'author'      // Explicitly defined by content author
+  | 'structural'  // Inferred from path/chapter structure
+  | 'semantic'    // Inferred from content similarity
+  | 'usage'       // Inferred from user navigation patterns
+  | 'citation'    // Extracted from references/links
+  | 'system';     // System-generated (e.g., inverse relationships)
+
+/**
+ * Wire format for ContentRelationshipDetail (snake_case for backend).
+ */
+export interface ContentRelationshipDetailWire {
+  id: string;
+  app_id: string;
+  source_id: string;
+  target_id: string;
+  relationship_type: string;
+  confidence: number;
+  inference_source: string;
+  is_bidirectional: number;  // SQLite stores boolean as 0/1
+  inverse_relationship_id: string | null;
+  provenance_chain_json: string | null;
+  governance_layer: string | null;
+  reach: string;
+  metadata_json: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Transform wire format to ContentRelationshipDetail.
+ */
+export function transformRelationshipDetailFromWire(wire: ContentRelationshipDetailWire): ContentRelationshipDetail {
+  let provenanceChain: string[] | undefined;
+  try {
+    provenanceChain = wire.provenance_chain_json
+      ? JSON.parse(wire.provenance_chain_json)
+      : undefined;
+  } catch {
+    // Ignore parse errors
+  }
+
+  let metadata: Record<string, unknown> | undefined;
+  try {
+    metadata = wire.metadata_json ? JSON.parse(wire.metadata_json) : undefined;
+  } catch {
+    // Ignore parse errors
+  }
+
+  return {
+    id: wire.id,
+    appId: wire.app_id,
+    sourceNodeId: wire.source_id,
+    targetNodeId: wire.target_id,
+    relationshipType: wire.relationship_type as ContentRelationshipType,
+    confidence: wire.confidence,
+    inferenceSource: wire.inference_source as RelationshipInferenceSource,
+    isBidirectional: wire.is_bidirectional === 1,
+    inverseRelationshipId: wire.inverse_relationship_id ?? undefined,
+    provenanceChain,
+    governanceLayer: wire.governance_layer ?? undefined,
+    reach: wire.reach as ContentReach,
+    metadata,
+    createdAt: wire.created_at,
+    updatedAt: wire.updated_at,
+  };
+}
+
+/**
+ * Query parameters for listing relationships.
+ */
+export interface RelationshipQuery {
+  sourceId?: string;
+  targetId?: string;
+  relationshipType?: string;
+  minConfidence?: number;
+  inferenceSource?: RelationshipInferenceSource;
+  bidirectionalOnly?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Input for creating a relationship.
+ */
+export interface CreateRelationshipInput {
+  sourceId: string;
+  targetId: string;
+  relationshipType: string;
+  confidence?: number;
+  inferenceSource?: RelationshipInferenceSource;
+  createInverse?: boolean;
+  inverseType?: string;
+  provenanceChain?: string[];
+  metadataJson?: string;
+}

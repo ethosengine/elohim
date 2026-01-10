@@ -33,7 +33,8 @@
 //! ```
 
 use crate::blob_store::BlobStore;
-use crate::db::{self, ContentDb, ContentQuery};
+use crate::db::{self, ContentDb, ContentQuery, DbPool, AppContext};
+use crate::db::{human_relationships, contributor_presences, economic_events, content_mastery, stewardship_allocations};
 use crate::error::StorageError;
 use crate::import_api::ImportApi;
 use crate::progress_hub::ProgressHub;
@@ -68,6 +69,8 @@ pub struct HttpServer {
     sync_manager: Option<Arc<SyncManager>>,
     /// SQLite content database for structured data
     content_db: Option<Arc<ContentDb>>,
+    /// Diesel connection pool for new entity endpoints
+    db_pool: Option<DbPool>,
     /// Service layer for business logic
     services: Option<Arc<Services>>,
 }
@@ -83,6 +86,7 @@ impl HttpServer {
             progress_hub: None,
             sync_manager: None,
             content_db: None,
+            db_pool: None,
             services: None,
         }
     }
@@ -114,6 +118,12 @@ impl HttpServer {
     /// Set the Service layer for business logic
     pub fn with_services(mut self, services: Arc<Services>) -> Self {
         self.services = Some(services);
+        self
+    }
+
+    /// Set the Diesel connection pool for new entity endpoints
+    pub fn with_db_pool(mut self, pool: DbPool) -> Self {
+        self.db_pool = Some(pool);
         self
     }
 
@@ -1132,6 +1142,108 @@ impl HttpServer {
 
         if let Some(ext_id) = resource_path.strip_prefix("path-extensions/") {
             return self.handle_db_path_extension_by_id(req, method, ext_id, &content_db).await;
+        }
+
+        // ============================================================================
+        // Diesel-based entity routes (using db_pool)
+        // ============================================================================
+
+        // Human relationships routes (Diesel)
+        if resource_path == "human-relationships" {
+            return self.handle_human_relationships_list(req, method, &app_ctx).await;
+        }
+
+        if let Some(rel_path) = resource_path.strip_prefix("human-relationships/") {
+            // Check for action sub-paths first
+            if let Some(rest) = rel_path.strip_suffix("/consent") {
+                return self.handle_human_relationship_consent(req, method, rest, &app_ctx).await;
+            }
+            if let Some(rest) = rel_path.strip_suffix("/custody") {
+                return self.handle_human_relationship_custody(req, method, rest, &app_ctx).await;
+            }
+            // Fall back to generic ID handler
+            return self.handle_human_relationship_by_id(req, method, rel_path, &app_ctx).await;
+        }
+
+        // Contributor presences routes (Diesel)
+        if resource_path == "presences" {
+            return self.handle_presences_list(req, method, &app_ctx).await;
+        }
+
+        if resource_path == "presences/bulk" {
+            return self.handle_presences_bulk(req, method, &app_ctx).await;
+        }
+
+        if let Some(presence_path) = resource_path.strip_prefix("presences/") {
+            // Check for action sub-paths first
+            if let Some(rest) = presence_path.strip_suffix("/stewardship") {
+                return self.handle_presence_stewardship(req, method, rest, &app_ctx).await;
+            }
+            if let Some(rest) = presence_path.strip_suffix("/claim") {
+                return self.handle_presence_claim(req, method, rest, &app_ctx).await;
+            }
+            if let Some(rest) = presence_path.strip_suffix("/verify-claim") {
+                return self.handle_presence_verify_claim(req, method, rest, &app_ctx).await;
+            }
+            // Fall back to generic ID handler
+            return self.handle_presence_by_id(req, method, presence_path, &app_ctx).await;
+        }
+
+        // Economic events routes (Diesel)
+        if resource_path == "events" {
+            return self.handle_events_list(req, method, &app_ctx).await;
+        }
+
+        if resource_path == "events/bulk" {
+            return self.handle_events_bulk(req, method, &app_ctx).await;
+        }
+
+        if let Some(event_id) = resource_path.strip_prefix("events/") {
+            return self.handle_event_by_id(req, method, event_id, &app_ctx).await;
+        }
+
+        // Content mastery routes (Diesel)
+        if resource_path == "mastery" {
+            return self.handle_mastery_list(req, method, &app_ctx).await;
+        }
+
+        if resource_path == "mastery/bulk" {
+            return self.handle_mastery_bulk(req, method, &app_ctx).await;
+        }
+
+        if let Some(mastery_path) = resource_path.strip_prefix("mastery/") {
+            // Support /mastery/human/{human_id} and /mastery/{id}
+            if let Some(human_id) = mastery_path.strip_prefix("human/") {
+                return self.handle_mastery_for_human(req, method, human_id, &app_ctx).await;
+            }
+            return self.handle_mastery_by_id(req, method, mastery_path, &app_ctx).await;
+        }
+
+        // Stewardship allocations routes (Diesel)
+        if resource_path == "allocations" {
+            return self.handle_allocations_list(req, method, &app_ctx).await;
+        }
+
+        if resource_path == "allocations/bulk" {
+            return self.handle_allocations_bulk(req, method, &app_ctx).await;
+        }
+
+        if let Some(alloc_path) = resource_path.strip_prefix("allocations/") {
+            // Support /allocations/content/{content_id} and /allocations/steward/{steward_id}
+            if let Some(content_id) = alloc_path.strip_prefix("content/") {
+                return self.handle_allocations_for_content(req, method, content_id, &app_ctx).await;
+            }
+            if let Some(steward_id) = alloc_path.strip_prefix("steward/") {
+                return self.handle_allocations_for_steward(req, method, steward_id, &app_ctx).await;
+            }
+            // Check for action sub-paths
+            if let Some(rest) = alloc_path.strip_suffix("/dispute") {
+                return self.handle_allocation_dispute(req, method, rest, &app_ctx).await;
+            }
+            if let Some(rest) = alloc_path.strip_suffix("/resolve") {
+                return self.handle_allocation_resolve(req, method, rest, &app_ctx).await;
+            }
+            return self.handle_allocation_by_id(req, method, alloc_path, &app_ctx).await;
         }
 
         Ok(Response::builder()
@@ -2919,6 +3031,815 @@ impl HttpServer {
             .header("X-App-Id", app_id)
             .body(Full::new(Bytes::from(contents)))
             .unwrap())
+    }
+
+    // ========================================================================
+    // Diesel-based Entity Handlers
+    // ========================================================================
+
+    /// Helper to get a Diesel connection from the pool
+    fn get_diesel_conn(&self) -> Result<crate::db::PooledConn, StorageError> {
+        self.db_pool
+            .as_ref()
+            .ok_or_else(|| StorageError::Internal("Diesel pool not configured".into()))?
+            .get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))
+    }
+
+    /// GET/POST /db/human-relationships - List or create human relationships
+    async fn handle_human_relationships_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+
+        match method {
+            Method::GET => {
+                let query_str = req.uri().query().unwrap_or("");
+                let query: human_relationships::HumanRelationshipQuery =
+                    serde_urlencoded::from_str(query_str).unwrap_or_default();
+
+                match human_relationships::list_human_relationships(&mut conn, ctx, &query) {
+                    Ok(items) => {
+                        let body = serde_json::json!({
+                            "items": items,
+                            "count": items.len(),
+                        });
+                        Ok(response::ok(&body))
+                    }
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::POST => {
+                let body = req.collect().await.map_err(|e| {
+                    StorageError::Internal(format!("Failed to read body: {}", e))
+                })?;
+                let input: human_relationships::CreateHumanRelationshipInput =
+                    serde_json::from_slice(&body.to_bytes())
+                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+                match human_relationships::create_human_relationship(&mut conn, ctx, input) {
+                    Ok(rel) => Ok(response::created(&rel)),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// GET/DELETE /db/human-relationships/{id}
+    async fn handle_human_relationship_by_id(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+
+        match method {
+            Method::GET => {
+                match human_relationships::get_human_relationship(&mut conn, ctx, id) {
+                    Ok(Some(rel)) => Ok(response::ok(&rel)),
+                    Ok(None) => Ok(response::not_found(&format!("Human relationship {} not found", id))),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::DELETE => {
+                match human_relationships::delete_human_relationship(&mut conn, ctx, id) {
+                    Ok(true) => Ok(response::ok(&serde_json::json!({"deleted": id}))),
+                    Ok(false) => Ok(response::not_found(&format!("Human relationship {} not found", id))),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// POST /db/human-relationships/{id}/consent - Update consent on a relationship
+    async fn handle_human_relationship_consent(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+        let body = req.collect().await.map_err(|e| {
+            StorageError::Internal(format!("Failed to read body: {}", e))
+        })?;
+
+        #[derive(Deserialize)]
+        struct ConsentInput {
+            party_id: String,
+            consent: bool,
+        }
+
+        let input: ConsentInput = serde_json::from_slice(&body.to_bytes())
+            .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+        let consent_update = human_relationships::ConsentUpdate {
+            consent_given: input.consent,
+        };
+
+        match human_relationships::update_consent(&mut conn, ctx, id, &input.party_id, &consent_update) {
+            Ok(rel) => Ok(response::ok(&rel)),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// POST /db/human-relationships/{id}/custody - Update custody settings on a relationship
+    async fn handle_human_relationship_custody(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+        let body = req.collect().await.map_err(|e| {
+            StorageError::Internal(format!("Failed to read body: {}", e))
+        })?;
+
+        #[derive(Deserialize)]
+        struct CustodyInput {
+            party_id: String,
+            enabled: bool,
+            #[serde(default)]
+            auto_custody: Option<bool>,
+            #[serde(default)]
+            emergency_access: Option<bool>,
+        }
+
+        let input: CustodyInput = serde_json::from_slice(&body.to_bytes())
+            .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+        let custody_update = human_relationships::CustodyUpdate {
+            custody_enabled: input.enabled,
+            auto_custody_enabled: input.auto_custody,
+            emergency_access_enabled: input.emergency_access,
+        };
+
+        match human_relationships::update_custody(&mut conn, ctx, id, &input.party_id, &custody_update) {
+            Ok(rel) => Ok(response::ok(&rel)),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// GET/POST /db/presences - List or create contributor presences
+    async fn handle_presences_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+
+        match method {
+            Method::GET => {
+                let query_str = req.uri().query().unwrap_or("");
+                let query: contributor_presences::ContributorPresenceQuery =
+                    serde_urlencoded::from_str(query_str).unwrap_or_default();
+
+                match contributor_presences::list_contributor_presences(&mut conn, ctx, &query) {
+                    Ok(items) => {
+                        let body = serde_json::json!({
+                            "items": items,
+                            "count": items.len(),
+                        });
+                        Ok(response::ok(&body))
+                    }
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::POST => {
+                let body = req.collect().await.map_err(|e| {
+                    StorageError::Internal(format!("Failed to read body: {}", e))
+                })?;
+                let input: contributor_presences::CreateContributorPresenceInput =
+                    serde_json::from_slice(&body.to_bytes())
+                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+                match contributor_presences::create_contributor_presence(&mut conn, ctx, input) {
+                    Ok(presence) => Ok(response::created(&presence)),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// GET/DELETE /db/presences/{id}
+    async fn handle_presence_by_id(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+
+        match method {
+            Method::GET => {
+                match contributor_presences::get_contributor_presence(&mut conn, ctx, id) {
+                    Ok(Some(presence)) => Ok(response::ok(&presence)),
+                    Ok(None) => Ok(response::not_found(&format!("Presence {} not found", id))),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::DELETE => {
+                match contributor_presences::delete_contributor_presence(&mut conn, ctx, id) {
+                    Ok(true) => Ok(response::ok(&serde_json::json!({"deleted": id}))),
+                    Ok(false) => Ok(response::not_found(&format!("Presence {} not found", id))),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// POST /db/presences/{id}/stewardship - Initiate stewardship of a presence
+    async fn handle_presence_stewardship(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+        let body = req.collect().await.map_err(|e| {
+            StorageError::Internal(format!("Failed to read body: {}", e))
+        })?;
+
+        let input: contributor_presences::InitiateStewardshipInput =
+            serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+        match contributor_presences::initiate_stewardship(&mut conn, ctx, id, &input) {
+            Ok(presence) => Ok(response::ok(&presence)),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// POST /db/presences/{id}/claim - Initiate claim of a presence
+    async fn handle_presence_claim(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+        let body = req.collect().await.map_err(|e| {
+            StorageError::Internal(format!("Failed to read body: {}", e))
+        })?;
+
+        let input: contributor_presences::InitiateClaimInput =
+            serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+        match contributor_presences::initiate_claim(&mut conn, ctx, id, &input) {
+            Ok(presence) => Ok(response::ok(&presence)),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// POST /db/presences/{id}/verify-claim - Verify a claim (sets state to claimed)
+    async fn handle_presence_verify_claim(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+
+        match contributor_presences::verify_claim(&mut conn, ctx, id) {
+            Ok(presence) => Ok(response::ok(&presence)),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// GET/POST /db/events - List or record economic events
+    async fn handle_events_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+
+        match method {
+            Method::GET => {
+                let query_str = req.uri().query().unwrap_or("");
+                let query: economic_events::EconomicEventQuery =
+                    serde_urlencoded::from_str(query_str).unwrap_or_default();
+
+                match economic_events::list_economic_events(&mut conn, ctx, &query) {
+                    Ok(items) => {
+                        let body = serde_json::json!({
+                            "items": items,
+                            "count": items.len(),
+                        });
+                        Ok(response::ok(&body))
+                    }
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::POST => {
+                let body = req.collect().await.map_err(|e| {
+                    StorageError::Internal(format!("Failed to read body: {}", e))
+                })?;
+                let input: economic_events::CreateEconomicEventInput =
+                    serde_json::from_slice(&body.to_bytes())
+                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+                match economic_events::record_event(&mut conn, ctx, input) {
+                    Ok(event) => Ok(response::created(&event)),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// GET /db/events/{id}
+    async fn handle_event_by_id(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+
+        match method {
+            Method::GET => {
+                match economic_events::get_economic_event(&mut conn, ctx, id) {
+                    Ok(Some(event)) => Ok(response::ok(&event)),
+                    Ok(None) => Ok(response::not_found(&format!("Event {} not found", id))),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// GET/POST /db/mastery - List or create content mastery records
+    async fn handle_mastery_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+
+        match method {
+            Method::GET => {
+                let query_str = req.uri().query().unwrap_or("");
+                let query: content_mastery::MasteryQuery =
+                    serde_urlencoded::from_str(query_str).unwrap_or_default();
+
+                match content_mastery::list_mastery(&mut conn, ctx, &query) {
+                    Ok(items) => {
+                        let body = serde_json::json!({
+                            "items": items,
+                            "count": items.len(),
+                        });
+                        Ok(response::ok(&body))
+                    }
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::POST => {
+                let body = req.collect().await.map_err(|e| {
+                    StorageError::Internal(format!("Failed to read body: {}", e))
+                })?;
+                let input: content_mastery::CreateMasteryInput =
+                    serde_json::from_slice(&body.to_bytes())
+                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+                match content_mastery::upsert_mastery(&mut conn, ctx, input) {
+                    Ok(mastery) => Ok(response::created(&mastery)),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// GET /db/mastery/{id}
+    async fn handle_mastery_by_id(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+
+        match method {
+            Method::GET => {
+                match content_mastery::get_mastery(&mut conn, ctx, id) {
+                    Ok(Some(mastery)) => Ok(response::ok(&mastery)),
+                    Ok(None) => Ok(response::not_found(&format!("Mastery record {} not found", id))),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// GET /db/mastery/human/{human_id} - Get all mastery records for a human
+    async fn handle_mastery_for_human(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        human_id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = self.get_diesel_conn()?;
+
+        match method {
+            Method::GET => {
+                match content_mastery::get_mastery_for_human(&mut conn, ctx, human_id) {
+                    Ok(items) => {
+                        let body = serde_json::json!({
+                            "items": items,
+                            "count": items.len(),
+                            "human_id": human_id,
+                        });
+                        Ok(response::ok(&body))
+                    }
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    // =========================================================================
+    // Bulk Endpoints (for seeding/import operations)
+    // =========================================================================
+
+    /// POST /db/presences/bulk - Bulk create contributor presences
+    async fn handle_presences_bulk(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+        let body = req.collect().await.map_err(|e| {
+            StorageError::Internal(format!("Failed to read body: {}", e))
+        })?;
+
+        let inputs: Vec<contributor_presences::CreateContributorPresenceInput> =
+            serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+        match contributor_presences::bulk_create_presences(&mut conn, ctx, inputs) {
+            Ok(result) => Ok(response::ok(&result)),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// POST /db/events/bulk - Bulk record economic events
+    async fn handle_events_bulk(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+        let body = req.collect().await.map_err(|e| {
+            StorageError::Internal(format!("Failed to read body: {}", e))
+        })?;
+
+        let inputs: Vec<economic_events::CreateEconomicEventInput> =
+            serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+        match economic_events::bulk_record_events(&mut conn, ctx, inputs) {
+            Ok(result) => Ok(response::ok(&result)),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// POST /db/mastery/bulk - Bulk create/update mastery records
+    async fn handle_mastery_bulk(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+        let body = req.collect().await.map_err(|e| {
+            StorageError::Internal(format!("Failed to read body: {}", e))
+        })?;
+
+        let inputs: Vec<content_mastery::CreateMasteryInput> =
+            serde_json::from_slice(&body.to_bytes())
+                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+
+        match content_mastery::bulk_upsert_mastery(&mut conn, ctx, inputs) {
+            Ok(result) => Ok(response::ok(&result)),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    // =========================================================================
+    // Stewardship Allocation handlers
+    // =========================================================================
+
+    /// GET/POST /db/allocations - List or create stewardship allocations
+    async fn handle_allocations_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        app_ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let pool = self.db_pool.as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
+        let mut conn = pool.get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        match method {
+            Method::GET => {
+                // Parse query params
+                let query_str = req.uri().query().unwrap_or("");
+                let params: std::collections::HashMap<String, String> =
+                    url::form_urlencoded::parse(query_str.as_bytes())
+                        .into_owned()
+                        .collect();
+
+                let query = stewardship_allocations::AllocationQuery {
+                    content_id: params.get("content_id").cloned(),
+                    steward_presence_id: params.get("steward_presence_id").cloned(),
+                    governance_state: params.get("governance_state").cloned(),
+                    active_only: params.get("active_only").map(|s| s == "true"),
+                    limit: params.get("limit").and_then(|s| s.parse().ok()),
+                    offset: params.get("offset").and_then(|s| s.parse().ok()),
+                };
+
+                match stewardship_allocations::list_allocations(&mut conn, app_ctx, &query) {
+                    Ok(allocations) => Ok(response::ok(&allocations)),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::POST => {
+                let body = req.collect().await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
+                    .to_bytes();
+                let input: stewardship_allocations::CreateAllocationInput = serde_json::from_slice(&body)
+                    .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
+
+                match stewardship_allocations::create_allocation(&mut conn, app_ctx, &input) {
+                    Ok(allocation) => Ok(response::created(&allocation)),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// GET /db/allocations/{id}, DELETE /db/allocations/{id}
+    async fn handle_allocation_by_id(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        id: &str,
+        app_ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let pool = self.db_pool.as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
+        let mut conn = pool.get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        match method {
+            Method::GET => {
+                match stewardship_allocations::get_allocation_by_id(&mut conn, app_ctx, id) {
+                    Ok(allocation) => Ok(response::ok(&allocation)),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::PUT => {
+                let body = req.collect().await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
+                    .to_bytes();
+                let input: stewardship_allocations::UpdateAllocationInput = serde_json::from_slice(&body)
+                    .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
+
+                match stewardship_allocations::update_allocation(&mut conn, app_ctx, id, &input) {
+                    Ok(allocation) => Ok(response::ok(&allocation)),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            Method::DELETE => {
+                match stewardship_allocations::delete_allocation(&mut conn, app_ctx, id) {
+                    Ok(()) => Ok(response::no_content()),
+                    Err(e) => Ok(response::error_response(e)),
+                }
+            }
+            _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    /// GET /db/allocations/content/{content_id} - Get content stewardship aggregate
+    async fn handle_allocations_for_content(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        content_id: &str,
+        app_ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        let pool = self.db_pool.as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
+        let mut conn = pool.get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        match stewardship_allocations::get_content_stewardship(&mut conn, app_ctx, content_id) {
+            Ok(stewardship) => Ok(response::ok(&stewardship)),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// GET /db/allocations/steward/{steward_id} - Get allocations for a steward
+    async fn handle_allocations_for_steward(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        steward_id: &str,
+        app_ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        let pool = self.db_pool.as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
+        let mut conn = pool.get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        match stewardship_allocations::get_allocations_for_steward(&mut conn, app_ctx, steward_id) {
+            Ok(allocations) => Ok(response::ok(&allocations)),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// POST /db/allocations/{id}/dispute - File a dispute on an allocation
+    async fn handle_allocation_dispute(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        allocation_id: &str,
+        app_ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+
+        let pool = self.db_pool.as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
+        let mut conn = pool.get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        #[derive(serde::Deserialize)]
+        struct DisputeInput {
+            dispute_id: String,
+            disputed_by: String,
+            reason: String,
+        }
+
+        let body = req.collect().await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
+            .to_bytes();
+        let input: DisputeInput = serde_json::from_slice(&body)
+            .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
+
+        match stewardship_allocations::file_dispute(&mut conn, app_ctx, allocation_id, &input.dispute_id, &input.disputed_by, &input.reason) {
+            Ok(allocation) => Ok(response::ok(&allocation)),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// POST /db/allocations/{id}/resolve - Resolve a dispute (Elohim ratification)
+    async fn handle_allocation_resolve(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        allocation_id: &str,
+        app_ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+
+        let pool = self.db_pool.as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
+        let mut conn = pool.get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        #[derive(serde::Deserialize)]
+        struct ResolveInput {
+            ratifier_id: String,
+            new_state: String,
+        }
+
+        let body = req.collect().await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
+            .to_bytes();
+        let input: ResolveInput = serde_json::from_slice(&body)
+            .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
+
+        match stewardship_allocations::resolve_dispute(&mut conn, app_ctx, allocation_id, &input.ratifier_id, &input.new_state) {
+            Ok(allocation) => Ok(response::ok(&allocation)),
+            Err(e) => Ok(response::error_response(e)),
+        }
+    }
+
+    /// POST /db/allocations/bulk - Bulk create stewardship allocations
+    async fn handle_allocations_bulk(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        app_ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::POST {
+            return Ok(response::method_not_allowed());
+        }
+
+        let pool = self.db_pool.as_ref()
+            .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
+        let mut conn = pool.get()
+            .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+
+        let body = req.collect().await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
+            .to_bytes();
+        let inputs: Vec<stewardship_allocations::CreateAllocationInput> = serde_json::from_slice(&body)
+            .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
+
+        let mut created = 0;
+        let mut failed = 0;
+        let mut errors: Vec<String> = Vec::new();
+
+        for input in inputs {
+            match stewardship_allocations::create_allocation(&mut conn, app_ctx, &input) {
+                Ok(_) => created += 1,
+                Err(e) => {
+                    failed += 1;
+                    errors.push(format!("{}: {}", input.content_id, e));
+                }
+            }
+        }
+
+        #[derive(serde::Serialize)]
+        struct BulkResult {
+            created: usize,
+            failed: usize,
+            errors: Vec<String>,
+        }
+
+        Ok(response::ok(&BulkResult { created, failed, errors }))
     }
 
     /// Get MIME type for a file path based on extension

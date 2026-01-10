@@ -25,3 +25,7 @@ export type { CreateEconomicEventInput } from './economic.service';
 // Appreciation (recognition flows)
 export { AppreciationService } from './appreciation.service';
 export type { AppreciationDisplay, CreateAppreciationInput } from './appreciation.service';
+
+// Event service (elohim-storage backend)
+export { EventService, LamadEventTypes, REAActions } from './event.service';
+export type { LamadEventType, REAAction } from './event.service';

@@ -34,7 +34,7 @@ pub struct CreateContentInput {
     #[serde(default)]
     pub blob_cid: Option<String>,
     #[serde(default)]
-    pub content_size_bytes: Option<i64>,
+    pub content_size_bytes: Option<i32>,
     #[serde(default)]
     pub metadata_json: Option<String>,
     #[serde(default = "default_reach")]

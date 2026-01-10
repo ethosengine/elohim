@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS idx_relationships_inference;
+DROP INDEX IF EXISTS idx_relationships_inverse;
+DROP INDEX IF EXISTS idx_relationships_source_type;
+DROP INDEX IF EXISTS idx_relationships_type;
+DROP INDEX IF EXISTS idx_relationships_target;
+DROP INDEX IF EXISTS idx_relationships_source;
+DROP INDEX IF EXISTS idx_relationships_app_id;
+DROP INDEX IF EXISTS idx_relationships_unique;
+DROP TABLE IF EXISTS relationships;
