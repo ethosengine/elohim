@@ -12,10 +12,12 @@
  *   DATA_DIR - Path to lamad data directory (optional, defaults to ../data/lamad)
  *   LIMIT - Maximum items to seed (optional, for testing)
  *   DRY_RUN - If "true", validate but don't write (optional)
+ *   SKIP_BLOB_UPLOAD - Skip uploading blobs (for debugging)
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 // Directory setup
@@ -31,6 +33,10 @@ const LIMIT = parseInt(process.env.LIMIT || args.find(a => a.startsWith('--limit
 const DRY_RUN = process.env.DRY_RUN === 'true' || args.includes('--dry-run');
 const CONTENT_ONLY = args.includes('--content-only') || process.env.CONTENT_ONLY === 'true';
 const PATHS_ONLY = args.includes('--paths-only') || process.env.PATHS_ONLY === 'true';
+const SKIP_BLOB_UPLOAD = process.env.SKIP_BLOB_UPLOAD === 'true' || args.includes('--skip-blob-upload');
+
+// Content formats that require blob upload
+const BLOB_FORMATS = ['html5-app', 'perseus-quiz-json'];
 
 // ============================================================================
 // Value Normalizers (map legacy/variant values to valid backend enums)
@@ -173,6 +179,10 @@ interface ConceptJson {
   estimatedMinutes?: number;
   thumbnailUrl?: string;
   metadata?: Record<string, unknown>;
+  // Blob references for html5-app and large content
+  blobHash?: string;       // Pre-computed hash (camelCase from JSON)
+  blob_hash?: string;      // Alternative snake_case format
+  entry_point?: string;    // Entry point for html5-app (e.g., "index.html")
 }
 
 interface PathJson {
@@ -248,6 +258,148 @@ class Timer {
 
 function formatCount(n: number): string {
   return n.toLocaleString();
+}
+
+/**
+ * Compute SHA256 hash of data (matching elohim-storage format).
+ */
+function computeHash(data: Buffer): string {
+  const hash = crypto.createHash('sha256').update(data).digest('hex');
+  return `sha256-${hash}`;
+}
+
+/**
+ * Upload a blob to elohim-storage.
+ * Returns the hash on success, null on failure.
+ */
+async function uploadBlob(data: Buffer, mimeType: string, description?: string): Promise<string | null> {
+  if (DRY_RUN) {
+    const hash = computeHash(data);
+    console.log(`   [DRY RUN] Would upload blob: ${hash} (${data.length} bytes)`);
+    return hash;
+  }
+
+  const hash = computeHash(data);
+
+  try {
+    const response = await fetch(`${STORAGE_URL}/blob/${hash}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': mimeType,
+      },
+      body: data,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`   ✗ Failed to upload ${description || hash}: ${response.status} - ${errorText}`);
+      return null;
+    }
+
+    return hash;
+  } catch (error) {
+    console.error(`   ✗ Failed to upload ${description || hash}: ${error}`);
+    return null;
+  }
+}
+
+/**
+ * Check if a blob exists in storage.
+ */
+async function blobExists(hash: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${STORAGE_URL}/blob/${hash}`, {
+      method: 'HEAD',
+    });
+    return response.status === 200;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Find and load HTML5 app ZIP blob for content.
+ * Returns the blob data and hash, or null if not found.
+ */
+function findHtml5AppBlob(concept: ConceptJson, contentDir: string): { data: Buffer; hash: string } | null {
+  // Get existing hash (supports both camelCase and snake_case)
+  const existingHash = concept.blobHash || concept.blob_hash;
+  const normalizedHash = existingHash
+    ? (existingHash.startsWith('sha256-') ? existingHash : `sha256-${existingHash}`)
+    : null;
+
+  // Check metadata.localZipPath first
+  const metadata = concept.metadata as Record<string, unknown> | undefined;
+  if (metadata?.localZipPath) {
+    const zipPath = path.join(GENESIS_DIR, metadata.localZipPath as string);
+    if (fs.existsSync(zipPath)) {
+      const data = fs.readFileSync(zipPath);
+      const hash = normalizedHash || computeHash(data);
+      console.log(`   📦 Found ZIP via metadata.localZipPath: ${metadata.localZipPath}`);
+      return { data, hash };
+    }
+  }
+
+  // Try to find a zip file with same ID in content directory
+  const zipPath = path.join(contentDir, `${concept.id}.zip`);
+  if (fs.existsSync(zipPath)) {
+    const data = fs.readFileSync(zipPath);
+    const hash = normalizedHash || computeHash(data);
+    return { data, hash };
+  }
+
+  // If we have a hash reference but no local file, the blob should already be uploaded
+  if (normalizedHash) {
+    return null; // No local file to upload
+  }
+
+  return null;
+}
+
+/**
+ * Find and load thumbnail image for a path.
+ * Searches in genesis/assets/images/ directory.
+ */
+function findThumbnailBlob(thumbnailUrl: string | undefined): { data: Buffer; hash: string; mimeType: string } | null {
+  if (!thumbnailUrl) return null;
+
+  // Handle various path formats
+  let imagePath: string | null = null;
+
+  if (thumbnailUrl.startsWith('/images/')) {
+    // Map /images/xxx to assets/images/xxx
+    imagePath = path.join(GENESIS_DIR, 'assets', thumbnailUrl.slice(1));
+  } else if (thumbnailUrl.startsWith('images/')) {
+    imagePath = path.join(GENESIS_DIR, 'assets', thumbnailUrl);
+  } else if (thumbnailUrl.startsWith('assets/')) {
+    imagePath = path.join(GENESIS_DIR, thumbnailUrl);
+  } else if (thumbnailUrl.startsWith('/assets/')) {
+    imagePath = path.join(GENESIS_DIR, thumbnailUrl.slice(1));
+  } else if (thumbnailUrl.startsWith('blob/') || thumbnailUrl.startsWith('/blob/')) {
+    // Already a blob reference
+    return null;
+  }
+
+  if (!imagePath || !fs.existsSync(imagePath)) {
+    return null;
+  }
+
+  const data = fs.readFileSync(imagePath);
+  const hash = computeHash(data);
+
+  // Determine MIME type from extension
+  const ext = path.extname(imagePath).toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+  };
+  const mimeType = mimeTypes[ext] || 'application/octet-stream';
+
+  return { data, hash, mimeType };
 }
 
 /**
@@ -589,6 +741,7 @@ async function main() {
   console.log(`   Dry run: ${DRY_RUN}`);
   console.log(`   Content only: ${CONTENT_ONLY}`);
   console.log(`   Paths only: ${PATHS_ONLY}`);
+  console.log(`   Skip blob upload: ${SKIP_BLOB_UPLOAD}`);
 
   // Check storage is available
   console.log(`\nChecking storage availability...`);
@@ -606,6 +759,101 @@ async function main() {
   let totalInserted = 0;
   let totalSkipped = 0;
   let totalErrors: string[] = [];
+
+  // Map to store uploaded blob hashes for content (id -> hash)
+  const uploadedContentBlobs = new Map<string, string>();
+  // Map to store uploaded thumbnail hashes for paths (thumbnailUrl -> hash)
+  const uploadedThumbnails = new Map<string, string>();
+
+  // ========================================
+  // Phase 0: Upload Blobs (HTML5 apps, thumbnails)
+  // ========================================
+  if (!SKIP_BLOB_UPLOAD) {
+    console.log(`\n${'='.repeat(70)}`);
+    console.log(`Phase 0: Uploading Blobs`);
+    console.log(`${'='.repeat(70)}`);
+
+    const blobTimer = new Timer();
+    const contentDir = path.join(DATA_DIR, 'content');
+    let blobsUploaded = 0;
+    let blobsSkipped = 0;
+    let blobsFailed = 0;
+
+    // Load content to find HTML5 apps
+    console.log(`\nScanning for HTML5 app blobs...`);
+    const content = loadContentFiles();
+    const html5Apps = content.filter(c =>
+      normalizeContentFormat(c.contentFormat) === 'html5-app' ||
+      c.contentFormat === 'html5-app'
+    );
+    console.log(`   Found ${html5Apps.length} HTML5 app content items`);
+
+    for (const app of html5Apps) {
+      const blob = findHtml5AppBlob(app, contentDir);
+      if (blob) {
+        // Check if already exists
+        const exists = await blobExists(blob.hash);
+        if (exists) {
+          console.log(`   ✓ ${app.id}: already exists (${blob.hash.slice(0, 16)}...)`);
+          blobsSkipped++;
+        } else {
+          const hash = await uploadBlob(blob.data, 'application/zip', app.id);
+          if (hash) {
+            console.log(`   ✓ ${app.id}: uploaded ${(blob.data.length / 1024 / 1024).toFixed(2)} MB`);
+            blobsUploaded++;
+          } else {
+            blobsFailed++;
+          }
+        }
+        uploadedContentBlobs.set(app.id, blob.hash);
+      } else {
+        // Check if there's a hash reference we should verify
+        const existingHash = app.blobHash || app.blob_hash;
+        if (existingHash) {
+          const normalizedHash = existingHash.startsWith('sha256-') ? existingHash : `sha256-${existingHash}`;
+          const exists = await blobExists(normalizedHash);
+          if (!exists) {
+            console.warn(`   ⚠️ ${app.id}: blob_hash exists but blob not found in storage`);
+          }
+          uploadedContentBlobs.set(app.id, normalizedHash);
+        }
+      }
+    }
+
+    // Scan for path thumbnails
+    console.log(`\nScanning for path thumbnails...`);
+    const paths = loadPathFiles();
+    const pathsWithThumbnails = paths.filter(p => p.thumbnailUrl);
+    console.log(`   Found ${pathsWithThumbnails.length} paths with thumbnails`);
+
+    for (const pathItem of pathsWithThumbnails) {
+      if (!pathItem.thumbnailUrl) continue;
+
+      // Skip if already processed
+      if (uploadedThumbnails.has(pathItem.thumbnailUrl)) continue;
+
+      const thumbnail = findThumbnailBlob(pathItem.thumbnailUrl);
+      if (thumbnail) {
+        const exists = await blobExists(thumbnail.hash);
+        if (exists) {
+          console.log(`   ✓ ${pathItem.id}: thumbnail already exists`);
+          blobsSkipped++;
+        } else {
+          const hash = await uploadBlob(thumbnail.data, thumbnail.mimeType, `${pathItem.id} thumbnail`);
+          if (hash) {
+            console.log(`   ✓ ${pathItem.id}: thumbnail uploaded ${(thumbnail.data.length / 1024).toFixed(1)} KB`);
+            blobsUploaded++;
+          } else {
+            blobsFailed++;
+          }
+        }
+        uploadedThumbnails.set(pathItem.thumbnailUrl, thumbnail.hash);
+      }
+    }
+
+    console.log(`\nBlob upload complete in ${blobTimer.elapsed()}`);
+    console.log(`   Uploaded: ${blobsUploaded}, Skipped: ${blobsSkipped}, Failed: ${blobsFailed}`);
+  }
 
   // ========================================
   // Phase 1: Seed Content
@@ -626,7 +874,15 @@ async function main() {
     }
 
     console.log(`\nTransforming content...`);
-    const contentInputs = content.map(transformContent);
+    const contentInputs = content.map(c => {
+      const input = transformContent(c);
+      // Add blob_hash if we uploaded one for this content
+      const blobHash = uploadedContentBlobs.get(c.id);
+      if (blobHash) {
+        input.blob_hash = blobHash;
+      }
+      return input;
+    });
     console.log(`   Transformed ${formatCount(contentInputs.length)} items`);
 
     console.log(`\nSeeding content to database...`);
@@ -668,7 +924,15 @@ async function main() {
     }
 
     console.log(`\nTransforming paths...`);
-    const pathInputs = paths.map(transformPath);
+    const pathInputs = paths.map(p => {
+      const input = transformPath(p);
+      // Update thumbnail_url to blob reference if we uploaded one
+      if (p.thumbnailUrl && uploadedThumbnails.has(p.thumbnailUrl)) {
+        const blobHash = uploadedThumbnails.get(p.thumbnailUrl)!;
+        input.thumbnail_url = `/blob/${blobHash}`;
+      }
+      return input;
+    });
     const totalSteps = pathInputs.reduce((sum, p) =>
       sum + p.chapters.reduce((csum, c) => csum + c.steps.length, 0), 0);
     console.log(`   Transformed ${formatCount(pathInputs.length)} paths with ${formatCount(totalSteps)} steps`);
