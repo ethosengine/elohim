@@ -2,7 +2,7 @@
  * Elohim Edge Infrastructure Pipeline (elohim-edge)
  *
  * Builds container images and deploys Edge Node to dev/prod environments.
- * Triggered by orchestrator when holochain/doorway/, elohim-storage/, edgenode/, or manifests/ change.
+ * Triggered by orchestrator when doorway/, holochain/elohim-storage/, holochain/edgenode/, or holochain/manifests/ change.
  *
  * What this pipeline builds:
  *   - elohim-doorway (HTTP gateway)
@@ -335,8 +335,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                                cd holochain
-
+                                # Build from repo root with doorway/Dockerfile
                                 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
                                     nerdctl -n k8s.io build \\
                                     -t elohim-doorway:${IMAGE_TAG} \\
@@ -580,7 +579,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         branch 'dev'
                         allOf {
                             anyOf {
-                                changeset "holochain/doorway/**"
+                                changeset "doorway/**"
                                 changeset "holochain/elohim-storage/**"
                                 changeset "holochain/edgenode/**"
                                 changeset "holochain/manifests/**"

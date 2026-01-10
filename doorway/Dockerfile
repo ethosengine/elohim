@@ -1,5 +1,5 @@
 # Build stage
-# NOTE: Build context should be holochain/ directory, not doorway/
+# NOTE: Build context should be repo root directory
 # Run: docker build -f doorway/Dockerfile -t doorway .
 FROM rust:1.83-slim-bookworm AS builder
 
@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y \
 
 # Copy manifests and local crates first for dependency caching
 COPY doorway/Cargo.toml doorway/Cargo.lock ./
-COPY crates ./crates
-COPY holochain-cache-core ./holochain-cache-core
+COPY holochain/crates ./holochain/crates
+COPY holochain/holochain-cache-core ./holochain/holochain-cache-core
 
 # Create dummy src to build dependencies
 RUN mkdir -p src/bin && \
@@ -23,8 +23,8 @@ RUN mkdir -p src/bin && \
     echo 'fn main() { println!("worker placeholder"); }' > src/bin/worker.rs
 
 # Fix the paths to local crates (now relative to /app)
-RUN sed -i 's|path = "../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
-    sed -i 's|path = "../holochain-cache-core"|path = "holochain-cache-core"|' Cargo.toml
+RUN sed -i 's|path = "../holochain/crates/doorway-client"|path = "holochain/crates/doorway-client"|' Cargo.toml && \
+    sed -i 's|path = "../holochain/holochain-cache-core"|path = "holochain/holochain-cache-core"|' Cargo.toml
 
 # Build dependencies (this layer gets cached)
 RUN cargo build --release

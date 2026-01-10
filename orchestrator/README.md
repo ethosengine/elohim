@@ -28,7 +28,7 @@ PIPELINES = [
         triggersGenesis: true
     ],
     'elohim-edge': [
-        changePatterns: ['holochain/doorway/', 'holochain/edgenode/', 'holochain/manifests/'],
+        changePatterns: ['doorway/', 'holochain/edgenode/', 'holochain/manifests/'],
         dependsOn: ['elohim-holochain'],
         triggersGenesis: true
     ],

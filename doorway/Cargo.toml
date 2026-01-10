@@ -65,7 +65,7 @@ hex = "0.4"
 
 # Caching
 sha2 = "0.10"
-holochain-cache-core = { path = "../holochain-cache-core" }
+holochain-cache-core = { path = "../holochain/holochain-cache-core" }
 
 # CID (Content Identifiers) - IPFS-compatible content addressing
 cid = "0.11"
@@ -79,7 +79,7 @@ async-trait = "0.1"
 base64ct = "=1.6.0"
 
 # Shared types with DNAs
-doorway-client = { path = "../crates/doorway-client" }
+doorway-client = { path = "../holochain/crates/doorway-client" }
 
 [dev-dependencies]
 tokio-test = "0.4"
