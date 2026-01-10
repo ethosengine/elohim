@@ -558,6 +558,8 @@ interface ConceptJson {
   // Attention metadata
   estimatedMinutes?: number;  // Reading/viewing time in minutes
   thumbnailUrl?: string;      // Preview image for visual cards
+  // HTML5 app blob reference (pre-computed hash in JSON)
+  blobHash?: string;          // SHA256 hash (without sha256- prefix)
 }
 
 interface PathJson {
@@ -1020,11 +1022,14 @@ async function seedViaDoorway(): Promise<SeedResult> {
   console.log('\n📦 Processing HTML5 app content...');
 
   // Initialize blob manager for HTML5 app processing
+  // forceUpload: true ensures blobs are uploaded even if blob_hash exists
+  // (needed for fresh deployments where content JSON has blob_hash but storage is empty)
   const blobManager = new BlobManager({
     doorwayUrl: DOORWAY_URL!,
     apiKey: DOORWAY_API_KEY,
     minBlobSize: 0, // Always extract html5-app ZIPs regardless of size
     cacheDir: path.join(GENESIS_DIR, '.blob-cache'),
+    forceUpload: true, // Always upload blobs to ensure storage has them
   });
 
   // Map to store blob_hash for each html5-app content ID

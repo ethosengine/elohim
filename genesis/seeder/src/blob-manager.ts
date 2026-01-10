@@ -63,6 +63,8 @@ export interface BlobManagerConfig {
   cacheDir?: string;
   /** Dry run - don't actually push blobs */
   dryRun?: boolean;
+  /** Force upload blobs even if blob_hash already exists (for fresh deployments) */
+  forceUpload?: boolean;
 }
 
 export interface ContentFile {
@@ -72,7 +74,8 @@ export interface ContentFile {
   title?: string;
   description?: string;
   content?: string | object;
-  blob_hash?: string;
+  blob_hash?: string;   // snake_case (internal/API format)
+  blobHash?: string;    // camelCase (JSON file format)
   blob_url?: string;
   entry_point?: string;
   fallback_url?: string;
@@ -106,6 +109,7 @@ export class BlobManager {
       minBlobSize: config.minBlobSize || 10 * 1024, // 10KB default
       cacheDir: config.cacheDir || '.blob-cache',
       dryRun: config.dryRun || false,
+      forceUpload: config.forceUpload || false,
     };
 
     // Ensure cache directory exists
@@ -134,8 +138,18 @@ export class BlobManager {
       };
     }
 
+    // Get existing blob hash (supports both camelCase from JSON and snake_case)
+    const existingHash = content.blob_hash || content.blobHash;
+
+    // Normalize hash format (ensure sha256- prefix)
+    const normalizedExistingHash = existingHash
+      ? (existingHash.startsWith('sha256-') ? existingHash : `sha256-${existingHash}`)
+      : null;
+
     // Check if content already has a blob reference
-    if (content.blob_hash) {
+    // If forceUpload is true, we still extract and prepare the blob for upload
+    // (needed for fresh deployments where blob_hash exists but blob isn't in storage)
+    if (normalizedExistingHash && !this.config.forceUpload) {
       return {
         metadata: content,
         blob: null,
@@ -193,8 +207,9 @@ export class BlobManager {
       };
     }
 
-    // Compute hash
-    const hash = this.computeHash(blob);
+    // Use existing blob_hash if available (forceUpload mode), otherwise compute
+    // This ensures consistency between JSON and actual blob hash
+    const hash = normalizedExistingHash || this.computeHash(blob);
     const mimeType = FORMAT_MIME_TYPES[format] || 'application/octet-stream';
 
     const blobMetadata: BlobMetadata = {
