@@ -349,6 +349,36 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        stage('Build Doorway App') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Building Doorway Operator Dashboard: ${IMAGE_TAG}"
+
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                cd doorway-app
+
+                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                    nerdctl -n k8s.io build \\
+                                    -t doorway-app:${IMAGE_TAG} \\
+                                    -f Dockerfile .
+
+                                nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} doorway-app:${GIT_COMMIT_HASH}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Build Storage') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
@@ -541,6 +571,19 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     fi
                                 """
 
+                                sh """
+                                    if nerdctl -n k8s.io images | grep -q "doorway-app.*${IMAGE_TAG}"; then
+                                        echo "Pushing Doorway App image..."
+                                        nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/doorway-app:${IMAGE_TAG}
+                                        nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/doorway-app:${GIT_COMMIT_HASH}
+
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/doorway-app:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/doorway-app:${GIT_COMMIT_HASH}
+                                    else
+                                        echo "Doorway App image not found, skipping push"
+                                    fi
+                                """
+
                                 if (env.BRANCH_NAME == 'dev') {
                                     sh """
                                         if nerdctl -n k8s.io images | grep -q "elohim-edgenode.*${IMAGE_TAG}"; then
@@ -561,6 +604,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                         if nerdctl -n k8s.io images | grep -q "elohim-happ-installer.*${IMAGE_TAG}"; then
                                             nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:dev-latest
                                             nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:dev-latest
+                                        fi
+
+                                        if nerdctl -n k8s.io images | grep -q "doorway-app.*${IMAGE_TAG}"; then
+                                            nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/doorway-app:dev-latest
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/doorway-app:dev-latest
                                         fi
                                     """
                                 }

@@ -36,8 +36,8 @@ import groovy.transform.Field
     ],
     'elohim-edge': [
         jenkinsPath: 'holochain/Jenkinsfile',
-        changePatterns: ['doorway/', 'holochain/edgenode/', 'holochain/elohim-storage/', 'holochain/manifests/', 'holochain/crates/'],
-        artifacts: ['elohim-doorway', 'elohim-edgenode', 'elohim-storage', 'elohim-happ-installer'],
+        changePatterns: ['doorway/', 'doorway-app/', 'holochain/edgenode/', 'holochain/elohim-storage/', 'holochain/manifests/', 'holochain/crates/'],
+        artifacts: ['elohim-doorway', 'doorway-app', 'elohim-edgenode', 'elohim-storage', 'elohim-happ-installer'],
         dependsOn: ['elohim-holochain'],
         triggersGenesis: true,
         deploymentCheck: [
