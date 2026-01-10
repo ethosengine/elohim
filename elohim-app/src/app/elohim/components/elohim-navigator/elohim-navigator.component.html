@@ -143,6 +143,10 @@
         </div>
       </div>
     } @else {
+      <!-- Theme Toggle for visitors (Lamad only) -->
+      @if (context === 'lamad') {
+        <app-theme-toggle [inline]="true"></app-theme-toggle>
+      }
       <!-- Visitor: Show Login/Register Buttons -->
       <div class="auth-buttons">
         <button class="auth-btn auth-btn-link" (click)="goToLogin()">
