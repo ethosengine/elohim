@@ -54,6 +54,55 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   private connected = false;
 
   // ==========================================================================
+  // Retry Helper for Source Chain Operations
+  // ==========================================================================
+
+  /**
+   * Retry an operation that may fail due to source chain conflicts.
+   *
+   * Holochain's source chain is single-threaded per agent. When multiple
+   * operations try to commit simultaneously (e.g., cap grants for multiple
+   * cells), they can race. This helper retries with backoff on known
+   * conflict errors.
+   */
+  private async withSourceChainRetry<T>(
+    operation: () => Promise<T>,
+    description: string,
+    maxRetries = 3
+  ): Promise<T> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+
+        // Check if this is a source chain conflict error
+        const isSourceChainConflict =
+          lastError.message.includes('source chain head has moved') ||
+          lastError.message.includes('HeadMoved');
+
+        if (isSourceChainConflict && attempt < maxRetries) {
+          // Exponential backoff: 100ms, 200ms, 400ms
+          const delay = 100 * Math.pow(2, attempt - 1);
+          console.warn(
+            `[DoorwayStrategy] Source chain conflict during ${description}, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // Not a retryable error or max retries reached
+        throw lastError;
+      }
+    }
+
+    // Should not reach here, but satisfy TypeScript
+    throw lastError ?? new Error('Retry failed');
+  }
+
+  // ==========================================================================
   // Environment Detection
   // ==========================================================================
 
@@ -265,21 +314,26 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       console.log('[DoorwayStrategy] Found', cellIds.size, 'cells:', Array.from(cellIds.keys()));
 
       // Step 6: Grant zome call capability for ALL cells
+      // Use retry helper since cap grants write to source chain and can race
       for (const [roleName, cellId] of cellIds) {
-        await this.adminWs.grantZomeCallCapability({
-          cell_id: cellId,
-          cap_grant: {
-            tag: `browser-signing-${roleName}`,
-            functions: { type: 'all' },
-            access: {
-              type: 'assigned',
-              value: {
-                secret: capSecret,
-                assignees: [signingKey],
+        await this.withSourceChainRetry(
+          () =>
+            this.adminWs!.grantZomeCallCapability({
+              cell_id: cellId,
+              cap_grant: {
+                tag: `browser-signing-${roleName}`,
+                functions: { type: 'all' },
+                access: {
+                  type: 'assigned',
+                  value: {
+                    secret: capSecret,
+                    assignees: [signingKey],
+                  },
+                },
               },
-            },
-          },
-        });
+            }),
+          `cap grant for ${roleName}`
+        );
         console.log(`[DoorwayStrategy] Granted cap for role '${roleName}'`);
       }
 
@@ -309,8 +363,12 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       }
 
       // Step 9: Authorize signing credentials for ALL cells
+      // Use retry helper since authorization writes to source chain
       for (const [roleName, cellId] of cellIds) {
-        await this.adminWs.authorizeSigningCredentials(cellId);
+        await this.withSourceChainRetry(
+          () => this.adminWs!.authorizeSigningCredentials(cellId),
+          `authorize credentials for ${roleName}`
+        );
         console.log(`[DoorwayStrategy] Authorized credentials for role '${roleName}'`);
       }
 
