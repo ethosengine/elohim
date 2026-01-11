@@ -153,6 +153,7 @@ pub fn health_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "application/json")
+        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(body)))
         .unwrap()
 }
@@ -182,6 +183,7 @@ pub fn readiness_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     Response::builder()
         .status(status)
         .header("Content-Type", "application/json")
+        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(body)))
         .unwrap()
 }
@@ -220,6 +222,7 @@ pub fn version_info() -> Response<Full<Bytes>> {
     Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "application/json")
+        .header("Access-Control-Allow-Origin", "*")
         .body(Full::new(Bytes::from(body)))
         .unwrap()
 }
