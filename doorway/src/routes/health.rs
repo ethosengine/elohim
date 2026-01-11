@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use crate::server::AppState;
 
-/// Health response for seeder compatibility
+/// Health response for seeder compatibility and doorway-picker UI
 ///
 /// The seeder expects this format:
 /// - healthy: boolean - overall health status
@@ -28,12 +28,23 @@ use crate::server::AppState;
 /// - cacheEnabled: boolean - whether projection cache is available
 /// - cache.enabled: boolean - backwards compat for seeder's data.cache?.enabled
 /// - conductor.connected: boolean - whether conductor is available (seeder should check this!)
+///
+/// The doorway-picker UI expects:
+/// - status: 'online' | 'degraded' | 'offline' | 'maintenance'
+/// - registrationOpen: boolean - whether new users can register
 #[derive(Serialize)]
 pub struct HealthResponse {
     /// Overall health status (true if service is running)
     pub healthy: bool,
+    /// Doorway status for UI display: 'online', 'degraded', 'offline', 'maintenance'
+    pub status: &'static str,
+    /// Whether new user registration is open
+    #[serde(rename = "registrationOpen")]
+    pub registration_open: bool,
     /// Service version
     pub version: &'static str,
+    /// Uptime in seconds
+    pub uptime: u64,
     /// Whether cache/projection is enabled (top-level for new clients)
     #[serde(rename = "cacheEnabled")]
     pub cache_enabled: bool,
@@ -115,9 +126,34 @@ fn build_health_response(state: &AppState) -> HealthResponse {
         None
     };
 
+    // Determine status for doorway-picker UI
+    // - 'online': fully operational
+    // - 'degraded': running but conductor not connected (limited functionality)
+    // - 'offline': would return early if service truly down
+    // - 'maintenance': reserved for planned maintenance
+    let status = if conductor_connected {
+        "online"
+    } else if args.dev_mode {
+        "online" // Dev mode is always "online" for picker purposes
+    } else {
+        "degraded"
+    };
+
+    // Registration is always open for now (can be made configurable via args later)
+    let registration_open = true;
+
+    // Calculate uptime in seconds (approximate - from process start)
+    let uptime = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
     HealthResponse {
         healthy: true, // Service is running
+        status,
+        registration_open,
         version: env!("CARGO_PKG_VERSION"),
+        uptime,
         cache_enabled,
         cache: CacheStatus {
             enabled: cache_enabled,
