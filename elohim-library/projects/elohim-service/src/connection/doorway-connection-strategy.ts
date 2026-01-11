@@ -106,16 +106,17 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
 
     if (cheProxy && config.useLocalProxy) {
       // Che environment: use path-based routing through dev-proxy
-      const url = `${cheProxy}/admin`;
+      const url = `${cheProxy}/hc/admin`;
       console.log('[DoorwayStrategy] Admin URL (Che dev-proxy):', url);
       return url;
     }
 
-    // Deployed: use configured URL with optional API key
+    // Deployed: use configured URL with /hc/admin path and optional API key
+    const baseUrl = config.adminUrl.replace(/\/$/, '');
     const url = config.proxyApiKey
-      ? `${config.adminUrl}?apiKey=${encodeURIComponent(config.proxyApiKey)}`
-      : config.adminUrl;
-    console.log('[DoorwayStrategy] Admin URL (direct):', url);
+      ? `${baseUrl}/hc/admin?apiKey=${encodeURIComponent(config.proxyApiKey)}`
+      : `${baseUrl}/hc/admin`;
+    console.log('[DoorwayStrategy] Admin URL (doorway):', url);
     return url;
   }
 
@@ -124,20 +125,20 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
 
     if (cheProxy && config.useLocalProxy) {
       // Che environment: use path-based routing with port through dev-proxy
-      const url = `${cheProxy}/app/${port}`;
+      const url = `${cheProxy}/hc/app/${port}`;
       console.log('[DoorwayStrategy] App URL (Che dev-proxy):', url);
       return url;
     }
 
     // Check if we have a configured admin URL (deployed environment)
-    // Route app interface through admin-proxy using /app/:port path
+    // Route app interface through doorway using /hc/app/:port path
     if (config.adminUrl && !config.adminUrl.includes('localhost')) {
       const baseUrl = config.adminUrl.replace(/\/$/, '');
       const apiKeyParam = config.proxyApiKey
         ? `?apiKey=${encodeURIComponent(config.proxyApiKey)}`
         : '';
-      const url = `${baseUrl}/app/${port}${apiKeyParam}`;
-      console.log('[DoorwayStrategy] App URL (admin-proxy):', url);
+      const url = `${baseUrl}/hc/app/${port}${apiKeyParam}`;
+      console.log('[DoorwayStrategy] App URL (doorway):', url);
       return url;
     }
 
