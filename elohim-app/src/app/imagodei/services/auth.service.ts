@@ -490,4 +490,55 @@ export class AuthService {
   clearError(): void {
     this.updateState({ error: null });
   }
+
+  /**
+   * Set authentication state from an external auth result.
+   * Used by OAuth callback to complete the login flow.
+   *
+   * @param result - Successful auth result from OAuth provider
+   * @param providerType - The provider type that was used (default: oauth)
+   */
+  async setAuthFromResult(
+    result: AuthResult,
+    providerType: AuthProviderType = 'oauth'
+  ): Promise<void> {
+    if (!result.success) {
+      this.updateState({
+        isLoading: false,
+        error: result.error,
+      });
+      return;
+    }
+
+    this.handleAuthSuccess(result, providerType);
+  }
+
+  /**
+   * Set authentication state from a Tauri local session.
+   * Used by TauriAuthService after OAuth handoff or session restoration.
+   *
+   * @param session - Local session from elohim-storage
+   */
+  setTauriSession(session: {
+    humanId: string;
+    agentPubKey: string;
+    doorwayUrl: string;
+    identifier: string;
+    displayName?: string;
+  }): void {
+    this.updateState({
+      isAuthenticated: true,
+      humanId: session.humanId,
+      agentPubKey: session.agentPubKey,
+      identifier: session.identifier,
+      // Tauri sessions don't use JWT tokens - local session is the auth
+      token: null,
+      expiresAt: null,
+      provider: 'tauri' as AuthProviderType,
+      isLoading: false,
+      error: null,
+    });
+
+    console.log('[AuthService] Tauri session set:', session.identifier);
+  }
 }

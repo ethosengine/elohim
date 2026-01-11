@@ -2,6 +2,13 @@
   "productName": "Elohim Steward",
   "version": "0.1.0",
   "identifier": "host.elohim.steward",
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["elohim"]
+      }
+    }
+  },
   "build": {
     "beforeBuildCommand": "",
     "devUrl": "http://localhost:4200",

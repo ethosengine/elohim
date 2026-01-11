@@ -143,6 +143,11 @@ pub struct Args {
     /// Admin port for orchestrator mDNS advertisement (defaults to conductor admin port)
     #[arg(long, env = "ORCHESTRATOR_ADMIN_PORT", default_value = "8888")]
     pub orchestrator_admin_port: u16,
+
+    /// Bootstrap URL for P2P discovery (Holochain kitsune bootstrap)
+    /// Returned in native-handoff response for Tauri clients to join network
+    #[arg(long, env = "BOOTSTRAP_URL")]
+    pub bootstrap_url: Option<String>,
 }
 
 /// NATS connection configuration

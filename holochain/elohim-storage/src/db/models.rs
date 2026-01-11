@@ -984,3 +984,44 @@ pub mod governance_states {
         ALL.contains(&state)
     }
 }
+
+// ============================================================================
+// Local Session Models (Tauri Native Handoff)
+// ============================================================================
+
+/// Local session row from SELECT query
+/// Stores identity info from doorway after OAuth authentication for offline access
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize, TS)]
+#[diesel(table_name = local_sessions)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct LocalSession {
+    pub id: String,
+    pub human_id: String,
+    pub agent_pub_key: String,
+    pub doorway_url: String,
+    pub doorway_id: Option<String>,
+    pub identifier: String,
+    pub display_name: Option<String>,
+    pub profile_image_hash: Option<String>,
+    pub is_active: i32,
+    pub created_at: String,
+    pub updated_at: String,
+    pub last_synced_at: Option<String>,
+    pub bootstrap_url: Option<String>,
+}
+
+/// New local session for INSERT
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = local_sessions)]
+pub struct NewLocalSession<'a> {
+    pub id: &'a str,
+    pub human_id: &'a str,
+    pub agent_pub_key: &'a str,
+    pub doorway_url: &'a str,
+    pub doorway_id: Option<&'a str>,
+    pub identifier: &'a str,
+    pub display_name: Option<&'a str>,
+    pub profile_image_hash: Option<&'a str>,
+    pub bootstrap_url: Option<&'a str>,
+}

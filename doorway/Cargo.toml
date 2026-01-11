@@ -63,6 +63,10 @@ dashmap = "6.1"
 rand = "0.8"
 hex = "0.4"
 
+# OAuth / URL encoding
+urlencoding = "2.1"
+serde_urlencoded = "0.7"
+
 # Caching
 sha2 = "0.10"
 holochain-cache-core = { path = "../holochain/holochain-cache-core" }

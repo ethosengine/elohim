@@ -17,6 +17,7 @@ import { Component, OnInit, inject, signal, computed, output, input } from '@ang
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
 import {
   type DoorwayInfo,
   type DoorwayRegion,
@@ -42,6 +43,7 @@ export class DoorwayPickerComponent implements OnInit {
   // ===========================================================================
 
   private readonly registryService = inject(DoorwayRegistryService);
+  private readonly oauthProvider = inject(OAuthAuthProvider);
 
   // ===========================================================================
   // Inputs
@@ -201,8 +203,29 @@ export class DoorwayPickerComponent implements OnInit {
   }
 
   selectDoorway(doorway: DoorwayInfo): void {
+    // Persist selection
     this.registryService.selectDoorway(doorway, true);
-    this.doorwaySelected.emit(doorway);
+
+    // In login mode, initiate OAuth redirect to doorway's /auth/authorize
+    if (this.mode() === 'login') {
+      // Use different return URL for Tauri (custom URL scheme) vs browser (web origin)
+      const returnUrl = this.isTauriEnvironment()
+        ? 'elohim://auth/callback'
+        : `${window.location.origin}/auth/callback`;
+
+      this.oauthProvider.initiateLogin(doorway.url, returnUrl);
+      // Note: This redirects the browser (or opens external browser in Tauri)
+    } else {
+      // In register mode, just emit the selection for the parent to handle
+      this.doorwaySelected.emit(doorway);
+    }
+  }
+
+  /**
+   * Detect if running in Tauri native app.
+   */
+  private isTauriEnvironment(): boolean {
+    return typeof window !== 'undefined' && '__TAURI__' in window;
   }
 
   toggleCustomInput(): void {

@@ -163,6 +163,24 @@ diesel::table! {
 }
 
 diesel::table! {
+    local_sessions (id) {
+        id -> Text,
+        human_id -> Text,
+        agent_pub_key -> Text,
+        doorway_url -> Text,
+        doorway_id -> Nullable<Text>,
+        identifier -> Text,
+        display_name -> Nullable<Text>,
+        profile_image_hash -> Nullable<Text>,
+        is_active -> Integer,
+        created_at -> Text,
+        updated_at -> Text,
+        last_synced_at -> Nullable<Text>,
+        bootstrap_url -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
     path_attestations (app_id, path_id, attestation_type) {
         app_id -> Text,
         path_id -> Text,
@@ -288,6 +306,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     contributor_presences,
     economic_events,
     human_relationships,
+    local_sessions,
     path_attestations,
     path_tags,
     paths,

@@ -31,6 +31,15 @@ export const routes: Routes = [
     loadChildren: () =>
       import('./doorway/doorway.routes').then(m => m.DOORWAY_ROUTES)
   },
+  // OAuth callback route for doorway authentication
+  {
+    path: 'auth/callback',
+    loadComponent: () =>
+      import('./imagodei/components/auth-callback/auth-callback.component').then(
+        m => m.AuthCallbackComponent
+      ),
+    title: 'Signing In...'
+  },
   // 404 catch-all - must be last
   {
     path: '**',

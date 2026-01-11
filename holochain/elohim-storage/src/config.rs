@@ -56,6 +56,15 @@ pub struct Config {
     /// HTTP API port for shard storage
     #[serde(default = "default_http_port")]
     pub http_port: u16,
+
+    /// P2P bootstrap nodes for content discovery
+    /// Format: /ip4/1.2.3.4/tcp/9876/p2p/12D3KooW...
+    #[serde(default)]
+    pub p2p_bootstrap_nodes: Vec<String>,
+
+    /// Enable mDNS for local network discovery
+    #[serde(default = "default_true")]
+    pub enable_mdns: bool,
 }
 
 fn default_http_port() -> u16 {
@@ -108,6 +117,8 @@ impl Default for Config {
             sync_interval_secs: 60,
             p2p_port: 9876,
             http_port: 8090,
+            p2p_bootstrap_nodes: Vec::new(),
+            enable_mdns: true,
         }
     }
 }

@@ -302,6 +302,36 @@ impl HttpServer {
                 }
             }
 
+            // Session API: Local session management for Tauri native handoff
+            (Method::GET, "/session") => {
+                if let Some(ref pool) = self.db_pool {
+                    self.handle_get_session(pool.clone()).await
+                } else {
+                    Ok(response::service_unavailable("Database not enabled"))
+                }
+            }
+            (Method::POST, "/session") => {
+                if let Some(ref pool) = self.db_pool {
+                    self.handle_create_session(req, pool.clone()).await
+                } else {
+                    Ok(response::service_unavailable("Database not enabled"))
+                }
+            }
+            (Method::DELETE, "/session") => {
+                if let Some(ref pool) = self.db_pool {
+                    self.handle_delete_session(pool.clone()).await
+                } else {
+                    Ok(response::service_unavailable("Database not enabled"))
+                }
+            }
+            (Method::GET, "/session/all") => {
+                if let Some(ref pool) = self.db_pool {
+                    self.handle_list_sessions(pool.clone()).await
+                } else {
+                    Ok(response::service_unavailable("Database not enabled"))
+                }
+            }
+
             // Not found
             _ => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
@@ -3841,6 +3871,111 @@ impl HttpServer {
 
         Ok(response::ok(&BulkResult { created, failed, errors }))
     }
+
+    // =========================================================================
+    // Session Handlers (Tauri Native Handoff)
+    // =========================================================================
+
+    /// GET /session - Get active local session
+    ///
+    /// Returns the currently active session for native app use.
+    /// Returns 404 if no active session exists (first run).
+    async fn handle_get_session(
+        &self,
+        pool: DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = pool.get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
+
+        match db::local_sessions::get_active_session(&mut conn)? {
+            Some(session) => Ok(response::ok(&session)),
+            None => Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error": "No active session"}"#)))
+                .unwrap()),
+        }
+    }
+
+    /// POST /session - Create a new local session
+    ///
+    /// Called after OAuth handoff from doorway to store session locally.
+    /// Automatically deactivates any existing sessions.
+    async fn handle_create_session(
+        &self,
+        req: Request<Incoming>,
+        pool: DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let body = req.collect().await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
+        let bytes = body.to_bytes();
+
+        let input: db::local_sessions::CreateLocalSessionInput = serde_json::from_slice(&bytes)
+            .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+
+        let mut conn = pool.get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
+
+        let session = db::local_sessions::create_session(&mut conn, input)?;
+
+        info!(
+            session_id = %session.id,
+            human_id = %session.human_id,
+            "Created local session"
+        );
+
+        Ok(Response::builder()
+            .status(StatusCode::CREATED)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(serde_json::to_string(&session).unwrap())))
+            .unwrap())
+    }
+
+    /// DELETE /session - Delete active session (logout)
+    ///
+    /// Deactivates and removes the currently active session.
+    async fn handle_delete_session(
+        &self,
+        pool: DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = pool.get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
+
+        // Get active session first to know what we're deleting
+        let active = db::local_sessions::get_active_session(&mut conn)?;
+
+        if let Some(session) = active {
+            db::local_sessions::delete_session(&mut conn, &session.id)?;
+            info!(session_id = %session.id, "Deleted local session");
+            Ok(response::ok(&serde_json::json!({
+                "deleted": true,
+                "session_id": session.id
+            })))
+        } else {
+            Ok(response::ok(&serde_json::json!({
+                "deleted": false,
+                "message": "No active session to delete"
+            })))
+        }
+    }
+
+    /// GET /session/all - List all sessions (for debugging)
+    ///
+    /// Returns all sessions including inactive ones.
+    async fn handle_list_sessions(
+        &self,
+        pool: DbPool,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let mut conn = pool.get()
+            .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
+
+        let sessions = db::local_sessions::list_all_sessions(&mut conn)?;
+        Ok(response::ok(&sessions))
+    }
+
+    // =========================================================================
+    // Utility Methods
+    // =========================================================================
 
     /// Get MIME type for a file path based on extension
     fn get_mime_type(path: &str) -> &'static str {

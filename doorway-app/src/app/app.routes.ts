@@ -10,6 +10,14 @@ export const routes: Routes = [
     title: 'Doorway Operator Dashboard',
   },
   {
+    path: 'login',
+    loadComponent: () =>
+      import('./components/login/threshold-login.component').then(
+        m => m.ThresholdLoginComponent
+      ),
+    title: 'Sign In',
+  },
+  {
     path: '**',
     redirectTo: '',
   },

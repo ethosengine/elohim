@@ -43,6 +43,15 @@ export type {
 // Strategy implementations
 export { DoorwayConnectionStrategy } from './doorway-connection-strategy';
 export { DirectConnectionStrategy } from './direct-connection-strategy';
+export { TauriConnectionStrategy } from './tauri-connection-strategy';
+
+// Tauri-specific types
+export type {
+  LocalSession,
+  CreateSessionInput,
+  NativeHandoffResponse,
+  OAuthCallbackPayload,
+} from './tauri-connection-strategy';
 
 // Factory functions
 export {

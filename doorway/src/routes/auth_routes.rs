@@ -21,9 +21,13 @@ use crate::auth::{
     extract_token_from_header, hash_password, verify_password, Claims, JwtValidator,
     PermissionLevel, TokenInput,
 };
-use crate::db::schemas::{UserDoc, USER_COLLECTION};
+use crate::db::schemas::{
+    get_registered_clients, validate_redirect_uri, OAuthSessionDoc, UserDoc,
+    OAUTH_SESSION_COLLECTION, USER_COLLECTION,
+};
 use crate::server::AppState;
 use crate::types::DoorwayError;
+use rand::Rng;
 
 type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
 
@@ -94,6 +98,91 @@ pub struct ErrorResponse {
 pub struct SuccessResponse {
     pub success: bool,
     pub message: String,
+}
+
+// =============================================================================
+// OAuth Request/Response Types
+// =============================================================================
+
+/// OAuth authorization request query parameters.
+#[derive(Debug, Deserialize)]
+pub struct OAuthAuthorizeRequest {
+    pub client_id: String,
+    pub redirect_uri: String,
+    pub response_type: String,
+    pub state: String,
+    #[serde(default)]
+    pub scope: Option<String>,
+}
+
+/// OAuth token exchange request body.
+#[derive(Debug, Deserialize)]
+pub struct OAuthTokenRequest {
+    pub grant_type: String,
+    pub code: String,
+    pub redirect_uri: String,
+    pub client_id: String,
+}
+
+/// OAuth token response (RFC 6749 compliant).
+#[derive(Debug, Serialize)]
+pub struct OAuthTokenResponse {
+    pub access_token: String,
+    pub token_type: String,
+    pub expires_in: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
+    /// Custom: Human ID for Holochain identity
+    pub human_id: String,
+    /// Custom: Agent public key for Holochain
+    pub agent_pub_key: String,
+    /// Custom: User identifier
+    pub identifier: String,
+    /// Custom: Doorway that issued this token
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doorway_id: Option<String>,
+    /// Custom: Doorway URL
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doorway_url: Option<String>,
+}
+
+/// OAuth error response (RFC 6749 compliant).
+#[derive(Debug, Serialize)]
+pub struct OAuthErrorResponse {
+    pub error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state: Option<String>,
+}
+
+// =============================================================================
+// Native Handoff Types (Tauri Session Migration)
+// =============================================================================
+
+/// Response for native handoff endpoint.
+/// Returns identity info for Tauri to create a local session.
+/// Content syncs via P2P (DHT gossip), not from doorway.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeHandoffResponse {
+    /// Holochain Human ID
+    pub human_id: String,
+    /// User identifier (email/username)
+    pub identifier: String,
+    /// Doorway ID that issued this session
+    pub doorway_id: String,
+    /// Doorway URL for future recovery
+    pub doorway_url: String,
+    /// Display name (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    /// Profile image blob hash (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile_image_hash: Option<String>,
+    /// Bootstrap URL for P2P discovery (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bootstrap_url: Option<String>,
 }
 
 // =============================================================================
@@ -619,6 +708,596 @@ async fn handle_me(
 }
 
 // =============================================================================
+// Native Handoff Handler (Tauri Session Migration)
+// =============================================================================
+
+/// GET /auth/native-handoff
+///
+/// Returns identity information for Tauri native session creation.
+/// Called after OAuth token exchange when migrating from doorway to native.
+///
+/// The response contains only identity info, not content. Content syncs
+/// automatically via P2P (Holochain DHT gossip) once the native conductor
+/// joins the network.
+///
+/// Response includes:
+/// - human_id, identifier: Core identity
+/// - doorway_id, doorway_url: For future recovery
+/// - display_name, profile_image_hash: Optional profile info
+/// - bootstrap_url: For P2P discovery
+async fn handle_native_handoff(
+    req: Request<hyper::body::Incoming>,
+    state: Arc<AppState>,
+) -> Response<BoxBody> {
+    // Validate token from Authorization header
+    let auth_header = get_auth_header(&req);
+    let token = match extract_token_from_header(auth_header) {
+        Some(t) => t,
+        None => {
+            return json_response(
+                StatusCode::UNAUTHORIZED,
+                &ErrorResponse {
+                    error: "No token provided".into(),
+                    code: Some("NO_TOKEN".into()),
+                },
+            )
+        }
+    };
+
+    let jwt = match get_jwt_validator(&state) {
+        Ok(j) => j,
+        Err(resp) => return resp,
+    };
+
+    let result = jwt.verify_token(token);
+    if !result.valid {
+        return json_response(
+            StatusCode::UNAUTHORIZED,
+            &ErrorResponse {
+                error: result
+                    .error
+                    .unwrap_or_else(|| "Invalid or expired token".into()),
+                code: Some("INVALID_TOKEN".into()),
+            },
+        );
+    }
+
+    let claims = result.claims.unwrap();
+
+    // Get doorway identity from config (required for handoff)
+    let doorway_id = match &state.args.doorway_id {
+        Some(id) => id.clone(),
+        None => {
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: "Doorway ID not configured".into(),
+                    code: Some("CONFIG_ERROR".into()),
+                },
+            )
+        }
+    };
+
+    let doorway_url = match &state.args.doorway_url {
+        Some(url) => url.clone(),
+        None => {
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: "Doorway URL not configured".into(),
+                    code: Some("CONFIG_ERROR".into()),
+                },
+            )
+        }
+    };
+
+    // Get bootstrap URL from config (optional)
+    let bootstrap_url = state.args.bootstrap_url.clone();
+
+    // TODO: Fetch display_name and profile_image_hash from user profile in MongoDB
+    // For now, return None for these optional fields
+    let display_name: Option<String> = None;
+    let profile_image_hash: Option<String> = None;
+
+    info!(
+        "Native handoff: {} migrating to native session",
+        claims.identifier
+    );
+
+    json_response(
+        StatusCode::OK,
+        &NativeHandoffResponse {
+            human_id: claims.human_id,
+            identifier: claims.identifier,
+            doorway_id,
+            doorway_url,
+            display_name,
+            profile_image_hash,
+            bootstrap_url,
+        },
+    )
+}
+
+// =============================================================================
+// OAuth Handlers
+// =============================================================================
+
+/// GET /auth/authorize
+///
+/// OAuth 2.0 authorization endpoint. Validates the client and redirect URI,
+/// then redirects to the login page. After successful login, the user is
+/// redirected back to the client with an authorization code.
+///
+/// Query Parameters:
+/// - client_id: OAuth client ID (e.g., "elohim-app")
+/// - redirect_uri: Where to redirect after authorization
+/// - response_type: Must be "code" for authorization code flow
+/// - state: CSRF protection token (passed back to client)
+/// - scope: Optional requested scope
+///
+/// Flow:
+/// 1. Validate client_id and redirect_uri
+/// 2. If user not authenticated, redirect to /threshold/login with OAuth params
+/// 3. If authenticated, generate auth code and redirect to redirect_uri
+async fn handle_authorize(
+    req: Request<hyper::body::Incoming>,
+    state: Arc<AppState>,
+) -> Response<BoxBody> {
+    // Parse query parameters
+    let query_str = req.uri().query().unwrap_or("");
+    let params: OAuthAuthorizeRequest = match serde_urlencoded::from_str(query_str) {
+        Ok(p) => p,
+        Err(e) => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &OAuthErrorResponse {
+                    error: "invalid_request".to_string(),
+                    error_description: Some(format!("Invalid query parameters: {}", e)),
+                    state: None,
+                },
+            )
+        }
+    };
+
+    // Validate response_type
+    if params.response_type != "code" {
+        return json_response(
+            StatusCode::BAD_REQUEST,
+            &OAuthErrorResponse {
+                error: "unsupported_response_type".to_string(),
+                error_description: Some("Only 'code' response type is supported".to_string()),
+                state: Some(params.state),
+            },
+        );
+    }
+
+    // Validate client_id
+    let clients = get_registered_clients();
+    let client = match clients.iter().find(|c| c.client_id == params.client_id) {
+        Some(c) => c,
+        None => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &OAuthErrorResponse {
+                    error: "invalid_client".to_string(),
+                    error_description: Some(format!("Unknown client_id: {}", params.client_id)),
+                    state: Some(params.state),
+                },
+            );
+        }
+    };
+
+    // Validate redirect_uri
+    if !validate_redirect_uri(client, &params.redirect_uri) {
+        return json_response(
+            StatusCode::BAD_REQUEST,
+            &OAuthErrorResponse {
+                error: "invalid_redirect_uri".to_string(),
+                error_description: Some("Redirect URI not allowed for this client".to_string()),
+                state: Some(params.state),
+            },
+        );
+    }
+
+    // Check if user is already authenticated (via cookie or header)
+    let auth_header = get_auth_header(&req);
+    let token = extract_token_from_header(auth_header);
+
+    if let Some(token) = token {
+        // User is authenticated - verify token and generate auth code
+        let jwt = match get_jwt_validator(&state) {
+            Ok(j) => j,
+            Err(resp) => return resp,
+        };
+
+        let result = jwt.verify_token(token);
+        if result.valid {
+            let claims = result.claims.unwrap();
+
+            // Generate authorization code
+            let code = generate_auth_code();
+
+            // Store in MongoDB
+            if let Some(mongo) = &state.mongo {
+                let session = OAuthSessionDoc::new(
+                    code.clone(),
+                    params.client_id.clone(),
+                    params.redirect_uri.clone(),
+                    params.state.clone(),
+                    params.scope.clone(),
+                    claims.human_id.clone(),
+                    claims.agent_pub_key.clone(),
+                    claims.identifier.clone(),
+                );
+
+                if let Ok(collection) = mongo
+                    .collection::<OAuthSessionDoc>(OAUTH_SESSION_COLLECTION)
+                    .await
+                {
+                    if let Err(e) = collection.insert_one(session).await {
+                        warn!("Failed to store OAuth session: {}", e);
+                        return json_response(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            &OAuthErrorResponse {
+                                error: "server_error".to_string(),
+                                error_description: Some("Failed to create authorization".to_string()),
+                                state: Some(params.state),
+                            },
+                        );
+                    }
+                }
+            }
+
+            // Redirect to client with code
+            let redirect_url = format!(
+                "{}{}code={}&state={}",
+                params.redirect_uri,
+                if params.redirect_uri.contains('?') { "&" } else { "?" },
+                urlencoding::encode(&code),
+                urlencoding::encode(&params.state)
+            );
+
+            info!(
+                "OAuth authorize: redirecting {} to client with code",
+                claims.identifier
+            );
+
+            return Response::builder()
+                .status(StatusCode::FOUND)
+                .header("Location", redirect_url)
+                .header("Cache-Control", "no-store")
+                .body(empty_body())
+                .unwrap();
+        }
+    }
+
+    // User not authenticated - redirect to login page with OAuth params
+    // The login page will handle authentication and then call /auth/authorize again
+    let login_url = format!(
+        "/threshold/login?{}",
+        serde_urlencoded::to_string(&[
+            ("client_id", params.client_id.as_str()),
+            ("redirect_uri", params.redirect_uri.as_str()),
+            ("response_type", params.response_type.as_str()),
+            ("state", params.state.as_str()),
+            ("scope", params.scope.as_deref().unwrap_or("")),
+        ]).unwrap_or_default()
+    );
+
+    info!("OAuth authorize: redirecting to login page");
+
+    Response::builder()
+        .status(StatusCode::FOUND)
+        .header("Location", login_url)
+        .header("Cache-Control", "no-store")
+        .body(empty_body())
+        .unwrap()
+}
+
+/// POST /auth/token
+///
+/// OAuth 2.0 token endpoint. Exchanges an authorization code for an access token.
+///
+/// Request Body (x-www-form-urlencoded or JSON):
+/// - grant_type: Must be "authorization_code"
+/// - code: Authorization code from /auth/authorize
+/// - redirect_uri: Must match the original redirect_uri
+/// - client_id: OAuth client ID
+///
+/// Response:
+/// - access_token: JWT token for API access
+/// - token_type: "Bearer"
+/// - expires_in: Token lifetime in seconds
+/// - human_id, agent_pub_key, identifier: Holochain identity info
+async fn handle_token(
+    req: Request<hyper::body::Incoming>,
+    state: Arc<AppState>,
+) -> Response<BoxBody> {
+    // Parse request body (support both JSON and form-urlencoded)
+    // Clone content-type before consuming request
+    let content_type = req
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    let body_bytes = match req.collect().await {
+        Ok(b) => b.to_bytes(),
+        Err(e) => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &OAuthErrorResponse {
+                    error: "invalid_request".to_string(),
+                    error_description: Some(format!("Failed to read body: {}", e)),
+                    state: None,
+                },
+            )
+        }
+    };
+
+    let token_req: OAuthTokenRequest = if content_type.contains("application/json") {
+        match serde_json::from_slice(&body_bytes) {
+            Ok(r) => r,
+            Err(e) => {
+                return json_response(
+                    StatusCode::BAD_REQUEST,
+                    &OAuthErrorResponse {
+                        error: "invalid_request".to_string(),
+                        error_description: Some(format!("Invalid JSON: {}", e)),
+                        state: None,
+                    },
+                )
+            }
+        }
+    } else {
+        // Assume form-urlencoded
+        match serde_urlencoded::from_bytes(&body_bytes) {
+            Ok(r) => r,
+            Err(e) => {
+                return json_response(
+                    StatusCode::BAD_REQUEST,
+                    &OAuthErrorResponse {
+                        error: "invalid_request".to_string(),
+                        error_description: Some(format!("Invalid form data: {}", e)),
+                        state: None,
+                    },
+                )
+            }
+        }
+    };
+
+    // Validate grant_type
+    if token_req.grant_type != "authorization_code" {
+        return json_response(
+            StatusCode::BAD_REQUEST,
+            &OAuthErrorResponse {
+                error: "unsupported_grant_type".to_string(),
+                error_description: Some("Only 'authorization_code' grant type is supported".to_string()),
+                state: None,
+            },
+        );
+    }
+
+    // Validate client_id
+    let clients = get_registered_clients();
+    if !clients.iter().any(|c| c.client_id == token_req.client_id) {
+        return json_response(
+            StatusCode::BAD_REQUEST,
+            &OAuthErrorResponse {
+                error: "invalid_client".to_string(),
+                error_description: Some(format!("Unknown client_id: {}", token_req.client_id)),
+                state: None,
+            },
+        );
+    }
+
+    // In dev mode without MongoDB, use simplified flow
+    if state.args.dev_mode && state.mongo.is_none() {
+        info!("OAuth token exchange (dev mode, no MongoDB)");
+        let jwt = match get_jwt_validator(&state) {
+            Ok(j) => j,
+            Err(resp) => return resp,
+        };
+
+        return generate_oauth_token_response(
+            &jwt,
+            &state,
+            "dev-human-id",
+            "uhCAk-dev-mode-agent-key",
+            "dev@example.com",
+        );
+    }
+
+    // Look up authorization code in MongoDB
+    let mongo = match &state.mongo {
+        Some(m) => m,
+        None => {
+            return json_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                &OAuthErrorResponse {
+                    error: "server_error".to_string(),
+                    error_description: Some("Database not available".to_string()),
+                    state: None,
+                },
+            )
+        }
+    };
+
+    let collection = match mongo
+        .collection::<OAuthSessionDoc>(OAUTH_SESSION_COLLECTION)
+        .await
+    {
+        Ok(c) => c,
+        Err(e) => {
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &OAuthErrorResponse {
+                    error: "server_error".to_string(),
+                    error_description: Some(format!("Database error: {}", e)),
+                    state: None,
+                },
+            )
+        }
+    };
+
+    // Find the session by code
+    let session = match collection
+        .find_one(doc! { "code": &token_req.code })
+        .await
+    {
+        Ok(Some(s)) => s,
+        Ok(None) => {
+            warn!("OAuth token exchange: code not found");
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &OAuthErrorResponse {
+                    error: "invalid_grant".to_string(),
+                    error_description: Some("Authorization code not found or expired".to_string()),
+                    state: None,
+                },
+            );
+        }
+        Err(e) => {
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &OAuthErrorResponse {
+                    error: "server_error".to_string(),
+                    error_description: Some(format!("Database error: {}", e)),
+                    state: None,
+                },
+            )
+        }
+    };
+
+    // Validate session
+    if !session.is_valid() {
+        warn!("OAuth token exchange: code expired or already used");
+        return json_response(
+            StatusCode::BAD_REQUEST,
+            &OAuthErrorResponse {
+                error: "invalid_grant".to_string(),
+                error_description: Some("Authorization code expired or already used".to_string()),
+                state: None,
+            },
+        );
+    }
+
+    // Validate redirect_uri matches
+    if session.redirect_uri != token_req.redirect_uri {
+        warn!("OAuth token exchange: redirect_uri mismatch");
+        return json_response(
+            StatusCode::BAD_REQUEST,
+            &OAuthErrorResponse {
+                error: "invalid_grant".to_string(),
+                error_description: Some("Redirect URI does not match".to_string()),
+                state: None,
+            },
+        );
+    }
+
+    // Validate client_id matches
+    if session.client_id != token_req.client_id {
+        warn!("OAuth token exchange: client_id mismatch");
+        return json_response(
+            StatusCode::BAD_REQUEST,
+            &OAuthErrorResponse {
+                error: "invalid_grant".to_string(),
+                error_description: Some("Client ID does not match".to_string()),
+                state: None,
+            },
+        );
+    }
+
+    // Mark code as used
+    if let Err(e) = collection
+        .update_one(
+            doc! { "code": &token_req.code },
+            doc! { "$set": { "used": true } },
+        )
+        .await
+    {
+        warn!("Failed to mark OAuth code as used: {}", e);
+    }
+
+    info!("OAuth token exchange successful: {}", session.identifier);
+
+    let jwt = match get_jwt_validator(&state) {
+        Ok(j) => j,
+        Err(resp) => return resp,
+    };
+
+    generate_oauth_token_response(
+        &jwt,
+        &state,
+        &session.human_id,
+        &session.agent_pub_key,
+        &session.identifier,
+    )
+}
+
+/// Generate a random authorization code.
+fn generate_auth_code() -> String {
+    let mut rng = rand::thread_rng();
+    let bytes: [u8; 32] = rng.gen();
+    hex::encode(bytes)
+}
+
+/// Generate OAuth token response with JWT.
+fn generate_oauth_token_response(
+    jwt: &JwtValidator,
+    state: &AppState,
+    human_id: &str,
+    agent_pub_key: &str,
+    identifier: &str,
+) -> Response<BoxBody> {
+    let doorway_id = state.args.doorway_id.clone();
+    let doorway_url = state.args.doorway_url.clone();
+
+    let input = TokenInput {
+        human_id: human_id.to_string(),
+        agent_pub_key: agent_pub_key.to_string(),
+        identifier: identifier.to_string(),
+        permission_level: PermissionLevel::Authenticated,
+        doorway_id: doorway_id.clone(),
+        doorway_url: doorway_url.clone(),
+    };
+
+    match jwt.generate_token(input) {
+        Ok(token) => {
+            let claims = jwt.verify_token(&token);
+            let expires_in = claims
+                .claims
+                .map(|c| c.exp.saturating_sub(c.iat))
+                .unwrap_or(3600);
+
+            json_response(
+                StatusCode::OK,
+                &OAuthTokenResponse {
+                    access_token: token,
+                    token_type: "Bearer".to_string(),
+                    expires_in,
+                    refresh_token: None, // Could add refresh token support
+                    human_id: human_id.to_string(),
+                    agent_pub_key: agent_pub_key.to_string(),
+                    identifier: identifier.to_string(),
+                    doorway_id,
+                    doorway_url,
+                },
+            )
+        }
+        Err(e) => json_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &OAuthErrorResponse {
+                error: "server_error".to_string(),
+                error_description: Some(format!("Failed to generate token: {}", e)),
+                state: None,
+            },
+        ),
+    }
+}
+
+// =============================================================================
 // Helper Functions
 // =============================================================================
 
@@ -727,18 +1406,29 @@ pub async fn handle_auth_request(
     let path = path.split('?').next().unwrap_or(path);
 
     let response = match (method, path) {
+        // Standard auth endpoints
         (&Method::POST, "/auth/register") => handle_register(req, state).await,
         (&Method::POST, "/auth/login") => handle_login(req, state).await,
         (&Method::POST, "/auth/logout") => handle_logout(req, state).await,
         (&Method::POST, "/auth/refresh") => handle_refresh(req, state).await,
         (&Method::GET, "/auth/me") => handle_me(req, state).await,
 
+        // OAuth 2.0 endpoints
+        (&Method::GET, "/auth/authorize") => handle_authorize(req, state).await,
+        (&Method::POST, "/auth/token") => handle_token(req, state).await,
+
+        // Native handoff (Tauri session migration)
+        (&Method::GET, "/auth/native-handoff") => handle_native_handoff(req, state).await,
+
         // Method not allowed
         (_, "/auth/register")
         | (_, "/auth/login")
         | (_, "/auth/logout")
         | (_, "/auth/refresh")
-        | (_, "/auth/me") => json_response(
+        | (_, "/auth/me")
+        | (_, "/auth/authorize")
+        | (_, "/auth/token")
+        | (_, "/auth/native-handoff") => json_response(
             StatusCode::METHOD_NOT_ALLOWED,
             &ErrorResponse {
                 error: "Method not allowed".into(),

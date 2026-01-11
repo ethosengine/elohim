@@ -31,7 +31,7 @@ export const AUTH_IDENTIFIER_KEY = 'elohim-auth-identifier';
 // =============================================================================
 
 /** Supported authentication provider types */
-export type AuthProviderType = 'password' | 'passkey' | 'oauth';
+export type AuthProviderType = 'password' | 'passkey' | 'oauth' | 'tauri';
 
 /** Identifier type for authentication */
 export type IdentifierType = 'email' | 'username';

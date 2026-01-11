@@ -45,6 +45,7 @@ pub mod contributor_presences;
 pub mod economic_events;
 pub mod content_mastery;
 pub mod stewardship_allocations;
+pub mod local_sessions;
 
 use std::path::Path;
 use std::sync::Mutex;

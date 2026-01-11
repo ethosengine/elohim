@@ -67,6 +67,8 @@ export interface ClientEnvironmentConfig {
   holochainAppId?: string;
   /** Direct conductor URL (Tauri mode only) */
   holochainConductorUrl?: string;
+  /** elohim-storage sidecar URL (Tauri mode - local blob/session storage) */
+  storageUrl?: string;
 }
 
 /**

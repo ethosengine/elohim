@@ -58,6 +58,8 @@ use tracing_subscriber::EnvFilter;
 #[cfg(feature = "p2p")]
 use elohim_storage::p2p::{P2PConfig, P2PNode};
 #[cfg(feature = "p2p")]
+use elohim_storage::db::{init_pool_from_dir, local_sessions};
+#[cfg(feature = "p2p")]
 use elohim_storage::identity::NodeIdentity;
 
 #[derive(Parser, Debug)]
@@ -138,6 +140,24 @@ struct Args {
     #[arg(long, env = "AGENT_PUBKEY")]
     #[cfg(feature = "p2p")]
     agent_pubkey: Option<String>,
+
+    /// P2P bootstrap nodes (multiaddr format)
+    /// Can be specified multiple times or comma-separated
+    /// Format: /ip4/1.2.3.4/tcp/9876/p2p/12D3KooW...
+    #[arg(long, env = "P2P_BOOTSTRAP_NODES", value_delimiter = ',')]
+    #[cfg(feature = "p2p")]
+    bootstrap_nodes: Vec<String>,
+
+    /// Disable mDNS local network discovery
+    #[arg(long, env = "DISABLE_MDNS")]
+    #[cfg(feature = "p2p")]
+    disable_mdns: bool,
+
+    /// Load P2P bootstrap URL from active session in database
+    /// Useful for Tauri apps where bootstrap URL comes from doorway handoff
+    #[arg(long, env = "P2P_BOOTSTRAP_FROM_SESSION")]
+    #[cfg(feature = "p2p")]
+    bootstrap_from_session: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -232,14 +252,54 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
 
         info!(peer_id = %identity.peer_id(), "P2P identity loaded");
 
+        // Collect bootstrap nodes from CLI args
+        let mut bootstrap_nodes = args.bootstrap_nodes.clone();
+
+        // Optionally load bootstrap URL from active session (stored in SQLite)
+        if args.bootstrap_from_session {
+            // Initialize Diesel pool to read session data
+            match init_pool_from_dir(&config.storage_dir) {
+                Ok(pool) => {
+                    match pool.get() {
+                        Ok(mut conn) => {
+                            match local_sessions::get_active_session(&mut conn) {
+                                Ok(Some(session)) => {
+                                    if let Some(bootstrap_url) = session.bootstrap_url {
+                                        info!("  Loading bootstrap from session: {}", bootstrap_url);
+                                        // Bootstrap URL from doorway handoff (libp2p multiaddr format)
+                                        bootstrap_nodes.push(bootstrap_url);
+                                    }
+                                }
+                                Ok(None) => {
+                                    info!("  No active session found for bootstrap");
+                                }
+                                Err(e) => {
+                                    warn!("  Failed to load session for bootstrap: {}", e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            warn!("  Failed to get DB connection for bootstrap lookup: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("  Failed to initialize DB pool for bootstrap lookup: {}", e);
+                }
+            }
+        }
+
         // Configure P2P
+        let enable_mdns = !args.disable_mdns;
         let p2p_config = P2PConfig {
             listen_addresses: if args.p2p_port == 0 {
                 vec!["/ip4/0.0.0.0/tcp/0".to_string()]
             } else {
                 vec![format!("/ip4/0.0.0.0/tcp/{}", args.p2p_port)]
             },
-            enable_mdns: true,
+            bootstrap_nodes: bootstrap_nodes.clone(),
+            enable_mdns,
+            storage_dir: config.storage_dir.clone(),
             ..Default::default()
         };
 
@@ -251,8 +311,10 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
 
         info!("P2P networking enabled");
         info!("  Peer ID: {}", p2p_node.peer_id());
-        info!("  mDNS discovery: enabled");
+        info!("  mDNS discovery: {}", if enable_mdns { "enabled" } else { "disabled" });
+        info!("  Bootstrap nodes: {}", if bootstrap_nodes.is_empty() { "none".to_string() } else { bootstrap_nodes.len().to_string() });
         info!("  Shard protocol: /elohim/shard/1.0.0");
+        info!("  Sync protocol: /elohim/sync/1.0.0");
 
         Some(p2p_node)
     } else {

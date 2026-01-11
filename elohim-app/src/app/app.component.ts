@@ -6,6 +6,7 @@ import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.com
 import { HolochainClientService } from './elohim/services/holochain-client.service';
 import { HolochainContentService } from './elohim/services/holochain-content.service';
 import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
+import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { environment } from '../environments/environment';
 
 /** Connection retry configuration */
@@ -30,6 +31,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly holochainService = inject(HolochainClientService);
   private readonly holochainContent = inject(HolochainContentService);
   private readonly blobBootstrap = inject(BlobBootstrapService);
+  private readonly tauriAuth = inject(TauriAuthService);
 
   /** Retry configuration for connection attempts */
   private readonly retryConfig: RetryConfig = {
@@ -57,8 +59,32 @@ export class AppComponent implements OnInit, OnDestroy {
     // Check initial route
     this.showFloatingToggle = this.isRootLandingPage(this.router.url);
 
+    // Initialize auth and connections
+    this.initializeApp();
+  }
+
+  /**
+   * Initialize the application - check for Tauri session first, then connections.
+   */
+  private async initializeApp(): Promise<void> {
+    // In Tauri environment, check for existing session first
+    if (this.tauriAuth.isTauriEnvironment()) {
+      console.log('[App] Tauri environment detected, checking for local session...');
+      await this.tauriAuth.initialize();
+
+      // If no session, TauriAuthService will set status to 'needs_login'
+      // The user should be routed to doorway picker
+      if (this.tauriAuth.needsLogin()) {
+        console.log('[App] No Tauri session found - routing to identity setup');
+        this.router.navigate(['/identity/login']);
+        return;
+      }
+
+      console.log('[App] Tauri session restored, continuing initialization');
+    }
+
     // Auto-connect to Edge Node if holochain config is available
-    this.initializeHolochainConnection();
+    await this.initializeHolochainConnection();
   }
 
   ngOnDestroy(): void {
@@ -67,6 +93,8 @@ export class AppComponent implements OnInit, OnDestroy {
       clearTimeout(this.retryTimeoutId);
       this.retryTimeoutId = null;
     }
+    // Clean up Tauri event listeners
+    this.tauriAuth.destroy();
   }
 
   /**
