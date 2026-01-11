@@ -8,6 +8,8 @@ npm-debug.log
 yarn-error.log
 package-lock.json
 !elohim-library/projects/perseus-plugin/package-lock.json
+!doorway-app/package-lock.json
+!holochain/sdk/storage-client-ts/package-lock.json
 
 # Python
 __pycache__/

@@ -428,6 +428,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             sh 'npm ci'
                         }
                     }
+                    dir('holochain/sdk/storage-client-ts') {
+                        script {
+                            echo 'Building storage-client-ts (required for @elohim/storage-client/generated types)'
+                            sh 'npm ci && npm run build'
+                            sh 'ls -la dist/ dist/generated/'
+                        }
+                    }
                     dir('elohim-app') {
                         script {
                             echo 'Installing npm dependencies'
