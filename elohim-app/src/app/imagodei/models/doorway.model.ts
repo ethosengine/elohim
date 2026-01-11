@@ -180,10 +180,10 @@ export interface DoorwayCacheEntry {
  */
 export const BOOTSTRAP_DOORWAYS: DoorwayInfo[] = [
   {
-    id: 'alpha-elohim-host',
-    name: 'Alpha (Primary)',
-    url: 'https://alpha.elohim.host',
-    description: 'Primary Elohim doorway operated by the Ethos Engine team. Recommended for new users.',
+    id: 'doorway-dev-elohim-host',
+    name: 'Dev Gateway',
+    url: 'https://doorway-dev.elohim.host',
+    description: 'Development doorway operated by the Ethos Engine team. For alpha/dev testing.',
     region: 'north-america',
     operator: 'Ethos Engine',
     features: ['premium-content', 'high-availability', 'recovery-service', 'media-hosting'],
