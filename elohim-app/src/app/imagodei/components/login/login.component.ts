@@ -180,7 +180,7 @@ export class LoginComponent implements OnInit {
    * Navigate to register page.
    */
   goToRegister(): void {
-    this.router.navigate(['/register'], {
+    this.router.navigate(['/identity/register'], {
       queryParams: { returnUrl: this.returnUrl },
     });
   }

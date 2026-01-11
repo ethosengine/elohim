@@ -38,12 +38,19 @@ type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RegisterRequest {
+    /// Holochain human ID (optional for doorway-hosted registration)
+    #[serde(default)]
     pub human_id: String,
+    /// Holochain agent public key (optional for doorway-hosted registration)
+    #[serde(default)]
     pub agent_pub_key: String,
     pub identifier: String,
     pub password: String,
     #[serde(default = "default_identifier_type")]
     pub identifier_type: String,
+    /// Display name for doorway-hosted registration (used to create identity)
+    #[serde(default)]
+    pub display_name: String,
 }
 
 fn default_identifier_type() -> String {
@@ -280,20 +287,51 @@ async fn handle_register(
         }
     };
 
-    // Validate required fields
-    if body.human_id.is_empty()
-        || body.agent_pub_key.is_empty()
-        || body.identifier.is_empty()
-        || body.password.is_empty()
-    {
+    // Validate required fields (identifier and password always required)
+    if body.identifier.is_empty() || body.password.is_empty() {
         return json_response(
             StatusCode::BAD_REQUEST,
             &ErrorResponse {
-                error: "Missing required fields: humanId, agentPubKey, identifier, password".into(),
+                error: "Missing required fields: identifier, password".into(),
                 code: None,
             },
         );
     }
+
+    // For doorway-hosted registration, generate identity if not provided
+    // TODO: In production, this should call the imagodei zome to create a proper
+    // Holochain identity. For now, we generate placeholder values for dev/testing.
+    let (human_id, agent_pub_key) = if body.human_id.is_empty() || body.agent_pub_key.is_empty() {
+        // Generate placeholder identity for doorway-hosted registration
+        let display_name = if body.display_name.is_empty() {
+            body.identifier.split('@').next().unwrap_or("User").to_string()
+        } else {
+            body.display_name.clone()
+        };
+
+        // Generate deterministic IDs based on identifier (for consistency)
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(body.identifier.as_bytes());
+        hasher.update(b"human_id_salt");
+        let hash = hasher.finalize();
+        let human_id = format!("uhCHk{}", hex::encode(&hash[..20]));
+
+        let mut hasher2 = Sha256::new();
+        hasher2.update(body.identifier.as_bytes());
+        hasher2.update(b"agent_pub_key_salt");
+        let hash2 = hasher2.finalize();
+        let agent_pub_key = format!("uhCAk{}", hex::encode(&hash2[..20]));
+
+        info!(
+            "Doorway-hosted registration: generated identity for {} (display_name={})",
+            body.identifier, display_name
+        );
+
+        (human_id, agent_pub_key)
+    } else {
+        (body.human_id.clone(), body.agent_pub_key.clone())
+    };
 
     // Validate password strength (minimum 8 characters)
     if body.password.len() < 8 {
@@ -321,8 +359,8 @@ async fn handle_register(
         return generate_auth_response(
             &jwt,
             &state,
-            &body.human_id,
-            &body.agent_pub_key,
+            &human_id,
+            &agent_pub_key,
             &body.identifier,
             StatusCode::CREATED,
         );
@@ -401,8 +439,8 @@ async fn handle_register(
         body.identifier.clone(),
         body.identifier_type.clone(),
         password_hash,
-        body.human_id.clone(),
-        body.agent_pub_key.clone(),
+        human_id.clone(),
+        agent_pub_key.clone(),
     );
 
     // Insert into MongoDB
@@ -432,8 +470,8 @@ async fn handle_register(
     generate_auth_response(
         &jwt,
         &state,
-        &body.human_id,
-        &body.agent_pub_key,
+        &human_id,
+        &agent_pub_key,
         &body.identifier,
         StatusCode::CREATED,
     )

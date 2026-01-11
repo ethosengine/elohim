@@ -18,6 +18,14 @@ export const routes: Routes = [
     title: 'Sign In',
   },
   {
+    path: 'register',
+    loadComponent: () =>
+      import('./components/register/threshold-register.component').then(
+        m => m.ThresholdRegisterComponent
+      ),
+    title: 'Create Account',
+  },
+  {
     path: '**',
     redirectTo: '',
   },

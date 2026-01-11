@@ -384,12 +384,21 @@ export class ThresholdLoginComponent implements OnInit {
   });
 
   readonly registerUrl = computed(() => {
-    // Link to registration in elohim-app (same doorway)
+    // Link to doorway's own registration page with OAuth params
     const params = this.oauthParams();
     if (params) {
-      return `${params.redirectUri.split('/auth')[0]}/identity/register`;
+      const searchParams = new URLSearchParams({
+        client_id: params.clientId,
+        redirect_uri: params.redirectUri,
+        response_type: params.responseType,
+        state: params.state,
+      });
+      if (params.scope) {
+        searchParams.set('scope', params.scope);
+      }
+      return `/threshold/register?${searchParams.toString()}`;
     }
-    return '/identity/register';
+    return '/threshold/register';
   });
 
   ngOnInit(): void {
