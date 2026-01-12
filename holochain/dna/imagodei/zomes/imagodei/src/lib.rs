@@ -11,6 +11,7 @@
 
 use hdk::prelude::*;
 use imagodei_integrity::*;
+use std::time::Duration;
 
 // =============================================================================
 // Input/Output Types
@@ -1283,6 +1284,639 @@ pub fn get_presences_by_state(state: String) -> ExternResult<Vec<PresenceOutput>
     }
 
     Ok(results)
+}
+
+// =============================================================================
+// Recovery Types
+// =============================================================================
+
+/// Output from recovery request operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryRequestOutput {
+    pub action_hash: ActionHash,
+    pub request: RecoveryRequest,
+}
+
+/// Output from recovery vote operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryVoteOutput {
+    pub action_hash: ActionHash,
+    pub vote: RecoveryVote,
+}
+
+/// Output from recovery hint operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryHintOutput {
+    pub action_hash: ActionHash,
+    pub hint: RecoveryHint,
+}
+
+/// Input for creating a recovery request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateRecoveryRequestInput {
+    pub human_id: String,
+    pub doorway_id: String,
+    pub recovery_method: String,
+    pub expires_in_hours: Option<u32>,
+}
+
+/// Input for voting on a recovery request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoteOnRecoveryInput {
+    pub request_id: String,
+    pub approved: bool,
+    pub attestation: String,
+    pub verification_method: String,
+}
+
+/// Input for creating/updating a recovery hint
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpsertRecoveryHintInput {
+    pub hint_type: String,
+    pub encrypted_data: String,
+    pub encryption_nonce: String,
+}
+
+/// Input for Elohim verification score update
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateElohimScoreInput {
+    pub request_id: String,
+    pub questions_json: String,
+    pub score: f64,
+}
+
+/// Recovery signals for real-time notification
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type", content = "payload")]
+pub enum RecoverySignal {
+    RecoveryRequested {
+        action_hash: ActionHash,
+        request: RecoveryRequest,
+        eligible_voters: Vec<String>,
+    },
+    RecoveryVoteCast {
+        action_hash: ActionHash,
+        vote: RecoveryVote,
+        request_id: String,
+        current_approvals: u32,
+        required_approvals: u32,
+    },
+    RecoveryApproved {
+        action_hash: ActionHash,
+        request: RecoveryRequest,
+    },
+    RecoveryRejected {
+        action_hash: ActionHash,
+        request_id: String,
+        reason: String,
+    },
+}
+
+// =============================================================================
+// Recovery Functions
+// =============================================================================
+
+/// Helper to calculate confidence weight based on intimacy level
+fn get_intimacy_weight(intimacy_level: &str) -> f64 {
+    match intimacy_level {
+        "intimate" => 0.25,   // Family counts 25% each
+        "trusted" => 0.20,   // Close friends 20%
+        "familiar" => 0.15,  // Acquaintances 15%
+        "acquainted" => 0.10,
+        "public" => 0.05,
+        _ => 0.05,
+    }
+}
+
+/// Helper to calculate required approvals based on relationships
+fn calculate_required_approvals(relationships: &[HumanRelationship]) -> u32 {
+    let weighted_count: f64 = relationships
+        .iter()
+        .filter(|r| r.emergency_access_enabled)
+        .map(|r| match r.intimacy_level.as_str() {
+            "intimate" => 2.0,
+            "trusted" => 1.5,
+            "familiar" => 1.0,
+            _ => 0.5,
+        })
+        .sum();
+
+    // M = ceil(weighted / 3), minimum 2
+    let m = (weighted_count / 3.0).ceil() as u32;
+    m.max(2)
+}
+
+/// Create a recovery request
+#[hdk_extern]
+pub fn create_recovery_request(input: CreateRecoveryRequestInput) -> ExternResult<RecoveryRequestOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Calculate expiry (default 48 hours)
+    let hours = input.expires_in_hours.unwrap_or(48);
+    let expiry_ms = hours as u64 * 60 * 60 * 1000 * 1000; // microseconds
+    let expires_at = format!("{:?}", now.checked_add(&Duration::from_micros(expiry_ms)).unwrap_or(now));
+
+    // Get relationships with emergency_access_enabled to determine M
+    let relationships = get_emergency_access_relationships(&input.human_id)?;
+    let required_approvals = calculate_required_approvals(&relationships);
+
+    let request_id = format!("recovery-{}-{}", input.human_id, timestamp.replace([':', ' ', '(', ')'], "-"));
+
+    let request = RecoveryRequest {
+        id: request_id.clone(),
+        human_id: input.human_id.clone(),
+        doorway_id: input.doorway_id,
+        recovery_method: input.recovery_method,
+        status: "pending".to_string(),
+        required_approvals,
+        current_approvals: 0,
+        confidence_score: 0.0,
+        elohim_questions_json: None,
+        elohim_score: None,
+        elohim_verified_at: None,
+        requested_at: timestamp.clone(),
+        expires_at,
+        approved_at: None,
+        completed_at: None,
+    };
+
+    let action_hash = create_entry(&EntryTypes::RecoveryRequest(request.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("recovery_request_id", &request_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToRecoveryRequest, ())?;
+
+    // Create human lookup link
+    let human_anchor = StringAnchor::new("human_recovery_requests", &input.human_id);
+    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
+    create_link(human_anchor_hash, action_hash.clone(), LinkTypes::HumanToRecoveryRequest, ())?;
+
+    // Create status link
+    let status_anchor = StringAnchor::new("recovery_status", "pending");
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::RecoveryRequestByStatus, ())?;
+
+    // Create pending vote links for each eligible voter
+    let eligible_voters: Vec<String> = relationships
+        .iter()
+        .filter(|r| r.emergency_access_enabled)
+        .flat_map(|r| {
+            if r.party_a_id == input.human_id {
+                vec![r.party_b_id.clone()]
+            } else {
+                vec![r.party_a_id.clone()]
+            }
+        })
+        .collect();
+
+    for voter_id in &eligible_voters {
+        let voter_anchor = StringAnchor::new("pending_recovery_votes", voter_id);
+        let voter_anchor_hash = hash_entry(&EntryTypes::StringAnchor(voter_anchor))?;
+        create_link(
+            voter_anchor_hash,
+            action_hash.clone(),
+            LinkTypes::PendingRecoveryVote,
+            request_id.as_bytes().to_vec(),
+        )?;
+    }
+
+    // Emit signal for real-time notification
+    emit_signal(RecoverySignal::RecoveryRequested {
+        action_hash: action_hash.clone(),
+        request: request.clone(),
+        eligible_voters,
+    })?;
+
+    Ok(RecoveryRequestOutput { action_hash, request })
+}
+
+/// Helper to get relationships with emergency_access_enabled for a human
+fn get_emergency_access_relationships(human_id: &str) -> ExternResult<Vec<HumanRelationship>> {
+    let anchor = StringAnchor::new("agent_relationships", human_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::AgentToRelationship)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(relationship) = record
+                    .entry()
+                    .to_app_option::<HumanRelationship>()
+                    .ok()
+                    .flatten()
+                {
+                    if relationship.emergency_access_enabled {
+                        results.push(relationship);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Vote on a recovery request
+#[hdk_extern]
+pub fn vote_on_recovery(input: VoteOnRecoveryInput) -> ExternResult<RecoveryVoteOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get my human profile
+    let my_human = get_my_human(())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Must have Human profile to vote".to_string())))?;
+
+    // Get the recovery request
+    let request_output = get_recovery_request_by_id(input.request_id.clone())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Recovery request not found".to_string())))?;
+
+    if request_output.request.status != "pending" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Can only vote on pending recovery requests".to_string()
+        )));
+    }
+
+    // Verify voter has emergency_access_enabled relationship with requestor
+    let relationships = get_emergency_access_relationships(&request_output.request.human_id)?;
+    let voter_relationship = relationships
+        .iter()
+        .find(|r| r.party_a_id == my_human.human.id || r.party_b_id == my_human.human.id);
+
+    let relationship = voter_relationship
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+            "You do not have emergency access enabled with this human".to_string()
+        )))?;
+
+    let confidence_weight = get_intimacy_weight(&relationship.intimacy_level);
+
+    let vote_id = format!("{}-{}", input.request_id, my_human.human.id);
+
+    let vote = RecoveryVote {
+        id: vote_id.clone(),
+        request_id: input.request_id.clone(),
+        voter_human_id: my_human.human.id.clone(),
+        approved: input.approved,
+        attestation: input.attestation,
+        intimacy_level: relationship.intimacy_level.clone(),
+        confidence_weight,
+        verification_method: input.verification_method,
+        voted_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::RecoveryVote(vote.clone()))?;
+
+    // Link vote to request
+    create_link(
+        request_output.action_hash.clone(),
+        action_hash.clone(),
+        LinkTypes::RecoveryVoteToRequest,
+        my_human.human.id.as_bytes().to_vec(),
+    )?;
+
+    // Remove pending vote link for this voter
+    let voter_anchor = StringAnchor::new("pending_recovery_votes", &my_human.human.id);
+    let voter_anchor_hash = hash_entry(&EntryTypes::StringAnchor(voter_anchor))?;
+    let pending_links = get_links(
+        LinkQuery::try_new(voter_anchor_hash, LinkTypes::PendingRecoveryVote)?,
+        GetStrategy::default(),
+    )?;
+    for link in pending_links {
+        if link.target == request_output.action_hash.clone().into() {
+            delete_link(link.create_link_hash, GetOptions::default())?;
+        }
+    }
+
+    // Update request with new approval count and check threshold
+    let all_votes = get_recovery_votes(input.request_id.clone())?;
+    let current_approvals = all_votes.iter().filter(|v| v.vote.approved).count() as u32;
+    let total_confidence: f64 = all_votes
+        .iter()
+        .filter(|v| v.vote.approved)
+        .map(|v| v.vote.confidence_weight)
+        .sum();
+
+    // Emit vote signal
+    emit_signal(RecoverySignal::RecoveryVoteCast {
+        action_hash: action_hash.clone(),
+        vote: vote.clone(),
+        request_id: input.request_id.clone(),
+        current_approvals,
+        required_approvals: request_output.request.required_approvals,
+    })?;
+
+    // Check if threshold reached
+    if current_approvals >= request_output.request.required_approvals {
+        // Update request status to approved
+        let mut updated_request = request_output.request.clone();
+        updated_request.status = "approved".to_string();
+        updated_request.current_approvals = current_approvals;
+        updated_request.confidence_score = total_confidence.min(1.0);
+        updated_request.approved_at = Some(format!("{:?}", sys_time()?));
+
+        let new_request_hash = create_entry(&EntryTypes::RecoveryRequest(updated_request.clone()))?;
+
+        // Update status links
+        let old_status_anchor = StringAnchor::new("recovery_status", "pending");
+        let old_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_status_anchor))?;
+        let old_links = get_links(
+            LinkQuery::try_new(old_status_anchor_hash, LinkTypes::RecoveryRequestByStatus)?,
+            GetStrategy::default(),
+        )?;
+        for link in old_links {
+            if link.target == request_output.action_hash.clone().into() {
+                delete_link(link.create_link_hash, GetOptions::default())?;
+            }
+        }
+
+        let new_status_anchor = StringAnchor::new("recovery_status", "approved");
+        let new_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_status_anchor))?;
+        create_link(new_status_anchor_hash, new_request_hash.clone(), LinkTypes::RecoveryRequestByStatus, ())?;
+
+        // Emit approval signal
+        emit_signal(RecoverySignal::RecoveryApproved {
+            action_hash: new_request_hash,
+            request: updated_request,
+        })?;
+    }
+
+    Ok(RecoveryVoteOutput { action_hash, vote })
+}
+
+/// Get recovery request by ID
+#[hdk_extern]
+pub fn get_recovery_request_by_id(id: String) -> ExternResult<Option<RecoveryRequestOutput>> {
+    let id_anchor = StringAnchor::new("recovery_request_id", &id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToRecoveryRequest)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(request) = record.entry().to_app_option::<RecoveryRequest>().ok().flatten() {
+                    return Ok(Some(RecoveryRequestOutput { action_hash, request }));
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Get votes for a recovery request
+#[hdk_extern]
+pub fn get_recovery_votes(request_id: String) -> ExternResult<Vec<RecoveryVoteOutput>> {
+    let request_output = get_recovery_request_by_id(request_id)?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Recovery request not found".to_string())))?;
+
+    let query = LinkQuery::try_new(request_output.action_hash, LinkTypes::RecoveryVoteToRequest)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(vote) = record.entry().to_app_option::<RecoveryVote>().ok().flatten() {
+                    results.push(RecoveryVoteOutput { action_hash, vote });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Get pending recovery votes for the calling agent
+#[hdk_extern]
+pub fn get_my_pending_recovery_votes(_: ()) -> ExternResult<Vec<RecoveryRequestOutput>> {
+    let my_human = get_my_human(())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Must have Human profile".to_string())))?;
+
+    let voter_anchor = StringAnchor::new("pending_recovery_votes", &my_human.human.id);
+    let voter_anchor_hash = hash_entry(&EntryTypes::StringAnchor(voter_anchor))?;
+
+    let query = LinkQuery::try_new(voter_anchor_hash, LinkTypes::PendingRecoveryVote)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(request) = record.entry().to_app_option::<RecoveryRequest>().ok().flatten() {
+                    results.push(RecoveryRequestOutput { action_hash, request });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Update recovery request with Elohim verification score
+#[hdk_extern]
+pub fn update_elohim_score(input: UpdateElohimScoreInput) -> ExternResult<RecoveryRequestOutput> {
+    let request_output = get_recovery_request_by_id(input.request_id.clone())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Recovery request not found".to_string())))?;
+
+    if request_output.request.status != "pending" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Can only update pending recovery requests".to_string()
+        )));
+    }
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let mut updated_request = request_output.request.clone();
+    updated_request.elohim_questions_json = Some(input.questions_json);
+    updated_request.elohim_score = Some(input.score);
+    updated_request.elohim_verified_at = Some(timestamp);
+
+    // Add Elohim score to confidence (max 60% from Elohim)
+    let elohim_confidence = input.score * 0.6;
+    updated_request.confidence_score = (updated_request.confidence_score + elohim_confidence).min(1.0);
+
+    // Check if confidence threshold reached (80%)
+    if updated_request.confidence_score >= 0.8 {
+        updated_request.status = "approved".to_string();
+        updated_request.approved_at = Some(format!("{:?}", sys_time()?));
+    }
+
+    let action_hash = create_entry(&EntryTypes::RecoveryRequest(updated_request.clone()))?;
+
+    // Update ID link
+    let id_anchor = StringAnchor::new("recovery_request_id", &input.request_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    let old_links = get_links(
+        LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToRecoveryRequest)?,
+        GetStrategy::default(),
+    )?;
+    for link in old_links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToRecoveryRequest, ())?;
+
+    if updated_request.status == "approved" {
+        emit_signal(RecoverySignal::RecoveryApproved {
+            action_hash: action_hash.clone(),
+            request: updated_request.clone(),
+        })?;
+    }
+
+    Ok(RecoveryRequestOutput { action_hash, request: updated_request })
+}
+
+/// Create or update a recovery hint for the calling agent
+#[hdk_extern]
+pub fn upsert_recovery_hint(input: UpsertRecoveryHintInput) -> ExternResult<RecoveryHintOutput> {
+    let my_human = get_my_human(())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Must have Human profile".to_string())))?;
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let hint_id = format!("{}-{}", my_human.human.id, input.hint_type);
+    let hint_anchor = StringAnchor::new("recovery_hint", &hint_id);
+    let hint_anchor_hash = hash_entry(&EntryTypes::StringAnchor(hint_anchor))?;
+
+    // Check if hint exists
+    let query = LinkQuery::try_new(hint_anchor_hash.clone(), LinkTypes::HumanToRecoveryHint)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let version = if let Some(link) = links.first() {
+        // Get existing version
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(existing) = record.entry().to_app_option::<RecoveryHint>().ok().flatten() {
+                    existing.version + 1
+                } else {
+                    1
+                }
+            } else {
+                1
+            }
+        } else {
+            1
+        }
+    } else {
+        1
+    };
+
+    let hint = RecoveryHint {
+        id: hint_id.clone(),
+        human_id: my_human.human.id.clone(),
+        hint_type: input.hint_type.clone(),
+        encrypted_data: input.encrypted_data,
+        encryption_nonce: input.encryption_nonce,
+        version,
+        created_at: if version == 1 { timestamp.clone() } else { "".to_string() },
+        updated_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::RecoveryHint(hint.clone()))?;
+
+    // Update links
+    for link in links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+    create_link(hint_anchor_hash, action_hash.clone(), LinkTypes::HumanToRecoveryHint, ())?;
+
+    // Create type lookup link
+    let type_anchor = StringAnchor::new("recovery_hint_type", &input.hint_type);
+    let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
+    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::RecoveryHintByType, ())?;
+
+    Ok(RecoveryHintOutput { action_hash, hint })
+}
+
+/// Get recovery hints for the calling agent
+#[hdk_extern]
+pub fn get_my_recovery_hints(_: ()) -> ExternResult<Vec<RecoveryHintOutput>> {
+    let my_human = get_my_human(())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Must have Human profile".to_string())))?;
+
+    let mut results = Vec::new();
+
+    // Check each hint type
+    for hint_type in &["password_hint", "security_qa", "trusted_doorways", "trusted_contacts"] {
+        let hint_id = format!("{}-{}", my_human.human.id, hint_type);
+        let hint_anchor = StringAnchor::new("recovery_hint", &hint_id);
+        let hint_anchor_hash = hash_entry(&EntryTypes::StringAnchor(hint_anchor))?;
+
+        let query = LinkQuery::try_new(hint_anchor_hash, LinkTypes::HumanToRecoveryHint)?;
+        let links = get_links(query, GetStrategy::default())?;
+
+        if let Some(link) = links.first() {
+            if let Some(action_hash) = link.target.clone().into_action_hash() {
+                if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                    if let Some(hint) = record.entry().to_app_option::<RecoveryHint>().ok().flatten() {
+                        results.push(RecoveryHintOutput { action_hash, hint });
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Mark recovery as completed (called by doorway after successful re-custody)
+#[hdk_extern]
+pub fn complete_recovery(request_id: String) -> ExternResult<RecoveryRequestOutput> {
+    let request_output = get_recovery_request_by_id(request_id.clone())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Recovery request not found".to_string())))?;
+
+    if request_output.request.status != "approved" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Can only complete approved recovery requests".to_string()
+        )));
+    }
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let mut updated_request = request_output.request.clone();
+    updated_request.status = "completed".to_string();
+    updated_request.completed_at = Some(timestamp);
+
+    let action_hash = create_entry(&EntryTypes::RecoveryRequest(updated_request.clone()))?;
+
+    // Update links
+    let id_anchor = StringAnchor::new("recovery_request_id", &request_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    let old_links = get_links(
+        LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToRecoveryRequest)?,
+        GetStrategy::default(),
+    )?;
+    for link in old_links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToRecoveryRequest, ())?;
+
+    // Update status link
+    let old_status_anchor = StringAnchor::new("recovery_status", "approved");
+    let old_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_status_anchor))?;
+    let old_status_links = get_links(
+        LinkQuery::try_new(old_status_anchor_hash, LinkTypes::RecoveryRequestByStatus)?,
+        GetStrategy::default(),
+    )?;
+    for link in old_status_links {
+        if link.target == request_output.action_hash.clone().into() {
+            delete_link(link.create_link_hash, GetOptions::default())?;
+        }
+    }
+
+    let new_status_anchor = StringAnchor::new("recovery_status", "completed");
+    let new_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_status_anchor))?;
+    create_link(new_status_anchor_hash, action_hash.clone(), LinkTypes::RecoveryRequestByStatus, ())?;
+
+    Ok(RecoveryRequestOutput { action_hash, request: updated_request })
 }
 
 // =============================================================================

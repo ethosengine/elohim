@@ -15,4 +15,4 @@ pub use oauth_session::{
     get_registered_clients, validate_redirect_uri, OAuthClient, OAuthSessionDoc,
     OAUTH_SESSION_COLLECTION,
 };
-pub use user::{UserDoc, UserQuota, UserUsage, USER_COLLECTION};
+pub use user::{CustodialKeyMaterial, UserDoc, UserQuota, UserUsage, USER_COLLECTION};

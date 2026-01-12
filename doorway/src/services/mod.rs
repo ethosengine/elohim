@@ -14,10 +14,12 @@
 //! - **Discovery**: Runtime discovery of zome capabilities from conductor
 //! - **RouteRegistry**: Dynamic route management from DNAs and external agents
 //! - **DIDResolver**: W3C DID resolution for doorway federation
+//! - **ElohimVerifier**: AI-assisted identity verification for disaster recovery
 
 pub mod custodian;
 pub mod did_resolver;
 pub mod discovery;
+pub mod elohim_verifier;
 pub mod import_client;
 pub mod import_config;
 pub mod import_orchestrator;
@@ -69,4 +71,9 @@ pub use storage_registration::{
 pub use did_resolver::{
     DIDDocument, DIDResolver, DIDResolverConfig, DIDResolverError, DIDResolverStats,
     Service as DIDService, VerificationMethod, create_resolver, create_resolver_with_config,
+};
+pub use elohim_verifier::{
+    AnswerScore, ClientQuestion, ElohimVerifier, LearningPreferences, PathCompletion,
+    QuestionAnswer, QuestionCategory, QuizScore, UserProfileData, VerificationQuestion,
+    VerificationResult, MAX_ELOHIM_CONFIDENCE, MIN_ACCURACY_THRESHOLD, QUESTION_COUNT,
 };

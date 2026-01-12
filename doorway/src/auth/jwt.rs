@@ -28,6 +28,9 @@ pub struct Claims {
     pub identifier: String,
     /// Permission level granted
     pub permission_level: PermissionLevel,
+    /// Session ID for signing key cache lookup (custodial mode)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
     /// Doorway ID that issued this token (for federation)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doorway_id: Option<String>,
@@ -49,6 +52,8 @@ pub struct TokenInput {
     pub agent_pub_key: String,
     pub identifier: String,
     pub permission_level: PermissionLevel,
+    /// Session ID for signing key cache lookup (custodial mode)
+    pub session_id: Option<String>,
     /// Doorway ID that issues this token (for federation)
     pub doorway_id: Option<String>,
     /// Doorway URL for cross-doorway validation
@@ -131,6 +136,7 @@ impl JwtValidator {
             agent_pub_key: input.agent_pub_key,
             identifier: input.identifier,
             permission_level: input.permission_level,
+            session_id: input.session_id,
             doorway_id: input.doorway_id,
             doorway_url: input.doorway_url,
             version: 1,
@@ -163,6 +169,7 @@ impl JwtValidator {
             agent_pub_key: input.agent_pub_key,
             identifier: input.identifier,
             permission_level: input.permission_level,
+            session_id: input.session_id,
             doorway_id: input.doorway_id,
             doorway_url: input.doorway_url,
             version: 1,
@@ -286,6 +293,7 @@ mod tests {
             agent_pub_key: "uhCAk...".into(),
             identifier: "test@example.com".into(),
             permission_level: PermissionLevel::Authenticated,
+            session_id: Some("session-abc".into()),
             doorway_id: Some("alpha-elohim-host".into()),
             doorway_url: Some("https://alpha.elohim.host".into()),
         };
@@ -300,6 +308,7 @@ mod tests {
         assert_eq!(claims.human_id, "human-123");
         assert_eq!(claims.identifier, "test@example.com");
         assert_eq!(claims.permission_level, PermissionLevel::Authenticated);
+        assert_eq!(claims.session_id, Some("session-abc".into()));
         assert_eq!(claims.doorway_id, Some("alpha-elohim-host".into()));
         assert_eq!(claims.doorway_url, Some("https://alpha.elohim.host".into()));
     }
@@ -327,6 +336,7 @@ mod tests {
             agent_pub_key: "uhCAk...".into(),
             identifier: "test@example.com".into(),
             permission_level: PermissionLevel::Authenticated,
+            session_id: None,
             doorway_id: None,
             doorway_url: None,
         };
@@ -399,6 +409,7 @@ mod tests {
             agent_pub_key: "uhCAk...".into(),
             identifier: "test@example.com".into(),
             permission_level: PermissionLevel::Admin,
+            session_id: None,
             doorway_id: None,
             doorway_url: None,
         };
@@ -418,6 +429,7 @@ mod tests {
             agent_pub_key: "uhCAk...".into(),
             identifier: "test@example.com".into(),
             permission_level: PermissionLevel::Authenticated,
+            session_id: None,
             doorway_id: None,
             doorway_url: None,
         };
@@ -427,6 +439,7 @@ mod tests {
         assert!(result.valid);
 
         let claims = result.claims.unwrap();
+        assert!(claims.session_id.is_none());
         assert!(claims.doorway_id.is_none());
         assert!(claims.doorway_url.is_none());
     }

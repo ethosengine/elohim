@@ -1,6 +1,7 @@
 //! User document schema
 //!
-//! Stores user credentials, Holochain identity mappings, usage tracking, and quotas.
+//! Stores user credentials, Holochain identity mappings, custodial keys,
+//! usage tracking, and quotas.
 
 use bson::{doc, oid::ObjectId, DateTime, Document};
 use mongodb::options::IndexOptions;
@@ -9,6 +10,56 @@ use serde::{Deserialize, Serialize};
 use crate::auth::PermissionLevel;
 use crate::db::mongo::{IntoIndexes, MutMetadata};
 use crate::db::schemas::Metadata;
+
+// =============================================================================
+// Custodial Key Material
+// =============================================================================
+
+/// Encrypted custodial key material for a hosted human.
+///
+/// Each hosted human gets their own Ed25519 keypair, encrypted with their
+/// password using Argon2id + ChaCha20-Poly1305. This gives them true Holochain
+/// agent identity while the doorway holds custody of the key.
+///
+/// When users migrate to sovereignty (Tauri app), they export and decrypt
+/// this key material to gain full control of their identity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustodialKeyMaterial {
+    /// Ed25519 public key (32 bytes, base64 encoded).
+    /// This is the user's Holochain agent public key.
+    pub public_key: String,
+
+    /// Encrypted Ed25519 private key (48 bytes, base64 encoded).
+    /// Ciphertext = 32 bytes key + 16 bytes auth tag.
+    pub encrypted_private_key: String,
+
+    /// Salt for Argon2id key derivation (16 bytes, base64 encoded).
+    /// Unique per user, used with password to derive encryption key.
+    pub key_derivation_salt: String,
+
+    /// Nonce for ChaCha20-Poly1305 encryption (12 bytes, base64 encoded).
+    /// Unique per encryption operation.
+    pub encryption_nonce: String,
+
+    /// When this key was created.
+    pub created_at: DateTime,
+
+    /// Key version for future rotation support.
+    #[serde(default = "default_key_version")]
+    pub key_version: u32,
+
+    /// Whether this key has been exported (audit trail).
+    #[serde(default)]
+    pub exported: bool,
+
+    /// When the key was exported (if exported).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exported_at: Option<DateTime>,
+}
+
+fn default_key_version() -> u32 {
+    1
+}
 
 /// Collection name for users
 pub const USER_COLLECTION: &str = "users";
@@ -126,6 +177,24 @@ pub struct UserDoc {
     /// Quota limits
     #[serde(default)]
     pub quota: UserQuota,
+
+    // =========================================================================
+    // Custodial Key Fields
+    // =========================================================================
+
+    /// Encrypted custodial key material.
+    /// Contains the user's Ed25519 keypair encrypted with their password.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custodial_key: Option<CustodialKeyMaterial>,
+
+    /// Whether this user has migrated to sovereign key management (Tauri app).
+    /// Once true, the doorway no longer holds custody of their key.
+    #[serde(default)]
+    pub is_sovereign: bool,
+
+    /// When the user migrated to sovereignty.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sovereignty_at: Option<DateTime>,
 }
 
 fn default_identifier_type() -> String {
@@ -141,13 +210,16 @@ fn default_permission_level() -> PermissionLevel {
 }
 
 impl UserDoc {
-    /// Create a new user document with default Authenticated permission
+    /// Create a new user document with custodial key.
+    ///
+    /// The `agent_pub_key` should be derived from the custodial key's public key.
     pub fn new(
         identifier: String,
         identifier_type: String,
         password_hash: String,
         human_id: String,
         agent_pub_key: String,
+        custodial_key: Option<CustodialKeyMaterial>,
     ) -> Self {
         Self {
             _id: None,
@@ -163,7 +235,29 @@ impl UserDoc {
             last_login_at: None,
             usage: UserUsage::default(),
             quota: UserQuota::default(),
+            custodial_key,
+            is_sovereign: false,
+            sovereignty_at: None,
         }
+    }
+
+    /// Create a new user document with custodial key (convenience method).
+    pub fn new_with_custodial_key(
+        identifier: String,
+        identifier_type: String,
+        password_hash: String,
+        human_id: String,
+        custodial_key: CustodialKeyMaterial,
+    ) -> Self {
+        let agent_pub_key = custodial_key.public_key.clone();
+        Self::new(
+            identifier,
+            identifier_type,
+            password_hash,
+            human_id,
+            agent_pub_key,
+            Some(custodial_key),
+        )
     }
 
     /// Create a new admin user
@@ -173,10 +267,31 @@ impl UserDoc {
         password_hash: String,
         human_id: String,
         agent_pub_key: String,
+        custodial_key: Option<CustodialKeyMaterial>,
     ) -> Self {
-        let mut user = Self::new(identifier, identifier_type, password_hash, human_id, agent_pub_key);
+        let mut user = Self::new(
+            identifier,
+            identifier_type,
+            password_hash,
+            human_id,
+            agent_pub_key,
+            custodial_key,
+        );
         user.permission_level = PermissionLevel::Admin;
         user
+    }
+
+    /// Check if user has a custodial key that can be activated.
+    pub fn has_custodial_key(&self) -> bool {
+        self.custodial_key.is_some() && !self.is_sovereign
+    }
+
+    /// Mark the user as sovereign (key exported and confirmed).
+    pub fn mark_sovereign(&mut self) {
+        self.is_sovereign = true;
+        self.sovereignty_at = Some(DateTime::now());
+        // Optionally clear custodial_key to reduce storage
+        // self.custodial_key = None;
     }
 
     /// Check if user is over any quota limit

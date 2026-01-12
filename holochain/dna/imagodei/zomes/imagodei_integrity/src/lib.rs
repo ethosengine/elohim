@@ -99,6 +99,119 @@ pub const CLAIM_VERIFICATION_METHODS: [&str; 5] = [
 ];
 
 // =============================================================================
+// Recovery Constants
+// =============================================================================
+
+/// Recovery request status lifecycle
+pub const RECOVERY_STATUSES: [&str; 4] = [
+    "pending",   // Awaiting verification
+    "approved",  // Threshold reached, can activate
+    "rejected",  // Denied by stewards or expired
+    "completed", // Recovery activated successfully
+];
+
+/// Recovery methods available
+pub const RECOVERY_METHODS: [&str; 3] = [
+    "social",       // M-of-N steward votes
+    "elohim_check", // AI knowledge verification against imagodei profile
+    "hint",         // Encrypted recovery hints
+];
+
+/// Recovery hint types
+pub const RECOVERY_HINT_TYPES: [&str; 4] = [
+    "password_hint",     // Encrypted password reminder
+    "security_qa",       // Security questions/answers
+    "trusted_doorways",  // Pre-registered doorway list
+    "trusted_contacts",  // Emergency contact list
+];
+
+// =============================================================================
+// Network-Attested Identity Constants (Phase 2 - Red-Team Enhancement)
+// =============================================================================
+
+/// Humanity attestation types for continuous identity verification
+pub const ATTESTATION_TYPES: [&str; 5] = [
+    "behavioral",   // Passive monitoring shows consistent behavior
+    "interaction",  // Direct interaction with known human
+    "video_call",   // Video verification with trusted party
+    "in_person",    // Physical presence verification
+    "elohim_check", // AI knowledge verification
+];
+
+/// Anomaly types detected by behavioral monitoring
+pub const ANOMALY_TYPES: [&str; 6] = [
+    "posting_pattern",    // Sudden change in posting frequency/style
+    "content_style",      // AI-detected writing style deviation
+    "relationship_change", // Rapid/mass relationship modifications
+    "geo_shift",          // Geographic location anomaly
+    "session_anomaly",    // Unusual login patterns
+    "capability_abuse",   // Excessive use of privileged operations
+];
+
+/// Anomaly severity levels
+pub const ANOMALY_SEVERITIES: [&str; 4] = [
+    "low",      // Notable but not concerning
+    "medium",   // Warrants monitoring
+    "high",     // Should trigger alerts
+    "critical", // Should trigger auto-freeze
+];
+
+/// Identity challenge types (community override)
+pub const CHALLENGE_TYPES: [&str; 4] = [
+    "hijack_report",   // Account appears compromised
+    "impersonation",   // Someone claiming to be this person
+    "spam",            // Posting spam/malicious content
+    "anomaly_confirm", // Confirming detected anomaly
+];
+
+/// Challenge status values
+pub const CHALLENGE_STATUSES: [&str; 4] = [
+    "pending",   // Challenge open, accumulating support
+    "upheld",    // Challenge succeeded, action taken
+    "dismissed", // Challenge rejected
+    "expired",   // Challenge timed out
+];
+
+/// Key revocation reasons
+pub const REVOCATION_REASONS: [&str; 4] = [
+    "compromised",       // Key known to be compromised
+    "stolen",            // Device/key stolen
+    "challenge_upheld",  // Community challenge succeeded
+    "voluntary",         // User-initiated revocation
+];
+
+/// Identity freeze types
+pub const FREEZE_TYPES: [&str; 3] = [
+    "auto_anomaly",       // Triggered by anomaly detection
+    "community_challenge", // Triggered by community reports
+    "steward_emergency",  // Triggered by M-of-N steward consensus
+];
+
+/// Capabilities that can be frozen
+pub const FREEZABLE_CAPABILITIES: [&str; 5] = [
+    "post",               // Create new content
+    "transfer",           // Transfer assets/points
+    "modify_relationships", // Change relationship graph
+    "vote",               // Participate in governance votes
+    "attest",             // Issue attestations to others
+];
+
+/// Verification requirements to unfreeze
+pub const UNFREEZE_REQUIREMENTS: [&str; 4] = [
+    "elohim_check",      // AI knowledge verification
+    "social_recovery",   // M-of-N steward approval
+    "steward_interview", // Direct interview by steward
+    "time_decay",        // Auto-unfreeze after timeout (low severity only)
+];
+
+/// Signing policy levels for distributed key custody
+pub const SIGNING_POLICIES: [&str; 3] = [
+    "normal",   // Standard M-of-N threshold
+    "elevated", // Higher threshold for sensitive ops
+    "emergency", // Recovery mode (relaxed threshold)
+];
+
+// =============================================================================
 // Mastery Constants
 // =============================================================================
 
@@ -375,6 +488,356 @@ pub struct ContributorPresence {
 }
 
 // =============================================================================
+// Recovery Entry Types
+// =============================================================================
+
+/// RecoveryRequest - Initiated when sovereign user needs to regain access.
+///
+/// Created by a doorway when a user who lost device access attempts recovery.
+/// Stewards with `emergency_access_enabled` relationships can vote to approve.
+/// Uses M-of-N threshold based on relationship intimacy levels.
+///
+/// Lifecycle: pending → approved/rejected → completed
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RecoveryRequest {
+    pub id: String,
+
+    // === REQUEST DETAILS ===
+    pub human_id: String,        // Human ID requesting recovery
+    pub doorway_id: String,      // Doorway initiating the request
+    pub recovery_method: String, // See RECOVERY_METHODS: social, elohim_check, hint
+
+    // === STATUS TRACKING ===
+    pub status: String,             // See RECOVERY_STATUSES
+    pub required_approvals: u32,    // M (threshold)
+    pub current_approvals: u32,     // Current vote count
+    pub confidence_score: f64,      // Combined confidence from all methods (0.0-1.0)
+
+    // === ELOHIM VERIFICATION ===
+    pub elohim_questions_json: Option<String>,  // Questions asked by Elohim
+    pub elohim_score: Option<f64>,              // Score from AI verification (0.0-1.0)
+    pub elohim_verified_at: Option<String>,
+
+    // === TIMESTAMPS ===
+    pub requested_at: String,
+    pub expires_at: String,        // 48 hours default
+    pub approved_at: Option<String>,
+    pub completed_at: Option<String>,
+}
+
+/// RecoveryVote - Vote on a recovery request from a trusted relationship.
+///
+/// Only agents with `emergency_access_enabled` in their HumanRelationship
+/// with the recovering human can vote. Intimacy level determines weight.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RecoveryVote {
+    pub id: String,
+    pub request_id: String,        // ID of RecoveryRequest being voted on
+    pub voter_human_id: String,    // Human ID of voter
+    pub approved: bool,            // Approve or reject
+    pub attestation: String,       // Verification note: "Verified via video call"
+    pub intimacy_level: String,    // Voter's intimacy level with requestor
+    pub confidence_weight: f64,    // Weight contribution (based on intimacy)
+    pub verification_method: String, // How voter verified: video_call, phone, in_person
+    pub voted_at: String,
+}
+
+/// RecoveryHint - Encrypted recovery metadata stored by user.
+///
+/// Users can store encrypted hints to help with self-recovery:
+/// - Password hints (encrypted)
+/// - Security Q&A (encrypted)
+/// - Trusted doorway list (encrypted)
+/// - Emergency contact info (encrypted)
+///
+/// Only the user can decrypt with their password/key.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RecoveryHint {
+    pub id: String,
+    pub human_id: String,
+    pub hint_type: String,       // See RECOVERY_HINT_TYPES
+    pub encrypted_data: String,  // AES-GCM encrypted hint data
+    pub encryption_nonce: String, // Nonce used for encryption
+    pub version: u32,            // For updating hints
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// =============================================================================
+// Network-Attested Identity Entry Types (Phase 2 - Red-Team Enhancement)
+// =============================================================================
+
+/// HumanityWitness - Continuous attestation of identity.
+///
+/// Unlike one-time authentication, HumanityWitness provides ongoing
+/// proof that an agent is acting as a consistent human identity.
+/// Intimate relationships automatically generate witnesses through
+/// normal interaction patterns.
+///
+/// Key insight: Identity is not just "who has the key" but "who is
+/// consistently acting like this person."
+///
+/// Attestations decay over time (expires_at) requiring ongoing
+/// relationship maintenance.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct HumanityWitness {
+    pub id: String,
+    pub human_id: String,        // Human being attested
+    pub witness_agent_id: String, // Agent providing attestation
+
+    // === ATTESTATION DETAILS ===
+    pub attestation_type: String,       // See ATTESTATION_TYPES
+    pub confidence: f64,                // 0.0 - 1.0 confidence in identity
+    pub behavioral_hash: Option<String>, // Hash of behavioral baseline for comparison
+
+    // === EVIDENCE ===
+    pub evidence_json: Option<String>,  // Supporting evidence (e.g., video call timestamp)
+    pub verification_method: Option<String>, // How identity was verified
+
+    // === LIFECYCLE ===
+    pub created_at: String,
+    pub expires_at: String,             // Attestations decay - must be renewed
+    pub revoked_at: Option<String>,     // Explicitly revoked if witness changes mind
+}
+
+/// KeyStewardship - Distributed key custody via Shamir Secret Sharing.
+///
+/// Instead of a single doorway holding the full custodial key,
+/// the key is split into N shards held by M trusted stewards.
+/// Any M-of-N can cooperate to sign, but no single party can act alone.
+///
+/// This prevents the "doorway admin compromised" attack vector.
+///
+/// Signing policy escalates for sensitive operations:
+/// - normal: Standard threshold for everyday actions
+/// - elevated: Higher threshold for relationship changes, transfers
+/// - emergency: Recovery mode allows threshold reduction
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct KeyStewardship {
+    pub id: String,
+    pub human_id: String,
+
+    // === SHARD HOLDERS ===
+    pub key_shard_holders: Vec<String>,  // Agent IDs holding key shards
+    pub threshold_m: u32,                // M required to sign
+    pub total_shards_n: u32,             // Total shards distributed
+
+    // === POLICY ===
+    pub signing_policy: String,          // See SIGNING_POLICIES
+    pub elevated_threshold: Option<u32>, // Higher M for sensitive ops
+
+    // === KEY METADATA ===
+    pub key_generation_id: String,       // Which key generation this stewardship covers
+    pub shard_commitment_hash: String,   // Commitment to verify shards
+
+    // === LIFECYCLE ===
+    pub created_at: String,
+    pub updated_at: String,
+    pub rotated_at: Option<String>,      // Last key rotation
+}
+
+/// IdentityAnomaly - Detected behavioral deviation.
+///
+/// AI monitors posting patterns, content style, relationship changes,
+/// and login patterns. When deviation exceeds threshold, an anomaly
+/// is recorded.
+///
+/// Critical anomalies can trigger auto-freeze (like the Sheila scenario
+/// where clickbait posting pattern was obviously not the real person).
+///
+/// Anomalies create an audit trail even if they don't trigger action.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct IdentityAnomaly {
+    pub id: String,
+    pub human_id: String,
+
+    // === ANOMALY DETAILS ===
+    pub anomaly_type: String,       // See ANOMALY_TYPES
+    pub severity: String,           // See ANOMALY_SEVERITIES
+    pub deviation_score: f64,       // 0.0 - 1.0 (1.0 = extreme deviation)
+
+    // === EVIDENCE ===
+    pub evidence_json: String,      // JSON blob: { baseline: {...}, current: {...}, diff: {...} }
+    pub detection_method: String,   // AI model, rule-based, etc.
+
+    // === ACTIONS ===
+    pub auto_freeze_triggered: bool, // Did this anomaly trigger a freeze?
+    pub freeze_id: Option<String>,   // Link to IdentityFreeze if triggered
+
+    // === RESOLUTION ===
+    pub acknowledged_at: Option<String>,  // User acknowledged anomaly
+    pub resolved_at: Option<String>,
+    pub resolution_json: Option<String>,  // How it was resolved
+
+    // === TIMESTAMPS ===
+    pub detected_at: String,
+    pub expires_at: Option<String>,       // Anomalies may expire if not concerning
+}
+
+/// IdentityChallenge - Community override mechanism.
+///
+/// When humans report "this isn't the real person," challenges accumulate.
+/// Each challenger's report is weighted by their relationship trust level.
+/// When weighted_support exceeds threshold, automatic action is triggered.
+///
+/// Unlike Meta's ignored reports, challenges have BINDING EFFECT.
+/// The architecture makes ignoring mass reports impossible.
+///
+/// Key innovation: Reports from intimate relationships count 3x,
+/// from trusted 2x, familiar 1x, acquaintances 0.5x, public 0.1x.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct IdentityChallenge {
+    pub id: String,
+    pub human_id: String,           // Human being challenged
+
+    // === CHALLENGE DETAILS ===
+    pub challenge_type: String,     // See CHALLENGE_TYPES
+    pub initiator_id: String,       // Who started the challenge
+    pub initiator_weight: f64,      // Weight of initial challenger
+
+    // === EVIDENCE ===
+    pub evidence_json: String,      // JSON: { description: "", screenshots: [], etc. }
+    pub supporting_anomaly_id: Option<String>, // Link to IdentityAnomaly if related
+
+    // === SUPPORT ACCUMULATION ===
+    pub weighted_support: f64,      // Sum of all supporter weights
+    pub supporter_count: u32,       // Number of unique supporters
+    pub supporters_json: String,    // JSON array of { agent_id, weight, voted_at }
+
+    // === THRESHOLDS ===
+    pub freeze_threshold: f64,      // Weight needed to trigger freeze (default 10.0)
+    pub revoke_threshold: f64,      // Weight needed to trigger revocation (default 25.0)
+
+    // === STATUS ===
+    pub status: String,             // See CHALLENGE_STATUSES
+    pub status_changed_at: Option<String>,
+    pub resolution_json: Option<String>, // How challenge was resolved
+
+    // === TIMESTAMPS ===
+    pub created_at: String,
+    pub expires_at: String,         // Challenges expire after timeout (default 7 days)
+}
+
+/// ChallengeSupport - Support for an IdentityChallenge.
+///
+/// Separate entry type to prevent single-point manipulation of
+/// the challenge's weighted_support field.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ChallengeSupport {
+    pub id: String,
+    pub challenge_id: String,       // Challenge being supported
+    pub supporter_id: String,       // Human supporting the challenge
+    pub weight: f64,                // Trust weight of supporter
+    pub intimacy_level: String,     // Relationship intimacy level
+    pub evidence_json: Option<String>, // Optional additional evidence
+    pub created_at: String,
+}
+
+/// KeyRevocation - DHT consensus to invalidate a compromised key.
+///
+/// Unlike current architecture where keys are permanent, this allows
+/// the network to revoke compromised keys via M-of-N steward consensus.
+///
+/// Once a key is revoked:
+/// - All new actions signed by that key are REJECTED
+/// - Content signed by revoked key can be flagged/removed
+/// - User must go through recovery to get new key
+///
+/// This is the "nuclear option" for account takeover scenarios.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct KeyRevocation {
+    pub id: String,
+    pub human_id: String,
+
+    // === REVOKED KEY ===
+    pub revoked_key: String,        // The agent_pub_key being revoked
+    pub reason: String,             // See REVOCATION_REASONS
+
+    // === TRIGGER ===
+    pub initiated_by: String,       // challenge_id, steward consensus, or voluntary
+    pub trigger_type: String,       // challenge, steward_vote, voluntary
+
+    // === STEWARD VOTES ===
+    pub required_votes: u32,        // M required for revocation
+    pub current_votes: u32,
+    pub votes_json: String,         // JSON array of RevocationVote
+
+    // === STATUS ===
+    pub threshold_reached: bool,
+    pub effective_at: Option<String>, // When revocation became active
+
+    // === TIMESTAMPS ===
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// RevocationVote - Individual steward vote on key revocation.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RevocationVote {
+    pub id: String,
+    pub revocation_id: String,      // KeyRevocation being voted on
+    pub steward_id: String,         // Steward voting
+    pub approved: bool,             // Approve or reject revocation
+    pub attestation: String,        // Why they're voting this way
+    pub voted_at: String,
+}
+
+/// IdentityFreeze - Emergency suspension of capabilities.
+///
+/// When anomaly detection or community challenge threshold is reached,
+/// an IdentityFreeze immediately suspends specified capabilities.
+/// The hijacker cannot continue posting/acting while verification
+/// is pending.
+///
+/// Key difference from Meta: Freeze happens AUTOMATICALLY based on
+/// network consensus, not on manual review that can be ignored.
+///
+/// Freeze can be:
+/// - Partial: Only specific capabilities frozen
+/// - Total: All capabilities frozen
+/// - Time-limited: Auto-expires for low-severity
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct IdentityFreeze {
+    pub id: String,
+    pub human_id: String,
+
+    // === FREEZE DETAILS ===
+    pub freeze_type: String,           // See FREEZE_TYPES
+    pub frozen_capabilities: Vec<String>, // See FREEZABLE_CAPABILITIES
+    pub severity: String,              // Anomaly severity that triggered
+
+    // === TRIGGER ===
+    pub triggered_by: String,          // ID of anomaly/challenge/steward action
+    pub trigger_type: String,          // anomaly, challenge, steward
+
+    // === VERIFICATION REQUIRED ===
+    pub requires_verification: String, // See UNFREEZE_REQUIREMENTS
+    pub verification_attempts: u32,
+    pub last_verification_at: Option<String>,
+
+    // === STATUS ===
+    pub is_active: bool,
+    pub lifted_at: Option<String>,
+    pub lifted_by: Option<String>,     // Who lifted the freeze
+    pub lift_reason: Option<String>,
+
+    // === TIMESTAMPS ===
+    pub frozen_at: String,
+    pub expires_at: Option<String>,    // Auto-lift for low severity
+}
+
+// =============================================================================
 // Anchor Entry (for link indexing)
 // =============================================================================
 
@@ -411,6 +874,19 @@ pub enum EntryTypes {
     ContentMastery(ContentMastery),
     ContributorPresence(ContributorPresence),
     StringAnchor(StringAnchor),
+    // Recovery entry types
+    RecoveryRequest(RecoveryRequest),
+    RecoveryVote(RecoveryVote),
+    RecoveryHint(RecoveryHint),
+    // Network-Attested Identity entry types (Phase 2)
+    HumanityWitness(HumanityWitness),
+    KeyStewardship(KeyStewardship),
+    IdentityAnomaly(IdentityAnomaly),
+    IdentityChallenge(IdentityChallenge),
+    ChallengeSupport(ChallengeSupport),
+    KeyRevocation(KeyRevocation),
+    RevocationVote(RevocationVote),
+    IdentityFreeze(IdentityFreeze),
 }
 
 // =============================================================================
@@ -456,6 +932,66 @@ pub enum LinkTypes {
     PresenceByState,         // Anchor(state) -> ContributorPresence
     StewardToPresence,       // Anchor(steward_id) -> ContributorPresence
     ClaimedAgentToPresence,  // Anchor(claimed_agent_id) -> ContributorPresence
+
+    // Recovery links
+    IdToRecoveryRequest,         // Anchor(request_id) -> RecoveryRequest
+    HumanToRecoveryRequest,      // Anchor(human_id) -> RecoveryRequest (user's requests)
+    RecoveryRequestByStatus,     // Anchor(status) -> RecoveryRequest
+    PendingRecoveryVote,         // Anchor(voter_human_id) -> RecoveryRequest (requests voter can act on)
+    RecoveryVoteToRequest,       // RecoveryVote -> RecoveryRequest
+    HumanToRecoveryHint,         // Anchor(human_id) -> RecoveryHint
+    RecoveryHintByType,          // Anchor(hint_type) -> RecoveryHint
+
+    // Network-Attested Identity links (Phase 2)
+    // HumanityWitness links
+    IdToHumanityWitness,         // Anchor(witness_id) -> HumanityWitness
+    HumanToWitness,              // Anchor(human_id) -> HumanityWitness (witnesses FOR this human)
+    WitnessAgentToWitness,       // Anchor(witness_agent_id) -> HumanityWitness (witnesses BY this agent)
+    WitnessByType,               // Anchor(attestation_type) -> HumanityWitness
+    ActiveWitnesses,             // Anchor(active) -> HumanityWitness (non-expired, non-revoked)
+
+    // KeyStewardship links
+    IdToKeyStewardship,          // Anchor(stewardship_id) -> KeyStewardship
+    HumanToKeyStewardship,       // Anchor(human_id) -> KeyStewardship
+    ShardHolderToStewardship,    // Anchor(shard_holder_id) -> KeyStewardship (stewardships this agent participates in)
+
+    // IdentityAnomaly links
+    IdToIdentityAnomaly,         // Anchor(anomaly_id) -> IdentityAnomaly
+    HumanToAnomaly,              // Anchor(human_id) -> IdentityAnomaly
+    AnomalyByType,               // Anchor(anomaly_type) -> IdentityAnomaly
+    AnomalyBySeverity,           // Anchor(severity) -> IdentityAnomaly
+    UnresolvedAnomalies,         // Anchor(unresolved) -> IdentityAnomaly
+
+    // IdentityChallenge links
+    IdToIdentityChallenge,       // Anchor(challenge_id) -> IdentityChallenge
+    HumanToChallenge,            // Anchor(human_id) -> IdentityChallenge (challenges against this human)
+    InitiatorToChallenge,        // Anchor(initiator_id) -> IdentityChallenge
+    ChallengeByType,             // Anchor(challenge_type) -> IdentityChallenge
+    ChallengeByStatus,           // Anchor(status) -> IdentityChallenge
+    ActiveChallenges,            // Anchor(active) -> IdentityChallenge (pending, not expired)
+
+    // ChallengeSupport links
+    IdToChallengeSupport,        // Anchor(support_id) -> ChallengeSupport
+    ChallengeToSupport,          // Anchor(challenge_id) -> ChallengeSupport
+    SupporterToSupport,          // Anchor(supporter_id) -> ChallengeSupport
+
+    // KeyRevocation links
+    IdToKeyRevocation,           // Anchor(revocation_id) -> KeyRevocation
+    HumanToKeyRevocation,        // Anchor(human_id) -> KeyRevocation
+    RevokedKeyToRevocation,      // Anchor(revoked_key) -> KeyRevocation (lookup by key)
+    PendingRevocations,          // Anchor(pending) -> KeyRevocation
+    EffectiveRevocations,        // Anchor(effective) -> KeyRevocation (threshold reached)
+
+    // RevocationVote links
+    IdToRevocationVote,          // Anchor(vote_id) -> RevocationVote
+    RevocationToVote,            // Anchor(revocation_id) -> RevocationVote
+    StewardToRevocationVote,     // Anchor(steward_id) -> RevocationVote
+
+    // IdentityFreeze links
+    IdToIdentityFreeze,          // Anchor(freeze_id) -> IdentityFreeze
+    HumanToFreeze,               // Anchor(human_id) -> IdentityFreeze
+    ActiveFreezes,               // Anchor(active) -> IdentityFreeze (currently frozen)
+    FreezeByType,                // Anchor(freeze_type) -> IdentityFreeze
 }
 
 // =============================================================================
@@ -478,6 +1014,18 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Attestation(attestation) => validate_attestation(&attestation),
                 EntryTypes::ContentMastery(mastery) => validate_content_mastery(&mastery),
                 EntryTypes::ContributorPresence(presence) => validate_contributor_presence(&presence),
+                EntryTypes::RecoveryRequest(request) => validate_recovery_request(&request),
+                EntryTypes::RecoveryVote(vote) => validate_recovery_vote(&vote),
+                EntryTypes::RecoveryHint(hint) => validate_recovery_hint(&hint),
+                // Network-Attested Identity validation (Phase 2)
+                EntryTypes::HumanityWitness(witness) => validate_humanity_witness(&witness),
+                EntryTypes::KeyStewardship(stewardship) => validate_key_stewardship(&stewardship),
+                EntryTypes::IdentityAnomaly(anomaly) => validate_identity_anomaly(&anomaly),
+                EntryTypes::IdentityChallenge(challenge) => validate_identity_challenge(&challenge),
+                EntryTypes::ChallengeSupport(support) => validate_challenge_support(&support),
+                EntryTypes::KeyRevocation(revocation) => validate_key_revocation(&revocation),
+                EntryTypes::RevocationVote(vote) => validate_revocation_vote(&vote),
+                EntryTypes::IdentityFreeze(freeze) => validate_identity_freeze(&freeze),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
@@ -701,6 +1249,486 @@ fn validate_contributor_presence(presence: &ContributorPresence) -> ExternResult
         return Ok(ValidateCallbackResult::Invalid(
             "Stewarded presence must have steward_id".to_string(),
         ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// Recovery Validation Functions
+// =============================================================================
+
+/// Validate RecoveryRequest entry
+fn validate_recovery_request(request: &RecoveryRequest) -> ExternResult<ValidateCallbackResult> {
+    if request.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryRequest ID cannot be empty".to_string(),
+        ));
+    }
+
+    if request.human_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryRequest human_id cannot be empty".to_string(),
+        ));
+    }
+
+    if request.doorway_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryRequest doorway_id cannot be empty".to_string(),
+        ));
+    }
+
+    if !RECOVERY_METHODS.contains(&request.recovery_method.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid recovery_method '{}'. Must be one of: {:?}",
+            request.recovery_method, RECOVERY_METHODS
+        )));
+    }
+
+    if !RECOVERY_STATUSES.contains(&request.status.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid status '{}'. Must be one of: {:?}",
+            request.status, RECOVERY_STATUSES
+        )));
+    }
+
+    if request.confidence_score < 0.0 || request.confidence_score > 1.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "confidence_score must be between 0.0 and 1.0".to_string(),
+        ));
+    }
+
+    // Minimum required approvals is 2
+    if request.required_approvals < 2 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "required_approvals must be at least 2 for security".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate RecoveryVote entry
+fn validate_recovery_vote(vote: &RecoveryVote) -> ExternResult<ValidateCallbackResult> {
+    if vote.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryVote ID cannot be empty".to_string(),
+        ));
+    }
+
+    if vote.request_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryVote request_id cannot be empty".to_string(),
+        ));
+    }
+
+    if vote.voter_human_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryVote voter_human_id cannot be empty".to_string(),
+        ));
+    }
+
+    if !INTIMACY_LEVELS.contains(&vote.intimacy_level.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid intimacy_level '{}'. Must be one of: {:?}",
+            vote.intimacy_level, INTIMACY_LEVELS
+        )));
+    }
+
+    if vote.confidence_weight < 0.0 || vote.confidence_weight > 1.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "confidence_weight must be between 0.0 and 1.0".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate RecoveryHint entry
+fn validate_recovery_hint(hint: &RecoveryHint) -> ExternResult<ValidateCallbackResult> {
+    if hint.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryHint ID cannot be empty".to_string(),
+        ));
+    }
+
+    if hint.human_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryHint human_id cannot be empty".to_string(),
+        ));
+    }
+
+    if !RECOVERY_HINT_TYPES.contains(&hint.hint_type.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid hint_type '{}'. Must be one of: {:?}",
+            hint.hint_type, RECOVERY_HINT_TYPES
+        )));
+    }
+
+    if hint.encrypted_data.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryHint encrypted_data cannot be empty".to_string(),
+        ));
+    }
+
+    if hint.encryption_nonce.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryHint encryption_nonce cannot be empty".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// Network-Attested Identity Validation Functions (Phase 2)
+// =============================================================================
+
+/// Validate HumanityWitness entry
+fn validate_humanity_witness(witness: &HumanityWitness) -> ExternResult<ValidateCallbackResult> {
+    if witness.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "HumanityWitness ID cannot be empty".to_string(),
+        ));
+    }
+
+    if witness.human_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "HumanityWitness human_id cannot be empty".to_string(),
+        ));
+    }
+
+    if witness.witness_agent_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "HumanityWitness witness_agent_id cannot be empty".to_string(),
+        ));
+    }
+
+    // Cannot witness yourself
+    if witness.human_id == witness.witness_agent_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot witness your own identity".to_string(),
+        ));
+    }
+
+    if !ATTESTATION_TYPES.contains(&witness.attestation_type.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid attestation_type '{}'. Must be one of: {:?}",
+            witness.attestation_type, ATTESTATION_TYPES
+        )));
+    }
+
+    if witness.confidence < 0.0 || witness.confidence > 1.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "confidence must be between 0.0 and 1.0".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate KeyStewardship entry
+fn validate_key_stewardship(stewardship: &KeyStewardship) -> ExternResult<ValidateCallbackResult> {
+    if stewardship.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyStewardship ID cannot be empty".to_string(),
+        ));
+    }
+
+    if stewardship.human_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyStewardship human_id cannot be empty".to_string(),
+        ));
+    }
+
+    // Must have at least 2 shard holders for security
+    if stewardship.key_shard_holders.len() < 2 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyStewardship must have at least 2 shard holders".to_string(),
+        ));
+    }
+
+    // M must be at least 2
+    if stewardship.threshold_m < 2 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "threshold_m must be at least 2 for security".to_string(),
+        ));
+    }
+
+    // M must be <= N
+    if stewardship.threshold_m > stewardship.total_shards_n {
+        return Ok(ValidateCallbackResult::Invalid(
+            "threshold_m cannot exceed total_shards_n".to_string(),
+        ));
+    }
+
+    // N must match shard holders count
+    if stewardship.total_shards_n as usize != stewardship.key_shard_holders.len() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "total_shards_n must match number of shard holders".to_string(),
+        ));
+    }
+
+    if !SIGNING_POLICIES.contains(&stewardship.signing_policy.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid signing_policy '{}'. Must be one of: {:?}",
+            stewardship.signing_policy, SIGNING_POLICIES
+        )));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate IdentityAnomaly entry
+fn validate_identity_anomaly(anomaly: &IdentityAnomaly) -> ExternResult<ValidateCallbackResult> {
+    if anomaly.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "IdentityAnomaly ID cannot be empty".to_string(),
+        ));
+    }
+
+    if anomaly.human_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "IdentityAnomaly human_id cannot be empty".to_string(),
+        ));
+    }
+
+    if !ANOMALY_TYPES.contains(&anomaly.anomaly_type.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid anomaly_type '{}'. Must be one of: {:?}",
+            anomaly.anomaly_type, ANOMALY_TYPES
+        )));
+    }
+
+    if !ANOMALY_SEVERITIES.contains(&anomaly.severity.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid severity '{}'. Must be one of: {:?}",
+            anomaly.severity, ANOMALY_SEVERITIES
+        )));
+    }
+
+    if anomaly.deviation_score < 0.0 || anomaly.deviation_score > 1.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "deviation_score must be between 0.0 and 1.0".to_string(),
+        ));
+    }
+
+    if anomaly.evidence_json.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "IdentityAnomaly evidence_json cannot be empty".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate IdentityChallenge entry
+fn validate_identity_challenge(challenge: &IdentityChallenge) -> ExternResult<ValidateCallbackResult> {
+    if challenge.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "IdentityChallenge ID cannot be empty".to_string(),
+        ));
+    }
+
+    if challenge.human_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "IdentityChallenge human_id cannot be empty".to_string(),
+        ));
+    }
+
+    if challenge.initiator_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "IdentityChallenge initiator_id cannot be empty".to_string(),
+        ));
+    }
+
+    // Cannot challenge yourself
+    if challenge.human_id == challenge.initiator_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot challenge your own identity".to_string(),
+        ));
+    }
+
+    if !CHALLENGE_TYPES.contains(&challenge.challenge_type.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid challenge_type '{}'. Must be one of: {:?}",
+            challenge.challenge_type, CHALLENGE_TYPES
+        )));
+    }
+
+    if !CHALLENGE_STATUSES.contains(&challenge.status.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid status '{}'. Must be one of: {:?}",
+            challenge.status, CHALLENGE_STATUSES
+        )));
+    }
+
+    if challenge.freeze_threshold <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "freeze_threshold must be positive".to_string(),
+        ));
+    }
+
+    if challenge.revoke_threshold <= challenge.freeze_threshold {
+        return Ok(ValidateCallbackResult::Invalid(
+            "revoke_threshold must be greater than freeze_threshold".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate ChallengeSupport entry
+fn validate_challenge_support(support: &ChallengeSupport) -> ExternResult<ValidateCallbackResult> {
+    if support.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ChallengeSupport ID cannot be empty".to_string(),
+        ));
+    }
+
+    if support.challenge_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ChallengeSupport challenge_id cannot be empty".to_string(),
+        ));
+    }
+
+    if support.supporter_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ChallengeSupport supporter_id cannot be empty".to_string(),
+        ));
+    }
+
+    if support.weight < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "weight cannot be negative".to_string(),
+        ));
+    }
+
+    if !INTIMACY_LEVELS.contains(&support.intimacy_level.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid intimacy_level '{}'. Must be one of: {:?}",
+            support.intimacy_level, INTIMACY_LEVELS
+        )));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate KeyRevocation entry
+fn validate_key_revocation(revocation: &KeyRevocation) -> ExternResult<ValidateCallbackResult> {
+    if revocation.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyRevocation ID cannot be empty".to_string(),
+        ));
+    }
+
+    if revocation.human_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyRevocation human_id cannot be empty".to_string(),
+        ));
+    }
+
+    if revocation.revoked_key.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyRevocation revoked_key cannot be empty".to_string(),
+        ));
+    }
+
+    if !REVOCATION_REASONS.contains(&revocation.reason.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid reason '{}'. Must be one of: {:?}",
+            revocation.reason, REVOCATION_REASONS
+        )));
+    }
+
+    // Minimum required votes is 2
+    if revocation.required_votes < 2 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "required_votes must be at least 2 for security".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate RevocationVote entry
+fn validate_revocation_vote(vote: &RevocationVote) -> ExternResult<ValidateCallbackResult> {
+    if vote.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RevocationVote ID cannot be empty".to_string(),
+        ));
+    }
+
+    if vote.revocation_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RevocationVote revocation_id cannot be empty".to_string(),
+        ));
+    }
+
+    if vote.steward_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RevocationVote steward_id cannot be empty".to_string(),
+        ));
+    }
+
+    if vote.attestation.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RevocationVote attestation cannot be empty (must provide reason)".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate IdentityFreeze entry
+fn validate_identity_freeze(freeze: &IdentityFreeze) -> ExternResult<ValidateCallbackResult> {
+    if freeze.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "IdentityFreeze ID cannot be empty".to_string(),
+        ));
+    }
+
+    if freeze.human_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "IdentityFreeze human_id cannot be empty".to_string(),
+        ));
+    }
+
+    if !FREEZE_TYPES.contains(&freeze.freeze_type.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid freeze_type '{}'. Must be one of: {:?}",
+            freeze.freeze_type, FREEZE_TYPES
+        )));
+    }
+
+    if freeze.frozen_capabilities.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "IdentityFreeze must freeze at least one capability".to_string(),
+        ));
+    }
+
+    // Validate all frozen capabilities
+    for cap in &freeze.frozen_capabilities {
+        if !FREEZABLE_CAPABILITIES.contains(&cap.as_str()) {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Invalid frozen capability '{}'. Must be one of: {:?}",
+                cap, FREEZABLE_CAPABILITIES
+            )));
+        }
+    }
+
+    if !ANOMALY_SEVERITIES.contains(&freeze.severity.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid severity '{}'. Must be one of: {:?}",
+            freeze.severity, ANOMALY_SEVERITIES
+        )));
+    }
+
+    if !UNFREEZE_REQUIREMENTS.contains(&freeze.requires_verification.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid requires_verification '{}'. Must be one of: {:?}",
+            freeze.requires_verification, UNFREEZE_REQUIREMENTS
+        )));
     }
 
     Ok(ValidateCallbackResult::Valid)

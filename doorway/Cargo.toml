@@ -42,6 +42,10 @@ bson = { version = "2.13", features = ["chrono-0_4"] }
 jsonwebtoken = "9.3"
 argon2 = "0.5"
 
+# Custodial key encryption
+chacha20poly1305 = "0.10"
+zeroize = { version = "1.8", features = ["derive"] }
+
 # CLI and configuration
 clap = { version = "4.5", features = ["derive", "env"] }
 dotenvy = "0.15"
