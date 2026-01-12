@@ -58,6 +58,7 @@
           },
           "configurations": {
             "production": {
+              "baseHref": "/threshold/",
               "budgets": [
                 {
                   "type": "initial",
