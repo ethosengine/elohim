@@ -62,6 +62,12 @@ export interface BrowserMode {
   type: 'browser';
   /** Doorway connection config */
   doorway: DoorwayConfig;
+  /**
+   * Direct storage URL for /db/* routes (optional)
+   * When set, /db/* requests bypass doorway and go directly to storage.
+   * Useful in local dev when doorway doesn't proxy /db/* routes.
+   */
+  storageUrl?: string;
 }
 
 /**

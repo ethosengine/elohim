@@ -376,12 +376,18 @@ export class ElohimClient {
     path: string,
     options?: RequestInit
   ): Promise<T | null> {
-    const url = `${mode.doorway.url}${path}`;
+    // Use storageUrl directly for /db/* routes if configured (local dev bypass)
+    const baseUrl = (path.startsWith('/db/') && mode.storageUrl)
+      ? mode.storageUrl
+      : mode.doorway.url;
+    const url = `${baseUrl}${path}`;
 
     const headers: Record<string, string> = {
       ...(options?.headers as Record<string, string>),
     };
-    if (mode.doorway.apiKey) {
+    // Only include auth header when using doorway (storage doesn't need it in dev)
+    const usingStorage = path.startsWith('/db/') && mode.storageUrl;
+    if (!usingStorage && mode.doorway.apiKey) {
       headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
     }
 
@@ -443,10 +449,13 @@ export class ElohimClient {
     // Map content type to elohim-storage route
     // 'content' → /db/content/, 'path' → /db/paths/
     const route = contentType === 'path' ? 'paths' : contentType;
-    const url = `${mode.doorway.url}/db/${route}/${id}`;
+    // Use storageUrl directly for /db/* routes if configured (local dev bypass)
+    const baseUrl = mode.storageUrl ?? mode.doorway.url;
+    const url = `${baseUrl}/db/${route}/${id}`;
 
     const headers: Record<string, string> = {};
-    if (mode.doorway.apiKey) {
+    // Only include auth header when using doorway (storage doesn't need it in dev)
+    if (!mode.storageUrl && mode.doorway.apiKey) {
       headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
     }
 
@@ -480,10 +489,13 @@ export class ElohimClient {
     if (query.limit) params.set('limit', String(query.limit));
     if (query.offset) params.set('offset', String(query.offset));
 
-    const url = `${mode.doorway.url}/db/${route}?${params}`;
+    // Use storageUrl directly for /db/* routes if configured (local dev bypass)
+    const baseUrl = mode.storageUrl ?? mode.doorway.url;
+    const url = `${baseUrl}/db/${route}?${params}`;
 
     const headers: Record<string, string> = {};
-    if (mode.doorway.apiKey) {
+    // Only include auth header when using doorway (storage doesn't need it in dev)
+    if (!mode.storageUrl && mode.doorway.apiKey) {
       headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
     }
 
@@ -510,15 +522,19 @@ export class ElohimClient {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    if (mode.doorway.apiKey) {
+    // Only include auth header when using doorway (storage doesn't need it in dev)
+    if (!mode.storageUrl && mode.doorway.apiKey) {
       headers['Authorization'] = `Bearer ${mode.doorway.apiKey}`;
     }
+
+    // Use storageUrl directly for /db/* routes if configured (local dev bypass)
+    const baseUrl = mode.storageUrl ?? mode.doorway.url;
 
     for (const [contentType, ops] of byType) {
       // Map content type to elohim-storage route
       // 'content' → /db/content/, 'path' → /db/paths/
       const route = contentType === 'path' ? 'paths' : contentType;
-      const url = `${mode.doorway.url}/db/${route}/bulk`;
+      const url = `${baseUrl}/db/${route}/bulk`;
       const items = ops.map(op => op.data);
 
       const response = await fetch(url, {
