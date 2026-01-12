@@ -76,6 +76,8 @@ export async function computeContentAddresses(data: Uint8Array): Promise<{
 export interface DoorwayClientConfig {
   /** Base URL of the doorway (e.g., https://doorway.example.com) */
   baseUrl: string;
+  /** Direct storage URL for bulk operations (bypasses doorway proxy if set) */
+  storageUrl?: string;
   /** API key for admin operations */
   apiKey?: string;
   /** Request timeout in ms (default: 30000) */
@@ -228,11 +230,12 @@ export interface ImportStatusResponse {
 // =============================================================================
 
 export class DoorwayClient {
-  private config: Required<DoorwayClientConfig>;
+  private config: DoorwayClientConfig & { baseUrl: string; timeout: number; retries: number; dryRun: boolean };
 
   constructor(config: DoorwayClientConfig) {
     this.config = {
       baseUrl: config.baseUrl.replace(/\/$/, ''), // Remove trailing slash
+      storageUrl: config.storageUrl?.replace(/\/$/, ''), // Direct storage URL for /db/* routes
       apiKey: config.apiKey || '',
       timeout: config.timeout || 30000,
       retries: config.retries || 3,
@@ -738,7 +741,7 @@ export class DoorwayClient {
   }
 
   // ===========================================================================
-  // Direct Bulk Operations - Calls elohim-storage via Doorway's /api/db/* proxy
+  // Direct Bulk Operations - Calls elohim-storage via Doorway's /db/* proxy
   // ===========================================================================
 
   /**
@@ -770,7 +773,7 @@ export class DoorwayClient {
       return { inserted: items.length, skipped: 0, errors: [] };
     }
 
-    const response = await this.fetch('/api/db/content/bulk', {
+    const response = await this.fetch('/db/content/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(items),
@@ -825,7 +828,7 @@ export class DoorwayClient {
       return { inserted: items.length, skipped: 0, errors: [] };
     }
 
-    const response = await this.fetch('/api/db/paths/bulk', {
+    const response = await this.fetch('/db/paths/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(items),
@@ -861,7 +864,7 @@ export class DoorwayClient {
       return { created: items.length, errors: [] };
     }
 
-    const response = await this.fetch('/api/db/relationships/bulk', {
+    const response = await this.fetch('/db/relationships/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(items),
@@ -899,7 +902,7 @@ export class DoorwayClient {
       return { created: items.length, errors: [] };
     }
 
-    const response = await this.fetch('/api/db/presences/bulk', {
+    const response = await this.fetch('/db/presences/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(items),
@@ -940,7 +943,7 @@ export class DoorwayClient {
       return { recorded: items.length, errors: [] };
     }
 
-    const response = await this.fetch('/api/db/events/bulk', {
+    const response = await this.fetch('/db/events/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(items),
@@ -976,7 +979,7 @@ export class DoorwayClient {
       return { created: items.length, updated: 0, errors: [] };
     }
 
-    const response = await this.fetch('/api/db/mastery/bulk', {
+    const response = await this.fetch('/db/mastery/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(items),
@@ -993,6 +996,9 @@ export class DoorwayClient {
 
   /**
    * Internal fetch wrapper with auth, timeout, and retry logic.
+   *
+   * For /db/* paths: Uses storageUrl directly if configured (bypasses doorway proxy).
+   * This is useful when doorway's proxy is unavailable but storage is accessible.
    */
   private async fetch(
     path: string,
@@ -1003,7 +1009,11 @@ export class DoorwayClient {
       timeout?: number;
     } = {}
   ): Promise<Response> {
-    const url = `${this.config.baseUrl}${path}`;
+    // Use storage URL directly for /db/* paths if configured
+    const baseUrl = (path.startsWith('/db/') && this.config.storageUrl)
+      ? this.config.storageUrl
+      : this.config.baseUrl;
+    const url = `${baseUrl}${path}`;
     const timeout = options.timeout || this.config.timeout;
 
     const headers: Record<string, string> = {

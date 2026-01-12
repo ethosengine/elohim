@@ -475,6 +475,53 @@ function cleanErrorMessage(error: any): string {
     .slice(0, 200); // Cap total length
 }
 
+/**
+ * Normalize content format to storage-accepted values.
+ *
+ * Valid formats: markdown, html, json, text, perseus, gherkin, yaml, toml, latex, asciidoc, html5-app, iframe, embed
+ */
+function normalizeContentFormat(format: string | undefined): string {
+  if (!format) return 'markdown';
+  const formatMap: Record<string, string> = {
+    'perseus-quiz-json': 'perseus',  // Perseus quiz format
+    'plaintext': 'text',             // Plain text
+    'plain': 'text',
+    'txt': 'text',
+  };
+  return formatMap[format.toLowerCase()] || format.toLowerCase();
+}
+
+/**
+ * Normalize path type to storage-accepted values.
+ *
+ * Valid types: guided, self-paced, challenge, assessment, exploration, certification
+ */
+function normalizePathType(pathType: string | undefined): string {
+  if (!pathType) return 'guided';
+  const typeMap: Record<string, string> = {
+    'linear': 'guided',
+    'journey': 'guided',
+    'course': 'guided',
+    'module': 'guided',
+    'expedition': 'exploration',  // Expedition → exploration
+    'adventure': 'exploration',
+    'discovery': 'exploration',
+    'tutorial': 'self-paced',
+    'interactive': 'exploration',
+    'test': 'assessment',
+    'quiz': 'assessment',
+    'exam': 'certification',
+  };
+  const normalized = typeMap[pathType.toLowerCase()] || pathType.toLowerCase();
+  // Valid types: guided, self-paced, challenge, assessment, exploration, certification
+  const validTypes = ['guided', 'self-paced', 'challenge', 'assessment', 'exploration', 'certification'];
+  if (!validTypes.includes(normalized)) {
+    console.warn(`   ⚠️ Unknown path_type '${pathType}' -> defaulting to 'guided'`);
+    return 'guided';
+  }
+  return normalized;
+}
+
 // Types matching the Holochain zome
 interface CreateContentInput {
   id: string;
@@ -746,7 +793,7 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
     summary: summary,
     // Sparse: store hash reference, Full: store entire content
     content: useSparsePattern ? `sha256:${blobEntry.hash}` : contentString,
-    content_format: concept.contentFormat || 'markdown',
+    content_format: normalizeContentFormat(concept.contentFormat),
     tags: concept.tags || [],
     source_path: sourcePathValue,
     related_node_ids: relatedIds,
@@ -924,8 +971,11 @@ async function seedViaDoorway(): Promise<SeedResult> {
   timer.startPhase('Doorway Import');
 
   // Create doorway client
+  // Pass storageUrl to use storage directly for /db/* bulk operations
+  // This bypasses doorway's proxy which may not have the routes compiled
   const doorwayClient = new DoorwayClient({
     baseUrl: DOORWAY_URL!,
+    storageUrl: STORAGE_URL || undefined,
     apiKey: DOORWAY_API_KEY,
     timeout: 120000, // 2 min for large blob uploads
     retries: 3,
@@ -1171,7 +1221,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
       title: item.title,
       description: item.description,
       content_type: item.content_type,
-      content_format: item.content_format,
+      content_format: normalizeContentFormat(item.content_format),  // Ensure valid format
       content_body: item.content,  // Backend expects content_body, not content
       blob_hash: item.blob_hash ?? undefined,
       blob_cid: item.blob_cid ?? undefined,
@@ -1417,26 +1467,33 @@ async function seedViaDoorway(): Promise<SeedResult> {
       is_optional?: boolean;
     }
 
-    // Valid step types per DNA validation
-    const VALID_STEP_TYPES = ['content', 'read', 'path', 'external', 'practice', 'assess', 'video', 'interactive'];
+    // Valid step types per storage validation
+    // Storage accepts: learn, practice, quiz, assessment, discussion, project, resource, video, reading, checkpoint
+    const VALID_STEP_TYPES = ['learn', 'practice', 'quiz', 'assessment', 'discussion', 'project', 'resource', 'video', 'reading', 'checkpoint'];
 
-    // Normalize step type aliases to valid zome values
+    // Normalize step type aliases to valid storage values
     function normalizeStepType(type: string | undefined): string {
-      if (!type) return 'content';
+      if (!type) return 'learn';  // Default to 'learn' (generic content)
       const normalized = type.toLowerCase();
-      // Common aliases
+      // Map old/alternative step types to storage-accepted values
       const aliases: Record<string, string> = {
-        'assessment': 'assess',
-        'quiz': 'assess',
-        'test': 'assess',
-        'reading': 'read',
-        'lesson': 'content',
-        'article': 'content',
+        // Old seeder types -> new storage types
+        'content': 'learn',
+        'read': 'reading',
+        'assess': 'assessment',
+        'path': 'resource',      // Sub-path reference
+        'external': 'resource',  // External link
+        'interactive': 'practice',
+        // Common variations
+        'lesson': 'learn',
+        'article': 'reading',
+        'test': 'quiz',
+        'exercise': 'practice',
       };
       const mapped = aliases[normalized] || normalized;
       if (!VALID_STEP_TYPES.includes(mapped)) {
-        console.warn(`   ⚠️ Unknown step_type '${type}' -> defaulting to 'content'`);
-        return 'content';
+        console.warn(`   ⚠️ Unknown step_type '${type}' -> defaulting to 'learn'`);
+        return 'learn';
       }
       return mapped;
     }
@@ -1468,7 +1525,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
       // If path has flat conceptIds array
       if (pathData.conceptIds && Array.isArray(pathData.conceptIds)) {
         return pathData.conceptIds.map((id: string, i: number) => ({
-          step_type: 'content',
+          step_type: 'learn',
           resource_id: id,
           order_index: i,
         }));
@@ -1487,7 +1544,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
           // Chapter-level conceptIds (flat)
           if (chapter.conceptIds && Array.isArray(chapter.conceptIds)) {
             for (const id of chapter.conceptIds) {
-              steps.push({ step_type: 'content', resource_id: id, order_index: orderIndex++ });
+              steps.push({ step_type: 'learn', resource_id: id, order_index: orderIndex++ });
             }
           }
           // Modules within chapters
@@ -1502,7 +1559,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
               // Module-level conceptIds
               if (module.conceptIds && Array.isArray(module.conceptIds)) {
                 for (const id of module.conceptIds) {
-                  steps.push({ step_type: 'content', resource_id: id, order_index: orderIndex++ });
+                  steps.push({ step_type: 'learn', resource_id: id, order_index: orderIndex++ });
                 }
               }
               // Sections within modules
@@ -1517,7 +1574,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
                   // Section-level conceptIds
                   if (section.conceptIds && Array.isArray(section.conceptIds)) {
                     for (const id of section.conceptIds) {
-                      steps.push({ step_type: 'content', resource_id: id, order_index: orderIndex++ });
+                      steps.push({ step_type: 'learn', resource_id: id, order_index: orderIndex++ });
                     }
                   }
                 }
@@ -1543,7 +1600,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
         difficulty: pathData.difficulty || 'beginner',
         estimated_duration: pathData.estimatedDuration || null,
         visibility: pathData.visibility || 'public',
-        path_type: pathData.pathType || 'linear',
+        path_type: normalizePathType(pathData.pathType),
         tags: pathData.tags || [],
         // metadata_json must be an object with a `chapters` property for the UI to parse it
         // The UI does: metadata.chapters (not just metadata as an array)
@@ -1592,7 +1649,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
         id: pathInput.id,
         title: pathInput.title,
         description: pathInput.description,
-        path_type: pathInput.path_type === 'linear' ? 'guided' : (pathInput.path_type || 'guided'),
+        path_type: normalizePathType(pathInput.path_type),
         difficulty: pathInput.difficulty,
         estimated_duration: pathInput.estimated_duration,
         visibility: pathInput.visibility || 'public',
