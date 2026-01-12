@@ -138,11 +138,7 @@
             "allowedHosts": [
               "*.code.ethosengine.com"
             ],
-            "proxyConfig": "proxy.conf.json",
-            "headers": {
-              "Cross-Origin-Opener-Policy": "same-origin",
-              "Cross-Origin-Embedder-Policy": "credentialless"
-            }
+            "proxyConfig": "proxy.conf.json"
           },
           "configurations": {
             "production": {
