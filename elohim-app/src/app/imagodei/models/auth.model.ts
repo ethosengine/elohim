@@ -103,8 +103,8 @@ export interface AuthSuccess {
   humanId: string;
   /** Holochain agent public key */
   agentPubKey: string;
-  /** Token expiration time (ISO string) */
-  expiresAt: string;
+  /** Token expiration - Unix timestamp (seconds) or ISO string */
+  expiresAt: number | string;
   /** User identifier */
   identifier: string;
 }
@@ -264,7 +264,8 @@ export interface AuthResponse {
   token: string;
   humanId: string;
   agentPubKey: string;
-  expiresAt: string;
+  /** Token expiration - Unix timestamp (seconds) or ISO string */
+  expiresAt: number | string;
   identifier: string;
   /** Profile info (returned on registration) */
   profile?: HumanProfileResponse;
@@ -303,16 +304,43 @@ export function isTokenExpiringSoon(
 }
 
 /**
- * Parse expiry string to Date.
+ * Parse expiry value to Date.
  *
- * @param expiresAt - ISO date string
+ * Handles multiple formats:
+ * - ISO date string: "2026-01-13T10:15:47Z"
+ * - Unix timestamp (seconds): 1736776547 or "1736776547"
+ * - Unix timestamp (milliseconds): 1736776547000 or "1736776547000"
+ *
+ * @param expiresAt - Expiry value (ISO string, Unix timestamp number, or timestamp string)
  * @returns Date object or null if invalid
  */
-export function parseExpiryDate(expiresAt: string | null): Date | null {
-  if (!expiresAt) return null;
+export function parseExpiryDate(expiresAt: string | number | null | undefined): Date | null {
+  if (expiresAt === null || expiresAt === undefined) return null;
+
   try {
-    const date = new Date(expiresAt);
-    return isNaN(date.getTime()) ? null : date;
+    // Handle numeric timestamps (from server returning u64)
+    const numValue = typeof expiresAt === 'number' ? expiresAt : Number(expiresAt);
+
+    if (!isNaN(numValue) && numValue > 0) {
+      // Distinguish between seconds and milliseconds timestamps
+      // Timestamps in seconds: < 10000000000 (before year 2286)
+      // Timestamps in milliseconds: >= 10000000000
+      const msTimestamp = numValue < 10000000000 ? numValue * 1000 : numValue;
+      const date = new Date(msTimestamp);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+
+    // Try parsing as ISO string (fallback for non-numeric strings)
+    if (typeof expiresAt === 'string') {
+      const date = new Date(expiresAt);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+
+    return null;
   } catch {
     return null;
   }

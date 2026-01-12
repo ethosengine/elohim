@@ -65,6 +65,9 @@ export class AuthService {
   /** Token refresh timer */
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Guard against re-entrant token refresh */
+  private isRefreshing = false;
+
   // ==========================================================================
   // Public Signals (read-only)
   // ==========================================================================
@@ -452,9 +455,16 @@ export class AuthService {
     const refreshTime = expiresAt.getTime() - Date.now() - 5 * 60 * 1000;
 
     if (refreshTime <= 0) {
-      // Token already expiring, refresh now
+      // Token already expiring soon - but guard against refresh loop
+      if (this.isRefreshing) {
+        console.warn('[AuthService] Already refreshing, skipping to prevent loop');
+        return;
+      }
       console.log('[AuthService] Token expiring soon, refreshing now');
-      this.refreshToken();
+      this.isRefreshing = true;
+      this.refreshToken().finally(() => {
+        this.isRefreshing = false;
+      });
       return;
     }
 
