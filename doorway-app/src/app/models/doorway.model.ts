@@ -298,3 +298,180 @@ export function tierColor(tier: StewardTier | null): string {
     default: return 'text-gray-500';
   }
 }
+
+// ============================================================================
+// User Admin Models
+// ============================================================================
+
+/**
+ * Permission levels for users
+ */
+export type UserPermissionLevel = 'PUBLIC' | 'AUTHENTICATED' | 'ADMIN';
+
+/**
+ * Usage tracking for hosted users
+ */
+export interface UserUsage {
+  storageBytes: number;
+  storageMb: number;
+  projectionQueries: number;
+  bandwidthBytes: number;
+  bandwidthMb: number;
+  periodStart: string | null;
+  lastUpdated: string | null;
+}
+
+/**
+ * Quota limits and status
+ */
+export interface UserQuota {
+  storageLimitBytes: number;
+  storageLimitMb: number;
+  storagePercentUsed: number;
+  dailyQueryLimit: number;
+  queriesPercentUsed: number;
+  dailyBandwidthLimitBytes: number;
+  dailyBandwidthLimitMb: number;
+  bandwidthPercentUsed: number;
+  enforceHardLimit: boolean;
+  isOverQuota: boolean;
+}
+
+/**
+ * User summary for list view
+ */
+export interface UserSummary {
+  id: string;
+  identifier: string;
+  identifierType: string;
+  permissionLevel: UserPermissionLevel;
+  isActive: boolean;
+  createdAt: string | null;
+  lastLoginAt: string | null;
+  storageUsedMb: number;
+  storageLimitMb: number;
+  storagePercent: number;
+  isOverQuota: boolean;
+}
+
+/**
+ * Full user details with usage and quota
+ */
+export interface UserDetails {
+  id: string;
+  identifier: string;
+  identifierType: string;
+  humanId: string;
+  agentPubKey: string;
+  permissionLevel: UserPermissionLevel;
+  isActive: boolean;
+  tokenVersion: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+  lastLoginAt: string | null;
+  usage: UserUsage;
+  quota: UserQuota;
+}
+
+/**
+ * Paginated users response
+ */
+export interface UsersResponse {
+  users: UserSummary[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/**
+ * Quota status from enforcement check
+ */
+export interface QuotaStatus {
+  allowed: boolean;
+  storageExceeded: boolean;
+  queriesExceeded: boolean;
+  bandwidthExceeded: boolean;
+  message: string | null;
+}
+
+/**
+ * Parameters for listing users
+ */
+export interface ListUsersParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  permissionLevel?: UserPermissionLevel;
+  isActive?: boolean;
+  overQuota?: boolean;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+}
+
+/**
+ * Update quota request
+ */
+export interface UpdateQuotaRequest {
+  storageLimitMb?: number;
+  dailyQueryLimit?: number;
+  dailyBandwidthLimitMb?: number;
+  enforceHardLimit?: boolean;
+}
+
+/**
+ * Success response for mutations
+ */
+export interface UserMutationResponse {
+  success: boolean;
+  message: string;
+}
+
+// ============================================================================
+// User Admin Helpers
+// ============================================================================
+
+/**
+ * Get color class for permission level
+ */
+export function permissionLevelColor(level: UserPermissionLevel): string {
+  switch (level) {
+    case 'ADMIN': return 'text-purple-600';
+    case 'AUTHENTICATED': return 'text-blue-600';
+    case 'PUBLIC': return 'text-gray-500';
+    default: return 'text-gray-400';
+  }
+}
+
+/**
+ * Get display name for permission level
+ */
+export function permissionLevelName(level: UserPermissionLevel): string {
+  switch (level) {
+    case 'ADMIN': return 'Admin';
+    case 'AUTHENTICATED': return 'Authenticated';
+    case 'PUBLIC': return 'Public';
+    default: return level;
+  }
+}
+
+/**
+ * Get color class for quota status (usage percentage)
+ */
+export function quotaStatusColor(percent: number): string {
+  if (percent >= 100) return 'text-red-600';
+  if (percent >= 80) return 'text-yellow-600';
+  if (percent >= 50) return 'text-blue-600';
+  return 'text-green-600';
+}
+
+/**
+ * Format bytes as human-readable string
+ */
+export function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}

@@ -1,6 +1,7 @@
 //! HTTP routes for Doorway
 
 pub mod admin;
+pub mod admin_users;
 pub mod api;
 pub mod apps;
 pub mod auth_routes;
@@ -39,3 +40,10 @@ pub use status::status_check;
 pub use stream::handle_stream_request;
 pub use debug_stream::{handle_debug_stream, DebugHub, DebugEvent};
 pub use threshold::handle_threshold_request;
+pub use admin_users::{
+    handle_admin_users_request, UsageTracker, QuotaEnforcer, QuotaStatus,
+    MongoUsageTracker, MongoQuotaEnforcer,
+    // Usage tracking helpers for integration with other routes
+    try_extract_user_id_for_tracking, track_bandwidth_if_user,
+    track_query_if_user, check_quota_if_user,
+};

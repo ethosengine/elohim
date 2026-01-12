@@ -12,10 +12,21 @@ import {
   statusColor,
   tierColor,
   reachLevelName,
+  // User admin models
+  UserSummary,
+  UserDetails,
+  UsersResponse,
+  ListUsersParams,
+  UserPermissionLevel,
+  permissionLevelColor,
+  permissionLevelName,
+  quotaStatusColor,
+  formatBytes,
 } from '../../models/doorway.model';
 
 type SortField = 'nodeId' | 'status' | 'combinedScore' | 'trustScore' | 'stewardTier';
 type SortDirection = 'asc' | 'desc';
+type UserSortField = 'identifier' | 'permissionLevel' | 'isActive' | 'storagePercent' | 'createdAt';
 
 /**
  * Doorway Operator Dashboard
@@ -42,10 +53,26 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   readonly error = signal<string | null>(null);
 
   // UI state
-  readonly activeTab = signal<'overview' | 'nodes' | 'resources'>('overview');
+  readonly activeTab = signal<'overview' | 'nodes' | 'resources' | 'users'>('overview');
   readonly sortField = signal<SortField>('combinedScore');
   readonly sortDirection = signal<SortDirection>('desc');
   readonly statusFilter = signal<NodeStatus | 'all'>('all');
+
+  // User admin state
+  readonly users = signal<UserSummary[]>([]);
+  readonly usersTotal = signal(0);
+  readonly usersPage = signal(1);
+  readonly usersPageSize = signal(20);
+  readonly usersTotalPages = signal(0);
+  readonly usersLoading = signal(false);
+  readonly usersSearch = signal('');
+  readonly usersPermFilter = signal<UserPermissionLevel | 'all'>('all');
+  readonly usersActiveFilter = signal<boolean | 'all'>('all');
+  readonly usersQuotaFilter = signal<boolean | 'all'>('all');
+  readonly userSortField = signal<UserSortField>('createdAt');
+  readonly userSortDir = signal<SortDirection>('desc');
+  readonly selectedUser = signal<UserDetails | null>(null);
+  readonly showUserDetail = signal(false);
 
   // Connection state
   readonly connectionState = this.adminService.connectionState;
@@ -122,6 +149,11 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   readonly statusColor = statusColor;
   readonly tierColor = tierColor;
   readonly reachLevelName = reachLevelName;
+  readonly permissionLevelColor = permissionLevelColor;
+  readonly permissionLevelName = permissionLevelName;
+  readonly quotaStatusColor = quotaStatusColor;
+  readonly formatBytesHelper = formatBytes;
+  readonly Math = Math; // Expose Math for template
 
   async ngOnInit(): Promise<void> {
     await this.loadData();
@@ -134,8 +166,12 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
     this.adminService.disconnect();
   }
 
-  setTab(tab: 'overview' | 'nodes' | 'resources'): void {
+  setTab(tab: 'overview' | 'nodes' | 'resources' | 'users'): void {
     this.activeTab.set(tab);
+    // Load users when switching to users tab
+    if (tab === 'users' && this.users().length === 0) {
+      this.loadUsers();
+    }
   }
 
   setSort(field: SortField): void {
@@ -153,6 +189,165 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
 
   async refresh(): Promise<void> {
     await this.loadData();
+    if (this.activeTab() === 'users') {
+      await this.loadUsers();
+    }
+  }
+
+  // ============================================================================
+  // User Admin Methods
+  // ============================================================================
+
+  async loadUsers(): Promise<void> {
+    this.usersLoading.set(true);
+    try {
+      const params: ListUsersParams = {
+        page: this.usersPage(),
+        limit: this.usersPageSize(),
+        sortBy: this.userSortField(),
+        sortDir: this.userSortDir(),
+      };
+
+      const search = this.usersSearch();
+      if (search) params.search = search;
+
+      const permFilter = this.usersPermFilter();
+      if (permFilter !== 'all') params.permissionLevel = permFilter;
+
+      const activeFilter = this.usersActiveFilter();
+      if (activeFilter !== 'all') params.isActive = activeFilter;
+
+      const quotaFilter = this.usersQuotaFilter();
+      if (quotaFilter !== 'all') params.overQuota = quotaFilter;
+
+      const response = await this.adminService.listUsers(params).toPromise();
+      if (response) {
+        this.users.set(response.users);
+        this.usersTotal.set(response.total);
+        this.usersTotalPages.set(response.totalPages);
+      }
+    } catch (e) {
+      console.error('[Dashboard] Failed to load users:', e);
+    } finally {
+      this.usersLoading.set(false);
+    }
+  }
+
+  setUserSort(field: UserSortField): void {
+    if (this.userSortField() === field) {
+      this.userSortDir.update(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.userSortField.set(field);
+      this.userSortDir.set('desc');
+    }
+    this.loadUsers();
+  }
+
+  setUsersPage(page: number): void {
+    this.usersPage.set(page);
+    this.loadUsers();
+  }
+
+  searchUsers(term: string): void {
+    this.usersSearch.set(term);
+    this.usersPage.set(1);
+    this.loadUsers();
+  }
+
+  filterByPermission(level: UserPermissionLevel | 'all'): void {
+    this.usersPermFilter.set(level);
+    this.usersPage.set(1);
+    this.loadUsers();
+  }
+
+  filterByActive(active: boolean | 'all'): void {
+    this.usersActiveFilter.set(active);
+    this.usersPage.set(1);
+    this.loadUsers();
+  }
+
+  filterByQuota(overQuota: boolean | 'all'): void {
+    this.usersQuotaFilter.set(overQuota);
+    this.usersPage.set(1);
+    this.loadUsers();
+  }
+
+  async viewUser(userId: string): Promise<void> {
+    const user = await this.adminService.getUser(userId).toPromise();
+    if (user) {
+      this.selectedUser.set(user);
+      this.showUserDetail.set(true);
+    }
+  }
+
+  closeUserDetail(): void {
+    this.showUserDetail.set(false);
+    this.selectedUser.set(null);
+  }
+
+  async toggleUserStatus(userId: string, currentActive: boolean): Promise<void> {
+    const result = await this.adminService.updateUserStatus(userId, !currentActive).toPromise();
+    if (result?.success) {
+      this.loadUsers();
+      // Update selected user if open
+      if (this.selectedUser()?.id === userId) {
+        this.viewUser(userId);
+      }
+    } else {
+      console.error('[Dashboard] Failed to toggle user status:', result?.message);
+    }
+  }
+
+  async forceUserLogout(userId: string): Promise<void> {
+    if (confirm('This will invalidate all active sessions for this user. Continue?')) {
+      const result = await this.adminService.forceLogout(userId).toPromise();
+      if (result?.success) {
+        alert('User has been logged out from all sessions.');
+        if (this.selectedUser()?.id === userId) {
+          this.viewUser(userId);
+        }
+      } else {
+        alert('Failed to force logout: ' + result?.message);
+      }
+    }
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      const result = await this.adminService.deleteUser(userId).toPromise();
+      if (result?.success) {
+        this.closeUserDetail();
+        this.loadUsers();
+      } else {
+        alert('Failed to delete user: ' + result?.message);
+      }
+    }
+  }
+
+  async resetUserUsage(userId: string): Promise<void> {
+    if (confirm('Reset all usage counters for this user?')) {
+      const result = await this.adminService.resetUsage(userId).toPromise();
+      if (result?.success) {
+        if (this.selectedUser()?.id === userId) {
+          this.viewUser(userId);
+        }
+        this.loadUsers();
+      } else {
+        alert('Failed to reset usage: ' + result?.message);
+      }
+    }
+  }
+
+  async updateUserPermission(userId: string, level: UserPermissionLevel): Promise<void> {
+    const result = await this.adminService.updatePermission(userId, level).toPromise();
+    if (result?.success) {
+      if (this.selectedUser()?.id === userId) {
+        this.viewUser(userId);
+      }
+      this.loadUsers();
+    } else {
+      alert('Failed to update permission: ' + result?.message);
+    }
   }
 
   private async loadData(): Promise<void> {

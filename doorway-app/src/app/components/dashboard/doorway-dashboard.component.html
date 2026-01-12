@@ -90,6 +90,12 @@
         (click)="setTab('resources')">
         Resources
       </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'users'"
+        (click)="setTab('users')">
+        Users ({{ usersTotal() }})
+      </button>
     </nav>
 
     <!-- Tab Content -->
@@ -403,6 +409,257 @@
           }
         </div>
       }
+
+      <!-- Users Tab -->
+      @if (activeTab() === 'users') {
+        <div class="users-panel">
+          <!-- Filters -->
+          <div class="users-filters">
+            <input
+              type="text"
+              class="search-input"
+              placeholder="Search users..."
+              [value]="usersSearch()"
+              (input)="searchUsers($any($event.target).value)"
+            />
+            <select [value]="usersPermFilter()" (change)="filterByPermission($any($event.target).value)">
+              <option value="all">All Permissions</option>
+              <option value="ADMIN">Admin</option>
+              <option value="AUTHENTICATED">Authenticated</option>
+              <option value="PUBLIC">Public</option>
+            </select>
+            <select [value]="usersActiveFilter()" (change)="filterByActive($any($event.target).value === 'all' ? 'all' : $any($event.target).value === 'true')">
+              <option value="all">All Status</option>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+            <select [value]="usersQuotaFilter()" (change)="filterByQuota($any($event.target).value === 'all' ? 'all' : $any($event.target).value === 'true')">
+              <option value="all">All Quota</option>
+              <option value="true">Over Quota</option>
+              <option value="false">Within Quota</option>
+            </select>
+          </div>
+
+          <!-- Loading -->
+          @if (usersLoading()) {
+            <div class="loading-state">
+              <div class="spinner"></div>
+              <p>Loading users...</p>
+            </div>
+          } @else {
+            <!-- Users Table -->
+            <table class="users-table">
+              <thead>
+                <tr>
+                  <th (click)="setUserSort('identifier')" class="sortable">
+                    Identifier
+                    @if (userSortField() === 'identifier') {
+                      <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                    }
+                  </th>
+                  <th (click)="setUserSort('permissionLevel')" class="sortable">
+                    Permission
+                    @if (userSortField() === 'permissionLevel') {
+                      <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                    }
+                  </th>
+                  <th (click)="setUserSort('isActive')" class="sortable">
+                    Status
+                    @if (userSortField() === 'isActive') {
+                      <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                    }
+                  </th>
+                  <th (click)="setUserSort('storagePercent')" class="sortable">
+                    Storage
+                    @if (userSortField() === 'storagePercent') {
+                      <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                    }
+                  </th>
+                  <th (click)="setUserSort('createdAt')" class="sortable">
+                    Created
+                    @if (userSortField() === 'createdAt') {
+                      <span class="sort-icon">{{ userSortDir() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                    }
+                  </th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (user of users(); track user.id) {
+                  <tr [class.inactive]="!user.isActive" [class.over-quota]="user.isOverQuota">
+                    <td class="identifier">{{ user.identifier }}</td>
+                    <td>
+                      <span class="perm-badge" [class]="user.permissionLevel.toLowerCase()">
+                        {{ permissionLevelName(user.permissionLevel) }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="status-badge" [class.active]="user.isActive" [class.inactive]="!user.isActive">
+                        {{ user.isActive ? 'Active' : 'Inactive' }}
+                      </span>
+                    </td>
+                    <td>
+                      <div class="storage-bar">
+                        <div
+                          class="storage-fill"
+                          [class]="quotaStatusColor(user.storagePercent)"
+                          [style.width.%]="Math.min(user.storagePercent, 100)">
+                        </div>
+                        <span class="storage-text">{{ user.storageUsedMb | number:'1.1-1' }} / {{ user.storageLimitMb | number:'1.0-0' }} MB</span>
+                      </div>
+                      @if (user.isOverQuota) {
+                        <span class="over-quota-badge">Over Quota</span>
+                      }
+                    </td>
+                    <td class="date">{{ user.createdAt | date:'short' }}</td>
+                    <td class="actions">
+                      <button class="btn-icon" title="View Details" (click)="viewUser(user.id)">👁</button>
+                      <button
+                        class="btn-icon"
+                        [title]="user.isActive ? 'Deactivate' : 'Activate'"
+                        (click)="toggleUserStatus(user.id, user.isActive)">
+                        {{ user.isActive ? '🔒' : '🔓' }}
+                      </button>
+                      <button class="btn-icon" title="Force Logout" (click)="forceUserLogout(user.id)">🚪</button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="6" class="empty-state">No users found</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+
+            <!-- Pagination -->
+            @if (usersTotalPages() > 1) {
+              <div class="pagination">
+                <button
+                  [disabled]="usersPage() <= 1"
+                  (click)="setUsersPage(usersPage() - 1)">
+                  Previous
+                </button>
+                <span>Page {{ usersPage() }} of {{ usersTotalPages() }}</span>
+                <button
+                  [disabled]="usersPage() >= usersTotalPages()"
+                  (click)="setUsersPage(usersPage() + 1)">
+                  Next
+                </button>
+              </div>
+            }
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- User Detail Modal -->
+  @if (showUserDetail() && selectedUser()) {
+    <div class="modal-overlay" (click)="closeUserDetail()">
+      <div class="modal-content user-detail-modal" (click)="$event.stopPropagation()">
+        <header class="modal-header">
+          <h2>User Details</h2>
+          <button class="close-btn" (click)="closeUserDetail()">&times;</button>
+        </header>
+
+        <div class="modal-body">
+          <!-- User Info -->
+          <section class="user-info">
+            <div class="info-row">
+              <span class="label">Identifier:</span>
+              <span class="value">{{ selectedUser()?.identifier }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Type:</span>
+              <span class="value">{{ selectedUser()?.identifierType }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Human ID:</span>
+              <span class="value monospace">{{ selectedUser()?.humanId | slice:0:20 }}...</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Status:</span>
+              <span class="status-badge" [class.active]="selectedUser()?.isActive" [class.inactive]="!selectedUser()?.isActive">
+                {{ selectedUser()?.isActive ? 'Active' : 'Inactive' }}
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="label">Permission:</span>
+              <select [value]="selectedUser()?.permissionLevel" (change)="updateUserPermission(selectedUser()!.id, $any($event.target).value)">
+                <option value="PUBLIC">Public</option>
+                <option value="AUTHENTICATED">Authenticated</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
+            <div class="info-row">
+              <span class="label">Created:</span>
+              <span class="value">{{ selectedUser()?.createdAt | date:'medium' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Last Login:</span>
+              <span class="value">{{ selectedUser()?.lastLoginAt | date:'medium' }}</span>
+            </div>
+          </section>
+
+          <!-- Usage Stats -->
+          <section class="usage-section">
+            <h3>Usage</h3>
+            <div class="usage-grid">
+              <div class="usage-item">
+                <span class="usage-label">Storage</span>
+                <div class="usage-bar">
+                  <div
+                    class="usage-fill"
+                    [style.width.%]="Math.min(selectedUser()?.quota?.storagePercentUsed ?? 0, 100)">
+                  </div>
+                </div>
+                <span class="usage-value">{{ selectedUser()?.usage?.storageMb | number:'1.1-1' }} / {{ selectedUser()?.quota?.storageLimitMb | number:'1.0-0' }} MB</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-label">Queries</span>
+                <div class="usage-bar">
+                  <div
+                    class="usage-fill"
+                    [style.width.%]="Math.min(selectedUser()?.quota?.queriesPercentUsed ?? 0, 100)">
+                  </div>
+                </div>
+                <span class="usage-value">{{ selectedUser()?.usage?.projectionQueries | number }} / {{ selectedUser()?.quota?.dailyQueryLimit | number }}</span>
+              </div>
+              <div class="usage-item">
+                <span class="usage-label">Bandwidth</span>
+                <div class="usage-bar">
+                  <div
+                    class="usage-fill"
+                    [style.width.%]="Math.min(selectedUser()?.quota?.bandwidthPercentUsed ?? 0, 100)">
+                  </div>
+                </div>
+                <span class="usage-value">{{ selectedUser()?.usage?.bandwidthMb | number:'1.1-1' }} / {{ selectedUser()?.quota?.dailyBandwidthLimitMb | number:'1.0-0' }} MB</span>
+              </div>
+            </div>
+            @if (selectedUser()?.quota?.isOverQuota) {
+              <div class="over-quota-warning">
+                ⚠️ User is over quota
+                @if (selectedUser()?.quota?.enforceHardLimit) {
+                  <span class="hard-limit">(Hard limit enforced)</span>
+                }
+              </div>
+            }
+          </section>
+
+          <!-- Actions -->
+          <section class="actions-section">
+            <h3>Actions</h3>
+            <div class="action-buttons">
+              <button class="btn" (click)="toggleUserStatus(selectedUser()!.id, selectedUser()!.isActive)">
+                {{ selectedUser()?.isActive ? '🔒 Deactivate' : '🔓 Activate' }}
+              </button>
+              <button class="btn" (click)="forceUserLogout(selectedUser()!.id)">🚪 Force Logout</button>
+              <button class="btn" (click)="resetUserUsage(selectedUser()!.id)">🔄 Reset Usage</button>
+              <button class="btn btn-danger" (click)="deleteUser(selectedUser()!.id)">🗑 Delete User</button>
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
   }
 </div>

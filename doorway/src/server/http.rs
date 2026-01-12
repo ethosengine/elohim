@@ -622,6 +622,14 @@ async fn handle_request(
             to_boxed(routes::handle_check_blob(hash, Arc::clone(&state)).await)
         }
 
+        // ====================================================================
+        // Admin User Management API
+        // Requires Admin permission via JWT token
+        // ====================================================================
+        (_, p) if p.starts_with("/admin/users") => {
+            to_boxed(routes::handle_admin_users_request(req, Arc::clone(&state), p).await)
+        }
+
         // Bootstrap service routes (X-Op header protocol)
         // POST /bootstrap with X-Op header, or legacy path-based routing
         (Method::POST, p) if p == "/bootstrap" || p.starts_with("/bootstrap/") => {

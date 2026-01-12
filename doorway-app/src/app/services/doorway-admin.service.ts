@@ -13,6 +13,14 @@ import {
   ClientMessage,
   NodeSnapshot,
   ClusterSnapshot,
+  // User admin models
+  UserSummary,
+  UserDetails,
+  UsersResponse,
+  ListUsersParams,
+  UpdateQuotaRequest,
+  UserMutationResponse,
+  UserPermissionLevel,
 } from '../models/doorway.model';
 
 /**
@@ -112,6 +120,141 @@ export class DoorwayAdminService {
       timeout(this.timeout),
       retry(2),
       catchError(this.handleError<CustodianNetwork | null>('getCustodians', null))
+    );
+  }
+
+  // ============================================================================
+  // User Admin API Methods
+  // ============================================================================
+
+  /**
+   * List users with pagination and filtering
+   */
+  listUsers(params: ListUsersParams = {}): Observable<UsersResponse> {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.set('page', params.page.toString());
+    if (params.limit) queryParams.set('limit', params.limit.toString());
+    if (params.search) queryParams.set('search', params.search);
+    if (params.permissionLevel) queryParams.set('permissionLevel', params.permissionLevel);
+    if (params.isActive !== undefined) queryParams.set('isActive', params.isActive.toString());
+    if (params.overQuota !== undefined) queryParams.set('overQuota', params.overQuota.toString());
+    if (params.sortBy) queryParams.set('sortBy', params.sortBy);
+    if (params.sortDir) queryParams.set('sortDir', params.sortDir);
+
+    const queryString = queryParams.toString();
+    const url = `${this.baseUrl}/admin/users${queryString ? '?' + queryString : ''}`;
+
+    return this.http.get<UsersResponse>(url).pipe(
+      timeout(this.timeout),
+      retry(1),
+      catchError(this.handleError<UsersResponse>('listUsers', {
+        users: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+        totalPages: 0,
+      }))
+    );
+  }
+
+  /**
+   * Get user details by ID
+   */
+  getUser(userId: string): Observable<UserDetails | null> {
+    return this.http.get<UserDetails>(`${this.baseUrl}/admin/users/${userId}`).pipe(
+      timeout(this.timeout),
+      retry(1),
+      catchError(this.handleError<UserDetails | null>('getUser', null))
+    );
+  }
+
+  /**
+   * Update user active status
+   */
+  updateUserStatus(userId: string, isActive: boolean): Observable<UserMutationResponse> {
+    return this.http.put<UserMutationResponse>(
+      `${this.baseUrl}/admin/users/${userId}/status`,
+      { isActive }
+    ).pipe(
+      timeout(this.timeout),
+      catchError(this.handleMutationError('updateUserStatus'))
+    );
+  }
+
+  /**
+   * Force logout user (invalidate all tokens)
+   */
+  forceLogout(userId: string): Observable<UserMutationResponse> {
+    return this.http.post<UserMutationResponse>(
+      `${this.baseUrl}/admin/users/${userId}/force-logout`,
+      {}
+    ).pipe(
+      timeout(this.timeout),
+      catchError(this.handleMutationError('forceLogout'))
+    );
+  }
+
+  /**
+   * Soft delete user
+   */
+  deleteUser(userId: string): Observable<UserMutationResponse> {
+    return this.http.delete<UserMutationResponse>(
+      `${this.baseUrl}/admin/users/${userId}`
+    ).pipe(
+      timeout(this.timeout),
+      catchError(this.handleMutationError('deleteUser'))
+    );
+  }
+
+  /**
+   * Reset user password
+   */
+  resetPassword(userId: string, newPassword: string): Observable<UserMutationResponse> {
+    return this.http.post<UserMutationResponse>(
+      `${this.baseUrl}/admin/users/${userId}/reset-password`,
+      { newPassword }
+    ).pipe(
+      timeout(this.timeout),
+      catchError(this.handleMutationError('resetPassword'))
+    );
+  }
+
+  /**
+   * Update user permission level
+   */
+  updatePermission(userId: string, permissionLevel: UserPermissionLevel): Observable<UserMutationResponse> {
+    return this.http.put<UserMutationResponse>(
+      `${this.baseUrl}/admin/users/${userId}/permission`,
+      { permissionLevel }
+    ).pipe(
+      timeout(this.timeout),
+      catchError(this.handleMutationError('updatePermission'))
+    );
+  }
+
+  /**
+   * Update user quota limits
+   */
+  updateQuota(userId: string, quota: UpdateQuotaRequest): Observable<UserMutationResponse> {
+    return this.http.put<UserMutationResponse>(
+      `${this.baseUrl}/admin/users/${userId}/quota`,
+      quota
+    ).pipe(
+      timeout(this.timeout),
+      catchError(this.handleMutationError('updateQuota'))
+    );
+  }
+
+  /**
+   * Reset user usage counters
+   */
+  resetUsage(userId: string): Observable<UserMutationResponse> {
+    return this.http.post<UserMutationResponse>(
+      `${this.baseUrl}/admin/users/${userId}/usage/reset`,
+      {}
+    ).pipe(
+      timeout(this.timeout),
+      catchError(this.handleMutationError('resetUsage'))
     );
   }
 
@@ -262,7 +405,7 @@ export class DoorwayAdminService {
   }
 
   /**
-   * Handle HTTP errors
+   * Handle HTTP errors with fallback
    */
   private handleError<T>(operation: string, fallback: T) {
     return (error: HttpErrorResponse): Observable<T> => {
@@ -274,6 +417,23 @@ export class DoorwayAdminService {
       }
 
       return of(fallback);
+    };
+  }
+
+  /**
+   * Handle mutation errors (return failure response instead of fallback)
+   */
+  private handleMutationError(operation: string) {
+    return (error: HttpErrorResponse): Observable<UserMutationResponse> => {
+      console.error(`[DoorwayAdmin] ${operation} failed:`, error.message);
+
+      // Extract error message from response if available
+      const message = error.error?.error ?? error.message ?? 'Operation failed';
+
+      return of({
+        success: false,
+        message,
+      });
     };
   }
 }
