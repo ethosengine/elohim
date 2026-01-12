@@ -7,6 +7,7 @@ import { PathService } from '../../services/path.service';
 import { PathFilterService } from '../../services/path-filter.service';
 import { ProfileService } from '@app/elohim/services/profile.service';
 import { AgentService } from '@app/elohim/services/agent.service';
+import { IdentityService, isNetworkMode } from '@app/imagodei/services/identity.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 import { CurrentFocus } from '../../models/profile.model';
 
@@ -63,7 +64,8 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     private readonly pathFilterService: PathFilterService,
     private readonly router: Router,
     private readonly profileService: ProfileService,
-    private readonly agentService: AgentService
+    private readonly agentService: AgentService,
+    private readonly identityService: IdentityService
   ) {
     // Load saved view mode preference
     const savedMode = localStorage.getItem('lamad-view-mode');
@@ -85,7 +87,8 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     this.isLoading = true;
     this.error = null;
 
-    const isAuth = this.agentService.getCurrentAgentId() !== 'anonymous';
+    // Use IdentityService for auth check - properly reflects doorway login state
+    const isAuth = isNetworkMode(this.identityService.mode());
 
     const tasks = isAuth
       ? [

@@ -30,6 +30,7 @@ export const appConfig: ApplicationConfig = {
         doorwayFallbacks: environment.client?.doorwayFallbacks,
         apiKey: environment.client?.apiKey,
         nodeUrls: environment.client?.nodeUrls,
+        storageUrl: environment.client?.storageUrl,
       }),
       // Holochain connection for agent-centric data (attestations, identity, points)
       holochain: environment.client?.holochainAppId ? {

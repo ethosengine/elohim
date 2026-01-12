@@ -26,6 +26,8 @@ export const environment: Environment = {
   client: {
     doorwayUrl: 'http://localhost:8888',
     apiKey: 'dev-elohim-auth-2024',
+    // Direct storage URL for /db/* routes (bypasses doorway in local dev)
+    storageUrl: 'http://localhost:8090',
     // For Tauri mode: personal nodes and conductor
     nodeUrls: [],  // No personal nodes in dev
     holochainAppId: 'elohim',
