@@ -84,14 +84,12 @@ interface HumanUpdateResult {
 
 /** Payload for registering a human */
 interface RegisterHumanPayload {
+  id: string;
   display_name: string;
   bio?: string;
   affinities: string[];
   profile_reach: string;
   location?: string;
-  email_hash?: string;
-  passkey_credential_id?: string;
-  external_identifiers_json: string;
 }
 
 /** Payload for updating human profile */
@@ -124,16 +122,24 @@ function mapToProfile(entry: HumanEntry): HumanProfile {
 }
 
 /**
+ * Generate a unique human ID.
+ * Uses crypto.randomUUID() for secure random UUIDs.
+ */
+function generateHumanId(): string {
+  return crypto.randomUUID();
+}
+
+/**
  * Map domain RegisterHumanRequest to wire format.
  */
 function toRegisterPayload(request: RegisterHumanRequest): RegisterHumanPayload {
   return {
+    id: generateHumanId(),
     display_name: request.displayName,
     bio: request.bio,
     affinities: request.affinities,
     profile_reach: request.profileReach,
     location: request.location,
-    external_identifiers_json: '{}',
   };
 }
 
