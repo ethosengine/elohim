@@ -424,12 +424,13 @@ export class AuthService {
   private persistAuth(
     token: string,
     provider: AuthProviderType,
-    expiresAt: string,
+    expiresAt: string | number,
     identifier: string
   ): void {
     localStorage.setItem(AUTH_TOKEN_KEY, token);
     localStorage.setItem(AUTH_PROVIDER_KEY, provider);
-    localStorage.setItem(AUTH_EXPIRY_KEY, expiresAt);
+    // Store as string - parseExpiryDate handles both formats on restore
+    localStorage.setItem(AUTH_EXPIRY_KEY, String(expiresAt));
     localStorage.setItem(AUTH_IDENTIFIER_KEY, identifier);
   }
 
