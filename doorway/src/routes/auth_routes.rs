@@ -27,6 +27,7 @@ use crate::db::schemas::{
 };
 use crate::server::AppState;
 use crate::types::DoorwayError;
+use crate::routes::zome_helpers::{call_create_human, get_agent_pub_key, CreateHumanInput};
 use rand::Rng;
 
 type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
@@ -48,9 +49,26 @@ pub struct RegisterRequest {
     pub password: String,
     #[serde(default = "default_identifier_type")]
     pub identifier_type: String,
+    // === Profile fields for doorway-hosted registration ===
     /// Display name for doorway-hosted registration (used to create identity)
     #[serde(default)]
     pub display_name: String,
+    /// Optional bio/description
+    #[serde(default)]
+    pub bio: Option<String>,
+    /// User interests/affinities
+    #[serde(default)]
+    pub affinities: Vec<String>,
+    /// Profile visibility (public, connections, private)
+    #[serde(default = "default_profile_reach")]
+    pub profile_reach: String,
+    /// Optional location
+    #[serde(default)]
+    pub location: Option<String>,
+}
+
+fn default_profile_reach() -> String {
+    "public".to_string()
 }
 
 fn default_identifier_type() -> String {
@@ -77,6 +95,25 @@ pub struct AuthResponse {
     /// Doorway URL for cross-doorway validation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doorway_url: Option<String>,
+    /// Human profile (returned on registration)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<HumanProfileResponse>,
+}
+
+/// Human profile response (from imagodei zome)
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HumanProfileResponse {
+    pub id: String,
+    pub display_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bio: Option<String>,
+    pub affinities: Vec<String>,
+    pub profile_reach: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -298,39 +335,104 @@ async fn handle_register(
         );
     }
 
-    // For doorway-hosted registration, generate identity if not provided
-    // TODO: In production, this should call the imagodei zome to create a proper
-    // Holochain identity. For now, we generate placeholder values for dev/testing.
-    let (human_id, agent_pub_key) = if body.human_id.is_empty() || body.agent_pub_key.is_empty() {
-        // Generate placeholder identity for doorway-hosted registration
-        let display_name = if body.display_name.is_empty() {
-            body.identifier.split('@').next().unwrap_or("User").to_string()
-        } else {
-            body.display_name.clone()
-        };
-
-        // Generate deterministic IDs based on identifier (for consistency)
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(body.identifier.as_bytes());
-        hasher.update(b"human_id_salt");
-        let hash = hasher.finalize();
-        let human_id = format!("uhCHk{}", hex::encode(&hash[..20]));
-
-        let mut hasher2 = Sha256::new();
-        hasher2.update(body.identifier.as_bytes());
-        hasher2.update(b"agent_pub_key_salt");
-        let hash2 = hasher2.finalize();
-        let agent_pub_key = format!("uhCAk{}", hex::encode(&hash2[..20]));
-
-        info!(
-            "Doorway-hosted registration: generated identity for {} (display_name={})",
-            body.identifier, display_name
-        );
-
-        (human_id, agent_pub_key)
+    // Determine display name for registration
+    let display_name = if body.display_name.is_empty() {
+        body.identifier.split('@').next().unwrap_or("User").to_string()
     } else {
-        (body.human_id.clone(), body.agent_pub_key.clone())
+        body.display_name.clone()
+    };
+
+    // For doorway-hosted registration, create identity via imagodei zome
+    let (human_id, agent_pub_key, profile) = if body.human_id.is_empty() || body.agent_pub_key.is_empty() {
+        // Generate UUID for human_id
+        let generated_human_id = uuid::Uuid::new_v4().to_string();
+
+        // Try to call imagodei zome (only if conductor is connected)
+        let zome_result = call_create_human(
+            &state,
+            CreateHumanInput {
+                id: generated_human_id.clone(),
+                display_name: display_name.clone(),
+                bio: body.bio.clone(),
+                affinities: body.affinities.clone(),
+                profile_reach: body.profile_reach.clone(),
+                location: body.location.clone(),
+            },
+        ).await;
+
+        match zome_result {
+            Ok(human_output) => {
+                // Get agent_pub_key from discovered zome config
+                let agent_key = match get_agent_pub_key(&state) {
+                    Ok(k) => k,
+                    Err(e) => {
+                        warn!("Failed to get agent_pub_key: {}", e);
+                        return json_response(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            &ErrorResponse {
+                                error: "Failed to get agent identity".into(),
+                                code: Some("AGENT_KEY_ERROR".into()),
+                            },
+                        );
+                    }
+                };
+
+                info!(
+                    "Created Holochain identity via imagodei zome: {} (display_name={})",
+                    human_output.human.id, display_name
+                );
+
+                let profile = HumanProfileResponse {
+                    id: human_output.human.id.clone(),
+                    display_name: human_output.human.display_name,
+                    bio: human_output.human.bio,
+                    affinities: human_output.human.affinities,
+                    profile_reach: human_output.human.profile_reach,
+                    location: human_output.human.location,
+                    created_at: human_output.human.created_at,
+                    updated_at: human_output.human.updated_at,
+                };
+
+                (human_output.human.id, agent_key, Some(profile))
+            }
+            Err(e) => {
+                // Zome call failed - check if we should fall back to placeholder (dev mode)
+                if state.args.dev_mode {
+                    warn!(
+                        "Imagodei zome unavailable, using dev fallback: {}",
+                        e
+                    );
+                    // Generate deterministic IDs for dev mode
+                    use sha2::{Digest, Sha256};
+                    let mut hasher = Sha256::new();
+                    hasher.update(body.identifier.as_bytes());
+                    hasher.update(b"human_id_salt");
+                    let hash = hasher.finalize();
+                    let human_id = format!("uhCHk{}", hex::encode(&hash[..20]));
+
+                    let mut hasher2 = Sha256::new();
+                    hasher2.update(body.identifier.as_bytes());
+                    hasher2.update(b"agent_pub_key_salt");
+                    let hash2 = hasher2.finalize();
+                    let agent_pub_key = format!("uhCAk{}", hex::encode(&hash2[..20]));
+
+                    (human_id, agent_pub_key, None)
+                } else {
+                    // Production mode - fail if zome unavailable
+                    warn!("Failed to create identity via imagodei zome: {}", e);
+                    return json_response(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        &ErrorResponse {
+                            error: format!("Failed to create Holochain identity: {}", e),
+                            code: Some("IDENTITY_CREATION_FAILED".into()),
+                        },
+                    );
+                }
+            }
+        }
+    } else {
+        // human_id and agent_pub_key provided (legacy/external registration)
+        (body.human_id.clone(), body.agent_pub_key.clone(), None)
     };
 
     // Validate password strength (minimum 8 characters)
@@ -363,6 +465,7 @@ async fn handle_register(
             &agent_pub_key,
             &body.identifier,
             StatusCode::CREATED,
+            profile,
         );
     }
 
@@ -474,6 +577,7 @@ async fn handle_register(
         &agent_pub_key,
         &body.identifier,
         StatusCode::CREATED,
+        profile,
     )
 }
 
@@ -527,6 +631,7 @@ async fn handle_login(
             "uhCAk-dev-mode-agent-key",
             &body.identifier,
             StatusCode::OK,
+            None,
         );
     }
 
@@ -621,6 +726,7 @@ async fn handle_login(
         &user.agent_pub_key,
         &user.identifier,
         StatusCode::OK,
+        None,
     )
 }
 
@@ -689,6 +795,7 @@ async fn handle_refresh(
         &old_claims.agent_pub_key,
         &old_claims.identifier,
         StatusCode::OK,
+        None,
     )
 }
 
@@ -1374,6 +1481,7 @@ fn generate_auth_response(
     agent_pub_key: &str,
     identifier: &str,
     status: StatusCode,
+    profile: Option<HumanProfileResponse>,
 ) -> Response<BoxBody> {
     // Get doorway identity from config
     let doorway_id = state.args.doorway_id.clone();
@@ -1403,6 +1511,7 @@ fn generate_auth_response(
                     expires_at,
                     doorway_id,
                     doorway_url,
+                    profile,
                 },
             )
         }

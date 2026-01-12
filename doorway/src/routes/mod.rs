@@ -17,6 +17,7 @@ pub mod seed;
 pub mod status;
 pub mod stream;
 pub mod threshold;
+pub mod zome_helpers;
 
 pub use admin::{
     handle_nodes, handle_node_by_id, handle_cluster_metrics,

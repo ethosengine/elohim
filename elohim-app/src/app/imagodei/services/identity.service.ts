@@ -617,9 +617,104 @@ export class IdentityService {
   // ==========================================================================
 
   /**
-   * Register a new human identity in Holochain.
+   * Register a new human identity via doorway (hosted mode).
+   *
+   * Doorway handles atomically:
+   * 1. Creating Holochain identity via imagodei zome
+   * 2. Storing auth credentials in MongoDB
+   * 3. Returning JWT + profile
+   *
+   * For native/steward mode (local conductor), use registerHumanNative().
    */
   async registerHuman(request: RegisterHumanRequest): Promise<HumanProfile> {
+    // Validate email is provided
+    if (!request.email) {
+      throw new Error('Email is required for registration');
+    }
+
+    if (!request.password) {
+      throw new Error('Password is required for registration');
+    }
+
+    this.updateState({ isLoading: true, error: null });
+
+    try {
+      // Register via doorway (handles identity creation + credentials atomically)
+      const authResult = await this.authService.register('password', {
+        identifier: request.email,
+        identifierType: 'email',
+        password: request.password,
+        displayName: request.displayName,
+        bio: request.bio,
+        affinities: request.affinities,
+        profileReach: request.profileReach,
+        location: request.location,
+      });
+
+      if (!authResult.success) {
+        throw new Error(authResult.error);
+      }
+
+      // Auth service effect will update identity state
+      // Build profile from auth result
+      const profile: HumanProfile = {
+        id: authResult.humanId,
+        displayName: request.displayName,
+        bio: request.bio ?? null,
+        affinities: request.affinities,
+        profileReach: request.profileReach,
+        location: request.location ?? null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Update state with registered profile
+      const session = this.sessionHumanService.getSession();
+      const did = generateDID('hosted', authResult.humanId, authResult.agentPubKey, session?.sessionId ?? null);
+
+      this.updateState({
+        mode: 'hosted',
+        isAuthenticated: true,
+        humanId: authResult.humanId,
+        displayName: request.displayName,
+        agentPubKey: authResult.agentPubKey,
+        did,
+        profile,
+        attestations: [],
+        sovereigntyStage: 'hosted',
+        keyLocation: 'custodial',
+        canExportKeys: true,
+        keyBackup: null,
+        isLocalConductor: false,
+        conductorUrl: null,
+        linkedSessionId: session?.sessionId ?? null,
+        hasPendingMigration: false,
+        hostingCost: this.getDefaultHostingCost(),
+        nodeOperatorIncome: null,
+        isLoading: false,
+      });
+
+      // Mark session as migrated if it exists
+      if (session) {
+        this.sessionHumanService.markAsMigrated(authResult.agentPubKey, authResult.humanId);
+      }
+
+      console.log('[IdentityService] Registered via doorway:', authResult.humanId);
+      return profile;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Registration failed';
+      this.updateState({ isLoading: false, error: errorMessage });
+      throw err;
+    }
+  }
+
+  /**
+   * Register a new human identity via local conductor (steward mode).
+   *
+   * Used when running with a local conductor (native app or dev mode).
+   * Calls the imagodei zome directly.
+   */
+  async registerHumanNative(request: RegisterHumanRequest): Promise<HumanProfile> {
     if (!this.holochainClient.isConnected()) {
       throw new Error('Holochain not connected');
     }
@@ -643,25 +738,19 @@ export class IdentityService {
       const sessionResult = result.data;
       const profile = mapToProfile(sessionResult.human);
 
-      // Determine conductor type
-      const conductorInfo = this.detectConductorType();
-      const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
-      const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
-      const sovereigntyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
-
       // Get session for linking
       const session = this.sessionHumanService.getSession();
 
-      // Generate DID for this identity
+      // Generate DID for steward identity
       const did = generateDID(
-        identityMode,
+        'steward',
         sessionResult.human.id,
         sessionResult.agent_pubkey,
         session?.sessionId ?? null
       );
 
       this.updateState({
-        mode: identityMode,
+        mode: 'steward',
         isAuthenticated: true,
         humanId: sessionResult.human.id,
         displayName: sessionResult.human.display_name,
@@ -669,25 +758,16 @@ export class IdentityService {
         did,
         profile,
         attestations: sessionResult.attestations.map(a => a.attestation.attestation_type),
-        sovereigntyStage,
-
-        // Key management
-        keyLocation,
-        canExportKeys: keyLocation === 'custodial',
+        sovereigntyStage: 'app-user',
+        keyLocation: 'device',
+        canExportKeys: false,
         keyBackup: null,
-
-        // Conductor info
-        isLocalConductor: conductorInfo.isLocal,
-        conductorUrl: conductorInfo.url,
-
-        // Session link
+        isLocalConductor: true,
+        conductorUrl: this.detectConductorType().url,
         linkedSessionId: session?.sessionId ?? null,
         hasPendingMigration: false,
-
-        // Hosting costs
-        hostingCost: sovereigntyStage === 'hosted' ? this.getDefaultHostingCost() : null,
+        hostingCost: null,
         nodeOperatorIncome: null,
-
         isLoading: false,
       });
 

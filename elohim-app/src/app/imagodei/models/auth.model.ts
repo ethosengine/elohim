@@ -63,15 +63,31 @@ export interface OAuthCredentials {
 /** Union of all credential types */
 export type AuthCredentials = PasswordCredentials | PasskeyCredentials | OAuthCredentials;
 
+// ProfileReach imported from identity.model.ts to avoid duplication
+import type { ProfileReach } from './identity.model';
+export type { ProfileReach };
+
 /** Registration credentials (for creating new auth) */
 export interface RegisterCredentials {
   identifier: string;
   identifierType: IdentifierType;
   password: string;
-  /** Holochain human ID (from successful registration) */
-  humanId: string;
-  /** Holochain agent public key */
-  agentPubKey: string;
+  // Profile fields - doorway creates Holochain identity
+  /** Display name for profile */
+  displayName: string;
+  /** Optional bio/description */
+  bio?: string;
+  /** User interests/affinities */
+  affinities?: string[];
+  /** Profile visibility (public, connections, private) */
+  profileReach?: ProfileReach;
+  /** Optional location */
+  location?: string;
+  // Legacy fields - only used for external registration flow
+  /** Holochain human ID (optional - doorway generates if not provided) */
+  humanId?: string;
+  /** Holochain agent public key (optional - doorway provides) */
+  agentPubKey?: string;
 }
 
 // =============================================================================
@@ -211,17 +227,36 @@ export interface AuthProvider {
 
 /** Request body for POST /auth/register */
 export interface RegisterAuthRequest {
-  humanId: string;
-  agentPubKey: string;
   identifier: string;
   identifierType: IdentifierType;
   password: string;
+  // Profile fields - doorway creates identity
+  displayName: string;
+  bio?: string;
+  affinities?: string[];
+  profileReach?: ProfileReach;
+  location?: string;
+  // Legacy fields (optional)
+  humanId?: string;
+  agentPubKey?: string;
 }
 
 /** Request body for POST /auth/login */
 export interface LoginRequest {
   identifier: string;
   password: string;
+}
+
+/** Human profile from registration response */
+export interface HumanProfileResponse {
+  id: string;
+  displayName: string;
+  bio?: string;
+  affinities: string[];
+  profileReach: string;
+  location?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Response from auth endpoints on success */
@@ -231,6 +266,8 @@ export interface AuthResponse {
   agentPubKey: string;
   expiresAt: string;
   identifier: string;
+  /** Profile info (returned on registration) */
+  profile?: HumanProfileResponse;
 }
 
 /** Response from auth endpoints on error */

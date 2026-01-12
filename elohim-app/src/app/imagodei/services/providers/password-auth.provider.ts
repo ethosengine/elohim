@@ -174,19 +174,32 @@ export class PasswordAuthProvider implements AuthProvider {
   }
 
   /**
-   * Register password credentials for a Holochain identity.
-   * Called after successful Holochain registration.
+   * Register with doorway (creates identity + credentials atomically).
+   *
+   * Doorway handles:
+   * 1. Creating Holochain identity via imagodei zome
+   * 2. Storing auth credentials in MongoDB
+   * 3. Returning JWT + profile
    */
   async register(credentials: RegisterCredentials): Promise<AuthResult> {
     const url = `${this.getAuthBaseUrl()}/auth/register`;
 
     const body: RegisterAuthRequest = {
-      humanId: credentials.humanId,
-      agentPubKey: credentials.agentPubKey,
       identifier: credentials.identifier,
       identifierType: credentials.identifierType,
       password: credentials.password,
+      // Profile fields - doorway creates identity
+      displayName: credentials.displayName,
+      bio: credentials.bio,
+      affinities: credentials.affinities ?? [],
+      profileReach: credentials.profileReach ?? 'public',
+      location: credentials.location,
+      // Legacy fields (optional - for external registration)
+      humanId: credentials.humanId,
+      agentPubKey: credentials.agentPubKey,
     };
+
+    console.log('[PasswordAuth] Registering with doorway:', url);
 
     try {
       const response = await firstValueFrom(
@@ -194,6 +207,8 @@ export class PasswordAuthProvider implements AuthProvider {
           headers: this.getHeaders(),
         })
       );
+
+      console.log('[PasswordAuth] Registration successful, profile:', response.profile);
 
       return {
         success: true,
@@ -204,6 +219,7 @@ export class PasswordAuthProvider implements AuthProvider {
         identifier: response.identifier,
       };
     } catch (err) {
+      console.error('[PasswordAuth] Registration failed:', err);
       return this.handleError(err);
     }
   }

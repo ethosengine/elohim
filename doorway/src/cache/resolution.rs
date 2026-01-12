@@ -437,6 +437,7 @@ mod tests {
             agent_pub_key: "uhCAk...".to_string(),
             zome_name: "content_store".to_string(),
             app_id: "elohim".to_string(),
+            role_name: "lamad".to_string(),
         };
         // Config with conductor requires zome config for conductor to be available
         let resolver = DoorwayResolver::new(None, None, Some(config));

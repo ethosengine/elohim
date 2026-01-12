@@ -221,6 +221,7 @@ export class RegisterComponent implements OnInit {
 
       if (hasSessionToMigrate) {
         // Use migration flow to preserve session progress
+        // Migration service will handle identity creation + auth credentials
         console.log('[Register] Session data found, using migration flow to preserve progress');
 
         const overrides: Partial<RegisterHumanRequest> = {
@@ -229,6 +230,8 @@ export class RegisterComponent implements OnInit {
           affinities: this.parseAffinities(this.form.affinities),
           profileReach: this.form.profileReach,
           location: this.form.location.trim() || undefined,
+          email: this.form.email.trim().toLowerCase(),
+          password: this.form.password,
         };
 
         const migrationResult = await this.migrationService.migrate(overrides);
@@ -239,39 +242,19 @@ export class RegisterComponent implements OnInit {
 
         console.log('[Register] Session migrated successfully:', migrationResult.migratedData);
       } else {
-        // No session data - standard registration
+        // No session data - standard registration via doorway
+        // Doorway handles identity creation + auth credentials atomically
         const request: RegisterHumanRequest = {
           displayName: this.form.displayName.trim(),
           bio: this.form.bio.trim() || undefined,
           affinities: this.parseAffinities(this.form.affinities),
           profileReach: this.form.profileReach,
           location: this.form.location.trim() || undefined,
+          email: this.form.email.trim().toLowerCase(),
+          password: this.form.password,
         };
 
         await this.identityService.registerHuman(request);
-      }
-
-      // Step 2: Create auth credentials for login/logout (both flows need this)
-      const humanId = this.identityService.humanId();
-      const agentPubKey = this.identityService.agentPubKey();
-
-      if (humanId && agentPubKey) {
-        const authCredentials: RegisterCredentials = {
-          identifier: this.form.email.trim().toLowerCase(),
-          identifierType: 'email',
-          password: this.form.password,
-          humanId,
-          agentPubKey,
-        };
-
-        const authResult = await this.authService.register('password', authCredentials);
-
-        if (!authResult.success) {
-          // Holochain registration succeeded but auth failed
-          // User can still use the app, just can't login from another device
-          console.warn('[Register] Auth credentials creation failed:', authResult.error);
-          // Don't block the flow - they're registered in Holochain
-        }
       }
 
       // Clear password from form for security
@@ -325,25 +308,9 @@ export class RegisterComponent implements OnInit {
       const result = await this.migrationService.migrate(overrides);
 
       if (result.success) {
-        // Also create auth credentials if email/password were provided
-        const humanId = this.identityService.humanId();
-        const agentPubKey = this.identityService.agentPubKey();
-
-        if (humanId && agentPubKey && this.form.email.trim() && this.form.password) {
-          const authCredentials: RegisterCredentials = {
-            identifier: this.form.email.trim().toLowerCase(),
-            identifierType: 'email',
-            password: this.form.password,
-            humanId,
-            agentPubKey,
-          };
-
-          await this.authService.register('password', authCredentials);
-          this.form.password = '';
-          this.form.confirmPassword = '';
-        }
-
         // Success - navigate to return URL
+        // Note: If email/password were provided, this code path isn't reached
+        // (we redirect to onRegister() at the start of this function)
         this.router.navigate([this.returnUrl]);
       } else {
         this.error.set(result.error ?? 'Migration failed');

@@ -147,6 +147,7 @@ impl DiscoveryService {
                     agent_pub_key: fallback_agent,
                     zome_name: self.config.zome_name.clone(),
                     app_id: self.config.installed_app_id.clone(),
+                    role_name: "lamad".to_string(), // Default fallback role
                 });
 
                 // Store default import config
@@ -184,6 +185,7 @@ impl DiscoveryService {
                 agent_pub_key: cell.agent_pub_key.clone(),
                 zome_name: self.config.zome_name.clone(),
                 app_id: self.config.installed_app_id.clone(),
+                role_name: cell.role_name.clone(),
             };
 
             // Store zome config for later use

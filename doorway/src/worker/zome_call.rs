@@ -88,6 +88,9 @@ pub struct ZomeCallConfig {
     pub zome_name: String,
     /// Installed app ID
     pub app_id: String,
+    /// Role name from hApp manifest (e.g., "lamad", "imagodei", "infrastructure")
+    /// Used to identify which DNA this config belongs to in multi-DNA apps
+    pub role_name: String,
 }
 
 impl Default for ZomeCallConfig {
@@ -97,6 +100,7 @@ impl Default for ZomeCallConfig {
             agent_pub_key: String::new(),
             zome_name: "content_store".to_string(),
             app_id: "elohim".to_string(),
+            role_name: "lamad".to_string(),
         }
     }
 }
@@ -331,5 +335,6 @@ mod tests {
         let config = ZomeCallConfig::default();
         assert_eq!(config.zome_name, "content_store");
         assert_eq!(config.app_id, "elohim");
+        assert_eq!(config.role_name, "lamad");
     }
 }
