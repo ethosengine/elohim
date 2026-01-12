@@ -79,6 +79,9 @@ export function provideAnonymousBrowserClient(doorwayUrl: string): Provider[] {
   });
 }
 
+// Browser window reference (safely handles SSR/Node environments)
+declare const window: Window & typeof globalThis | undefined;
+
 /**
  * Detect if running in Eclipse Che environment
  */
@@ -100,7 +103,21 @@ function isEclipseChe(): boolean {
  * - hc-dev:  mbd06b-gmail-com-elohim-devspace-hc-dev.code.ethosengine.com
  */
 function getCheHcDevUrl(): string {
+  if (typeof window === 'undefined') return '';
   const hostname = window.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
+  return `https://${hostname}`;
+}
+
+/**
+ * Get the Che hc-storage endpoint URL for direct storage access
+ *
+ * Example:
+ * - Angular:     mbd06b-gmail-com-elohim-devspace-angular-dev.code.ethosengine.com
+ * - hc-storage:  mbd06b-gmail-com-elohim-devspace-hc-storage.code.ethosengine.com
+ */
+function getCheStorageUrl(): string {
+  if (typeof window === 'undefined') return '';
+  const hostname = window.location.hostname.replace(/-angular-dev\./, '-hc-storage.');
   return `https://${hostname}`;
 }
 
@@ -131,6 +148,8 @@ export function detectClientMode(environment: {
   tauri?: boolean;
   /** Personal elohim-node URLs (for Tauri sync) */
   nodeUrls?: string[];
+  /** Direct storage URL for /db/* routes in browser mode (bypasses doorway) */
+  storageUrl?: string;
 }): ClientMode {
   // Tauri mode (detected via window.__TAURI__)
   if (environment.tauri || typeof (globalThis as any).__TAURI__ !== 'undefined') {
@@ -153,9 +172,11 @@ export function detectClientMode(environment: {
 
   // Eclipse Che: Use hc-dev endpoint for doorway access
   // The browser runs on user's machine, services run in remote workspace
+  // Doorway proxies /db/* to storage internally, so we don't need a separate storageUrl
   if (isEclipseChe()) {
     const cheUrl = getCheHcDevUrl();
     console.log('[ElohimClient] Detected Eclipse Che, using hc-dev endpoint:', cheUrl);
+    console.log('[ElohimClient] Doorway will proxy /db/* routes to storage internally');
     return {
       type: 'browser',
       doorway: {
@@ -163,6 +184,8 @@ export function detectClientMode(environment: {
         fallbacks: environment.doorwayFallbacks,
         apiKey: environment.apiKey,
       },
+      // Don't set storageUrl - doorway proxies /db/* to storage
+      // The hc-storage endpoint has SSL issues that may block browser requests
     };
   }
 
@@ -174,5 +197,6 @@ export function detectClientMode(environment: {
       fallbacks: environment.doorwayFallbacks,
       apiKey: environment.apiKey,
     },
+    storageUrl: environment.storageUrl,
   };
 }

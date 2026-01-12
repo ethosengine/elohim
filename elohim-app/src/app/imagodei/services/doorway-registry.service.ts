@@ -47,6 +47,46 @@ const CACHE_TTL_MS = 60 * 60 * 1000;
 const MAX_CONCURRENT_HEALTH_CHECKS = 5;
 
 // =============================================================================
+// Che Environment Detection
+// =============================================================================
+
+/**
+ * Detect if running in Eclipse Che environment
+ */
+function isEclipseChe(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  return hostname.includes('.code.ethosengine.com') || hostname.includes('.devspaces.');
+}
+
+/**
+ * Get the Che hc-dev endpoint URL for doorway access
+ */
+function getCheHcDevUrl(): string {
+  if (typeof window === 'undefined') return '';
+  const hostname = window.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
+  return `https://${hostname}`;
+}
+
+/**
+ * Create a doorway info for the Che local environment
+ */
+function createCheDoorway(): DoorwayInfo {
+  return {
+    id: 'che-local-hc-dev',
+    name: 'Local Dev (Che)',
+    url: getCheHcDevUrl(),
+    description: 'Local development doorway via Eclipse Che hc-dev endpoint',
+    region: 'global',  // Use 'global' as catch-all for dev
+    operator: 'Local Development',
+    features: [],  // No special features for local dev
+    status: 'online',
+    registrationOpen: true,
+    vouchCount: 0,
+  };
+}
+
+// =============================================================================
 // Service
 // =============================================================================
 
@@ -442,9 +482,21 @@ export class DoorwayRegistryService {
   }
 
   /**
-   * Restore selection from localStorage.
+   * Restore selection from localStorage, or auto-select Che doorway in dev.
    */
   private restoreSelection(): void {
+    // In Eclipse Che, always use the local hc-dev endpoint
+    if (isEclipseChe()) {
+      const cheDoorway = createCheDoorway();
+      console.log('[DoorwayRegistry] Eclipse Che detected, using local hc-dev endpoint:', cheDoorway.url);
+      this.selectedSignal.set({
+        doorway: cheDoorway,
+        selectedAt: new Date().toISOString(),
+        isExplicit: false,
+      });
+      return;
+    }
+
     try {
       const raw = localStorage.getItem(DOORWAY_URL_KEY);
       if (!raw) return;
