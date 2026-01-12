@@ -37,11 +37,18 @@ impl MongoClient {
     pub async fn new(uri: &str, db_name: &str) -> Result<Self, DoorwayError> {
         info!("Connecting to MongoDB at {}", uri);
 
-        let client = Client::with_uri_str(uri)
+        // Use serverSelectionTimeoutMS to avoid hanging on unreachable MongoDB
+        let timeout_uri = if uri.contains('?') {
+            format!("{}&serverSelectionTimeoutMS=3000&connectTimeoutMS=3000", uri)
+        } else {
+            format!("{}?serverSelectionTimeoutMS=3000&connectTimeoutMS=3000", uri)
+        };
+
+        let client = Client::with_uri_str(&timeout_uri)
             .await
             .map_err(|e| DoorwayError::Database(format!("Failed to connect to MongoDB: {}", e)))?;
 
-        // Verify connection
+        // Verify connection with timeout
         client
             .database(db_name)
             .run_command(doc! { "ping": 1 })
