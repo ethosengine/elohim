@@ -65,7 +65,6 @@
     "@angular/router": "^19.2.0",
     "@elohim/storage-client": "file:../holochain/sdk/storage-client-ts",
     "@holochain/client": "0.20.0",
-    "@kuzu/kuzu-wasm": "^0.7.0",
     "@phosphor-icons/core": "^2.1.1",
     "@popperjs/core": "^2.11.8",
     "@types/d3": "^7.4.3",
