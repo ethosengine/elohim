@@ -11,6 +11,7 @@ import { HolochainClientService } from '@app/elohim/services/holochain-client.se
 import { EdgeNodeDisplayInfo } from '@app/elohim/models/holochain-connection.model';
 import { SovereigntyBadgeComponent } from '@app/lamad/components/sovereignty-badge/sovereignty-badge.component';
 import { IdentityService } from '@app/imagodei/services/identity.service';
+import { AuthService } from '@app/imagodei/services/auth.service';
 import { RunningContextService } from '@app/doorway/services/running-context.service';
 import { ConnectionIndicatorComponent } from '@app/imagodei/components/connection-indicator/connection-indicator.component';
 
@@ -113,6 +114,9 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   /** Running context service - determines if operator mode is available */
   private readonly runningContext = inject(RunningContextService);
 
+  /** Auth service for immediate auth state feedback */
+  private readonly authService = inject(AuthService);
+
   /**
    * Available context apps - includes Doorway when user has web-hosting capable nodes
    */
@@ -139,10 +143,17 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
 
   /**
    * Whether the user is authenticated (hosted or self-sovereign mode)
+   * Also checks AuthService for immediate feedback after login (before IdentityService updates)
    */
   readonly isAuthenticated = computed(() => {
     const mode = this.identityService.mode();
-    return mode === 'hosted' || mode === 'self-sovereign';
+    // Check identity mode first (full identity state)
+    if (mode === 'hosted' || mode === 'self-sovereign') {
+      return true;
+    }
+    // Fallback: check auth service for immediate feedback after login
+    // This handles the race condition where auth succeeds but identity state hasn't updated yet
+    return this.authService.isAuthenticated();
   });
 
   /**

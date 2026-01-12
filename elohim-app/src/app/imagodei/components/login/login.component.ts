@@ -149,6 +149,10 @@ export class LoginComponent implements OnInit {
           localStorage.removeItem(AUTH_IDENTIFIER_KEY);
         }
 
+        // Wait for identity state to be fully established before navigating
+        // This ensures the UI shows authenticated state immediately after redirect
+        await this.identityService.waitForAuthenticatedState(3000);
+
         // Navigate to return URL
         this.router.navigate([this.returnUrl]);
       } else {

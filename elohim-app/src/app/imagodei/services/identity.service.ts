@@ -38,6 +38,9 @@ import {
 } from '../models/identity.model';
 import { type PasswordCredentials, type AuthResult } from '../models/auth.model';
 
+// Re-export utility functions for consumers
+export { isNetworkMode, isStewardMode, getInitials } from '../models/identity.model';
+
 // =============================================================================
 // Wire Format Types (internal - snake_case matches conductor response)
 // =============================================================================
@@ -416,6 +419,46 @@ export class IdentityService {
     // If Holochain is connected, check for identity there
     if (this.holochainClient.isConnected()) {
       await this.checkHolochainIdentity();
+    }
+
+    // Check for restored auth session that needs identity fetch
+    // This handles the case where AuthService restored a token from localStorage
+    // but doesn't have humanId/agentPubKey (they weren't persisted)
+    await this.fetchRestoredSessionIdentity();
+  }
+
+  /**
+   * Fetch identity from server if we have a restored auth session without humanId/agentPubKey.
+   * This completes the session restoration by fetching the missing identity data.
+   */
+  private async fetchRestoredSessionIdentity(): Promise<void> {
+    const auth = this.authService.auth();
+
+    // Only fetch if we have a token but missing identity fields
+    if (!auth.isAuthenticated || !auth.token || (auth.humanId && auth.agentPubKey)) {
+      return;
+    }
+
+    console.log('[IdentityService] Fetching identity for restored session...');
+
+    // Use the password provider to fetch current user from /auth/me
+    const provider = this.authService.getProvider('password') as PasswordAuthProvider | undefined;
+    if (!provider?.getCurrentUser) {
+      console.warn('[IdentityService] No provider available to fetch identity');
+      return;
+    }
+
+    try {
+      const identity = await provider.getCurrentUser(auth.token);
+      if (identity) {
+        console.log('[IdentityService] Fetched identity:', identity.humanId);
+        // Now connect as the authenticated user
+        await this.connectAsAuthenticatedUser(identity.humanId, identity.agentPubKey);
+      } else {
+        console.warn('[IdentityService] Failed to fetch identity from server');
+      }
+    } catch (err) {
+      console.error('[IdentityService] Error fetching identity:', err);
     }
   }
 
@@ -901,6 +944,39 @@ export class IdentityService {
   }
 
   /**
+   * Wait for identity to be fully authenticated (hosted or steward mode).
+   *
+   * Use this after login to ensure the identity state is fully established
+   * before navigating away from the login page.
+   *
+   * @param timeoutMs - Maximum time to wait in milliseconds (default: 3000)
+   * @returns True if authenticated state was reached, false if timed out
+   */
+  async waitForAuthenticatedState(timeoutMs = 3000): Promise<boolean> {
+    // If already in authenticated mode, return immediately
+    const currentMode = this.mode();
+    if (currentMode === 'hosted' || currentMode === 'steward') {
+      return true;
+    }
+
+    // Wait for mode to change or timeout
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      const checkInterval = setInterval(() => {
+        const mode = this.mode();
+        if (mode === 'hosted' || mode === 'steward') {
+          clearInterval(checkInterval);
+          resolve(true);
+        } else if (Date.now() - startTime > timeoutMs) {
+          clearInterval(checkInterval);
+          console.log('[IdentityService] Timeout waiting for authenticated state');
+          resolve(false);
+        }
+      }, 100);
+    });
+  }
+
+  /**
    * Connect to Holochain as an authenticated user (after login).
    * This is called by the auth state effect when login succeeds.
    */
@@ -909,8 +985,16 @@ export class IdentityService {
     // We need to verify the identity and load the profile
 
     if (!this.holochainClient.isConnected()) {
-      console.log('[IdentityService] Waiting for Holochain connection to verify auth');
-      return;
+      console.log('[IdentityService] Waiting for Holochain connection...');
+
+      // Wait up to 10 seconds for connection
+      const connected = await this.waitForHolochainConnection(10000);
+      if (!connected) {
+        console.warn('[IdentityService] Timeout waiting for Holochain - setting hosted mode without profile');
+        // Still update state to show logged-in UI, just without full profile
+        this.setMinimalAuthenticatedState(humanId, agentPubKey);
+        return;
+      }
     }
 
     try {
@@ -969,6 +1053,54 @@ export class IdentityService {
     } catch (err) {
       console.error('[IdentityService] Failed to verify authenticated user:', err);
     }
+  }
+
+  /**
+   * Wait for Holochain connection with timeout.
+   *
+   * @param timeoutMs - Maximum time to wait in milliseconds
+   * @returns True if connected, false if timeout
+   */
+  private async waitForHolochainConnection(timeoutMs: number): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (this.holochainClient.isConnected()) {
+        return true;
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    return false;
+  }
+
+  /**
+   * Set minimal authenticated state when Holochain is unavailable.
+   * This allows the UI to show logged-in state even without full profile.
+   *
+   * @param humanId - The authenticated human ID
+   * @param agentPubKey - The agent public key
+   */
+  private setMinimalAuthenticatedState(humanId: string, agentPubKey: string): void {
+    // Generate DID for hosted identity
+    const did = generateDID('hosted', humanId, agentPubKey, null);
+
+    this.updateState({
+      mode: 'hosted',
+      isAuthenticated: true,
+      humanId,
+      agentPubKey,
+      did,
+      displayName: humanId, // Use humanId as fallback display name
+      sovereigntyStage: 'hosted',
+      keyLocation: 'custodial',
+      canExportKeys: true,
+      isLocalConductor: false,
+      conductorUrl: null,
+      hostingCost: this.getDefaultHostingCost(),
+      isLoading: false,
+      error: null,
+    });
+
+    console.log('[IdentityService] Set minimal authenticated state for:', humanId);
   }
 
   // ==========================================================================
