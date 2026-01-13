@@ -6,6 +6,7 @@ import { PathService } from '../../services/path.service';
 import { PathFilterService } from '../../services/path-filter.service';
 import { ProfileService } from '@app/elohim/services/profile.service';
 import { AgentService } from '@app/elohim/services/agent.service';
+import { IdentityService } from '@app/imagodei/services/identity.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 
 describe('LamadHomeComponent', () => {
@@ -16,6 +17,7 @@ describe('LamadHomeComponent', () => {
   let router: jasmine.SpyObj<Router>;
   let profileService: jasmine.SpyObj<ProfileService>;
   let agentService: jasmine.SpyObj<AgentService>;
+  let identityService: jasmine.SpyObj<IdentityService>;
   let localStorageMock: { [key: string]: string };
 
   const mockPaths: PathIndexEntry[] = [
@@ -51,6 +53,9 @@ describe('LamadHomeComponent', () => {
     const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
     const profileServiceSpy = jasmine.createSpyObj('ProfileService', ['getCurrentFocus']);
     const agentServiceSpy = jasmine.createSpyObj('AgentService', ['getCurrentAgentId', 'getAgentProgress']);
+    const identityServiceSpy = jasmine.createSpyObj('IdentityService', ['mode']);
+    // mode() returns 'anonymous' by default (unauthenticated)
+    identityServiceSpy.mode.and.returnValue('anonymous');
 
     // Mock localStorage
     localStorageMock = {};
@@ -68,7 +73,8 @@ describe('LamadHomeComponent', () => {
         { provide: PathFilterService, useValue: pathFilterServiceSpy },
         { provide: Router, useValue: routerSpy },
         { provide: ProfileService, useValue: profileServiceSpy },
-        { provide: AgentService, useValue: agentServiceSpy }
+        { provide: AgentService, useValue: agentServiceSpy },
+        { provide: IdentityService, useValue: identityServiceSpy }
       ]
     }).compileComponents();
 
@@ -77,6 +83,7 @@ describe('LamadHomeComponent', () => {
     router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
     profileService = TestBed.inject(ProfileService) as jasmine.SpyObj<ProfileService>;
     agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
+    identityService = TestBed.inject(IdentityService) as jasmine.SpyObj<IdentityService>;
 
     pathService.listPaths.and.returnValue(of(mockPathIndex));
     pathFilterService.getFeaturedPaths.and.callFake((paths: PathIndexEntry[]) => paths);
@@ -209,12 +216,12 @@ describe('LamadHomeComponent', () => {
   it('should load saved view mode from localStorage', () => {
     localStorageMock['lamad-view-mode'] = 'explore';
 
-    const newComponent = new LamadHomeComponent(pathService, pathFilterService, router, profileService, agentService);
+    const newComponent = new LamadHomeComponent(pathService, pathFilterService, router, profileService, agentService, identityService);
     expect(newComponent.viewMode).toBe('explore');
   });
 
   it('should default to paths mode if no saved preference', () => {
-    const newComponent = new LamadHomeComponent(pathService, pathFilterService, router, profileService, agentService);
+    const newComponent = new LamadHomeComponent(pathService, pathFilterService, router, profileService, agentService, identityService);
     expect(newComponent.viewMode).toBe('paths');
   });
 
@@ -240,6 +247,9 @@ describe('LamadHomeComponent', () => {
   });
 
   it('should populate pathProgressMap from agent progress', () => {
+    // Set identity mode to 'hosted' so agent progress is fetched (requires network authentication)
+    identityService.mode.and.returnValue('hosted');
+
     const mockAgentProgress = [
       {
         agentId: 'test-agent',
