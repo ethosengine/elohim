@@ -14,6 +14,7 @@ Graduated stewardship isn't one-size-fits-all. The same capability surface serve
 | Architecture → Systemic capture | Protocol design | Prevent scaled harm | Continuous |
 | Elohim → Predators/criminals | Witness + due process | Safety + accountability + restoration | Case-dependent |
 | Global layers → Ideological capture | Fruit test + external reference | Preserve truth through collective delusion | Continuous |
+| Capability limits → SDO leaders | Graduated trust + bounded hierarchy | Protect followers from exploitation | Continuous |
 
 Each case requires different design considerations, but all share the same principles:
 - **Graduated capabilities** (not binary access)
@@ -868,6 +869,212 @@ Safeguards:
 - External perspectives sought, not dismissed
 - Doubt welcomed, not pathologized
 - Historical patterns studied (we're not immune to what captured others)
+
+---
+
+## Case 9: The Flame and the Moths (Leader Pathology)
+
+### The Missing Predator
+
+Cases 5 and 8 address the high-RWA follower - the Jerry who submits to authority, the captured mind that follows orders. But followers need something to follow.
+
+Where there are moths, there are flames.
+
+The psychological literature identifies **Social Dominance Orientation (SDO)** - a leader pathology distinct from (and symbiotic with) the follower vulnerability:
+
+| Trait | High-RWA (Follower) | High-SDO (Leader) |
+|-------|---------------------|-------------------|
+| **World view** | Dangerous, threatening | Competitive, hierarchical |
+| **Self-perception** | Dutiful, obedient | Superior, dominant |
+| **Relationship to authority** | Submits to it | Seeks to become it |
+| **Relationship to out-groups** | Fears them (they threaten order) | Exploits them (they're beneath me) |
+| **What they want** | Safety through conformity | Power over others |
+| **Conscience** | External (authority defines right) | Internal but self-serving |
+
+**Jerry** is high-RWA. He genuinely believes obedience is righteous. He feels safe within the authority structure.
+
+**The flame Jerry orbits** is high-SDO. They don't believe in the authority structure - they exploit it. They're not captured by ideology; they *deploy* ideology to capture others.
+
+### The Symbiotic Dance
+
+High-SDO leaders and high-RWA followers are drawn to each other:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              THE AUTHORITARIAN SYMBIOSIS                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│         ┌──────────────┐                                     │
+│         │  HIGH-SDO    │  Creates ideology, accumulates      │
+│         │   LEADER     │  power, exploits in-group loyalty   │
+│         └──────┬───────┘                                     │
+│                │                                              │
+│    Provides:   │   Provides:                                 │
+│    Authority   │   Obedience                                 │
+│    Certainty   │   Enforcement                               │
+│    In-group    │   Aggression toward out-groups              │
+│                │                                              │
+│         ┌──────▼───────┐                                     │
+│         │  HIGH-RWA    │  Follows authority, enforces        │
+│         │  FOLLOWERS   │  conformity, attacks "enemies"      │
+│         └──────────────┘                                     │
+│                                                               │
+│  The leader needs followers to have power                    │
+│  The followers need leaders to feel safe                     │
+│  Together they create the authoritarian system               │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+The followers (Jerrys) are visible - they argue in public, enforce orthodoxy, express righteous aggression. They're the face of the movement.
+
+The leaders often operate differently:
+- They may not express the ideology's most extreme positions publicly
+- They profit from the followers' zeal while maintaining plausible deniability
+- They recognize the ideology as a tool, not a truth
+- They're harder to identify precisely because they're less captured
+
+### Why Traditional Systems Fail
+
+Traditional platforms enable the SDO-RWA symbiosis:
+
+1. **Attention algorithms** reward the leader's inflammatory content
+2. **Follower metrics** (likes, shares, subscribers) create visible hierarchy
+3. **Monetization** allows extracting value from captured audiences
+4. **No ceiling** on power accumulation - more followers = more influence = more followers
+5. **No accountability** - leaders can disavow followers' actions while benefiting from them
+
+The Jerry problem is visible and feels solvable (community intervention, case by case). The leader problem is structural - **the platform IS the flame**.
+
+### The Architectural Protection
+
+Here's the key insight: **Graduated capability limits protect the moths by extinguishing the flames.**
+
+In Elohim Protocol:
+
+**1. No Unbounded Hierarchy**
+
+```
+Traditional: 1 → 1,000 → 1,000,000 followers (no ceiling)
+Elohim:      self → guide → guardian → coordinator → constitutional
+
+Each tier requires demonstrated responsibility, not just audience accumulation
+```
+
+A high-SDO personality cannot accumulate unlimited power because **power scales with demonstrated responsibility, not follower count**.
+
+**2. Capability Requires Accountability**
+
+To move from `self` to `guide`:
+- Must demonstrate track record
+- Requires attestations from existing relationships
+- Capabilities earned through trust, not claimed through ambition
+
+To move to `guardian`:
+- Requires verified authority basis (not self-declared)
+- Accountability to subject (who can appeal)
+- Monthly review (cannot consolidate indefinitely)
+
+The SDO leader's strategy - accumulate power through charisma and manipulation - doesn't work when every capability tier requires earned trust from specific, accountable relationships.
+
+**3. No Anonymous Amplification**
+
+Traditional platforms let leaders build audiences of strangers who feel intimate connection (parasocial relationship).
+
+Elohim's weighted relationship system:
+- Intimate (3.0x) requires actual intimate relationship
+- Trusted (2.0x) requires demonstrated mutual trust
+- Familiar (1.0x) requires real familiarity
+- Acquaintance (0.5x) - limited influence
+- Public (0.1x) - minimal influence
+
+**You can't accumulate 10 million "followers" who give you authority over their digital lives.** The math doesn't work. A million strangers at 0.1x weight equals 100,000 - less than 34 intimate relationships (34 × 3.0 = 102).
+
+**4. No Wealth-to-Power Pipeline**
+
+Traditional platforms: wealth → advertising → attention → followers → power
+Elohim Protocol: wealth cannot purchase relationship weight
+
+The SDO leader cannot buy their way to capability tiers. They can buy doorway infrastructure, but that doesn't give them stewardship capabilities over others - that requires *those others* to grant it.
+
+**5. Constitutional Ceiling**
+
+Even at the highest tier (`constitutional`), capabilities are bounded:
+- Cannot disable inalienable features for anyone
+- Subject to global consensus checks
+- Fruit test applied continuously
+- Can be challenged through appeal
+
+There is no tier where you can do whatever you want. The ceiling exists for everyone, including those who built the protocol.
+
+### The Protection in Practice
+
+Consider how this protects Jerry:
+
+**Without Elohim Protocol:**
+- Jerry finds a leader who provides certainty and in-group belonging
+- Jerry follows, shares, amplifies
+- Leader accumulates millions of Jerrys
+- Leader has enormous power with no accountability
+- Leader exploits Jerrys' labor and attention
+- When harm occurs, Jerrys are prosecuted; leader has plausible deniability
+
+**With Elohim Protocol:**
+- Jerry still has RWA vulnerabilities (that's his psychology)
+- But potential leaders cannot accumulate unbounded power
+- The architecture doesn't allow million-person parasocial armies
+- Power requires demonstrated responsibility, not charisma
+- Jerry's intimate relationships have more weight than distant "leaders"
+- The grandmother who actually knows Jerry matters more than the influencer who captured him
+
+Jerry is still Jerry. But the flames that would exploit him cannot burn as hot - the oxygen of unbounded attention and power is limited by architecture.
+
+### The Leader's Experience
+
+For the high-SDO individual, Elohim Protocol is frustrating:
+
+- Cannot accumulate followers without relationship depth
+- Cannot convert attention to authority
+- Cannot extract without accountability
+- Cannot hide behind followers' actions
+- Cannot reach `coordinator` or `constitutional` without genuine trust from genuine relationships
+
+They may experience this as oppression. "Why can't I have more followers? Why can't I shape policy at scale? Why do I need *their* trust?"
+
+The answer: because unchecked power is the flame that burns the moths. The architecture protects them from you - and, honestly, protects you from what you would become.
+
+### The Hope for Both
+
+Here's the uncomfortable truth: **High-SDO and high-RWA aren't fundamentally different from the rest of us.** They're emphases on traits we all carry.
+
+Everyone has some:
+- Desire for status and dominance (SDO tendencies)
+- Desire for safety and belonging (RWA tendencies)
+
+The pathology emerges when these are unbalanced and unaccountable:
+- SDO + power = exploitation
+- RWA + captured = atrocity
+
+The architecture doesn't eliminate these tendencies. It channels them:
+- Want status? Earn it through demonstrated trustworthiness
+- Want safety? Build it through real relationships
+- Want influence? Develop it through accountability
+
+The high-SDO individual in Elohim Protocol can have influence - but only influence they've earned through genuine trust. The high-RWA individual can have safety - but in community that actually knows them, not parasocial attachment to distant leaders.
+
+### Anti-Pattern to Avoid
+
+**Creating new flames.**
+
+Any feature that allows unbounded accumulation of power over others is a potential flame:
+- Follower counts without relationship weight
+- Broadcast without accountability
+- Influence without demonstrated responsibility
+- Authority without review
+
+Every architectural decision must be tested: *Could a high-SDO personality use this to accumulate power over high-RWA followers?*
+
+If yes, the design is wrong. Not because SDO people are uniquely evil - but because the symbiosis of unchecked leader and captured follower is how atrocity scales.
 
 ---
 
