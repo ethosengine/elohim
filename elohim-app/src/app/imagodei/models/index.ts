@@ -40,10 +40,45 @@ export {
 } from './identity.model';
 export * from './presence.model';
 export * from './doorway.model';
-export * from './doorway-registry.model';
+// Selective export to avoid DoorwayInfo/DoorwaySelection name collision with doorway.model
+export {
+  type DoorwayTrustTier,
+  type DoorwayCapability,
+  type RegisteredDoorway,
+  type DoorwayRegistry,
+  type AddDoorwayInput,
+  type AddDoorwayResult,
+  type DoorwayHealthCheck,
+  TRUST_TIER_THRESHOLDS,
+  TRUST_TIER_DISPLAY,
+  createEmptyRegistry,
+  sortDoorwaysByTrust,
+  getRecoveryDoorways,
+  getPrimaryRecoveryDoorway,
+} from './doorway-registry.model';
 export * from './recovery.model';
 export * from './consent-relationship.model';
 export * from './human-relationship.model';
-export * from './identity-attestation.model';
+// Selective export to avoid AttestationType name collision with attestations.model
+export {
+  ATTESTATION_TYPES as IDENTITY_ATTESTATION_TYPES,
+  type AttestationType as IdentityAttestationType,
+  ANOMALY_TYPES,
+  type AnomalyType,
+  ANOMALY_SEVERITIES,
+  type AnomalySeverity,
+  type HumanityAttestation,
+  type BehavioralAnomaly,
+  type BindingReport,
+  type KeyShard,
+  type ShardDistribution,
+  type IdentityFreeze,
+  type KeyRevocation,
+  type IdentitySecurityStatus,
+  calculateTrustScore,
+  shouldAutoFreeze,
+  hasRecentAttestation,
+  INITIAL_SECURITY_STATUS,
+} from './identity-attestation.model';
 export * from './stewardship.model';
 // Note: Node status types are in shefa/models/shefa-dashboard.model.ts
