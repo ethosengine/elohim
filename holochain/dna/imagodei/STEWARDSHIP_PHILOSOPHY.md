@@ -1007,6 +1007,43 @@ Even at the highest tier (`constitutional`), capabilities are bounded:
 
 There is no tier where you can do whatever you want. The ceiling exists for everyone, including those who built the protocol.
 
+**6. Reach: Graduated Broadcast Limits**
+
+The protocol's reach system (see [REACH.md](../../REACH.md)) provides another structural barrier:
+
+```
+private → invited → local → neighborhood → municipal → bioregional → regional → commons
+   0         1        2          3             4            5           6         7
+```
+
+Content doesn't start "public" and get restricted - it starts **local** and must be intentionally promoted. The SDO leader's strategy of broadcasting inflammatory content to maximum audience doesn't work:
+
+- **Default is intimate**: Content reaches your actual relationships first
+- **Promotion requires effort**: Each reach expansion is an intentional act
+- **No algorithmic amplification**: No system rewards engagement-bait with broader reach
+- **Local context preserved**: Neighborhood conversations stay in the neighborhood
+
+The flames need oxygen. Reach starves them of it.
+
+**7. Tri-Coupling: The Economic Forcing Function**
+
+The protocol's economic dimension (see [economic/README.md](../../research/economic/README.md)) implements **tri-coupling** - the insight that viable currency must bind together:
+
+| Dimension | Traditional Platform | Elohim Protocol |
+|-----------|---------------------|-----------------|
+| **Value** | Abstract tokens (likes, followers) | Specific swimlanes (care, time, infrastructure) |
+| **Story** | Hidden algorithms | Full event provenance (REA/ValueFlows) |
+| **Limits** | None (accumulation → power) | Constitutional bounds (dignity floor, accumulation ceiling) |
+
+**The forcing function**: By keeping value, story, and limits coupled - with frontier AI providing complex reasoning to maintain trust - **power remains coupled to responsibility at any scale**.
+
+The SDO leader's economic strategy - extract value from followers while externalizing costs - breaks against this:
+- **Value carries story**: Every transaction records who, what, why
+- **Story carries limits**: Constitutional constraints cannot be bypassed
+- **Limits require story**: You can't accumulate without the provenance trail
+
+This creates a **fit-for-purpose medium** where the SDO-RWA symbiosis cannot form its usual extractive patterns.
+
 ### The Protection in Practice
 
 Consider how this protects Jerry:
