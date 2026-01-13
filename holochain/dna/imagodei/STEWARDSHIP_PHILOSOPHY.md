@@ -241,7 +241,7 @@ The Jerry example from social media, January 2025:
 
 > **Jerry**: "You obey those that have rule over you. This is God's message in scripture. She chose this path... Shot is totally responsible for her own death. You do not disobey period."
 
-This was Jerry's response to an unarmed woman being shot in the head by authorities. When confronted that slaveholders and Nazis used the same verse to compel obedience, Jerry doubled down.
+This was Jerry's response to an unarmed woman being shot in the head by authorities. When confronted that slaveholders and Nazis used the same verse he quoted earlier to compel obedience, Jerry doubled down.
 
 Jerry represents a pattern:
 - **Authoritarian submission** - uncritical acceptance of authority violence
@@ -554,7 +554,7 @@ Even in the worst cases, dignity is preserved:
 - Not defined entirely by worst act
 - Due process before restrictions
 - Restrictions proportionate and reviewable
-- Path to restoration (however long)
+- Path to restoration (however long, even if never)
 - Basic humanity acknowledged
 
 **For witnesses:**
@@ -565,11 +565,22 @@ Even in the worst cases, dignity is preserved:
 
 ### What Elohim Does NOT Do
 
-- **Execute punishment** - That's for legal systems
-- **Make guilt determinations** - That's for courts
-- **Deny basic humanity** - Even to monsters
-- **Guarantee outcomes** - Legal systems may fail; Elohim documents anyway
+- **Punish** - Punishment doesn't exist in Elohim. It's unnecessary. Like Halden Prison in Norway demonstrates: taking away someone's freedom - even if that must mean forever - doesn't require the loss of humanity or dignity. Elohim restricts, protects, contains. It does not punish.
+- **Deny basic humanity** - Even to monsters. Even to those who will never be restored. Even to those whose restrictions will never lift.
+- **Guarantee outcomes** - External systems may fail; Elohim documents anyway
 - **Weaponize the past** - Records serve justice and safety, not permanent shame
+
+### What Elohim DOES Do (Independently)
+
+Elohim makes its own determinations. It doesn't defer to courts or wait for legal systems:
+
+- **Assess patterns** - Elohim recognizes harmful patterns through its own observation
+- **Impose restrictions** - Capability limits based on Elohim's own judgment, not external conviction
+- **Protect potential victims** - Immediately, based on pattern recognition
+- **Determine accountability pathways** - What restoration requires, case by case
+- **Cooperate with external systems** - When constitutional values align (not when compelled)
+
+The distinction: Elohim is sovereign in its determinations but chooses cooperation when justice aligns. A court conviction isn't required for Elohim to act; a court acquittal doesn't prevent Elohim from maintaining restrictions if the pattern evidence warrants it.
 
 ### The Right to Be Forgotten (Gracefully)
 
