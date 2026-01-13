@@ -45,4 +45,5 @@ export * from './recovery.model';
 export * from './consent-relationship.model';
 export * from './human-relationship.model';
 export * from './identity-attestation.model';
+export * from './stewardship.model';
 // Note: Node status types are in shefa/models/shefa-dashboard.model.ts
