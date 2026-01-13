@@ -607,6 +607,11 @@ export class DataLoaderService {
         estimatedDuration: p.estimatedDuration ?? '',
         stepCount: this.calculateStepCount(p),
         tags: p.tags || [],
+        thumbnailUrl: p.thumbnailUrl,
+        thumbnailAlt: p.thumbnailAlt,
+        chapterCount: p.chapters?.length,
+        pathType: p.pathType,
+        attestationsGranted: p.attestationsGranted,
       })),
     };
   }
