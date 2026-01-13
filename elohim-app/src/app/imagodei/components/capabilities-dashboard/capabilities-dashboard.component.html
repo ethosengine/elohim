@@ -1,0 +1,182 @@
+<div class="capabilities-dashboard">
+  <!-- Header -->
+  <header class="dashboard-header">
+    <h1>My Capabilities</h1>
+    <p class="subtitle">View your current access and restrictions</p>
+
+    <button
+      class="refresh-btn"
+      (click)="refresh()"
+      [disabled]="isLoading()"
+      title="Refresh">
+      <span class="icon">&#8635;</span>
+    </button>
+  </header>
+
+  <!-- Error State -->
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span class="error-icon">&#9888;</span>
+      <span class="error-message">{{ error() }}</span>
+      <button class="dismiss-btn" (click)="clearError()" aria-label="Dismiss">
+        &times;
+      </button>
+    </div>
+  }
+
+  <!-- Loading State -->
+  @if (isLoading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading capabilities...</p>
+    </div>
+  }
+
+  <!-- Main Content -->
+  @if (!isLoading()) {
+    <!-- Time Status Card -->
+    @if (timeStatus()) {
+      <section class="time-status-card" [class]="timeStatus()?.status">
+        <div class="status-icon">
+          @if (timeStatus()?.status === 'ok') {
+            <span class="icon-check">&#10003;</span>
+          } @else {
+            <span class="icon-clock">&#128337;</span>
+          }
+        </div>
+
+        <div class="status-content">
+          <h3>Time Status</h3>
+          <p class="status-message">{{ timeStatus()?.message }}</p>
+
+          <div class="time-remaining">
+            @if (sessionRemaining()) {
+              <div class="time-item">
+                <span class="label">Session:</span>
+                <span class="value">{{ sessionRemaining() }} left</span>
+              </div>
+            }
+            @if (dailyRemaining()) {
+              <div class="time-item">
+                <span class="label">Today:</span>
+                <span class="value">{{ dailyRemaining() }} left</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="current-time">
+          {{ currentTime() | date:'shortTime' }}
+        </div>
+      </section>
+    }
+
+    <!-- No Restrictions State -->
+    @if (!hasRestrictions()) {
+      <section class="no-restrictions">
+        <div class="icon">&#127775;</div>
+        <h3>No Active Restrictions</h3>
+        <p>You have full access to all features and content.</p>
+      </section>
+    }
+
+    <!-- Restrictions List -->
+    @if (hasRestrictions()) {
+      <section class="restrictions-section">
+        <h2>Active Restrictions</h2>
+
+        <div class="restrictions-list">
+          @for (restriction of restrictions(); track restriction.label) {
+            <div class="restriction-card" [attr.data-type]="restriction.type">
+              <div class="restriction-icon">
+                @switch (restriction.type) {
+                  @case ('category') { <span>&#128683;</span> }
+                  @case ('feature') { <span>&#128274;</span> }
+                  @case ('route') { <span>&#128679;</span> }
+                  @case ('time') { <span>&#9200;</span> }
+                  @case ('age_rating') { <span>&#127922;</span> }
+                  @case ('reach') { <span>&#127760;</span> }
+                  @default { <span>&#8226;</span> }
+                }
+              </div>
+
+              <div class="restriction-content">
+                <h4>{{ restriction.label }}</h4>
+                <p>{{ restriction.description }}</p>
+              </div>
+
+              @if (restriction.canAppeal) {
+                <button
+                  class="appeal-btn"
+                  (click)="fileAppeal(restriction)"
+                  title="Request change">
+                  Appeal
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Steward Contact Section -->
+    @if (primarySteward()) {
+      <section class="steward-section">
+        <h2>Your Steward</h2>
+
+        <div class="steward-card">
+          <div class="steward-avatar">
+            <span class="avatar-placeholder">&#128100;</span>
+          </div>
+
+          <div class="steward-info">
+            <h4>{{ getStewardTierLabel(primarySteward()!.stewardId) }}</h4>
+            <p class="authority-basis">
+              {{ getAuthorityBasisLabel(primarySteward()!.authorityBasis) }}
+            </p>
+            <p class="steward-meta">
+              <span>Since {{ primarySteward()!.grantedAt | date:'mediumDate' }}</span>
+              @if (primarySteward()!.expiresAt) {
+                <span>&bull; Expires {{ primarySteward()!.expiresAt | date:'mediumDate' }}</span>
+              }
+            </p>
+          </div>
+
+          <div class="steward-actions">
+            <button class="contact-btn" (click)="contactSteward()">
+              Contact
+            </button>
+          </div>
+        </div>
+      </section>
+    }
+
+    <!-- Inalienable Rights Notice -->
+    <section class="rights-notice">
+      <h3>Your Rights</h3>
+      <p>
+        These capabilities can <strong>never</strong> be restricted:
+      </p>
+      <ul class="rights-list">
+        <li><span class="icon">&#128065;</span> View this dashboard</li>
+        <li><span class="icon">&#9999;</span> File appeals</li>
+        <li><span class="icon">&#128172;</span> Contact your steward</li>
+        <li><span class="icon">&#129302;</span> Access Elohim chat</li>
+        <li><span class="icon">&#128222;</span> Emergency contacts</li>
+        <li><span class="icon">&#128337;</span> See time remaining</li>
+      </ul>
+    </section>
+
+    <!-- Quick Actions -->
+    <section class="quick-actions">
+      <a routerLink="../appeal" class="action-btn">
+        <span class="icon">&#9999;</span>
+        File an Appeal
+      </a>
+      <a routerLink="../settings" class="action-btn">
+        <span class="icon">&#9881;</span>
+        My Settings
+      </a>
+    </section>
+  }
+</div>

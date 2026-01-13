@@ -12,6 +12,10 @@
 
 use hdi::prelude::*;
 
+// Stewardship module for graduated capability management
+pub mod stewardship;
+pub use stewardship::*;
+
 // =============================================================================
 // Identity Constants
 // =============================================================================
@@ -887,6 +891,12 @@ pub enum EntryTypes {
     KeyRevocation(KeyRevocation),
     RevocationVote(RevocationVote),
     IdentityFreeze(IdentityFreeze),
+    // Stewardship entry types (Graduated Capabilities)
+    StewardshipGrant(StewardshipGrant),
+    DevicePolicy(DevicePolicy),
+    PolicyInheritance(PolicyInheritance),
+    StewardshipAppeal(StewardshipAppeal),
+    ActivityLog(ActivityLog),
 }
 
 // =============================================================================
@@ -992,6 +1002,41 @@ pub enum LinkTypes {
     HumanToFreeze,               // Anchor(human_id) -> IdentityFreeze
     ActiveFreezes,               // Anchor(active) -> IdentityFreeze (currently frozen)
     FreezeByType,                // Anchor(freeze_type) -> IdentityFreeze
+
+    // Stewardship links (Graduated Capabilities)
+    // StewardshipGrant links
+    IdToStewardshipGrant,        // Anchor(grant_id) -> StewardshipGrant
+    StewardToGrant,              // Anchor(steward_id) -> StewardshipGrant (grants where I am steward)
+    SubjectToGrant,              // Anchor(subject_id) -> StewardshipGrant (grants affecting me)
+    GrantByStatus,               // Anchor(status) -> StewardshipGrant
+    GrantByAuthorityBasis,       // Anchor(authority_basis) -> StewardshipGrant
+    ActiveGrants,                // Anchor(active) -> StewardshipGrant (currently active)
+    DelegatedFromGrant,          // Anchor(parent_grant_id) -> StewardshipGrant (delegated children)
+
+    // DevicePolicy links
+    IdToDevicePolicy,            // Anchor(policy_id) -> DevicePolicy
+    SubjectToPolicy,             // Anchor(subject_id) -> DevicePolicy
+    AuthorToPolicy,              // Anchor(author_id) -> DevicePolicy
+    PolicyByTier,                // Anchor(author_tier) -> DevicePolicy
+    InheritedFromPolicy,         // Anchor(parent_policy_id) -> DevicePolicy (children)
+    EffectivePolicies,           // Anchor(effective) -> DevicePolicy (currently in effect)
+
+    // PolicyInheritance links
+    IdToPolicyInheritance,       // Anchor(inheritance_id) -> PolicyInheritance
+    SubjectToInheritance,        // Anchor(subject_id) -> PolicyInheritance
+
+    // StewardshipAppeal links
+    IdToStewardshipAppeal,       // Anchor(appeal_id) -> StewardshipAppeal
+    AppellantToAppeal,           // Anchor(appellant_id) -> StewardshipAppeal
+    GrantToAppeal,               // Anchor(grant_id) -> StewardshipAppeal (appeals against grant)
+    AppealByStatus,              // Anchor(status) -> StewardshipAppeal
+    AppealByType,                // Anchor(appeal_type) -> StewardshipAppeal
+    ActiveAppeals,               // Anchor(pending) -> StewardshipAppeal
+
+    // ActivityLog links
+    IdToActivityLog,             // Anchor(log_id) -> ActivityLog
+    SubjectToActivityLog,        // Anchor(subject_id) -> ActivityLog
+    SessionToActivityLog,        // Anchor(session_id) -> ActivityLog
 }
 
 // =============================================================================
@@ -1026,6 +1071,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::KeyRevocation(revocation) => validate_key_revocation(&revocation),
                 EntryTypes::RevocationVote(vote) => validate_revocation_vote(&vote),
                 EntryTypes::IdentityFreeze(freeze) => validate_identity_freeze(&freeze),
+                // Stewardship entry validation
+                EntryTypes::StewardshipGrant(grant) => validate_stewardship_grant(&grant),
+                EntryTypes::DevicePolicy(policy) => validate_device_policy(&policy),
+                EntryTypes::PolicyInheritance(inheritance) => validate_policy_inheritance(&inheritance),
+                EntryTypes::StewardshipAppeal(appeal) => validate_stewardship_appeal(&appeal),
+                EntryTypes::ActivityLog(log) => validate_activity_log(&log),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {

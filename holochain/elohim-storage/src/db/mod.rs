@@ -47,6 +47,9 @@ pub mod content_mastery;
 pub mod stewardship_allocations;
 pub mod local_sessions;
 
+// Policy cache for stewardship enforcement
+pub mod policy_cache;
+
 use std::path::Path;
 use std::sync::Mutex;
 use std::time::Duration;

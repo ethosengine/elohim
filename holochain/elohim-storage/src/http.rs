@@ -35,6 +35,7 @@
 use crate::blob_store::BlobStore;
 use crate::db::{self, ContentDb, ContentQuery, DbPool, AppContext};
 use crate::db::{human_relationships, contributor_presences, economic_events, content_mastery, stewardship_allocations};
+use crate::db::policy_cache::{PolicyEnforcement, ContentMetadata, PolicyDecision, PolicyEvent, PolicyEventType};
 use crate::error::StorageError;
 use crate::import_api::ImportApi;
 use crate::progress_hub::ProgressHub;
@@ -73,6 +74,8 @@ pub struct HttpServer {
     db_pool: Option<DbPool>,
     /// Service layer for business logic
     services: Option<Arc<Services>>,
+    /// Policy enforcement for stewardship content filtering
+    policy_enforcement: Option<Arc<PolicyEnforcement>>,
 }
 
 impl HttpServer {
@@ -88,6 +91,7 @@ impl HttpServer {
             content_db: None,
             db_pool: None,
             services: None,
+            policy_enforcement: None,
         }
     }
 
@@ -124,6 +128,12 @@ impl HttpServer {
     /// Set the Diesel connection pool for new entity endpoints
     pub fn with_db_pool(mut self, pool: DbPool) -> Self {
         self.db_pool = Some(pool);
+        self
+    }
+
+    /// Set the Policy Enforcement engine for stewardship content filtering
+    pub fn with_policy_enforcement(mut self, enforcement: Arc<PolicyEnforcement>) -> Self {
+        self.policy_enforcement = Some(enforcement);
         self
     }
 
@@ -191,7 +201,8 @@ impl HttpServer {
             }
             (Method::GET, p) if p.starts_with("/blob/") => {
                 let hash = p.strip_prefix("/blob/").unwrap_or("");
-                self.handle_get_blob(hash).await
+                let agent_id = Self::extract_agent_id(&req);
+                self.handle_get_blob(hash, agent_id.as_deref()).await
             }
 
             // Manifest API
@@ -577,16 +588,73 @@ impl HttpServer {
             .unwrap())
     }
 
+    /// Extract agent ID from request headers (set by doorway)
+    fn extract_agent_id(req: &Request<Incoming>) -> Option<String> {
+        req.headers()
+            .get("x-agent-id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string())
+    }
+
     /// GET /blob/{hash} - Reassemble blob from shards
+    /// Checks policy enforcement if agent_id is provided
     async fn handle_get_blob(
         &self,
         hash: &str,
+        agent_id: Option<&str>,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         if hash.is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .body(Full::new(Bytes::from("Missing blob hash")))
                 .unwrap());
+        }
+
+        // Check policy enforcement if enabled and agent_id is provided
+        if let (Some(ref enforcement), Some(agent)) = (&self.policy_enforcement, agent_id) {
+            // Create content metadata for policy check
+            // For now, we only have the hash - in future, we could look up metadata
+            let content = ContentMetadata {
+                hash: hash.to_string(),
+                categories: Vec::new(),  // TODO: Could be looked up from content_db
+                age_rating: None,
+                reach_level: None,
+            };
+
+            match enforcement.can_serve(agent, &content) {
+                Ok(PolicyDecision::Allow) => {
+                    debug!(hash = %hash, agent = %agent, "Policy check passed");
+                }
+                Ok(PolicyDecision::Block { reason }) => {
+                    warn!(hash = %hash, agent = %agent, reason = %reason, "Content blocked by policy");
+
+                    // Log the policy event
+                    let _ = enforcement.cache().log_event(
+                        agent,
+                        None,
+                        &PolicyEvent {
+                            event_type: PolicyEventType::BlockedContent,
+                            details: reason.clone(),
+                            content_hash: Some(hash.to_string()),
+                            feature_name: None,
+                        },
+                        30, // Default retention days
+                    );
+
+                    return Ok(Response::builder()
+                        .status(StatusCode::FORBIDDEN)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(format!(
+                            r#"{{"error": "blocked", "reason": "{}"}}"#,
+                            reason
+                        ))))
+                        .unwrap());
+                }
+                Err(e) => {
+                    // Policy check failed, but we shouldn't block content - log and proceed
+                    warn!(error = %e, "Policy check failed, allowing access");
+                }
+            }
         }
 
         // Get manifest

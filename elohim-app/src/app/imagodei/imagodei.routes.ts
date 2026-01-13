@@ -8,6 +8,11 @@
  * - /identity/presences - Contributor presence list (requires auth)
  * - /identity/presences/create - Create new contributor presence (requires auth)
  * - /identity/stewardship - Stewardship dashboard (requires auth)
+ * - /identity/stewardship/capabilities - My capabilities view (requires auth)
+ * - /identity/stewardship/policy/:subjectId - Policy console for subject (requires auth)
+ * - /identity/stewardship/appeal/:grantId - Appeal a stewardship grant (requires auth)
+ * - /identity/stewardship/intervention - Community intervention (requires auth)
+ * - /identity/stewardship/intervention/initiate/:subjectId - Initiate intervention (requires auth)
  */
 
 import { Routes } from '@angular/router';
@@ -45,8 +50,43 @@ export const IMAGODEI_ROUTES: Routes = [
   {
     path: 'stewardship',
     canActivate: [identityGuard],
-    loadComponent: () =>
-      import('./components/stewardship-dashboard/stewardship-dashboard.component').then(m => m.StewardshipDashboardComponent),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./components/stewardship-dashboard/stewardship-dashboard.component').then(m => m.StewardshipDashboardComponent),
+      },
+      {
+        path: 'capabilities',
+        loadComponent: () =>
+          import('./components/capabilities-dashboard/capabilities-dashboard.component').then(m => m.CapabilitiesDashboardComponent),
+      },
+      {
+        path: 'policy/:subjectId',
+        loadComponent: () =>
+          import('./components/policy-console/policy-console.component').then(m => m.PolicyConsoleComponent),
+      },
+      {
+        path: 'appeal/:grantId',
+        loadComponent: () =>
+          import('./components/appeal-wizard/appeal-wizard.component').then(m => m.AppealWizardComponent),
+      },
+      {
+        path: 'intervention',
+        loadComponent: () =>
+          import('./components/community-intervention/community-intervention.component').then(m => m.CommunityInterventionComponent),
+      },
+      {
+        path: 'intervention/view/:interventionId',
+        loadComponent: () =>
+          import('./components/community-intervention/community-intervention.component').then(m => m.CommunityInterventionComponent),
+      },
+      {
+        path: 'intervention/initiate/:subjectId',
+        loadComponent: () =>
+          import('./components/community-intervention/community-intervention.component').then(m => m.CommunityInterventionComponent),
+      },
+    ],
   },
   {
     path: '',

@@ -70,6 +70,9 @@ rusqlite = { version = "0.37", features = ["bundled", "serde_json"] }
 # CRDT sync - Automerge for offline-first document sync
 automerge = "0.5"
 
+# Concurrent hash map for policy hot cache
+dashmap = "5"
+
 # Error handling
 thiserror = "1"
 anyhow = "1"

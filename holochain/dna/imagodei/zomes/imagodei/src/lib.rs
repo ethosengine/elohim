@@ -13,6 +13,10 @@ use hdk::prelude::*;
 use imagodei_integrity::*;
 use std::time::Duration;
 
+// Stewardship coordinator functions
+pub mod stewardship;
+pub use stewardship::*;
+
 // =============================================================================
 // Input/Output Types
 // =============================================================================

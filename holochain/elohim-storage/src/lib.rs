@@ -100,6 +100,12 @@ pub use sync::{DocStore, DocStoreConfig, StoredDocument, StreamPosition, StreamT
 // SQLite re-exports
 pub use db::{ContentDb, DbStats, ContentRow, PathRow, StepRow};
 
+// Policy cache re-exports
+pub use db::policy_cache::{
+    PolicyCache, PolicyEnforcement, CachedPolicy, PolicyDecision, TimeAccessDecision,
+    ContentMetadata, PolicyEvent, PolicyEventType, TimeWindow,
+};
+
 // Service re-exports
 pub use services::{
     Services, ContentService, PathService, RelationshipService, KnowledgeService,

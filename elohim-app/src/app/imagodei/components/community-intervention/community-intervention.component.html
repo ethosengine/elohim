@@ -1,0 +1,271 @@
+<div class="community-intervention">
+  <!-- Header -->
+  <header class="intervention-header">
+    <h1>Community Intervention</h1>
+    <p class="subtitle">
+      For patterns of behavior that harm the community. Requires weighted support from people who know the person.
+    </p>
+  </header>
+
+  <!-- Philosophy Notice -->
+  <section class="philosophy-notice">
+    <div class="notice-icon">&#9432;</div>
+    <div class="notice-content">
+      <p>
+        <strong>This is not mob rule.</strong> Community intervention requires:
+      </p>
+      <ul>
+        <li>{{ threshold }} weighted support (people who know you have more weight)</li>
+        <li>Subject notification within 24 hours</li>
+        <li>7-day response window</li>
+        <li>Elohim arbitration review</li>
+        <li>Monthly reviews (if intervention proceeds)</li>
+        <li>Clear path to restoration</li>
+      </ul>
+      <p class="goal-statement">
+        <em>"The goal is a world where everyone can flourish - just not at others' expense."</em>
+      </p>
+    </div>
+  </section>
+
+  <!-- Messages -->
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span class="icon">&#9888;</span>
+      <span class="message">{{ error() }}</span>
+      <button class="dismiss-btn" (click)="clearMessages()">&times;</button>
+    </div>
+  }
+
+  @if (successMessage()) {
+    <div class="success-banner" role="status">
+      <span class="icon">&#10003;</span>
+      <span class="message">{{ successMessage() }}</span>
+      <button class="dismiss-btn" (click)="clearMessages()">&times;</button>
+    </div>
+  }
+
+  <!-- Loading State -->
+  @if (isLoading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading...</p>
+    </div>
+  }
+
+  @if (!isLoading()) {
+    <!-- Existing Intervention View -->
+    @if (mode() === 'view' && intervention()) {
+      <section class="intervention-view">
+        <div class="progress-card">
+          <h3>Support Progress</h3>
+          <div class="progress-bar">
+            <div class="progress-fill" [style.width.%]="progressPercent()"></div>
+          </div>
+          <div class="progress-stats">
+            <span class="current">{{ intervention()!.totalWeight.toFixed(1) }}</span>
+            <span class="separator">/</span>
+            <span class="target">{{ threshold }}</span>
+            <span class="label">weighted support</span>
+          </div>
+          @if (!intervention()!.thresholdMet) {
+            <p class="remaining">
+              {{ remainingWeight().toFixed(1) }} more needed to trigger review
+            </p>
+          } @else {
+            <p class="threshold-met">
+              Threshold met on {{ intervention()!.thresholdMetAt | date:'mediumDate' }}
+            </p>
+          }
+        </div>
+
+        <div class="intervention-details">
+          <h3>Pattern Description</h3>
+          <p class="pattern-text">{{ intervention()!.patternDescription }}</p>
+
+          <h3>Categories</h3>
+          <div class="category-tags">
+            @for (cat of intervention()!.categories; track cat) {
+              <span class="category-tag">{{ cat }}</span>
+            }
+          </div>
+
+          <h3>Status</h3>
+          <span class="status-badge">{{ getInterventionStatusLabel(intervention()!.status) }}</span>
+        </div>
+
+        <!-- Support Form -->
+        @if (!intervention()!.thresholdMet) {
+          <div class="support-form">
+            <h3>Add Your Support</h3>
+            <button class="support-btn" (click)="switchToSupport()">
+              Support This Intervention
+            </button>
+          </div>
+        }
+      </section>
+    }
+
+    <!-- Support Mode -->
+    @if (mode() === 'support' && intervention()) {
+      <section class="support-section">
+        <h2>Add Your Support</h2>
+
+        <!-- Relationship Level -->
+        <div class="form-group">
+          <label>Your relationship to this person:</label>
+          <div class="relationship-options">
+            @for (level of relationshipLevels; track level.value) {
+              <button
+                class="relationship-btn"
+                [class.selected]="relationshipLevel() === level.value"
+                (click)="setRelationshipLevel(level.value)">
+                <span class="level-weight">{{ level.weight }}x</span>
+                <span class="level-name">{{ getRelationshipLevelLabel(level.value) }}</span>
+              </button>
+            }
+          </div>
+          <p class="weight-note">
+            Your support will add <strong>{{ currentWeight() }}</strong> weight to the total.
+          </p>
+        </div>
+
+        <!-- Reason -->
+        <div class="form-group">
+          <label for="supportReason">Why do you support this intervention?</label>
+          <textarea
+            id="supportReason"
+            [ngModel]="supportReason()"
+            (ngModelChange)="supportReason.set($event)"
+            placeholder="Describe the patterns you've observed and why intervention is needed..."
+            rows="4">
+          </textarea>
+        </div>
+
+        <!-- Submit -->
+        <div class="form-actions">
+          <button
+            class="submit-btn"
+            [disabled]="!canSubmit() || isSubmitting()"
+            (click)="submitSupport()">
+            @if (isSubmitting()) {
+              <span class="spinner-small"></span>
+              Submitting...
+            } @else {
+              Add Support
+            }
+          </button>
+          <button class="cancel-btn" (click)="mode.set('view')">Cancel</button>
+        </div>
+      </section>
+    }
+
+    <!-- Initiate Mode -->
+    @if (mode() === 'initiate') {
+      <section class="initiate-section">
+        <h2>Initiate Community Intervention</h2>
+
+        <!-- Subject ID -->
+        <div class="form-group">
+          <label for="subjectId">Person to intervene on:</label>
+          <input
+            type="text"
+            id="subjectId"
+            [ngModel]="subjectId()"
+            (ngModelChange)="subjectId.set($event)"
+            placeholder="Agent ID or handle">
+        </div>
+
+        <!-- Relationship Level -->
+        <div class="form-group">
+          <label>Your relationship to this person:</label>
+          <div class="relationship-options">
+            @for (level of relationshipLevels; track level.value) {
+              <button
+                class="relationship-btn"
+                [class.selected]="relationshipLevel() === level.value"
+                (click)="setRelationshipLevel(level.value)">
+                <span class="level-weight">{{ level.weight }}x</span>
+                <span class="level-name">{{ getRelationshipLevelLabel(level.value) }}</span>
+              </button>
+            }
+          </div>
+          <p class="weight-note">
+            Your initial support will be <strong>{{ currentWeight() }}</strong> weight.
+            Threshold is <strong>{{ threshold }}</strong>.
+          </p>
+        </div>
+
+        <!-- Pattern Description -->
+        <div class="form-group">
+          <label for="patternDescription">Describe the pattern of harmful behavior:</label>
+          <textarea
+            id="patternDescription"
+            [ngModel]="patternDescription()"
+            (ngModelChange)="patternDescription.set($event)"
+            placeholder="Be specific. Describe observable patterns, not personality judgments. Example: 'Repeatedly justifies violence against protestors. Victim-blames in discussions about police shootings. Dehumanizes people with different political views.'"
+            rows="5">
+          </textarea>
+        </div>
+
+        <!-- Categories -->
+        <div class="form-group">
+          <label>Categories (select all that apply):</label>
+          <div class="category-options">
+            @for (cat of categories; track cat.value) {
+              <label
+                class="category-option"
+                [class.selected]="isCategorySelected(cat.value)">
+                <input
+                  type="checkbox"
+                  [checked]="isCategorySelected(cat.value)"
+                  (change)="toggleCategory(cat.value)">
+                <div class="category-content">
+                  <span class="category-name">{{ cat.label }}</span>
+                  <span class="category-desc">{{ cat.description }}</span>
+                </div>
+              </label>
+            }
+          </div>
+        </div>
+
+        <!-- Evidence -->
+        <div class="form-group">
+          <label for="evidence">Supporting evidence (optional):</label>
+          <textarea
+            id="evidence"
+            [ngModel]="evidence()"
+            (ngModelChange)="evidence.set($event)"
+            placeholder="Links, screenshots, quotes, or other evidence of the pattern..."
+            rows="3">
+          </textarea>
+        </div>
+
+        <!-- Submit -->
+        <div class="form-actions">
+          <button
+            class="submit-btn"
+            [disabled]="!canSubmit() || isSubmitting()"
+            (click)="submitInitiation()">
+            @if (isSubmitting()) {
+              <span class="spinner-small"></span>
+              Submitting...
+            } @else {
+              Initiate Intervention
+            }
+          </button>
+        </div>
+
+        <!-- Warning -->
+        <div class="warning-notice">
+          <span class="icon">&#9888;</span>
+          <p>
+            <strong>Initiating an intervention is serious.</strong> False or malicious reports
+            will be flagged and may result in intervention against the reporter. The subject
+            will be notified and have full opportunity to respond.
+          </p>
+        </div>
+      </section>
+    }
+  }
+</div>
