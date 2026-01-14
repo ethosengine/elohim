@@ -576,6 +576,8 @@ export class ContentService {
       estimatedDuration: pathData.estimated_duration || pathData.estimatedDuration,
       visibility: pathData.visibility || 'public',
       pathType: pathData.path_type || pathData.pathType || 'course',
+      thumbnailUrl: pathData.thumbnail_url || pathData.thumbnailUrl,
+      thumbnailAlt: pathData.thumbnail_alt || pathData.thumbnailAlt,
       tags: pathData.tags || [],
       createdBy: pathData.created_by || pathData.createdBy || '',
       contributors: pathData.contributors || [],
