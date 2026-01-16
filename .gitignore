@@ -46,4 +46,5 @@ output/
 target/
 *.happ
 *.dna
+bindings/
 research/matrix/pinecone
