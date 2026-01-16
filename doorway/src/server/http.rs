@@ -694,6 +694,33 @@ async fn handle_request(
             }
         }
 
+        // Blob API alias for /store/* (used by Angular app in doorway mode)
+        // GET /api/blob/{hash} - Stream entire content or byte range
+        // HEAD /api/blob/{hash} - Get content metadata
+        (Method::GET, p) if p.starts_with("/api/blob/") => {
+            // Rewrite path from /api/blob/{hash} to /store/{hash} for blob handler
+            let hash = p.strip_prefix("/api/blob/").unwrap_or("");
+            let new_uri = format!("/store/{}", hash);
+            let (mut parts, body) = req.into_parts();
+            parts.uri = new_uri.parse().unwrap_or(parts.uri);
+            let req = Request::from_parts(parts, body);
+            match routes::blob::handle_blob_request(req, Arc::clone(&state.cache)).await {
+                Ok(resp) => to_boxed(resp),
+                Err(err) => to_boxed(routes::blob::error_response(err)),
+            }
+        }
+        (Method::HEAD, p) if p.starts_with("/api/blob/") => {
+            let hash = p.strip_prefix("/api/blob/").unwrap_or("");
+            let new_uri = format!("/store/{}", hash);
+            let (mut parts, body) = req.into_parts();
+            parts.uri = new_uri.parse().unwrap_or(parts.uri);
+            let req = Request::from_parts(parts, body);
+            match routes::blob::handle_blob_request(req, Arc::clone(&state.cache)).await {
+                Ok(resp) => to_boxed(resp),
+                Err(err) => to_boxed(routes::blob::error_response(err)),
+            }
+        }
+
         // Cache API routes: GET /api/v1/cache/{type}/{id?}
         (Method::GET, p) if p.starts_with("/api/v1/cache/") => {
             let query = req.uri().query();
