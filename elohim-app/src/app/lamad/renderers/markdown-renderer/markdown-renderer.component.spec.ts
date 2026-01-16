@@ -2,10 +2,16 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import { SimpleChange } from '@angular/core';
 import { MarkdownRendererComponent, TocEntry } from './markdown-renderer.component';
 import { ContentNode } from '../../models/content-node.model';
+import { StorageClientService } from '@app/elohim/services/storage-client.service';
 
 describe('MarkdownRendererComponent', () => {
   let component: MarkdownRendererComponent;
   let fixture: ComponentFixture<MarkdownRendererComponent>;
+
+  // Mock StorageClientService
+  const mockStorageClientService = {
+    getBlobUrl: (hash: string) => `https://test-doorway.example.com/api/blob/${hash}`
+  };
 
   const createContentNode = (content: string): ContentNode => ({
     id: 'test-markdown',
@@ -21,7 +27,10 @@ describe('MarkdownRendererComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [MarkdownRendererComponent]
+      imports: [MarkdownRendererComponent],
+      providers: [
+        { provide: StorageClientService, useValue: mockStorageClientService }
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(MarkdownRendererComponent);
