@@ -269,11 +269,11 @@
             >
               <div class="step-indicator">
                 @if (s.isCompleted) {
-                  <span class="checkmark">&#10003;</span>
+                  <span class="checkmark">✓</span>
                 } @else if (s.isGlobalCompletion) {
                   <span class="checkmark global" title="Mastered in another journey">✓</span>
                 } @else if (s.isLocked) {
-                  <span class="lock">&#128274;</span>
+                  <span class="lock">🔒</span>
                 } @else {
                   <span class="number">{{ s.step.order + 1 }}</span>
                 }
@@ -310,7 +310,7 @@
       <!-- Action Buttons -->
       <section class="action-section">
         <div *ngIf="isCompleted()" class="completed-message">
-          <span class="checkmark">&#10003;</span>
+          <span class="checkmark">✓</span>
           Path Completed!
         </div>
 

@@ -39,9 +39,9 @@
       <section class="time-status-card" [class]="timeStatus()?.status">
         <div class="status-icon">
           @if (timeStatus()?.status === 'ok') {
-            <span class="icon-check">&#10003;</span>
+            <span class="icon-check">✓</span>
           } @else {
-            <span class="icon-clock">&#128337;</span>
+            <span class="icon-clock">🕐</span>
           }
         </div>
 
@@ -74,7 +74,7 @@
     <!-- No Restrictions State -->
     @if (!hasRestrictions()) {
       <section class="no-restrictions">
-        <div class="icon">&#127775;</div>
+        <div class="icon">🌟</div>
         <h3>No Active Restrictions</h3>
         <p>You have full access to all features and content.</p>
       </section>
@@ -90,12 +90,12 @@
             <div class="restriction-card" [attr.data-type]="restriction.type">
               <div class="restriction-icon">
                 @switch (restriction.type) {
-                  @case ('category') { <span>&#128683;</span> }
-                  @case ('feature') { <span>&#128274;</span> }
-                  @case ('route') { <span>&#128679;</span> }
-                  @case ('time') { <span>&#9200;</span> }
-                  @case ('age_rating') { <span>&#127922;</span> }
-                  @case ('reach') { <span>&#127760;</span> }
+                  @case ('category') { <span>🚫</span> }
+                  @case ('feature') { <span>🔒</span> }
+                  @case ('route') { <span>🚧</span> }
+                  @case ('time') { <span>⏰</span> }
+                  @case ('age_rating') { <span>🎲</span> }
+                  @case ('reach') { <span>🌐</span> }
                   @default { <span>&#8226;</span> }
                 }
               </div>
@@ -126,7 +126,7 @@
 
         <div class="steward-card">
           <div class="steward-avatar">
-            <span class="avatar-placeholder">&#128100;</span>
+            <span class="avatar-placeholder">👤</span>
           </div>
 
           <div class="steward-info">
@@ -158,23 +158,23 @@
         These capabilities can <strong>never</strong> be restricted:
       </p>
       <ul class="rights-list">
-        <li><span class="icon">&#128065;</span> View this dashboard</li>
-        <li><span class="icon">&#9999;</span> File appeals</li>
-        <li><span class="icon">&#128172;</span> Contact your steward</li>
-        <li><span class="icon">&#129302;</span> Access Elohim chat</li>
-        <li><span class="icon">&#128222;</span> Emergency contacts</li>
-        <li><span class="icon">&#128337;</span> See time remaining</li>
+        <li><span class="icon">👁</span> View this dashboard</li>
+        <li><span class="icon">✏️</span> File appeals</li>
+        <li><span class="icon">💬</span> Contact your steward</li>
+        <li><span class="icon">🤖</span> Access Elohim chat</li>
+        <li><span class="icon">📞</span> Emergency contacts</li>
+        <li><span class="icon">🕐</span> See time remaining</li>
       </ul>
     </section>
 
     <!-- Quick Actions -->
     <section class="quick-actions">
       <a routerLink="../appeal" class="action-btn">
-        <span class="icon">&#9999;</span>
+        <span class="icon">✏️</span>
         File an Appeal
       </a>
       <a routerLink="../settings" class="action-btn">
-        <span class="icon">&#9881;</span>
+        <span class="icon">⚙️</span>
         My Settings
       </a>
     </section>

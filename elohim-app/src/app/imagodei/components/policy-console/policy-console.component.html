@@ -74,21 +74,21 @@
         class="tab-btn"
         [class.active]="activeTab() === 'content'"
         (click)="setActiveTab('content')">
-        <span class="icon">&#128683;</span>
+        <span class="icon">🚫</span>
         Content
       </button>
       <button
         class="tab-btn"
         [class.active]="activeTab() === 'time'"
         (click)="setActiveTab('time')">
-        <span class="icon">&#9200;</span>
+        <span class="icon">⏰</span>
         Time
       </button>
       <button
         class="tab-btn"
         [class.active]="activeTab() === 'features'"
         (click)="setActiveTab('features')">
-        <span class="icon">&#128274;</span>
+        <span class="icon">🔒</span>
         Features
       </button>
       @if (canViewMonitoring()) {
@@ -96,7 +96,7 @@
           class="tab-btn"
           [class.active]="activeTab() === 'monitoring'"
           (click)="setActiveTab('monitoring')">
-          <span class="icon">&#128065;</span>
+          <span class="icon">👁</span>
           Monitoring
         </button>
       }
@@ -347,7 +347,7 @@
 
           <!-- Inalienable Rights Notice -->
           <div class="inalienable-notice">
-            <h4>&#128274; Protected Features</h4>
+            <h4>🔒 Protected Features</h4>
             <p>
               These features can <strong>never</strong> be disabled, regardless of stewardship level:
             </p>
@@ -370,7 +370,7 @@
 
           @if (!canEditMonitoring()) {
             <div class="view-only-notice">
-              <span class="icon">&#128065;</span>
+              <span class="icon">👁</span>
               <p>As a <strong>guide</strong>, you can view monitoring settings but cannot change them.</p>
             </div>
           }
