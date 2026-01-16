@@ -281,19 +281,19 @@ export class PerformanceMetricsService {
 
     return {
       health: {
-        uptime_percent: m.uptimePercent,
+        uptimePercent: m.uptimePercent,
         availability: true,
-        response_time_p50_ms: m.queryResponseTimes.p50,
-        response_time_p95_ms: m.queryResponseTimes.p95,
-        response_time_p99_ms: m.queryResponseTimes.p99,
-        error_rate: this.errorRatePercent() / 100 // Convert to 0-1
+        responseTimeP50Ms: m.queryResponseTimes.p50,
+        responseTimeP95Ms: m.queryResponseTimes.p95,
+        responseTimeP99Ms: m.queryResponseTimes.p99,
+        errorRate: this.errorRatePercent() / 100 // Convert to 0-1
       },
 
       computation: {
-        cpu_usage_percent: m.cpuUsagePercent,
-        memory_usage_percent: m.memoryUsagePercent,
-        zome_ops_per_second: (m.queriesProcessed + m.mutationsProcessed) / ((Date.now() - m.startTime) / 1000),
-        reconstruction_workload_percent: m.reconstructionTasksRunning > 0 ? 50 : 0
+        cpuUsagePercent: m.cpuUsagePercent,
+        memoryUsagePercent: m.memoryUsagePercent,
+        zomeOpsPerSecond: (m.queriesProcessed + m.mutationsProcessed) / ((Date.now() - m.startTime) / 1000),
+        reconstructionWorkloadPercent: m.reconstructionTasksRunning > 0 ? 50 : 0
       },
 
       operations: {

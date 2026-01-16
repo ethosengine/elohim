@@ -324,8 +324,8 @@ const GENESIS_MANIFEST_PATH = path.join(BLOBS_DIR, 'manifest.json');
 interface GenesisManifestEntry {
   cid: string;
   hash: string;
-  size_bytes: number;
-  content_format: string;
+  sizeBytes: number;
+  contentFormat: string;
 }
 interface GenesisManifest {
   version: number;
@@ -516,7 +516,7 @@ function normalizePathType(pathType: string | undefined): string {
   // Valid types: guided, self-paced, challenge, assessment, exploration, certification
   const validTypes = ['guided', 'self-paced', 'challenge', 'assessment', 'exploration', 'certification'];
   if (!validTypes.includes(normalized)) {
-    console.warn(`   ⚠️ Unknown path_type '${pathType}' -> defaulting to 'guided'`);
+    console.warn(`   ⚠️ Unknown pathType '${pathType}' -> defaulting to 'guided'`);
     return 'guided';
   }
   return normalized;
@@ -525,30 +525,30 @@ function normalizePathType(pathType: string | undefined): string {
 // Types matching the Holochain zome
 interface CreateContentInput {
   id: string;
-  content_type: string;
+  contentType: string;
   title: string;
   description: string;
   summary: string | null;           // Short preview text for cards/lists
   content: string;                  // Legacy: full body. New: empty/hash if blob_cid set
-  content_format: string;
+  contentFormat: string;
   tags: string[];
-  source_path: string | null;
-  related_node_ids: string[];
+  sourcePath: string | null;
+  relatedNodeIds: string[];
   reach: string;
-  estimated_minutes: number | null; // Reading/viewing time
-  thumbnail_url: string | null;     // Preview image for visual cards
-  metadata_json: string;
+  estimatedMinutes: number | null; // Reading/viewing time
+  thumbnailUrl: string | null;     // Preview image for visual cards
+  metadataJson: string;
   // Content manifest fields (Phase 0 refactor - sparse DHT)
-  blob_cid: string | null;          // CID pointing to elohim-storage blob
-  content_size_bytes: number | null; // Size of content body
-  content_hash: string | null;      // SHA256 of content body
+  blobCid: string | null;          // CID pointing to elohim-storage blob
+  contentSizeBytes: number | null; // Size of content body
+  contentHash: string | null;      // SHA256 of content body
   // HTML5 app blob reference (ZIP stored in elohim-storage)
-  blob_hash?: string;               // SHA256 hash of ZIP blob for html5-app content
+  blobHash?: string;               // SHA256 hash of ZIP blob for html5-app content
 }
 
 interface ContentOutput {
-  action_hash: Uint8Array;
-  entry_hash: Uint8Array;
+  actionHash: Uint8Array;
+  entryHash: Uint8Array;
   content: any;
 }
 
@@ -559,26 +559,26 @@ interface CreatePathInput {
   description: string;
   purpose: string | null;
   difficulty: string;
-  estimated_duration: string | null;
+  estimatedDuration: string | null;
   visibility: string;
-  path_type: string;
+  pathType: string;
   tags: string[];
   /** Extensible metadata JSON (stores chapters for hierarchical paths) */
-  metadata_json: string | null;
+  metadataJson: string | null;
   /** Thumbnail image URL (relative path or blob reference) */
-  thumbnail_url?: string;
+  thumbnailUrl?: string;
   /** SHA256 hash of thumbnail blob in elohim-storage */
-  thumbnail_blob_hash?: string;
+  thumbnailBlobHash?: string;
 }
 
 interface AddPathStepInput {
-  path_id: string;
-  order_index: number;
-  step_type: string;
-  resource_id: string;
-  step_title: string | null;
-  step_narrative: string | null;
-  is_optional: boolean;
+  pathId: string;
+  orderIndex: number;
+  stepType: string;
+  resourceId: string;
+  stepTitle: string | null;
+  stepNarrative: string | null;
+  isOptional: boolean;
 }
 
 // JSON file types from data/lamad/
@@ -787,20 +787,20 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
 
   return {
     id: concept.id,
-    content_type: concept.contentType || 'concept',
+    contentType: concept.contentType || 'concept',
     title: concept.title,
     description: description,
     summary: summary,
     // Sparse: store hash reference, Full: store entire content
     content: useSparsePattern ? `sha256:${blobEntry.hash}` : contentString,
-    content_format: normalizeContentFormat(concept.contentFormat),
+    contentFormat: normalizeContentFormat(concept.contentFormat),
     tags: concept.tags || [],
-    source_path: sourcePathValue,
-    related_node_ids: relatedIds,
+    sourcePath: sourcePathValue,
+    relatedNodeIds: relatedIds,
     reach: 'public',
-    estimated_minutes: concept.estimatedMinutes || null,
-    thumbnail_url: concept.thumbnailUrl || null,
-    metadata_json: JSON.stringify({
+    estimatedMinutes: concept.estimatedMinutes || null,
+    thumbnailUrl: concept.thumbnailUrl || null,
+    metadataJson: JSON.stringify({
       sourceDoc: concept.sourceDoc,
       sourcePath: concept.sourcePath,
       relationships: concept.relationships,
@@ -810,9 +810,9 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
       ...concept.metadata,
     }),
     // Content manifest fields for sparse DHT
-    blob_cid: blobEntry?.cid ?? null,
-    content_size_bytes: blobEntry?.size_bytes ?? null,
-    content_hash: blobEntry?.hash ?? null,
+    blobCid: blobEntry?.cid ?? null,
+    contentSizeBytes: blobEntry?.sizeBytes ?? null,
+    contentHash: blobEntry?.hash ?? null,
   };
 }
 
@@ -995,9 +995,9 @@ async function seedViaDoorway(): Promise<SeedResult> {
     console.log(`✅ Doorway healthy (v${health.version || 'unknown'}, cache=${health.cacheEnabled ? 'on' : 'off'})`);
   } else {
     console.log(`✅ Doorway status: ${status.status} (v${status.version || 'unknown'})`);
-    console.log(`   Conductor: ${status.conductor.connected ? '✅ connected' : '❌ disconnected'} (${status.conductor.connected_workers}/${status.conductor.total_workers} workers)`);
-    console.log(`   Storage: ${status.storage.healthy ? '✅ healthy' : '❌ unhealthy'} (import=${status.storage.import_enabled ? 'on' : 'off'})`);
-    console.log(`   Cell: ${status.diagnostics.cell_discovered ? '✅ discovered' : '⏳ will discover lazily'}`);
+    console.log(`   Conductor: ${status.conductor.connected ? '✅ connected' : '❌ disconnected'} (${status.conductor.connectedWorkers}/${status.conductor.totalWorkers} workers)`);
+    console.log(`   Storage: ${status.storage.healthy ? '✅ healthy' : '❌ unhealthy'} (import=${status.storage.importEnabled ? 'on' : 'off'})`);
+    console.log(`   Cell: ${status.diagnostics.cellDiscovered ? '✅ discovered' : '⏳ will discover lazily'}`);
 
     // Show any recommendations
     if (status.diagnostics.recommendations.length > 0) {
@@ -1167,13 +1167,13 @@ async function seedViaDoorway(): Promise<SeedResult> {
       const appInfo = html5AppBlobHashes.get(concept.id);
       if (appInfo) {
         // Set blob_hash to point to the uploaded ZIP
-        input.blob_hash = appInfo.hash;
+        input.blobHash = appInfo.hash;
 
         // Add appId to metadata_json so elohim-storage can look it up
-        const metadata = input.metadata_json ? JSON.parse(input.metadata_json) : {};
+        const metadata = input.metadataJson ? JSON.parse(input.metadataJson) : {};
         metadata.appId = appInfo.appId;
         metadata.entryPoint = appInfo.entryPoint;
-        input.metadata_json = JSON.stringify(metadata);
+        input.metadataJson = JSON.stringify(metadata);
       }
 
       return input;
@@ -1220,12 +1220,12 @@ async function seedViaDoorway(): Promise<SeedResult> {
       id: item.id,
       title: item.title,
       description: item.description,
-      content_type: item.content_type,
-      content_format: normalizeContentFormat(item.content_format),  // Ensure valid format
+      contentType: item.contentType,
+      contentFormat: normalizeContentFormat(item.contentFormat),  // Ensure valid format
       content_body: item.content,  // Backend expects content_body, not content
-      blob_hash: item.blob_hash ?? undefined,
-      blob_cid: item.blob_cid ?? undefined,
-      metadata_json: item.metadata_json,
+      blobHash: item.blobHash ?? undefined,
+      blobCid: item.blobCid ?? undefined,
+      metadataJson: item.metadataJson,
       reach: item.reach || 'public',
       tags: item.tags || [],
     }));
@@ -1273,11 +1273,11 @@ async function seedViaDoorway(): Promise<SeedResult> {
 
       // Extract relationships from content items
       const relationships: Array<{
-        source_id: string;
-        target_id: string;
-        relationship_type: string;
+        sourceId: string;
+        targetId: string;
+        relationshipType: string;
         confidence: number;
-        inference_source: string;
+        inferenceSource: string;
       }> = [];
 
       // Track seen relationships to avoid duplicates
@@ -1285,26 +1285,26 @@ async function seedViaDoorway(): Promise<SeedResult> {
 
       for (const item of itemsToSeed) {
         // Extract from relatedNodeIds array (simple RELATES_TO relationships)
-        if (item.related_node_ids && item.related_node_ids.length > 0) {
-          for (const targetId of item.related_node_ids) {
+        if (item.relatedNodeIds && item.relatedNodeIds.length > 0) {
+          for (const targetId of item.relatedNodeIds) {
             const key = `${item.id}:${targetId}:RELATES_TO`;
             if (!seen.has(key) && item.id !== targetId) {
               seen.add(key);
               relationships.push({
-                source_id: item.id,
-                target_id: targetId,
-                relationship_type: 'RELATES_TO',
+                sourceId: item.id,
+                targetId: targetId,
+                relationshipType: 'RELATES_TO',
                 confidence: 1.0,
-                inference_source: 'explicit',
+                inferenceSource: 'explicit',
               });
             }
           }
         }
 
         // Extract from relationships array in metadata (typed relationships)
-        if (item.metadata_json) {
+        if (item.metadataJson) {
           try {
-            const metadata = JSON.parse(item.metadata_json);
+            const metadata = JSON.parse(item.metadataJson);
             if (metadata.relationships && Array.isArray(metadata.relationships)) {
               for (const rel of metadata.relationships) {
                 const targetId = rel.target || rel.targetId || rel.target_id;
@@ -1314,11 +1314,11 @@ async function seedViaDoorway(): Promise<SeedResult> {
                   if (!seen.has(key)) {
                     seen.add(key);
                     relationships.push({
-                      source_id: item.id,
-                      target_id: targetId,
-                      relationship_type: relType.toUpperCase(),
+                      sourceId: item.id,
+                      targetId: targetId,
+                      relationshipType: relType.toUpperCase(),
                       confidence: rel.confidence ?? 1.0,
-                      inference_source: rel.inference_source || 'explicit',
+                      inferenceSource: rel.inference_source || 'explicit',
                     });
                   }
                 }
@@ -1459,12 +1459,12 @@ async function seedViaDoorway(): Promise<SeedResult> {
 
     // Step type matching zome's PathImportStepInput struct
     interface StepInput {
-      step_type: string;
-      resource_id: string;
-      order_index: number;
-      step_title?: string;
-      step_narrative?: string;
-      is_optional?: boolean;
+      stepType: string;
+      resourceId: string;
+      orderIndex: number;
+      stepTitle?: string;
+      stepNarrative?: string;
+      isOptional?: boolean;
     }
 
     // Valid step types per storage validation
@@ -1492,7 +1492,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
       };
       const mapped = aliases[normalized] || normalized;
       if (!VALID_STEP_TYPES.includes(mapped)) {
-        console.warn(`   ⚠️ Unknown step_type '${type}' -> defaulting to 'learn'`);
+        console.warn(`   ⚠️ Unknown stepType '${type}' -> defaulting to 'learn'`);
         return 'learn';
       }
       return mapped;
@@ -1501,13 +1501,13 @@ async function seedViaDoorway(): Promise<SeedResult> {
     // Helper to extract step data from a step object (preserves optional fields)
     function extractStepData(step: any, orderIndex: number): StepInput {
       return {
-        step_type: normalizeStepType(step.step_type || step.stepType),
-        resource_id: step.resource_id || step.resourceId || step.id,
-        order_index: step.order_index ?? step.orderIndex ?? orderIndex,
+        stepType: normalizeStepType(step.stepType || step.stepType),
+        resourceId: step.resourceId || step.resourceId || step.id,
+        orderIndex: step.orderIndex ?? step.orderIndex ?? orderIndex,
         // Optional fields - only include if present
-        ...(step.step_title || step.stepTitle ? { step_title: step.step_title || step.stepTitle } : {}),
-        ...(step.step_narrative || step.stepNarrative ? { step_narrative: step.step_narrative || step.stepNarrative } : {}),
-        ...((step.is_optional ?? step.optional) !== undefined ? { is_optional: step.is_optional ?? step.optional ?? false } : {}),
+        ...(step.stepTitle || step.stepTitle ? { stepTitle: step.stepTitle || step.stepTitle } : {}),
+        ...(step.stepNarrative || step.stepNarrative ? { stepNarrative: step.stepNarrative || step.stepNarrative } : {}),
+        ...((step.isOptional ?? step.optional) !== undefined ? { isOptional: step.isOptional ?? step.optional ?? false } : {}),
       };
     }
 
@@ -1525,9 +1525,9 @@ async function seedViaDoorway(): Promise<SeedResult> {
       // If path has flat conceptIds array
       if (pathData.conceptIds && Array.isArray(pathData.conceptIds)) {
         return pathData.conceptIds.map((id: string, i: number) => ({
-          step_type: 'learn',
-          resource_id: id,
-          order_index: i,
+          stepType: 'learn',
+          resourceId: id,
+          orderIndex: i,
         }));
       }
 
@@ -1544,7 +1544,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
           // Chapter-level conceptIds (flat)
           if (chapter.conceptIds && Array.isArray(chapter.conceptIds)) {
             for (const id of chapter.conceptIds) {
-              steps.push({ step_type: 'learn', resource_id: id, order_index: orderIndex++ });
+              steps.push({ stepType: 'learn', resourceId: id, orderIndex: orderIndex++ });
             }
           }
           // Modules within chapters
@@ -1559,7 +1559,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
               // Module-level conceptIds
               if (module.conceptIds && Array.isArray(module.conceptIds)) {
                 for (const id of module.conceptIds) {
-                  steps.push({ step_type: 'learn', resource_id: id, order_index: orderIndex++ });
+                  steps.push({ stepType: 'learn', resourceId: id, orderIndex: orderIndex++ });
                 }
               }
               // Sections within modules
@@ -1574,7 +1574,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
                   // Section-level conceptIds
                   if (section.conceptIds && Array.isArray(section.conceptIds)) {
                     for (const id of section.conceptIds) {
-                      steps.push({ step_type: 'learn', resource_id: id, order_index: orderIndex++ });
+                      steps.push({ stepType: 'learn', resourceId: id, orderIndex: orderIndex++ });
                     }
                   }
                 }
@@ -1598,23 +1598,23 @@ async function seedViaDoorway(): Promise<SeedResult> {
         description: pathData.description || '',
         purpose: pathData.purpose || null,
         difficulty: pathData.difficulty || 'beginner',
-        estimated_duration: pathData.estimatedDuration || null,
+        estimatedDuration: pathData.estimatedDuration || null,
         visibility: pathData.visibility || 'public',
-        path_type: normalizePathType(pathData.pathType),
+        pathType: normalizePathType(pathData.pathType),
         tags: pathData.tags || [],
         // metadata_json must be an object with a `chapters` property for the UI to parse it
         // The UI does: metadata.chapters (not just metadata as an array)
-        metadata_json: JSON.stringify(
+        metadataJson: JSON.stringify(
           pathData.chapters
             ? { chapters: pathData.chapters, ...pathData.metadata }
             : pathData.metadata || {}
         ),
         steps: extractStepsFromPath(pathData),
         // Thumbnail: use blob URL if we uploaded, otherwise keep original
-        thumbnail_url: thumbnailHash
+        thumbnailUrl: thumbnailHash
           ? `/blob/${thumbnailHash}`
           : pathData.thumbnailUrl || null,
-        thumbnail_blob_hash: thumbnailHash || null,
+        thumbnailBlobHash: thumbnailHash || null,
       };
     });
 
@@ -1632,16 +1632,16 @@ async function seedViaDoorway(): Promise<SeedResult> {
         id: `${pathInput.id}-chapter-1`,
         title: pathInput.title || 'Main Content',
         description: pathInput.description || '',
-        order_index: 0,
+        orderIndex: 0,
         steps: (pathInput.steps || []).map((step: any, idx: number) => ({
           id: `${pathInput.id}-step-${idx + 1}`,
-          path_id: pathInput.id,
-          chapter_id: `${pathInput.id}-chapter-1`,
-          title: step.step_title || step.title || `Step ${idx + 1}`,
-          step_type: step.step_type || 'learn',
-          resource_id: step.resource_id || null,
-          order_index: step.order_index ?? idx,
-          metadata_json: step.metadata_json || null,
+          pathId: pathInput.id,
+          chapterId: `${pathInput.id}-chapter-1`,
+          title: step.stepTitle || step.title || `Step ${idx + 1}`,
+          stepType: step.stepType || 'learn',
+          resourceId: step.resourceId || null,
+          orderIndex: step.orderIndex ?? idx,
+          metadataJson: step.metadataJson || null,
         })),
       };
 
@@ -1649,14 +1649,14 @@ async function seedViaDoorway(): Promise<SeedResult> {
         id: pathInput.id,
         title: pathInput.title,
         description: pathInput.description,
-        path_type: normalizePathType(pathInput.path_type),
+        pathType: normalizePathType(pathInput.pathType),
         difficulty: pathInput.difficulty,
-        estimated_duration: pathInput.estimated_duration,
+        estimatedDuration: pathInput.estimatedDuration,
         visibility: pathInput.visibility || 'public',
-        metadata_json: pathInput.metadata_json,
+        metadataJson: pathInput.metadataJson,
         tags: pathInput.tags || [],
-        thumbnail_url: pathInput.thumbnail_url,
-        thumbnail_blob_hash: pathInput.thumbnail_blob_hash,
+        thumbnailUrl: pathInput.thumbnailUrl,
+        thumbnailBlobHash: pathInput.thumbnailBlobHash,
         chapters: [defaultChapter],
       };
     });

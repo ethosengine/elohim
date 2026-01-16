@@ -22,22 +22,22 @@ import type { ListResponse, BulkCreateResult } from '../models/storage-response.
 /** Content node from storage (matches backend ContentWithTags) */
 export interface StorageContentNode {
   id: string;
-  content_type: string;
+  contentType: string;
   title: string;
   description: string;
-  content_body: string | null;
-  content_format: string;
-  blob_hash: string | null;
-  blob_cid: string | null;
-  metadata_json: string | null;
+  contentBody: string | null;
+  contentFormat: string;
+  blobHash: string | null;
+  blobCid: string | null;
+  metadataJson: string | null;
   tags: string[];
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
   // Additional fields from backend
   reach?: string;              // visibility scope (commons, private, etc.)
-  validation_status?: string;  // draft, approved, etc.
-  created_by?: string;         // agent who created the content
-  content_size_bytes?: number; // size of blob content
+  validationStatus?: string;  // draft, approved, etc.
+  createdBy?: string;         // agent who created the content
+  contentSizeBytes?: number; // size of blob content
 }
 
 /** Path from storage */
@@ -47,11 +47,11 @@ export interface StoragePath {
   title: string;
   description: string;
   difficulty: string;
-  estimated_duration: string | null;
-  path_type: string;
-  thumbnail_url: string | null;
-  thumbnail_blob_hash: string | null;
-  metadata_json: string | null;
+  estimatedDuration: string | null;
+  pathType: string;
+  thumbnailUrl: string | null;
+  thumbnailBlobHash: string | null;
+  metadataJson: string | null;
   tags: string[];
 }
 
@@ -64,17 +64,17 @@ export interface ContentFilter {
   offset?: number;
 }
 
-/** Relationship between content nodes */
+/** Relationship between content nodes - camelCase for API */
 export interface StorageRelationship {
   id?: string;               // Optional for creates
-  source_id: string;
-  target_id: string;
-  relationship_type: string; // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
+  sourceId: string;
+  targetId: string;
+  relationshipType: string; // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
   confidence?: number;       // 0.0-1.0
-  inference_source?: string; // explicit, path, tag, semantic
-  metadata_json?: string;
-  created_at?: string;
-  updated_at?: string;
+  inferenceSource?: string; // explicit, path, tag, semantic
+  metadata?: Record<string, unknown>;  // Parsed JSON object
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 @Injectable({
@@ -162,8 +162,8 @@ export class StorageClientService {
     const baseUrl = this.getStorageBaseUrl();
     const params = new URLSearchParams();
 
-    if (filter.contentType) params.set('content_type', filter.contentType);
-    if (filter.contentFormat) params.set('content_format', filter.contentFormat);
+    if (filter.contentType) params.set('contentType', filter.contentType);
+    if (filter.contentFormat) params.set('contentFormat', filter.contentFormat);
     if (filter.tags?.length) params.set('tags', filter.tags.join(','));
     if (filter.limit) params.set('limit', String(filter.limit));
     if (filter.offset) params.set('offset', String(filter.offset));
@@ -219,13 +219,13 @@ export class StorageClientService {
 
   /**
    * Get thumbnail URL for a path.
-   * Returns blob URL if thumbnail_blob_hash is set, otherwise returns thumbnail_url.
+   * Returns blob URL if thumbnailBlobHash is set, otherwise returns thumbnailUrl.
    */
   getPathThumbnailUrl(path: StoragePath): string | null {
-    if (path.thumbnail_blob_hash) {
-      return this.getBlobUrl(path.thumbnail_blob_hash);
+    if (path.thumbnailBlobHash) {
+      return this.getBlobUrl(path.thumbnailBlobHash);
     }
-    return path.thumbnail_url;
+    return path.thumbnailUrl;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

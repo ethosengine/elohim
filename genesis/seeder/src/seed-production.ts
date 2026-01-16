@@ -2,7 +2,7 @@
  * Production Seeder - Dual-path seeding for DNA + Projection Cache
  *
  * Seeds content to both:
- * 1. Holochain DNA (metadata with blob_hash references)
+ * 1. Holochain DNA (metadata with blobHash references)
  * 2. Doorway Projection Cache (actual blob content)
  *
  * Architecture:
@@ -24,7 +24,7 @@
  * ┌───────────────────────┐           ┌───────────────────────────┐
  * │  Holochain DNA        │           │  Doorway Projection Cache │
  * │  - Metadata entries   │           │  - Blob content           │
- * │  - blob_hash refs     │           │  - Fast delivery          │
+ * │  - blobHash refs     │           │  - Fast delivery          │
  * │  - Path entries       │           │  - CDN-like serving       │
  * └───────────────────────┘           └───────────────────────────┘
  *

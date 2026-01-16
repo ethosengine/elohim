@@ -68,7 +68,7 @@ function normalizeContentFormat(format: string | undefined): string {
   if (VALID_CONTENT_FORMATS.includes(normalized)) return normalized;
 
   // Default to markdown for unknown formats
-  console.warn(`   ⚠️ Unknown content_format '${format}', defaulting to 'markdown'`);
+  console.warn(`   ⚠️ Unknown contentFormat '${format}', defaulting to 'markdown'`);
   return 'markdown';
 }
 
@@ -97,7 +97,7 @@ function normalizeStepType(stepType: string | undefined): string {
   if (VALID_STEP_TYPES.includes(normalized)) return normalized;
 
   // Default to learn for unknown types
-  console.warn(`   ⚠️ Unknown step_type '${stepType}', defaulting to 'learn'`);
+  console.warn(`   ⚠️ Unknown stepType '${stepType}', defaulting to 'learn'`);
   return 'learn';
 }
 
@@ -109,16 +109,16 @@ interface CreateContentInput {
   id: string;
   title: string;
   description?: string;
-  content_type: string;
-  content_format: string;
+  contentType: string;
+  contentFormat: string;
   /** Inline content body (markdown, JSON quiz data, etc.) */
-  content_body?: string;
-  blob_hash?: string;
-  blob_cid?: string;
-  content_size_bytes?: number;
-  metadata_json?: string;
+  contentBody?: string;
+  blobHash?: string;
+  blobCid?: string;
+  contentSizeBytes?: number;
+  metadataJson?: string;
   reach: string;
-  created_by?: string;
+  createdBy?: string;
   tags: string[];
 }
 
@@ -126,14 +126,14 @@ interface CreatePathInput {
   id: string;
   title: string;
   description?: string;
-  path_type: string;
+  pathType: string;
   difficulty?: string;
-  estimated_duration?: string;
-  thumbnail_url?: string;
-  thumbnail_alt?: string;
-  metadata_json?: string;
+  estimatedDuration?: string;
+  thumbnailUrl?: string;
+  thumbnailAlt?: string;
+  metadataJson?: string;
   visibility: string;
-  created_by?: string;
+  createdBy?: string;
   tags: string[];
   chapters: CreateChapterInput[];
 }
@@ -142,23 +142,23 @@ interface CreateChapterInput {
   id: string;
   title: string;
   description?: string;
-  order_index: number;
-  estimated_duration?: string;
+  orderIndex: number;
+  estimatedDuration?: string;
   steps: CreateStepInput[];
 }
 
 interface CreateStepInput {
   id: string;
-  path_id: string;
-  chapter_id?: string;
+  pathId: string;
+  chapterId?: string;
   title: string;
   description?: string;
-  step_type: string;
-  resource_id?: string;
-  resource_type?: string;
-  order_index: number;
-  estimated_duration?: string;
-  metadata_json?: string;
+  stepType: string;
+  resourceId?: string;
+  resourceType?: string;
+  orderIndex: number;
+  estimatedDuration?: string;
+  metadataJson?: string;
 }
 
 // ============================================================================
@@ -182,7 +182,7 @@ interface ConceptJson {
   // Blob references for html5-app and large content
   blobHash?: string;       // Pre-computed hash (camelCase from JSON)
   blob_hash?: string;      // Alternative snake_case format
-  entry_point?: string;    // Entry point for html5-app (e.g., "index.html")
+  entryPoint?: string;    // Entry point for html5-app (e.g., "index.html")
 }
 
 interface PathJson {
@@ -323,7 +323,7 @@ async function blobExists(hash: string): Promise<boolean> {
  */
 function findHtml5AppBlob(concept: ConceptJson, contentDir: string): { data: Buffer; hash: string } | null {
   // Get existing hash (supports both camelCase and snake_case)
-  const existingHash = concept.blobHash || concept.blob_hash;
+  const existingHash = concept.blobHash || concept.blobHash;
   const normalizedHash = existingHash
     ? (existingHash.startsWith('sha256-') ? existingHash : `sha256-${existingHash}`)
     : null;
@@ -478,11 +478,11 @@ function transformContent(json: ConceptJson): CreateContentInput {
     id: json.id,
     title: json.title,
     description: json.description || undefined,
-    content_type: json.contentType || 'concept',
-    content_format: normalizeContentFormat(json.contentFormat),
-    content_body: contentBody,
-    content_size_bytes: contentSizeBytes,
-    metadata_json: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
+    contentType: json.contentType || 'concept',
+    contentFormat: normalizeContentFormat(json.contentFormat),
+    contentBody: contentBody,
+    contentSizeBytes: contentSizeBytes,
+    metadataJson: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
     reach: 'public',
     tags: json.tags || [],
   };
@@ -551,21 +551,21 @@ function transformPath(json: PathJson): CreatePathInput {
                 for (const conceptId of section.conceptIds) {
                   chapterSteps.push({
                     id: `${json.id}-step-${stepIndex}`,
-                    path_id: json.id,
-                    chapter_id: chapter.id,
+                    pathId: json.id,
+                    chapterId: chapter.id,
                     // Use concept ID as title - each step gets unique title
                     // Section title is stored in metadata for grouping context
                     title: formatConceptTitle(conceptId),
                     description: section.description,
-                    step_type: 'learn',
-                    resource_id: conceptId,
-                    resource_type: 'content',
-                    order_index: stepIndex++,
-                    estimated_duration: section.estimatedMinutes
+                    stepType: 'learn',
+                    resourceId: conceptId,
+                    resourceType: 'content',
+                    orderIndex: stepIndex++,
+                    estimatedDuration: section.estimatedMinutes
                       ? `${section.estimatedMinutes} minutes`
                       : undefined,
                     // Store section context in metadata for UI grouping
-                    metadata_json: JSON.stringify({
+                    metadataJson: JSON.stringify({
                       sectionTitle: section.title,
                       sectionOrder: section.order,
                     }),
@@ -582,13 +582,13 @@ function transformPath(json: PathJson): CreatePathInput {
         for (const conceptId of chapter.conceptIds) {
           chapterSteps.push({
             id: `${json.id}-step-${stepIndex}`,
-            path_id: json.id,
-            chapter_id: chapter.id,
+            pathId: json.id,
+            chapterId: chapter.id,
             title: formatConceptTitle(conceptId),
-            step_type: 'learn',
-            resource_id: conceptId,
-            resource_type: 'content',
-            order_index: stepIndex++,
+            stepType: 'learn',
+            resourceId: conceptId,
+            resourceType: 'content',
+            orderIndex: stepIndex++,
           });
         }
       }
@@ -598,16 +598,16 @@ function transformPath(json: PathJson): CreatePathInput {
         for (const step of chapter.steps) {
           chapterSteps.push({
             id: `${json.id}-step-${stepIndex}`,
-            path_id: json.id,
-            chapter_id: chapter.id,
+            pathId: json.id,
+            chapterId: chapter.id,
             title: step.stepTitle || step.resourceId || `Step ${stepIndex + 1}`,
             description: step.stepNarrative,
-            step_type: normalizeStepType(step.stepType),
-            resource_id: step.resourceId,
-            resource_type: 'content',
-            order_index: step.order ?? stepIndex,
-            estimated_duration: step.estimatedTime,
-            metadata_json: step.learningObjectives || step.completionCriteria
+            stepType: normalizeStepType(step.stepType),
+            resourceId: step.resourceId,
+            resourceType: 'content',
+            orderIndex: step.order ?? stepIndex,
+            estimatedDuration: step.estimatedTime,
+            metadataJson: step.learningObjectives || step.completionCriteria
               ? JSON.stringify({
                   learningObjectives: step.learningObjectives,
                   completionCriteria: step.completionCriteria,
@@ -623,8 +623,8 @@ function transformPath(json: PathJson): CreatePathInput {
         id: chapter.id,
         title: chapter.title,
         description: chapter.description,
-        order_index: chapter.order ?? ci,
-        estimated_duration: chapter.estimatedDuration,
+        orderIndex: chapter.order ?? ci,
+        estimatedDuration: chapter.estimatedDuration,
         steps: chapterSteps,
       });
     }
@@ -635,19 +635,19 @@ function transformPath(json: PathJson): CreatePathInput {
     // Create a default chapter to hold steps
     const defaultSteps: CreateStepInput[] = json.conceptIds.map((conceptId, i) => ({
       id: `${json.id}-step-${i}`,
-      path_id: json.id,
+      pathId: json.id,
       title: formatConceptTitle(conceptId),
-      step_type: 'learn',
-      resource_id: conceptId,
-      resource_type: 'content',
-      order_index: i,
+      stepType: 'learn',
+      resourceId: conceptId,
+      resourceType: 'content',
+      orderIndex: i,
     }));
 
     chapters.push({
       id: `${json.id}-default-chapter`,
       title: json.title,
       description: json.description,
-      order_index: 0,
+      orderIndex: 0,
       steps: defaultSteps,
     });
   }
@@ -656,12 +656,12 @@ function transformPath(json: PathJson): CreatePathInput {
     id: json.id,
     title: json.title,
     description: json.description,
-    path_type: 'guided',
+    pathType: 'guided',
     difficulty: json.difficulty,
-    estimated_duration: json.estimatedDuration,
-    thumbnail_url: json.thumbnailUrl,
-    thumbnail_alt: json.thumbnailAlt,
-    metadata_json: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
+    estimatedDuration: json.estimatedDuration,
+    thumbnailUrl: json.thumbnailUrl,
+    thumbnailAlt: json.thumbnailAlt,
+    metadataJson: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
     visibility: json.visibility || 'public',
     tags: json.tags || [],
     chapters,
@@ -879,7 +879,7 @@ async function main() {
       // Add blob_hash if we uploaded one for this content
       const blobHash = uploadedContentBlobs.get(c.id);
       if (blobHash) {
-        input.blob_hash = blobHash;
+        input.blobHash = blobHash;
       }
       return input;
     });
@@ -929,7 +929,7 @@ async function main() {
       // Update thumbnail_url to blob reference if we uploaded one
       if (p.thumbnailUrl && uploadedThumbnails.has(p.thumbnailUrl)) {
         const blobHash = uploadedThumbnails.get(p.thumbnailUrl)!;
-        input.thumbnail_url = `/blob/${blobHash}`;
+        input.thumbnailUrl = `/blob/${blobHash}`;
       }
       return input;
     });

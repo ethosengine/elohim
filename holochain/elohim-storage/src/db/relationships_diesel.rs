@@ -44,8 +44,9 @@ fn default_confidence() -> f32 { 1.0 }
 fn default_inference_source() -> String { "explicit".to_string() }
 fn default_reach() -> String { "commons".to_string() }
 
-/// Query parameters for listing relationships
+/// Query parameters for listing relationships - camelCase for URL params
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RelationshipQuery {
     pub content_id: Option<String>,
     /// Direction filter: "outgoing", "incoming", or "both" (default)

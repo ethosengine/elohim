@@ -311,11 +311,11 @@ export class ContentService {
     relationshipType?: string,
   ): Observable<Relationship[]> {
     const params = new URLSearchParams({
-      content_id: contentId,
+      contentId: contentId,
       direction,
     });
     if (relationshipType) {
-      params.set('relationship_type', relationshipType);
+      params.set('relationshipType', relationshipType);
     }
 
     return from(this.client.fetch<{ items: any[] }>(`/db/relationships?${params}`)).pipe(
@@ -367,9 +367,9 @@ export class ContentService {
    */
   queryKnowledgeMaps(filters: KnowledgeMapFilters): Observable<KnowledgeMap[]> {
     const params = new URLSearchParams();
-    if (filters.ownerId) params.set('owner_id', filters.ownerId);
-    if (filters.mapType) params.set('map_type', filters.mapType);
-    if (filters.subjectId) params.set('subject_id', filters.subjectId);
+    if (filters.ownerId) params.set('ownerId', filters.ownerId);
+    if (filters.mapType) params.set('mapType', filters.mapType);
+    if (filters.subjectId) params.set('subjectId', filters.subjectId);
     if (filters.visibility) params.set('visibility', filters.visibility);
     if (filters.limit) params.set('limit', String(filters.limit));
     if (filters.offset) params.set('offset', String(filters.offset));
@@ -405,8 +405,8 @@ export class ContentService {
    */
   queryPathExtensions(filters: PathExtensionFilters): Observable<PathExtension[]> {
     const params = new URLSearchParams();
-    if (filters.basePathId) params.set('base_path_id', filters.basePathId);
-    if (filters.extendedBy) params.set('extended_by', filters.extendedBy);
+    if (filters.basePathId) params.set('basePathId', filters.basePathId);
+    if (filters.extendedBy) params.set('extendedBy', filters.extendedBy);
     if (filters.visibility) params.set('visibility', filters.visibility);
     if (filters.limit) params.set('limit', String(filters.limit));
     if (filters.offset) params.set('offset', String(filters.offset));
@@ -472,37 +472,27 @@ export class ContentService {
    * Transform raw data to ContentNode model
    */
   private transformContent(data: any): ContentNode {
-    const contentFormat = data.content_format || data.contentFormat || 'markdown';
-    const rawContent = data.content_body || data.content || '';
-
-    // Parse metadata_json if it's a string (from SQLite backend)
-    let metadata = data.metadata || {};
-    if (data.metadata_json && typeof data.metadata_json === 'string') {
-      try {
-        metadata = JSON.parse(data.metadata_json);
-      } catch {
-        // Keep default empty object
-      }
-    }
+    const contentFormat = data.contentFormat || 'markdown';
+    const rawContent = data.contentBody || data.content || '';
 
     return {
-      id: data.id || data.doc_id,
-      contentType: data.content_type || data.contentType,
+      id: data.id || data.docId,
+      contentType: data.contentType,
       title: data.title || '',
       description: data.description || '',
       // Parse content for structured formats (html5-app, perseus, quiz-json, etc.)
       content: this.parseContentBody(rawContent, contentFormat),
       contentFormat,
       tags: data.tags || [],
-      relatedNodeIds: data.related_node_ids || data.relatedNodeIds || [],
-      metadata,
-      authorId: data.author_id || data.authorId,
+      relatedNodeIds: data.relatedNodeIds || [],
+      metadata: data.metadata || {},
+      authorId: data.authorId,
       reach: data.reach || 'commons',
-      trustScore: data.trust_score || data.trustScore,
-      estimatedMinutes: data.estimated_minutes || data.estimatedMinutes,
-      thumbnailUrl: data.thumbnail_url || data.thumbnailUrl,
-      createdAt: data.created_at || data.createdAt,
-      updatedAt: data.updated_at || data.updatedAt,
+      trustScore: data.trustScore,
+      estimatedMinutes: data.estimatedMinutes,
+      thumbnailUrl: data.thumbnailUrl,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
     } as ContentNode;
   }
 
@@ -548,15 +538,15 @@ export class ContentService {
     // Handle nested response format from elohim-storage
     const pathData = data.path || data;
     const rawChapters = data.chapters || pathData.chapters || [];
-    const ungroupedSteps = data.ungrouped_steps || [];
+    const ungroupedSteps = data.ungroupedSteps || [];
 
     // Transform chapters with their steps
     const chapters = rawChapters.map((ch: any) => ({
       id: ch.id,
       title: ch.title || '',
       description: ch.description || '',
-      orderIndex: ch.order_index ?? ch.orderIndex ?? 0,
-      estimatedDuration: ch.estimated_duration || ch.estimatedDuration,
+      orderIndex: ch.orderIndex ?? 0,
+      estimatedDuration: ch.estimatedDuration || ch.estimatedDuration,
       steps: (ch.steps || []).map((s: any) => this.transformStep(s)),
     }));
 
@@ -567,26 +557,26 @@ export class ContentService {
     ];
 
     return {
-      id: pathData.id || pathData.doc_id,
+      id: pathData.id || pathData.docId,
       version: pathData.version || '1.0.0',
       title: pathData.title || '',
       description: pathData.description || '',
       purpose: pathData.purpose || '',
       difficulty: pathData.difficulty || 'beginner',
-      estimatedDuration: pathData.estimated_duration || pathData.estimatedDuration,
+      estimatedDuration: pathData.estimatedDuration || pathData.estimatedDuration,
       visibility: pathData.visibility || 'public',
-      pathType: pathData.path_type || pathData.pathType || 'course',
-      thumbnailUrl: pathData.thumbnail_url || pathData.thumbnailUrl,
-      thumbnailAlt: pathData.thumbnail_alt || pathData.thumbnailAlt,
+      pathType: pathData.pathType || 'course',
+      thumbnailUrl: pathData.thumbnailUrl || pathData.thumbnailUrl,
+      thumbnailAlt: pathData.thumbnailAlt || pathData.thumbnailAlt,
       tags: pathData.tags || [],
-      createdBy: pathData.created_by || pathData.createdBy || '',
+      createdBy: pathData.createdBy || pathData.createdBy || '',
       contributors: pathData.contributors || [],
       steps: allSteps,
       chapters,
-      stepCount: pathData.step_count || pathData.stepCount || allSteps.length,
-      chapterCount: pathData.chapter_count || pathData.chapterCount || chapters.length,
-      createdAt: pathData.created_at || pathData.createdAt,
-      updatedAt: pathData.updated_at || pathData.updatedAt,
+      stepCount: pathData.stepCount || pathData.stepCount || allSteps.length,
+      chapterCount: pathData.chapterCount || pathData.chapterCount || chapters.length,
+      createdAt: pathData.createdAt,
+      updatedAt: pathData.updatedAt,
     } as LearningPath;
   }
 
@@ -596,20 +586,20 @@ export class ContentService {
   private transformStep(step: any): any {
     return {
       id: step.id,
-      pathId: step.path_id || step.pathId,
-      chapterId: step.chapter_id || step.chapterId,
+      pathId: step.pathId || step.pathId,
+      chapterId: step.chapterId,
       // Map to both 'title' and 'stepTitle' for compatibility
       title: step.title || '',
       stepTitle: step.title || '',
       stepNarrative: step.description || '',
       description: step.description || '',
-      stepType: step.step_type || step.stepType || 'learn',
-      resourceId: step.resource_id || step.resourceId || '',
-      resourceType: step.resource_type || step.resourceType || 'content',
-      order: step.order_index ?? step.orderIndex ?? 0,
-      orderIndex: step.order_index ?? step.orderIndex ?? 0,
-      estimatedDuration: step.estimated_duration || step.estimatedDuration,
-      metadata: step.metadata_json ? JSON.parse(step.metadata_json) : step.metadata,
+      stepType: step.stepType || 'learn',
+      resourceId: step.resourceId || step.resourceId || '',
+      resourceType: step.resourceType || step.resourceType || 'content',
+      order: step.orderIndex ?? 0,
+      orderIndex: step.orderIndex ?? 0,
+      estimatedDuration: step.estimatedDuration || step.estimatedDuration,
+      metadata: step.metadata,
     };
   }
 
@@ -656,13 +646,13 @@ export class ContentService {
   private transformRelationship(data: any): Relationship {
     return {
       id: data.id,
-      sourceId: data.source_id || data.sourceId,
-      targetId: data.target_id || data.targetId,
-      relationshipType: data.relationship_type || data.relationshipType,
+      sourceId: data.sourceId || data.sourceId,
+      targetId: data.targetId || data.targetId,
+      relationshipType: data.relationshipType || data.relationshipType,
       confidence: data.confidence ?? 1.0,
-      inferenceSource: data.inference_source || data.inferenceSource || 'explicit',
-      metadata: data.metadata_json ? JSON.parse(data.metadata_json) : data.metadata,
-      createdAt: data.created_at || data.createdAt,
+      inferenceSource: data.inferenceSource || data.inferenceSource || 'explicit',
+      metadata: data.metadata,
+      createdAt: data.createdAt,
     };
   }
 
@@ -671,9 +661,9 @@ export class ContentService {
    */
   private transformContentGraph(data: any): ContentGraph {
     return {
-      rootId: data.root_id || data.rootId,
+      rootId: data.rootId || data.rootId,
       related: (data.related || []).map((node: any) => this.transformContentGraphNode(node)),
-      totalNodes: data.total_nodes || data.totalNodes || 0,
+      totalNodes: data.totalNodes || data.totalNodes || 0,
     };
   }
 
@@ -682,8 +672,8 @@ export class ContentService {
    */
   private transformContentGraphNode(data: any): ContentGraphNode {
     return {
-      contentId: data.content_id || data.contentId,
-      relationshipType: data.relationship_type || data.relationshipType,
+      contentId: data.contentId || data.contentId,
+      relationshipType: data.relationshipType || data.relationshipType,
       confidence: data.confidence ?? 1.0,
       children: (data.children || []).map((child: any) => this.transformContentGraphNode(child)),
     };
@@ -695,24 +685,24 @@ export class ContentService {
   private transformKnowledgeMap(data: any): KnowledgeMap {
     return {
       id: data.id,
-      mapType: data.map_type || data.mapType,
-      ownerId: data.owner_id || data.ownerId,
+      mapType: data.mapType || data.mapType,
+      ownerId: data.ownerId || data.ownerId,
       title: data.title || '',
       description: data.description,
-      subjectType: data.subject_type || data.subjectType,
-      subjectId: data.subject_id || data.subjectId,
-      subjectName: data.subject_name || data.subjectName,
+      subjectType: data.subjectType || data.subjectType,
+      subjectId: data.subjectId || data.subjectId,
+      subjectName: data.subjectName || data.subjectName,
       visibility: data.visibility || 'private',
-      sharedWith: data.shared_with_json ? JSON.parse(data.shared_with_json) : data.sharedWith,
-      nodes: data.nodes_json ? JSON.parse(data.nodes_json) : data.nodes,
-      pathIds: data.path_ids_json ? JSON.parse(data.path_ids_json) : data.pathIds,
-      overallAffinity: data.overall_affinity ?? data.overallAffinity ?? 0,
-      contentGraphId: data.content_graph_id || data.contentGraphId,
-      masteryLevels: data.mastery_levels_json ? JSON.parse(data.mastery_levels_json) : data.masteryLevels,
-      goals: data.goals_json ? JSON.parse(data.goals_json) : data.goals,
-      metadata: data.metadata_json ? JSON.parse(data.metadata_json) : data.metadata,
-      createdAt: data.created_at || data.createdAt,
-      updatedAt: data.updated_at || data.updatedAt,
+      sharedWith: data.sharedWith,
+      nodes: data.nodes,
+      pathIds: data.pathIds,
+      overallAffinity: data.overallAffinity ?? data.overallAffinity ?? 0,
+      contentGraphId: data.contentGraphId || data.contentGraphId,
+      masteryLevels: data.masteryLevels,
+      goals: data.goals,
+      metadata: data.metadata,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
     };
   }
 
@@ -722,23 +712,23 @@ export class ContentService {
   private transformPathExtension(data: any): PathExtension {
     return {
       id: data.id,
-      basePathId: data.base_path_id || data.basePathId,
-      basePathVersion: data.base_path_version || data.basePathVersion,
-      extendedBy: data.extended_by || data.extendedBy,
+      basePathId: data.basePathId || data.basePathId,
+      basePathVersion: data.basePathVersion || data.basePathVersion,
+      extendedBy: data.extendedBy || data.extendedBy,
       title: data.title || '',
       description: data.description,
-      insertions: data.insertions_json ? JSON.parse(data.insertions_json) : data.insertions,
-      annotations: data.annotations_json ? JSON.parse(data.annotations_json) : data.annotations,
-      reorderings: data.reorderings_json ? JSON.parse(data.reorderings_json) : data.reorderings,
-      exclusions: data.exclusions_json ? JSON.parse(data.exclusions_json) : data.exclusions,
+      insertions: data.insertions,
+      annotations: data.annotations,
+      reorderings: data.reorderings,
+      exclusions: data.exclusions,
       visibility: data.visibility || 'private',
-      sharedWith: data.shared_with_json ? JSON.parse(data.shared_with_json) : data.sharedWith,
-      forkedFrom: data.forked_from || data.forkedFrom,
-      forks: data.forks_json ? JSON.parse(data.forks_json) : data.forks,
-      upstreamProposal: data.upstream_proposal_json ? JSON.parse(data.upstream_proposal_json) : data.upstreamProposal,
-      stats: data.stats_json ? JSON.parse(data.stats_json) : data.stats,
-      createdAt: data.created_at || data.createdAt,
-      updatedAt: data.updated_at || data.updatedAt,
+      sharedWith: data.sharedWith,
+      forkedFrom: data.forkedFrom || data.forkedFrom,
+      forks: data.forks,
+      upstreamProposal: data.upstreamProposal,
+      stats: data.stats,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
     };
   }
 }

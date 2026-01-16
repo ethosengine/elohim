@@ -65,8 +65,9 @@ pub struct UpdateAllocationInput {
     pub note: Option<String>,
 }
 
-/// Query parameters for listing allocations
+/// Query parameters for listing allocations - camelCase for URL params
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AllocationQuery {
     pub content_id: Option<String>,
     pub steward_presence_id: Option<String>,

@@ -262,24 +262,24 @@ export interface HumanRelationshipQuery {
  */
 export interface HumanRelationshipWire {
   id: string;
-  app_id: string;
-  party_a_id: string;
-  party_b_id: string;
-  relationship_type: string;
-  intimacy_level: string;
-  is_bidirectional: number; // SQLite boolean
-  consent_given_by_a: number;
-  consent_given_by_b: number;
-  custody_enabled_by_a: number;
-  custody_enabled_by_b: number;
-  auto_custody_enabled: number;
-  initiated_by: string;
-  verified_at: string | null;
-  governance_layer: string | null;
+  appId: string;
+  partyAId: string;
+  partyBId: string;
+  relationshipType: string;
+  intimacyLevel: string;
+  isBidirectional: number; // SQLite boolean
+  consentGivenByA: number;
+  consentGivenByB: number;
+  custodyEnabledByA: number;
+  custodyEnabledByB: number;
+  autoCustodyEnabled: number;
+  initiatedBy: string;
+  verifiedAt: string | null;
+  governanceLayer: string | null;
   reach: string;
-  context_json: string | null;
-  created_at: string;
-  updated_at: string;
+  contextJson: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
@@ -288,34 +288,34 @@ export interface HumanRelationshipWire {
 export function transformHumanRelationshipFromWire(wire: HumanRelationshipWire): HumanRelationshipView {
   let context: Record<string, unknown> | undefined;
   try {
-    context = wire.context_json ? JSON.parse(wire.context_json) : undefined;
+    context = wire.contextJson ? JSON.parse(wire.contextJson) : undefined;
   } catch {
     // Ignore parse errors
   }
 
-  const consentA = wire.consent_given_by_a === 1;
-  const consentB = wire.consent_given_by_b === 1;
+  const consentA = wire.consentGivenByA === 1;
+  const consentB = wire.consentGivenByB === 1;
 
   return {
     id: wire.id,
-    partyAId: wire.party_a_id,
-    partyBId: wire.party_b_id,
-    relationshipType: wire.relationship_type as HumanRelationshipType,
-    intimacyLevel: wire.intimacy_level as IntimacyLevel,
-    isBidirectional: wire.is_bidirectional === 1,
+    partyAId: wire.partyAId,
+    partyBId: wire.partyBId,
+    relationshipType: wire.relationshipType as HumanRelationshipType,
+    intimacyLevel: wire.intimacyLevel as IntimacyLevel,
+    isBidirectional: wire.isBidirectional === 1,
     consentGivenByA: consentA,
     consentGivenByB: consentB,
     isFullyConsented: consentA && consentB,
-    custodyEnabledByA: wire.custody_enabled_by_a === 1,
-    custodyEnabledByB: wire.custody_enabled_by_b === 1,
-    autoCustodyEnabled: wire.auto_custody_enabled === 1,
-    initiatedBy: wire.initiated_by,
-    verifiedAt: wire.verified_at ?? undefined,
-    governanceLayer: wire.governance_layer ?? undefined,
+    custodyEnabledByA: wire.custodyEnabledByA === 1,
+    custodyEnabledByB: wire.custodyEnabledByB === 1,
+    autoCustodyEnabled: wire.autoCustodyEnabled === 1,
+    initiatedBy: wire.initiatedBy,
+    verifiedAt: wire.verifiedAt ?? undefined,
+    governanceLayer: wire.governanceLayer ?? undefined,
     reach: wire.reach,
     context,
-    createdAt: wire.created_at,
-    updatedAt: wire.updated_at,
+    createdAt: wire.createdAt,
+    updatedAt: wire.updatedAt,
   };
 }
 
@@ -325,24 +325,24 @@ export function transformHumanRelationshipFromWire(wire: HumanRelationshipWire):
 export function transformHumanRelationshipToWire(
   view: HumanRelationshipView,
   appId: string = 'imagodei'
-): Omit<HumanRelationshipWire, 'created_at' | 'updated_at'> {
+): Omit<HumanRelationshipWire, 'createdAt' | 'updatedAt'> {
   return {
     id: view.id,
-    app_id: appId,
-    party_a_id: view.partyAId,
-    party_b_id: view.partyBId,
-    relationship_type: view.relationshipType,
-    intimacy_level: view.intimacyLevel,
-    is_bidirectional: view.isBidirectional ? 1 : 0,
-    consent_given_by_a: view.consentGivenByA ? 1 : 0,
-    consent_given_by_b: view.consentGivenByB ? 1 : 0,
-    custody_enabled_by_a: view.custodyEnabledByA ? 1 : 0,
-    custody_enabled_by_b: view.custodyEnabledByB ? 1 : 0,
-    auto_custody_enabled: view.autoCustodyEnabled ? 1 : 0,
-    initiated_by: view.initiatedBy,
-    verified_at: view.verifiedAt ?? null,
-    governance_layer: view.governanceLayer ?? null,
+    appId: appId,
+    partyAId: view.partyAId,
+    partyBId: view.partyBId,
+    relationshipType: view.relationshipType,
+    intimacyLevel: view.intimacyLevel,
+    isBidirectional: view.isBidirectional ? 1 : 0,
+    consentGivenByA: view.consentGivenByA ? 1 : 0,
+    consentGivenByB: view.consentGivenByB ? 1 : 0,
+    custodyEnabledByA: view.custodyEnabledByA ? 1 : 0,
+    custodyEnabledByB: view.custodyEnabledByB ? 1 : 0,
+    autoCustodyEnabled: view.autoCustodyEnabled ? 1 : 0,
+    initiatedBy: view.initiatedBy,
+    verifiedAt: view.verifiedAt ?? null,
+    governanceLayer: view.governanceLayer ?? null,
     reach: view.reach,
-    context_json: view.context ? JSON.stringify(view.context) : null,
+    contextJson: view.context ? JSON.stringify(view.context) : null,
   };
 }

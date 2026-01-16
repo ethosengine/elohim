@@ -420,13 +420,13 @@ export class ProjectionAPIService {
       const types = Array.isArray(filters.contentType)
         ? filters.contentType.join(',')
         : filters.contentType;
-      params = params.set('content_type', types);
+      params = params.set('contentType', types);
     }
     if (filters.tags?.length) {
       params = params.set('tags', filters.tags.join(','));
     }
     if (filters.anyTags?.length) {
-      params = params.set('any_tags', filters.anyTags.join(','));
+      params = params.set('anyTags', filters.anyTags.join(','));
     }
     if (filters.reach) {
       const reaches = Array.isArray(filters.reach)
@@ -435,7 +435,7 @@ export class ProjectionAPIService {
       params = params.set('reach', reaches);
     }
     if (filters.publicOnly) {
-      params = params.set('public_only', 'true');
+      params = params.set('publicOnly', 'true');
     }
     if (filters.author) {
       params = params.set('author', filters.author);
@@ -472,7 +472,7 @@ export class ProjectionAPIService {
       params = params.set('visibility', filters.visibility);
     }
     if (filters.publicOnly) {
-      params = params.set('public_only', 'true');
+      params = params.set('publicOnly', 'true');
     }
     if (filters.tags?.length) {
       params = params.set('tags', filters.tags.join(','));
@@ -494,34 +494,27 @@ export class ProjectionAPIService {
    * Transform projected content to ContentNode model
    */
   private transformContent(data: any): ContentNode {
-    // Parse metadata if it's a JSON string
-    let metadata = data.metadata || {};
-    if (typeof data.metadata_json === 'string') {
-      try {
-        metadata = JSON.parse(data.metadata_json);
-      } catch {
-        // Ignore parse errors
-      }
-    }
+    // Rust API now returns parsed metadata directly
+    const metadata = data.metadata ?? {};
 
     // Projection data may have slightly different field names
     return {
-      id: data.id || data.doc_id,
-      contentType: data.content_type || data.contentType,
+      id: data.id || data.docId,
+      contentType: data.contentType,
       title: data.title || '',
       description: data.description || '',
       content: data.content || '',
-      contentFormat: data.content_format || data.contentFormat || 'markdown',
+      contentFormat: data.contentFormat || 'markdown',
       tags: data.tags || [],
-      relatedNodeIds: data.related_node_ids || data.relatedNodeIds || [],
+      relatedNodeIds: data.relatedNodeIds || [],
       metadata,
-      authorId: data.author_id || data.author || data.authorId,
+      authorId: data.authorId || data.author || data.authorId,
       reach: data.reach || 'private',
-      trustScore: data.trust_score || data.trustScore,
-      estimatedMinutes: data.estimated_minutes || data.estimatedMinutes,
-      thumbnailUrl: data.thumbnail_url || data.thumbnailUrl,
-      createdAt: data.created_at || data.createdAt,
-      updatedAt: data.updated_at || data.updatedAt,
+      trustScore: data.trustScore || data.trustScore,
+      estimatedMinutes: data.estimatedMinutes || data.estimatedMinutes,
+      thumbnailUrl: data.thumbnailUrl || data.thumbnailUrl,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
     } as ContentNode;
   }
 
@@ -530,24 +523,24 @@ export class ProjectionAPIService {
    */
   private transformPath(data: any): LearningPath {
     return {
-      id: data.id || data.doc_id,
+      id: data.id || data.docId,
       version: data.version || '1.0.0',
       title: data.title || '',
       description: data.description || '',
       purpose: data.purpose || '',
       difficulty: data.difficulty || 'beginner',
-      estimatedDuration: data.estimated_duration || data.estimatedDuration,
+      estimatedDuration: data.estimatedDuration || data.estimatedDuration,
       visibility: data.visibility || 'public',
-      pathType: data.path_type || data.pathType || 'course',
+      pathType: data.pathType || 'course',
       tags: data.tags || [],
-      createdBy: data.created_by || data.author || data.createdBy || '',
+      createdBy: data.createdBy || data.author || data.createdBy || '',
       contributors: data.contributors || [],
       steps: data.steps || [],
       chapters: data.chapters || [],
-      stepCount: data.step_count || data.stepCount || 0,
-      chapterCount: data.chapter_count || data.chapterCount || 0,
-      createdAt: data.created_at || data.createdAt,
-      updatedAt: data.updated_at || data.updatedAt,
+      stepCount: data.stepCount || data.stepCount || 0,
+      chapterCount: data.chapterCount || data.chapterCount || 0,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
     } as LearningPath;
   }
 

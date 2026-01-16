@@ -56,7 +56,7 @@ export class DuplicateDetectionService {
    */
   async detect(transaction: PlaidTransaction): Promise<DuplicateResult> {
     // Level 1: Exact plaidTransactionId match
-    const exactMatch = await this.checkExactMatch(transaction.transaction_id);
+    const exactMatch = await this.checkExactMatch(transaction.transactionId);
     if (exactMatch) {
       return {
         isDuplicate: true,
@@ -188,7 +188,7 @@ export class DuplicateDetectionService {
    * Same transaction imported twice will have identical hash.
    */
   private generateHash(transaction: PlaidTransaction): string {
-    const data = `${transaction.account_id}|${this.roundAmount(transaction.amount)}|${transaction.date}|${transaction.name}`;
+    const data = `${transaction.accountId}|${this.roundAmount(transaction.amount)}|${transaction.date}|${transaction.name}`;
     return this.sha256Hash(data);
   }
 

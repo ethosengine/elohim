@@ -847,13 +847,12 @@ export class ContentResolverService implements OnDestroy {
    */
   private transformHolochainPath(hcPath: HolochainPathWithSteps): LearningPath {
     let chapters: LearningPath['chapters'] | undefined;
-    try {
-      const metadata = JSON.parse(hcPath.path.metadata_json || '{}');
-      if (metadata.chapters && Array.isArray(metadata.chapters)) {
-        chapters = metadata.chapters;
+    const metadata = hcPath.path.metadata ?? {};
+    if (metadata && typeof metadata === 'object' && 'chapters' in metadata) {
+      const metadataObj = metadata as Record<string, unknown>;
+      if (Array.isArray(metadataObj['chapters'])) {
+        chapters = metadataObj['chapters'] as LearningPath['chapters'];
       }
-    } catch {
-      // Ignore JSON parse errors
     }
 
     return {
@@ -862,23 +861,23 @@ export class ContentResolverService implements OnDestroy {
       title: hcPath.path.title,
       description: hcPath.path.description,
       purpose: hcPath.path.purpose ?? '',
-      createdBy: hcPath.path.created_by,
+      createdBy: hcPath.path.createdBy,
       contributors: [],
-      createdAt: hcPath.path.created_at,
-      updatedAt: hcPath.path.updated_at,
+      createdAt: hcPath.path.createdAt,
+      updatedAt: hcPath.path.updatedAt,
       difficulty: hcPath.path.difficulty as LearningPath['difficulty'],
-      estimatedDuration: hcPath.path.estimated_duration ?? '',
+      estimatedDuration: hcPath.path.estimatedDuration ?? '',
       tags: hcPath.path.tags,
       visibility: hcPath.path.visibility as LearningPath['visibility'],
       chapters,
       steps: hcPath.steps.map((s, index) => ({
-        order: s.step.order_index,
-        stepType: (s.step.step_type || 'content') as 'content' | 'path' | 'external' | 'checkpoint',
-        resourceId: s.step.resource_id,
-        stepTitle: s.step.step_title ?? `Step ${index + 1}`,
-        stepNarrative: s.step.step_narrative ?? '',
+        order: s.step.orderIndex,
+        stepType: (s.step.stepType || 'content') as 'content' | 'path' | 'external' | 'checkpoint',
+        resourceId: s.step.resourceId,
+        stepTitle: s.step.stepTitle ?? `Step ${index + 1}`,
+        stepNarrative: s.step.stepNarrative ?? '',
         learningObjectives: [],
-        optional: s.step.is_optional,
+        optional: s.step.isOptional,
         completionCriteria: [],
       })),
     };

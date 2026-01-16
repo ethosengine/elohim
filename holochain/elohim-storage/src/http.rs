@@ -35,6 +35,19 @@
 use crate::blob_store::BlobStore;
 use crate::db::{self, ContentDb, ContentQuery, DbPool, AppContext};
 use crate::db::{human_relationships, contributor_presences, economic_events, content_mastery, stewardship_allocations};
+use crate::views::{
+    PathView, PathWithDetailsView, ChapterView, StepView,
+    ContentView, ContentWithTagsView,
+    RelationshipView, RelationshipWithContentView,
+    HumanRelationshipView, ContributorPresenceView, EconomicEventView,
+    ContentMasteryView, StewardshipAllocationView, StewardshipAllocationWithPresenceView,
+    ContentStewardshipView, LocalSessionView,
+    // InputView types for API boundary (camelCase with parsed JSON)
+    CreateContentInputView, CreatePathInputView, CreateRelationshipInputView,
+    CreateHumanRelationshipInputView, CreateContributorPresenceInputView,
+    CreateEconomicEventInputView, CreateAllocationInputView, UpdateAllocationInputView,
+    InitiateClaimInputView, CreateChapterInputView, CreateStepInputView,
+};
 use crate::db::policy_cache::{PolicyEnforcement, ContentMetadata, PolicyDecision, PolicyEvent, PolicyEventType};
 use crate::error::StorageError;
 use crate::import_api::ImportApi;
@@ -1446,8 +1459,10 @@ impl HttpServer {
                     })?;
                     let body_bytes = body.to_bytes();
 
-                    let input: db::content::CreateContentInput = serde_json::from_slice(&body_bytes)
+                    // Deserialize camelCase InputView, convert to internal DB type
+                    let input_view: CreateContentInputView = serde_json::from_slice(&body_bytes)
                         .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    let input: db::content::CreateContentInput = input_view.into();
 
                     Ok(response::from_create_result(services.content.create(input)))
                 }
@@ -1490,8 +1505,10 @@ impl HttpServer {
                     })?;
                     let body_bytes = body.to_bytes();
 
-                    let input: db::content::CreateContentInput = serde_json::from_slice(&body_bytes)
+                    // Deserialize camelCase InputView, convert to internal DB type
+                    let input_view: CreateContentInputView = serde_json::from_slice(&body_bytes)
                         .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+                    let input: db::content::CreateContentInput = input_view.into();
 
                     content_db.with_conn_mut(|conn| {
                         match db::content::create_content(conn, input) {
@@ -1541,8 +1558,10 @@ impl HttpServer {
         })?;
         let body_bytes = body.to_bytes();
 
-        let items: Vec<db::content::CreateContentInput> = serde_json::from_slice(&body_bytes)
+        // Deserialize camelCase InputViews, convert to internal DB types
+        let input_views: Vec<CreateContentInputView> = serde_json::from_slice(&body_bytes)
             .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+        let items: Vec<db::content::CreateContentInput> = input_views.into_iter().map(|v| v.into()).collect();
 
         let count = items.len();
         info!(count = count, "Bulk creating content");
@@ -1693,9 +1712,10 @@ impl HttpServer {
                 Method::GET => {
                     match services.path.list(limit, offset) {
                         Ok(paths) => {
+                            let views: Vec<PathView> = paths.into_iter().map(|p| p.into()).collect();
                             let body = serde_json::json!({
-                                "items": paths,
-                                "count": paths.len(),
+                                "items": views,
+                                "count": views.len(),
                                 "limit": limit,
                                 "offset": offset,
                             });
@@ -1710,8 +1730,10 @@ impl HttpServer {
                     })?;
                     let body_bytes = body.to_bytes();
 
-                    let input: db::paths::CreatePathInput = serde_json::from_slice(&body_bytes)
+                    // Deserialize camelCase InputView, convert to internal DB type
+                    let input_view: CreatePathInputView = serde_json::from_slice(&body_bytes)
                         .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    let input: db::paths::CreatePathInput = input_view.into();
 
                     Ok(response::from_create_result(services.path.create(input)))
                 }
@@ -1754,8 +1776,10 @@ impl HttpServer {
                     })?;
                     let body_bytes = body.to_bytes();
 
-                    let input: db::paths::CreatePathInput = serde_json::from_slice(&body_bytes)
+                    // Deserialize camelCase InputView, convert to internal DB type
+                    let input_view: CreatePathInputView = serde_json::from_slice(&body_bytes)
                         .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+                    let input: db::paths::CreatePathInput = input_view.into();
 
                     content_db.with_conn_mut(|conn| {
                         match db::paths::create_path(conn, input) {
@@ -1807,8 +1831,10 @@ impl HttpServer {
             })?;
             let body_bytes = body.to_bytes();
 
-            let paths: Vec<db::paths::CreatePathInput> = serde_json::from_slice(&body_bytes)
+            // Deserialize camelCase InputViews, convert to internal DB types
+            let input_views: Vec<CreatePathInputView> = serde_json::from_slice(&body_bytes)
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+            let paths: Vec<db::paths::CreatePathInput> = input_views.into_iter().map(|v| v.into()).collect();
 
             let count = paths.len();
             info!(count = count, "Bulk creating paths via service");
@@ -1830,8 +1856,10 @@ impl HttpServer {
         })?;
         let body_bytes = body.to_bytes();
 
-        let paths: Vec<db::paths::CreatePathInput> = serde_json::from_slice(&body_bytes)
+        // Deserialize camelCase InputViews, convert to internal DB types
+        let input_views: Vec<CreatePathInputView> = serde_json::from_slice(&body_bytes)
             .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+        let paths: Vec<db::paths::CreatePathInput> = input_views.into_iter().map(|v| v.into()).collect();
 
         let count = paths.len();
         info!(count = count, "Bulk creating paths");
@@ -1874,8 +1902,14 @@ impl HttpServer {
         if let Some(ref services) = self.services {
             match method {
                 Method::GET => {
-                    let result = services.path.get_with_steps(path_id);
-                    return Ok(response::from_option(result, &format!("Path not found: {}", path_id)));
+                    match services.path.get_with_steps(path_id) {
+                        Ok(Some(path)) => {
+                            let view: PathWithDetailsView = path.into();
+                            return Ok(response::ok(&view));
+                        }
+                        Ok(None) => return Ok(response::not_found(&format!("Path not found: {}", path_id))),
+                        Err(e) => return Ok(response::error_response(e)),
+                    }
                 }
                 Method::DELETE => {
                     let result = services.path.delete(path_id);
@@ -1985,9 +2019,10 @@ impl HttpServer {
                 Method::GET => {
                     match services.relationship.list(&query) {
                         Ok(items) => {
+                            let views: Vec<RelationshipView> = items.into_iter().map(|r| r.into()).collect();
                             let body = serde_json::json!({
-                                "items": items,
-                                "count": items.len(),
+                                "items": views,
+                                "count": views.len(),
                                 "limit": query.limit,
                                 "offset": query.offset,
                             });
@@ -2001,8 +2036,10 @@ impl HttpServer {
                         StorageError::Internal(format!("Failed to read body: {}", e))
                     })?;
                     let body_bytes = body.to_bytes();
-                    let input: db::relationships::CreateRelationshipInput = serde_json::from_slice(&body_bytes)
+                    // Deserialize camelCase InputView, convert to internal DB type
+                    let input_view: CreateRelationshipInputView = serde_json::from_slice(&body_bytes)
                         .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    let input: db::relationships::CreateRelationshipInput = input_view.into();
                     return Ok(response::from_create_result(services.relationship.create(input)));
                 }
                 _ => return Ok(response::method_not_allowed()),
@@ -2059,8 +2096,10 @@ impl HttpServer {
                 })?;
                 let body_bytes = body.to_bytes();
 
-                let input: db::relationships::CreateRelationshipInput = serde_json::from_slice(&body_bytes)
+                // Deserialize camelCase InputView, convert to internal DB type
+                let input_view: CreateRelationshipInputView = serde_json::from_slice(&body_bytes)
                     .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+                let input: db::relationships::CreateRelationshipInput = input_view.into();
 
                 content_db.with_conn_mut(|conn| {
                     match db::relationships::create_relationship(conn, input) {
@@ -2111,8 +2150,10 @@ impl HttpServer {
             })?;
             let body_bytes = body.to_bytes();
 
-            let inputs: Vec<db::relationships::CreateRelationshipInput> = serde_json::from_slice(&body_bytes)
+            // Deserialize camelCase InputViews, convert to internal DB types
+            let input_views: Vec<CreateRelationshipInputView> = serde_json::from_slice(&body_bytes)
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+            let inputs: Vec<db::relationships::CreateRelationshipInput> = input_views.into_iter().map(|v| v.into()).collect();
 
             return Ok(response::from_result(services.relationship.bulk_create(inputs)));
         }
@@ -2131,8 +2172,10 @@ impl HttpServer {
         })?;
         let body_bytes = body.to_bytes();
 
-        let inputs: Vec<db::relationships::CreateRelationshipInput> = serde_json::from_slice(&body_bytes)
+        // Deserialize camelCase InputViews, convert to internal DB types
+        let input_views: Vec<CreateRelationshipInputView> = serde_json::from_slice(&body_bytes)
             .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+        let inputs: Vec<db::relationships::CreateRelationshipInput> = input_views.into_iter().map(|v| v.into()).collect();
 
         content_db.with_conn_mut(|conn| {
             match db::relationships::bulk_create_relationships(conn, inputs) {
@@ -3174,9 +3217,11 @@ impl HttpServer {
                 let body = req.collect().await.map_err(|e| {
                     StorageError::Internal(format!("Failed to read body: {}", e))
                 })?;
-                let input: human_relationships::CreateHumanRelationshipInput =
+                // Deserialize camelCase InputView, convert to internal DB type
+                let input_view: CreateHumanRelationshipInputView =
                     serde_json::from_slice(&body.to_bytes())
                         .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                let input: human_relationships::CreateHumanRelationshipInput = input_view.into();
 
                 match human_relationships::create_human_relationship(&mut conn, ctx, input) {
                     Ok(rel) => Ok(response::created(&rel)),
@@ -3311,9 +3356,10 @@ impl HttpServer {
 
                 match contributor_presences::list_contributor_presences(&mut conn, ctx, &query) {
                     Ok(items) => {
+                        let views: Vec<ContributorPresenceView> = items.into_iter().map(|p| p.into()).collect();
                         let body = serde_json::json!({
-                            "items": items,
-                            "count": items.len(),
+                            "items": views,
+                            "count": views.len(),
                         });
                         Ok(response::ok(&body))
                     }
@@ -3324,12 +3370,17 @@ impl HttpServer {
                 let body = req.collect().await.map_err(|e| {
                     StorageError::Internal(format!("Failed to read body: {}", e))
                 })?;
-                let input: contributor_presences::CreateContributorPresenceInput =
+                // Deserialize camelCase InputView, convert to internal DB type
+                let input_view: CreateContributorPresenceInputView =
                     serde_json::from_slice(&body.to_bytes())
                         .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                let input: contributor_presences::CreateContributorPresenceInput = input_view.into();
 
                 match contributor_presences::create_contributor_presence(&mut conn, ctx, input) {
-                    Ok(presence) => Ok(response::created(&presence)),
+                    Ok(presence) => {
+                        let view: ContributorPresenceView = presence.into();
+                        Ok(response::created(&view))
+                    }
                     Err(e) => Ok(response::error_response(e)),
                 }
             }
@@ -3350,7 +3401,10 @@ impl HttpServer {
         match method {
             Method::GET => {
                 match contributor_presences::get_contributor_presence(&mut conn, ctx, id) {
-                    Ok(Some(presence)) => Ok(response::ok(&presence)),
+                    Ok(Some(presence)) => {
+                        let view: ContributorPresenceView = presence.into();
+                        Ok(response::ok(&view))
+                    }
                     Ok(None) => Ok(response::not_found(&format!("Presence {} not found", id))),
                     Err(e) => Ok(response::error_response(e)),
                 }
@@ -3388,7 +3442,10 @@ impl HttpServer {
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
 
         match contributor_presences::initiate_stewardship(&mut conn, ctx, id, &input) {
-            Ok(presence) => Ok(response::ok(&presence)),
+            Ok(presence) => {
+                let view: ContributorPresenceView = presence.into();
+                Ok(response::ok(&view))
+            }
             Err(e) => Ok(response::error_response(e)),
         }
     }
@@ -3410,12 +3467,17 @@ impl HttpServer {
             StorageError::Internal(format!("Failed to read body: {}", e))
         })?;
 
-        let input: contributor_presences::InitiateClaimInput =
+        // Deserialize camelCase InputView, convert to internal DB type
+        let input_view: InitiateClaimInputView =
             serde_json::from_slice(&body.to_bytes())
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+        let input: contributor_presences::InitiateClaimInput = input_view.into();
 
         match contributor_presences::initiate_claim(&mut conn, ctx, id, &input) {
-            Ok(presence) => Ok(response::ok(&presence)),
+            Ok(presence) => {
+                let view: ContributorPresenceView = presence.into();
+                Ok(response::ok(&view))
+            }
             Err(e) => Ok(response::error_response(e)),
         }
     }
@@ -3435,7 +3497,10 @@ impl HttpServer {
         let mut conn = self.get_diesel_conn()?;
 
         match contributor_presences::verify_claim(&mut conn, ctx, id) {
-            Ok(presence) => Ok(response::ok(&presence)),
+            Ok(presence) => {
+                let view: ContributorPresenceView = presence.into();
+                Ok(response::ok(&view))
+            }
             Err(e) => Ok(response::error_response(e)),
         }
     }
@@ -3457,9 +3522,10 @@ impl HttpServer {
 
                 match economic_events::list_economic_events(&mut conn, ctx, &query) {
                     Ok(items) => {
+                        let views: Vec<EconomicEventView> = items.into_iter().map(|e| e.into()).collect();
                         let body = serde_json::json!({
-                            "items": items,
-                            "count": items.len(),
+                            "items": views,
+                            "count": views.len(),
                         });
                         Ok(response::ok(&body))
                     }
@@ -3470,12 +3536,17 @@ impl HttpServer {
                 let body = req.collect().await.map_err(|e| {
                     StorageError::Internal(format!("Failed to read body: {}", e))
                 })?;
-                let input: economic_events::CreateEconomicEventInput =
+                // Deserialize camelCase InputView, convert to internal DB type
+                let input_view: CreateEconomicEventInputView =
                     serde_json::from_slice(&body.to_bytes())
                         .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                let input: economic_events::CreateEconomicEventInput = input_view.into();
 
                 match economic_events::record_event(&mut conn, ctx, input) {
-                    Ok(event) => Ok(response::created(&event)),
+                    Ok(event) => {
+                        let view: EconomicEventView = event.into();
+                        Ok(response::created(&view))
+                    }
                     Err(e) => Ok(response::error_response(e)),
                 }
             }
@@ -3496,7 +3567,10 @@ impl HttpServer {
         match method {
             Method::GET => {
                 match economic_events::get_economic_event(&mut conn, ctx, id) {
-                    Ok(Some(event)) => Ok(response::ok(&event)),
+                    Ok(Some(event)) => {
+                        let view: EconomicEventView = event.into();
+                        Ok(response::ok(&view))
+                    }
                     Ok(None) => Ok(response::not_found(&format!("Event {} not found", id))),
                     Err(e) => Ok(response::error_response(e)),
                 }
@@ -3522,9 +3596,10 @@ impl HttpServer {
 
                 match content_mastery::list_mastery(&mut conn, ctx, &query) {
                     Ok(items) => {
+                        let views: Vec<ContentMasteryView> = items.into_iter().map(|m| m.into()).collect();
                         let body = serde_json::json!({
-                            "items": items,
-                            "count": items.len(),
+                            "items": views,
+                            "count": views.len(),
                         });
                         Ok(response::ok(&body))
                     }
@@ -3540,7 +3615,10 @@ impl HttpServer {
                         .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
 
                 match content_mastery::upsert_mastery(&mut conn, ctx, input) {
-                    Ok(mastery) => Ok(response::created(&mastery)),
+                    Ok(mastery) => {
+                        let view: ContentMasteryView = mastery.into();
+                        Ok(response::created(&view))
+                    }
                     Err(e) => Ok(response::error_response(e)),
                 }
             }
@@ -3561,7 +3639,10 @@ impl HttpServer {
         match method {
             Method::GET => {
                 match content_mastery::get_mastery(&mut conn, ctx, id) {
-                    Ok(Some(mastery)) => Ok(response::ok(&mastery)),
+                    Ok(Some(mastery)) => {
+                        let view: ContentMasteryView = mastery.into();
+                        Ok(response::ok(&view))
+                    }
                     Ok(None) => Ok(response::not_found(&format!("Mastery record {} not found", id))),
                     Err(e) => Ok(response::error_response(e)),
                 }
@@ -3584,10 +3665,12 @@ impl HttpServer {
             Method::GET => {
                 match content_mastery::get_mastery_for_human(&mut conn, ctx, human_id) {
                     Ok(items) => {
+                        let views: Vec<ContentMasteryView> = items.into_iter().map(|m| m.into()).collect();
+                        let count = views.len();
                         let body = serde_json::json!({
-                            "items": items,
-                            "count": items.len(),
-                            "human_id": human_id,
+                            "items": views,
+                            "count": count,
+                            "humanId": human_id,
                         });
                         Ok(response::ok(&body))
                     }
@@ -3618,9 +3701,12 @@ impl HttpServer {
             StorageError::Internal(format!("Failed to read body: {}", e))
         })?;
 
-        let inputs: Vec<contributor_presences::CreateContributorPresenceInput> =
+        // Deserialize camelCase InputView array, convert to internal DB types
+        let input_views: Vec<CreateContributorPresenceInputView> =
             serde_json::from_slice(&body.to_bytes())
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+        let inputs: Vec<contributor_presences::CreateContributorPresenceInput> =
+            input_views.into_iter().map(|v| v.into()).collect();
 
         match contributor_presences::bulk_create_presences(&mut conn, ctx, inputs) {
             Ok(result) => Ok(response::ok(&result)),
@@ -3644,9 +3730,12 @@ impl HttpServer {
             StorageError::Internal(format!("Failed to read body: {}", e))
         })?;
 
-        let inputs: Vec<economic_events::CreateEconomicEventInput> =
+        // Deserialize camelCase InputView array, convert to internal DB types
+        let input_views: Vec<CreateEconomicEventInputView> =
             serde_json::from_slice(&body.to_bytes())
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+        let inputs: Vec<economic_events::CreateEconomicEventInput> =
+            input_views.into_iter().map(|v| v.into()).collect();
 
         match economic_events::bulk_record_events(&mut conn, ctx, inputs) {
             Ok(result) => Ok(response::ok(&result)),
@@ -3715,7 +3804,10 @@ impl HttpServer {
                 };
 
                 match stewardship_allocations::list_allocations(&mut conn, app_ctx, &query) {
-                    Ok(allocations) => Ok(response::ok(&allocations)),
+                    Ok(allocations) => {
+                        let views: Vec<StewardshipAllocationView> = allocations.into_iter().map(|a| a.into()).collect();
+                        Ok(response::ok(&views))
+                    }
                     Err(e) => Ok(response::error_response(e)),
                 }
             }
@@ -3723,11 +3815,16 @@ impl HttpServer {
                 let body = req.collect().await
                     .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
                     .to_bytes();
-                let input: stewardship_allocations::CreateAllocationInput = serde_json::from_slice(&body)
+                // Deserialize camelCase InputView, convert to internal DB type
+                let input_view: CreateAllocationInputView = serde_json::from_slice(&body)
                     .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
+                let input: stewardship_allocations::CreateAllocationInput = input_view.into();
 
                 match stewardship_allocations::create_allocation(&mut conn, app_ctx, &input) {
-                    Ok(allocation) => Ok(response::created(&allocation)),
+                    Ok(allocation) => {
+                        let view: StewardshipAllocationView = allocation.into();
+                        Ok(response::created(&view))
+                    }
                     Err(e) => Ok(response::error_response(e)),
                 }
             }
@@ -3751,7 +3848,10 @@ impl HttpServer {
         match method {
             Method::GET => {
                 match stewardship_allocations::get_allocation_by_id(&mut conn, app_ctx, id) {
-                    Ok(allocation) => Ok(response::ok(&allocation)),
+                    Ok(allocation) => {
+                        let view: StewardshipAllocationView = allocation.into();
+                        Ok(response::ok(&view))
+                    }
                     Err(e) => Ok(response::error_response(e)),
                 }
             }
@@ -3759,11 +3859,16 @@ impl HttpServer {
                 let body = req.collect().await
                     .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
                     .to_bytes();
-                let input: stewardship_allocations::UpdateAllocationInput = serde_json::from_slice(&body)
+                // Deserialize camelCase InputView, convert to internal DB type
+                let input_view: UpdateAllocationInputView = serde_json::from_slice(&body)
                     .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
+                let input: stewardship_allocations::UpdateAllocationInput = input_view.into();
 
                 match stewardship_allocations::update_allocation(&mut conn, app_ctx, id, &input) {
-                    Ok(allocation) => Ok(response::ok(&allocation)),
+                    Ok(allocation) => {
+                        let view: StewardshipAllocationView = allocation.into();
+                        Ok(response::ok(&view))
+                    }
                     Err(e) => Ok(response::error_response(e)),
                 }
             }
@@ -3795,7 +3900,10 @@ impl HttpServer {
             .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
 
         match stewardship_allocations::get_content_stewardship(&mut conn, app_ctx, content_id) {
-            Ok(stewardship) => Ok(response::ok(&stewardship)),
+            Ok(stewardship) => {
+                let view: ContentStewardshipView = stewardship.into();
+                Ok(response::ok(&view))
+            }
             Err(e) => Ok(response::error_response(e)),
         }
     }
@@ -3818,7 +3926,10 @@ impl HttpServer {
             .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
 
         match stewardship_allocations::get_allocations_for_steward(&mut conn, app_ctx, steward_id) {
-            Ok(allocations) => Ok(response::ok(&allocations)),
+            Ok(allocations) => {
+                let views: Vec<StewardshipAllocationView> = allocations.into_iter().map(|a| a.into()).collect();
+                Ok(response::ok(&views))
+            }
             Err(e) => Ok(response::error_response(e)),
         }
     }
@@ -3854,7 +3965,10 @@ impl HttpServer {
             .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
 
         match stewardship_allocations::file_dispute(&mut conn, app_ctx, allocation_id, &input.dispute_id, &input.disputed_by, &input.reason) {
-            Ok(allocation) => Ok(response::ok(&allocation)),
+            Ok(allocation) => {
+                let view: StewardshipAllocationView = allocation.into();
+                Ok(response::ok(&view))
+            }
             Err(e) => Ok(response::error_response(e)),
         }
     }
@@ -3889,7 +4003,10 @@ impl HttpServer {
             .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
 
         match stewardship_allocations::resolve_dispute(&mut conn, app_ctx, allocation_id, &input.ratifier_id, &input.new_state) {
-            Ok(allocation) => Ok(response::ok(&allocation)),
+            Ok(allocation) => {
+                let view: StewardshipAllocationView = allocation.into();
+                Ok(response::ok(&view))
+            }
             Err(e) => Ok(response::error_response(e)),
         }
     }
@@ -3913,8 +4030,11 @@ impl HttpServer {
         let body = req.collect().await
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
             .to_bytes();
-        let inputs: Vec<stewardship_allocations::CreateAllocationInput> = serde_json::from_slice(&body)
+        // Deserialize camelCase InputView array, convert to internal DB types
+        let input_views: Vec<CreateAllocationInputView> = serde_json::from_slice(&body)
             .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
+        let inputs: Vec<stewardship_allocations::CreateAllocationInput> =
+            input_views.into_iter().map(|v| v.into()).collect();
 
         let mut created = 0;
         let mut failed = 0;

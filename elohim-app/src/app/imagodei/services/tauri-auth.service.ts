@@ -210,18 +210,18 @@ export class TauriAuthService {
       // Convert snake_case to camelCase
       return {
         id: session.id,
-        humanId: session.human_id,
-        agentPubKey: session.agent_pub_key,
-        doorwayUrl: session.doorway_url,
-        doorwayId: session.doorway_id,
+        humanId: session.humanId,
+        agentPubKey: session.agentPubKey,
+        doorwayUrl: session.doorwayUrl,
+        doorwayId: session.doorwayId,
         identifier: session.identifier,
-        displayName: session.display_name,
-        profileImageHash: session.profile_image_hash,
-        isActive: session.is_active,
-        createdAt: session.created_at,
-        updatedAt: session.updated_at,
-        lastSyncedAt: session.last_synced_at,
-        bootstrapUrl: session.bootstrap_url,
+        displayName: session.displayName,
+        profileImageHash: session.profileImageHash,
+        isActive: session.isActive,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+        lastSyncedAt: session.lastSyncedAt,
+        bootstrapUrl: session.bootstrapUrl,
       };
     } catch (err) {
       console.warn('[TauriAuth] Failed to get session:', err);
@@ -328,14 +328,14 @@ export class TauriAuthService {
     const storageUrl = this.getStorageUrl();
 
     const body = {
-      human_id: input.humanId,
-      agent_pub_key: input.agentPubKey,
-      doorway_url: input.doorwayUrl,
-      doorway_id: input.doorwayId,
+      humanId: input.humanId,
+      agentPubKey: input.agentPubKey,
+      doorwayUrl: input.doorwayUrl,
+      doorwayId: input.doorwayId,
       identifier: input.identifier,
-      display_name: input.displayName,
-      profile_image_hash: input.profileImageHash,
-      bootstrap_url: input.bootstrapUrl,
+      displayName: input.displayName,
+      profileImageHash: input.profileImageHash,
+      bootstrapUrl: input.bootstrapUrl,
     };
 
     const response = await fetch(`${storageUrl}/session`, {
@@ -352,18 +352,18 @@ export class TauriAuthService {
     const session = await response.json();
     return {
       id: session.id,
-      humanId: session.human_id,
-      agentPubKey: session.agent_pub_key,
-      doorwayUrl: session.doorway_url,
-      doorwayId: session.doorway_id,
+      humanId: session.humanId,
+      agentPubKey: session.agentPubKey,
+      doorwayUrl: session.doorwayUrl,
+      doorwayId: session.doorwayId,
       identifier: session.identifier,
-      displayName: session.display_name,
-      profileImageHash: session.profile_image_hash,
-      isActive: session.is_active,
-      createdAt: session.created_at,
-      updatedAt: session.updated_at,
-      lastSyncedAt: session.last_synced_at,
-      bootstrapUrl: session.bootstrap_url,
+      displayName: session.displayName,
+      profileImageHash: session.profileImageHash,
+      isActive: session.isActive,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      lastSyncedAt: session.lastSyncedAt,
+      bootstrapUrl: session.bootstrapUrl,
     };
   }
 

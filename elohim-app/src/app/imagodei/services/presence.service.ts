@@ -31,67 +31,67 @@ import {
 /** ContributorPresence entry as returned from conductor */
 interface PresenceEntry {
   id: string;
-  display_name: string;
-  presence_state: string;
-  external_identifiers_json: string;
-  establishing_content_ids_json: string;
-  established_at: string;
-  affinity_total: number;
-  unique_engagers: number;
-  citation_count: number;
-  endorsements_json: string;
-  recognition_score: number;
-  recognition_by_content_json: string;
-  accumulating_since: string;
-  last_recognition_at: string;
-  steward_id: string | null;
-  stewardship_started_at: string | null;
-  stewardship_commitment_id: string | null;
-  stewardship_quality_score: number | null;
-  claim_initiated_at: string | null;
-  claim_verified_at: string | null;
-  claim_verification_method: string | null;
-  claim_evidence_json: string | null;
-  claimed_agent_id: string | null;
-  claim_recognition_transferred_value: number | null;
-  claim_recognition_transferred_unit: string | null;
-  claim_facilitated_by: string | null;
-  invitations_json: string;
+  displayName: string;
+  presenceState: string;
+  externalIdentifiersJson: string;
+  establishingContentIdsJson: string;
+  establishedAt: string;
+  affinityTotal: number;
+  uniqueEngagers: number;
+  citationCount: number;
+  endorsementsJson: string;
+  recognitionScore: number;
+  recognitionByContentJson: string;
+  accumulatingSince: string;
+  lastRecognitionAt: string;
+  stewardId: string | null;
+  stewardshipStartedAt: string | null;
+  stewardshipCommitmentId: string | null;
+  stewardshipQualityScore: number | null;
+  claimInitiatedAt: string | null;
+  claimVerifiedAt: string | null;
+  claimVerificationMethod: string | null;
+  claimEvidenceJson: string | null;
+  claimedAgentId: string | null;
+  claimRecognitionTransferredValue: number | null;
+  claimRecognitionTransferredUnit: string | null;
+  claimFacilitatedBy: string | null;
+  invitationsJson: string;
   note: string | null;
   image: string | null;
-  metadata_json: string;
-  created_at: string;
-  updated_at: string;
+  metadataJson: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Presence result from conductor */
 interface PresenceResult {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   presence: PresenceEntry;
 }
 
 /** Payload for creating a presence */
 interface CreatePresencePayload {
-  display_name: string;
-  external_identifiers_json?: string;
-  establishing_content_ids_json?: string;
+  displayName: string;
+  externalIdentifiersJson?: string;
+  establishingContentIdsJson?: string;
   note?: string;
   image?: string;
-  metadata_json?: string;
+  metadataJson?: string;
 }
 
 /** Payload for beginning stewardship */
 interface BeginStewardshipPayload {
-  presence_id: string;
-  steward_agent_id: string;
-  commitment_note?: string;
+  presenceId: string;
+  stewardAgentId: string;
+  commitmentNote?: string;
 }
 
 /** Payload for initiating a claim */
 interface InitiateClaimPayload {
-  presence_id: string;
-  claim_evidence_json: string;
-  verification_method: string;
+  presenceId: string;
+  claimEvidenceJson: string;
+  verificationMethod: string;
 }
 
 // =============================================================================
@@ -104,28 +104,28 @@ interface InitiateClaimPayload {
 function mapToPresenceView(entry: PresenceEntry): ContributorPresenceView {
   return {
     id: entry.id,
-    displayName: entry.display_name,
-    presenceState: entry.presence_state as PresenceState,
-    externalIdentifiers: parseExternalIdentifiers(entry.external_identifiers_json),
-    establishingContentIds: parseJsonArray(entry.establishing_content_ids_json),
-    establishedAt: entry.established_at,
-    affinityTotal: entry.affinity_total,
-    uniqueEngagers: entry.unique_engagers,
-    citationCount: entry.citation_count,
-    recognitionScore: entry.recognition_score,
-    accumulatingSince: entry.accumulating_since,
-    lastRecognitionAt: entry.last_recognition_at,
-    stewardId: entry.steward_id,
-    stewardshipStartedAt: entry.stewardship_started_at,
-    stewardshipQualityScore: entry.stewardship_quality_score,
-    claimInitiatedAt: entry.claim_initiated_at,
-    claimVerifiedAt: entry.claim_verified_at,
-    claimVerificationMethod: entry.claim_verification_method,
-    claimedAgentId: entry.claimed_agent_id,
+    displayName: entry.displayName,
+    presenceState: entry.presenceState as PresenceState,
+    externalIdentifiers: parseExternalIdentifiers(entry.externalIdentifiersJson),
+    establishingContentIds: parseJsonArray(entry.establishingContentIdsJson),
+    establishedAt: entry.establishedAt,
+    affinityTotal: entry.affinityTotal,
+    uniqueEngagers: entry.uniqueEngagers,
+    citationCount: entry.citationCount,
+    recognitionScore: entry.recognitionScore,
+    accumulatingSince: entry.accumulatingSince,
+    lastRecognitionAt: entry.lastRecognitionAt,
+    stewardId: entry.stewardId,
+    stewardshipStartedAt: entry.stewardshipStartedAt,
+    stewardshipQualityScore: entry.stewardshipQualityScore,
+    claimInitiatedAt: entry.claimInitiatedAt,
+    claimVerifiedAt: entry.claimVerifiedAt,
+    claimVerificationMethod: entry.claimVerificationMethod,
+    claimedAgentId: entry.claimedAgentId,
     note: entry.note,
     image: entry.image,
-    createdAt: entry.created_at,
-    updatedAt: entry.updated_at,
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
   };
 }
 
@@ -134,11 +134,11 @@ function mapToPresenceView(entry: PresenceEntry): ContributorPresenceView {
  */
 function toCreatePayload(request: CreatePresenceRequest): CreatePresencePayload {
   return {
-    display_name: request.displayName,
-    external_identifiers_json: request.externalIdentifiers
+    displayName: request.displayName,
+    externalIdentifiersJson: request.externalIdentifiers
       ? serializeExternalIdentifiers(request.externalIdentifiers)
       : undefined,
-    establishing_content_ids_json: request.establishingContentIds
+    establishingContentIdsJson: request.establishingContentIds
       ? JSON.stringify(request.establishingContentIds)
       : undefined,
     note: request.note,
@@ -265,9 +265,9 @@ export class PresenceService {
 
     try {
       const payload: BeginStewardshipPayload = {
-        presence_id: presenceId,
-        steward_agent_id: agentPubKey,
-        commitment_note: commitmentNote,
+        presenceId: presenceId,
+        stewardAgentId: agentPubKey,
+        commitmentNote: commitmentNote,
       };
 
       // ContributorPresence stewardship is identity domain - routes to imagodei DNA
@@ -354,9 +354,9 @@ export class PresenceService {
 
     try {
       const payload: InitiateClaimPayload = {
-        presence_id: request.presenceId,
-        claim_evidence_json: JSON.stringify(request.claimEvidence),
-        verification_method: request.verificationMethod,
+        presenceId: request.presenceId,
+        claimEvidenceJson: JSON.stringify(request.claimEvidence),
+        verificationMethod: request.verificationMethod,
       };
 
       // Claim initiation is identity domain - routes to imagodei DNA

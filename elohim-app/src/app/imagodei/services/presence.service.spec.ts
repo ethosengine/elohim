@@ -15,37 +15,37 @@ describe('PresenceService', () => {
 
   const mockPresenceEntry = {
     id: 'presence-123',
-    display_name: 'Test Contributor',
-    presence_state: 'unclaimed',
-    external_identifiers_json: '[]',
-    establishing_content_ids_json: '["content-1"]',
-    established_at: new Date().toISOString(),
-    affinity_total: 10,
-    unique_engagers: 5,
-    citation_count: 3,
-    endorsements_json: '[]',
-    recognition_score: 15,
-    recognition_by_content_json: '{}',
-    accumulating_since: new Date().toISOString(),
-    last_recognition_at: new Date().toISOString(),
-    steward_id: null,
-    stewardship_started_at: null,
-    stewardship_commitment_id: null,
-    stewardship_quality_score: null,
-    claim_initiated_at: null,
-    claim_verified_at: null,
-    claim_verification_method: null,
-    claim_evidence_json: null,
-    claimed_agent_id: null,
-    claim_recognition_transferred_value: null,
-    claim_recognition_transferred_unit: null,
-    claim_facilitated_by: null,
-    invitations_json: '[]',
+    displayName: 'Test Contributor',
+    presenceState: 'unclaimed',
+    externalIdentifiersJson: '[]',
+    establishingContentIdsJson: '["content-1"]',
+    establishedAt: new Date().toISOString(),
+    affinityTotal: 10,
+    uniqueEngagers: 5,
+    citationCount: 3,
+    endorsementsJson: '[]',
+    recognitionScore: 15,
+    recognitionByContentJson: '{}',
+    accumulatingSince: new Date().toISOString(),
+    lastRecognitionAt: new Date().toISOString(),
+    stewardId: null,
+    stewardshipStartedAt: null,
+    stewardshipCommitmentId: null,
+    stewardshipQualityScore: null,
+    claimInitiatedAt: null,
+    claimVerifiedAt: null,
+    claimVerificationMethod: null,
+    claimEvidenceJson: null,
+    claimedAgentId: null,
+    claimRecognitionTransferredValue: null,
+    claimRecognitionTransferredUnit: null,
+    claimFacilitatedBy: null,
+    invitationsJson: '[]',
     note: 'Test note',
     image: null,
-    metadata_json: '{}',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    metadataJson: '{}',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
   beforeEach(() => {
@@ -190,9 +190,9 @@ describe('PresenceService', () => {
 
       const stewardedEntry = {
         ...mockPresenceEntry,
-        presence_state: 'stewarded',
-        steward_id: 'agent-pub-key-123',
-        stewardship_started_at: new Date().toISOString(),
+        presenceState: 'stewarded',
+        stewardId: 'agent-pub-key-123',
+        stewardshipStartedAt: new Date().toISOString(),
       };
 
       mockHolochainClient.callZome.and.resolveTo({
@@ -208,9 +208,9 @@ describe('PresenceService', () => {
         jasmine.objectContaining({
           fnName: 'begin_stewardship',
           payload: jasmine.objectContaining({
-            presence_id: 'presence-123',
-            steward_agent_id: 'agent-pub-key-123',
-            commitment_note: 'I will care for this',
+            presenceId: 'presence-123',
+            stewardAgentId: 'agent-pub-key-123',
+            commitmentNote: 'I will care for this',
           }),
         })
       );
@@ -269,8 +269,8 @@ describe('PresenceService', () => {
 
       const claimingEntry = {
         ...mockPresenceEntry,
-        claim_initiated_at: new Date().toISOString(),
-        claim_verification_method: 'email',
+        claimInitiatedAt: new Date().toISOString(),
+        claimVerificationMethod: 'email',
       };
 
       mockHolochainClient.callZome.and.resolveTo({
@@ -295,9 +295,9 @@ describe('PresenceService', () => {
 
       const claimedEntry = {
         ...mockPresenceEntry,
-        presence_state: 'claimed',
-        claim_verified_at: new Date().toISOString(),
-        claimed_agent_id: 'agent-123',
+        presenceState: 'claimed',
+        claimVerifiedAt: new Date().toISOString(),
+        claimedAgentId: 'agent-123',
       };
 
       mockHolochainClient.callZome.and.resolveTo({

@@ -37,28 +37,28 @@ import { ContentNode, ContentType, ContentFormat, ContentMetadata } from '../../
  */
 export interface HolochainContentEntry {
   id: string;
-  content_type: string;
+  contentType: string;
   title: string;
   description: string;
   content: string;
-  content_format: string;
+  contentFormat: string;
   tags: string[];
-  source_path: string | null;
-  related_node_ids: string[];
-  author_id: string | null;
+  sourcePath: string | null;
+  relatedNodeIds: string[];
+  authorId: string | null;
   reach: string;
-  trust_score: number;
-  metadata_json: string;
-  created_at: string;
-  updated_at: string;
+  trustScore: number;
+  metadata: unknown; // Parsed JSON object from Rust API
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
  * Output from content retrieval zome calls
  */
 export interface HolochainContentOutput {
-  action_hash: Uint8Array;
-  entry_hash: Uint8Array;
+  actionHash: Uint8Array;
+  entryHash: Uint8Array;
   content: HolochainContentEntry;
 }
 
@@ -66,12 +66,16 @@ export interface HolochainContentOutput {
  * Content statistics from get_content_stats
  */
 export interface HolochainContentStats {
-  total_count: number;
-  by_type: Record<string, number>;
+  totalCount: number;
+  byType: Record<string, number>;
 }
 
 /**
  * Query input for content by type
+ *
+ * TODO: [HOLOCHAIN-ZOME] Uses snake_case because this is a Holochain zome payload.
+ * Zomes are Rust and expect snake_case field names. This cannot be changed without
+ * updating the Rust zome and running a DNA migration.
  */
 export interface QueryByTypeInput {
   content_type: string;
@@ -97,11 +101,15 @@ export interface BatchGetContentInput {
  */
 export interface BatchGetContentOutput {
   found: HolochainContentOutput[];
-  not_found: string[];
+  notFound: string[];
 }
 
 /**
  * Input for paginated content query by type
+ *
+ * TODO: [HOLOCHAIN-ZOME] Uses snake_case because this is a Holochain zome payload.
+ * Zomes are Rust and expect snake_case field names. This cannot be changed without
+ * updating the Rust zome and running a DNA migration.
  */
 export interface PaginatedByTypeInput {
   content_type: string;
@@ -111,6 +119,10 @@ export interface PaginatedByTypeInput {
 
 /**
  * Input for paginated content query by tag
+ *
+ * TODO: [HOLOCHAIN-ZOME] Uses snake_case because this is a Holochain zome payload.
+ * Zomes are Rust and expect snake_case field names. This cannot be changed without
+ * updating the Rust zome and running a DNA migration.
  */
 export interface PaginatedByTagInput {
   tag: string;
@@ -123,9 +135,9 @@ export interface PaginatedByTagInput {
  */
 export interface PaginatedContentOutput {
   items: HolochainContentOutput[];
-  total_count: number;
+  totalCount: number;
   offset: number;
-  has_more: boolean;
+  hasMore: boolean;
 }
 
 // =============================================================================
@@ -140,8 +152,8 @@ export interface HolochainPathIndexEntry {
   title: string;
   description: string;
   difficulty: string;
-  estimated_duration: string | null;
-  step_count: number;
+  estimatedDuration: string | null;
+  stepCount: number;
   tags: string[];
 }
 
@@ -150,8 +162,8 @@ export interface HolochainPathIndexEntry {
  */
 export interface HolochainPathIndex {
   paths: HolochainPathIndexEntry[];
-  total_count: number;
-  last_updated: string;
+  totalCount: number;
+  lastUpdated: string;
 }
 
 /**
@@ -159,13 +171,13 @@ export interface HolochainPathIndex {
  */
 export interface HolochainPathStep {
   id: string;
-  path_id: string;
-  order_index: number;
-  step_type: string;
-  resource_id: string;
-  step_title: string | null;
-  step_narrative: string | null;
-  is_optional: boolean;
+  pathId: string;
+  orderIndex: number;
+  stepType: string;
+  resourceId: string;
+  stepTitle: string | null;
+  stepNarrative: string | null;
+  isOptional: boolean;
 }
 
 /**
@@ -177,26 +189,26 @@ export interface HolochainLearningPath {
   title: string;
   description: string;
   purpose: string | null;
-  created_by: string;
+  createdBy: string;
   difficulty: string;
-  estimated_duration: string | null;
+  estimatedDuration: string | null;
   visibility: string;
-  path_type: string;
+  pathType: string;
   tags: string[];
-  /** Extensible metadata JSON (stores chapters for hierarchical paths) */
-  metadata_json: string;
-  created_at: string;
-  updated_at: string;
+  /** Extensible metadata object (stores chapters for hierarchical paths) */
+  metadata: unknown;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
  * Path with steps output
  */
 export interface HolochainPathWithSteps {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   path: HolochainLearningPath;
   steps: Array<{
-    action_hash: Uint8Array;
+    actionHash: Uint8Array;
     step: HolochainPathStep;
   }>;
 }
@@ -206,9 +218,9 @@ export interface HolochainPathWithSteps {
  * Use for: path listings, path-overview page, initial navigation
  */
 export interface HolochainPathOverview {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   path: HolochainLearningPath;
-  step_count: number;
+  stepCount: number;
 }
 
 // =============================================================================
@@ -221,18 +233,18 @@ export interface HolochainPathOverview {
  */
 export interface HolochainAgentEntry {
   id: string;
-  agent_type: string;           // human, organization, ai-agent, elohim
-  display_name: string;
+  agentType: string;           // human, organization, ai-agent, elohim
+  displayName: string;
   bio: string | null;
   avatar: string | null;
   affinities: string[];
   visibility: string;           // public, connections, private
   location: string | null;
-  holochain_agent_key: string | null;
+  holochainAgentKey: string | null;
   did: string | null;
-  activity_pub_type: string | null;
-  created_at: string;
-  updated_at: string;
+  activityPubType: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
@@ -262,17 +274,17 @@ export interface QueryAgentsInput {
  */
 export interface HolochainAttestationEntry {
   id: string;
-  agent_id: string;
+  agentId: string;
   category: string;             // domain-mastery, path-completion, role-credential, achievement
-  attestation_type: string;
-  display_name: string;
+  attestationType: string;
+  displayName: string;
   description: string;
-  icon_url: string | null;
+  iconUrl: string | null;
   tier: string | null;          // bronze, silver, gold, platinum
-  earned_via_json: string;
-  issued_at: string;
-  issued_by: string;
-  expires_at: string | null;
+  earnedVia: unknown;
+  issuedAt: string;
+  issuedBy: string;
+  expiresAt: string | null;
   proof: string | null;
 }
 
@@ -280,7 +292,7 @@ export interface HolochainAttestationEntry {
  * Output from attestation retrieval zome calls
  */
 export interface HolochainAttestationOutput {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   attestation: HolochainAttestationEntry;
 }
 
@@ -288,7 +300,7 @@ export interface HolochainAttestationOutput {
  * Input for querying attestations
  */
 export interface QueryAttestationsInput {
-  agent_id?: string;
+  agentId?: string;
   category?: string;
   limit?: number;
 }
@@ -307,30 +319,30 @@ export interface QueryAttestationsInput {
  */
 export interface HolochainContentAttestationEntry {
   id: string;
-  content_id: string;
-  attestation_type: string;        // author-verified, steward-approved, etc.
-  reach_granted: string;           // private, local, community, commons
-  granted_by_json: string;         // AttestationGrantor serialized
-  granted_at: string;
-  expires_at: string | null;
+  contentId: string;
+  attestationType: string;        // author-verified, steward-approved, etc.
+  reachGranted: string;           // private, local, community, commons
+  grantedBy: unknown;             // AttestationGrantor parsed
+  grantedAt: string;
+  expiresAt: string | null;
   status: string;                  // active, expired, revoked, superseded
-  revocation_json: string | null;  // AttestationRevocation if revoked
-  evidence_json: string | null;    // AttestationEvidence
-  scope_json: string | null;       // AttestationScope (optional)
-  metadata_json: string;
-  created_at: string;
-  updated_at: string;
-  schema_version: number;
-  validation_status: string;
+  revocation: unknown | null;     // AttestationRevocation if revoked
+  evidence: unknown | null;       // AttestationEvidence
+  scope: unknown | null;          // AttestationScope (optional)
+  metadata: unknown;
+  createdAt: string;
+  updatedAt: string;
+  schemaVersion: number;
+  validationStatus: string;
 }
 
 /**
  * Output from content attestation retrieval zome calls
  */
 export interface HolochainContentAttestationOutput {
-  action_hash: Uint8Array;
-  entry_hash: Uint8Array;
-  content_attestation: HolochainContentAttestationEntry;
+  actionHash: Uint8Array;
+  entryHash: Uint8Array;
+  contentAttestation: HolochainContentAttestationEntry;
 }
 
 /**
@@ -338,23 +350,23 @@ export interface HolochainContentAttestationOutput {
  */
 export interface CreateContentAttestationInput {
   id?: string;
-  content_id: string;
-  attestation_type: string;
-  reach_granted: string;
-  granted_by_json: string;
-  expires_at?: string;
-  evidence_json?: string;
-  scope_json?: string;
-  metadata_json?: string;
+  contentId: string;
+  attestationType: string;
+  reachGranted: string;
+  grantedByJson: string;
+  expiresAt?: string;
+  evidenceJson?: string;
+  scopeJson?: string;
+  metadataJson?: string;
 }
 
 /**
  * Input for querying content attestations
  */
 export interface QueryContentAttestationsInput {
-  content_id?: string;
-  attestation_type?: string;
-  reach_granted?: string;
+  contentId?: string;
+  attestationType?: string;
+  reachGranted?: string;
   status?: string;
   limit?: number;
 }
@@ -389,20 +401,20 @@ export interface RevokeContentAttestationInput {
  */
 export interface HolochainRelationshipEntry {
   id: string;
-  source_id: string;
-  target_id: string;
-  relationship_type: string;    // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
+  sourceId: string;
+  targetId: string;
+  relationshipType: string;    // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
   confidence: number;           // 0.0 - 1.0
-  inference_source: string;     // explicit, path, tag, semantic
-  metadata_json: string | null;
-  created_at: string;
+  inferenceSource: string;     // explicit, path, tag, semantic
+  metadata: unknown | null;
+  createdAt: string;
 }
 
 /**
  * Output from relationship retrieval zome calls
  */
 export interface HolochainRelationshipOutput {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   relationship: HolochainRelationshipEntry;
 }
 
@@ -410,7 +422,7 @@ export interface HolochainRelationshipOutput {
  * Input for querying relationships
  */
 export interface GetRelationshipsInput {
-  content_id: string;
+  contentId: string;
   direction: string;            // outgoing, incoming, both
 }
 
@@ -428,7 +440,7 @@ export interface QueryRelatedContentInput {
  */
 export interface HolochainContentGraphNode {
   content: HolochainContentOutput;
-  relationship_type: string;
+  relationshipType: string;
   confidence: number;
   children: HolochainContentGraphNode[];
 }
@@ -439,7 +451,7 @@ export interface HolochainContentGraphNode {
 export interface HolochainContentGraph {
   root: HolochainContentOutput | null;
   related: HolochainContentGraphNode[];
-  total_nodes: number;
+  totalNodes: number;
 }
 
 // =============================================================================
@@ -451,40 +463,40 @@ export interface HolochainContentGraph {
  */
 export interface HolochainKnowledgeMapEntry {
   id: string;
-  map_type: string;             // domain, self, person, collective
-  owner_id: string;
+  mapType: string;             // domain, self, person, collective
+  ownerId: string;
   title: string;
   description: string | null;
-  subject_type: string;
-  subject_id: string;
-  subject_name: string;
+  subjectType: string;
+  subjectId: string;
+  subjectName: string;
   visibility: string;
-  shared_with_json: string;
-  nodes_json: string;
-  path_ids_json: string;
-  overall_affinity: number;
-  content_graph_id: string | null;
-  mastery_levels_json: string;
-  goals_json: string;
-  created_at: string;
-  updated_at: string;
-  metadata_json: string;
+  sharedWith: unknown;
+  nodes: unknown;
+  pathIds: unknown;
+  overallAffinity: number;
+  contentGraphId: string | null;
+  masteryLevels: unknown;
+  goals: unknown;
+  createdAt: string;
+  updatedAt: string;
+  metadata: unknown;
 }
 
 /**
  * Output from knowledge map retrieval
  */
 export interface HolochainKnowledgeMapOutput {
-  action_hash: Uint8Array;
-  knowledge_map: HolochainKnowledgeMapEntry;
+  actionHash: Uint8Array;
+  knowledgeMap: HolochainKnowledgeMapEntry;
 }
 
 /**
  * Input for querying knowledge maps
  */
 export interface QueryKnowledgeMapsInput {
-  owner_id?: string;
-  map_type?: string;
+  ownerId?: string;
+  mapType?: string;
   limit?: number;
 }
 
@@ -497,39 +509,39 @@ export interface QueryKnowledgeMapsInput {
  */
 export interface HolochainPathExtensionEntry {
   id: string;
-  base_path_id: string;
-  base_path_version: string;
-  extended_by: string;
+  basePathId: string;
+  basePathVersion: string;
+  extendedBy: string;
   title: string;
   description: string | null;
-  insertions_json: string;
-  annotations_json: string;
-  reorderings_json: string;
-  exclusions_json: string;
+  insertions: unknown;
+  annotations: unknown;
+  reorderings: unknown;
+  exclusions: unknown;
   visibility: string;
-  shared_with_json: string;
-  forked_from: string | null;
-  forks_json: string;
-  upstream_proposal_json: string | null;
-  stats_json: string;
-  created_at: string;
-  updated_at: string;
+  sharedWith: unknown;
+  forkedFrom: string | null;
+  forks: unknown;
+  upstreamProposal: unknown | null;
+  stats: unknown;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
  * Output from path extension retrieval
  */
 export interface HolochainPathExtensionOutput {
-  action_hash: Uint8Array;
-  path_extension: HolochainPathExtensionEntry;
+  actionHash: Uint8Array;
+  pathExtension: HolochainPathExtensionEntry;
 }
 
 /**
  * Input for querying path extensions
  */
 export interface QueryPathExtensionsInput {
-  base_path_id?: string;
-  extended_by?: string;
+  basePathId?: string;
+  extendedBy?: string;
   limit?: number;
 }
 
@@ -542,31 +554,31 @@ export interface QueryPathExtensionsInput {
  */
 export interface HolochainChallengeEntry {
   id: string;
-  entity_type: string;
-  entity_id: string;
-  challenger_id: string;
-  challenger_name: string;
-  challenger_standing: string;
+  entityType: string;
+  entityId: string;
+  challengerId: string;
+  challengerName: string;
+  challengerStanding: string;
   grounds: string;
   description: string;
-  evidence_json: string;
+  evidence: unknown;
   status: string;
-  filed_at: string;
-  acknowledged_at: string | null;
-  sla_deadline: string | null;
-  assigned_elohim: string | null;
+  filedAt: string;
+  acknowledgedAt: string | null;
+  slaDeadline: string | null;
+  assignedElohim: string | null;
   priority: string;
-  resolution_json: string | null;
-  created_at: string;
-  updated_at: string;
-  metadata_json: string;
+  resolution: unknown | null;
+  createdAt: string;
+  updatedAt: string;
+  metadata: unknown;
 }
 
 /**
  * Output from challenge retrieval
  */
 export interface HolochainChallengeOutput {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   challenge: HolochainChallengeEntry;
 }
 
@@ -574,9 +586,9 @@ export interface HolochainChallengeOutput {
  * Input for querying challenges
  */
 export interface QueryChallengesInput {
-  entity_type?: string;
-  entity_id?: string;
-  challenger_id?: string;
+  entityType?: string;
+  entityId?: string;
+  challengerId?: string;
   status?: string;
   limit?: number;
 }
@@ -587,22 +599,22 @@ export interface QueryChallengesInput {
 export interface HolochainProposalEntry {
   id: string;
   title: string;
-  proposal_type: string;
+  proposalType: string;
   description: string;
-  proposer_id: string;
-  proposer_name: string;
+  proposerId: string;
+  proposerName: string;
   rationale: string;
   status: string;
   phase: string;
-  amendments_json: string;
-  voting_config_json: string;
-  current_votes_json: string;
-  outcome_json: string | null;
-  related_entity_type: string | null;
-  related_entity_id: string | null;
-  created_at: string;
-  updated_at: string;
-  metadata_json: string;
+  amendments: unknown;
+  votingConfig: unknown;
+  currentVotes: unknown;
+  outcome: unknown | null;
+  relatedEntityType: string | null;
+  relatedEntityId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  metadata: unknown;
 }
 
 /**
@@ -630,24 +642,24 @@ export interface HolochainPrecedentEntry {
   id: string;
   title: string;
   summary: string;
-  full_reasoning: string;
+  fullReasoning: string;
   binding: string;
-  scope_json: string;
+  scope: unknown;
   citations: number;
   status: string;
-  established_by: string;
-  established_at: string;
-  superseded_by: string | null;
-  created_at: string;
-  updated_at: string;
-  metadata_json: string;
+  establishedBy: string;
+  establishedAt: string;
+  supersededBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  metadata: unknown;
 }
 
 /**
  * Output from precedent retrieval
  */
 export interface HolochainPrecedentOutput {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   precedent: HolochainPrecedentEntry;
 }
 
@@ -665,24 +677,24 @@ export interface QueryPrecedentsInput {
  */
 export interface HolochainDiscussionEntry {
   id: string;
-  entity_type: string;
-  entity_id: string;
+  entityType: string;
+  entityId: string;
   category: string;
   title: string;
-  messages_json: string;
+  messages: unknown;
   status: string;
-  message_count: number;
-  last_activity_at: string;
-  created_at: string;
-  updated_at: string;
-  metadata_json: string;
+  messageCount: number;
+  lastActivityAt: string;
+  createdAt: string;
+  updatedAt: string;
+  metadata: unknown;
 }
 
 /**
  * Output from discussion retrieval
  */
 export interface HolochainDiscussionOutput {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   discussion: HolochainDiscussionEntry;
 }
 
@@ -690,8 +702,8 @@ export interface HolochainDiscussionOutput {
  * Input for querying discussions
  */
 export interface QueryDiscussionsInput {
-  entity_type?: string;
-  entity_id?: string;
+  entityType?: string;
+  entityId?: string;
   category?: string;
   status?: string;
   limit?: number;
@@ -702,34 +714,34 @@ export interface QueryDiscussionsInput {
  */
 export interface HolochainGovernanceStateEntry {
   id: string;
-  entity_type: string;
-  entity_id: string;
+  entityType: string;
+  entityId: string;
   status: string;
-  status_basis_json: string;
-  labels_json: string;
-  active_challenges_json: string;
-  active_proposals_json: string;
-  precedent_ids_json: string;
-  last_updated: string;
-  created_at: string;
-  updated_at: string;
-  metadata_json: string;
+  statusBasis: unknown;
+  labels: unknown;
+  activeChallenges: unknown;
+  activeProposals: unknown;
+  precedentIds: unknown;
+  lastUpdated: string;
+  createdAt: string;
+  updatedAt: string;
+  metadata: unknown;
 }
 
 /**
  * Output from governance state retrieval
  */
 export interface HolochainGovernanceStateOutput {
-  action_hash: Uint8Array;
-  governance_state: HolochainGovernanceStateEntry;
+  actionHash: Uint8Array;
+  governanceState: HolochainGovernanceStateEntry;
 }
 
 /**
  * Input for getting governance state
  */
 export interface GetGovernanceStateInput {
-  entity_type: string;
-  entity_id: string;
+  entityType: string;
+  entityId: string;
 }
 
 /**
@@ -980,7 +992,7 @@ export class HolochainContentService {
         this.contentCache.set(content.id, of(content).pipe(shareReplay(1)));
       }
 
-      return { found, notFound: result.data.not_found };
+      return { found, notFound: result.data.notFound };
     } catch (err) {
       console.warn('[HolochainContent] Batch get error:', err);
       return { found: new Map(), notFound: ids };
@@ -1080,9 +1092,9 @@ export class HolochainContentService {
 
       return {
         items,
-        totalCount: result.data.total_count,
+        totalCount: result.data.totalCount,
         offset: result.data.offset,
-        hasMore: result.data.has_more,
+        hasMore: result.data.hasMore,
       };
     } catch (err) {
       console.warn('[HolochainContent] Paginated query error:', err);
@@ -1132,9 +1144,9 @@ export class HolochainContentService {
 
       return {
         items,
-        totalCount: result.data.total_count,
+        totalCount: result.data.totalCount,
         offset: result.data.offset,
-        hasMore: result.data.has_more,
+        hasMore: result.data.hasMore,
       };
     } catch (err) {
       console.warn('[HolochainContent] Paginated tag query error:', err);
@@ -1151,14 +1163,14 @@ export class HolochainContentService {
    */
   getStats(): Observable<HolochainContentStats> {
     if (!this.isAvailable()) {
-      return of({ total_count: 0, by_type: {} });
+      return of({ totalCount: 0, byType: {} });
     }
 
     this.statsCache$ ??= defer(() =>
       from(this.fetchStats())
     ).pipe(
       shareReplay(1),
-      catchError(() => of({ total_count: 0, by_type: {} }))
+      catchError(() => of({ totalCount: 0, byType: {} }))
     );
 
     return this.statsCache$;
@@ -1188,7 +1200,7 @@ export class HolochainContentService {
 
       if (result.success) {
         this.availableSignal.set(true);
-        console.log('[HolochainContent] Service available, content count:', result.data?.total_count);
+        console.log('[HolochainContent] Service available, content count:', result.data?.totalCount);
         return true;
       }
 
@@ -1223,10 +1235,10 @@ export class HolochainContentService {
 
     if (!result.success || !result.data) {
       console.warn('[HolochainContent] get_all_paths failed or empty:', result.error);
-      return { paths: [], total_count: 0, last_updated: new Date().toISOString() };
+      return { paths: [], totalCount: 0, lastUpdated: new Date().toISOString() };
     }
 
-    console.log('[HolochainContent] Found paths:', result.data.total_count);
+    console.log('[HolochainContent] Found paths:', result.data.totalCount);
     return result.data;
   }
 
@@ -1820,7 +1832,7 @@ export class HolochainContentService {
     });
 
     if (!result.success || !result.data) {
-      return { total_count: 0, by_type: {} };
+      return { totalCount: 0, byType: {} };
     }
 
     return result.data;
@@ -1834,35 +1846,30 @@ export class HolochainContentService {
    * Transform Holochain content output to ContentNode
    *
    * Maps snake_case Rust fields to camelCase TypeScript fields.
-   * Parses metadata_json back to ContentMetadata object.
+   * Uses parsed metadata from Rust API.
    */
   private transformToContentNode(output: HolochainContentOutput): ContentNode {
     const entry = output.content;
 
-    // Parse metadata JSON
-    let metadata: ContentMetadata = {};
-    try {
-      metadata = JSON.parse(entry.metadata_json || '{}');
-    } catch {
-      console.warn(`[HolochainContent] Failed to parse metadata for "${entry.id}"`);
-    }
+    // Use parsed metadata from Rust API
+    const metadata: ContentMetadata = entry.metadata as any ?? {};
 
     return {
       id: entry.id,
-      contentType: entry.content_type as ContentType,
+      contentType: entry.contentType as ContentType,
       title: entry.title,
       description: entry.description,
       content: entry.content,
-      contentFormat: entry.content_format as ContentFormat,
+      contentFormat: entry.contentFormat as ContentFormat,
       tags: entry.tags,
-      sourcePath: entry.source_path ?? undefined,
-      relatedNodeIds: entry.related_node_ids,
+      sourcePath: entry.sourcePath ?? undefined,
+      relatedNodeIds: entry.relatedNodeIds,
       metadata,
-      authorId: entry.author_id ?? undefined,
+      authorId: entry.authorId ?? undefined,
       reach: this.mapReachLevel(entry.reach),
-      trustScore: entry.trust_score,
-      createdAt: entry.created_at,
-      updatedAt: entry.updated_at,
+      trustScore: entry.trustScore,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
     };
   }
 

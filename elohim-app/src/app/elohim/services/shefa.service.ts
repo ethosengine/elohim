@@ -25,71 +25,71 @@ export interface CustodianMetrics {
 
   // Health metrics
   health: {
-    uptime_percent: number;        // 0-100
+    uptimePercent: number;        // 0-100
     availability: boolean;         // Currently online
-    response_time_p50_ms: number;
-    response_time_p95_ms: number;
-    response_time_p99_ms: number;
-    error_rate: number;           // 0-1 (percentage)
-    sla_compliance: boolean;      // Meeting SLA targets
+    responseTimeP50Ms: number;
+    responseTimeP95Ms: number;
+    responseTimeP99Ms: number;
+    errorRate: number;           // 0-1 (percentage)
+    slaCompliance: boolean;      // Meeting SLA targets
   };
 
   // Storage metrics
   storage: {
-    total_capacity_bytes: number;
-    used_bytes: number;
-    free_bytes: number;
-    utilization_percent: number;
-    by_domain: Map<string, number>;
-    full_replica_bytes: number;
-    threshold_bytes: number;
-    erasure_coded_bytes: number;
+    totalCapacityBytes: number;
+    usedBytes: number;
+    freeBytes: number;
+    utilizationPercent: number;
+    byDomain: Map<string, number>;
+    fullReplicaBytes: number;
+    thresholdBytes: number;
+    erasureCodedBytes: number;
   };
 
   // Bandwidth metrics
   bandwidth: {
-    declared_mbps: number;
-    current_usage_mbps: number;
-    peak_usage_mbps: number;
-    average_usage_mbps: number;
-    utilization_percent: number;
-    inbound_mbps: number;
-    outbound_mbps: number;
-    by_domain: Map<string, number>;
+    declaredMbps: number;
+    currentUsageMbps: number;
+    peakUsageMbps: number;
+    averageUsageMbps: number;
+    utilizationPercent: number;
+    inboundMbps: number;
+    outboundMbps: number;
+    byDomain: Map<string, number>;
   };
 
   // Computation metrics
   computation: {
-    cpu_cores: number;
-    cpu_usage_percent: number;
-    memory_gb: number;
-    memory_usage_percent: number;
-    zome_ops_per_second: number;
-    reconstruction_workload_percent: number;
+    cpuCores: number;
+    cpuUsagePercent: number;
+    memoryGb: number;
+    memoryUsagePercent: number;
+    zomeOpsPerSecond: number;
+    reconstructionWorkloadPercent: number;
   };
 
   // Reputation metrics
   reputation: {
-    reliability_rating: number;     // 0-5 stars
-    speed_rating: number;           // 0-5 stars
-    reputation_score: number;       // 0-100
-    specialization_bonus: number;   // 0-0.1 (10%)
-    commitment_fulfillment: number; // 0-1 (percentage of commitments honored)
+    reliabilityRating: number;     // 0-5 stars
+    speedRating: number;           // 0-5 stars
+    reputationScore: number;       // 0-100
+    specializationBonus: number;   // 0-0.1 (10%)
+    commitmentFulfillment: number; // 0-1 (percentage of commitments honored)
   };
 
   // Economic metrics
   economic: {
-    steward_tier: 1 | 2 | 3 | 4;
-    price_per_gb: number;           // $/GB/month
-    monthly_earnings: number;
-    lifetime_earnings: number;
-    active_commitments: number;
-    total_committed_bytes: number;
+    stewardTier: 1 | 2 | 3 | 4;
+    pricePerGb: number;           // $/GB/month
+    monthlyEarnings: number;
+    lifetimeEarnings: number;
+    activeCommitments: number;
+    totalCommittedBytes: number;
   };
 
   // Timestamp
-  collected_at: number;
-  last_updated_at: number;
+  collectedAt: number;
+  lastUpdatedAt: number;
 }
 
 @Injectable({
@@ -242,7 +242,7 @@ export class ShefaService {
   async getRankedByHealth(limit: number = 10): Promise<CustodianMetrics[]> {
     const allMetrics = await this.getAllMetrics();
     return allMetrics
-      .sort((a, b) => b.health.uptime_percent - a.health.uptime_percent)
+      .sort((a, b) => b.health.uptimePercent - a.health.uptimePercent)
       .slice(0, limit);
   }
 
@@ -252,7 +252,7 @@ export class ShefaService {
   async getRankedBySpeed(limit: number = 10): Promise<CustodianMetrics[]> {
     const allMetrics = await this.getAllMetrics();
     return allMetrics
-      .sort((a, b) => a.health.response_time_p95_ms - b.health.response_time_p95_ms)
+      .sort((a, b) => a.health.responseTimeP95Ms - b.health.responseTimeP95Ms)
       .slice(0, limit);
   }
 
@@ -262,7 +262,7 @@ export class ShefaService {
   async getRankedByReputation(limit: number = 10): Promise<CustodianMetrics[]> {
     const allMetrics = await this.getAllMetrics();
     return allMetrics
-      .sort((a, b) => b.reputation.reputation_score - a.reputation.reputation_score)
+      .sort((a, b) => b.reputation.reputationScore - a.reputation.reputationScore)
       .slice(0, limit);
   }
 
@@ -272,7 +272,7 @@ export class ShefaService {
   async getAvailableCustodians(): Promise<CustodianMetrics[]> {
     const allMetrics = await this.getAllMetrics();
     return allMetrics.filter(
-      m => m.health.availability && m.health.uptime_percent >= 95 && m.health.sla_compliance
+      m => m.health.availability && m.health.uptimePercent >= 95 && m.health.slaCompliance
     );
   }
 
@@ -301,62 +301,62 @@ export class ShefaService {
 
     for (const metrics of allMetrics) {
       // High memory usage
-      if (metrics.computation.memory_usage_percent > 80) {
+      if (metrics.computation.memoryUsagePercent > 80) {
         alerts.push({
           custodianId: metrics.custodianId,
           severity: 'warning',
           category: 'resource',
-          message: `Memory usage high: ${metrics.computation.memory_usage_percent.toFixed(1)}%`,
+          message: `Memory usage high: ${metrics.computation.memoryUsagePercent.toFixed(1)}%`,
           suggestion: 'Consider upgrading memory or reducing commitments'
         });
       }
 
       // High latency
-      if (metrics.health.response_time_p95_ms > 1000) {
+      if (metrics.health.responseTimeP95Ms > 1000) {
         alerts.push({
           custodianId: metrics.custodianId,
           severity: 'warning',
           category: 'performance',
-          message: `High latency: p95=${metrics.health.response_time_p95_ms}ms`,
+          message: `High latency: p95=${metrics.health.responseTimeP95Ms}ms`,
           suggestion: 'Investigate network issues or reduce load'
         });
       }
 
       // Low uptime
-      if (metrics.health.uptime_percent < 95) {
+      if (metrics.health.uptimePercent < 95) {
         alerts.push({
           custodianId: metrics.custodianId,
           severity: 'critical',
           category: 'reliability',
-          message: `Low uptime: ${metrics.health.uptime_percent.toFixed(1)}%`,
+          message: `Low uptime: ${metrics.health.uptimePercent.toFixed(1)}%`,
           suggestion: 'Investigate outages and improve reliability'
         });
       }
 
       // High error rate
-      if (metrics.health.error_rate > 0.05) {
+      if (metrics.health.errorRate > 0.05) {
         alerts.push({
           custodianId: metrics.custodianId,
           severity: 'critical',
           category: 'error',
-          message: `High error rate: ${(metrics.health.error_rate * 100).toFixed(1)}%`,
+          message: `High error rate: ${(metrics.health.errorRate * 100).toFixed(1)}%`,
           suggestion: 'Check logs and debug failing operations'
         });
       }
 
       // Storage full
-      if (metrics.storage.utilization_percent > 90) {
+      if (metrics.storage.utilizationPercent > 90) {
         alerts.push({
           custodianId: metrics.custodianId,
           severity: 'critical',
           category: 'storage',
-          message: `Storage nearly full: ${metrics.storage.utilization_percent.toFixed(1)}%`,
+          message: `Storage nearly full: ${metrics.storage.utilizationPercent.toFixed(1)}%`,
           suggestion: 'Expand storage capacity or reduce commitments'
         });
       }
 
       // SLA not met
-      if (!metrics.health.sla_compliance) {
+      if (!metrics.health.slaCompliance) {
         alerts.push({
           custodianId: metrics.custodianId,
           severity: 'critical',
@@ -386,9 +386,9 @@ export class ShefaService {
 
     for (const metrics of allMetrics) {
       // Available bandwidth opportunity
-      const avgUtilization = (metrics.bandwidth.current_usage_mbps / metrics.bandwidth.declared_mbps) * 100;
+      const avgUtilization = (metrics.bandwidth.currentUsageMbps / metrics.bandwidth.declaredMbps) * 100;
       if (avgUtilization < 50) {
-        const availableMbps = metrics.bandwidth.declared_mbps - metrics.bandwidth.current_usage_mbps;
+        const availableMbps = metrics.bandwidth.declaredMbps - metrics.bandwidth.currentUsageMbps;
         recommendations.push({
           custodianId: metrics.custodianId,
           category: 'capacity',
@@ -398,16 +398,16 @@ export class ShefaService {
       }
 
       // CPU capacity opportunity
-      if (metrics.computation.cpu_usage_percent < 50) {
+      if (metrics.computation.cpuUsagePercent < 50) {
         recommendations.push({
           custodianId: metrics.custodianId,
           category: 'capacity',
-          opportunity: `Significant CPU capacity available (${Math.round(100 - metrics.computation.cpu_usage_percent)}%) - take on computation work`
+          opportunity: `Significant CPU capacity available (${Math.round(100 - metrics.computation.cpuUsagePercent)}%) - take on computation work`
         });
       }
 
       // Tier promotion opportunity
-      if (metrics.economic.steward_tier < 4 && metrics.health.uptime_percent >= 99) {
+      if (metrics.economic.stewardTier < 4 && metrics.health.uptimePercent >= 99) {
         recommendations.push({
           custodianId: metrics.custodianId,
           category: 'tier',
@@ -416,7 +416,7 @@ export class ShefaService {
       }
 
       // Specialization opportunity
-      if (metrics.reputation.specialization_bonus < 0.05) {
+      if (metrics.reputation.specializationBonus < 0.05) {
         recommendations.push({
           custodianId: metrics.custodianId,
           category: 'specialization',

@@ -32,52 +32,52 @@ import {
 
 export interface CreateContentInput {
   id: string;
-  content_type: string;
+  contentType: string;
   title: string;
   description: string;
   summary: string | null;
   content: string;
-  content_format: string;
+  contentFormat: string;
   tags: string[];
-  source_path: string | null;
-  related_node_ids: string[];
+  sourcePath: string | null;
+  relatedNodeIds: string[];
   reach: string;
-  estimated_minutes: number | null;
-  thumbnail_url: string | null;
-  metadata_json: string;
+  estimatedMinutes: number | null;
+  thumbnailUrl: string | null;
+  metadataJson: string;
   // Content manifest fields (sparse DHT - blob storage)
-  blob_cid: string | null;           // CID pointing to elohim-storage blob
-  content_size_bytes: number | null; // Size of content body
-  content_hash: string | null;       // SHA256 of content body
-  blob_hash?: string;                // SHA256 hash of ZIP blob for html5-app content
+  blobCid: string | null;           // CID pointing to elohim-storage blob
+  contentSizeBytes: number | null; // Size of content body
+  contentHash: string | null;       // SHA256 of content body
+  blobHash?: string;                // SHA256 hash of ZIP blob for html5-app content
 }
 
 export interface CreateLearningPathInput {
   id: string;
   title: string;
   description: string;
-  created_by: string;
+  createdBy: string;
   visibility: string;
   tags: string[];
 }
 
 export interface CreatePathStepInput {
   id: string;
-  path_id: string;
-  resource_id: string;
-  step_type: string;
-  order_index: number;
-  completion_criteria?: string;
+  pathId: string;
+  resourceId: string;
+  stepType: string;
+  orderIndex: number;
+  completionCriteria?: string;
 }
 
 export interface CreateContentMasteryInput {
   id: string;
-  human_id: string;
-  content_id: string;
-  mastery_level: string;
-  mastery_level_index: number;
-  freshness_score: number;
-  last_engagement_type: string;
+  humanId: string;
+  contentId: string;
+  masteryLevel: string;
+  masteryLevelIndex: number;
+  freshnessScore: number;
+  lastEngagementType: string;
 }
 
 // =============================================================================
@@ -115,14 +115,14 @@ export function validateContent(content: CreateContentInput): ValidationResult {
   if (!content.title || content.title.trim() === '') {
     errors.push('Content title is required');
   }
-  if (!content.content_type || content.content_type.trim() === '') {
+  if (!content.contentType || content.contentType.trim() === '') {
     errors.push('Content type is required');
   }
 
   // Enum validation (deterministic)
-  if (content.content_type && !CONTENT_TYPES.includes(content.content_type as any)) {
+  if (content.contentType && !CONTENT_TYPES.includes(content.contentType as any)) {
     errors.push(
-      `Invalid content_type '${content.content_type}'. Must be one of: ${CONTENT_TYPES.join(', ')}`
+      `Invalid contentType '${content.contentType}'. Must be one of: ${CONTENT_TYPES.join(', ')}`
     );
   }
 
@@ -132,14 +132,14 @@ export function validateContent(content: CreateContentInput): ValidationResult {
     );
   }
 
-  if (content.content_format && !CONTENT_FORMATS.includes(content.content_format as any)) {
+  if (content.contentFormat && !CONTENT_FORMATS.includes(content.contentFormat as any)) {
     errors.push(
-      `Invalid content_format '${content.content_format}'. Must be one of: ${CONTENT_FORMATS.join(', ')}`
+      `Invalid contentFormat '${content.contentFormat}'. Must be one of: ${CONTENT_FORMATS.join(', ')}`
     );
   }
 
   // Related ID validation (structure only, not existence)
-  for (const relatedId of content.related_node_ids || []) {
+  for (const relatedId of content.relatedNodeIds || []) {
     if (!relatedId || relatedId.trim() === '') {
       errors.push('Related content ID cannot be empty');
     }
@@ -170,8 +170,8 @@ export function validateLearningPath(path: CreateLearningPathInput): ValidationR
   if (!path.title || path.title.trim() === '') {
     errors.push('LearningPath title is required');
   }
-  if (!path.created_by || path.created_by.trim() === '') {
-    errors.push('LearningPath created_by is required');
+  if (!path.createdBy || path.createdBy.trim() === '') {
+    errors.push('LearningPath createdBy is required');
   }
 
   // Enum validation
@@ -203,17 +203,17 @@ export function validatePathStep(step: CreatePathStepInput): ValidationResult {
   if (!step.id || step.id.trim() === '') {
     errors.push('PathStep id is required');
   }
-  if (!step.path_id || step.path_id.trim() === '') {
-    errors.push('PathStep path_id is required');
+  if (!step.pathId || step.pathId.trim() === '') {
+    errors.push('PathStep pathId is required');
   }
-  if (!step.resource_id || step.resource_id.trim() === '') {
-    errors.push('PathStep resource_id is required');
+  if (!step.resourceId || step.resourceId.trim() === '') {
+    errors.push('PathStep resourceId is required');
   }
 
   // Enum validation
-  if (step.step_type && !STEP_TYPES.includes(step.step_type as any)) {
+  if (step.stepType && !STEP_TYPES.includes(step.stepType as any)) {
     errors.push(
-      `Invalid step_type '${step.step_type}'. Must be one of: ${STEP_TYPES.join(', ')}`
+      `Invalid stepType '${step.stepType}'. Must be one of: ${STEP_TYPES.join(', ')}`
     );
   }
 
@@ -239,40 +239,40 @@ export function validateContentMastery(mastery: CreateContentMasteryInput): Vali
   if (!mastery.id || mastery.id.trim() === '') {
     errors.push('ContentMastery id is required');
   }
-  if (!mastery.human_id || mastery.human_id.trim() === '') {
-    errors.push('ContentMastery human_id is required');
+  if (!mastery.humanId || mastery.humanId.trim() === '') {
+    errors.push('ContentMastery humanId is required');
   }
-  if (!mastery.content_id || mastery.content_id.trim() === '') {
-    errors.push('ContentMastery content_id is required');
+  if (!mastery.contentId || mastery.contentId.trim() === '') {
+    errors.push('ContentMastery contentId is required');
   }
 
   // Enum validation
-  if (mastery.mastery_level && !MASTERY_LEVELS.includes(mastery.mastery_level as any)) {
+  if (mastery.masteryLevel && !MASTERY_LEVELS.includes(mastery.masteryLevel as any)) {
     errors.push(
-      `Invalid mastery_level '${mastery.mastery_level}'. Must be one of: ${MASTERY_LEVELS.join(', ')}`
+      `Invalid masteryLevel '${mastery.masteryLevel}'. Must be one of: ${MASTERY_LEVELS.join(', ')}`
     );
   }
 
   // Range validation
-  if (mastery.freshness_score < 0.0 || mastery.freshness_score > 1.0) {
+  if (mastery.freshnessScore < 0.0 || mastery.freshnessScore > 1.0) {
     errors.push(
-      `freshness_score ${mastery.freshness_score} out of range (0.0-1.0)`
+      `freshnessScore ${mastery.freshnessScore} out of range (0.0-1.0)`
     );
   }
 
   // Engagement type validation
-  if (mastery.last_engagement_type && !ENGAGEMENT_TYPES.includes(mastery.last_engagement_type as any)) {
+  if (mastery.lastEngagementType && !ENGAGEMENT_TYPES.includes(mastery.lastEngagementType as any)) {
     errors.push(
-      `Invalid last_engagement_type '${mastery.last_engagement_type}'. Must be one of: ${ENGAGEMENT_TYPES.join(', ')}`
+      `Invalid lastEngagementType '${mastery.lastEngagementType}'. Must be one of: ${ENGAGEMENT_TYPES.join(', ')}`
     );
   }
 
-  // Cross-field validation: mastery_level_index should match mastery_level
-  if (mastery.mastery_level) {
-    const expectedIndex = MASTERY_LEVELS.indexOf(mastery.mastery_level as any);
-    if (expectedIndex !== -1 && mastery.mastery_level_index !== expectedIndex) {
+  // Cross-field validation: masteryLevelIndex should match mastery_level
+  if (mastery.masteryLevel) {
+    const expectedIndex = MASTERY_LEVELS.indexOf(mastery.masteryLevel as any);
+    if (expectedIndex !== -1 && mastery.masteryLevelIndex !== expectedIndex) {
       errors.push(
-        `mastery_level_index ${mastery.mastery_level_index} doesn't match mastery_level '${mastery.mastery_level}' (expected ${expectedIndex})`
+        `masteryLevelIndex ${mastery.masteryLevelIndex} doesn't match masteryLevel '${mastery.masteryLevel}' (expected ${expectedIndex})`
       );
     }
   }

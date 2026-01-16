@@ -314,14 +314,14 @@ export class TransactionImportService {
     plaidTransactions: PlaidTransaction[]
   ): NormalizedTransaction[] {
     return plaidTransactions.map(txn => ({
-      plaidTransactionId: txn.transaction_id,
-      plaidAccountId: txn.account_id,
+      plaidTransactionId: txn.transactionId,
+      plaidAccountId: txn.accountId,
       timestamp: `${txn.date}T00:00:00Z`, // Plaid gives date only
       type: this.determineTransactionType(txn),
       amount: Math.abs(txn.amount),
-      currency: txn.iso_currency_code || 'USD',
+      currency: txn.isoCurrencyCode || 'USD',
       description: txn.name,
-      merchantName: txn.merchant_name,
+      merchantName: txn.merchantName,
       raw: txn,
     }));
   }

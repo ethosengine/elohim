@@ -46,8 +46,9 @@ pub struct CreateHumanRelationshipInput {
 fn default_intimacy() -> String { intimacy_levels::RECOGNITION.to_string() }
 fn default_private_reach() -> String { "private".to_string() }
 
-/// Query parameters for listing human relationships
+/// Query parameters for listing human relationships - camelCase for URL params
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HumanRelationshipQuery {
     /// Filter by party (either side)
     pub party_id: Option<String>,

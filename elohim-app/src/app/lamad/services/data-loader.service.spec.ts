@@ -113,9 +113,9 @@ describe('DataLoaderService', () => {
     mockProjectionApi.isHealthy.and.returnValue(of(false));
 
     // Default mock returns
-    mockHolochainContent.getStats.and.returnValue(of({ total_count: 0, by_type: {} }));
+    mockHolochainContent.getStats.and.returnValue(of({ totalCount: 0, byType: {} }));
     mockHolochainContent.isAvailable.and.returnValue(true);
-    (mockHolochainContent.getPathIndex as jasmine.Spy).and.returnValue(Promise.resolve({ paths: [], total_count: 0, last_updated: '' }));
+    (mockHolochainContent.getPathIndex as jasmine.Spy).and.returnValue(Promise.resolve({ paths: [], totalCount: 0, lastUpdated: '' }));
     (mockHolochainContent.getPathWithSteps as jasmine.Spy).and.returnValue(Promise.resolve(null));
 
     // IndexedDB mock returns (disabled by default to use Holochain)

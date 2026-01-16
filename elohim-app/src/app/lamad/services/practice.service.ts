@@ -349,12 +349,8 @@ export class PracticeService {
   getActiveCount(): number {
     const pool = this.poolSubject.value;
     if (!pool) return 0;
-    try {
-      const ids = JSON.parse(pool.active_content_ids_json) as string[];
-      return ids.length;
-    } catch {
-      return 0;
-    }
+    const ids = (pool.activeContentIds ?? []) as string[];
+    return ids.length;
   }
 
   /**
@@ -363,12 +359,8 @@ export class PracticeService {
   getRefreshCount(): number {
     const pool = this.poolSubject.value;
     if (!pool) return 0;
-    try {
-      const ids = JSON.parse(pool.refresh_queue_ids_json) as string[];
-      return ids.length;
-    } catch {
-      return 0;
-    }
+    const ids = (pool.refreshQueueIds ?? []) as string[];
+    return ids.length;
   }
 
   /**
@@ -377,12 +369,8 @@ export class PracticeService {
   getDiscoveryCount(): number {
     const pool = this.poolSubject.value;
     if (!pool) return 0;
-    try {
-      const candidates = JSON.parse(pool.discovery_candidates_json) as unknown[];
-      return candidates.length;
-    } catch {
-      return 0;
-    }
+    const candidates = (pool.discoveryCandidates ?? []) as unknown[];
+    return candidates.length;
   }
 
   /**

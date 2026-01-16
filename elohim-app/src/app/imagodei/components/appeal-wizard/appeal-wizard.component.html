@@ -32,7 +32,7 @@
           class="step-indicator"
           [class.active]="currentStep() === step.id"
           [class.completed]="step.completed && currentStep() !== step.id"
-          [disabled]="i > currentStepIndex() && !steps()[i - 1]?.completed"
+          [disabled]="i > currentStepIndex() && !steps()[i - 1].completed"
           (click)="goToStep(step.id)">
           <span class="step-number">{{ i + 1 }}</span>
           <span class="step-label">{{ step.label }}</span>

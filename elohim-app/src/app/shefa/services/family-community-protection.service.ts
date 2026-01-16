@@ -25,6 +25,11 @@
  * - CustodianCommitment entries (Holochain DHT)
  * - Agent status service (heartbeat health)
  * - Geographic location service
+ *
+ * TODO: [HOLOCHAIN-ZOME] Zome call payloads in this service use snake_case
+ * (e.g., steward_id, agent_id) because Holochain zomes are Rust and expect
+ * snake_case field names. This cannot be changed without updating the Rust
+ * zomes and running a DNA migration.
  */
 
 import { Injectable } from '@angular/core';
@@ -45,41 +50,41 @@ import { HolochainClientService } from '@app/elohim/services/holochain-client.se
  */
 interface RawCustodianCommitment {
   id: string;
-  steward_id: string;
-  custodian_id: string;
-  custodian_name?: string;
-  custodian_type: 'family' | 'friend' | 'community' | 'professional' | 'institution';
-  data_description?: string;
-  total_gb: number;
-  shard_count: number;
-  shard_threshold?: number; // Minimum shards needed to recover
-  redundancy_level: number; // 1, 2, 3, etc.
+  stewardId: string;
+  custodianId: string;
+  custodianName?: string;
+  custodianType: 'family' | 'friend' | 'community' | 'professional' | 'institution';
+  dataDescription?: string;
+  totalGb: number;
+  shardCount: number;
+  shardThreshold?: number; // Minimum shards needed to recover
+  redundancyLevel: number; // 1, 2, 3, etc.
   strategy: 'full_replica' | 'threshold_split' | 'erasure_coded';
   status: 'active' | 'pending' | 'breached' | 'expired';
   relationship?: string;
-  trust_level?: number;
+  trustLevel?: number;
   location?: {
     region: string;
     country: string;
     latitude?: number;
     longitude?: number;
   };
-  start_date: string;
-  expiry_date: string;
-  renewal_status: 'auto-renew' | 'manual' | 'expired';
-  created_at: string;
-  updated_at: string;
+  startDate: string;
+  expiryDate: string;
+  renewalStatus: 'auto-renew' | 'manual' | 'expired';
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
  * Agent status from heartbeat service
  */
 interface AgentStatus {
-  agent_id: string;
-  uptime_percent: number;
-  last_heartbeat: string;
-  response_time_ms: number;
-  consecutive_failures?: number;
+  agentId: string;
+  uptimePercent: number;
+  lastHeartbeat: string;
+  responseTimeMs: number;
+  consecutiveFailures?: number;
 }
 
 /**
@@ -152,7 +157,7 @@ export class FamilyCommunityProtectionService {
             this.holochain.callZome<AgentStatus>({
               zomeName: 'content_store',
               fnName: 'get_agent_status',
-              payload: { agent_id: c.custodian_id },
+              payload: { agent_id: c.custodianId },
             })
           ).pipe(
             map(statusResult => ({
@@ -182,20 +187,20 @@ export class FamilyCommunityProtectionService {
   ): FamilyCommunityProtectionStatus {
     // Convert to CustodianNode objects
     const custodians: CustodianNode[] = commitmentHealthPairs.map(pair => ({
-      id: pair.commitment.custodian_id,
-      name: pair.commitment.custodian_name || pair.commitment.custodian_id,
-      type: pair.commitment.custodian_type,
+      id: pair.commitment.custodianId,
+      name: pair.commitment.custodianName || pair.commitment.custodianId,
+      type: pair.commitment.custodianType,
       location: pair.commitment.location,
       dataStored: {
-        totalGB: pair.commitment.total_gb,
-        shardCount: pair.commitment.shard_count,
-        redundancyLevel: pair.commitment.redundancy_level,
+        totalGB: pair.commitment.totalGb,
+        shardCount: pair.commitment.shardCount,
+        redundancyLevel: pair.commitment.redundancyLevel,
       },
       health: pair.status
         ? {
-            upPercent: pair.status.uptime_percent,
-            lastHeartbeat: pair.status.last_heartbeat,
-            responseTime: pair.status.response_time_ms,
+            upPercent: pair.status.uptimePercent,
+            lastHeartbeat: pair.status.lastHeartbeat,
+            responseTime: pair.status.responseTimeMs,
           }
         : {
             upPercent: 0,
@@ -205,12 +210,12 @@ export class FamilyCommunityProtectionService {
       commitment: {
         id: pair.commitment.id,
         status: pair.commitment.status,
-        startDate: pair.commitment.start_date,
-        expiryDate: pair.commitment.expiry_date,
-        renewalStatus: pair.commitment.renewal_status,
+        startDate: pair.commitment.startDate,
+        expiryDate: pair.commitment.expiryDate,
+        renewalStatus: pair.commitment.renewalStatus,
       },
-      trustLevel: pair.commitment.trust_level || 50,
-      relationship: pair.commitment.relationship || pair.commitment.custodian_type,
+      trustLevel: pair.commitment.trustLevel || 50,
+      relationship: pair.commitment.relationship || pair.commitment.custodianType,
     }));
 
     // Calculate redundancy metrics
@@ -290,7 +295,7 @@ export class FamilyCommunityProtectionService {
 
     // Calculate average redundancy factor
     const avgRedundancy =
-      commitmentHealthPairs.reduce((sum, pair) => sum + pair.commitment.redundancy_level, 0) / commitmentHealthPairs.length;
+      commitmentHealthPairs.reduce((sum, pair) => sum + pair.commitment.redundancyLevel, 0) / commitmentHealthPairs.length;
 
     // Calculate recovery threshold
     let recoveryThreshold: number;
@@ -300,7 +305,7 @@ export class FamilyCommunityProtectionService {
     } else if (strategy === 'threshold_split') {
       // Threshold: need m-of-n shards
       const avgShardThreshold = commitmentHealthPairs.reduce(
-        (sum, pair) => sum + (pair.commitment.shard_threshold || Math.ceil(pair.commitment.shard_count / 2)),
+        (sum, pair) => sum + (pair.commitment.shardThreshold || Math.ceil(pair.commitment.shardCount / 2)),
         0
       ) / commitmentHealthPairs.length;
       recoveryThreshold = Math.ceil(avgShardThreshold);

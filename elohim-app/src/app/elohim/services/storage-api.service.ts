@@ -36,27 +36,23 @@ import { Observable, throwError, of } from 'rxjs';
 import { map, catchError, timeout } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 
-// Wire types from generated (ts-rs from Diesel models)
+// View types from generated (Rust API now returns camelCase directly)
 import type {
-  Relationship,
-  HumanRelationship,
-  ContributorPresence,
-  EconomicEvent,
-  ContentMastery,
+  RelationshipView,
+  HumanRelationshipView as HumanRelationshipViewBase,
+  ContributorPresenceView as ContributorPresenceViewBase,
+  EconomicEventView,
+  ContentMasteryView,
 } from '@elohim/storage-client/generated';
 
-// View types and transformers from adapter
+// Extended view types and helpers from adapter
 import {
-  RelationshipView,
-  transformRelationshipFromWire,
   HumanRelationshipView,
-  transformHumanRelationshipFromWire,
   ContributorPresenceView,
-  transformContributorPresenceFromWire,
-  EconomicEventView,
-  transformEconomicEventFromWire,
-  ContentMasteryView,
-  transformContentMasteryFromWire,
+  withFullyConsentedFlag,
+  withFullyConsentedFlags,
+  withEstablishingContentIds,
+  withEstablishingContentIdsArray,
 } from '@app/elohim/adapters/storage-types.adapter';
 
 // Query and input types from domain models (these remain domain-specific)
@@ -74,7 +70,6 @@ import {
   BulkAllocationResult,
   fromWireStewardshipAllocation,
   fromWireContentStewardship,
-  toWireCreateAllocationInput,
 } from '@app/lamad/models/stewardship-allocation.model';
 
 /**
@@ -161,22 +156,22 @@ export class StorageApiService {
 
   /**
    * List content relationships with optional filters.
+   * Query params use camelCase.
    */
   getRelationships(query?: RelationshipQuery): Observable<RelationshipView[]> {
-    let params = new HttpParams().set('app_id', this.appId);
+    let params = new HttpParams().set('appId', this.appId);
 
-    if (query?.sourceId) params = params.set('source_id', query.sourceId);
-    if (query?.targetId) params = params.set('target_id', query.targetId);
-    if (query?.relationshipType) params = params.set('relationship_type', query.relationshipType);
-    if (query?.minConfidence) params = params.set('min_confidence', query.minConfidence.toString());
-    if (query?.inferenceSource) params = params.set('inference_source', query.inferenceSource);
-    if (query?.bidirectionalOnly) params = params.set('bidirectional_only', 'true');
+    if (query?.sourceId) params = params.set('sourceId', query.sourceId);
+    if (query?.targetId) params = params.set('targetId', query.targetId);
+    if (query?.relationshipType) params = params.set('relationshipType', query.relationshipType);
+    if (query?.minConfidence) params = params.set('minConfidence', query.minConfidence.toString());
+    if (query?.inferenceSource) params = params.set('inferenceSource', query.inferenceSource);
+    if (query?.bidirectionalOnly) params = params.set('bidirectionalOnly', 'true');
     if (query?.limit) params = params.set('limit', query.limit.toString());
     if (query?.offset) params = params.set('offset', query.offset.toString());
 
-    return this.http.get<Relationship[]>(`${this.baseUrl}/db/relationships`, { params }).pipe(
+    return this.http.get<RelationshipView[]>(`${this.baseUrl}/db/relationships`, { params }).pipe(
       timeout(this.defaultTimeoutMs),
-      map(wires => wires.map(w => transformRelationshipFromWire(w))),
       catchError(error => this.handleError('getRelationships', error))
     );
   }
@@ -195,23 +190,23 @@ export class StorageApiService {
 
   /**
    * Create a new relationship.
+   * API accepts camelCase InputView with parsed JSON objects.
    */
   createRelationship(input: CreateRelationshipInput): Observable<RelationshipView> {
     const body = {
-      source_id: input.sourceId,
-      target_id: input.targetId,
-      relationship_type: input.relationshipType,
+      sourceId: input.sourceId,
+      targetId: input.targetId,
+      relationshipType: input.relationshipType,
       confidence: input.confidence ?? 1.0,
-      inference_source: input.inferenceSource ?? 'author',
-      create_inverse: input.createInverse ?? false,
-      inverse_type: input.inverseType,
-      provenance_chain_json: input.provenanceChain ? JSON.stringify(input.provenanceChain) : null,
-      metadata_json: input.metadataJson,
+      inferenceSource: input.inferenceSource ?? 'author',
+      createInverse: input.createInverse ?? false,
+      inverseType: input.inverseType,
+      provenanceChain: input.provenanceChain ?? null,
+      metadata: input.metadataJson ? JSON.parse(input.metadataJson) : null,
     };
 
-    return this.http.post<Relationship>(`${this.baseUrl}/db/relationships`, body).pipe(
+    return this.http.post<RelationshipView>(`${this.baseUrl}/db/relationships`, body).pipe(
       timeout(this.defaultTimeoutMs),
-      map(w => transformRelationshipFromWire(w)),
       catchError(error => this.handleError('createRelationship', error))
     );
   }
@@ -224,21 +219,21 @@ export class StorageApiService {
    * List human relationships with optional filters.
    */
   getHumanRelationships(query?: HumanRelationshipQuery): Observable<HumanRelationshipView[]> {
-    let params = new HttpParams().set('app_id', 'imagodei');
+    let params = new HttpParams().set('appId', 'imagodei');
 
-    if (query?.partyId) params = params.set('party_id', query.partyId);
-    if (query?.partyAId) params = params.set('party_a_id', query.partyAId);
-    if (query?.partyBId) params = params.set('party_b_id', query.partyBId);
-    if (query?.relationshipType) params = params.set('relationship_type', query.relationshipType);
-    if (query?.minIntimacyLevel) params = params.set('min_intimacy_level', query.minIntimacyLevel);
-    if (query?.fullyConsentedOnly) params = params.set('fully_consented_only', 'true');
-    if (query?.custodyEnabledOnly) params = params.set('custody_enabled_only', 'true');
+    if (query?.partyId) params = params.set('partyId', query.partyId);
+    if (query?.partyAId) params = params.set('partyAId', query.partyAId);
+    if (query?.partyBId) params = params.set('partyBId', query.partyBId);
+    if (query?.relationshipType) params = params.set('relationshipType', query.relationshipType);
+    if (query?.minIntimacyLevel) params = params.set('minIntimacyLevel', query.minIntimacyLevel);
+    if (query?.fullyConsentedOnly) params = params.set('fullyConsentedOnly', 'true');
+    if (query?.custodyEnabledOnly) params = params.set('custodyEnabledOnly', 'true');
     if (query?.limit) params = params.set('limit', query.limit.toString());
     if (query?.offset) params = params.set('offset', query.offset.toString());
 
-    return this.http.get<HumanRelationship[]>(`${this.baseUrl}/db/human-relationships`, { params }).pipe(
+    return this.http.get<HumanRelationshipViewBase[]>(`${this.baseUrl}/db/human-relationships`, { params }).pipe(
       timeout(this.defaultTimeoutMs),
-      map(wires => wires.map(w => transformHumanRelationshipFromWire(w))),
+      map(views => withFullyConsentedFlags(views)),
       catchError(error => this.handleError('getHumanRelationships', error))
     );
   }
@@ -252,20 +247,21 @@ export class StorageApiService {
 
   /**
    * Create a new human relationship.
+   * API accepts camelCase InputView with parsed JSON objects.
    */
   createHumanRelationship(input: CreateHumanRelationshipInput): Observable<HumanRelationshipView> {
     const body = {
-      party_a_id: input.partyAId,
-      party_b_id: input.partyBId,
-      relationship_type: input.relationshipType,
-      intimacy_level: input.intimacyLevel ?? 'recognition',
-      is_bidirectional: input.isBidirectional ?? false,
-      context_json: input.context ? JSON.stringify(input.context) : null,
+      partyAId: input.partyAId,
+      partyBId: input.partyBId,
+      relationshipType: input.relationshipType,
+      intimacyLevel: input.intimacyLevel ?? 'recognition',
+      isBidirectional: input.isBidirectional ?? false,
+      context: input.context ?? null,
     };
 
-    return this.http.post<HumanRelationship>(`${this.baseUrl}/db/human-relationships`, body).pipe(
+    return this.http.post<HumanRelationshipViewBase>(`${this.baseUrl}/db/human-relationships`, body).pipe(
       timeout(this.defaultTimeoutMs),
-      map(w => transformHumanRelationshipFromWire(w)),
+      map(view => withFullyConsentedFlag(view)),
       catchError(error => this.handleError('createHumanRelationship', error))
     );
   }
@@ -278,18 +274,18 @@ export class StorageApiService {
    * List contributor presences with optional filters.
    */
   getContributorPresences(query?: PresenceQuery): Observable<ContributorPresenceView[]> {
-    let params = new HttpParams().set('app_id', this.appId);
+    let params = new HttpParams().set('appId', this.appId);
 
-    if (query?.presenceState) params = params.set('presence_state', query.presenceState);
-    if (query?.stewardId) params = params.set('steward_id', query.stewardId);
-    if (query?.claimedAgentId) params = params.set('claimed_agent_id', query.claimedAgentId);
-    if (query?.minRecognitionScore) params = params.set('min_recognition_score', query.minRecognitionScore.toString());
+    if (query?.presenceState) params = params.set('presenceState', query.presenceState);
+    if (query?.stewardId) params = params.set('stewardId', query.stewardId);
+    if (query?.claimedAgentId) params = params.set('claimedAgentId', query.claimedAgentId);
+    if (query?.minRecognitionScore) params = params.set('minRecognitionScore', query.minRecognitionScore.toString());
     if (query?.limit) params = params.set('limit', query.limit.toString());
     if (query?.offset) params = params.set('offset', query.offset.toString());
 
-    return this.http.get<ContributorPresence[]>(`${this.baseUrl}/db/presences`, { params }).pipe(
+    return this.http.get<ContributorPresenceViewBase[]>(`${this.baseUrl}/db/presences`, { params }).pipe(
       timeout(this.defaultTimeoutMs),
-      map(wires => wires.map(w => transformContributorPresenceFromWire(w))),
+      map(views => withEstablishingContentIdsArray(views)),
       catchError(error => this.handleError('getContributorPresences', error))
     );
   }
@@ -298,9 +294,9 @@ export class StorageApiService {
    * Get a specific contributor presence.
    */
   getContributorPresence(presenceId: string): Observable<ContributorPresenceView | null> {
-    return this.http.get<ContributorPresence | null>(`${this.baseUrl}/db/presences/${presenceId}`).pipe(
+    return this.http.get<ContributorPresenceViewBase | null>(`${this.baseUrl}/db/presences/${presenceId}`).pipe(
       timeout(this.defaultTimeoutMs),
-      map(w => w ? transformContributorPresenceFromWire(w) : null),
+      map(view => view ? withEstablishingContentIds(view) : null),
       catchError(error => {
         if ((error as any).status === 404) {
           return of(null);
@@ -325,17 +321,18 @@ export class StorageApiService {
 
   /**
    * Create a new contributor presence.
+   * API accepts camelCase InputView with parsed JSON objects.
    */
   createContributorPresence(input: CreatePresenceInput): Observable<ContributorPresenceView> {
     const body = {
-      display_name: input.displayName,
-      establishing_content_ids_json: JSON.stringify(input.establishingContentIds),
-      external_identifiers_json: input.externalIdentifiers ? JSON.stringify(input.externalIdentifiers) : null,
+      displayName: input.displayName,
+      establishingContentIds: input.establishingContentIds,
+      externalIdentifiers: input.externalIdentifiers ?? null,
     };
 
-    return this.http.post<ContributorPresence>(`${this.baseUrl}/db/presences`, body).pipe(
+    return this.http.post<ContributorPresenceViewBase>(`${this.baseUrl}/db/presences`, body).pipe(
       timeout(this.defaultTimeoutMs),
-      map(w => transformContributorPresenceFromWire(w)),
+      map(view => withEstablishingContentIds(view)),
       catchError(error => this.handleError('createContributorPresence', error))
     );
   }
@@ -348,23 +345,22 @@ export class StorageApiService {
    * List economic events with optional filters.
    */
   getEconomicEvents(query?: EventQuery): Observable<EconomicEventView[]> {
-    let params = new HttpParams().set('app_id', 'shefa');
+    let params = new HttpParams().set('appId', 'shefa');
 
     if (query?.agentId) {
       params = params.set(query.agentRole === 'provider' ? 'provider' : 'receiver', query.agentId);
     }
     if (query?.actions?.length) params = params.set('action', query.actions.join(','));
-    if (query?.eventTypes?.length) params = params.set('lamad_event_type', query.eventTypes.join(','));
-    if (query?.contentId) params = params.set('content_id', query.contentId);
-    if (query?.pathId) params = params.set('path_id', query.pathId);
+    if (query?.eventTypes?.length) params = params.set('lamadEventType', query.eventTypes.join(','));
+    if (query?.contentId) params = params.set('contentId', query.contentId);
+    if (query?.pathId) params = params.set('pathId', query.pathId);
     if (query?.from) params = params.set('from', query.from);
     if (query?.to) params = params.set('to', query.to);
     if (query?.limit) params = params.set('limit', query.limit.toString());
     if (query?.offset) params = params.set('offset', query.offset.toString());
 
-    return this.http.get<EconomicEvent[]>(`${this.baseUrl}/db/events`, { params }).pipe(
+    return this.http.get<EconomicEventView[]>(`${this.baseUrl}/db/events`, { params }).pipe(
       timeout(this.defaultTimeoutMs),
-      map(wires => wires.map(w => transformEconomicEventFromWire(w))),
       catchError(error => this.handleError('getEconomicEvents', error))
     );
   }
@@ -391,18 +387,17 @@ export class StorageApiService {
    * List content mastery records with optional filters.
    */
   getMasteryRecords(query?: MasteryQuery): Observable<ContentMasteryView[]> {
-    let params = new HttpParams().set('app_id', this.appId);
+    let params = new HttpParams().set('appId', this.appId);
 
-    if (query?.humanId) params = params.set('human_id', query.humanId);
-    if (query?.contentId) params = params.set('content_id', query.contentId);
-    if (query?.minLevel) params = params.set('min_level', query.minLevel);
-    if (query?.needsRefresh) params = params.set('needs_refresh', 'true');
+    if (query?.humanId) params = params.set('humanId', query.humanId);
+    if (query?.contentId) params = params.set('contentId', query.contentId);
+    if (query?.minLevel) params = params.set('minLevel', query.minLevel);
+    if (query?.needsRefresh) params = params.set('needsRefresh', 'true');
     if (query?.limit) params = params.set('limit', query.limit.toString());
     if (query?.offset) params = params.set('offset', query.offset.toString());
 
-    return this.http.get<ContentMastery[]>(`${this.baseUrl}/db/mastery`, { params }).pipe(
+    return this.http.get<ContentMasteryView[]>(`${this.baseUrl}/db/mastery`, { params }).pipe(
       timeout(this.defaultTimeoutMs),
-      map(wires => wires.map(w => transformContentMasteryFromWire(w))),
       catchError(error => this.handleError('getMasteryRecords', error))
     );
   }
@@ -411,9 +406,8 @@ export class StorageApiService {
    * Get mastery for a specific human.
    */
   getMasteryForHuman(humanId: string): Observable<ContentMasteryView[]> {
-    return this.http.get<ContentMastery[]>(`${this.baseUrl}/db/mastery/human/${humanId}`).pipe(
+    return this.http.get<ContentMasteryView[]>(`${this.baseUrl}/db/mastery/human/${humanId}`).pipe(
       timeout(this.defaultTimeoutMs),
-      map(wires => wires.map(w => transformContentMasteryFromWire(w))),
       catchError(error => this.handleError('getMasteryForHuman', error))
     );
   }
@@ -437,18 +431,18 @@ export class StorageApiService {
 
   /**
    * Create or update mastery record.
+   * API accepts camelCase InputView.
    */
   upsertMastery(input: CreateMasteryInput): Observable<ContentMasteryView> {
     const body = {
-      human_id: input.humanId,
-      content_id: input.contentId,
-      mastery_level: input.masteryLevel ?? 'seen',
-      engagement_type: input.engagementType ?? 'view',
+      humanId: input.humanId,
+      contentId: input.contentId,
+      masteryLevel: input.masteryLevel ?? 'seen',
+      engagementType: input.engagementType ?? 'view',
     };
 
-    return this.http.post<ContentMastery>(`${this.baseUrl}/db/mastery`, body).pipe(
+    return this.http.post<ContentMasteryView>(`${this.baseUrl}/db/mastery`, body).pipe(
       timeout(this.defaultTimeoutMs),
-      map(w => transformContentMasteryFromWire(w)),
       catchError(error => this.handleError('upsertMastery', error))
     );
   }
@@ -472,6 +466,7 @@ export class StorageApiService {
 
   /**
    * Update custody setting on a human relationship.
+   * API accepts camelCase.
    */
   updateHumanRelationshipCustody(
     relationshipId: string,
@@ -480,7 +475,7 @@ export class StorageApiService {
   ): Observable<void> {
     return this.http.post<void>(
       `${this.baseUrl}/db/human-relationships/${relationshipId}/custody`,
-      { enabled, auto_custody: autoCustody }
+      { enabled, autoCustody }
     ).pipe(
       timeout(this.defaultTimeoutMs),
       catchError(error => this.handleError('updateHumanRelationshipCustody', error))
@@ -493,11 +488,12 @@ export class StorageApiService {
 
   /**
    * Initiate stewardship of a contributor presence.
+   * API accepts camelCase.
    */
   initiatePresenceStewardship(presenceId: string, stewardId: string): Observable<void> {
     return this.http.post<void>(
       `${this.baseUrl}/db/presences/${presenceId}/stewardship`,
-      { steward_id: stewardId }
+      { stewardId }
     ).pipe(
       timeout(this.defaultTimeoutMs),
       catchError(error => this.handleError('initiatePresenceStewardship', error))
@@ -508,9 +504,10 @@ export class StorageApiService {
    * Initiate a claim on a contributor presence.
    */
   initiatePresenceClaim(presenceId: string, agentId: string): Observable<void> {
+    // API accepts camelCase InputView
     return this.http.post<void>(
       `${this.baseUrl}/db/presences/${presenceId}/claim`,
-      { agent_id: agentId }
+      { agentId }
     ).pipe(
       timeout(this.defaultTimeoutMs),
       catchError(error => this.handleError('initiatePresenceClaim', error))
@@ -519,6 +516,7 @@ export class StorageApiService {
 
   /**
    * Verify a presence claim with evidence.
+   * API accepts camelCase InputView with parsed JSON objects.
    */
   verifyPresenceClaim(
     presenceId: string,
@@ -527,8 +525,8 @@ export class StorageApiService {
     return this.http.post<void>(
       `${this.baseUrl}/db/presences/${presenceId}/verify-claim`,
       {
-        verification_method: evidence.method,
-        evidence_json: JSON.stringify(evidence.data),
+        verificationMethod: evidence.method,
+        evidence: evidence.data,
       }
     ).pipe(
       timeout(this.defaultTimeoutMs),
@@ -542,26 +540,26 @@ export class StorageApiService {
 
   /**
    * Create a new economic event.
+   * API accepts camelCase InputView with parsed JSON objects.
    */
   createEconomicEvent(input: CreateEventInput): Observable<EconomicEventView> {
     const body = {
       action: input.action,
       provider: input.provider,
       receiver: input.receiver,
-      resource_conforms_to: input.resourceConformsTo,
-      resource_quantity_value: input.resourceQuantity?.value,
-      resource_quantity_unit: input.resourceQuantity?.unit,
-      lamad_event_type: input.lamadEventType,
-      content_id: input.contentId,
-      path_id: input.pathId,
-      contributor_presence_id: input.contributorPresenceId,
+      resourceConformsTo: input.resourceConformsTo,
+      resourceQuantityValue: input.resourceQuantity?.value,
+      resourceQuantityUnit: input.resourceQuantity?.unit,
+      lamadEventType: input.lamadEventType,
+      contentId: input.contentId,
+      pathId: input.pathId,
+      contributorPresenceId: input.contributorPresenceId,
       note: input.note,
-      metadata_json: input.metadata ? JSON.stringify(input.metadata) : null,
+      metadata: input.metadata ?? null,
     };
 
-    return this.http.post<EconomicEvent>(`${this.baseUrl}/db/events`, body).pipe(
+    return this.http.post<EconomicEventView>(`${this.baseUrl}/db/events`, body).pipe(
       timeout(this.defaultTimeoutMs),
-      map(w => transformEconomicEventFromWire(w)),
       catchError(error => this.handleError('createEconomicEvent', error))
     );
   }
@@ -574,12 +572,12 @@ export class StorageApiService {
    * List stewardship allocations with optional filters.
    */
   getStewardshipAllocations(query?: AllocationQuery): Observable<StewardshipAllocation[]> {
-    let params = new HttpParams().set('app_id', this.appId);
+    let params = new HttpParams().set('appId', this.appId);
 
-    if (query?.contentId) params = params.set('content_id', query.contentId);
-    if (query?.stewardPresenceId) params = params.set('steward_presence_id', query.stewardPresenceId);
-    if (query?.governanceState) params = params.set('governance_state', query.governanceState);
-    if (query?.activeOnly) params = params.set('active_only', 'true');
+    if (query?.contentId) params = params.set('contentId', query.contentId);
+    if (query?.stewardPresenceId) params = params.set('stewardPresenceId', query.stewardPresenceId);
+    if (query?.governanceState) params = params.set('governanceState', query.governanceState);
+    if (query?.activeOnly) params = params.set('activeOnly', 'true');
     if (query?.limit) params = params.set('limit', query.limit.toString());
     if (query?.offset) params = params.set('offset', query.offset.toString());
 
@@ -630,9 +628,19 @@ export class StorageApiService {
 
   /**
    * Create a new stewardship allocation.
+   * API accepts camelCase InputView with parsed JSON objects.
    */
   createStewardshipAllocation(input: CreateAllocationInput): Observable<StewardshipAllocation> {
-    const body = toWireCreateAllocationInput(input);
+    const body = {
+      contentId: input.contentId,
+      stewardPresenceId: input.stewardPresenceId,
+      allocationRatio: input.allocationRatio ?? 1.0,
+      allocationMethod: input.allocationMethod ?? 'manual',
+      contributionType: input.contributionType ?? 'inherited',
+      contributionEvidence: input.contributionEvidenceJson ? JSON.parse(input.contributionEvidenceJson) : null,
+      note: input.note,
+      metadata: input.metadataJson ? JSON.parse(input.metadataJson) : null,
+    };
 
     return this.http.post<Record<string, unknown>>(`${this.baseUrl}/db/allocations`, body).pipe(
       timeout(this.defaultTimeoutMs),
@@ -643,18 +651,19 @@ export class StorageApiService {
 
   /**
    * Update a stewardship allocation.
+   * API accepts camelCase InputView with parsed JSON objects.
    */
   updateStewardshipAllocation(allocationId: string, input: UpdateAllocationInput): Observable<StewardshipAllocation> {
     const body: Record<string, unknown> = {};
-    if (input.allocationRatio !== undefined) body['allocation_ratio'] = input.allocationRatio;
-    if (input.allocationMethod) body['allocation_method'] = input.allocationMethod;
-    if (input.contributionType) body['contribution_type'] = input.contributionType;
-    if (input.contributionEvidenceJson) body['contribution_evidence_json'] = input.contributionEvidenceJson;
-    if (input.governanceState) body['governance_state'] = input.governanceState;
-    if (input.disputeId) body['dispute_id'] = input.disputeId;
-    if (input.disputeReason) body['dispute_reason'] = input.disputeReason;
-    if (input.elohimRatifiedAt) body['elohim_ratified_at'] = input.elohimRatifiedAt;
-    if (input.elohimRatifierId) body['elohim_ratifier_id'] = input.elohimRatifierId;
+    if (input.allocationRatio !== undefined) body['allocationRatio'] = input.allocationRatio;
+    if (input.allocationMethod) body['allocationMethod'] = input.allocationMethod;
+    if (input.contributionType) body['contributionType'] = input.contributionType;
+    if (input.contributionEvidenceJson) body['contributionEvidence'] = JSON.parse(input.contributionEvidenceJson);
+    if (input.governanceState) body['governanceState'] = input.governanceState;
+    if (input.disputeId) body['disputeId'] = input.disputeId;
+    if (input.disputeReason) body['disputeReason'] = input.disputeReason;
+    if (input.elohimRatifiedAt) body['elohimRatifiedAt'] = input.elohimRatifiedAt;
+    if (input.elohimRatifierId) body['elohimRatifierId'] = input.elohimRatifierId;
     if (input.note) body['note'] = input.note;
 
     return this.http.put<Record<string, unknown>>(`${this.baseUrl}/db/allocations/${allocationId}`, body).pipe(
@@ -676,11 +685,12 @@ export class StorageApiService {
 
   /**
    * File a dispute on a stewardship allocation.
+   * API accepts camelCase InputView.
    */
   fileAllocationDispute(allocationId: string, input: FileDisputeInput): Observable<StewardshipAllocation> {
     const body = {
-      dispute_id: input.disputeId,
-      disputed_by: input.disputedBy,
+      disputeId: input.disputeId,
+      disputedBy: input.disputedBy,
       reason: input.reason,
     };
 
@@ -693,11 +703,12 @@ export class StorageApiService {
 
   /**
    * Resolve a dispute on a stewardship allocation (Elohim ratification).
+   * API accepts camelCase InputView.
    */
   resolveAllocationDispute(allocationId: string, input: ResolveDisputeInput): Observable<StewardshipAllocation> {
     const body = {
-      ratifier_id: input.ratifierId,
-      new_state: input.newState,
+      ratifierId: input.ratifierId,
+      newState: input.newState,
     };
 
     return this.http.post<Record<string, unknown>>(`${this.baseUrl}/db/allocations/${allocationId}/resolve`, body).pipe(
@@ -709,9 +720,19 @@ export class StorageApiService {
 
   /**
    * Bulk create stewardship allocations.
+   * API accepts camelCase InputView with parsed JSON objects.
    */
   bulkCreateAllocations(inputs: CreateAllocationInput[]): Observable<BulkAllocationResult> {
-    const body = inputs.map(toWireCreateAllocationInput);
+    const body = inputs.map(input => ({
+      contentId: input.contentId,
+      stewardPresenceId: input.stewardPresenceId,
+      allocationRatio: input.allocationRatio ?? 1.0,
+      allocationMethod: input.allocationMethod ?? 'manual',
+      contributionType: input.contributionType ?? 'inherited',
+      contributionEvidence: input.contributionEvidenceJson ? JSON.parse(input.contributionEvidenceJson) : null,
+      note: input.note,
+      metadata: input.metadataJson ? JSON.parse(input.metadataJson) : null,
+    }));
 
     return this.http.post<BulkAllocationResult>(`${this.baseUrl}/db/allocations/bulk`, body).pipe(
       timeout(this.defaultTimeoutMs * 2),  // Double timeout for bulk operations

@@ -47,38 +47,38 @@ interface HolochainEconomicEvent {
   action: string;
   provider: string;
   receiver: string;
-  resource_conforms_to: string | null;
-  resource_inventoried_as: string | null;
-  to_resource_inventoried_as: string | null;
-  resource_classified_as_json: string;
-  resource_quantity_value: number | null;
-  resource_quantity_unit: string | null;
-  effort_quantity_value: number | null;
-  effort_quantity_unit: string | null;
-  has_point_in_time: string;
-  has_duration: string | null;
-  input_of: string | null;
-  output_of: string | null;
-  fulfills_json: string;
-  realization_of: string | null;
-  agreed_in: string | null;
-  satisfies_json: string;
-  in_scope_of_json: string;
+  resourceConformsTo: string | null;
+  resourceInventoriedAs: string | null;
+  toResourceInventoriedAs: string | null;
+  resourceClassifiedAsJson: string;
+  resourceQuantityValue: number | null;
+  resourceQuantityUnit: string | null;
+  effortQuantityValue: number | null;
+  effortQuantityUnit: string | null;
+  hasPointInTime: string;
+  hasDuration: string | null;
+  inputOf: string | null;
+  outputOf: string | null;
+  fulfillsJson: string;
+  realizationOf: string | null;
+  agreedIn: string | null;
+  satisfiesJson: string;
+  inScopeOfJson: string;
   note: string | null;
   state: string;
-  triggered_by: string | null;
-  at_location: string | null;
+  triggeredBy: string | null;
+  atLocation: string | null;
   image: string | null;
-  lamad_event_type: string | null;
-  metadata_json: string;
-  created_at: string;
+  lamadEventType: string | null;
+  metadataJson: string;
+  createdAt: string;
 }
 
 /**
  * Output from economic event zome calls
  */
 interface HolochainEconomicEventOutput {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   event: HolochainEconomicEvent;
 }
 
@@ -401,46 +401,46 @@ export class EconomicService {
     const hc = output.event;
 
     // Parse JSON fields
-    const resourceClassifiedAs = this.safeParseJson<string[]>(hc.resource_classified_as_json, []);
-    const fulfills = this.safeParseJson<string[]>(hc.fulfills_json, []);
-    const satisfies = this.safeParseJson<string[]>(hc.satisfies_json, []);
-    const inScopeOf = this.safeParseJson<string[]>(hc.in_scope_of_json, []);
-    const metadata = this.safeParseJson<Record<string, unknown>>(hc.metadata_json, {});
+    const resourceClassifiedAs = this.safeParseJson<string[]>(hc.resourceClassifiedAsJson, []);
+    const fulfills = this.safeParseJson<string[]>(hc.fulfillsJson, []);
+    const satisfies = this.safeParseJson<string[]>(hc.satisfiesJson, []);
+    const inScopeOf = this.safeParseJson<string[]>(hc.inScopeOfJson, []);
+    const metadata = this.safeParseJson<Record<string, unknown>>(hc.metadataJson, {});
 
     return {
       id: hc.id,
       action: hc.action as REAAction,
       provider: hc.provider,
       receiver: hc.receiver,
-      resourceConformsTo: hc.resource_conforms_to ?? undefined,
-      resourceInventoriedAs: hc.resource_inventoried_as ?? undefined,
-      toResourceInventoriedAs: hc.to_resource_inventoried_as ?? undefined,
+      resourceConformsTo: hc.resourceConformsTo ?? undefined,
+      resourceInventoriedAs: hc.resourceInventoriedAs ?? undefined,
+      toResourceInventoriedAs: hc.toResourceInventoriedAs ?? undefined,
       resourceClassifiedAs: resourceClassifiedAs.length > 0 ? resourceClassifiedAs as ResourceClassification[] : undefined,
-      resourceQuantity: hc.resource_quantity_value != null ? {
-        hasNumericalValue: hc.resource_quantity_value,
-        hasUnit: hc.resource_quantity_unit ?? 'unit',
+      resourceQuantity: hc.resourceQuantityValue != null ? {
+        hasNumericalValue: hc.resourceQuantityValue,
+        hasUnit: hc.resourceQuantityUnit ?? 'unit',
       } : undefined,
-      effortQuantity: hc.effort_quantity_value != null ? {
-        hasNumericalValue: hc.effort_quantity_value,
-        hasUnit: hc.effort_quantity_unit ?? 'unit',
+      effortQuantity: hc.effortQuantityValue != null ? {
+        hasNumericalValue: hc.effortQuantityValue,
+        hasUnit: hc.effortQuantityUnit ?? 'unit',
       } : undefined,
-      hasPointInTime: hc.has_point_in_time,
-      hasDuration: hc.has_duration ?? undefined,
-      inputOf: hc.input_of ?? undefined,
-      outputOf: hc.output_of ?? undefined,
+      hasPointInTime: hc.hasPointInTime,
+      hasDuration: hc.hasDuration ?? undefined,
+      inputOf: hc.inputOf ?? undefined,
+      outputOf: hc.outputOf ?? undefined,
       fulfills: fulfills.length > 0 ? fulfills : undefined,
-      realizationOf: hc.realization_of ?? undefined,
-      agreedIn: hc.agreed_in ?? undefined,
+      realizationOf: hc.realizationOf ?? undefined,
+      agreedIn: hc.agreedIn ?? undefined,
       satisfies: satisfies.length > 0 ? satisfies : undefined,
       inScopeOf: inScopeOf.length > 0 ? inScopeOf : undefined,
       note: hc.note ?? undefined,
       state: hc.state as EventState,
-      triggeredBy: hc.triggered_by ?? undefined,
-      atLocation: hc.at_location ?? undefined,
+      triggeredBy: hc.triggeredBy ?? undefined,
+      atLocation: hc.atLocation ?? undefined,
       image: hc.image ?? undefined,
       metadata: {
         ...metadata,
-        lamadEventType: hc.lamad_event_type ?? undefined,
+        lamadEventType: hc.lamadEventType ?? undefined,
       },
     };
   }

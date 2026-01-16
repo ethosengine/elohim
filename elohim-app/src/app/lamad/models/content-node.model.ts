@@ -858,62 +858,46 @@ export type RelationshipInferenceSource =
   | 'system';     // System-generated (e.g., inverse relationships)
 
 /**
- * Wire format for ContentRelationshipDetail (snake_case for backend).
+ * Wire format for ContentRelationshipDetail (camelCase from backend).
  */
 export interface ContentRelationshipDetailWire {
   id: string;
-  app_id: string;
-  source_id: string;
-  target_id: string;
-  relationship_type: string;
+  appId: string;
+  sourceId: string;
+  targetId: string;
+  relationshipType: string;
   confidence: number;
-  inference_source: string;
-  is_bidirectional: number;  // SQLite stores boolean as 0/1
-  inverse_relationship_id: string | null;
-  provenance_chain_json: string | null;
-  governance_layer: string | null;
+  inferenceSource: string;
+  isBidirectional: number;  // SQLite stores boolean as 0/1
+  inverseRelationshipId: string | null;
+  provenanceChain: any | null;
+  governanceLayer: string | null;
   reach: string;
-  metadata_json: string | null;
-  created_at: string;
-  updated_at: string;
+  metadata: any | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
  * Transform wire format to ContentRelationshipDetail.
  */
 export function transformRelationshipDetailFromWire(wire: ContentRelationshipDetailWire): ContentRelationshipDetail {
-  let provenanceChain: string[] | undefined;
-  try {
-    provenanceChain = wire.provenance_chain_json
-      ? JSON.parse(wire.provenance_chain_json)
-      : undefined;
-  } catch {
-    // Ignore parse errors
-  }
-
-  let metadata: Record<string, unknown> | undefined;
-  try {
-    metadata = wire.metadata_json ? JSON.parse(wire.metadata_json) : undefined;
-  } catch {
-    // Ignore parse errors
-  }
-
   return {
     id: wire.id,
-    appId: wire.app_id,
-    sourceNodeId: wire.source_id,
-    targetNodeId: wire.target_id,
-    relationshipType: wire.relationship_type as ContentRelationshipType,
+    appId: wire.appId,
+    sourceNodeId: wire.sourceId,
+    targetNodeId: wire.targetId,
+    relationshipType: wire.relationshipType as ContentRelationshipType,
     confidence: wire.confidence,
-    inferenceSource: wire.inference_source as RelationshipInferenceSource,
-    isBidirectional: wire.is_bidirectional === 1,
-    inverseRelationshipId: wire.inverse_relationship_id ?? undefined,
-    provenanceChain,
-    governanceLayer: wire.governance_layer ?? undefined,
+    inferenceSource: wire.inferenceSource as RelationshipInferenceSource,
+    isBidirectional: wire.isBidirectional === 1,
+    inverseRelationshipId: wire.inverseRelationshipId ?? undefined,
+    provenanceChain: wire.provenanceChain ?? undefined,
+    governanceLayer: wire.governanceLayer ?? undefined,
     reach: wire.reach as ContentReach,
-    metadata,
-    createdAt: wire.created_at,
-    updatedAt: wire.updated_at,
+    metadata: wire.metadata ?? undefined,
+    createdAt: wire.createdAt,
+    updatedAt: wire.updatedAt,
   };
 }
 

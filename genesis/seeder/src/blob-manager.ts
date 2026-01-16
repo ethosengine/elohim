@@ -4,12 +4,12 @@
  * Handles the separation of metadata (DNA) from content blobs (projection cache).
  *
  * Content Architecture:
- * - DNA stores metadata with blob_hash references
+ * - DNA stores metadata with blobHash references
  * - holochain-cache-core stores and serves actual blob content
  * - Clients use ContentResolver to find content across tiers
  *
  * Blob-extractable formats:
- * - html5-app: Zip files with entry_point
+ * - html5-app: Zip files with entryPoint
  * - perseus-quiz-json: Large quiz JSON
  * - gherkin: Feature file content (usually small, may stay inline)
  *
@@ -74,11 +74,11 @@ export interface ContentFile {
   title?: string;
   description?: string;
   content?: string | object;
-  blob_hash?: string;   // snake_case (internal/API format)
-  blobHash?: string;    // camelCase (JSON file format)
-  blob_url?: string;
-  entry_point?: string;
-  fallback_url?: string;
+  blobHash?: string;     // camelCase (JSON file format)
+  blob_hash?: string;    // snake_case (legacy API compat)
+  blobUrl?: string;
+  entryPoint?: string;
+  fallbackUrl?: string;
   [key: string]: unknown;
 }
 
@@ -139,7 +139,7 @@ export class BlobManager {
     }
 
     // Get existing blob hash (supports both camelCase from JSON and snake_case)
-    const existingHash = content.blob_hash || content.blobHash;
+    const existingHash = content.blobHash || content.blobHash;
 
     // Normalize hash format (ensure sha256- prefix)
     const normalizedExistingHash = existingHash
@@ -217,18 +217,18 @@ export class BlobManager {
       sizeBytes: blob.length,
       mimeType,
       entryPoint,
-      fallbackUrl: content.fallback_url as string | undefined,
+      fallbackUrl: content.fallbackUrl as string | undefined,
     };
 
     // Create metadata with blob reference (remove inline content)
     const metadata: Record<string, unknown> = {
       ...content,
-      blob_hash: hash,
-      blob_url: `${this.config.doorwayUrl}/store/${hash}`,
+      blobHash: hash,
+      blobUrl: `${this.config.doorwayUrl}/store/${hash}`,
     };
 
     if (entryPoint) {
-      metadata.entry_point = entryPoint;
+      metadata.entryPoint = entryPoint;
     }
 
     // Remove inline content from metadata
@@ -260,7 +260,7 @@ export class BlobManager {
     // Get appId from content.content object (for html5-app format)
     const contentObj = typeof content.content === 'object' ? content.content as Record<string, unknown> : null;
     const appId = contentObj?.appId as string | undefined;
-    const entryPoint = contentObj?.entryPoint as string | undefined || (content.entry_point as string) || 'index.html';
+    const entryPoint = contentObj?.entryPoint as string | undefined || (content.entryPoint as string) || 'index.html';
 
     // Try metadata.localZipPath first (relative to genesis directory)
     const metadata = content.metadata as Record<string, unknown> | undefined;
@@ -289,8 +289,8 @@ export class BlobManager {
     }
 
     // Try blob_file reference
-    if (content.blob_file) {
-      const blobPath = path.join(contentDir, content.blob_file as string);
+    if (content.blobFile) {
+      const blobPath = path.join(contentDir, content.blobFile as string);
       if (fs.existsSync(blobPath)) {
         return {
           blob: fs.readFileSync(blobPath),
@@ -415,26 +415,26 @@ export function validateBlobReferences(content: ContentFile): {
 
   // For blob formats, should have either inline content OR blob reference
   const hasInlineContent = content.content !== undefined && content.content !== null;
-  const hasBlobRef = content.blob_hash !== undefined && content.blob_hash !== null;
+  const hasBlobRef = content.blobHash !== undefined && content.blobHash !== null;
 
   if (!hasInlineContent && !hasBlobRef) {
-    errors.push(`${format} content must have either 'content' or 'blob_hash'`);
+    errors.push(`${format} content must have either 'content' or 'blobHash'`);
   }
 
   if (hasBlobRef) {
-    if (!isValidBlobHash(content.blob_hash!)) {
-      errors.push(`Invalid blob_hash format: ${content.blob_hash}`);
+    if (!isValidBlobHash(content.blobHash!)) {
+      errors.push(`Invalid blobHash format: ${content.blobHash}`);
     }
 
     // Warn if no fallback URL for external content
-    if (!content.fallback_url) {
-      warnings.push(`No fallback_url for blob content (recommended for resilience)`);
+    if (!content.fallbackUrl) {
+      warnings.push(`No fallbackUrl for blob content (recommended for resilience)`);
     }
   }
 
-  // html5-app should have entry_point
-  if (format === 'html5-app' && hasBlobRef && !content.entry_point) {
-    warnings.push(`html5-app should have 'entry_point' (defaulting to 'index.html')`);
+  // html5-app should have entryPoint
+  if (format === 'html5-app' && hasBlobRef && !content.entryPoint) {
+    warnings.push(`html5-app should have 'entryPoint' (defaulting to 'index.html')`);
   }
 
   return {

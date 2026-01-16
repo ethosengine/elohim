@@ -62,8 +62,9 @@ pub struct CreateEconomicEventInput {
     pub metadata_json: Option<String>,
 }
 
-/// Query parameters for listing economic events
+/// Query parameters for listing economic events - camelCase for URL params
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EconomicEventQuery {
     /// Filter by action type
     pub action: Option<String>,

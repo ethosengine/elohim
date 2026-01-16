@@ -29,56 +29,56 @@ const ZOME_NAME = 'content_store';
 
 // Types matching the Holochain zome migration module
 interface MigrationReport {
-  source_version: string;
-  target_version: string;
-  started_at: string;
-  completed_at: string | null;
-  content_migrated: number;
-  content_failed: number;
-  paths_migrated: number;
-  paths_failed: number;
-  mastery_migrated: number;
-  mastery_failed: number;
-  progress_migrated: number;
-  progress_failed: number;
+  sourceVersion: string;
+  targetVersion: string;
+  startedAt: string;
+  completedAt: string | null;
+  contentMigrated: number;
+  contentFailed: number;
+  pathsMigrated: number;
+  pathsFailed: number;
+  masteryMigrated: number;
+  masteryFailed: number;
+  progressMigrated: number;
+  progressFailed: number;
   errors: string[];
   verification: MigrationVerification;
 }
 
 interface MigrationVerification {
   passed: boolean;
-  content_count_match: boolean;
-  path_count_match: boolean;
-  reference_integrity: boolean;
+  contentCountMatch: boolean;
+  pathCountMatch: boolean;
+  referenceIntegrity: boolean;
   notes: string[];
 }
 
 interface MigrationCounts {
-  content_count: number;
-  path_count: number;
-  mastery_count: number;
-  progress_count: number;
+  contentCount: number;
+  pathCount: number;
+  masteryCount: number;
+  progressCount: number;
 }
 
 interface Content {
   id: string;
-  content_type: string;
+  contentType: string;
   title: string;
   description: string;
   content: string;
-  content_format: string;
+  contentFormat: string;
   tags: string[];
-  source_path: string | null;
-  related_node_ids: string[];
+  sourcePath: string | null;
+  relatedNodeIds: string[];
   reach: string;
-  metadata_json: string;
-  created_at: string;
-  updated_at: string;
+  metadataJson: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ContentOutput {
-  action_hash: Uint8Array;
-  entry_hash: Uint8Array;
+  actionHash: Uint8Array;
+  entryHash: Uint8Array;
   content: Content;
 }
 
@@ -88,8 +88,8 @@ interface PathWithStepsExport {
 }
 
 interface MigrationExport {
-  schema_version: string;
-  exported_at: string;
+  schemaVersion: string;
+  exportedAt: string;
   content: ContentOutput[];
   paths: PathWithStepsExport[];
   mastery: any[];
@@ -369,24 +369,24 @@ async function main() {
   console.log('='.repeat(60));
 
   const report: MigrationReport = {
-    source_version: exportData.schema_version,
-    target_version: 'current',
-    started_at: new Date().toISOString(),
-    completed_at: null,
-    content_migrated: 0,
-    content_failed: 0,
-    paths_migrated: 0,
-    paths_failed: 0,
-    mastery_migrated: 0,
-    mastery_failed: 0,
-    progress_migrated: 0,
-    progress_failed: 0,
+    sourceVersion: exportData.schemaVersion,
+    targetVersion: 'current',
+    startedAt: new Date().toISOString(),
+    completedAt: null,
+    contentMigrated: 0,
+    contentFailed: 0,
+    pathsMigrated: 0,
+    pathsFailed: 0,
+    masteryMigrated: 0,
+    masteryFailed: 0,
+    progressMigrated: 0,
+    progressFailed: 0,
     errors: [],
     verification: {
       passed: false,
-      content_count_match: false,
-      path_count_match: false,
-      reference_integrity: false,
+      contentCountMatch: false,
+      pathCountMatch: false,
+      referenceIntegrity: false,
       notes: [],
     },
   };
@@ -404,7 +404,7 @@ async function main() {
       });
 
       if (existing) {
-        report.content_migrated++;
+        report.contentMigrated++;
         console.log(`  [skip] ${item.content.id.slice(0, 40)}... (exists)`);
         continue;
       }
@@ -416,23 +416,23 @@ async function main() {
         fn_name: 'create_content',
         payload: {
           id: item.content.id,
-          content_type: item.content.content_type,
+          contentType: item.content.contentType,
           title: item.content.title,
           description: item.content.description,
           content: item.content.content,
-          content_format: item.content.content_format,
+          contentFormat: item.content.contentFormat,
           tags: item.content.tags,
-          source_path: item.content.source_path,
-          related_node_ids: item.content.related_node_ids,
+          sourcePath: item.content.sourcePath,
+          relatedNodeIds: item.content.relatedNodeIds,
           reach: item.content.reach,
-          metadata_json: item.content.metadata_json,
+          metadataJson: item.content.metadataJson,
         },
       });
 
-      report.content_migrated++;
+      report.contentMigrated++;
       console.log(`  [ok] ${item.content.id.slice(0, 40)}...`);
     } catch (error: any) {
-      report.content_failed++;
+      report.contentFailed++;
       report.errors.push(`Content ${item.content.id}: ${error.message || error}`);
       console.error(`  [err] ${item.content.id}: ${error.message || error}`);
     }
@@ -451,7 +451,7 @@ async function main() {
       });
 
       if (existing) {
-        report.paths_migrated++;
+        report.pathsMigrated++;
         console.log(`  [skip] ${pathExport.path.id} (exists)`);
         continue;
       }
@@ -493,10 +493,10 @@ async function main() {
         });
       }
 
-      report.paths_migrated++;
+      report.pathsMigrated++;
       console.log(`  [ok] ${pathExport.path.id} (${pathExport.steps.length} steps)`);
     } catch (error: any) {
-      report.paths_failed++;
+      report.pathsFailed++;
       report.errors.push(`Path ${pathExport.path.id}: ${error.message || error}`);
       console.error(`  [err] ${pathExport.path.id}: ${error.message || error}`);
     }
@@ -509,10 +509,10 @@ async function main() {
 
   try {
     const expectedCounts: MigrationCounts = {
-      content_count: exportData.content.length,
-      path_count: exportData.paths.length,
-      mastery_count: exportData.mastery.length,
-      progress_count: exportData.progress.length,
+      contentCount: exportData.content.length,
+      pathCount: exportData.paths.length,
+      masteryCount: exportData.mastery.length,
+      progressCount: exportData.progress.length,
     };
 
     const verification = await appWs.callZome({
@@ -524,9 +524,9 @@ async function main() {
 
     report.verification = verification;
     console.log(`Verification passed: ${verification.passed}`);
-    console.log(`  Content count match: ${verification.content_count_match}`);
-    console.log(`  Path count match: ${verification.path_count_match}`);
-    console.log(`  Reference integrity: ${verification.reference_integrity}`);
+    console.log(`  Content count match: ${verification.contentCountMatch}`);
+    console.log(`  Path count match: ${verification.pathCountMatch}`);
+    console.log(`  Reference integrity: ${verification.referenceIntegrity}`);
 
     if (verification.notes.length > 0) {
       console.log('Notes:');
@@ -540,16 +540,16 @@ async function main() {
   }
 
   // Complete report
-  report.completed_at = new Date().toISOString();
+  report.completedAt = new Date().toISOString();
 
   // Summary
   console.log('\n' + '='.repeat(60));
   console.log('  Migration Summary');
   console.log('='.repeat(60));
-  console.log(`Content: ${report.content_migrated} migrated, ${report.content_failed} failed`);
-  console.log(`Paths: ${report.paths_migrated} migrated, ${report.paths_failed} failed`);
-  console.log(`Mastery: ${report.mastery_migrated} migrated, ${report.mastery_failed} failed`);
-  console.log(`Progress: ${report.progress_migrated} migrated, ${report.progress_failed} failed`);
+  console.log(`Content: ${report.contentMigrated} migrated, ${report.contentFailed} failed`);
+  console.log(`Paths: ${report.pathsMigrated} migrated, ${report.pathsFailed} failed`);
+  console.log(`Mastery: ${report.masteryMigrated} migrated, ${report.masteryFailed} failed`);
+  console.log(`Progress: ${report.progressMigrated} migrated, ${report.progressFailed} failed`);
 
   if (report.errors.length > 0) {
     console.log('\nErrors:');
@@ -561,7 +561,7 @@ async function main() {
     }
   }
 
-  const success = report.content_failed === 0 && report.paths_failed === 0;
+  const success = report.contentFailed === 0 && report.pathsFailed === 0;
   console.log(`\nMigration ${success ? 'SUCCESSFUL' : 'COMPLETED WITH ERRORS'}`);
 
   // Save report
@@ -633,10 +633,10 @@ async function verifyMigration(
   console.log('\nVerifying target DNA...');
   try {
     const expectedCounts: MigrationCounts = {
-      content_count: sourceExport.content.length,
-      path_count: sourceExport.paths.length,
-      mastery_count: sourceExport.mastery.length,
-      progress_count: sourceExport.progress.length,
+      contentCount: sourceExport.content.length,
+      pathCount: sourceExport.paths.length,
+      masteryCount: sourceExport.mastery.length,
+      progressCount: sourceExport.progress.length,
     };
 
     const verification = await appWs.callZome({
@@ -648,9 +648,9 @@ async function verifyMigration(
 
     console.log(`\nVerification Result:`);
     console.log(`  Passed: ${verification.passed}`);
-    console.log(`  Content count match: ${verification.content_count_match}`);
-    console.log(`  Path count match: ${verification.path_count_match}`);
-    console.log(`  Reference integrity: ${verification.reference_integrity}`);
+    console.log(`  Content count match: ${verification.contentCountMatch}`);
+    console.log(`  Path count match: ${verification.pathCountMatch}`);
+    console.log(`  Reference integrity: ${verification.referenceIntegrity}`);
 
     if (verification.notes.length > 0) {
       console.log('\nNotes:');

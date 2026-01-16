@@ -48,59 +48,59 @@ export { isNetworkMode, isStewardMode, getInitials } from '../models/identity.mo
 /** Human entry as returned from conductor */
 interface HumanEntry {
   id: string;
-  display_name: string;
+  displayName: string;
   bio: string | null;
   affinities: string[];
-  profile_reach: string;
+  profileReach: string;
   location: string | null;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Attestation as returned from conductor */
 interface AttestationEntry {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   attestation: {
     id: string;
-    attestation_type: string;
-    attester_id: string;
-    recipient_id: string;
-    evidence_json: string;
-    issued_at: string;
+    attestationType: string;
+    attesterId: string;
+    recipientId: string;
+    evidenceJson: string;
+    issuedAt: string;
   };
 }
 
 /** Session result from get_current_human / register_human */
 interface HumanSessionResult {
-  agent_pubkey: string;
-  action_hash: Uint8Array;
+  agentPubkey: string;
+  actionHash: Uint8Array;
   human: HumanEntry;
-  session_started_at: string;
+  sessionStartedAt: string;
   attestations: AttestationEntry[];
 }
 
 /** Result from update_human_profile */
 interface HumanUpdateResult {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   human: HumanEntry;
 }
 
 /** Payload for registering a human */
 interface RegisterHumanPayload {
   id: string;
-  display_name: string;
+  displayName: string;
   bio?: string;
   affinities: string[];
-  profile_reach: string;
+  profileReach: string;
   location?: string;
 }
 
 /** Payload for updating human profile */
 interface UpdateHumanPayload {
-  display_name?: string;
+  displayName?: string;
   bio?: string;
   affinities?: string[];
-  profile_reach?: string;
+  profileReach?: string;
   location?: string;
 }
 
@@ -114,13 +114,13 @@ interface UpdateHumanPayload {
 function mapToProfile(entry: HumanEntry): HumanProfile {
   return {
     id: entry.id,
-    displayName: entry.display_name,
+    displayName: entry.displayName,
     bio: entry.bio,
     affinities: entry.affinities ?? [],
-    profileReach: entry.profile_reach as ProfileReach,
+    profileReach: entry.profileReach as ProfileReach,
     location: entry.location,
-    createdAt: entry.created_at,
-    updatedAt: entry.updated_at,
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
   };
 }
 
@@ -138,10 +138,10 @@ function generateHumanId(): string {
 function toRegisterPayload(request: RegisterHumanRequest): RegisterHumanPayload {
   return {
     id: generateHumanId(),
-    display_name: request.displayName,
+    displayName: request.displayName,
     bio: request.bio,
     affinities: request.affinities,
-    profile_reach: request.profileReach,
+    profileReach: request.profileReach,
     location: request.location,
   };
 }
@@ -151,10 +151,10 @@ function toRegisterPayload(request: RegisterHumanRequest): RegisterHumanPayload 
  */
 function toUpdatePayload(request: UpdateProfileRequest): UpdateHumanPayload {
   return {
-    display_name: request.displayName,
+    displayName: request.displayName,
     bio: request.bio,
     affinities: request.affinities,
-    profile_reach: request.profileReach,
+    profileReach: request.profileReach,
     location: request.location,
   };
 }
@@ -508,7 +508,7 @@ export class IdentityService {
         const did = generateDID(
           identityMode,
           sessionResult.human.id,
-          sessionResult.agent_pubkey,
+          sessionResult.agentPubkey,
           linkedSessionId
         );
 
@@ -516,11 +516,11 @@ export class IdentityService {
           mode: identityMode,
           isAuthenticated: true,
           humanId: sessionResult.human.id,
-          displayName: sessionResult.human.display_name,
-          agentPubKey: sessionResult.agent_pubkey,
+          displayName: sessionResult.human.displayName,
+          agentPubKey: sessionResult.agentPubkey,
           did,
           profile: mapToProfile(sessionResult.human),
-          attestations: sessionResult.attestations.map(a => a.attestation.attestation_type),
+          attestations: sessionResult.attestations.map(a => a.attestation.attestationType),
           sovereigntyStage,
 
           // Key management
@@ -546,7 +546,7 @@ export class IdentityService {
         // If session exists, link it to this Holochain identity
         if (session && session.sessionState !== 'linked' && session.sessionState !== 'migrated') {
           this.sessionHumanService.linkToHolochainIdentity(
-            sessionResult.agent_pubkey,
+            sessionResult.agentPubkey,
             sessionResult.human.id
           );
         }
@@ -788,7 +788,7 @@ export class IdentityService {
       const did = generateDID(
         'steward',
         sessionResult.human.id,
-        sessionResult.agent_pubkey,
+        sessionResult.agentPubkey,
         session?.sessionId ?? null
       );
 
@@ -796,11 +796,11 @@ export class IdentityService {
         mode: 'steward',
         isAuthenticated: true,
         humanId: sessionResult.human.id,
-        displayName: sessionResult.human.display_name,
-        agentPubKey: sessionResult.agent_pubkey,
+        displayName: sessionResult.human.displayName,
+        agentPubKey: sessionResult.agentPubkey,
         did,
         profile,
-        attestations: sessionResult.attestations.map(a => a.attestation.attestation_type),
+        attestations: sessionResult.attestations.map(a => a.attestation.attestationType),
         sovereigntyStage: 'app-user',
         keyLocation: 'device',
         canExportKeys: false,
@@ -817,7 +817,7 @@ export class IdentityService {
       // Mark session as migrated if it exists
       if (session) {
         this.sessionHumanService.markAsMigrated(
-          sessionResult.agent_pubkey,
+          sessionResult.agentPubkey,
           sessionResult.human.id
         );
       }
@@ -1025,7 +1025,7 @@ export class IdentityService {
         const did = generateDID(
           identityMode,
           sessionResult.human.id,
-          sessionResult.agent_pubkey,
+          sessionResult.agentPubkey,
           null
         );
 
@@ -1033,11 +1033,11 @@ export class IdentityService {
           mode: identityMode,
           isAuthenticated: true,
           humanId: sessionResult.human.id,
-          displayName: sessionResult.human.display_name,
-          agentPubKey: sessionResult.agent_pubkey,
+          displayName: sessionResult.human.displayName,
+          agentPubKey: sessionResult.agentPubkey,
           did,
           profile: mapToProfile(sessionResult.human),
-          attestations: sessionResult.attestations.map(a => a.attestation.attestation_type),
+          attestations: sessionResult.attestations.map(a => a.attestation.attestationType),
           sovereigntyStage,
           keyLocation,
           canExportKeys: keyLocation === 'custodial',
@@ -1048,7 +1048,7 @@ export class IdentityService {
           error: null,
         });
 
-        console.log('[IdentityService] Connected as authenticated user:', sessionResult.human.display_name);
+        console.log('[IdentityService] Connected as authenticated user:', sessionResult.human.displayName);
       }
     } catch (err) {
       console.error('[IdentityService] Failed to verify authenticated user:', err);

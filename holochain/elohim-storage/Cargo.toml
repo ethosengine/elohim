@@ -54,7 +54,7 @@ serde_json = "1"
 serde_urlencoded = "0.7"
 
 # TypeScript generation from Rust types
-ts-rs = { version = "10.1", features = ["serde-compat"] }
+ts-rs = { version = "10.1", features = ["serde-compat", "serde-json-impl"] }
 
 # Local database for metadata
 sled = "0.34"

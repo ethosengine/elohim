@@ -28,24 +28,24 @@ import { DoorwayClient } from './doorway-client.js';
 
 /** Input for creating a contributor presence */
 export interface CreatePresenceInput {
-  display_name: string;
-  presence_state?: string;
-  external_identifiers_json?: string;
-  establishing_content_ids_json: string;
-  affinity_total?: number;
-  unique_engagers?: number;
-  citation_count?: number;
-  recognition_score?: number;
+  displayName: string;
+  presenceState?: string;
+  externalIdentifiersJson?: string;
+  establishingContentIdsJson: string;
+  affinityTotal?: number;
+  uniqueEngagers?: number;
+  citationCount?: number;
+  recognitionScore?: number;
 }
 
 /** Input for creating content mastery */
 export interface CreateMasteryInput {
-  human_id: string;
-  content_id: string;
-  mastery_level?: string;
-  mastery_level_index?: number;
-  freshness_score?: number;
-  engagement_count?: number;
+  humanId: string;
+  contentId: string;
+  masteryLevel?: string;
+  masteryLevelIndex?: number;
+  freshnessScore?: number;
+  engagementCount?: number;
 }
 
 /** Input for creating an economic event */
@@ -53,14 +53,14 @@ export interface CreateEventInput {
   action: string;
   provider: string;
   receiver: string;
-  resource_conforms_to?: string;
-  resource_quantity_value?: number;
-  resource_quantity_unit?: string;
-  lamad_event_type?: string;
-  content_id?: string;
-  contributor_presence_id?: string;
-  path_id?: string;
-  metadata_json?: string;
+  resourceConformsTo?: string;
+  resourceQuantityValue?: number;
+  resourceQuantityUnit?: string;
+  lamadEventType?: string;
+  contentId?: string;
+  contributorPresenceId?: string;
+  pathId?: string;
+  metadataJson?: string;
 }
 
 // =============================================================================
@@ -71,9 +71,9 @@ export interface CreateEventInput {
  * Extract author information from content metadata.
  *
  * Looks for author in various places:
- * - metadata_json.author
- * - metadata_json.creator
- * - metadata_json.contributors[]
+ * - metadataJson.author
+ * - metadataJson.creator
+ * - metadataJson.contributors[]
  */
 function extractAuthor(content: Content): string | null {
   if (!content.metadata_json) return null;
@@ -122,13 +122,13 @@ export function buildContributorPresences(contentItems: Content[]): CreatePresen
   const presences: CreatePresenceInput[] = [];
   for (const [author, contentIds] of authorMap) {
     presences.push({
-      display_name: author,
-      presence_state: 'unclaimed',
-      establishing_content_ids_json: JSON.stringify([...contentIds]),
-      affinity_total: 0.0,
-      unique_engagers: 0,
-      citation_count: contentIds.size,
-      recognition_score: 0.0,
+      displayName: author,
+      presenceState: 'unclaimed',
+      establishingContentIdsJson: JSON.stringify([...contentIds]),
+      affinityTotal: 0.0,
+      uniqueEngagers: 0,
+      citationCount: contentIds.size,
+      recognitionScore: 0.0,
     });
   }
 
@@ -172,12 +172,12 @@ export async function seedContributorPresences(
  */
 export function buildInitialMastery(humanId: string, contentIds: string[]): CreateMasteryInput[] {
   return contentIds.map(contentId => ({
-    human_id: humanId,
-    content_id: contentId,
-    mastery_level: 'not_started',
-    mastery_level_index: 0,
-    freshness_score: 1.0,
-    engagement_count: 0,
+    humanId: humanId,
+    contentId: contentId,
+    masteryLevel: 'not_started',
+    masteryLevelIndex: 0,
+    freshnessScore: 1.0,
+    engagementCount: 0,
   }));
 }
 
@@ -242,8 +242,8 @@ export function generateSampleEvents(
         action: 'use',
         provider: agentId,
         receiver: contentId,
-        lamad_event_type: 'content-view',
-        content_id: contentId,
+        lamadEventType: 'content-view',
+        contentId: contentId,
       });
     }
 
@@ -253,8 +253,8 @@ export function generateSampleEvents(
         action: 'produce',
         provider: agentId,
         receiver: agentId,
-        lamad_event_type: 'content-complete',
-        content_id: contentId,
+        lamadEventType: 'content-complete',
+        contentId: contentId,
       });
     }
   }

@@ -40,68 +40,68 @@ import {
 // =============================================================================
 
 interface HolochainContributorDashboard {
-  contributor_id: string;
-  total_recognition_points: number;
-  total_learners_reached: number;
-  total_content_mastered: number;
-  total_discoveries_sparked: number;
-  impact_by_content: HolochainContentImpactSummary[];
-  recent_events: HolochainRecognitionEventSummary[];
+  contributorId: string;
+  totalRecognitionPoints: number;
+  totalLearnersReached: number;
+  totalContentMastered: number;
+  totalDiscoveriesSparked: number;
+  impactByContent: HolochainContentImpactSummary[];
+  recentEvents: HolochainRecognitionEventSummary[];
   impact: HolochainContributorImpactOutput | null;
 }
 
 interface HolochainContentImpactSummary {
-  content_id: string;
-  recognition_points: number;
-  learners_reached: number;
-  mastery_count: number;
+  contentId: string;
+  recognitionPoints: number;
+  learnersReached: number;
+  masteryCount: number;
 }
 
 interface HolochainRecognitionEventSummary {
-  learner_id: string;
-  content_id: string;
-  flow_type: string;
-  recognition_points: number;
-  occurred_at: string;
+  learnerId: string;
+  contentId: string;
+  flowType: string;
+  recognitionPoints: number;
+  occurredAt: string;
 }
 
 interface HolochainContributorImpact {
   id: string;
-  contributor_id: string;
-  total_recognition_points: number;
-  total_learners_reached: number;
-  total_content_mastered: number;
-  total_discoveries_sparked: number;
-  unique_content_engaged: number;
-  impact_by_content_json: string;
-  first_recognition_at: string;
-  last_recognition_at: string;
-  created_at: string;
-  updated_at: string;
+  contributorId: string;
+  totalRecognitionPoints: number;
+  totalLearnersReached: number;
+  totalContentMastered: number;
+  totalDiscoveriesSparked: number;
+  uniqueContentEngaged: number;
+  impactByContentJson: string;
+  firstRecognitionAt: string;
+  lastRecognitionAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface HolochainContributorImpactOutput {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   impact: HolochainContributorImpact;
 }
 
 interface HolochainContributorRecognition {
   id: string;
-  contributor_id: string;
-  content_id: string;
-  learner_id: string;
-  appreciation_of_event_id: string;
-  flow_type: string;
-  recognition_points: number;
-  path_id: string | null;
-  challenge_id: string | null;
+  contributorId: string;
+  contentId: string;
+  learnerId: string;
+  appreciationOfEventId: string;
+  flowType: string;
+  recognitionPoints: number;
+  pathId: string | null;
+  challengeId: string | null;
   note: string | null;
-  metadata_json: string;
-  occurred_at: string;
+  metadataJson: string;
+  occurredAt: string;
 }
 
 interface HolochainContributorRecognitionOutput {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   recognition: HolochainContributorRecognition;
 }
 
@@ -393,23 +393,23 @@ export class ContributorService {
 
   private transformDashboard(hc: HolochainContributorDashboard): LamadContributorDashboard {
     return {
-      contributorId: hc.contributor_id,
-      totalRecognitionPoints: hc.total_recognition_points,
-      totalLearnersReached: hc.total_learners_reached,
-      totalContentMastered: hc.total_content_mastered,
-      totalDiscoveriesSparked: hc.total_discoveries_sparked,
-      impactByContent: hc.impact_by_content.map(ic => ({
-        contentId: ic.content_id,
-        recognitionPoints: ic.recognition_points,
-        learnersReached: ic.learners_reached,
-        masteryCount: ic.mastery_count,
+      contributorId: hc.contributorId,
+      totalRecognitionPoints: hc.totalRecognitionPoints,
+      totalLearnersReached: hc.totalLearnersReached,
+      totalContentMastered: hc.totalContentMastered,
+      totalDiscoveriesSparked: hc.totalDiscoveriesSparked,
+      impactByContent: hc.impactByContent.map(ic => ({
+        contentId: ic.contentId,
+        recognitionPoints: ic.recognitionPoints,
+        learnersReached: ic.learnersReached,
+        masteryCount: ic.masteryCount,
       })),
-      recentEvents: hc.recent_events.map(re => ({
-        learnerId: re.learner_id,
-        contentId: re.content_id,
-        flowType: re.flow_type,
-        recognitionPoints: re.recognition_points,
-        occurredAt: re.occurred_at,
+      recentEvents: hc.recentEvents.map(re => ({
+        learnerId: re.learnerId,
+        contentId: re.contentId,
+        flowType: re.flowType,
+        recognitionPoints: re.recognitionPoints,
+        occurredAt: re.occurredAt,
       })),
       impact: hc.impact ? this.transformImpact(hc.impact) : null,
     };
@@ -418,43 +418,43 @@ export class ContributorService {
   private transformImpact(output: HolochainContributorImpactOutput): LamadContributorImpact {
     const hc = output.impact;
     const impactByContent = this.safeParseJson<LamadContentImpactSummary[]>(
-      hc.impact_by_content_json,
+      hc.impactByContentJson,
       []
     );
 
     return {
       id: hc.id,
-      contributorId: hc.contributor_id,
-      totalRecognitionPoints: hc.total_recognition_points,
-      totalLearnersReached: hc.total_learners_reached,
-      totalContentMastered: hc.total_content_mastered,
-      totalDiscoveriesSparked: hc.total_discoveries_sparked,
-      uniqueContentEngaged: hc.unique_content_engaged,
+      contributorId: hc.contributorId,
+      totalRecognitionPoints: hc.totalRecognitionPoints,
+      totalLearnersReached: hc.totalLearnersReached,
+      totalContentMastered: hc.totalContentMastered,
+      totalDiscoveriesSparked: hc.totalDiscoveriesSparked,
+      uniqueContentEngaged: hc.uniqueContentEngaged,
       impactByContent,
-      firstRecognitionAt: hc.first_recognition_at,
-      lastRecognitionAt: hc.last_recognition_at,
-      createdAt: hc.created_at,
-      updatedAt: hc.updated_at,
+      firstRecognitionAt: hc.firstRecognitionAt,
+      lastRecognitionAt: hc.lastRecognitionAt,
+      createdAt: hc.createdAt,
+      updatedAt: hc.updatedAt,
     };
   }
 
   private transformRecognition(output: HolochainContributorRecognitionOutput): LamadContributorRecognition {
     const hc = output.recognition;
-    const metadata = this.safeParseJson<Record<string, unknown>>(hc.metadata_json, {});
+    const metadata = this.safeParseJson<Record<string, unknown>>(hc.metadataJson, {});
 
     return {
       id: hc.id,
-      contributorId: hc.contributor_id,
-      contentId: hc.content_id,
-      learnerId: hc.learner_id,
-      appreciationOfEventId: hc.appreciation_of_event_id,
-      flowType: hc.flow_type,
-      recognitionPoints: hc.recognition_points,
-      pathId: hc.path_id,
-      challengeId: hc.challenge_id,
+      contributorId: hc.contributorId,
+      contentId: hc.contentId,
+      learnerId: hc.learnerId,
+      appreciationOfEventId: hc.appreciationOfEventId,
+      flowType: hc.flowType,
+      recognitionPoints: hc.recognitionPoints,
+      pathId: hc.pathId,
+      challengeId: hc.challengeId,
       note: hc.note,
       metadata,
-      occurredAt: hc.occurred_at,
+      occurredAt: hc.occurredAt,
     };
   }
 

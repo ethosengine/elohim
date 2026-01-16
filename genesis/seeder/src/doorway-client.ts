@@ -95,8 +95,8 @@ export interface HealthStatus {
   /** Conductor connection status - seeder should check this before seeding! */
   conductor?: {
     connected: boolean;
-    connected_workers: number;
-    total_workers: number;
+    connectedWorkers: number;
+    totalWorkers: number;
   };
   error?: string;
 }
@@ -105,27 +105,27 @@ export interface HealthStatus {
 export interface DoorwayStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
   version?: string;
-  uptime_seconds?: number;
+  uptimeSeconds?: number;
   conductor: {
     connected: boolean;
-    connected_workers: number;
-    total_workers: number;
+    connectedWorkers: number;
+    totalWorkers: number;
   };
   storage: {
     healthy: boolean;
-    import_enabled: boolean;
-    active_batches?: number;
+    importEnabled: boolean;
+    activeBatches?: number;
     url?: string;
   };
   diagnostics: {
-    cell_discovered: boolean;
-    ready_for_seeding: boolean;
+    cellDiscovered: boolean;
+    readyForSeeding: boolean;
     recommendations: string[];
   };
   cache?: {
     enabled: boolean;
     entries?: number;
-    size_bytes?: number;
+    sizeBytes?: number;
   };
 }
 
@@ -183,46 +183,46 @@ export interface BulkEventResult {
 
 export interface ImportQueueRequest {
   /** Optional batch ID (generated if not provided) */
-  batch_id?: string;
+  batchId?: string;
   /** Hash of the blob in elohim-storage containing the items JSON
    *  REQUIRED - upload to storage first, then queue import */
-  blob_hash: string;
+  blobHash: string;
   /** Total number of items in the blob */
-  total_items: number;
+  totalItems: number;
   /** Schema version for the import data */
-  schema_version?: number;
+  schemaVersion?: number;
   /**
    * Items per chunk (optional, uses server default if not provided).
    * Smaller chunks = less conductor pressure but slower throughput.
    * Server default: 50 items per chunk.
    */
-  chunk_size?: number;
+  chunkSize?: number;
   /**
    * Delay between chunks in ms (optional, uses server default if not provided).
    * Higher delay = more conductor breathing room but slower throughput.
    * Server default: 300ms.
    */
-  chunk_delay_ms?: number;
+  chunkDelayMs?: number;
 }
 
 export interface ImportQueueResponse {
-  batch_id: string;
-  queued_count: number;
+  batchId: string;
+  queuedCount: number;
   processing: boolean;
   message?: string;
 }
 
 export interface ImportStatusResponse {
-  batch_id: string;
+  batchId: string;
   status: 'queued' | 'processing' | 'completed' | 'completed_with_errors' | 'failed';
-  total_items: number;
-  processed_count: number;
-  error_count: number;
-  skipped_count?: number;  // Items that already existed in DHT
+  totalItems: number;
+  processedCount: number;
+  errorCount: number;
+  skippedCount?: number;  // Items that already existed in DHT
   errors: string[];
-  elapsed_ms?: number;
-  items_per_second?: number;
-  completed_at?: string;
+  elapsedMs?: number;
+  itemsPerSecond?: number;
+  completedAt?: string;
 }
 
 // =============================================================================
@@ -269,8 +269,8 @@ export class DoorwayClient {
 
       // Check conductor connectivity - this is critical for seeding
       const conductorConnected = data.conductor?.connected ?? false;
-      const conductorWorkers = data.conductor?.connected_workers ?? 0;
-      const totalWorkers = data.conductor?.total_workers ?? 0;
+      const conductorWorkers = data.conductor?.connectedWorkers ?? 0;
+      const totalWorkers = data.conductor?.totalWorkers ?? 0;
 
       // Include conductor status in health response
       return {
@@ -279,8 +279,8 @@ export class DoorwayClient {
         cacheEnabled: data.cache?.enabled ?? true,
         conductor: {
           connected: conductorConnected,
-          connected_workers: conductorWorkers,
-          total_workers: totalWorkers,
+          connectedWorkers: conductorWorkers,
+          totalWorkers: totalWorkers,
         },
         error: conductorConnected ? undefined : data.error || `Conductor not connected (${conductorWorkers}/${totalWorkers} workers)`,
       };
@@ -315,21 +315,21 @@ export class DoorwayClient {
       return {
         status: data.status || 'unhealthy',
         version: data.version,
-        uptime_seconds: data.uptime_seconds,
+        uptimeSeconds: data.uptimeSeconds,
         conductor: {
           connected: data.conductor?.connected ?? false,
-          connected_workers: data.conductor?.connected_workers ?? 0,
-          total_workers: data.conductor?.total_workers ?? 0,
+          connectedWorkers: data.conductor?.connectedWorkers ?? 0,
+          totalWorkers: data.conductor?.totalWorkers ?? 0,
         },
         storage: {
           healthy: data.storage?.healthy ?? false,
-          import_enabled: data.storage?.import_enabled ?? false,
-          active_batches: data.storage?.active_batches,
+          importEnabled: data.storage?.importEnabled ?? false,
+          activeBatches: data.storage?.activeBatches,
           url: data.storage?.url,
         },
         diagnostics: {
-          cell_discovered: data.diagnostics?.cell_discovered ?? false,
-          ready_for_seeding: data.diagnostics?.ready_for_seeding ?? false,
+          cellDiscovered: data.diagnostics?.cellDiscovered ?? false,
+          readyForSeeding: data.diagnostics?.readyForSeeding ?? false,
           recommendations: data.diagnostics?.recommendations ?? [],
         },
         cache: data.cache,
@@ -514,10 +514,10 @@ export class DoorwayClient {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          app_id: appId,
-          blob_hash: blobHash,
-          entry_point: entryPoint,
-          fallback_url: fallbackUrl,
+          appId: appId,
+          blobHash: blobHash,
+          entryPoint: entryPoint,
+          fallbackUrl: fallbackUrl,
         }),
       });
 
@@ -563,18 +563,18 @@ export class DoorwayClient {
    * Queue content items for import via doorway.
    *
    * @param batchType - Type of content to import (e.g., 'content', 'paths')
-   * @param request - Import request with items or blob_hash
-   * @returns Import queue response with batch_id
+   * @param request - Import request with items or blobHash
+   * @returns Import queue response with batchId
    */
   async queueImport(
     batchType: string,
     request: ImportQueueRequest
   ): Promise<ImportQueueResponse> {
     if (this.config.dryRun) {
-      console.log(`[DRY RUN] Would queue import: ${batchType} (${request.total_items} items, blob: ${request.blob_hash.slice(0, 20)}...)`);
+      console.log(`[DRY RUN] Would queue import: ${batchType} (${request.totalItems} items, blob: ${request.blobHash.slice(0, 20)}...)`);
       return {
-        batch_id: `dry-run-${Date.now()}`,
-        queued_count: request.total_items,
+        batchId: `dry-run-${Date.now()}`,
+        queuedCount: request.totalItems,
         processing: false,
         message: 'Dry run - not actually queued',
       };
@@ -702,12 +702,12 @@ export class DoorwayClient {
 
     // Queue the import
     const queueResult = await this.queueImport(batchType, request);
-    console.log(`📤 Import queued: ${queueResult.batch_id} (${queueResult.queued_count} items)`);
+    console.log(`📤 Import queued: ${queueResult.batchId} (${queueResult.queuedCount} items)`);
 
     // If already completed (synchronous processing)
-    if (queueResult.processing === false && queueResult.queued_count === 0) {
+    if (queueResult.processing === false && queueResult.queuedCount === 0) {
       // Might be an error or already processed
-      const status = await this.getImportStatus(batchType, queueResult.batch_id);
+      const status = await this.getImportStatus(batchType, queueResult.batchId);
       if (status) return status;
     }
 
@@ -718,17 +718,17 @@ export class DoorwayClient {
     while (Date.now() - startTime < timeout) {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
 
-      const status = await this.getImportStatus(batchType, queueResult.batch_id);
+      const status = await this.getImportStatus(batchType, queueResult.batchId);
       if (!status) {
-        throw new Error(`Batch ${queueResult.batch_id} not found during polling`);
+        throw new Error(`Batch ${queueResult.batchId} not found during polling`);
       }
 
       // Report progress
-      if (status.processed_count !== lastProcessed) {
+      if (status.processedCount !== lastProcessed) {
         if (options.onProgress) {
           options.onProgress(status);
         }
-        lastProcessed = status.processed_count;
+        lastProcessed = status.processedCount;
       }
 
       // Check for completion
@@ -750,20 +750,20 @@ export class DoorwayClient {
    * This bypasses the queue-based import flow and directly calls the
    * elohim-storage bulk endpoint through Doorway's API proxy.
    *
-   * @param items - Content items to create (with content_body field, not content)
+   * @param items - Content items to create (with contentBody field, not content)
    * @returns BulkCreateResult with inserted/skipped counts
    */
   async bulkCreateContent(
     items: Array<{
       id: string;
       title: string;
-      content_type?: string;
-      content_format?: string;
-      content_body?: string;
+      contentType?: string;
+      contentFormat?: string;
+      contentBody?: string;
       description?: string;
-      blob_hash?: string;
-      blob_cid?: string;
-      metadata_json?: string;
+      blobHash?: string;
+      blobCid?: string;
+      metadataJson?: string;
       reach?: string;
       tags?: string[];
     }>
@@ -799,26 +799,26 @@ export class DoorwayClient {
       id: string;
       title: string;
       description?: string;
-      path_type?: string;
+      pathType?: string;
       difficulty?: string;
-      estimated_duration?: string;
+      estimatedDuration?: string;
       visibility?: string;
-      metadata_json?: string;
+      metadataJson?: string;
       tags?: string[];
       chapters?: Array<{
         id: string;
         title: string;
         description?: string;
-        order_index: number;
+        orderIndex: number;
         steps?: Array<{
           id: string;
-          path_id: string;
-          chapter_id?: string;
+          pathId: string;
+          chapterId?: string;
           title: string;
-          step_type?: string;
-          resource_id?: string;
-          order_index: number;
-          metadata_json?: string;
+          stepType?: string;
+          resourceId?: string;
+          orderIndex: number;
+          metadataJson?: string;
         }>;
       }>;
     }>
@@ -851,12 +851,12 @@ export class DoorwayClient {
    */
   async bulkCreateRelationships(
     items: Array<{
-      source_id: string;
-      target_id: string;
-      relationship_type: string;
+      sourceId: string;
+      targetId: string;
+      relationshipType: string;
       confidence?: number;
-      inference_source?: string;
-      metadata_json?: string;
+      inferenceSource?: string;
+      metadataJson?: string;
     }>
   ): Promise<BulkRelationshipResult> {
     if (this.config.dryRun) {
@@ -887,14 +887,14 @@ export class DoorwayClient {
    */
   async bulkCreatePresences(
     items: Array<{
-      display_name: string;
-      presence_state?: string;
-      external_identifiers_json?: string;
-      establishing_content_ids_json: string;
-      affinity_total?: number;
-      unique_engagers?: number;
-      citation_count?: number;
-      recognition_score?: number;
+      displayName: string;
+      presenceState?: string;
+      externalIdentifiersJson?: string;
+      establishingContentIdsJson: string;
+      affinityTotal?: number;
+      uniqueEngagers?: number;
+      citationCount?: number;
+      recognitionScore?: number;
     }>
   ): Promise<BulkPresenceResult> {
     if (this.config.dryRun) {
@@ -928,14 +928,14 @@ export class DoorwayClient {
       action: string;
       provider: string;
       receiver: string;
-      resource_conforms_to?: string;
-      resource_quantity_value?: number;
-      resource_quantity_unit?: string;
-      lamad_event_type?: string;
-      content_id?: string;
-      contributor_presence_id?: string;
-      path_id?: string;
-      metadata_json?: string;
+      resourceConformsTo?: string;
+      resourceQuantityValue?: number;
+      resourceQuantityUnit?: string;
+      lamadEventType?: string;
+      contentId?: string;
+      contributorPresenceId?: string;
+      pathId?: string;
+      metadataJson?: string;
     }>
   ): Promise<BulkEventResult> {
     if (this.config.dryRun) {
@@ -966,12 +966,12 @@ export class DoorwayClient {
    */
   async bulkUpsertMastery(
     items: Array<{
-      human_id: string;
-      content_id: string;
-      mastery_level?: string;
-      mastery_level_index?: number;
-      freshness_score?: number;
-      engagement_count?: number;
+      humanId: string;
+      contentId: string;
+      masteryLevel?: string;
+      masteryLevelIndex?: number;
+      freshnessScore?: number;
+      engagementCount?: number;
     }>
   ): Promise<BulkMasteryResult> {
     if (this.config.dryRun) {
@@ -1000,7 +1000,7 @@ export class DoorwayClient {
    * For /db/* paths: Uses storageUrl directly if configured (bypasses doorway proxy).
    * This is useful when doorway's proxy is unavailable but storage is accessible.
    */
-  private async fetch(
+  protected async fetch(
     path: string,
     options: {
       method?: string;

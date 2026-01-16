@@ -42,8 +42,9 @@ pub struct CreateRelationshipInput {
 fn default_confidence() -> f64 { 1.0 }
 fn default_inference_source() -> String { "explicit".to_string() }
 
-/// Query parameters for listing relationships
+/// Query parameters for listing relationships - camelCase for URL params
 #[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct RelationshipQuery {
     pub content_id: Option<String>,
     pub direction: Option<String>,  // outgoing, incoming, both

@@ -237,7 +237,7 @@ export class PointsService {
     return this.balance$.pipe(
       map(balance => {
         if (!balance) return {};
-        return parsePointsByTrigger(balance.points_by_trigger_json);
+        return parsePointsByTrigger(balance.pointsByTriggerJson);
       })
     );
   }
@@ -248,7 +248,7 @@ export class PointsService {
   getPointsByTriggerSync(): Record<string, number> {
     const balance = this.balanceSubject.value;
     if (!balance) return {};
-    return parsePointsByTrigger(balance.points_by_trigger_json);
+    return parsePointsByTrigger(balance.pointsByTriggerJson);
   }
 
   /**

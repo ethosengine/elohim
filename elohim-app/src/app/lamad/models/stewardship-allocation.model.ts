@@ -259,81 +259,70 @@ export interface BulkAllocationResult {
 // ============================================================================
 
 /**
- * Transform wire format (snake_case) to TypeScript model (camelCase).
+ * Transform API response (camelCase View) to TypeScript domain model.
+ * API now returns camelCase with parsed JSON objects.
  */
-export function fromWireStewardshipAllocation(wire: Record<string, unknown>): StewardshipAllocation {
+export function fromWireStewardshipAllocation(view: Record<string, unknown>): StewardshipAllocation {
+  // API returns parsed JSON objects; stringify for domain model compatibility
+  const contributionEvidence = view['contributionEvidence'];
+  const metadata = view['metadata'];
+
   return {
-    id: wire['id'] as string,
-    contentId: wire['content_id'] as string,
-    stewardPresenceId: wire['steward_presence_id'] as string,
-    allocationRatio: wire['allocation_ratio'] as number,
-    allocationMethod: wire['allocation_method'] as AllocationMethod,
-    contributionType: wire['contribution_type'] as ContributionType,
-    contributionEvidenceJson: wire['contribution_evidence_json'] as string | null,
-    governanceState: wire['governance_state'] as GovernanceState,
-    disputeId: wire['dispute_id'] as string | null,
-    disputeReason: wire['dispute_reason'] as string | null,
-    disputedAt: wire['disputed_at'] as string | null,
-    disputedBy: wire['disputed_by'] as string | null,
-    negotiationSessionId: wire['negotiation_session_id'] as string | null,
-    elohimRatifiedAt: wire['elohim_ratified_at'] as string | null,
-    elohimRatifierId: wire['elohim_ratifier_id'] as string | null,
-    effectiveFrom: wire['effective_from'] as string,
-    effectiveUntil: wire['effective_until'] as string | null,
-    supersededBy: wire['superseded_by'] as string | null,
-    recognitionAccumulated: wire['recognition_accumulated'] as number,
-    lastRecognitionAt: wire['last_recognition_at'] as string | null,
-    note: wire['note'] as string | null,
-    metadataJson: wire['metadata_json'] as string | null,
-    createdAt: wire['created_at'] as string,
-    updatedAt: wire['updated_at'] as string,
+    id: view['id'] as string,
+    contentId: view['contentId'] as string,
+    stewardPresenceId: view['stewardPresenceId'] as string,
+    allocationRatio: view['allocationRatio'] as number,
+    allocationMethod: view['allocationMethod'] as AllocationMethod,
+    contributionType: view['contributionType'] as ContributionType,
+    contributionEvidenceJson: contributionEvidence ? JSON.stringify(contributionEvidence) : null,
+    governanceState: view['governanceState'] as GovernanceState,
+    disputeId: view['disputeId'] as string | null,
+    disputeReason: view['disputeReason'] as string | null,
+    disputedAt: view['disputedAt'] as string | null,
+    disputedBy: view['disputedBy'] as string | null,
+    negotiationSessionId: view['negotiationSessionId'] as string | null,
+    elohimRatifiedAt: view['elohimRatifiedAt'] as string | null,
+    elohimRatifierId: view['elohimRatifierId'] as string | null,
+    effectiveFrom: view['effectiveFrom'] as string,
+    effectiveUntil: view['effectiveUntil'] as string | null,
+    supersededBy: view['supersededBy'] as string | null,
+    recognitionAccumulated: view['recognitionAccumulated'] as number,
+    lastRecognitionAt: view['lastRecognitionAt'] as string | null,
+    note: view['note'] as string | null,
+    metadataJson: metadata ? JSON.stringify(metadata) : null,
+    createdAt: view['createdAt'] as string,
+    updatedAt: view['updatedAt'] as string,
   };
 }
 
 /**
- * Transform TypeScript model to wire format for API calls.
+ * Transform ContentStewardship from API response (camelCase View).
  */
-export function toWireCreateAllocationInput(input: CreateAllocationInput): Record<string, unknown> {
-  return {
-    content_id: input.contentId,
-    steward_presence_id: input.stewardPresenceId,
-    allocation_ratio: input.allocationRatio ?? 1.0,
-    allocation_method: input.allocationMethod ?? 'manual',
-    contribution_type: input.contributionType ?? 'inherited',
-    contribution_evidence_json: input.contributionEvidenceJson,
-    note: input.note,
-    metadata_json: input.metadataJson,
-  };
-}
-
-/**
- * Transform ContentStewardship from wire format.
- */
-export function fromWireContentStewardship(wire: Record<string, unknown>): ContentStewardship {
-  const allocations = (wire['allocations'] as Array<Record<string, unknown>> ?? []).map(a => ({
+export function fromWireContentStewardship(view: Record<string, unknown>): ContentStewardship {
+  const allocations = (view['allocations'] as Array<Record<string, unknown>> ?? []).map(a => ({
     allocation: fromWireStewardshipAllocation(a['allocation'] as Record<string, unknown>),
     steward: a['steward'] ? fromWireContributorPresenceRef(a['steward'] as Record<string, unknown>) : null,
   }));
 
   return {
-    contentId: wire['content_id'] as string,
+    contentId: view['contentId'] as string,
     allocations,
-    totalAllocation: wire['total_allocation'] as number,
-    hasDisputes: wire['has_disputes'] as boolean,
-    primarySteward: wire['primary_steward']
-      ? fromWireStewardshipAllocation(wire['primary_steward'] as Record<string, unknown>)
+    totalAllocation: view['totalAllocation'] as number,
+    hasDisputes: view['hasDisputes'] as boolean,
+    primarySteward: view['primarySteward']
+      ? fromWireStewardshipAllocation(view['primarySteward'] as Record<string, unknown>)
       : null,
   };
 }
 
 /**
- * Transform ContributorPresenceRef from wire format.
+ * Transform ContributorPresenceRef from API response (camelCase View).
  */
-function fromWireContributorPresenceRef(wire: Record<string, unknown>): ContributorPresenceRef {
+function fromWireContributorPresenceRef(view: Record<string, unknown>): ContributorPresenceRef {
   return {
-    id: wire['id'] as string,
-    displayName: wire['display_name'] as string,
-    image: wire['image'] as string | null,
-    presenceState: wire['presence_state'] as string,
+    id: view['id'] as string,
+    displayName: view['displayName'] as string,
+    image: view['image'] as string | null,
+    presenceState: view['presenceState'] as string,
   };
 }

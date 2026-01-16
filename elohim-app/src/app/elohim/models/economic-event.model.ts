@@ -753,45 +753,40 @@ export interface UnytEventAdapter {
 // =============================================================================
 
 /**
- * EconomicEventWire - Backend wire format (snake_case).
+ * EconomicEventWire - Backend wire format (camelCase).
  * Maps to the economic_events table in elohim-storage.
  */
 export interface EconomicEventWire {
   id: string;
-  app_id: string;
+  appId: string;
   action: string;
   provider: string;
   receiver: string;
-  resource_conforms_to: string | null;
-  resource_quantity_value: number | null;
-  resource_quantity_unit: string | null;
-  has_point_in_time: string;
-  lamad_event_type: string | null;
-  content_id: string | null;
-  contributor_presence_id: string | null;
-  path_id: string | null;
+  resourceConformsTo: string | null;
+  resourceQuantityValue: number | null;
+  resourceQuantityUnit: string | null;
+  hasPointInTime: string;
+  lamadEventType: string | null;
+  contentId: string | null;
+  contributorPresenceId: string | null;
+  pathId: string | null;
   state: string;
-  metadata_json: string | null;
-  created_at: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
 }
 
 /**
  * Transform wire format to EconomicEvent.
  */
 export function transformEventFromWire(wire: EconomicEventWire): EconomicEvent {
-  let metadata: Record<string, unknown> | undefined;
-  try {
-    metadata = wire.metadata_json ? JSON.parse(wire.metadata_json) : undefined;
-  } catch {
-    // Ignore parse errors
-  }
+  const metadata = wire.metadata ?? undefined;
 
   // Extract lamad-specific metadata
   if (metadata) {
-    metadata['lamadEventType'] = wire.lamad_event_type;
-    metadata['contentId'] = wire.content_id;
-    metadata['presenceId'] = wire.contributor_presence_id;
-    metadata['pathId'] = wire.path_id;
+    metadata['lamadEventType'] = wire.lamadEventType;
+    metadata['contentId'] = wire.contentId;
+    metadata['presenceId'] = wire.contributorPresenceId;
+    metadata['pathId'] = wire.pathId;
   }
 
   return {
@@ -799,12 +794,12 @@ export function transformEventFromWire(wire: EconomicEventWire): EconomicEvent {
     action: wire.action as REAAction,
     provider: wire.provider,
     receiver: wire.receiver,
-    resourceConformsTo: wire.resource_conforms_to ?? undefined,
-    resourceQuantity: wire.resource_quantity_value != null ? {
-      hasNumericalValue: wire.resource_quantity_value,
-      hasUnit: wire.resource_quantity_unit ?? 'unit-each',
+    resourceConformsTo: wire.resourceConformsTo ?? undefined,
+    resourceQuantity: wire.resourceQuantityValue != null ? {
+      hasNumericalValue: wire.resourceQuantityValue,
+      hasUnit: wire.resourceQuantityUnit ?? 'unit-each',
     } : undefined,
-    hasPointInTime: wire.has_point_in_time,
+    hasPointInTime: wire.hasPointInTime,
     state: wire.state as EventState,
     metadata,
   };
@@ -813,24 +808,24 @@ export function transformEventFromWire(wire: EconomicEventWire): EconomicEvent {
 /**
  * Transform EconomicEvent to wire format for backend.
  */
-export function transformEventToWire(event: EconomicEvent, appId: string = 'shefa'): Omit<EconomicEventWire, 'created_at'> {
+export function transformEventToWire(event: EconomicEvent, appId: string = 'shefa'): Omit<EconomicEventWire, 'createdAt'> {
   const metadata = event.metadata as Record<string, unknown> | undefined;
 
   return {
     id: event.id,
-    app_id: appId,
+    appId: appId,
     action: event.action,
     provider: event.provider,
     receiver: event.receiver,
-    resource_conforms_to: event.resourceConformsTo ?? null,
-    resource_quantity_value: event.resourceQuantity?.hasNumericalValue ?? null,
-    resource_quantity_unit: event.resourceQuantity?.hasUnit ?? null,
-    has_point_in_time: event.hasPointInTime,
-    lamad_event_type: (metadata?.['lamadEventType'] as string) ?? null,
-    content_id: (metadata?.['contentId'] as string) ?? null,
-    contributor_presence_id: (metadata?.['presenceId'] as string) ?? null,
-    path_id: (metadata?.['pathId'] as string) ?? null,
+    resourceConformsTo: event.resourceConformsTo ?? null,
+    resourceQuantityValue: event.resourceQuantity?.hasNumericalValue ?? null,
+    resourceQuantityUnit: event.resourceQuantity?.hasUnit ?? null,
+    hasPointInTime: event.hasPointInTime,
+    lamadEventType: (metadata?.['lamadEventType'] as string) ?? null,
+    contentId: (metadata?.['contentId'] as string) ?? null,
+    contributorPresenceId: (metadata?.['presenceId'] as string) ?? null,
+    pathId: (metadata?.['pathId'] as string) ?? null,
     state: event.state,
-    metadata_json: event.metadata ? JSON.stringify(event.metadata) : null,
+    metadata: event.metadata ?? null,
   };
 }

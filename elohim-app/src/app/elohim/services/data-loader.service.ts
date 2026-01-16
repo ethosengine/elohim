@@ -345,15 +345,14 @@ export class DataLoaderService {
    * Returns path with empty steps array - use getPath() for full steps.
    */
   private transformHolochainPathOverview(hcPath: HolochainPathOverview): LearningPath {
-    // Parse metadata to extract chapters if available
+    // Extract chapters from metadata if available
     let chapters: LearningPath['chapters'] | undefined;
-    try {
-      const metadata = JSON.parse(hcPath.path.metadata_json || '{}');
-      if (metadata.chapters && Array.isArray(metadata.chapters)) {
-        chapters = metadata.chapters;
+    const metadata = hcPath.path.metadata ?? {};
+    if (metadata && typeof metadata === 'object' && 'chapters' in metadata) {
+      const metadataObj = metadata as Record<string, unknown>;
+      if (Array.isArray(metadataObj['chapters'])) {
+        chapters = metadataObj['chapters'] as LearningPath['chapters'];
       }
-    } catch {
-      // Ignore JSON parse errors
     }
 
     return {
@@ -362,19 +361,19 @@ export class DataLoaderService {
       title: hcPath.path.title,
       description: hcPath.path.description,
       purpose: hcPath.path.purpose ?? '',
-      createdBy: hcPath.path.created_by,
+      createdBy: hcPath.path.createdBy,
       contributors: [],
-      createdAt: hcPath.path.created_at,
-      updatedAt: hcPath.path.updated_at,
+      createdAt: hcPath.path.createdAt,
+      updatedAt: hcPath.path.updatedAt,
       difficulty: hcPath.path.difficulty as LearningPath['difficulty'],
-      estimatedDuration: hcPath.path.estimated_duration ?? '',
+      estimatedDuration: hcPath.path.estimatedDuration ?? '',
       tags: hcPath.path.tags,
       visibility: hcPath.path.visibility as LearningPath['visibility'],
       chapters,
       // Empty steps - use getPath() for full step data
       steps: [],
       // Store step count in metadata for UI display
-      stepCount: hcPath.step_count,
+      stepCount: hcPath.stepCount,
     } as LearningPath & { stepCount?: number };
   }
 
@@ -621,7 +620,7 @@ export class DataLoaderService {
    */
   private calculateStepCount(path: LearningPath): number {
     // Check if raw data includes pre-computed stepCount (from doorway)
-    const rawStepCount = (path as any).stepCount ?? (path as any).step_count;
+    const rawStepCount = (path as any).stepCount ?? (path as any).stepCount;
     if (typeof rawStepCount === 'number' && rawStepCount > 0) {
       return rawStepCount;
     }
@@ -824,7 +823,7 @@ export class DataLoaderService {
     this.attestationCache$ ??= defer(() =>
       from(this.holochainContent.queryContentAttestations({ status: 'active' }))
     ).pipe(
-      map(results => results.map(r => this.transformHolochainContentAttestation(r.content_attestation))),
+      map(results => results.map(r => this.transformHolochainContentAttestation(r.contentAttestation))),
       shareReplay(1),
       catchError((err) => {
         console.warn('[DataLoader] Failed to load content attestations:', err);
@@ -846,7 +845,7 @@ export class DataLoaderService {
     }
 
     return defer(() => from(this.holochainContent.getAttestations({
-      agent_id: agentId,
+      agentId: agentId,
       category: category,
     }))).pipe(
       map(results => results.map(r => this.transformHolochainAttestation(r.attestation))),
@@ -861,26 +860,21 @@ export class DataLoaderService {
    * Transform Holochain attestation entry to frontend AgentAttestation model.
    */
   private transformHolochainAttestation(hcAtt: HolochainAttestationEntry): AgentAttestation {
-    let earnedVia: AgentAttestation['earnedVia'] = {};
-    try {
-      earnedVia = JSON.parse(hcAtt.earned_via_json || '{}');
-    } catch {
-      // Ignore parse errors
-    }
+    const earnedVia = (hcAtt.earnedVia ?? {}) as AgentAttestation['earnedVia'];
 
     return {
       id: hcAtt.id,
-      agentId: hcAtt.agent_id,
+      agentId: hcAtt.agentId,
       category: hcAtt.category as AgentAttestation['category'],
-      attestationType: hcAtt.attestation_type,
-      displayName: hcAtt.display_name,
+      attestationType: hcAtt.attestationType,
+      displayName: hcAtt.displayName,
       description: hcAtt.description,
-      iconUrl: hcAtt.icon_url ?? undefined,
+      iconUrl: hcAtt.iconUrl ?? undefined,
       tier: hcAtt.tier as AgentAttestation['tier'],
       earnedVia,
-      issuedAt: hcAtt.issued_at,
-      issuedBy: hcAtt.issued_by,
-      expiresAt: hcAtt.expires_at ?? undefined,
+      issuedAt: hcAtt.issuedAt,
+      issuedBy: hcAtt.issuedBy,
+      expiresAt: hcAtt.expiresAt ?? undefined,
       proof: hcAtt.proof ?? undefined,
     };
   }
@@ -889,46 +883,20 @@ export class DataLoaderService {
    * Transform Holochain content attestation entry to frontend ContentAttestation model.
    */
   private transformHolochainContentAttestation(hcAtt: HolochainContentAttestationEntry): ContentAttestation {
-    let grantedBy: ContentAttestation['grantedBy'] = { type: 'system', grantorId: 'unknown' };
-    let revocation: ContentAttestation['revocation'] = undefined;
-    let evidence: ContentAttestation['evidence'] = undefined;
-    let scope: ContentAttestation['scope'] = undefined;
-    let metadata: ContentAttestation['metadata'] = {};
-
-    try {
-      grantedBy = JSON.parse(hcAtt.granted_by_json || '{}');
-    } catch { /* ignore */ }
-
-    try {
-      if (hcAtt.revocation_json) {
-        revocation = JSON.parse(hcAtt.revocation_json);
-      }
-    } catch { /* ignore */ }
-
-    try {
-      if (hcAtt.evidence_json) {
-        evidence = JSON.parse(hcAtt.evidence_json);
-      }
-    } catch { /* ignore */ }
-
-    try {
-      if (hcAtt.scope_json) {
-        scope = JSON.parse(hcAtt.scope_json);
-      }
-    } catch { /* ignore */ }
-
-    try {
-      metadata = JSON.parse(hcAtt.metadata_json || '{}');
-    } catch { /* ignore */ }
+    const grantedBy = (hcAtt.grantedBy ?? { type: 'system', grantorId: 'unknown' }) as ContentAttestation['grantedBy'];
+    const revocation = (hcAtt.revocation ?? undefined) as ContentAttestation['revocation'];
+    const evidence = (hcAtt.evidence ?? undefined) as ContentAttestation['evidence'];
+    const scope = (hcAtt.scope ?? undefined) as ContentAttestation['scope'];
+    const metadata = (hcAtt.metadata ?? {}) as ContentAttestation['metadata'];
 
     return {
       id: hcAtt.id,
-      contentId: hcAtt.content_id,
-      attestationType: hcAtt.attestation_type as ContentAttestation['attestationType'],
-      reachGranted: hcAtt.reach_granted as ContentAttestation['reachGranted'],
+      contentId: hcAtt.contentId,
+      attestationType: hcAtt.attestationType as ContentAttestation['attestationType'],
+      reachGranted: hcAtt.reachGranted as ContentAttestation['reachGranted'],
       grantedBy,
-      grantedAt: hcAtt.granted_at,
-      expiresAt: hcAtt.expires_at ?? undefined,
+      grantedAt: hcAtt.grantedAt,
+      expiresAt: hcAtt.expiresAt ?? undefined,
       status: hcAtt.status as ContentAttestation['status'],
       revocation,
       evidence,
@@ -955,7 +923,7 @@ export class DataLoaderService {
       from(this.holochainContent.getAttestationsForContent(contentId))
     ).pipe(
       map(results => {
-        const attestations = results.map(r => this.transformHolochainContentAttestation(r.content_attestation));
+        const attestations = results.map(r => this.transformHolochainContentAttestation(r.contentAttestation));
         this.attestationsByContentCache.set(contentId, attestations);
         return attestations;
       }),
@@ -1000,15 +968,15 @@ export class DataLoaderService {
   private transformHolochainAgent(hcAgent: HolochainAgentEntry): Agent {
     return {
       id: hcAgent.id,
-      displayName: hcAgent.display_name,
-      type: hcAgent.agent_type as Agent['type'],
+      displayName: hcAgent.displayName,
+      type: hcAgent.agentType as Agent['type'],
       bio: hcAgent.bio ?? undefined,
       avatar: hcAgent.avatar ?? undefined,
       visibility: hcAgent.visibility as Agent['visibility'],
-      createdAt: hcAgent.created_at,
-      updatedAt: hcAgent.updated_at,
+      createdAt: hcAgent.createdAt,
+      updatedAt: hcAgent.updatedAt,
       did: hcAgent.did ?? undefined,
-      activityPubType: hcAgent.activity_pub_type as Agent['activityPubType'],
+      activityPubType: hcAgent.activityPubType as Agent['activityPubType'],
     };
   }
 
@@ -1028,7 +996,7 @@ export class DataLoaderService {
       map(results => ({
         lastUpdated: new Date().toISOString(),
         totalCount: results.length,
-        maps: results.map(r => this.transformHolochainKnowledgeMapToIndex(r.knowledge_map))
+        maps: results.map(r => this.transformHolochainKnowledgeMapToIndex(r.knowledgeMap))
       })),
       catchError((err) => {
         console.warn('[DataLoader] Failed to load knowledge map index:', err);
@@ -1046,7 +1014,7 @@ export class DataLoaderService {
     }
 
     return defer(() => from(this.holochainContent.getKnowledgeMapById(mapId))).pipe(
-      map(result => result ? this.transformHolochainKnowledgeMap(result.knowledge_map) : null),
+      map(result => result ? this.transformHolochainKnowledgeMap(result.knowledgeMap) : null),
       catchError((err) => {
         console.warn(`[DataLoader] Failed to load knowledge map "${mapId}":`, err);
         return of(null);
@@ -1059,35 +1027,30 @@ export class DataLoaderService {
    */
   private transformHolochainKnowledgeMapToIndex(hcMap: {
     id: string;
-    map_type: string;
-    owner_id: string;
+    mapType: string;
+    ownerId: string;
     title: string;
-    subject_type: string;
-    subject_id: string;
-    subject_name: string;
+    subjectType: string;
+    subjectId: string;
+    subjectName: string;
     visibility: string;
-    nodes_json: string;
-    overall_affinity: number;
-    updated_at: string;
+    nodes: unknown;
+    overallAffinity: number;
+    updatedAt: string;
   }): KnowledgeMapIndexEntry {
-    let nodes: unknown[] = [];
-    try {
-      nodes = hcMap.nodes_json ? JSON.parse(hcMap.nodes_json) : [];
-    } catch {
-      // Ignore parse errors
-    }
+    const nodes = Array.isArray(hcMap.nodes) ? hcMap.nodes : [];
 
     return {
       id: hcMap.id,
-      mapType: hcMap.map_type as KnowledgeMapType,
+      mapType: hcMap.mapType as KnowledgeMapType,
       title: hcMap.title,
-      subjectName: hcMap.subject_name,
-      ownerId: hcMap.owner_id,
+      subjectName: hcMap.subjectName,
+      ownerId: hcMap.ownerId,
       ownerName: '', // Would need to look up agent name
       visibility: hcMap.visibility,
-      overallAffinity: hcMap.overall_affinity,
+      overallAffinity: hcMap.overallAffinity,
       nodeCount: Array.isArray(nodes) ? nodes.length : 0,
-      updatedAt: hcMap.updated_at
+      updatedAt: hcMap.updatedAt
     };
   }
 
@@ -1096,57 +1059,48 @@ export class DataLoaderService {
    */
   private transformHolochainKnowledgeMap(hcMap: {
     id: string;
-    map_type: string;
-    owner_id: string;
+    mapType: string;
+    ownerId: string;
     title: string;
     description: string | null;
-    subject_type: string;
-    subject_id: string;
-    subject_name: string;
+    subjectType: string;
+    subjectId: string;
+    subjectName: string;
     visibility: string;
-    shared_with_json: string;
-    nodes_json: string;
-    path_ids_json: string;
-    overall_affinity: number;
-    content_graph_id: string | null;
-    mastery_levels_json: string;
-    goals_json: string;
-    created_at: string;
-    updated_at: string;
-    metadata_json: string;
+    sharedWith: unknown;
+    nodes: unknown;
+    pathIds: unknown;
+    overallAffinity: number;
+    contentGraphId: string | null;
+    masteryLevels: unknown;
+    goals: unknown;
+    createdAt: string;
+    updatedAt: string;
+    metadata: unknown;
   }): KnowledgeMap {
-    let nodes: KnowledgeNode[] = [];
-    let pathIds: string[] = [];
-    let sharedWith: string[] = [];
-    let metadata: Record<string, unknown> = {};
-
-    try {
-      nodes = hcMap.nodes_json ? JSON.parse(hcMap.nodes_json) : [];
-      pathIds = hcMap.path_ids_json ? JSON.parse(hcMap.path_ids_json) : [];
-      sharedWith = hcMap.shared_with_json ? JSON.parse(hcMap.shared_with_json) : [];
-      metadata = hcMap.metadata_json ? JSON.parse(hcMap.metadata_json) : {};
-    } catch {
-      // Ignore parse errors
-    }
+    const nodes = (Array.isArray(hcMap.nodes) ? hcMap.nodes : []) as KnowledgeNode[];
+    const pathIds = (Array.isArray(hcMap.pathIds) ? hcMap.pathIds : []) as string[];
+    const sharedWith = (Array.isArray(hcMap.sharedWith) ? hcMap.sharedWith : []) as string[];
+    const metadata = (hcMap.metadata && typeof hcMap.metadata === 'object' ? hcMap.metadata : {}) as Record<string, unknown>;
 
     return {
       id: hcMap.id,
-      mapType: hcMap.map_type as KnowledgeMapType,
+      mapType: hcMap.mapType as KnowledgeMapType,
       subject: {
-        type: hcMap.subject_type as 'content-graph' | 'agent' | 'organization',
-        subjectId: hcMap.subject_id,
-        subjectName: hcMap.subject_name
+        type: hcMap.subjectType as 'content-graph' | 'agent' | 'organization',
+        subjectId: hcMap.subjectId,
+        subjectName: hcMap.subjectName
       },
-      ownerId: hcMap.owner_id,
+      ownerId: hcMap.ownerId,
       title: hcMap.title,
       description: hcMap.description ?? undefined,
       visibility: hcMap.visibility as 'private' | 'mutual' | 'shared' | 'public',
       sharedWith,
       nodes,
       pathIds,
-      overallAffinity: hcMap.overall_affinity,
-      createdAt: hcMap.created_at,
-      updatedAt: hcMap.updated_at,
+      overallAffinity: hcMap.overallAffinity,
+      createdAt: hcMap.createdAt,
+      updatedAt: hcMap.updatedAt,
       metadata
     };
   }
@@ -1167,7 +1121,7 @@ export class DataLoaderService {
       map(results => ({
         lastUpdated: new Date().toISOString(),
         totalCount: results.length,
-        extensions: results.map(r => this.transformHolochainPathExtensionToIndex(r.path_extension))
+        extensions: results.map(r => this.transformHolochainPathExtensionToIndex(r.pathExtension))
       })),
       catchError((err) => {
         console.warn('[DataLoader] Failed to load path extension index:', err);
@@ -1185,7 +1139,7 @@ export class DataLoaderService {
     }
 
     return defer(() => from(this.holochainContent.getPathExtensionById(extensionId))).pipe(
-      map(result => result ? this.transformHolochainPathExtension(result.path_extension) : null),
+      map(result => result ? this.transformHolochainPathExtension(result.pathExtension) : null),
       catchError((err) => {
         console.warn(`[DataLoader] Failed to load path extension "${extensionId}":`, err);
         return of(null);
@@ -1201,8 +1155,8 @@ export class DataLoaderService {
       return of([]);
     }
 
-    return defer(() => from(this.holochainContent.queryPathExtensions({ base_path_id: pathId }))).pipe(
-      map(results => results.map(r => this.transformHolochainPathExtension(r.path_extension))),
+    return defer(() => from(this.holochainContent.queryPathExtensions({ basePathId: pathId }))).pipe(
+      map(results => results.map(r => this.transformHolochainPathExtension(r.pathExtension))),
       catchError((err) => {
         console.warn(`[DataLoader] Failed to load extensions for path "${pathId}":`, err);
         return of([]);
@@ -1215,40 +1169,34 @@ export class DataLoaderService {
    */
   private transformHolochainPathExtensionToIndex(hcExt: {
     id: string;
-    base_path_id: string;
-    base_path_version: string;
-    extended_by: string;
+    basePathId: string;
+    basePathVersion: string;
+    extendedBy: string;
     title: string;
     description: string | null;
     visibility: string;
-    insertions_json: string;
-    annotations_json: string;
-    updated_at: string;
+    insertions: unknown;
+    annotations: unknown;
+    updatedAt: string;
   }): PathExtensionIndexEntry {
-    let insertionCount = 0;
-    let annotationCount = 0;
-    try {
-      const insertions = hcExt.insertions_json ? JSON.parse(hcExt.insertions_json) : [];
-      const annotations = hcExt.annotations_json ? JSON.parse(hcExt.annotations_json) : [];
-      insertionCount = Array.isArray(insertions) ? insertions.length : 0;
-      annotationCount = Array.isArray(annotations) ? annotations.length : 0;
-    } catch {
-      // Ignore parse errors
-    }
+    const insertions = Array.isArray(hcExt.insertions) ? hcExt.insertions : [];
+    const annotations = Array.isArray(hcExt.annotations) ? hcExt.annotations : [];
+    const insertionCount = insertions.length;
+    const annotationCount = annotations.length;
 
     return {
       id: hcExt.id,
-      basePathId: hcExt.base_path_id,
+      basePathId: hcExt.basePathId,
       basePathTitle: '', // Would need to look up path title
       title: hcExt.title,
       description: hcExt.description ?? undefined,
-      extendedBy: hcExt.extended_by,
+      extendedBy: hcExt.extendedBy,
       extenderName: '', // Would need to look up agent name
       visibility: hcExt.visibility,
       insertionCount,
       annotationCount,
       forkCount: 0, // Would need separate query
-      updatedAt: hcExt.updated_at
+      updatedAt: hcExt.updatedAt
     };
   }
 
@@ -1257,51 +1205,38 @@ export class DataLoaderService {
    */
   private transformHolochainPathExtension(hcExt: {
     id: string;
-    base_path_id: string;
-    base_path_version: string;
-    extended_by: string;
+    basePathId: string;
+    basePathVersion: string;
+    extendedBy: string;
     title: string;
     description: string | null;
     visibility: string;
-    shared_with_json: string;
-    insertions_json: string;
-    annotations_json: string;
-    reorderings_json: string;
-    exclusions_json: string;
-    forked_from: string | null;
-    forks_json: string;
-    upstream_proposal_json: string | null;
-    stats_json: string;
-    created_at: string;
-    updated_at: string;
+    sharedWith: unknown;
+    insertions: unknown;
+    annotations: unknown;
+    reorderings: unknown;
+    exclusions: unknown;
+    forkedFrom: string | null;
+    forks: unknown;
+    upstreamProposal: unknown;
+    stats: unknown;
+    createdAt: string;
+    updatedAt: string;
   }): PathExtension {
-    let sharedWith: string[] = [];
-    let insertions: PathStepInsertion[] = [];
-    let annotations: PathStepAnnotation[] = [];
-    let reorderings: PathStepReorder[] = [];
-    let exclusions: PathStepExclusion[] = [];
-    let forks: string[] = [];
-    let upstreamProposal: UpstreamProposal | undefined;
-    let stats: ExtensionStats | undefined;
-
-    try {
-      sharedWith = hcExt.shared_with_json ? JSON.parse(hcExt.shared_with_json) : [];
-      insertions = hcExt.insertions_json ? JSON.parse(hcExt.insertions_json) : [];
-      annotations = hcExt.annotations_json ? JSON.parse(hcExt.annotations_json) : [];
-      reorderings = hcExt.reorderings_json ? JSON.parse(hcExt.reorderings_json) : [];
-      exclusions = hcExt.exclusions_json ? JSON.parse(hcExt.exclusions_json) : [];
-      forks = hcExt.forks_json ? JSON.parse(hcExt.forks_json) : [];
-      upstreamProposal = hcExt.upstream_proposal_json ? JSON.parse(hcExt.upstream_proposal_json) : undefined;
-      stats = hcExt.stats_json ? JSON.parse(hcExt.stats_json) : undefined;
-    } catch {
-      // Ignore parse errors
-    }
+    const sharedWith = (Array.isArray(hcExt.sharedWith) ? hcExt.sharedWith : []) as string[];
+    const insertions = (Array.isArray(hcExt.insertions) ? hcExt.insertions : []) as PathStepInsertion[];
+    const annotations = (Array.isArray(hcExt.annotations) ? hcExt.annotations : []) as PathStepAnnotation[];
+    const reorderings = (Array.isArray(hcExt.reorderings) ? hcExt.reorderings : []) as PathStepReorder[];
+    const exclusions = (Array.isArray(hcExt.exclusions) ? hcExt.exclusions : []) as PathStepExclusion[];
+    const forks = (Array.isArray(hcExt.forks) ? hcExt.forks : []) as string[];
+    const upstreamProposal = (hcExt.upstreamProposal ?? undefined) as UpstreamProposal | undefined;
+    const stats = (hcExt.stats ?? undefined) as ExtensionStats | undefined;
 
     return {
       id: hcExt.id,
-      basePathId: hcExt.base_path_id,
-      basePathVersion: hcExt.base_path_version,
-      extendedBy: hcExt.extended_by,
+      basePathId: hcExt.basePathId,
+      basePathVersion: hcExt.basePathVersion,
+      extendedBy: hcExt.extendedBy,
       title: hcExt.title,
       description: hcExt.description ?? undefined,
       insertions,
@@ -1310,12 +1245,12 @@ export class DataLoaderService {
       exclusions,
       visibility: hcExt.visibility as 'private' | 'shared' | 'public',
       sharedWith,
-      forkedFrom: hcExt.forked_from ?? undefined,
+      forkedFrom: hcExt.forkedFrom ?? undefined,
       forks,
       upstreamProposal,
       stats,
-      createdAt: hcExt.created_at,
-      updatedAt: hcExt.updated_at
+      createdAt: hcExt.createdAt,
+      updatedAt: hcExt.updatedAt
     };
   }
 
@@ -1407,7 +1342,7 @@ export class DataLoaderService {
     }
 
     return defer(() =>
-      from(this.holochainContent.getRelationships({ content_id: contentId, direction }))
+      from(this.holochainContent.getRelationships({ contentId: contentId, direction }))
     ).pipe(
       map(results => results.map(r => this.transformHolochainRelationship(r.relationship)))
     );
@@ -1417,14 +1352,9 @@ export class DataLoaderService {
    * Transform Holochain relationship entry to frontend ContentRelationship model.
    */
   private transformHolochainRelationship(
-    hcRel: { id: string; source_id: string; target_id: string; relationship_type: string; confidence: number; metadata_json: string | null }
+    hcRel: { id: string; sourceId: string; targetId: string; relationshipType: string; confidence: number; metadata: unknown }
   ): ContentRelationship {
-    let metadata: Record<string, unknown> = {};
-    try {
-      metadata = JSON.parse(hcRel.metadata_json || '{}');
-    } catch {
-      // Ignore parse errors
-    }
+    const metadata = (hcRel.metadata && typeof hcRel.metadata === 'object' ? hcRel.metadata : {}) as Record<string, unknown>;
 
     // Store confidence in metadata since ContentRelationship doesn't have a confidence field
     if (hcRel.confidence !== undefined && hcRel.confidence !== null) {
@@ -1433,9 +1363,9 @@ export class DataLoaderService {
 
     return {
       id: hcRel.id,
-      sourceNodeId: hcRel.source_id,
-      targetNodeId: hcRel.target_id,
-      relationshipType: hcRel.relationship_type as ContentRelationshipType,
+      sourceNodeId: hcRel.sourceId,
+      targetNodeId: hcRel.targetId,
+      relationshipType: hcRel.relationshipType as ContentRelationshipType,
       metadata
     };
   }
@@ -1503,7 +1433,7 @@ export class DataLoaderService {
       adjacency,
       reverseAdjacency,
       metadata: {
-        nodeCount: hcGraph.total_nodes,
+        nodeCount: hcGraph.totalNodes,
         relationshipCount: relationships.size,
         lastUpdated: new Date().toISOString(),
         version: '1.0.0'
@@ -1514,28 +1444,23 @@ export class DataLoaderService {
   /**
    * Transform HolochainContentOutput to ContentNode.
    */
-  private transformHolochainContentToNode(output: { content: { id: string; content_type: string; title: string; description: string; content: string; content_format: string; tags: string[]; source_path: string | null; related_node_ids: string[]; metadata_json: string; created_at: string; updated_at: string } }): ContentNode {
+  private transformHolochainContentToNode(output: { content: { id: string; contentType: string; title: string; description: string; content: string; contentFormat: string; tags: string[]; sourcePath: string | null; relatedNodeIds: string[]; metadata: unknown; createdAt: string; updatedAt: string } }): ContentNode {
     const entry = output.content;
-    let metadata = {};
-    try {
-      metadata = JSON.parse(entry.metadata_json || '{}');
-    } catch {
-      // Ignore parse errors
-    }
+    const metadata = (entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {}) as Record<string, unknown>;
 
     return {
       id: entry.id,
-      contentType: entry.content_type as ContentNode['contentType'],
+      contentType: entry.contentType as ContentNode['contentType'],
       title: entry.title,
       description: entry.description,
       content: entry.content,
-      contentFormat: entry.content_format as ContentNode['contentFormat'],
+      contentFormat: entry.contentFormat as ContentNode['contentFormat'],
       tags: entry.tags,
-      sourcePath: entry.source_path ?? undefined,
-      relatedNodeIds: entry.related_node_ids,
+      sourcePath: entry.sourcePath ?? undefined,
+      relatedNodeIds: entry.relatedNodeIds,
       metadata,
-      createdAt: entry.created_at,
-      updatedAt: entry.updated_at,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
     };
   }
 
@@ -1564,7 +1489,7 @@ export class DataLoaderService {
           id: relId,
           sourceNodeId: parentId,
           targetNodeId: node.id,
-          relationshipType: graphNode.relationship_type as ContentRelationshipType
+          relationshipType: graphNode.relationshipType as ContentRelationshipType
         });
 
         // Update adjacency
@@ -1757,8 +1682,8 @@ export class DataLoaderService {
     }
 
     return defer(() => from(this.holochainContent.queryChallenges({
-      entity_type: entityType,
-      entity_id: entityId
+      entityType: entityType,
+      entityId: entityId
     }))).pipe(
       map(results => results.map(r => this.transformHolochainChallenge(r.challenge))),
       catchError((err) => {
@@ -1773,42 +1698,37 @@ export class DataLoaderService {
    */
   private transformHolochainChallenge(hcChallenge: {
     id: string;
-    entity_type: string;
-    entity_id: string;
-    challenger_id: string;
-    challenger_name: string;
-    challenger_standing: string;
+    entityType: string;
+    entityId: string;
+    challengerId: string;
+    challengerName: string;
+    challengerStanding: string;
     grounds: string;
     description: string;
-    evidence_json: string;
+    evidence: unknown;
     status: string;
-    filed_at: string;
-    sla_deadline: string | null;
-    assigned_elohim: string | null;
-    resolution_json: string | null;
+    filedAt: string;
+    slaDeadline: string | null;
+    assignedElohim: string | null;
+    resolution: unknown;
   }): ChallengeRecord {
-    let resolution: ChallengeRecord['resolution'];
-    try {
-      resolution = hcChallenge.resolution_json ? JSON.parse(hcChallenge.resolution_json) : undefined;
-    } catch {
-      // Ignore parse errors
-    }
+    const resolution = (hcChallenge.resolution ?? undefined) as ChallengeRecord['resolution'];
 
     return {
       id: hcChallenge.id,
-      entityType: hcChallenge.entity_type,
-      entityId: hcChallenge.entity_id,
+      entityType: hcChallenge.entityType,
+      entityId: hcChallenge.entityId,
       challenger: {
-        agentId: hcChallenge.challenger_id,
-        displayName: hcChallenge.challenger_name,
-        standing: hcChallenge.challenger_standing
+        agentId: hcChallenge.challengerId,
+        displayName: hcChallenge.challengerName,
+        standing: hcChallenge.challengerStanding
       },
       grounds: hcChallenge.grounds,
       description: hcChallenge.description,
       status: hcChallenge.status,
-      filedAt: hcChallenge.filed_at,
-      slaDeadline: hcChallenge.sla_deadline ?? undefined,
-      assignedElohim: hcChallenge.assigned_elohim ?? undefined,
+      filedAt: hcChallenge.filedAt,
+      slaDeadline: hcChallenge.slaDeadline ?? undefined,
+      assignedElohim: hcChallenge.assignedElohim ?? undefined,
       resolution
     };
   }
@@ -1853,41 +1773,33 @@ export class DataLoaderService {
   private transformHolochainProposal(hcProposal: {
     id: string;
     title: string;
-    proposal_type: string;
+    proposalType: string;
     description: string;
-    proposer_id: string;
-    proposer_name: string;
+    proposerId: string;
+    proposerName: string;
     status: string;
     phase: string;
-    voting_config_json: string;
-    current_votes_json: string;
-    outcome_json: string | null;
-    created_at: string;
+    votingConfig: unknown;
+    currentVotes: unknown;
+    outcome: unknown;
+    createdAt: string;
   }): ProposalRecord {
-    let votingConfig: ProposalRecord['votingConfig'];
-    let currentVotes: ProposalRecord['currentVotes'];
-    let outcome: ProposalRecord['outcome'];
-
-    try {
-      votingConfig = hcProposal.voting_config_json ? JSON.parse(hcProposal.voting_config_json) : undefined;
-      currentVotes = hcProposal.current_votes_json ? JSON.parse(hcProposal.current_votes_json) : undefined;
-      outcome = hcProposal.outcome_json ? JSON.parse(hcProposal.outcome_json) : undefined;
-    } catch {
-      // Ignore parse errors
-    }
+    const votingConfig = (hcProposal.votingConfig ?? undefined) as ProposalRecord['votingConfig'];
+    const currentVotes = (hcProposal.currentVotes ?? undefined) as ProposalRecord['currentVotes'];
+    const outcome = (hcProposal.outcome ?? undefined) as ProposalRecord['outcome'];
 
     return {
       id: hcProposal.id,
       title: hcProposal.title,
-      proposalType: hcProposal.proposal_type,
+      proposalType: hcProposal.proposalType,
       description: hcProposal.description,
       proposer: {
-        agentId: hcProposal.proposer_id,
-        displayName: hcProposal.proposer_name
+        agentId: hcProposal.proposerId,
+        displayName: hcProposal.proposerName
       },
       status: hcProposal.status,
       phase: hcProposal.phase,
-      createdAt: hcProposal.created_at,
+      createdAt: hcProposal.createdAt,
       votingConfig,
       currentVotes,
       outcome
@@ -1935,24 +1847,19 @@ export class DataLoaderService {
     id: string;
     title: string;
     summary: string;
-    full_reasoning: string;
+    fullReasoning: string;
     binding: string;
-    scope_json: string;
+    scope: unknown;
     citations: number;
     status: string;
   }): PrecedentRecord {
-    let scope: PrecedentRecord['scope'] = { entityTypes: [] };
-    try {
-      scope = hcPrecedent.scope_json ? JSON.parse(hcPrecedent.scope_json) : { entityTypes: [] };
-    } catch {
-      // Ignore parse errors
-    }
+    const scope = (hcPrecedent.scope ?? { entityTypes: [] }) as PrecedentRecord['scope'];
 
     return {
       id: hcPrecedent.id,
       title: hcPrecedent.title,
       summary: hcPrecedent.summary,
-      fullReasoning: hcPrecedent.full_reasoning,
+      fullReasoning: hcPrecedent.fullReasoning,
       binding: hcPrecedent.binding,
       scope,
       citations: hcPrecedent.citations,
@@ -1986,8 +1893,8 @@ export class DataLoaderService {
     }
 
     return defer(() => from(this.holochainContent.queryDiscussions({
-      entity_type: entityType,
-      entity_id: entityId
+      entityType: entityType,
+      entityId: entityId
     }))).pipe(
       map(results => results.map(r => this.transformHolochainDiscussion(r.discussion))),
       catchError((err) => {
@@ -2002,30 +1909,25 @@ export class DataLoaderService {
    */
   private transformHolochainDiscussion(hcDiscussion: {
     id: string;
-    entity_type: string;
-    entity_id: string;
+    entityType: string;
+    entityId: string;
     category: string;
     title: string;
-    messages_json: string;
+    messages: unknown;
     status: string;
-    message_count: number;
+    messageCount: number;
   }): DiscussionRecord {
-    let messages: DiscussionRecord['messages'] = [];
-    try {
-      messages = hcDiscussion.messages_json ? JSON.parse(hcDiscussion.messages_json) : [];
-    } catch {
-      // Ignore parse errors
-    }
+    const messages = (Array.isArray(hcDiscussion.messages) ? hcDiscussion.messages : []) as DiscussionRecord['messages'];
 
     return {
       id: hcDiscussion.id,
-      entityType: hcDiscussion.entity_type,
-      entityId: hcDiscussion.entity_id,
+      entityType: hcDiscussion.entityType,
+      entityId: hcDiscussion.entityId,
       category: hcDiscussion.category,
       title: hcDiscussion.title,
       messages,
       status: hcDiscussion.status,
-      messageCount: hcDiscussion.message_count
+      messageCount: hcDiscussion.messageCount
     };
   }
 
@@ -2038,10 +1940,10 @@ export class DataLoaderService {
     }
 
     return defer(() => from(this.holochainContent.getGovernanceState({
-      entity_type: entityType,
-      entity_id: entityId
+      entityType: entityType,
+      entityId: entityId
     }))).pipe(
-      map(result => result ? this.transformHolochainGovernanceState(result.governance_state) : null),
+      map(result => result ? this.transformHolochainGovernanceState(result.governanceState) : null),
       catchError((err) => {
         console.warn('[DataLoader] Failed to load governance state:', err);
         return of(null);
@@ -2053,40 +1955,32 @@ export class DataLoaderService {
    * Transform Holochain governance state entry to frontend GovernanceStateRecord model.
    */
   private transformHolochainGovernanceState(hcState: {
-    entity_type: string;
-    entity_id: string;
+    entityType: string;
+    entityId: string;
     status: string;
-    status_basis_json: string;
-    labels_json: string;
-    active_challenges_json: string;
-    last_updated: string;
+    statusBasis: unknown;
+    labels: unknown;
+    activeChallenges: unknown;
+    lastUpdated: string;
   }): GovernanceStateRecord {
-    let statusBasis: GovernanceStateRecord['statusBasis'] = {
+    const statusBasis = (hcState.statusBasis ?? {
       method: '',
       reasoning: '',
       deciderId: '',
       deciderType: '',
       decidedAt: ''
-    };
-    let labels: GovernanceStateRecord['labels'] = [];
-    let activeChallenges: string[] = [];
-
-    try {
-      statusBasis = hcState.status_basis_json ? JSON.parse(hcState.status_basis_json) : statusBasis;
-      labels = hcState.labels_json ? JSON.parse(hcState.labels_json) : [];
-      activeChallenges = hcState.active_challenges_json ? JSON.parse(hcState.active_challenges_json) : [];
-    } catch {
-      // Ignore parse errors
-    }
+    }) as GovernanceStateRecord['statusBasis'];
+    const labels = (Array.isArray(hcState.labels) ? hcState.labels : []) as GovernanceStateRecord['labels'];
+    const activeChallenges = (Array.isArray(hcState.activeChallenges) ? hcState.activeChallenges : []) as string[];
 
     return {
-      entityType: hcState.entity_type,
-      entityId: hcState.entity_id,
+      entityType: hcState.entityType,
+      entityId: hcState.entityId,
       status: hcState.status,
       statusBasis,
       labels,
       activeChallenges,
-      lastUpdated: hcState.last_updated
+      lastUpdated: hcState.lastUpdated
     };
   }
 

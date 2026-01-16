@@ -42,21 +42,21 @@ interface OAuthState {
 
 /** Response from POST /auth/token */
 interface OAuthTokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
-  refresh_token?: string;
-  human_id: string;
-  agent_pub_key: string;
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+  refreshToken?: string;
+  humanId: string;
+  agentPubKey: string;
   identifier: string;
-  doorway_id?: string;
-  doorway_url?: string;
+  doorwayId?: string;
+  doorwayUrl?: string;
 }
 
 /** Error response from OAuth endpoints */
 interface OAuthErrorResponse {
   error: string;
-  error_description?: string;
+  errorDescription?: string;
   state?: string;
 }
 
@@ -118,9 +118,9 @@ export class OAuthAuthProvider implements AuthProvider {
 
     // Build authorization URL
     const params = new URLSearchParams({
-      client_id: 'elohim-app',
-      redirect_uri: redirectUri,
-      response_type: 'code',
+      clientId: 'elohim-app',
+      redirectUri: redirectUri,
+      responseType: 'code',
       state,
     });
 
@@ -216,10 +216,10 @@ export class OAuthAuthProvider implements AuthProvider {
     console.log('[OAuthProvider] Exchanging code for token at:', tokenUrl);
 
     const body = {
-      grant_type: 'authorization_code',
+      grantType: 'authorization_code',
       code,
-      redirect_uri: redirectUri ?? `${window.location.origin}/auth/callback`,
-      client_id: 'elohim-app',
+      redirectUri: redirectUri ?? `${window.location.origin}/auth/callback`,
+      clientId: 'elohim-app',
     };
 
     try {
@@ -232,13 +232,13 @@ export class OAuthAuthProvider implements AuthProvider {
       console.log('[OAuthProvider] Token exchange successful');
 
       // Calculate expiry time
-      const expiresAt = new Date(Date.now() + response.expires_in * 1000);
+      const expiresAt = new Date(Date.now() + response.expiresIn * 1000);
 
       return {
         success: true,
-        token: response.access_token,
-        humanId: response.human_id,
-        agentPubKey: response.agent_pub_key,
+        token: response.accessToken,
+        humanId: response.humanId,
+        agentPubKey: response.agentPubKey,
         expiresAt: expiresAt.toISOString(),
         identifier: response.identifier,
       };
@@ -257,10 +257,10 @@ export class OAuthAuthProvider implements AuthProvider {
   }
 
   /**
-   * Refresh token using refresh_token (if available).
+   * Refresh token using refreshToken (if available).
    */
   async refreshToken(token: string): Promise<AuthResult> {
-    // OAuth typically uses refresh_token grant
+    // OAuth typically uses refreshToken grant
     // For now, we redirect back to the doorway for re-authentication
     const doorwayUrl = this.doorwayRegistry.selectedUrl();
     if (!doorwayUrl) {
@@ -284,13 +284,13 @@ export class OAuthAuthProvider implements AuthProvider {
         })
       );
 
-      const expiresAt = new Date(Date.now() + response.expires_in * 1000);
+      const expiresAt = new Date(Date.now() + response.expiresIn * 1000);
 
       return {
         success: true,
-        token: response.access_token,
-        humanId: response.human_id,
-        agentPubKey: response.agent_pub_key,
+        token: response.accessToken,
+        humanId: response.humanId,
+        agentPubKey: response.agentPubKey,
         expiresAt: expiresAt.toISOString(),
         identifier: response.identifier,
       };
@@ -325,7 +325,7 @@ export class OAuthAuthProvider implements AuthProvider {
     const error = url.searchParams.get('error');
 
     if (error) {
-      console.error('[OAuthProvider] OAuth error:', error, url.searchParams.get('error_description'));
+      console.error('[OAuthProvider] OAuth error:', error, url.searchParams.get('errorDescription'));
       return null;
     }
 
@@ -342,7 +342,7 @@ export class OAuthAuthProvider implements AuthProvider {
     url.searchParams.delete('code');
     url.searchParams.delete('state');
     url.searchParams.delete('error');
-    url.searchParams.delete('error_description');
+    url.searchParams.delete('errorDescription');
 
     // Replace current URL without navigation
     window.history.replaceState({}, '', url.toString());
@@ -365,7 +365,7 @@ export class OAuthAuthProvider implements AuthProvider {
       const body = err.error as OAuthErrorResponse | undefined;
 
       // OAuth-specific error handling
-      const error = body?.error_description ?? body?.error ?? this.getHttpErrorMessage(err.status);
+      const error = body?.errorDescription ?? body?.error ?? this.getHttpErrorMessage(err.status);
       const code = this.getErrorCode(body?.error ?? '', err.status);
 
       return {

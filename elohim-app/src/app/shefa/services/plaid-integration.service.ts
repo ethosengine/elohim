@@ -46,7 +46,7 @@ export interface PlaidLinkConfig {
 interface PlaidOAuthCallback {
   publicToken: string;
   metadata: {
-    institution: { name: string; institution_id: string };
+    institution: { name: string; institutionId: string };
     accounts: Array<{
       id: string;
       name: string;
@@ -129,12 +129,12 @@ export class PlaidIntegrationService {
     };
 
     const response = await firstValueFrom(
-      this.callPlaidAPI<{ link_token: string }>('/link/token/create', requestBody)
+      this.callPlaidAPI<{ linkToken: string }>('/link/token/create', requestBody)
     );
-    if (!response?.link_token) {
-      throw new Error('No link_token in response');
+    if (!response?.linkToken) {
+      throw new Error('No linkToken in response');
     }
-    return response.link_token;
+    return response.linkToken;
   }
 
   /**
@@ -149,35 +149,35 @@ export class PlaidIntegrationService {
       );
 
       if (
-        !accessTokenResponse?.access_token ||
-        !accessTokenResponse?.item_id
+        !accessTokenResponse?.accessToken ||
+        !accessTokenResponse?.itemId
       ) {
         throw new Error('Invalid token exchange response');
       }
 
       // Get institution and account details
       const itemResponse = await firstValueFrom(
-        this.getItemDetails(accessTokenResponse.access_token)
+        this.getItemDetails(accessTokenResponse.accessToken)
       );
 
       // Encrypt the access token before storing
       const encryptedToken = await this.encryptAccessToken(
-        accessTokenResponse.access_token
+        accessTokenResponse.accessToken
       );
 
       // Get account details
       const accountsResponse = await this.getAccounts(
-        accessTokenResponse.access_token
+        accessTokenResponse.accessToken
       );
 
       const linkedAccounts = (accountsResponse?.accounts || []).map(
         (account: any) => ({
-          plaidAccountId: account.account_id,
+          plaidAccountId: account.accountId,
           plaidAccountName: account.name,
           plaidAccountSubtype: account.subtype,
           financialAssetId: '', // Will be linked by user in UI
           balanceAmount: account.balances?.current || 0,
-          currency: account.balances?.iso_currency_code || 'USD',
+          currency: account.balances?.isoCurrencyCode || 'USD',
           lastLinkedAt: new Date().toISOString(),
         })
       );
@@ -187,9 +187,9 @@ export class PlaidIntegrationService {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         connectionNumber: `PC-${this.generateSequentialId()}`,
         stewardId: '', // Will be set by calling service
-        plaidItemId: accessTokenResponse.item_id,
+        plaidItemId: accessTokenResponse.itemId,
         plaidAccessToken: encryptedToken, // Encrypted
-        plaidInstitutionId: itemResponse?.institution?.institution_id || '',
+        plaidInstitutionId: itemResponse?.institution?.institutionId || '',
         institutionName: itemResponse?.institution?.name || 'Unknown',
         linkedAccounts,
         status: 'active',
@@ -210,14 +210,14 @@ export class PlaidIntegrationService {
    */
   private exchangePublicToken(
     publicToken: string
-  ): Observable<{ access_token: string; item_id: string }> {
+  ): Observable<{ accessToken: string; itemId: string }> {
     const requestBody = {
       public_token: publicToken,
       client_id: environment.plaid?.clientId,
       secret: environment.plaid?.secret,
     };
 
-    return this.callPlaidAPI<{ access_token: string; item_id: string }>(
+    return this.callPlaidAPI<{ accessToken: string; itemId: string }>(
       '/item/public_token/exchange',
       requestBody
     ).pipe(
@@ -270,7 +270,7 @@ export class PlaidIntegrationService {
         }
 
         allTransactions = [...allTransactions, ...response.transactions];
-        cursor = response.next_cursor;
+        cursor = response.nextCursor;
 
         // Rate limiting: Plaid allows 120 requests/minute
         await this.delay(100);
@@ -311,7 +311,7 @@ export class PlaidIntegrationService {
         newTransactionsCount: response.added?.length || 0,
         updatedTransactionsCount: response.modified?.length || 0,
         syncedAt: new Date().toISOString(),
-        nextCursorValue: response.next_cursor,
+        nextCursorValue: response.nextCursor,
       };
     } catch (error) {
       console.error('[PlaidIntegration] Transaction sync failed', error);
@@ -435,8 +435,8 @@ export class PlaidIntegrationService {
    */
   handleWebhook(payload: PlaidWebhookPayload): void {
     console.log('[PlaidIntegration] Webhook received', {
-      type: payload.webhook_type,
-      code: payload.webhook_code,
+      type: payload.webhookType,
+      code: payload.webhookCode,
     });
 
     // Validate webhook signature (TODO: implement in production)

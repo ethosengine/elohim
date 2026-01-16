@@ -163,18 +163,18 @@ export class SeedingService implements OnDestroy {
     };
     this.progressSubject.next(progress);
 
-    // Queue all content for writing
+    // Queue all content for writing (camelCase InputView)
     for (const content of contents) {
       const payload = JSON.stringify({
         id: content.id,
-        content_type: content.contentType,
+        contentType: content.contentType,
         title: content.title,
         description: content.description,
         content: content.content,
-        content_format: content.contentFormat,
+        contentFormat: content.contentFormat,
         tags: content.tags,
-        related_node_ids: content.relatedNodeIds || [],
-        metadata_json: JSON.stringify(content.metadata || {}),
+        relatedNodeIds: content.relatedNodeIds || [],
+        metadata: content.metadata || {},
       });
 
       this.writeBuffer.queueWrite(
@@ -234,7 +234,7 @@ export class SeedingService implements OnDestroy {
     };
     this.progressSubject.next(progress);
 
-    // Queue all paths for writing
+    // Queue all paths for writing (camelCase InputView)
     for (const pathData of paths) {
       const payload = JSON.stringify({
         id: pathData.id,
@@ -243,20 +243,20 @@ export class SeedingService implements OnDestroy {
         description: pathData.description,
         purpose: pathData.purpose || '',
         difficulty: pathData.difficulty,
-        estimated_duration: pathData.estimatedDuration || '',
+        estimatedDuration: pathData.estimatedDuration || '',
         tags: pathData.tags || [],
         visibility: pathData.visibility || 'public',
-        metadata_json: JSON.stringify({
+        metadata: {
           chapters: pathData.chapters,
           ...(pathData as unknown as Record<string, unknown>).metadata,
-        }),
+        },
         steps: pathData.steps.map((step, index) => ({
-          order_index: step.order ?? index,
-          step_type: step.stepType || 'content',
-          resource_id: step.resourceId,
-          step_title: step.stepTitle || `Step ${index + 1}`,
-          step_narrative: step.stepNarrative || '',
-          is_optional: step.optional || false,
+          orderIndex: step.order ?? index,
+          stepType: step.stepType || 'content',
+          resourceId: step.resourceId,
+          stepTitle: step.stepTitle || `Step ${index + 1}`,
+          stepNarrative: step.stepNarrative || '',
+          isOptional: step.optional || false,
         })),
       });
 
@@ -372,16 +372,16 @@ export class SeedingService implements OnDestroy {
       // Parse payloads and transform to backend format
       const entries = contentOps.map((op) => {
         const parsed = JSON.parse(op.payload);
-        // Transform to backend format: content → content_body
+        // Transform to backend format: content → contentBody
         return {
           id: parsed.id,
-          content_type: parsed.content_type,
+          contentType: parsed.contentType,
           title: parsed.title,
           description: parsed.description,
-          content_body: parsed.content, // Backend expects content_body, not content
-          content_format: parsed.content_format,
+          contentBody: parsed.content, // Backend expects contentBody, not content
+          contentFormat: parsed.contentFormat,
           tags: parsed.tags || [],
-          metadata_json: parsed.metadata_json,
+          metadataJson: parsed.metadataJson,
           reach: 'public',
         };
       });

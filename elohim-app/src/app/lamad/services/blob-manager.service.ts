@@ -8,6 +8,10 @@
  * - Progress tracking for large downloads
  * - Error handling and recovery
  * - Metadata retrieval from Holochain DHT
+ *
+ * TODO: [HOLOCHAIN-ZOME] Zome call payloads in this service use snake_case
+ * (e.g., content_id) because Holochain zomes are Rust and expect snake_case
+ * field names. This cannot be changed without updating the Rust zomes.
  */
 
 import { Injectable, Injector, inject } from '@angular/core';
@@ -79,28 +83,28 @@ export interface BlobMetadataOutput {
   hash: string;
 
   /** Size in bytes */
-  size_bytes: number;
+  sizeBytes: number;
 
   /** MIME type (video/mp4, audio/mpeg, etc.) */
-  mime_type: string;
+  mimeType: string;
 
   /** Primary + fallback URLs */
-  fallback_urls: string[];
+  fallbackUrls: string[];
 
   /** Bitrate in Mbps (optional) */
-  bitrate_mbps?: number;
+  bitrateMbps?: number;
 
   /** Duration in seconds for audio/video */
-  duration_seconds?: number;
+  durationSeconds?: number;
 
   /** Codec (H.264, H.265, VP9, AAC, etc.) */
   codec?: string;
 
   /** When this blob was created */
-  created_at?: string;
+  createdAt?: string;
 
   /** When this blob was last verified */
-  verified_at?: string;
+  verifiedAt?: string;
 }
 
 /**
@@ -653,14 +657,14 @@ export class BlobManagerService {
   private transformBlobMetadata(metadata: BlobMetadataOutput): ContentBlob {
     return {
       hash: metadata.hash,
-      sizeBytes: metadata.size_bytes,
-      mimeType: metadata.mime_type,
-      fallbackUrls: metadata.fallback_urls,
-      bitrateMbps: metadata.bitrate_mbps,
-      durationSeconds: metadata.duration_seconds,
+      sizeBytes: metadata.sizeBytes,
+      mimeType: metadata.mimeType,
+      fallbackUrls: metadata.fallbackUrls,
+      bitrateMbps: metadata.bitrateMbps,
+      durationSeconds: metadata.durationSeconds,
       codec: metadata.codec,
-      createdAt: metadata.created_at,
-      verifiedAt: metadata.verified_at,
+      createdAt: metadata.createdAt,
+      verifiedAt: metadata.verifiedAt,
     };
   }
 }

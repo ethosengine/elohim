@@ -38,136 +38,136 @@ import type {
 // =============================================================================
 
 interface ZomeGrantOutput {
-  action_hash: string;
+  actionHash: string;
   grant: RawStewardshipGrant;
 }
 
 interface ZomePolicyOutput {
-  action_hash: string;
+  actionHash: string;
   policy: RawDevicePolicy;
 }
 
 interface ZomeAppealOutput {
-  action_hash: string;
+  actionHash: string;
   appeal: RawStewardshipAppeal;
 }
 
 interface ZomeActivityLogOutput {
-  action_hash: string;
+  actionHash: string;
   log: RawActivityLog;
 }
 
 // Raw types from zome (snake_case)
 interface RawStewardshipGrant {
   id: string;
-  steward_id: string;
-  subject_id: string;
+  stewardId: string;
+  subjectId: string;
   tier: string;
-  authority_basis: string;
-  evidence_hash: string | null;
-  verified_by: string;
-  content_filtering: boolean;
-  time_limits: boolean;
-  feature_restrictions: boolean;
-  activity_monitoring: boolean;
-  policy_delegation: boolean;
+  authorityBasis: string;
+  evidenceHash: string | null;
+  verifiedBy: string;
+  contentFiltering: boolean;
+  timeLimits: boolean;
+  featureRestrictions: boolean;
+  activityMonitoring: boolean;
+  policyDelegation: boolean;
   delegatable: boolean;
-  delegated_from: string | null;
-  delegation_depth: number;
-  granted_at: string;
-  expires_at: string;
-  review_at: string;
+  delegatedFrom: string | null;
+  delegationDepth: number;
+  grantedAt: string;
+  expiresAt: string;
+  reviewAt: string;
   status: string;
-  appeal_id: string | null;
-  created_at: string;
-  updated_at: string;
+  appealId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface RawDevicePolicy {
   id: string;
-  subject_id: string;
-  device_id: string | null;
-  author_id: string;
-  author_tier: string;
-  inherits_from: string | null;
-  blocked_categories_json: string;
-  blocked_hashes_json: string;
-  age_rating_max: string | null;
-  reach_level_max: number | null;
-  session_max_minutes: number | null;
-  daily_max_minutes: number | null;
-  time_windows_json: string;
-  cooldown_minutes: number | null;
-  disabled_features_json: string;
-  disabled_routes_json: string;
-  require_approval_json: string;
-  log_sessions: boolean;
-  log_categories: boolean;
-  log_policy_events: boolean;
-  retention_days: number;
-  subject_can_view: boolean;
-  effective_from: string;
-  effective_until: string | null;
+  subjectId: string;
+  deviceId: string | null;
+  authorId: string;
+  authorTier: string;
+  inheritsFrom: string | null;
+  blockedCategoriesJson: string;
+  blockedHashesJson: string;
+  ageRatingMax: string | null;
+  reachLevelMax: number | null;
+  sessionMaxMinutes: number | null;
+  dailyMaxMinutes: number | null;
+  timeWindowsJson: string;
+  cooldownMinutes: number | null;
+  disabledFeaturesJson: string;
+  disabledRoutesJson: string;
+  requireApprovalJson: string;
+  logSessions: boolean;
+  logCategories: boolean;
+  logPolicyEvents: boolean;
+  retentionDays: number;
+  subjectCanView: boolean;
+  effectiveFrom: string;
+  effectiveUntil: string | null;
   version: number;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface RawComputedPolicy {
-  subject_id: string;
-  computed_at: string;
-  blocked_categories: string[];
-  blocked_hashes: string[];
-  age_rating_max: string | null;
-  reach_level_max: number | null;
-  session_max_minutes: number | null;
-  daily_max_minutes: number | null;
-  time_windows_json: string;
-  cooldown_minutes: number | null;
-  disabled_features: string[];
-  disabled_routes: string[];
-  require_approval: string[];
-  log_sessions: boolean;
-  log_categories: boolean;
-  log_policy_events: boolean;
-  retention_days: number;
-  subject_can_view: boolean;
+  subjectId: string;
+  computedAt: string;
+  blockedCategories: string[];
+  blockedHashes: string[];
+  ageRatingMax: string | null;
+  reachLevelMax: number | null;
+  sessionMaxMinutes: number | null;
+  dailyMaxMinutes: number | null;
+  timeWindowsJson: string;
+  cooldownMinutes: number | null;
+  disabledFeatures: string[];
+  disabledRoutes: string[];
+  requireApproval: string[];
+  logSessions: boolean;
+  logCategories: boolean;
+  logPolicyEvents: boolean;
+  retentionDays: number;
+  subjectCanView: boolean;
 }
 
 interface RawStewardshipAppeal {
   id: string;
-  appellant_id: string;
-  grant_id: string;
-  policy_id: string | null;
-  appeal_type: string;
-  grounds_json: string;
-  evidence_json: string;
-  advocate_id: string | null;
-  advocate_notes: string | null;
-  arbitration_layer: string;
-  assigned_to: string | null;
+  appellantId: string;
+  grantId: string;
+  policyId: string | null;
+  appealType: string;
+  groundsJson: string;
+  evidenceJson: string;
+  advocateId: string | null;
+  advocateNotes: string | null;
+  arbitrationLayer: string;
+  assignedTo: string | null;
   status: string;
-  status_changed_at: string | null;
-  decision_json: string | null;
-  decision_made_by: string | null;
-  decision_made_at: string | null;
-  filed_at: string;
-  expires_at: string;
-  created_at: string;
-  updated_at: string;
+  statusChangedAt: string | null;
+  decisionJson: string | null;
+  decisionMadeBy: string | null;
+  decisionMadeAt: string | null;
+  filedAt: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface RawActivityLog {
   id: string;
-  subject_id: string;
-  device_id: string | null;
-  session_id: string;
-  session_started_at: string;
-  session_duration_minutes: number;
-  categories_accessed_json: string;
-  policy_events_json: string;
-  logged_at: string;
-  retention_expires_at: string;
+  subjectId: string;
+  deviceId: string | null;
+  sessionId: string;
+  sessionStartedAt: string;
+  sessionDurationMinutes: number;
+  categoriesAccessedJson: string;
+  policyEventsJson: string;
+  loggedAt: string;
+  retentionExpiresAt: string;
 }
 
 interface RawPolicyDecision {
@@ -182,50 +182,50 @@ interface RawPolicyDecision {
 function toGrant(raw: RawStewardshipGrant): StewardshipGrant {
   return {
     id: raw.id,
-    stewardId: raw.steward_id,
-    subjectId: raw.subject_id,
+    stewardId: raw.stewardId,
+    subjectId: raw.subjectId,
     tier: raw.tier as StewardshipGrant['tier'],
-    authorityBasis: raw.authority_basis as StewardshipGrant['authorityBasis'],
-    evidenceHash: raw.evidence_hash ?? undefined,
-    verifiedBy: raw.verified_by,
-    contentFiltering: raw.content_filtering,
-    timeLimits: raw.time_limits,
-    featureRestrictions: raw.feature_restrictions,
-    activityMonitoring: raw.activity_monitoring,
-    policyDelegation: raw.policy_delegation,
+    authorityBasis: raw.authorityBasis as StewardshipGrant['authorityBasis'],
+    evidenceHash: raw.evidenceHash ?? undefined,
+    verifiedBy: raw.verifiedBy,
+    contentFiltering: raw.contentFiltering,
+    timeLimits: raw.timeLimits,
+    featureRestrictions: raw.featureRestrictions,
+    activityMonitoring: raw.activityMonitoring,
+    policyDelegation: raw.policyDelegation,
     delegatable: raw.delegatable,
-    delegatedFrom: raw.delegated_from ?? undefined,
-    delegationDepth: raw.delegation_depth,
-    grantedAt: raw.granted_at,
-    expiresAt: raw.expires_at,
-    reviewAt: raw.review_at,
+    delegatedFrom: raw.delegatedFrom ?? undefined,
+    delegationDepth: raw.delegationDepth,
+    grantedAt: raw.grantedAt,
+    expiresAt: raw.expiresAt,
+    reviewAt: raw.reviewAt,
     status: raw.status as StewardshipGrant['status'],
-    appealId: raw.appeal_id ?? undefined,
-    createdAt: raw.created_at,
-    updatedAt: raw.updated_at,
+    appealId: raw.appealId ?? undefined,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
   };
 }
 
 function toPolicy(raw: RawDevicePolicy): DevicePolicy {
-  const blockedCategories = JSON.parse(raw.blocked_categories_json || '[]');
-  const blockedHashes = JSON.parse(raw.blocked_hashes_json || '[]');
-  const ageRatingMax = (raw.age_rating_max ?? undefined) as DevicePolicy['ageRatingMax'];
-  const reachLevelMax = raw.reach_level_max ?? undefined;
-  const sessionMaxMinutes = raw.session_max_minutes ?? undefined;
-  const dailyMaxMinutes = raw.daily_max_minutes ?? undefined;
-  const timeWindows = JSON.parse(raw.time_windows_json || '[]');
-  const cooldownMinutes = raw.cooldown_minutes ?? undefined;
-  const disabledFeatures = JSON.parse(raw.disabled_features_json || '[]');
-  const disabledRoutes = JSON.parse(raw.disabled_routes_json || '[]');
-  const requireApproval = JSON.parse(raw.require_approval_json || '[]');
+  const blockedCategories = JSON.parse(raw.blockedCategoriesJson || '[]');
+  const blockedHashes = JSON.parse(raw.blockedHashesJson || '[]');
+  const ageRatingMax = (raw.ageRatingMax ?? undefined) as DevicePolicy['ageRatingMax'];
+  const reachLevelMax = raw.reachLevelMax ?? undefined;
+  const sessionMaxMinutes = raw.sessionMaxMinutes ?? undefined;
+  const dailyMaxMinutes = raw.dailyMaxMinutes ?? undefined;
+  const timeWindows = JSON.parse(raw.timeWindowsJson || '[]');
+  const cooldownMinutes = raw.cooldownMinutes ?? undefined;
+  const disabledFeatures = JSON.parse(raw.disabledFeaturesJson || '[]');
+  const disabledRoutes = JSON.parse(raw.disabledRoutesJson || '[]');
+  const requireApproval = JSON.parse(raw.requireApprovalJson || '[]');
 
   return {
     id: raw.id,
-    subjectId: raw.subject_id,
-    deviceId: raw.device_id ?? undefined,
-    authorId: raw.author_id,
-    authorTier: raw.author_tier as DevicePolicy['authorTier'],
-    inheritsFrom: raw.inherits_from ?? undefined,
+    subjectId: raw.subjectId,
+    deviceId: raw.deviceId ?? undefined,
+    authorId: raw.authorId,
+    authorTier: raw.authorTier as DevicePolicy['authorTier'],
+    inheritsFrom: raw.inheritsFrom ?? undefined,
     // Nested rules for convenience
     contentRules: {
       blockedCategories,
@@ -256,77 +256,77 @@ function toPolicy(raw: RawDevicePolicy): DevicePolicy {
     disabledFeatures,
     disabledRoutes,
     requireApproval,
-    logSessions: raw.log_sessions,
-    logCategories: raw.log_categories,
-    logPolicyEvents: raw.log_policy_events,
-    retentionDays: raw.retention_days,
-    subjectCanView: raw.subject_can_view,
-    effectiveFrom: raw.effective_from,
-    effectiveUntil: raw.effective_until ?? undefined,
+    logSessions: raw.logSessions,
+    logCategories: raw.logCategories,
+    logPolicyEvents: raw.logPolicyEvents,
+    retentionDays: raw.retentionDays,
+    subjectCanView: raw.subjectCanView,
+    effectiveFrom: raw.effectiveFrom,
+    effectiveUntil: raw.effectiveUntil ?? undefined,
     version: raw.version,
-    createdAt: raw.created_at,
-    updatedAt: raw.updated_at,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
   };
 }
 
 function toComputedPolicy(raw: RawComputedPolicy): ComputedPolicy {
   return {
-    subjectId: raw.subject_id,
-    computedAt: raw.computed_at,
-    blockedCategories: raw.blocked_categories,
-    blockedHashes: raw.blocked_hashes,
-    ageRatingMax: raw.age_rating_max ?? undefined,
-    reachLevelMax: raw.reach_level_max ?? undefined,
-    sessionMaxMinutes: raw.session_max_minutes ?? undefined,
-    dailyMaxMinutes: raw.daily_max_minutes ?? undefined,
-    timeWindowsJson: raw.time_windows_json,
-    cooldownMinutes: raw.cooldown_minutes ?? undefined,
-    disabledFeatures: raw.disabled_features,
-    disabledRoutes: raw.disabled_routes,
-    requireApproval: raw.require_approval,
-    logSessions: raw.log_sessions,
-    logCategories: raw.log_categories,
-    logPolicyEvents: raw.log_policy_events,
-    retentionDays: raw.retention_days,
-    subjectCanView: raw.subject_can_view,
+    subjectId: raw.subjectId,
+    computedAt: raw.computedAt,
+    blockedCategories: raw.blockedCategories,
+    blockedHashes: raw.blockedHashes,
+    ageRatingMax: raw.ageRatingMax ?? undefined,
+    reachLevelMax: raw.reachLevelMax ?? undefined,
+    sessionMaxMinutes: raw.sessionMaxMinutes ?? undefined,
+    dailyMaxMinutes: raw.dailyMaxMinutes ?? undefined,
+    timeWindowsJson: raw.timeWindowsJson,
+    cooldownMinutes: raw.cooldownMinutes ?? undefined,
+    disabledFeatures: raw.disabledFeatures,
+    disabledRoutes: raw.disabledRoutes,
+    requireApproval: raw.requireApproval,
+    logSessions: raw.logSessions,
+    logCategories: raw.logCategories,
+    logPolicyEvents: raw.logPolicyEvents,
+    retentionDays: raw.retentionDays,
+    subjectCanView: raw.subjectCanView,
   };
 }
 
 function toAppeal(raw: RawStewardshipAppeal): StewardshipAppeal {
   return {
     id: raw.id,
-    appellantId: raw.appellant_id,
-    grantId: raw.grant_id,
-    policyId: raw.policy_id ?? undefined,
-    appealType: raw.appeal_type as StewardshipAppeal['appealType'],
-    grounds: JSON.parse(raw.grounds_json || '[]'),
-    evidenceJson: raw.evidence_json,
-    advocateId: raw.advocate_id ?? undefined,
-    advocateNotes: raw.advocate_notes ?? undefined,
-    arbitrationLayer: raw.arbitration_layer,
-    assignedTo: raw.assigned_to ?? undefined,
+    appellantId: raw.appellantId,
+    grantId: raw.grantId,
+    policyId: raw.policyId ?? undefined,
+    appealType: raw.appealType as StewardshipAppeal['appealType'],
+    grounds: JSON.parse(raw.groundsJson || '[]'),
+    evidenceJson: raw.evidenceJson,
+    advocateId: raw.advocateId ?? undefined,
+    advocateNotes: raw.advocateNotes ?? undefined,
+    arbitrationLayer: raw.arbitrationLayer,
+    assignedTo: raw.assignedTo ?? undefined,
     status: raw.status as StewardshipAppeal['status'],
-    statusChangedAt: raw.status_changed_at ?? undefined,
-    decision: raw.decision_json ? JSON.parse(raw.decision_json) : undefined,
-    filedAt: raw.filed_at,
-    expiresAt: raw.expires_at,
-    createdAt: raw.created_at,
-    updatedAt: raw.updated_at,
+    statusChangedAt: raw.statusChangedAt ?? undefined,
+    decision: raw.decisionJson ? JSON.parse(raw.decisionJson) : undefined,
+    filedAt: raw.filedAt,
+    expiresAt: raw.expiresAt,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
   };
 }
 
 function toActivityLog(raw: RawActivityLog): ActivityLog {
   return {
     id: raw.id,
-    subjectId: raw.subject_id,
-    deviceId: raw.device_id ?? undefined,
-    sessionId: raw.session_id,
-    sessionStartedAt: raw.session_started_at,
-    sessionDurationMinutes: raw.session_duration_minutes,
-    categoriesAccessed: JSON.parse(raw.categories_accessed_json || '[]'),
-    policyEvents: JSON.parse(raw.policy_events_json || '[]'),
-    loggedAt: raw.logged_at,
-    retentionExpiresAt: raw.retention_expires_at,
+    subjectId: raw.subjectId,
+    deviceId: raw.deviceId ?? undefined,
+    sessionId: raw.sessionId,
+    sessionStartedAt: raw.sessionStartedAt,
+    sessionDurationMinutes: raw.sessionDurationMinutes,
+    categoriesAccessed: JSON.parse(raw.categoriesAccessedJson || '[]'),
+    policyEvents: JSON.parse(raw.policyEventsJson || '[]'),
+    loggedAt: raw.loggedAt,
+    retentionExpiresAt: raw.retentionExpiresAt,
   };
 }
 
@@ -442,10 +442,10 @@ export class StewardshipService {
       zomeName: 'imagodei',
       fnName: 'check_content_access',
       payload: {
-        content_hash: contentHash,
+        contentHash: contentHash,
         categories,
-        age_rating: ageRating ?? null,
-        reach_level: reachLevel ?? null,
+        ageRating: ageRating ?? null,
+        reachLevel: reachLevel ?? null,
       },
       roleName: 'imagodei',
     });
@@ -534,18 +534,18 @@ export class StewardshipService {
       zomeName: 'imagodei',
       fnName: 'create_stewardship_grant',
       payload: {
-        subject_id: input.subjectId,
-        authority_basis: input.authorityBasis,
-        evidence_hash: input.evidenceHash ?? null,
-        verified_by: input.verifiedBy,
-        content_filtering: input.contentFiltering,
-        time_limits: input.timeLimits,
-        feature_restrictions: input.featureRestrictions,
-        activity_monitoring: input.activityMonitoring,
-        policy_delegation: input.policyDelegation,
+        subjectId: input.subjectId,
+        authorityBasis: input.authorityBasis,
+        evidenceHash: input.evidenceHash ?? null,
+        verifiedBy: input.verifiedBy,
+        contentFiltering: input.contentFiltering,
+        timeLimits: input.timeLimits,
+        featureRestrictions: input.featureRestrictions,
+        activityMonitoring: input.activityMonitoring,
+        policyDelegation: input.policyDelegation,
         delegatable: input.delegatable,
-        expires_in_days: input.expiresInDays,
-        review_in_days: input.reviewInDays,
+        expiresInDays: input.expiresInDays,
+        reviewInDays: input.reviewInDays,
       },
       roleName: 'imagodei',
     });
@@ -568,14 +568,14 @@ export class StewardshipService {
       zomeName: 'imagodei',
       fnName: 'delegate_grant',
       payload: {
-        parent_grant_id: input.parentGrantId,
-        new_steward_id: input.newStewardId,
-        content_filtering: input.contentFiltering ?? null,
-        time_limits: input.timeLimits ?? null,
-        feature_restrictions: input.featureRestrictions ?? null,
-        activity_monitoring: input.activityMonitoring ?? null,
-        policy_delegation: input.policyDelegation ?? null,
-        expires_in_days: input.expiresInDays,
+        parent_grantId: input.parentGrantId,
+        new_stewardId: input.newStewardId,
+        contentFiltering: input.contentFiltering ?? null,
+        timeLimits: input.timeLimits ?? null,
+        featureRestrictions: input.featureRestrictions ?? null,
+        activityMonitoring: input.activityMonitoring ?? null,
+        policyDelegation: input.policyDelegation ?? null,
+        expiresInDays: input.expiresInDays,
       },
       roleName: 'imagodei',
     });
@@ -665,28 +665,28 @@ export class StewardshipService {
       zomeName: 'imagodei',
       fnName: 'upsert_policy',
       payload: {
-        subject_id: input.subjectId ?? null,
-        device_id: input.deviceId ?? null,
+        subjectId: input.subjectId ?? null,
+        deviceId: input.deviceId ?? null,
         // Content rules
-        blocked_categories: input.contentRules.blockedCategories,
-        blocked_hashes: input.contentRules.blockedHashes,
-        age_rating_max: input.contentRules.ageRatingMax ?? null,
-        reach_level_max: input.contentRules.reachLevelMax ?? null,
+        blockedCategories: input.contentRules.blockedCategories,
+        blockedHashes: input.contentRules.blockedHashes,
+        ageRatingMax: input.contentRules.ageRatingMax ?? null,
+        reachLevelMax: input.contentRules.reachLevelMax ?? null,
         // Time rules
-        session_max_minutes: input.timeRules.sessionMaxMinutes ?? null,
-        daily_max_minutes: input.timeRules.dailyMaxMinutes ?? null,
-        time_windows_json: JSON.stringify(input.timeRules.timeWindows),
-        cooldown_minutes: input.timeRules.cooldownMinutes ?? null,
+        sessionMaxMinutes: input.timeRules.sessionMaxMinutes ?? null,
+        dailyMaxMinutes: input.timeRules.dailyMaxMinutes ?? null,
+        timeWindowsJson: JSON.stringify(input.timeRules.timeWindows),
+        cooldownMinutes: input.timeRules.cooldownMinutes ?? null,
         // Feature rules
-        disabled_features: input.featureRules.disabledFeatures,
-        disabled_routes: input.featureRules.disabledRoutes,
-        require_approval: input.featureRules.requireApproval,
+        disabledFeatures: input.featureRules.disabledFeatures,
+        disabledRoutes: input.featureRules.disabledRoutes,
+        requireApproval: input.featureRules.requireApproval,
         // Monitoring rules (with defaults)
-        log_sessions: input.monitoringRules?.logSessions ?? false,
-        log_categories: input.monitoringRules?.logCategories ?? false,
-        log_policy_events: input.monitoringRules?.logPolicyEvents ?? true,
-        retention_days: input.monitoringRules?.retentionDays ?? 30,
-        subject_can_view: input.monitoringRules?.subjectCanView ?? true,
+        logSessions: input.monitoringRules?.logSessions ?? false,
+        logCategories: input.monitoringRules?.logCategories ?? false,
+        logPolicyEvents: input.monitoringRules?.logPolicyEvents ?? true,
+        retentionDays: input.monitoringRules?.retentionDays ?? 30,
+        subjectCanView: input.monitoringRules?.subjectCanView ?? true,
       },
       roleName: 'imagodei',
     });
@@ -806,12 +806,12 @@ export class StewardshipService {
       zomeName: 'imagodei',
       fnName: 'file_appeal',
       payload: {
-        grant_id: input.grantId,
-        policy_id: input.policyId ?? null,
-        appeal_type: input.appealType,
+        grantId: input.grantId,
+        policyId: input.policyId ?? null,
+        appealType: input.appealType,
         grounds: input.grounds,
-        evidence_json: input.evidenceJson,
-        advocate_id: input.advocateId ?? null,
+        evidenceJson: input.evidenceJson,
+        advocateId: input.advocateId ?? null,
       },
       roleName: 'imagodei',
     });
@@ -858,10 +858,10 @@ export class StewardshipService {
       zomeName: 'imagodei',
       fnName: 'log_activity',
       payload: {
-        session_id: sessionId,
-        session_duration_minutes: sessionDurationMinutes,
+        sessionId: sessionId,
+        sessionDurationMinutes: sessionDurationMinutes,
         categories_accessed: categoriesAccessed,
-        policy_events_json: JSON.stringify(policyEvents),
+        policyEventsJson: JSON.stringify(policyEvents),
       },
       roleName: 'imagodei',
     });
@@ -874,7 +874,7 @@ export class StewardshipService {
   }
 
   /**
-   * Get my activity logs (if subject_can_view is true).
+   * Get my activity logs (if subjectCanView is true).
    */
   async getMyActivityLogs(): Promise<ActivityLog[]> {
     const result = await this.holochain.callZome<ZomeActivityLogOutput[]>({

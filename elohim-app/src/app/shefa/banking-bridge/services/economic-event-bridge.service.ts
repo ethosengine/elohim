@@ -15,33 +15,33 @@ import { HolochainClientService } from '@app/elohim/services/holochain-client.se
 import { bankingStore, StagedTransactionLocal, ImportBatchLocal } from '../stores/banking-store';
 
 /**
- * EconomicEvent payload for Holochain zome call.
- * This matches the REA EconomicEvent entry type in the integrity zome.
+ * Economic event payload for API - camelCase with parsed JSON objects.
+ * This matches the REA EconomicEvent entry type expected by elohim-storage.
  */
 export interface EconomicEventPayload {
   id: string;
   action: string;
   provider: string;
   receiver: string;
-  resource_conforms_to: string;
-  resource_classified_as_json: string;
-  resource_quantity_value: number;
-  resource_quantity_unit: string;
-  effort_quantity_value?: number;
-  effort_quantity_unit?: string;
-  has_beginning?: string;
-  has_end?: string;
-  has_point_in_time: string;
+  resourceConformsTo: string;
+  resourceClassifiedAs: string[];  // Parsed JSON array
+  resourceQuantityValue: number;
+  resourceQuantityUnit: string;
+  effortQuantityValue?: number;
+  effortQuantityUnit?: string;
+  hasBeginning?: string;
+  hasEnd?: string;
+  hasPointInTime: string;
   due?: string;
   note?: string;
-  input_of?: string;
-  output_of?: string;
+  inputOf?: string;
+  outputOf?: string;
   state: string;
-  triggered_by?: string;
-  at_location?: string;
-  lamad_event_type?: string;
-  metadata_json: string;
-  created_at: string;
+  triggeredBy?: string;
+  atLocation?: string;
+  lamadEventType?: string;
+  metadata: Record<string, unknown>;  // Parsed JSON object
+  createdAt: string;
 }
 
 /**
@@ -218,21 +218,22 @@ export class EconomicEventBridgeService {
       category_source: staged.categorySource,
     };
 
+    // Return camelCase InputView with parsed JSON objects
     return {
       id: `ee-${staged.plaidTransactionId}`, // Deterministic ID from Plaid ID
       action,
       provider,
       receiver,
-      resource_conforms_to: 'currency',
-      resource_classified_as_json: JSON.stringify(resourceClassifications),
-      resource_quantity_value: Math.abs(staged.amount.value),
-      resource_quantity_unit: staged.amount.unit,
-      has_point_in_time: staged.timestamp,
+      resourceConformsTo: 'currency',
+      resourceClassifiedAs: resourceClassifications,
+      resourceQuantityValue: Math.abs(staged.amount.value),
+      resourceQuantityUnit: staged.amount.unit,
+      hasPointInTime: staged.timestamp,
       note: staged.description,
       state: 'completed',
-      lamad_event_type: 'bank_transaction',
-      metadata_json: JSON.stringify(metadata),
-      created_at: now,
+      lamadEventType: 'bank_transaction',
+      metadata,
+      createdAt: now,
     };
   }
 

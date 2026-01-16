@@ -385,14 +385,14 @@ describe('BlobManagerService', () => {
     it('should transform BlobMetadataOutput to ContentBlob', () => {
       const metadata = service['transformBlobMetadata']({
         hash: 'test_hash',
-        size_bytes: 1024,
-        mime_type: 'video/mp4',
-        fallback_urls: ['https://example.com/blob.mp4'],
-        bitrate_mbps: 5,
-        duration_seconds: 300,
+        sizeBytes: 1024,
+        mimeType: 'video/mp4',
+        fallbackUrls: ['https://example.com/blob.mp4'],
+        bitrateMbps: 5,
+        durationSeconds: 300,
         codec: 'h264',
-        created_at: '2024-01-01T00:00:00Z',
-        verified_at: '2024-01-02T00:00:00Z',
+        createdAt: '2024-01-01T00:00:00Z',
+        verifiedAt: '2024-01-02T00:00:00Z',
       });
 
       expect(metadata.hash).toBe('test_hash');

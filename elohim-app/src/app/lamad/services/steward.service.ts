@@ -47,116 +47,116 @@ import {
 
 interface HolochainStewardCredential {
   id: string;
-  steward_presence_id: string;
-  agent_id: string;
+  stewardPresenceId: string;
+  agentId: string;
   tier: string;
-  stewarded_presence_ids_json: string;
-  stewarded_content_ids_json: string;
-  stewarded_path_ids_json: string;
-  mastery_content_ids_json: string;
-  mastery_level_achieved: string;
-  qualification_verified_at: string;
-  peer_attestation_ids_json: string;
-  unique_attester_count: number;
-  attester_reputation_sum: number;
-  stewardship_quality_score: number;
-  total_learners_served: number;
-  total_content_improvements: number;
-  domain_tags_json: string;
-  is_active: boolean;
-  deactivation_reason: string | null;
+  stewartedPresenceIdsJson: string;
+  stewartedContentIdsJson: string;
+  stewartedPathIdsJson: string;
+  masteryContentIdsJson: string;
+  masteryLevelAchieved: string;
+  qualificationVerifiedAt: string;
+  peerAttestationIdsJson: string;
+  uniqueAttesterCount: number;
+  attesterReputationSum: number;
+  stewardshipQualityScore: number;
+  totalLearnersServed: number;
+  totalContentImprovements: number;
+  domainTagsJson: string;
+  isActive: boolean;
+  deactivationReason: string | null;
   note: string | null;
-  metadata_json: string;
-  created_at: string;
-  updated_at: string;
+  metadataJson: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface HolochainStewardCredentialOutput {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   credential: HolochainStewardCredential;
 }
 
 interface HolochainPremiumGate {
   id: string;
-  steward_credential_id: string;
-  steward_presence_id: string;
-  contributor_presence_id: string | null;
-  gated_resource_type: string;
-  gated_resource_ids_json: string;
-  gate_title: string;
-  gate_description: string;
-  gate_image: string | null;
-  required_attestations_json: string;
-  required_mastery_json: string;
-  required_vouches_json: string;
-  pricing_model: string;
-  price_amount: number | null;
-  price_unit: string | null;
-  subscription_period_days: number | null;
-  min_amount: number | null;
-  steward_share_percent: number;
-  commons_share_percent: number;
-  contributor_share_percent: number | null;
-  scholarship_eligible: boolean;
-  max_scholarships_per_period: number | null;
-  scholarship_criteria_json: string | null;
-  is_active: boolean;
-  deactivation_reason: string | null;
-  total_access_grants: number;
-  total_revenue_generated: number;
-  total_to_steward: number;
-  total_to_contributor: number;
-  total_to_commons: number;
-  total_scholarships_granted: number;
+  stewardCredentialId: string;
+  stewardPresenceId: string;
+  contributorPresenceId: string | null;
+  gatedResourceType: string;
+  gatedResourceIdsJson: string;
+  gateTitle: string;
+  gateDescription: string;
+  gateImage: string | null;
+  requiredAttestationsJson: string;
+  requiredMasteryJson: string;
+  requiredVouchesJson: string;
+  pricingModel: string;
+  priceAmount: number | null;
+  priceUnit: string | null;
+  subscriptionPeriodDays: number | null;
+  minAmount: number | null;
+  stewardSharePercent: number;
+  commonsSharePercent: number;
+  contributorSharePercent: number | null;
+  scholarshipEligible: boolean;
+  maxScholarshipsPerPeriod: number | null;
+  scholarshipCriteriaJson: string | null;
+  isActive: boolean;
+  deactivationReason: string | null;
+  totalAccessGrants: number;
+  totalRevenueGenerated: number;
+  totalToSteward: number;
+  totalToContributor: number;
+  totalToCommons: number;
+  totalScholarshipsGranted: number;
   note: string | null;
-  metadata_json: string;
-  created_at: string;
-  updated_at: string;
+  metadataJson: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface HolochainPremiumGateOutput {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   gate: HolochainPremiumGate;
 }
 
 interface HolochainAccessGrant {
   id: string;
-  gate_id: string;
-  learner_agent_id: string;
-  grant_type: string;
-  granted_via: string;
-  payment_event_id: string | null;
-  payment_amount: number | null;
-  payment_unit: string | null;
-  scholarship_sponsor_id: string | null;
-  scholarship_reason: string | null;
-  granted_at: string;
-  valid_until: string | null;
-  renewal_due_at: string | null;
-  is_active: boolean;
-  revoked_at: string | null;
-  revoke_reason: string | null;
-  metadata_json: string;
-  created_at: string;
+  gateId: string;
+  learnerAgentId: string;
+  grantType: string;
+  grantedVia: string;
+  paymentEventId: string | null;
+  paymentAmount: number | null;
+  paymentUnit: string | null;
+  scholarshipSponsorId: string | null;
+  scholarshipReason: string | null;
+  grantedAt: string;
+  validUntil: string | null;
+  renewalDueAt: string | null;
+  isActive: boolean;
+  revokedAt: string | null;
+  revokeReason: string | null;
+  metadataJson: string;
+  createdAt: string;
 }
 
 interface HolochainAccessGrantOutput {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   grant: HolochainAccessGrant;
 }
 
 interface HolochainStewardRevenueSummary {
-  steward_presence_id: string;
-  total_revenue: number;
-  total_grants: number;
-  revenue_by_gate: HolochainGateRevenueSummary[];
+  stewardPresenceId: string;
+  totalRevenue: number;
+  totalGrants: number;
+  revenueByGate: HolochainGateRevenueSummary[];
 }
 
 interface HolochainGateRevenueSummary {
-  gate_id: string;
-  gate_title: string;
-  total_revenue: number;
-  grant_count: number;
+  gateId: string;
+  gateTitle: string;
+  totalRevenue: number;
+  grantCount: number;
 }
 
 // =============================================================================
@@ -764,28 +764,28 @@ export class StewardService {
 
     return {
       id: hc.id,
-      stewardPresenceId: hc.steward_presence_id,
-      agentId: hc.agent_id,
+      stewardPresenceId: hc.stewardPresenceId,
+      agentId: hc.agentId,
       tier: hc.tier as StewardTier,
-      stewartedPresenceIds: this.safeParseJson<string[]>(hc.stewarded_presence_ids_json, []),
-      stewartedContentIds: this.safeParseJson<string[]>(hc.stewarded_content_ids_json, []),
-      stewartedPathIds: this.safeParseJson<string[]>(hc.stewarded_path_ids_json, []),
-      masteryContentIds: this.safeParseJson<string[]>(hc.mastery_content_ids_json, []),
-      masteryLevelAchieved: hc.mastery_level_achieved,
-      qualificationVerifiedAt: hc.qualification_verified_at,
-      peerAttestationIds: this.safeParseJson<string[]>(hc.peer_attestation_ids_json, []),
-      uniqueAttesterCount: hc.unique_attester_count,
-      attesterReputationSum: hc.attester_reputation_sum,
-      stewardshipQualityScore: hc.stewardship_quality_score,
-      totalLearnersServed: hc.total_learners_served,
-      totalContentImprovements: hc.total_content_improvements,
-      domainTags: this.safeParseJson<string[]>(hc.domain_tags_json, []),
-      isActive: hc.is_active,
-      deactivationReason: hc.deactivation_reason,
+      stewartedPresenceIds: this.safeParseJson<string[]>(hc.stewartedPresenceIdsJson, []),
+      stewartedContentIds: this.safeParseJson<string[]>(hc.stewartedContentIdsJson, []),
+      stewartedPathIds: this.safeParseJson<string[]>(hc.stewartedPathIdsJson, []),
+      masteryContentIds: this.safeParseJson<string[]>(hc.masteryContentIdsJson, []),
+      masteryLevelAchieved: hc.masteryLevelAchieved,
+      qualificationVerifiedAt: hc.qualificationVerifiedAt,
+      peerAttestationIds: this.safeParseJson<string[]>(hc.peerAttestationIdsJson, []),
+      uniqueAttesterCount: hc.uniqueAttesterCount,
+      attesterReputationSum: hc.attesterReputationSum,
+      stewardshipQualityScore: hc.stewardshipQualityScore,
+      totalLearnersServed: hc.totalLearnersServed,
+      totalContentImprovements: hc.totalContentImprovements,
+      domainTags: this.safeParseJson<string[]>(hc.domainTagsJson, []),
+      isActive: hc.isActive,
+      deactivationReason: hc.deactivationReason,
       note: hc.note,
-      metadata: this.safeParseJson<Record<string, unknown>>(hc.metadata_json, {}),
-      createdAt: hc.created_at,
-      updatedAt: hc.updated_at,
+      metadata: this.safeParseJson<Record<string, unknown>>(hc.metadataJson, {}),
+      createdAt: hc.createdAt,
+      updatedAt: hc.updatedAt,
     };
   }
 
@@ -794,40 +794,40 @@ export class StewardService {
 
     return {
       id: hc.id,
-      stewardCredentialId: hc.steward_credential_id,
-      stewardPresenceId: hc.steward_presence_id,
-      contributorPresenceId: hc.contributor_presence_id,
-      gatedResourceType: hc.gated_resource_type,
-      gatedResourceIds: this.safeParseJson<string[]>(hc.gated_resource_ids_json, []),
-      gateTitle: hc.gate_title,
-      gateDescription: hc.gate_description,
-      gateImage: hc.gate_image,
-      requiredAttestations: this.safeParseJson<RequiredAttestation[]>(hc.required_attestations_json, []),
-      requiredMastery: this.safeParseJson<RequiredMastery[]>(hc.required_mastery_json, []),
-      requiredVouches: this.safeParseJson<RequiredVouches | null>(hc.required_vouches_json, null),
-      pricingModel: hc.pricing_model as PricingModel,
-      priceAmount: hc.price_amount,
-      priceUnit: hc.price_unit,
-      subscriptionPeriodDays: hc.subscription_period_days,
-      minAmount: hc.min_amount,
-      stewardSharePercent: hc.steward_share_percent,
-      commonsSharePercent: hc.commons_share_percent,
-      contributorSharePercent: hc.contributor_share_percent,
-      scholarshipEligible: hc.scholarship_eligible,
-      maxScholarshipsPerPeriod: hc.max_scholarships_per_period,
-      scholarshipCriteria: this.safeParseJson<Record<string, unknown> | null>(hc.scholarship_criteria_json, null),
-      isActive: hc.is_active,
-      deactivationReason: hc.deactivation_reason,
-      totalAccessGrants: hc.total_access_grants,
-      totalRevenueGenerated: hc.total_revenue_generated,
-      totalToSteward: hc.total_to_steward,
-      totalToContributor: hc.total_to_contributor,
-      totalToCommons: hc.total_to_commons,
-      totalScholarshipsGranted: hc.total_scholarships_granted,
+      stewardCredentialId: hc.stewardCredentialId,
+      stewardPresenceId: hc.stewardPresenceId,
+      contributorPresenceId: hc.contributorPresenceId,
+      gatedResourceType: hc.gatedResourceType,
+      gatedResourceIds: this.safeParseJson<string[]>(hc.gatedResourceIdsJson, []),
+      gateTitle: hc.gateTitle,
+      gateDescription: hc.gateDescription,
+      gateImage: hc.gateImage,
+      requiredAttestations: this.safeParseJson<RequiredAttestation[]>(hc.requiredAttestationsJson, []),
+      requiredMastery: this.safeParseJson<RequiredMastery[]>(hc.requiredMasteryJson, []),
+      requiredVouches: this.safeParseJson<RequiredVouches | null>(hc.requiredVouchesJson, null),
+      pricingModel: hc.pricingModel as PricingModel,
+      priceAmount: hc.priceAmount,
+      priceUnit: hc.priceUnit,
+      subscriptionPeriodDays: hc.subscriptionPeriodDays,
+      minAmount: hc.minAmount,
+      stewardSharePercent: hc.stewardSharePercent,
+      commonsSharePercent: hc.commonsSharePercent,
+      contributorSharePercent: hc.contributorSharePercent,
+      scholarshipEligible: hc.scholarshipEligible,
+      maxScholarshipsPerPeriod: hc.maxScholarshipsPerPeriod,
+      scholarshipCriteria: this.safeParseJson<Record<string, unknown> | null>(hc.scholarshipCriteriaJson, null),
+      isActive: hc.isActive,
+      deactivationReason: hc.deactivationReason,
+      totalAccessGrants: hc.totalAccessGrants,
+      totalRevenueGenerated: hc.totalRevenueGenerated,
+      totalToSteward: hc.totalToSteward,
+      totalToContributor: hc.totalToContributor,
+      totalToCommons: hc.totalToCommons,
+      totalScholarshipsGranted: hc.totalScholarshipsGranted,
       note: hc.note,
-      metadata: this.safeParseJson<Record<string, unknown>>(hc.metadata_json, {}),
-      createdAt: hc.created_at,
-      updatedAt: hc.updated_at,
+      metadata: this.safeParseJson<Record<string, unknown>>(hc.metadataJson, {}),
+      createdAt: hc.createdAt,
+      updatedAt: hc.updatedAt,
     };
   }
 
@@ -836,36 +836,36 @@ export class StewardService {
 
     return {
       id: hc.id,
-      gateId: hc.gate_id,
-      learnerAgentId: hc.learner_agent_id,
-      grantType: hc.grant_type as GrantType,
-      grantedVia: hc.granted_via,
-      paymentEventId: hc.payment_event_id,
-      paymentAmount: hc.payment_amount,
-      paymentUnit: hc.payment_unit,
-      scholarshipSponsorId: hc.scholarship_sponsor_id,
-      scholarshipReason: hc.scholarship_reason,
-      grantedAt: hc.granted_at,
-      validUntil: hc.valid_until,
-      renewalDueAt: hc.renewal_due_at,
-      isActive: hc.is_active,
-      revokedAt: hc.revoked_at,
-      revokeReason: hc.revoke_reason,
-      metadata: this.safeParseJson<Record<string, unknown>>(hc.metadata_json, {}),
-      createdAt: hc.created_at,
+      gateId: hc.gateId,
+      learnerAgentId: hc.learnerAgentId,
+      grantType: hc.grantType as GrantType,
+      grantedVia: hc.grantedVia,
+      paymentEventId: hc.paymentEventId,
+      paymentAmount: hc.paymentAmount,
+      paymentUnit: hc.paymentUnit,
+      scholarshipSponsorId: hc.scholarshipSponsorId,
+      scholarshipReason: hc.scholarshipReason,
+      grantedAt: hc.grantedAt,
+      validUntil: hc.validUntil,
+      renewalDueAt: hc.renewalDueAt,
+      isActive: hc.isActive,
+      revokedAt: hc.revokedAt,
+      revokeReason: hc.revokeReason,
+      metadata: this.safeParseJson<Record<string, unknown>>(hc.metadataJson, {}),
+      createdAt: hc.createdAt,
     };
   }
 
   private transformRevenueSummary(hc: HolochainStewardRevenueSummary): StewardRevenueSummary {
     return {
-      stewardPresenceId: hc.steward_presence_id,
-      totalRevenue: hc.total_revenue,
-      totalGrants: hc.total_grants,
-      revenueByGate: hc.revenue_by_gate.map(g => ({
-        gateId: g.gate_id,
-        gateTitle: g.gate_title,
-        totalRevenue: g.total_revenue,
-        grantCount: g.grant_count,
+      stewardPresenceId: hc.stewardPresenceId,
+      totalRevenue: hc.totalRevenue,
+      totalGrants: hc.totalGrants,
+      revenueByGate: hc.revenueByGate.map(g => ({
+        gateId: g.gateId,
+        gateTitle: g.gateTitle,
+        totalRevenue: g.totalRevenue,
+        grantCount: g.grantCount,
       })),
     };
   }

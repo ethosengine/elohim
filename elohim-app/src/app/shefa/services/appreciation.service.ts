@@ -79,17 +79,17 @@ export interface CreateAppreciationInput {
 
 interface HolochainAppreciation {
   id: string;
-  appreciation_of: string;
-  appreciated_by: string;
-  appreciation_to: string;
-  quantity_value: number;
-  quantity_unit: string;
+  appreciationOf: string;
+  appreciatedBy: string;
+  appreciationTo: string;
+  quantityValue: number;
+  quantityUnit: string;
   note: string | null;
-  created_at: string;
+  createdAt: string;
 }
 
 interface HolochainAppreciationOutput {
-  action_hash: Uint8Array;
+  actionHash: Uint8Array;
   appreciation: HolochainAppreciation;
 }
 
@@ -322,13 +322,13 @@ export class AppreciationService {
 
     return {
       id: hc.id,
-      appreciationOf: hc.appreciation_of,
-      appreciatedBy: hc.appreciated_by,
-      appreciationTo: hc.appreciation_to,
-      quantityValue: hc.quantity_value,
-      quantityUnit: hc.quantity_unit,
+      appreciationOf: hc.appreciationOf,
+      appreciatedBy: hc.appreciatedBy,
+      appreciationTo: hc.appreciationTo,
+      quantityValue: hc.quantityValue,
+      quantityUnit: hc.quantityUnit,
       note: hc.note,
-      createdAt: hc.created_at,
+      createdAt: hc.createdAt,
     };
   }
 }

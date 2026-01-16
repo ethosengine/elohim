@@ -135,44 +135,44 @@ export class CustodianMetricsReporterService {
       // Format for Shefa reporting
       const report = {
         custodianId,
-        collected_at: Date.now(),
+        collectedAt: Date.now(),
         health: {
-          uptime_percent: metricsSnapshot.health.uptime_percent,
+          uptimePercent: metricsSnapshot.health.uptimePercent,
           availability: metricsSnapshot.health.availability,
-          response_time_p50_ms: metricsSnapshot.health.response_time_p50_ms,
-          response_time_p95_ms: metricsSnapshot.health.response_time_p95_ms,
-          response_time_p99_ms: metricsSnapshot.health.response_time_p99_ms,
-          error_rate: metricsSnapshot.health.error_rate,
-          sla_compliance: metricsSnapshot.health.error_rate < 0.01, // < 1% error rate = SLA compliant
+          responseTimeP50Ms: metricsSnapshot.health.responseTimeP50Ms,
+          responseTimeP95Ms: metricsSnapshot.health.responseTimeP95Ms,
+          responseTimeP99Ms: metricsSnapshot.health.responseTimeP99Ms,
+          errorRate: metricsSnapshot.health.errorRate,
+          slaCompliance: metricsSnapshot.health.errorRate < 0.01, // < 1% error rate = SLA compliant
         },
         storage: {
-          total_capacity_bytes: 1_099_511_627_776, // 1TB placeholder
-          used_bytes: 0, // Would be collected from system
-          free_bytes: 1_099_511_627_776, // Would be collected from system
-          utilization_percent: 0, // Would be collected from system
+          totalCapacityBytes: 1_099_511_627_776, // 1TB placeholder
+          usedBytes: 0, // Would be collected from system
+          freeBytes: 1_099_511_627_776, // Would be collected from system
+          utilizationPercent: 0, // Would be collected from system
         },
         bandwidth: {
-          declared_mbps: 1000, // Placeholder - would come from config
-          current_usage_mbps: 0, // Would be collected from system
-          peak_mbps: 0, // Would be collected from system
-          average_mbps: 0, // Would be collected from system
+          declaredMbps: 1000, // Placeholder - would come from config
+          currentUsageMbps: 0, // Would be collected from system
+          peakMbps: 0, // Would be collected from system
+          averageMbps: 0, // Would be collected from system
         },
         computation: {
-          cpu_cores: 8, // Placeholder
-          cpu_usage_percent: metricsSnapshot.computation.cpu_usage_percent,
-          memory_gb: 16, // Placeholder
-          memory_usage_percent: metricsSnapshot.computation.memory_usage_percent,
+          cpuCores: 8, // Placeholder
+          cpuUsagePercent: metricsSnapshot.computation.cpuUsagePercent,
+          memoryGb: 16, // Placeholder
+          memoryUsagePercent: metricsSnapshot.computation.memoryUsagePercent,
         },
         reputation: {
-          reliability_rating: this.calculateReliabilityRating(metricsSnapshot.health.uptime_percent),
-          speed_rating: this.calculateSpeedRating(metricsSnapshot.health.response_time_p95_ms),
-          reputation_score: this.calculateReputationScore(metricsSnapshot),
-          specialization_bonus: 0, // Calculate based on domains served
+          reliabilityRating: this.calculateReliabilityRating(metricsSnapshot.health.uptimePercent),
+          speedRating: this.calculateSpeedRating(metricsSnapshot.health.responseTimeP95Ms),
+          reputationScore: this.calculateReputationScore(metricsSnapshot),
+          specializationBonus: 0, // Calculate based on domains served
         },
         economic: {
-          steward_tier: 2, // Placeholder - would come from identity service
-          price_per_gb: 0.01, // Placeholder pricing
-          active_commitments: 0, // Would be collected from DHT commitments
+          stewardTier: 2, // Placeholder - would come from identity service
+          pricePerGb: 0.01, // Placeholder pricing
+          activeCommitments: 0, // Would be collected from DHT commitments
         },
       };
 
@@ -251,9 +251,9 @@ export class CustodianMetricsReporterService {
    * Based on reliability, speed, error rate, and SLA compliance
    */
   private calculateReputationScore(metricsSnapshot: any): number {
-    const uptimePercent = metricsSnapshot.health.uptime_percent;
-    const latencyMs = metricsSnapshot.health.response_time_p95_ms;
-    const errorRate = metricsSnapshot.health.error_rate; // 0-1
+    const uptimePercent = metricsSnapshot.health.uptimePercent;
+    const latencyMs = metricsSnapshot.health.responseTimeP95Ms;
+    const errorRate = metricsSnapshot.health.errorRate; // 0-1
 
     const reliabilityScore = this.calculateReliabilityRating(uptimePercent);
     const speedScore = this.calculateSpeedRating(latencyMs);

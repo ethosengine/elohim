@@ -31,8 +31,9 @@ pub struct CreateMasteryInput {
 
 fn default_mastery_level() -> String { mastery_levels::NOT_STARTED.to_string() }
 
-/// Query parameters for listing mastery records
+/// Query parameters for listing mastery records - camelCase for URL params
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MasteryQuery {
     /// Filter by human ID
     pub human_id: Option<String>,

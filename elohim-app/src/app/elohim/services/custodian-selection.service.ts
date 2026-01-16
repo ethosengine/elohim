@@ -182,35 +182,35 @@ export class CustodianSelectionService {
       }
 
       // Skip unhealthy custodians
-      if (metrics.health.uptime_percent < 50 || !metrics.health.availability) {
+      if (metrics.health.uptimePercent < 50 || !metrics.health.availability) {
         console.log(
           `[CustodianSelection] Skipping unhealthy custodian ${custodian.id}: ` +
-          `uptime=${metrics.health.uptime_percent}%, available=${metrics.health.availability}`
+          `uptime=${metrics.health.uptimePercent}%, available=${metrics.health.availability}`
         );
         return null;
       }
 
       // Calculate component scores (0-1)
-      const healthScore = this.calculateHealthScore(metrics.health.uptime_percent);
+      const healthScore = this.calculateHealthScore(metrics.health.uptimePercent);
 
       const latencyScore = this.calculateLatencyScore(
-        metrics.health.response_time_p95_ms
+        metrics.health.responseTimeP95Ms
       );
 
       const bandwidthScore = this.calculateBandwidthScore(
-        metrics.bandwidth.current_usage_mbps,
-        metrics.bandwidth.declared_mbps
+        metrics.bandwidth.currentUsageMbps,
+        metrics.bandwidth.declaredMbps
       );
 
       const specializationScore = this.calculateSpecializationScore(
-        metrics.reputation.specialization_bonus
+        metrics.reputation.specializationBonus
       );
 
       // Steward tier bonus (higher tier = better)
       const tierBonus = this.getTierBonus(stewardTier);
 
       // SLA compliance bonus
-      const slaBonus = metrics.health.sla_compliance ? 0.05 : 0;
+      const slaBonus = metrics.health.slaCompliance ? 0.05 : 0;
 
       // Weighted sum (result is 0-1)
       const rawScore =
@@ -226,11 +226,11 @@ export class CustodianSelectionService {
 
       return {
         custodian,
-        health: metrics.health.uptime_percent,
-        latency: metrics.health.response_time_p95_ms,
+        health: metrics.health.uptimePercent,
+        latency: metrics.health.responseTimeP95Ms,
         bandwidth:
-          metrics.bandwidth.current_usage_mbps / metrics.bandwidth.declared_mbps,
-        specialization: metrics.reputation.specialization_bonus,
+          metrics.bandwidth.currentUsageMbps / metrics.bandwidth.declaredMbps,
+        specialization: metrics.reputation.specializationBonus,
         commitment: true, // We only score committed custodians
         finalScore,
         breakdown: {
@@ -340,7 +340,7 @@ export class CustodianSelectionService {
           epic: 'unknown'
         };
 
-        const score = await this.scoreCustodian(custodian, metrics.economic.steward_tier);
+        const score = await this.scoreCustodian(custodian, metrics.economic.stewardTier);
 
         if (score) {
           scores.push(score);

@@ -86,8 +86,9 @@ fn default_content_type() -> String { "concept".to_string() }
 fn default_content_format() -> String { "markdown".to_string() }
 fn default_reach() -> String { "public".to_string() }
 
-/// Query parameters for listing content
+/// Query parameters for listing content - camelCase for URL params
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ContentQuery {
     #[serde(default)]
     pub content_type: Option<String>,

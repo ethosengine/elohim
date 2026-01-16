@@ -33,8 +33,9 @@ pub struct CreateContributorPresenceInput {
     pub metadata_json: Option<String>,
 }
 
-/// Query parameters for listing contributor presences
+/// Query parameters for listing contributor presences - camelCase for URL params
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ContributorPresenceQuery {
     /// Filter by presence state
     pub presence_state: Option<String>,

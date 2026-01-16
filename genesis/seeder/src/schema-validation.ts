@@ -28,7 +28,7 @@ const VALID_CONTENT_TYPES = [
 ];
 
 // Content Format Architecture:
-// - DNA stores metadata including `content_format` as a hint for clients
+// - DNA stores metadata including `contentFormat` as a hint for clients
 // - DNA does NOT validate the actual format (intentionally flexible)
 // - holochain-cache-core handles content resolution and delivery
 // - Clients use format to determine rendering strategy
@@ -68,11 +68,11 @@ interface ContentSeedFile {
   estimatedMinutes?: number;
   thumbnailUrl?: string;
   // Blob reference fields (for content stored in projection cache)
-  blob_hash?: string;      // SHA256 hash of blob content
-  blob_url?: string;       // URL to fetch blob from cache
-  blob_file?: string;      // Local file path for blob
-  entry_point?: string;    // Entry point for compound content (e.g., "index.html")
-  fallback_url?: string;   // External fallback URL
+  blobHash?: string;      // SHA256 hash of blob content
+  blobUrl?: string;       // URL to fetch blob from cache
+  blobFile?: string;      // Local file path for blob
+  entryPoint?: string;    // Entry point for compound content (e.g., "index.html")
+  fallbackUrl?: string;   // External fallback URL
   // Additional fields that may be present
   did?: string;
   activityPubType?: string;
@@ -299,29 +299,29 @@ export function validateContentFile(filePath: string): FileValidationResult {
   const BLOB_FORMATS = ['html5-app', 'perseus-quiz-json'];
   if (content.contentFormat && BLOB_FORMATS.includes(content.contentFormat)) {
     const hasInlineContent = content.content !== undefined && content.content !== null;
-    const hasBlobRef = content.blob_hash !== undefined && content.blob_hash !== null;
+    const hasBlobRef = content.blobHash !== undefined && content.blobHash !== null;
 
     // Warn if has neither
     if (!hasInlineContent && !hasBlobRef) {
-      result.warnings.push(`${content.contentFormat} content should have either 'content' or 'blob_hash'`);
+      result.warnings.push(`${content.contentFormat} content should have either 'content' or 'blobHash'`);
     }
 
     // Validate blob_hash format if present
     if (hasBlobRef) {
-      const hash = content.blob_hash as string;
+      const hash = content.blobHash as string;
       if (!/^sha256-[a-f0-9]{64}$/.test(hash)) {
-        result.warnings.push(`Invalid blob_hash format (expected sha256-{64 hex chars}): ${hash}`);
+        result.warnings.push(`Invalid blobHash format (expected sha256-{64 hex chars}): ${hash}`);
       }
 
       // Warn about missing fallback_url
-      if (!content.fallback_url) {
-        result.warnings.push(`No fallback_url for blob content (recommended for resilience)`);
+      if (!content.fallbackUrl) {
+        result.warnings.push(`No fallbackUrl for blob content (recommended for resilience)`);
       }
     }
 
     // html5-app should have entry_point when using blob reference
-    if (content.contentFormat === 'html5-app' && hasBlobRef && !content.entry_point) {
-      result.warnings.push(`html5-app with blob_hash should have 'entry_point' (defaulting to 'index.html')`);
+    if (content.contentFormat === 'html5-app' && hasBlobRef && !content.entryPoint) {
+      result.warnings.push(`html5-app with blobHash should have 'entryPoint' (defaulting to 'index.html')`);
     }
   }
 

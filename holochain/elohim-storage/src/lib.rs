@@ -58,6 +58,9 @@ pub mod cell_discovery;
 pub mod debug_stream;
 pub mod services;
 
+// View types for HTTP API responses (camelCase serialization for TypeScript)
+pub mod views;
+
 // P2P identity and discovery (always available, but some types require p2p feature)
 pub mod identity;
 pub mod content_server;
