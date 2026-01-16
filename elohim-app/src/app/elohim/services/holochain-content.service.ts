@@ -420,9 +420,13 @@ export interface HolochainRelationshipOutput {
 
 /**
  * Input for querying relationships
+ *
+ * TODO: [HOLOCHAIN-ZOME] Uses snake_case because this is a Holochain zome payload.
+ * Zomes are Rust and expect snake_case field names. This cannot be changed without
+ * updating the Rust zome and running a DNA migration.
  */
 export interface GetRelationshipsInput {
-  contentId: string;
+  content_id: string;           // snake_case for zome
   direction: string;            // outgoing, incoming, both
 }
 

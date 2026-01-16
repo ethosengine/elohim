@@ -43,6 +43,7 @@ use crate::db::models::{
 // Legacy rusqlite types (used by services until migration complete)
 use crate::db::paths::{PathRow, StepRow, ChapterRow, PathWithSteps as LegacyPathWithSteps};
 use crate::db::relationships::RelationshipRow;
+use crate::db::content::ContentRow;
 
 // ============================================================================
 // App View
@@ -110,6 +111,30 @@ impl From<Content> for ContentView {
             blob_hash: c.blob_hash,
             blob_cid: c.blob_cid,
             content_size_bytes: c.content_size_bytes,
+            metadata: parse_json_opt(&c.metadata_json),
+            reach: c.reach,
+            validation_status: c.validation_status,
+            created_by: c.created_by,
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+            content_body: c.content_body,
+        }
+    }
+}
+
+// Legacy ContentRow → ContentView (rusqlite)
+impl From<ContentRow> for ContentView {
+    fn from(c: ContentRow) -> Self {
+        Self {
+            id: c.id,
+            app_id: String::new(), // Legacy doesn't have app_id
+            title: c.title,
+            description: c.description,
+            content_type: c.content_type,
+            content_format: c.content_format,
+            blob_hash: c.blob_hash,
+            blob_cid: c.blob_cid,
+            content_size_bytes: c.content_size_bytes.map(|v| v as i32),
             metadata: parse_json_opt(&c.metadata_json),
             reach: c.reach,
             validation_status: c.validation_status,

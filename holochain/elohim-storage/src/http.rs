@@ -1442,9 +1442,11 @@ impl HttpServer {
                 Method::GET => {
                     match services.content.list(&query) {
                         Ok(items) => {
+                            // Convert to View types for camelCase API boundary
+                            let views: Vec<ContentView> = items.into_iter().map(Into::into).collect();
                             let body = serde_json::json!({
-                                "items": items,
-                                "count": items.len(),
+                                "items": views,
+                                "count": views.len(),
                                 "limit": query.limit,
                                 "offset": query.offset,
                             });
@@ -1475,9 +1477,11 @@ impl HttpServer {
                     content_db.with_conn(|conn| {
                         match db::content::list_content(conn, &query) {
                             Ok(items) => {
+                                // Convert to View types for camelCase API boundary
+                                let views: Vec<ContentView> = items.into_iter().map(Into::into).collect();
                                 let body = serde_json::json!({
-                                    "items": items,
-                                    "count": items.len(),
+                                    "items": views,
+                                    "count": views.len(),
                                     "limit": query.limit,
                                     "offset": query.offset,
                                 });
@@ -1610,7 +1614,9 @@ impl HttpServer {
         if let Some(ref services) = self.services {
             match method {
                 Method::GET => {
-                    let result = services.content.get(content_id);
+                    // Convert to View type for camelCase API boundary
+                    let result = services.content.get(content_id)
+                        .map(|opt| opt.map(ContentView::from));
                     Ok(response::from_option(result, &format!("Content not found: {}", content_id)))
                 }
                 Method::DELETE => {
@@ -1627,7 +1633,9 @@ impl HttpServer {
                     content_db.with_conn(|conn| {
                         match db::content::get_content(conn, content_id) {
                             Ok(Some(content)) => {
-                                let body = serde_json::to_string(&content)
+                                // Convert to View type for camelCase API boundary
+                                let view: ContentView = content.into();
+                                let body = serde_json::to_string(&view)
                                     .map_err(|e| StorageError::Internal(e.to_string()))?;
 
                                 Ok(Response::builder()
@@ -1746,9 +1754,11 @@ impl HttpServer {
                     content_db.with_conn(|conn| {
                         match db::paths::list_paths(conn, limit, offset) {
                             Ok(paths) => {
+                                // Convert to View types for camelCase API boundary
+                                let views: Vec<PathView> = paths.into_iter().map(|p| p.into()).collect();
                                 let body = serde_json::json!({
-                                    "items": paths,
-                                    "count": paths.len(),
+                                    "items": views,
+                                    "count": views.len(),
                                     "limit": limit,
                                     "offset": offset,
                                 });
@@ -1926,7 +1936,9 @@ impl HttpServer {
                     // Return path with all steps
                     match db::paths::get_path_with_steps(conn, path_id) {
                         Ok(Some(path_with_steps)) => {
-                            let body = serde_json::to_string(&path_with_steps)
+                            // Convert to View type for camelCase API boundary
+                            let view: PathWithDetailsView = path_with_steps.into();
+                            let body = serde_json::to_string(&view)
                                 .map_err(|e| StorageError::Internal(e.to_string()))?;
 
                             Ok(Response::builder()

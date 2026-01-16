@@ -1382,7 +1382,7 @@ export class DataLoaderService {
     }
 
     return defer(() =>
-      from(this.holochainContent.getRelationships({ contentId: contentId, direction }))
+      from(this.holochainContent.getRelationships({ content_id: contentId, direction }))
     ).pipe(
       map(results => results.map(r => this.transformHolochainRelationship(r.relationship)))
     );
