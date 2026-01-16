@@ -44,7 +44,7 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
       <!-- Stats Grid -->
       <div class="stats-grid" *ngIf="!loading()">
         <div class="stat-card">
-          <div class="stat-icon">&#x1F4CA;</div>
+          <div class="stat-icon">📊</div>
           <div class="stat-content">
             <div class="stat-value">{{ totalEvents() }}</div>
             <div class="stat-label">Economic Events</div>
@@ -52,7 +52,7 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon">&#x2764;&#xFE0F;</div>
+          <div class="stat-icon">❤️</div>
           <div class="stat-content">
             <div class="stat-value">{{ totalAppreciations() }}</div>
             <div class="stat-label">Appreciations</div>
@@ -60,7 +60,7 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon">&#x1F91D;</div>
+          <div class="stat-icon">🤝</div>
           <div class="stat-content">
             <div class="stat-value">{{ uniqueAgents() }}</div>
             <div class="stat-label">Active Agents</div>
@@ -68,7 +68,7 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon">&#x2728;</div>
+          <div class="stat-icon">✨</div>
           <div class="stat-content">
             <div class="stat-value">{{ totalRecognition() | number:'1.0-0' }}</div>
             <div class="stat-label">Recognition Points</div>
@@ -109,7 +109,7 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
 
           <ng-template #noEvents>
             <div class="empty-state">
-              <div class="empty-icon">&#x1F4ED;</div>
+              <div class="empty-icon">📭</div>
               <p>No economic events yet</p>
               <p class="empty-hint">Events will appear here as value flows through the network</p>
             </div>
@@ -125,7 +125,7 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
 
           <div class="events-list" *ngIf="appreciations().length > 0; else noAppreciations">
             <div class="appreciation-item" *ngFor="let appreciation of appreciations().slice(0, 10)">
-              <div class="appreciation-icon">&#x1F49C;</div>
+              <div class="appreciation-icon">💜</div>
               <div class="appreciation-details">
                 <div class="appreciation-flow">
                   <span class="appreciator">{{ shortenId(appreciation.appreciatedBy) }}</span>
@@ -147,7 +147,7 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
 
           <ng-template #noAppreciations>
             <div class="empty-state">
-              <div class="empty-icon">&#x2764;&#xFE0F;</div>
+              <div class="empty-icon">❤️</div>
               <p>No appreciations yet</p>
               <p class="empty-hint">Recognition will flow as learners engage with content</p>
             </div>
@@ -158,19 +158,19 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
       <!-- Action Buttons -->
       <div class="dashboard-actions" *ngIf="!loading()">
         <button class="action-btn primary" (click)="refreshData()">
-          &#x1F504; Refresh Data
+          🔄 Refresh Data
         </button>
         <button class="action-btn" (click)="testConnection()">
-          &#x1F50C; Test Connection
+          🔌 Test Connection
         </button>
         <a routerLink="/lamad" class="action-btn">
-          &#x1F4DA; Explore Lamad
+          📚 Explore Lamad
         </a>
       </div>
 
       <!-- Error State -->
       <div class="error-banner" *ngIf="error()">
-        <span class="error-icon">&#x26A0;&#xFE0F;</span>
+        <span class="error-icon">⚠️</span>
         {{ error() }}
         <button class="dismiss-btn" (click)="dismissError()">Dismiss</button>
       </div>
@@ -717,17 +717,17 @@ export class ShefaHomeComponent implements OnInit {
 
   getActionIcon(action: string): string {
     const icons: Record<string, string> = {
-      use: '&#x1F441;',
-      produce: '&#x2728;',
-      consume: '&#x1F525;',
-      transfer: '&#x1F4E6;',
-      raise: '&#x2B06;',
-      lower: '&#x2B07;',
-      cite: '&#x1F4DD;',
-      work: '&#x1F6E0;',
-      'deliver-service': '&#x1F91D;',
+      use: '👁',
+      produce: '✨',
+      consume: '🔥',
+      transfer: '📦',
+      raise: '⬆️',
+      lower: '⬇️',
+      cite: '📝',
+      work: '🛠️',
+      'deliver-service': '🤝',
     };
-    return icons[action] || '&#x25CF;';
+    return icons[action] || '●';
   }
 
   getActionClass(action: string): string {

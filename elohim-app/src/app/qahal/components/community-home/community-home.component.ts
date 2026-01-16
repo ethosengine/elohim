@@ -21,7 +21,7 @@ import { RouterModule } from '@angular/router';
   template: `
     <div class="community-home">
       <div class="hero">
-        <div class="icon">&#x1F465;</div>
+        <div class="icon">👥</div>
         <h1>Community</h1>
         <p class="subtitle">Community & Governance</p>
       </div>
@@ -36,25 +36,25 @@ import { RouterModule } from '@angular/router';
 
       <div class="features">
         <div class="feature-card">
-          <div class="feature-icon">&#x1F91D;</div>
+          <div class="feature-icon">🤝</div>
           <h3>Graduated Intimacy</h3>
           <p>Consent-based relationships from recognition to intimate trust</p>
         </div>
 
         <div class="feature-card">
-          <div class="feature-icon">&#x2696;&#xFE0F;</div>
+          <div class="feature-icon">⚖️</div>
           <h3>Governance</h3>
           <p>Loomio-style deliberation with Polis-inspired sensemaking</p>
         </div>
 
         <div class="feature-card">
-          <div class="feature-icon">&#x1F30D;</div>
+          <div class="feature-icon">🌍</div>
           <h3>Place-Based Community</h3>
           <p>Bioregional coordination with constitutional ecological limits</p>
         </div>
 
         <div class="feature-card">
-          <div class="feature-icon">&#x1F4AC;</div>
+          <div class="feature-icon">💬</div>
           <h3>Affinity Circles</h3>
           <p>Visual representation of your community connections</p>
         </div>
@@ -62,10 +62,10 @@ import { RouterModule } from '@angular/router';
 
       <div class="navigation">
         <a routerLink="/lamad" class="nav-link">
-          &#x1F4DA; Explore Lamad (Content)
+          📚 Explore Lamad (Content)
         </a>
         <a routerLink="/shefa" class="nav-link secondary">
-          &#x2728; View Shefa (Economy)
+          ✨ View Shefa (Economy)
         </a>
       </div>
     </div>
