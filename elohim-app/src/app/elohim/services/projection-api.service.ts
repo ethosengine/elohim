@@ -14,6 +14,7 @@ import { Observable, of } from 'rxjs';
 import { map, catchError, timeout, shareReplay } from 'rxjs/operators';
 
 import { environment } from '../../../environments/environment';
+import { StorageClientService } from './storage-client.service';
 import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
 
@@ -91,6 +92,7 @@ export interface ProjectionStats {
 @Injectable({ providedIn: 'root' })
 export class ProjectionAPIService {
   private readonly http = inject(HttpClient);
+  private readonly storageClient = inject(StorageClientService);
 
   /** Base URL for cache API */
   private get baseUrl(): string {
@@ -512,7 +514,7 @@ export class ProjectionAPIService {
       reach: data.reach || 'private',
       trustScore: data.trustScore || data.trustScore,
       estimatedMinutes: data.estimatedMinutes || data.estimatedMinutes,
-      thumbnailUrl: data.thumbnailUrl || data.thumbnailUrl,
+      thumbnailUrl: this.resolveBlobUrl(data.thumbnailUrl),
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
     } as ContentNode;
@@ -532,6 +534,8 @@ export class ProjectionAPIService {
       estimatedDuration: data.estimatedDuration || data.estimatedDuration,
       visibility: data.visibility || 'public',
       pathType: data.pathType || 'course',
+      thumbnailUrl: this.resolveBlobUrl(data.thumbnailUrl),
+      thumbnailAlt: data.thumbnailAlt,
       tags: data.tags || [],
       createdBy: data.createdBy || data.author || data.createdBy || '',
       contributors: data.contributors || [],
@@ -542,6 +546,29 @@ export class ProjectionAPIService {
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
     } as LearningPath;
+  }
+
+  /**
+   * Resolve a blob reference to a full URL.
+   * Uses StorageClientService for strategy-aware URL construction.
+   */
+  private resolveBlobUrl(value: string | null | undefined): string | undefined {
+    if (!value) return undefined;
+
+    // Already a full URL - pass through
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+
+    // Extract blob hash from various formats
+    let blobHash = value;
+    if (value.startsWith('/blob/')) {
+      blobHash = value.slice(6);
+    } else if (value.startsWith('blob/')) {
+      blobHash = value.slice(5);
+    }
+
+    return this.storageClient.getBlobUrl(blobHash);
   }
 
   /**

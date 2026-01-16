@@ -14,6 +14,7 @@ import { Observable, from, of } from 'rxjs';
 import { map, catchError, shareReplay } from 'rxjs/operators';
 
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
+import { StorageClientService } from './storage-client.service';
 import type { ContentQuery } from '@elohim/service/client';
 import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
@@ -162,6 +163,7 @@ export interface PathExtensionFilters {
 @Injectable({ providedIn: 'root' })
 export class ContentService {
   private readonly client: ElohimClient = inject(ELOHIM_CLIENT);
+  private readonly storageClient = inject(StorageClientService);
 
   // In-memory cache for hot paths
   private contentCache = new Map<string, Observable<ContentNode | null>>();
@@ -490,7 +492,7 @@ export class ContentService {
       reach: data.reach || 'commons',
       trustScore: data.trustScore,
       estimatedMinutes: data.estimatedMinutes,
-      thumbnailUrl: data.thumbnailUrl,
+      thumbnailUrl: this.resolveBlobUrl(data.thumbnailUrl),
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
     } as ContentNode;
@@ -566,8 +568,8 @@ export class ContentService {
       estimatedDuration: pathData.estimatedDuration || pathData.estimatedDuration,
       visibility: pathData.visibility || 'public',
       pathType: pathData.pathType || 'course',
-      thumbnailUrl: pathData.thumbnailUrl || pathData.thumbnailUrl,
-      thumbnailAlt: pathData.thumbnailAlt || pathData.thumbnailAlt,
+      thumbnailUrl: this.resolveBlobUrl(pathData.thumbnailUrl),
+      thumbnailAlt: pathData.thumbnailAlt,
       tags: pathData.tags || [],
       createdBy: pathData.createdBy || pathData.createdBy || '',
       contributors: pathData.contributors || [],
@@ -638,6 +640,42 @@ export class ContentService {
     }
 
     return result;
+  }
+
+  /**
+   * Resolve a blob reference to a full URL.
+   *
+   * Handles multiple formats:
+   * - Full URL (https://...): pass through unchanged
+   * - Relative path (/blob/sha256-...): extract hash, build URL
+   * - Blob hash (sha256-...): build URL directly
+   * - Null/undefined: return undefined
+   *
+   * Uses StorageClientService for strategy-aware URL construction
+   * (doorway vs direct/tauri mode).
+   */
+  private resolveBlobUrl(value: string | null | undefined): string | undefined {
+    if (!value) return undefined;
+
+    // Already a full URL - pass through
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+
+    // Extract blob hash from various formats
+    let blobHash = value;
+
+    // Handle /blob/{hash} format
+    if (value.startsWith('/blob/')) {
+      blobHash = value.slice(6);
+    }
+    // Handle blob/{hash} format (no leading slash)
+    else if (value.startsWith('blob/')) {
+      blobHash = value.slice(5);
+    }
+
+    // Build full URL using strategy-aware service
+    return this.storageClient.getBlobUrl(blobHash);
   }
 
   /**
