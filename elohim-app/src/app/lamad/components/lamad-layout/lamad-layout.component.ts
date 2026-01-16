@@ -29,8 +29,9 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // Verify data is loadable by fetching the content index
-    this.dataLoader.getContentIndex().pipe(takeUntil(this.destroy$)).subscribe({
+    // Lightweight check that data layer is accessible
+    // Uses checkReadiness() instead of getContentIndex() to avoid loading all content
+    this.dataLoader.checkReadiness().pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.isReady = true;
       },

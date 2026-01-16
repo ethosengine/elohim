@@ -514,11 +514,51 @@ export class DataLoaderService {
   /** Cached content index for search/discovery */
   private contentIndexCache$: Observable<any> | null = null;
 
+  /** Cached readiness check */
+  private readinessCache$: Observable<boolean> | null = null;
+
+  /**
+   * Lightweight readiness check for data availability.
+   * Use this instead of getContentIndex() when you just need to know if data is loadable.
+   * Much faster than loading 1000+ content items.
+   *
+   * @returns Observable<boolean> - true if data layer is ready
+   */
+  checkReadiness(): Observable<boolean> {
+    if (!this.readinessCache$) {
+      // Try to get a single content item or path to verify connectivity
+      // This is much lighter than getContentIndex() which loads all content
+      this.readinessCache$ = this.contentService.queryContent({ limit: 1 }).pipe(
+        timeout(5000),
+        map(() => true),
+        catchError(err => {
+          this.logger.warn('Readiness check failed', err);
+          // Clear cache so next call retries
+          this.readinessCache$ = null;
+          return of(false);
+        }),
+        shareReplay(1)
+      );
+    }
+    return this.readinessCache$;
+  }
+
+  /**
+   * Invalidate the readiness cache.
+   * Call this if connection state changes.
+   */
+  invalidateReadinessCache(): void {
+    this.readinessCache$ = null;
+  }
+
   /**
    * Load the content index for search/discovery.
    * Returns metadata only, not full content.
    * Uses ContentService (doorway) as the source.
    * Cached with shareReplay(1) to prevent redundant calls.
+   *
+   * NOTE: This is a heavy operation (loads up to 1000 items).
+   * Use checkReadiness() if you just need to verify data is available.
    */
   getContentIndex(): Observable<any> {
     if (!this.contentIndexCache$) {

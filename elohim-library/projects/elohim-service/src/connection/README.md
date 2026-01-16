@@ -366,6 +366,38 @@ const blobUrl = this.strategy.getBlobStorageUrl(config, hash);
 // Direct:  http://localhost:8090/store/{hash}
 ```
 
+## Unified HTTP API Access
+
+Both strategies access the **same** elohim-storage HTTP API - the only difference is the host:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    elohim-storage                           │
+│              (http.rs / views.rs unified API)               │
+│                                                             │
+│  Endpoints:                                                 │
+│  • /db/content, /db/paths, /db/relationships               │
+│  • /session (native auth)                                   │
+│  • /store/{hash} (blob storage)                            │
+│                                                             │
+│  All responses: camelCase JSON                             │
+└─────────────────────────────────────────────────────────────┘
+                          ▲
+            ┌─────────────┴─────────────┐
+            │                           │
+   ┌────────┴────────┐        ┌────────┴────────┐
+   │    Doorway      │        │     Tauri       │
+   │ (proxies to     │        │ (direct HTTP    │
+   │  storage)       │        │  localhost:8090)│
+   └─────────────────┘        └─────────────────┘
+```
+
+**Key Insight**: Tauri does NOT use Rust FFI or direct SQLite bindings. It makes standard HTTP fetch calls to the same `http.rs` endpoints. This ensures:
+
+- **Single API boundary** (`views.rs`) for all clients
+- **Consistent camelCase transformation** regardless of access path
+- **Same validation and error handling** for all modes
+
 ## Architecture Decision Records
 
 ### ADR-001: Strategy Pattern for Connection Modes
@@ -379,3 +411,16 @@ const blobUrl = this.strategy.getBlobStorageUrl(config, hash);
 - ✅ New modes (e.g., Holo hosting) can be added without modifying services
 - ✅ ContentResolver sources are mode-aware
 - ✅ HolochainClientService reduced from ~840 lines to ~300 lines
+
+### ADR-002: HTTP API Over IPC for Tauri
+
+**Context:** Tauri apps could use Rust IPC for direct database access or HTTP for API consistency.
+
+**Decision:** Use HTTP fetch to elohim-storage sidecar (port 8090) for all data operations.
+
+**Consequences:**
+- ✅ Single API boundary in `views.rs` for all clients
+- ✅ Consistent camelCase transformation
+- ✅ Same validation/error handling code paths
+- ✅ Easier testing (HTTP is more observable than IPC)
+- ⚠️ Slightly more latency than direct IPC (minimal in practice)

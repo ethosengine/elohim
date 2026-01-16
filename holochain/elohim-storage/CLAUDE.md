@@ -12,6 +12,42 @@ TypeScript clients receive camelCase objects with properly typed fields - no par
 
 ---
 
+## Unified API for All Clients
+
+This HTTP API serves **both** deployment modes through a single codebase:
+
+```
+                    ┌─────────────────────────────────────┐
+                    │         elohim-storage              │
+                    │   (http.rs / views.rs unified API)  │
+                    │                                     │
+                    │  /db/content, /session, /store/...  │
+                    │         camelCase boundary          │
+                    └─────────────────────────────────────┘
+                                    ▲
+                    ┌───────────────┴───────────────┐
+                    │                               │
+            ┌───────┴───────┐             ┌────────┴────────┐
+            │   Doorway     │             │  Tauri App      │
+            │  (proxy at    │             │ (direct HTTP    │
+            │  doorway.host)│             │  localhost:8090)│
+            └───────────────┘             └─────────────────┘
+```
+
+### Browser/Doorway Mode
+- Request path: `Browser → Doorway → elohim-storage`
+- Doorway proxies `/db/*` requests to elohim-storage
+- Also has projection cache at `/api/v1/cache/*` for fast reads
+
+### Tauri/Direct Mode
+- Request path: `Tauri App → elohim-storage (localhost:8090)`
+- Same HTTP endpoints, just different host
+- No proxy, direct connection to local sidecar
+
+**Key Insight**: Tauri does NOT use Rust FFI or direct SQLite bindings. It makes standard HTTP fetch calls to the same `http.rs` endpoints that doorway proxies to. This ensures a single API boundary with consistent behavior.
+
+---
+
 ## Architecture Layers
 
 ```
