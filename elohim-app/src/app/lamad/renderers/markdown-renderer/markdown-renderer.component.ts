@@ -1,10 +1,11 @@
-import { Component, Input, OnChanges, SimpleChanges, Output, EventEmitter, AfterViewInit, ElementRef, ViewChild, OnDestroy } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges, Output, EventEmitter, AfterViewInit, ElementRef, ViewChild, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
 import hljs from 'highlight.js';
 import { ContentNode } from '../../models/content-node.model';
+import { StorageClientService } from '@app/elohim/services/storage-client.service';
 
 /**
  * Table of Contents entry extracted from markdown headings.
@@ -96,6 +97,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private readonly marked: Marked;
   private scrollListener?: () => void;
   private headingElements: HTMLElement[] = [];
+  private readonly storageClient = inject(StorageClientService);
 
   constructor(private readonly sanitizer: DomSanitizer) {
     // Configure marked with syntax highlighting
@@ -114,6 +116,47 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       gfm: true,
       breaks: false
     });
+
+    // Configure custom renderer to transform blob URLs in images
+    const self = this; // Capture reference for closure
+    this.marked.use({
+      renderer: {
+        image(token) {
+          // Transform blob URLs to full doorway URLs
+          const resolvedHref = self.resolveBlobUrl(token.href);
+          const title = token.title ? ` title="${token.title}"` : '';
+          return `<img src="${resolvedHref}" alt="${token.text}"${title}>`;
+        }
+      }
+    });
+  }
+
+  /**
+   * Resolve blob URL references to full URLs.
+   * Transforms /blob/hash and blob/hash to strategy-aware full URLs.
+   */
+  private resolveBlobUrl(url: string): string {
+    if (!url) return url;
+
+    // Already a full URL - pass through
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+      return url;
+    }
+
+    // Handle /blob/{hash} format
+    if (url.startsWith('/blob/')) {
+      const blobHash = url.slice(6);
+      return this.storageClient.getBlobUrl(blobHash);
+    }
+
+    // Handle blob/{hash} format (no leading slash)
+    if (url.startsWith('blob/')) {
+      const blobHash = url.slice(5);
+      return this.storageClient.getBlobUrl(blobHash);
+    }
+
+    // Not a blob URL, return as-is
+    return url;
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -160,7 +203,10 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     }
 
     // Parse markdown to HTML
-    const html = await this.marked.parse(this.node.content);
+    let html = await this.marked.parse(this.node.content);
+
+    // Post-process to transform any raw HTML img src attributes
+    html = this.transformHtmlImageUrls(html);
 
     // Extract TOC and add heading IDs
     const { processedHtml, toc } = this.processHeadings(html);
@@ -171,6 +217,21 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
 
     // Update heading elements after view updates
     setTimeout(() => this.cacheHeadingElements(), 0);
+  }
+
+  /**
+   * Transform image src attributes in raw HTML to resolve blob URLs.
+   * Handles <img src="/blob/..."> patterns that bypass marked's renderer.
+   */
+  private transformHtmlImageUrls(html: string): string {
+    // Match img tags with src attributes containing blob paths
+    return html.replace(
+      /<img([^>]*)\ssrc=["'](\/?blob\/[^"']+)["']([^>]*)>/gi,
+      (match, before, src, after) => {
+        const resolvedSrc = this.resolveBlobUrl(src);
+        return `<img${before} src="${resolvedSrc}"${after}>`;
+      }
+    );
   }
 
   private processHeadings(html: string): { processedHtml: string; toc: TocEntry[] } {
