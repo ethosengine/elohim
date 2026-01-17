@@ -133,12 +133,14 @@ export HOLOCHAIN_ADMIN_URL="ws://localhost:$ADMIN_PORT"
 export STORAGE_DIR="$STORAGE_DIR"
 export HTTP_PORT="$STORAGE_PORT"
 export ENABLE_IMPORT_API=true
+export ENABLE_CONTENT_DB=true
 
 echo "🚀 Starting elohim-storage..."
 echo "   HOLOCHAIN_ADMIN_URL=$HOLOCHAIN_ADMIN_URL"
 echo "   STORAGE_DIR=$STORAGE_DIR"
 echo "   HTTP_PORT=$HTTP_PORT"
 echo "   ENABLE_IMPORT_API=$ENABLE_IMPORT_API"
+echo "   ENABLE_CONTENT_DB=$ENABLE_CONTENT_DB"
 echo ""
 
 if [ "$FOREGROUND" = true ]; then
