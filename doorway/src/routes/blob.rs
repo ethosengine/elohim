@@ -361,7 +361,7 @@ pub fn error_response(err: BlobError) -> Response<Full<Bytes>> {
 
 /// Handle blob request with elohim-storage proxy fallback.
 ///
-/// On cache miss, proxies to `{storage_url}/store/{hash}` and caches the result.
+/// On cache miss, proxies to `{storage_url}/blob/{hash}` and caches the result.
 /// This is the primary fallback mechanism for seeded blobs.
 pub async fn handle_blob_request_with_storage_proxy(
     req: Request<hyper::body::Incoming>,
@@ -420,8 +420,9 @@ pub async fn handle_blob_request_with_storage_proxy(
 /// Fetch blob from elohim-storage.
 ///
 /// Returns (data, content_type) on success.
+/// Note: elohim-storage uses `/blob/{hash}` for blob retrieval.
 async fn fetch_from_storage(storage_url: &str, hash: &str) -> Result<(Bytes, String), String> {
-    let url = format!("{}/store/{}", storage_url.trim_end_matches('/'), hash);
+    let url = format!("{}/blob/{}", storage_url.trim_end_matches('/'), hash);
 
     let client = reqwest::Client::new();
     let response = client
