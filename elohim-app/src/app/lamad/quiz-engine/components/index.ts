@@ -5,6 +5,7 @@
  * - Inline quiz for post-content attestation
  * - Mastery gate for section boundaries
  * - Pre-assessment for skip-ahead
+ * - Discovery quiz for self-discovery assessments
  */
 
 export { InlineQuizComponent } from './inline-quiz/inline-quiz.component';
@@ -18,3 +19,9 @@ export type {
   PreAssessmentDecision,
   SkipSelectionEvent
 } from './pre-assessment/pre-assessment.component';
+
+export { DiscoveryQuizComponent } from './discovery-quiz/discovery-quiz.component';
+export type {
+  DiscoveryQuizCompletionEvent,
+  EPIC_SUBSCALES
+} from './discovery-quiz/discovery-quiz.component';

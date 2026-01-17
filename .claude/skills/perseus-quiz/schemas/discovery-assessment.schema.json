@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/discovery-assessment.schema.json",
+  "title": "DiscoveryAssessment",
+  "description": "A discovery assessment quiz with subscale-based scoring",
+  "type": "object",
+  "required": ["id", "title", "description", "questions"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique quiz identifier",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "title": {
+      "type": "string",
+      "description": "Display title for the quiz"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of what this assessment discovers"
+    },
+    "sourceFormat": {
+      "type": "string",
+      "const": "quiz-json"
+    },
+    "migratedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/DiscoveryQuestion"
+      },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "DiscoveryQuestion": {
+      "type": "object",
+      "required": ["id", "version", "discoveryMode", "question", "metadata"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "object",
+          "required": ["major", "minor"],
+          "properties": {
+            "major": { "type": "integer" },
+            "minor": { "type": "integer" }
+          }
+        },
+        "discoveryMode": {
+          "type": "boolean",
+          "const": true
+        },
+        "question": {
+          "$ref": "#/$defs/DiscoveryQuestionData"
+        },
+        "answerArea": {
+          "type": "object"
+        },
+        "hints": {
+          "type": "array"
+        },
+        "metadata": {
+          "type": "object"
+        }
+      }
+    },
+    "DiscoveryQuestionData": {
+      "type": "object",
+      "required": ["content", "widgets"],
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "images": {
+          "type": "object"
+        },
+        "widgets": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/DiscoveryRadioWidget"
+          }
+        }
+      }
+    },
+    "DiscoveryRadioWidget": {
+      "type": "object",
+      "required": ["type", "options"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "radio"
+        },
+        "options": {
+          "$ref": "#/$defs/DiscoveryRadioOptions"
+        },
+        "graded": {
+          "type": "boolean",
+          "const": false
+        },
+        "version": {
+          "type": "object"
+        }
+      }
+    },
+    "DiscoveryRadioOptions": {
+      "type": "object",
+      "required": ["choices"],
+      "properties": {
+        "choices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DiscoveryChoice"
+          },
+          "minItems": 2
+        },
+        "randomize": {
+          "type": "boolean"
+        },
+        "multipleSelect": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "DiscoveryChoice": {
+      "type": "object",
+      "required": ["content", "subscaleContributions"],
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "Choice text displayed to user"
+        },
+        "subscaleContributions": {
+          "type": "object",
+          "description": "Maps subscale names to contribution values",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  }
+}

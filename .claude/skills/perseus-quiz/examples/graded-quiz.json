@@ -1,0 +1,178 @@
+{
+  "id": "quiz-ai-governance-basics",
+  "title": "AI Governance Fundamentals",
+  "description": "Test your understanding of AI governance principles and constitutional frameworks",
+  "sourceFormat": "quiz-json",
+  "migratedAt": "2026-01-17T00:00:00.000Z",
+  "questions": [
+    {
+      "id": "q1",
+      "version": { "major": 1, "minor": 0 },
+      "question": {
+        "content": "What is the primary purpose of an AI constitution?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "To establish binding rules and values that govern AI system behavior",
+                  "correct": true,
+                  "clue": "Correct! An AI constitution defines the foundational rules and values that AI systems must follow."
+                },
+                {
+                  "content": "To maximize AI system performance and efficiency",
+                  "correct": false,
+                  "clue": "Performance optimization is important, but not the primary purpose of a constitution."
+                },
+                {
+                  "content": "To replace human decision-making entirely",
+                  "correct": false,
+                  "clue": "AI constitutions aim to guide AI behavior, not replace human agency."
+                },
+                {
+                  "content": "To limit AI capabilities to prevent any risks",
+                  "correct": false,
+                  "clue": "A constitution provides guidance, not just limitations."
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": { "content": "", "images": {}, "widgets": {} },
+        "calculator": false
+      },
+      "hints": [
+        {
+          "content": "Think about what a human constitution does for a country.",
+          "widgets": {},
+          "images": {}
+        }
+      ],
+      "metadata": {
+        "assessesContentId": "ai-constitutional",
+        "bloomsLevel": "understand",
+        "difficulty": "easy",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["ai-governance", "constitutional", "fundamentals"],
+        "createdAt": "2026-01-17T00:00:00.000Z"
+      }
+    },
+    {
+      "id": "q2",
+      "version": { "major": 1, "minor": 0 },
+      "question": {
+        "content": "Which of the following best describes 'democratic oversight' in AI governance?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Citizens and elected representatives have input and control over AI policy decisions",
+                  "correct": true
+                },
+                {
+                  "content": "AI systems vote on their own operational parameters",
+                  "correct": false
+                },
+                {
+                  "content": "Tech companies make AI decisions on behalf of the public",
+                  "correct": false
+                },
+                {
+                  "content": "Government agencies operate without public input",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": { "content": "", "images": {}, "widgets": {} },
+        "calculator": false
+      },
+      "hints": [],
+      "metadata": {
+        "assessesContentId": "ai-constitutional",
+        "bloomsLevel": "understand",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 45,
+        "questionType": "core",
+        "tags": ["ai-governance", "democracy", "oversight"],
+        "createdAt": "2026-01-17T00:00:00.000Z"
+      }
+    },
+    {
+      "id": "q3",
+      "version": { "major": 1, "minor": 0 },
+      "question": {
+        "content": "How would you apply the principle of 'value alignment' in an AI system for healthcare?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "Ensure the AI prioritizes patient wellbeing and follows medical ethics guidelines",
+                  "correct": true
+                },
+                {
+                  "content": "Maximize hospital revenue from AI-suggested treatments",
+                  "correct": false
+                },
+                {
+                  "content": "Let the AI determine its own values based on training data",
+                  "correct": false
+                },
+                {
+                  "content": "Copy value systems from other industries without adaptation",
+                  "correct": false
+                }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "answerArea": {
+        "type": "multiple",
+        "options": { "content": "", "images": {}, "widgets": {} },
+        "calculator": false
+      },
+      "hints": [],
+      "metadata": {
+        "assessesContentId": "ai-constitutional",
+        "bloomsLevel": "apply",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "applied",
+        "tags": ["ai-governance", "value-alignment", "healthcare"],
+        "createdAt": "2026-01-17T00:00:00.000Z"
+      }
+    }
+  ]
+}

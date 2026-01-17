@@ -36,6 +36,14 @@ export interface PerseusItem {
 
   /** Assessment metadata for lamad integration */
   metadata: PerseusItemMetadata;
+
+  /**
+   * Discovery mode flag for self-assessment quizzes.
+   * When true, answers are not graded as correct/incorrect.
+   * Instead, each answer contributes to subscale scores
+   * for personalization and path recommendation.
+   */
+  discoveryMode?: boolean;
 }
 
 /**
@@ -222,7 +230,7 @@ export interface RadioChoice {
   /** Choice content (supports markdown/math) */
   content: string;
 
-  /** Whether this is the correct answer */
+  /** Whether this is the correct answer (for graded quizzes) */
   correct?: boolean;
 
   /** Clue shown after answering */
@@ -233,6 +241,16 @@ export interface RadioChoice {
 
   /** Widget references in choice content */
   widgets?: Record<string, PerseusWidget>;
+
+  /**
+   * Subscale contributions for discovery assessments.
+   * Maps subscale names to contribution values (typically 0-1).
+   * Used when discoveryMode is true at the item level.
+   *
+   * @example
+   * { "governance": 1, "care": 0, "economic": 0 }
+   */
+  subscaleContributions?: Record<string, number>;
 }
 
 /**

@@ -7,6 +7,8 @@
   "questions": [
     {
       "id": "q1",
+      "version": { "major": 1, "minor": 0 },
+      "discoveryMode": true,
       "question": {
         "content": "Which of these activities interests you most?\n\n[[☃ radio 1]]",
         "images": {},
@@ -17,32 +19,32 @@
               "choices": [
                 {
                   "content": "Shaping AI policy and constitutional frameworks",
-                  "correct": true
+                  "subscaleContributions": { "governance": 1, "care": 0, "economic": 0, "public": 0, "social": 0 }
                 },
                 {
                   "content": "Supporting caregivers and recognizing invisible work",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 1, "economic": 0, "public": 0, "social": 0 }
                 },
                 {
                   "content": "Transforming workplace ownership and governance",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 0, "economic": 1, "public": 0, "social": 0 }
                 },
                 {
                   "content": "Civic participation and public oversight",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 0, "economic": 0, "public": 1, "social": 0 }
                 },
                 {
                   "content": "Building healthier digital communication spaces",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 0, "economic": 0, "public": 0, "social": 1 }
                 }
               ],
-              "randomize": true,
+              "randomize": false,
               "multipleSelect": false,
               "displayCount": null,
               "hasNoneOfTheAbove": false,
               "deselectEnabled": false
             },
-            "graded": true,
+            "graded": false,
             "version": {
               "major": 0,
               "minor": 0
@@ -65,6 +67,8 @@
         "assessesContentId": "governance",
         "bloomsLevel": "remember",
         "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
         "tags": [
           "assessment",
           "onboarding",
@@ -76,6 +80,8 @@
     },
     {
       "id": "q2",
+      "version": { "major": 1, "minor": 0 },
+      "discoveryMode": true,
       "question": {
         "content": "What aspect of the current system concerns you most?\n\n[[☃ radio 1]]",
         "images": {},
@@ -86,32 +92,32 @@
               "choices": [
                 {
                   "content": "AI systems making decisions without democratic oversight",
-                  "correct": true
+                  "subscaleContributions": { "governance": 1, "care": 0, "economic": 0, "public": 0, "social": 0 }
                 },
                 {
                   "content": "Unpaid care work being invisible in our economy",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 1, "economic": 0, "public": 0, "social": 0 }
                 },
                 {
                   "content": "Workers having no voice in their workplaces",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 0, "economic": 1, "public": 0, "social": 0 }
                 },
                 {
                   "content": "Citizens being disconnected from decision-making",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 0, "economic": 0, "public": 1, "social": 0 }
                 },
                 {
                   "content": "Social media amplifying division and misinformation",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 0, "economic": 0, "public": 0, "social": 1 }
                 }
               ],
-              "randomize": true,
+              "randomize": false,
               "multipleSelect": false,
               "displayCount": null,
               "hasNoneOfTheAbove": false,
               "deselectEnabled": false
             },
-            "graded": true,
+            "graded": false,
             "version": {
               "major": 0,
               "minor": 0
@@ -134,6 +140,8 @@
         "assessesContentId": "governance",
         "bloomsLevel": "remember",
         "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
         "tags": [
           "assessment",
           "onboarding",
@@ -145,6 +153,8 @@
     },
     {
       "id": "q3",
+      "version": { "major": 1, "minor": 0 },
+      "discoveryMode": true,
       "question": {
         "content": "Which role resonates most with how you see yourself?\n\n[[☃ radio 1]]",
         "images": {},
@@ -155,32 +165,32 @@
               "choices": [
                 {
                   "content": "Policy maker, constitutional council member, or researcher",
-                  "correct": true
+                  "subscaleContributions": { "governance": 1, "care": 0, "economic": 0, "public": 0, "social": 0 }
                 },
                 {
                   "content": "Caregiver, parent, or community supporter",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 1, "economic": 0, "public": 0, "social": 0 }
                 },
                 {
                   "content": "Worker, business owner, or economic participant",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 0, "economic": 1, "public": 0, "social": 0 }
                 },
                 {
                   "content": "Citizen, activist, journalist, or community organizer",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 0, "economic": 0, "public": 1, "social": 0 }
                 },
                 {
                   "content": "Content creator, moderator, or digital community builder",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 0, "economic": 0, "public": 0, "social": 1 }
                 }
               ],
-              "randomize": true,
+              "randomize": false,
               "multipleSelect": false,
               "displayCount": null,
               "hasNoneOfTheAbove": false,
               "deselectEnabled": false
             },
-            "graded": true,
+            "graded": false,
             "version": {
               "major": 0,
               "minor": 0
@@ -203,6 +213,8 @@
         "assessesContentId": "governance",
         "bloomsLevel": "remember",
         "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
         "tags": [
           "assessment",
           "onboarding",
@@ -214,6 +226,8 @@
     },
     {
       "id": "q4",
+      "version": { "major": 1, "minor": 0 },
+      "discoveryMode": true,
       "question": {
         "content": "What kind of impact do you want to have?\n\n[[☃ radio 1]]",
         "images": {},
@@ -224,32 +238,32 @@
               "choices": [
                 {
                   "content": "Ensuring AI serves humanity through proper governance",
-                  "correct": true
+                  "subscaleContributions": { "governance": 1, "care": 0, "economic": 0, "public": 0, "social": 0 }
                 },
                 {
                   "content": "Making care work visible and valued in society",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 1, "economic": 0, "public": 0, "social": 0 }
                 },
                 {
                   "content": "Creating more equitable economic relationships",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 0, "economic": 1, "public": 0, "social": 0 }
                 },
                 {
                   "content": "Strengthening democratic participation and transparency",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 0, "economic": 0, "public": 1, "social": 0 }
                 },
                 {
                   "content": "Fostering genuine human connection online",
-                  "correct": false
+                  "subscaleContributions": { "governance": 0, "care": 0, "economic": 0, "public": 0, "social": 1 }
                 }
               ],
-              "randomize": true,
+              "randomize": false,
               "multipleSelect": false,
               "displayCount": null,
               "hasNoneOfTheAbove": false,
               "deselectEnabled": false
             },
-            "graded": true,
+            "graded": false,
             "version": {
               "major": 0,
               "minor": 0
@@ -272,6 +286,8 @@
         "assessesContentId": "governance",
         "bloomsLevel": "remember",
         "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
         "tags": [
           "assessment",
           "onboarding",
