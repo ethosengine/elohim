@@ -790,3 +790,20 @@ body.focused-view-mode app-header,
 body.focused-view-mode .site-header {
     display: none !important;
 }
+
+/* ============================================================================
+   Perseus Quiz Theme Support
+   ============================================================================
+   Perseus theme overrides have been consolidated into a separate file:
+   /assets/perseus-plugin/perseus-theme-overrides.css
+
+   This file is loaded lazily by the perseus-element-loader.ts when
+   the first quiz is rendered. This reduces initial page load and
+   keeps Perseus-specific styles in one maintainable location.
+
+   See: perseus-theme-overrides.css for:
+   - Dark mode text/background colors
+   - Wonder Blocks CSS variable mappings
+   - Multiple choice button fixes
+   - Aphrodite (CSS-in-JS) overrides
+   ============================================================================ */

@@ -140,6 +140,20 @@ interface PerseusRendererAPI {
 }
 
 /**
+ * Generate a unique hash code from a string.
+ * Used to create unique problemNum for each question to prevent
+ * radio button name collisions across different questions.
+ */
+function hashCode(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+}
+
+/**
  * Transform Perseus score format to our expected format.
  */
 function transformPerseusScore(score: PerseusScore, userInput: unknown): PerseusScoreResult {
@@ -211,17 +225,33 @@ function PerseusItemWrapper({
     error,
   });
 
+  // DEBUG: Check if we're reaching the useEffect definition
+  console.log('[PerseusItemWrapper] About to define useEffect, React.useEffect type:', typeof useEffect);
+
   // Initialize Perseus on mount (lazy load the module)
   useEffect(() => {
+    console.log('[PerseusItemWrapper] useEffect running, PerseusModule already loaded:', !!PerseusModule);
     let cancelled = false;
 
     async function loadPerseus() {
       console.log('[PerseusItemWrapper] Starting lazy load of Perseus module...');
+
+      // If module already loaded, skip the loading
+      if (PerseusModule) {
+        console.log('[PerseusItemWrapper] Module already cached, using cached version');
+        setLoading(false);
+        setInitialized(true);
+        return;
+      }
+
       setLoading(true);
 
       const module = await ensurePerseusLoaded();
 
-      if (cancelled) return;
+      if (cancelled) {
+        console.log('[PerseusItemWrapper] Load cancelled');
+        return;
+      }
 
       console.log('[PerseusItemWrapper] PerseusModule loaded:', module ? Object.keys(module) : 'null');
 
@@ -236,7 +266,10 @@ function PerseusItemWrapper({
 
     loadPerseus();
 
-    return () => { cancelled = true; };
+    return () => {
+      console.log('[PerseusItemWrapper] useEffect cleanup, setting cancelled=true');
+      cancelled = true;
+    };
   }, []);
 
   // Expose API ref for external scoring
@@ -256,10 +289,45 @@ function PerseusItemWrapper({
     [onAnswerChange]
   );
 
+  // Inline styles for loading/error/empty states (Light DOM, no shadow styles)
+  const loadingStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '2rem',
+    color: '#666',
+  };
+
+  const spinnerStyle: React.CSSProperties = {
+    width: '20px',
+    height: '20px',
+    border: '2px solid #e0e0e0',
+    borderTopColor: '#1976d2',
+    borderRadius: '50%',
+    animation: 'perseus-spin 1s linear infinite',
+  };
+
+  const errorStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '1rem',
+    background: '#ffebee',
+    color: '#c62828',
+    borderRadius: '4px',
+  };
+
+  const emptyStyle: React.CSSProperties = {
+    padding: '2rem',
+    textAlign: 'center',
+    color: '#666',
+  };
+
   if (loading || !initialized) {
     return (
-      <div className="perseus-loading">
-        <div className="perseus-loading-spinner" />
+      <div style={loadingStyle}>
+        <style>{`@keyframes perseus-spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={spinnerStyle} />
         <span>Loading Perseus quiz engine...</span>
       </div>
     );
@@ -267,8 +335,8 @@ function PerseusItemWrapper({
 
   if (error) {
     return (
-      <div className="perseus-error">
-        <span className="perseus-error-icon">!</span>
+      <div style={errorStyle}>
+        <span style={{ fontSize: '1.25rem' }}>!</span>
         <span>{error}</span>
       </div>
     );
@@ -276,7 +344,7 @@ function PerseusItemWrapper({
 
   if (!item) {
     return (
-      <div className="perseus-empty">
+      <div style={emptyStyle}>
         <span>No question loaded</span>
       </div>
     );
@@ -284,8 +352,8 @@ function PerseusItemWrapper({
 
   if (!PerseusModule?.ServerItemRenderer) {
     return (
-      <div className="perseus-error">
-        <span className="perseus-error-icon">!</span>
+      <div style={errorStyle}>
+        <span style={{ fontSize: '1.25rem' }}>!</span>
         <span>Perseus renderer not available</span>
       </div>
     );
@@ -386,7 +454,7 @@ function PerseusItemWrapper({
       }}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       item={item as any}
-      problemNum={1}
+      problemNum={item.id ? hashCode(item.id) : Date.now()}
       reviewMode={reviewMode}
       // Pass dependencies directly - ServerItemRenderer wraps content in DependenciesContext.Provider
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -402,7 +470,7 @@ function PerseusItemWrapper({
 
   // Wrap in i18n provider for localization
   return (
-    <div className="perseus-item-container">
+    <div className="perseus-item-container framework-perseus">
       {PerseusI18nContextProvider ? (
         <PerseusI18nContextProvider locale="en" strings={defaultStrings}>
           {rendererElement}
@@ -435,20 +503,14 @@ class PerseusQuestionElement extends HTMLElement {
   }
 
   connectedCallback(): void {
-    // Create shadow DOM for style isolation
-    if (!this.shadowRoot) {
-      this.attachShadow({ mode: 'open' });
-    }
+    // Use Light DOM (not Shadow DOM) for Perseus compatibility
+    // Aphrodite CSS-in-JS injects styles into document.head which can't
+    // penetrate Shadow DOM boundaries. Light DOM allows Perseus styles to work.
 
-    // Add Perseus styles to shadow DOM
-    const style = document.createElement('style');
-    style.textContent = this.getStyles();
-    this.shadowRoot!.appendChild(style);
-
-    // Create mount point for React
+    // Create mount point for React directly in the element
     const container = document.createElement('div');
-    container.className = 'perseus-mount';
-    this.shadowRoot!.appendChild(container);
+    container.className = 'perseus-mount framework-perseus';
+    this.appendChild(container);
 
     // Initialize React root
     this.root = createRoot(container);
@@ -611,98 +673,8 @@ class PerseusQuestionElement extends HTMLElement {
     );
   }
 
-  private getStyles(): string {
-    return `
-      :host {
-        display: block;
-        font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-      }
-
-      .perseus-mount {
-        padding: 1rem;
-      }
-
-      .perseus-loading {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 2rem;
-        color: var(--text-secondary, #666);
-      }
-
-      .perseus-loading-spinner {
-        width: 20px;
-        height: 20px;
-        border: 2px solid var(--border-color, #e0e0e0);
-        border-top-color: var(--primary-color, #1976d2);
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-      }
-
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-
-      .perseus-error {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 1rem;
-        background: var(--error-bg, #ffebee);
-        color: var(--error-color, #c62828);
-        border-radius: 4px;
-      }
-
-      .perseus-error-icon {
-        font-size: 1.25rem;
-      }
-
-      .perseus-empty {
-        padding: 2rem;
-        text-align: center;
-        color: var(--text-secondary, #666);
-      }
-
-      .perseus-item-container {
-        /* Perseus-specific styling overrides */
-      }
-
-      .perseus-tex {
-        font-family: 'KaTeX_Main', 'Times New Roman', serif;
-      }
-
-      /* Radio widget styling */
-      .perseus-item-container :global(.radio-option) {
-        padding: 0.75rem 1rem;
-        margin: 0.5rem 0;
-        border: 1px solid var(--border-color, #e0e0e0);
-        border-radius: 8px;
-        cursor: pointer;
-        transition: border-color 0.2s, background-color 0.2s;
-      }
-
-      .perseus-item-container :global(.radio-option:hover) {
-        border-color: var(--primary-color, #1976d2);
-        background-color: var(--hover-bg, #f5f5f5);
-      }
-
-      .perseus-item-container :global(.radio-option.selected) {
-        border-color: var(--primary-color, #1976d2);
-        background-color: var(--selected-bg, #e3f2fd);
-      }
-
-      /* Correct/incorrect feedback */
-      .perseus-item-container :global(.correct) {
-        border-color: var(--success-color, #4caf50) !important;
-        background-color: var(--success-bg, #e8f5e9) !important;
-      }
-
-      .perseus-item-container :global(.incorrect) {
-        border-color: var(--error-color, #f44336) !important;
-        background-color: var(--error-bg, #ffebee) !important;
-      }
-    `;
-  }
+  // Note: getStyles() method removed - using Light DOM with global Perseus CSS
+  // Loading/error/empty states use inline styles in the React component
 }
 
 // Registration

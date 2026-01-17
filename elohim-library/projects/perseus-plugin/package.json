@@ -9,6 +9,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "rollup -c",
+    "postbuild": "cp node_modules/@khanacademy/perseus/dist/index.css dist/perseus.css",
     "build:watch": "rollup -c -w",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"

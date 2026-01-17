@@ -130,13 +130,13 @@ export interface InlineQuizCompletionEvent {
           <!-- Question display -->
           @if (currentQuestion()) {
             <div class="question-container">
-              <app-perseus-wrapper
+              <app-perseus-question
                 [item]="currentQuestion()!"
                 [reviewMode]="showFeedback()"
                 [autoFocus]="true"
                 (scored)="onQuestionScored($event)"
                 (answerChanged)="onAnswerChanged()">
-              </app-perseus-wrapper>
+              </app-perseus-question>
 
               <!-- Answer controls -->
               <div class="answer-controls">

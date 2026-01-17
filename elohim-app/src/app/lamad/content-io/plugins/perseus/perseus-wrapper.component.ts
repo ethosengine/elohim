@@ -20,7 +20,8 @@ import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
 import {
   registerPerseusElement,
   type PerseusQuestionElement,
-  getPerseusElement
+  getPerseusElement,
+  refreshPerseusDarkMode
 } from './perseus-element-loader';
 
 /**
@@ -184,6 +185,8 @@ export class PerseusWrapperComponent implements AfterViewInit, OnDestroy, OnChan
           this.hasPendingItemChange = false;
           // Verify item was set
           console.log('[PerseusWrapper] After setting, element.item:', this.perseusElement.item?.id || 'null');
+          // Dark mode refresh disabled for debugging
+          // refreshPerseusDarkMode();
         } else {
           console.log('[PerseusWrapper] No item to set');
         }
@@ -233,6 +236,8 @@ export class PerseusWrapperComponent implements AfterViewInit, OnDestroy, OnChan
       console.log('[PerseusWrapper] Updating item to:', this.item?.id);
       this.perseusElement.item = this.item;
       this.hasPendingItemChange = false;
+      // Dark mode refresh disabled for debugging
+      // refreshPerseusDarkMode();
     }
 
     if (changes['reviewMode']) {
