@@ -28,6 +28,7 @@ pub use apps::handle_app_request;
 pub use auth_routes::handle_auth_request;
 pub use blob::{
     handle_blob_request, handle_blob_request_with_fallback,
+    handle_blob_request_with_storage_proxy,
     error_response as blob_error_response, BlobContext, BlobError,
 };
 pub use dashboard_ws::handle_dashboard_ws;

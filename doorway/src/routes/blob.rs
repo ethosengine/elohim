@@ -356,6 +356,101 @@ pub fn error_response(err: BlobError) -> Response<Full<Bytes>> {
 }
 
 // ============================================================================
+// Storage Proxy Fallback
+// ============================================================================
+
+/// Handle blob request with elohim-storage proxy fallback.
+///
+/// On cache miss, proxies to `{storage_url}/store/{hash}` and caches the result.
+/// This is the primary fallback mechanism for seeded blobs.
+pub async fn handle_blob_request_with_storage_proxy(
+    req: Request<hyper::body::Incoming>,
+    cache: Arc<ContentCache>,
+    storage_url: Option<String>,
+) -> Result<Response<Full<Bytes>>, BlobError> {
+    // Extract address from path: /store/{address}
+    let path = req.uri().path();
+    let raw_address = path
+        .strip_prefix("/store/")
+        .ok_or(BlobError::NotFound)?;
+
+    if raw_address.is_empty() {
+        return Err(BlobError::NotFound);
+    }
+
+    // Normalize address to SHA256 format for cache lookup
+    let hash = parse_content_address(raw_address)?;
+
+    debug!(raw_address = %raw_address, hash = %hash, method = %req.method(), "Blob request with storage proxy");
+
+    // Check cache first (hot path)
+    if let Some(_size) = cache.blob_size(&hash) {
+        return match *req.method() {
+            Method::GET => handle_get_blob(req, cache, &hash).await,
+            Method::HEAD => handle_head_blob(req, cache, &hash).await,
+            _ => Err(BlobError::MethodNotAllowed),
+        };
+    }
+
+    // Cache miss - try fetching from elohim-storage
+    if let Some(ref storage) = storage_url {
+        debug!(hash = %hash, storage = %storage, "Cache miss, fetching from elohim-storage");
+
+        if let Ok((data, content_type)) = fetch_from_storage(storage, &hash).await {
+            // Cache the result with 1 hour TTL
+            let ttl = std::time::Duration::from_secs(3600);
+            cache.set(&hash, data.to_vec(), &content_type, ttl);
+            info!(hash = %hash, size = data.len(), "Fetched and cached from elohim-storage");
+
+            // Now serve from cache
+            return match *req.method() {
+                Method::GET => handle_get_blob(req, cache, &hash).await,
+                Method::HEAD => handle_head_blob(req, cache, &hash).await,
+                _ => Err(BlobError::MethodNotAllowed),
+            };
+        } else {
+            warn!(hash = %hash, "Failed to fetch from elohim-storage");
+        }
+    }
+
+    // All fallbacks failed
+    Err(BlobError::NotFound)
+}
+
+/// Fetch blob from elohim-storage.
+///
+/// Returns (data, content_type) on success.
+async fn fetch_from_storage(storage_url: &str, hash: &str) -> Result<(Bytes, String), String> {
+    let url = format!("{}/store/{}", storage_url.trim_end_matches('/'), hash);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Storage returned {}", response.status()));
+    }
+
+    let content_type = response
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream")
+        .to_string();
+
+    let data = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read body: {}", e))?;
+
+    Ok((data, content_type))
+}
+
+// ============================================================================
 // Shard Resolution Fallback
 // ============================================================================
 
