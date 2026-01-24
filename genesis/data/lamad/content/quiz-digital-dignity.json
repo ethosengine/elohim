@@ -6,7 +6,8 @@
   "content": [
     {
       "id": "dd-q1",
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "What does 'virality as privilege' mean?\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
@@ -14,45 +15,18 @@
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "Only privileged people can go viral",
-                  "correct": false
-                },
-                {
-                  "content": "Wide reach must be earned through trust, not just engagement",
-                  "correct": true
-                },
-                {
-                  "content": "Viruses are privileged",
-                  "correct": false
-                },
-                {
-                  "content": "Viral content gets special treatment",
-                  "correct": false
-                }
+                { "content": "Only privileged people can go viral", "correct": false, "id": "dd-q1-choice-0" },
+                { "content": "Wide reach must be earned through trust, not just engagement", "correct": true, "id": "dd-q1-choice-1" },
+                { "content": "Viruses are privileged", "correct": false, "id": "dd-q1-choice-2" },
+                { "content": "Viral content gets special treatment", "correct": false, "id": "dd-q1-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "multipleSelect": false
             },
             "graded": true,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
-      },
-      "answerArea": {
-        "type": "multiple",
-        "options": {
-          "content": "",
-          "images": {},
-          "widgets": {}
-        },
-        "calculator": false
       },
       "hints": [
         {
@@ -66,18 +40,15 @@
         "assessesContentId": "social-medium-epic",
         "bloomsLevel": "remember",
         "difficulty": "medium",
-        "tags": [
-          "quiz",
-          "social-medium",
-          "dignity",
-          "design"
-        ],
-        "createdAt": "2025-12-25T23:31:36.264Z"
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["social-medium", "virality", "trust"]
       }
     },
     {
       "id": "dd-q2",
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "The Social Medium epic supports 'like' buttons as primary engagement.\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
@@ -85,37 +56,16 @@
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "True",
-                  "correct": false
-                },
-                {
-                  "content": "False",
-                  "correct": true
-                }
+                { "content": "True", "correct": false, "id": "dd-q2-true" },
+                { "content": "False", "correct": true, "id": "dd-q2-false" }
               ],
               "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "multipleSelect": false
             },
             "graded": true,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
-      },
-      "answerArea": {
-        "type": "multiple",
-        "options": {
-          "content": "",
-          "images": {},
-          "widgets": {}
-        },
-        "calculator": false
       },
       "hints": [
         {
@@ -129,18 +79,15 @@
         "assessesContentId": "social-medium-epic",
         "bloomsLevel": "remember",
         "difficulty": "easy",
-        "tags": [
-          "quiz",
-          "social-medium",
-          "dignity",
-          "design"
-        ],
-        "createdAt": "2025-12-25T23:31:36.264Z"
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["social-medium", "true-false"]
       }
     },
     {
       "id": "dd-q3",
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "What is 'mediated reaction'?\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
@@ -148,45 +95,18 @@
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "Reactions by mediators",
-                  "correct": false
-                },
-                {
-                  "content": "Elohim intercepting potentially harmful reactions with teaching",
-                  "correct": true
-                },
-                {
-                  "content": "Delayed reactions",
-                  "correct": false
-                },
-                {
-                  "content": "Reactions on media",
-                  "correct": false
-                }
+                { "content": "Reactions by mediators", "correct": false, "id": "dd-q3-choice-0" },
+                { "content": "Elohim intercepting potentially harmful reactions with teaching", "correct": true, "id": "dd-q3-choice-1" },
+                { "content": "Delayed reactions", "correct": false, "id": "dd-q3-choice-2" },
+                { "content": "Reactions on media", "correct": false, "id": "dd-q3-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "multipleSelect": false
             },
             "graded": true,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
-      },
-      "answerArea": {
-        "type": "multiple",
-        "options": {
-          "content": "",
-          "images": {},
-          "widgets": {}
-        },
-        "calculator": false
       },
       "hints": [
         {
@@ -200,34 +120,23 @@
         "assessesContentId": "social-medium-epic",
         "bloomsLevel": "remember",
         "difficulty": "medium",
-        "tags": [
-          "quiz",
-          "social-medium",
-          "dignity",
-          "design"
-        ],
-        "createdAt": "2025-12-25T23:31:36.264Z"
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["social-medium", "mediation"]
       }
     }
   ],
-  "contentFormat": "perseus-quiz-json",
-  "tags": [
-    "quiz",
-    "social-medium",
-    "dignity",
-    "design"
-  ],
-  "sourcePath": "generated/quiz-digital-dignity.json",
-  "relatedNodeIds": [
-    "social-medium-epic"
-  ],
+  "contentFormat": "sophia",
+  "tags": ["assessment", "social-medium", "dignity", "design"],
+  "relatedNodeIds": ["social-medium-epic"],
   "metadata": {
+    "assessmentType": "mastery",
     "category": "social-medium",
     "attestationId": "dignity-advocate",
+    "difficulty": "medium",
     "questionCount": 3,
-    "sourceFormat": "quiz-json",
-    "migratedAt": "2025-12-26T05:36:35.095Z"
+    "migratedAt": "2026-01-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479370",
-  "updatedAt": "2025-11-28T00:09:03.479371"
+  "updatedAt": "2026-01-24T00:00:00.000Z"
 }

@@ -44,7 +44,7 @@ const BLOB_FORMATS = ['html5-app', 'perseus-quiz-json'];
 
 /** Valid content formats accepted by elohim-storage */
 const VALID_CONTENT_FORMATS = [
-  'markdown', 'html', 'json', 'text', 'perseus', 'gherkin',
+  'markdown', 'html', 'json', 'text', 'perseus', 'sophia', 'gherkin',
   'yaml', 'toml', 'latex', 'asciidoc', 'html5-app', 'iframe', 'embed'
 ];
 
@@ -59,6 +59,10 @@ function normalizeContentFormat(format: string | undefined): string {
     'perseus-quiz-json': 'perseus',
     'perseus-quiz': 'perseus',
     'quiz-json': 'perseus',
+    'sophia-moment-json': 'sophia',
+    'sophia-quiz-json': 'sophia',
+    'sophia-mastery': 'sophia',
+    'sophia-discovery': 'sophia',
     'md': 'markdown',
     'htm': 'html',
     'txt': 'text',

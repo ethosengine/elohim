@@ -6,7 +6,8 @@
   "content": [
     {
       "id": "gf-q1",
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "What is the primary purpose of Elohim agents in governance?\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
@@ -14,45 +15,18 @@
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "To make all decisions for humans",
-                  "correct": false
-                },
-                {
-                  "content": "To serve as constitutional guardians while respecting human agency",
-                  "correct": true
-                },
-                {
-                  "content": "To maximize engagement metrics",
-                  "correct": false
-                },
-                {
-                  "content": "To enforce rules without exception",
-                  "correct": false
-                }
+                { "content": "To make all decisions for humans", "correct": false, "id": "gf-q1-choice-0" },
+                { "content": "To serve as constitutional guardians while respecting human agency", "correct": true, "id": "gf-q1-choice-1" },
+                { "content": "To maximize engagement metrics", "correct": false, "id": "gf-q1-choice-2" },
+                { "content": "To enforce rules without exception", "correct": false, "id": "gf-q1-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "multipleSelect": false
             },
             "graded": true,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
-      },
-      "answerArea": {
-        "type": "multiple",
-        "options": {
-          "content": "",
-          "images": {},
-          "widgets": {}
-        },
-        "calculator": false
       },
       "hints": [
         {
@@ -65,19 +39,16 @@
         "sourceContentId": "quiz-governance-foundations",
         "assessesContentId": "governance-epic",
         "bloomsLevel": "remember",
-        "difficulty": "intermediate",
-        "tags": [
-          "quiz",
-          "governance",
-          "foundations",
-          "assessment"
-        ],
-        "createdAt": "2025-12-25T23:31:36.264Z"
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["governance", "foundations", "assessment"]
       }
     },
     {
       "id": "gf-q2",
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "In the Elohim hierarchy, which level handles family-specific matters?\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
@@ -85,45 +56,18 @@
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "Global Elohim",
-                  "correct": false
-                },
-                {
-                  "content": "Community Elohim",
-                  "correct": false
-                },
-                {
-                  "content": "Family Elohim",
-                  "correct": true
-                },
-                {
-                  "content": "Personal Agent",
-                  "correct": false
-                }
+                { "content": "Global Elohim", "correct": false, "id": "gf-q2-choice-0" },
+                { "content": "Community Elohim", "correct": false, "id": "gf-q2-choice-1" },
+                { "content": "Family Elohim", "correct": true, "id": "gf-q2-choice-2" },
+                { "content": "Personal Agent", "correct": false, "id": "gf-q2-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "multipleSelect": false
             },
             "graded": true,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
-      },
-      "answerArea": {
-        "type": "multiple",
-        "options": {
-          "content": "",
-          "images": {},
-          "widgets": {}
-        },
-        "calculator": false
       },
       "hints": [
         {
@@ -136,19 +80,16 @@
         "sourceContentId": "quiz-governance-foundations",
         "assessesContentId": "governance-epic",
         "bloomsLevel": "remember",
-        "difficulty": "intermediate",
-        "tags": [
-          "quiz",
-          "governance",
-          "foundations",
-          "assessment"
-        ],
-        "createdAt": "2025-12-25T23:31:36.264Z"
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["governance", "foundations", "assessment"]
       }
     },
     {
       "id": "gf-q3",
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "Every governance decision in the protocol can be challenged.\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
@@ -156,37 +97,16 @@
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "True",
-                  "correct": true
-                },
-                {
-                  "content": "False",
-                  "correct": false
-                }
+                { "content": "True", "correct": true, "id": "gf-q3-true" },
+                { "content": "False", "correct": false, "id": "gf-q3-false" }
               ],
               "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "multipleSelect": false
             },
             "graded": true,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
-      },
-      "answerArea": {
-        "type": "multiple",
-        "options": {
-          "content": "",
-          "images": {},
-          "widgets": {}
-        },
-        "calculator": false
       },
       "hints": [
         {
@@ -200,18 +120,15 @@
         "assessesContentId": "governance-epic",
         "bloomsLevel": "remember",
         "difficulty": "easy",
-        "tags": [
-          "quiz",
-          "governance",
-          "foundations",
-          "assessment"
-        ],
-        "createdAt": "2025-12-25T23:31:36.264Z"
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["governance", "true-false"]
       }
     },
     {
       "id": "gf-q4",
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "What happens if a governance SLA is breached?\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
@@ -219,45 +136,18 @@
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "Nothing, SLAs are aspirational",
-                  "correct": false
-                },
-                {
-                  "content": "The decision defaults in favor of the challenger",
-                  "correct": true
-                },
-                {
-                  "content": "The system shuts down",
-                  "correct": false
-                },
-                {
-                  "content": "Users lose their accounts",
-                  "correct": false
-                }
+                { "content": "Nothing, SLAs are aspirational", "correct": false, "id": "gf-q4-choice-0" },
+                { "content": "The decision defaults in favor of the challenger", "correct": true, "id": "gf-q4-choice-1" },
+                { "content": "The system shuts down", "correct": false, "id": "gf-q4-choice-2" },
+                { "content": "Users lose their accounts", "correct": false, "id": "gf-q4-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "multipleSelect": false
             },
             "graded": true,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
-      },
-      "answerArea": {
-        "type": "multiple",
-        "options": {
-          "content": "",
-          "images": {},
-          "widgets": {}
-        },
-        "calculator": false
       },
       "hints": [
         {
@@ -270,19 +160,16 @@
         "sourceContentId": "quiz-governance-foundations",
         "assessesContentId": "governance-epic",
         "bloomsLevel": "remember",
-        "difficulty": "intermediate",
-        "tags": [
-          "quiz",
-          "governance",
-          "foundations",
-          "assessment"
-        ],
-        "createdAt": "2025-12-25T23:31:36.264Z"
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["governance", "sla"]
       }
     },
     {
       "id": "gf-q5",
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "What is the purpose of precedent in the governance system?\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
@@ -290,45 +177,18 @@
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "To make governance predictable and consistent over time",
-                  "correct": true
-                },
-                {
-                  "content": "To lock in decisions permanently",
-                  "correct": false
-                },
-                {
-                  "content": "To benefit long-time users",
-                  "correct": false
-                },
-                {
-                  "content": "To reduce the number of appeals",
-                  "correct": false
-                }
+                { "content": "To make governance predictable and consistent over time", "correct": true, "id": "gf-q5-choice-0" },
+                { "content": "To lock in decisions permanently", "correct": false, "id": "gf-q5-choice-1" },
+                { "content": "To benefit long-time users", "correct": false, "id": "gf-q5-choice-2" },
+                { "content": "To reduce the number of appeals", "correct": false, "id": "gf-q5-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "multipleSelect": false
             },
             "graded": true,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
-      },
-      "answerArea": {
-        "type": "multiple",
-        "options": {
-          "content": "",
-          "images": {},
-          "widgets": {}
-        },
-        "calculator": false
       },
       "hints": [
         {
@@ -341,36 +201,24 @@
         "sourceContentId": "quiz-governance-foundations",
         "assessesContentId": "governance-epic",
         "bloomsLevel": "remember",
-        "difficulty": "intermediate",
-        "tags": [
-          "quiz",
-          "governance",
-          "foundations",
-          "assessment"
-        ],
-        "createdAt": "2025-12-25T23:31:36.264Z"
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["governance", "precedent"]
       }
     }
   ],
-  "contentFormat": "perseus-quiz-json",
-  "tags": [
-    "quiz",
-    "governance",
-    "foundations",
-    "assessment"
-  ],
-  "sourcePath": "generated/quiz-governance-foundations.json",
-  "relatedNodeIds": [
-    "governance-epic"
-  ],
+  "contentFormat": "sophia",
+  "tags": ["assessment", "governance", "foundations"],
+  "relatedNodeIds": ["governance-epic"],
   "metadata": {
+    "assessmentType": "mastery",
     "category": "governance",
     "attestationId": "governance-foundations",
-    "difficulty": "intermediate",
+    "difficulty": "medium",
     "questionCount": 5,
-    "sourceFormat": "quiz-json",
-    "migratedAt": "2025-12-26T05:36:35.096Z"
+    "migratedAt": "2026-01-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479353",
-  "updatedAt": "2025-11-28T00:09:03.479355"
+  "updatedAt": "2026-01-24T00:00:00.000Z"
 }

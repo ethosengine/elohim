@@ -6,7 +6,8 @@
   "content": [
     {
       "id": "civ-q1",
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "What is the primary role of a public observer?\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
@@ -14,45 +15,18 @@
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "To make governance decisions",
-                  "correct": false
-                },
-                {
-                  "content": "To provide oversight and accountability",
-                  "correct": true
-                },
-                {
-                  "content": "To build AI systems",
-                  "correct": false
-                },
-                {
-                  "content": "To enforce rules",
-                  "correct": false
-                }
+                { "content": "To make governance decisions", "correct": false, "id": "civ-q1-choice-0" },
+                { "content": "To provide oversight and accountability", "correct": true, "id": "civ-q1-choice-1" },
+                { "content": "To build AI systems", "correct": false, "id": "civ-q1-choice-2" },
+                { "content": "To enforce rules", "correct": false, "id": "civ-q1-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "multipleSelect": false
             },
             "graded": true,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
-      },
-      "answerArea": {
-        "type": "multiple",
-        "options": {
-          "content": "",
-          "images": {},
-          "widgets": {}
-        },
-        "calculator": false
       },
       "hints": [
         {
@@ -66,18 +40,15 @@
         "assessesContentId": "public-observer-epic",
         "bloomsLevel": "remember",
         "difficulty": "medium",
-        "tags": [
-          "quiz",
-          "public-observer",
-          "civic",
-          "participation"
-        ],
-        "createdAt": "2025-12-25T23:31:36.263Z"
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["public-observer", "oversight"]
       }
     },
     {
       "id": "civ-q2",
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "Public observers must have technical AI expertise.\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
@@ -85,37 +56,16 @@
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "True",
-                  "correct": false
-                },
-                {
-                  "content": "False",
-                  "correct": true
-                }
+                { "content": "True", "correct": false, "id": "civ-q2-true" },
+                { "content": "False", "correct": true, "id": "civ-q2-false" }
               ],
               "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "multipleSelect": false
             },
             "graded": true,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
-      },
-      "answerArea": {
-        "type": "multiple",
-        "options": {
-          "content": "",
-          "images": {},
-          "widgets": {}
-        },
-        "calculator": false
       },
       "hints": [
         {
@@ -129,18 +79,15 @@
         "assessesContentId": "public-observer-epic",
         "bloomsLevel": "remember",
         "difficulty": "easy",
-        "tags": [
-          "quiz",
-          "public-observer",
-          "civic",
-          "participation"
-        ],
-        "createdAt": "2025-12-25T23:31:36.263Z"
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["public-observer", "true-false"]
       }
     },
     {
       "id": "civ-q3",
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "How does the protocol ensure transparency?\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
@@ -148,45 +95,18 @@
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "Everything is public with no privacy",
-                  "correct": false
-                },
-                {
-                  "content": "Nothing is shared publicly",
-                  "correct": false
-                },
-                {
-                  "content": "Graduated transparency based on context and consent",
-                  "correct": true
-                },
-                {
-                  "content": "Random audits only",
-                  "correct": false
-                }
+                { "content": "Everything is public with no privacy", "correct": false, "id": "civ-q3-choice-0" },
+                { "content": "Nothing is shared publicly", "correct": false, "id": "civ-q3-choice-1" },
+                { "content": "Graduated transparency based on context and consent", "correct": true, "id": "civ-q3-choice-2" },
+                { "content": "Random audits only", "correct": false, "id": "civ-q3-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "multipleSelect": false
             },
             "graded": true,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
-      },
-      "answerArea": {
-        "type": "multiple",
-        "options": {
-          "content": "",
-          "images": {},
-          "widgets": {}
-        },
-        "calculator": false
       },
       "hints": [
         {
@@ -200,34 +120,23 @@
         "assessesContentId": "public-observer-epic",
         "bloomsLevel": "remember",
         "difficulty": "medium",
-        "tags": [
-          "quiz",
-          "public-observer",
-          "civic",
-          "participation"
-        ],
-        "createdAt": "2025-12-25T23:31:36.263Z"
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["public-observer", "transparency"]
       }
     }
   ],
-  "contentFormat": "perseus-quiz-json",
-  "tags": [
-    "quiz",
-    "public-observer",
-    "civic",
-    "participation"
-  ],
-  "sourcePath": "generated/quiz-civic-engagement.json",
-  "relatedNodeIds": [
-    "public-observer-epic"
-  ],
+  "contentFormat": "sophia",
+  "tags": ["assessment", "public-observer", "civic", "participation"],
+  "relatedNodeIds": ["public-observer-epic"],
   "metadata": {
+    "assessmentType": "mastery",
     "category": "public-observer",
     "attestationId": "civic-participant",
+    "difficulty": "medium",
     "questionCount": 3,
-    "sourceFormat": "quiz-json",
-    "migratedAt": "2025-12-26T05:36:35.095Z"
+    "migratedAt": "2026-01-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479362",
-  "updatedAt": "2025-11-28T00:09:03.479363"
+  "updatedAt": "2026-01-24T00:00:00.000Z"
 }

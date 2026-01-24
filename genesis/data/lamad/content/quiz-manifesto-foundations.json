@@ -1,344 +1,251 @@
 {
   "id": "quiz-manifesto-foundations",
-  "did": "did:web:elohim.host:content:quiz-manifesto-foundations",
   "contentType": "assessment",
-  "activityPubType": "Quiz",
   "title": "Manifesto Foundations Quiz",
   "description": "Test your understanding of the core concepts from the Elohim Protocol Manifesto",
   "content": [
     {
       "id": "manifesto-q1",
-      "version": {
-        "major": 1,
-        "minor": 0
-      },
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "According to the Elohim Protocol manifesto, what is the fundamental operating principle around which digital infrastructure should be organized?\n\n[[☃ radio 1]]",
+        "images": {},
         "widgets": {
           "radio 1": {
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "Efficiency and profit maximization",
-                  "correct": false
-                },
-                {
-                  "content": "Love as committed action toward flourishing",
-                  "correct": true
-                },
-                {
-                  "content": "Centralized control for security",
-                  "correct": false
-                },
-                {
-                  "content": "Engagement optimization",
-                  "correct": false
-                }
+                { "content": "Efficiency and profit maximization", "correct": false, "id": "mf-q1-choice-0" },
+                { "content": "Love as committed action toward flourishing", "correct": true, "id": "mf-q1-choice-1" },
+                { "content": "Centralized control for security", "correct": false, "id": "mf-q1-choice-2" },
+                { "content": "Engagement optimization", "correct": false, "id": "mf-q1-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
-            }
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
       "hints": [
         {
-          "content": "The manifesto proposes a radical reimagining of digital infrastructure..."
+          "content": "The manifesto proposes a radical reimagining of digital infrastructure...",
+          "images": {},
+          "widgets": {}
         },
         {
-          "content": "Think about what 'agape' means in the context of the protocol."
+          "content": "Think about what 'agape' means in the context of the protocol.",
+          "images": {},
+          "widgets": {}
         }
       ],
       "metadata": {
+        "sourceContentId": "quiz-manifesto-foundations",
         "assessesContentId": "manifesto",
         "bloomsLevel": "remember",
         "difficulty": "easy",
         "estimatedTimeSeconds": 45,
-        "tags": [
-          "manifesto",
-          "core-principle",
-          "love"
-        ],
-        "sourceDoc": "elohim-protocol/manifesto.md"
+        "questionType": "core",
+        "tags": ["manifesto", "core-principle", "love"]
       }
     },
     {
       "id": "manifesto-q2",
-      "version": {
-        "major": 1,
-        "minor": 0
-      },
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "The manifesto identifies several problems with current currencies. Which of the following is NOT mentioned as a problem with modern currencies?\n\n[[☃ radio 1]]",
+        "images": {},
         "widgets": {
           "radio 1": {
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "They carry no values",
-                  "correct": false
-                },
-                {
-                  "content": "They have no natural limits",
-                  "correct": false
-                },
-                {
-                  "content": "They are too difficult to transfer digitally",
-                  "correct": true
-                },
-                {
-                  "content": "They fail to reward care work",
-                  "correct": false
-                }
+                { "content": "They carry no values", "correct": false, "id": "mf-q2-choice-0" },
+                { "content": "They have no natural limits", "correct": false, "id": "mf-q2-choice-1" },
+                { "content": "They are too difficult to transfer digitally", "correct": true, "id": "mf-q2-choice-2" },
+                { "content": "They fail to reward care work", "correct": false, "id": "mf-q2-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
-            }
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
       "hints": [
         {
-          "content": "Review the 'Economic Architecture: The Poverty of Currency' section."
+          "content": "Review the 'Economic Architecture: The Poverty of Currency' section.",
+          "images": {},
+          "widgets": {}
         },
         {
-          "content": "The manifesto focuses on values, limits, care, and concentration - not transaction ease."
+          "content": "The manifesto focuses on values, limits, care, and concentration - not transaction ease.",
+          "images": {},
+          "widgets": {}
         }
       ],
       "metadata": {
+        "sourceContentId": "quiz-manifesto-foundations",
         "assessesContentId": "manifesto",
         "bloomsLevel": "understand",
         "difficulty": "medium",
         "estimatedTimeSeconds": 60,
-        "tags": [
-          "manifesto",
-          "economics",
-          "currency"
-        ],
-        "sourceDoc": "elohim-protocol/manifesto.md"
+        "questionType": "core",
+        "tags": ["manifesto", "economics", "currency"]
       }
     },
     {
       "id": "manifesto-q3",
-      "version": {
-        "major": 1,
-        "minor": 0
-      },
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "The Elohim Protocol uses a layered constitutional architecture. Which layer is described as 'most immutable' and requires Elohim consensus across all scales?\n\n[[☃ radio 1]]",
+        "images": {},
         "widgets": {
           "radio 1": {
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "Individual Layer",
-                  "correct": false
-                },
-                {
-                  "content": "Community Layer",
-                  "correct": false
-                },
-                {
-                  "content": "Nation-State Layer",
-                  "correct": false
-                },
-                {
-                  "content": "Global Layer",
-                  "correct": true
-                }
+                { "content": "Individual Layer", "correct": false, "id": "mf-q3-choice-0" },
+                { "content": "Community Layer", "correct": false, "id": "mf-q3-choice-1" },
+                { "content": "Nation-State Layer", "correct": false, "id": "mf-q3-choice-2" },
+                { "content": "Global Layer", "correct": true, "id": "mf-q3-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
-            }
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
       "hints": [
         {
-          "content": "The layers range from most to least immutable..."
+          "content": "The layers range from most to least immutable...",
+          "images": {},
+          "widgets": {}
         },
         {
-          "content": "Universal principles like 'No extinction, no genocide, no slavery' are at this layer."
+          "content": "Universal principles like 'No extinction, no genocide, no slavery' are at this layer.",
+          "images": {},
+          "widgets": {}
         }
       ],
       "metadata": {
+        "sourceContentId": "quiz-manifesto-foundations",
         "assessesContentId": "manifesto",
         "bloomsLevel": "remember",
         "difficulty": "easy",
         "estimatedTimeSeconds": 45,
-        "tags": [
-          "manifesto",
-          "governance",
-          "constitution",
-          "layers"
-        ],
-        "sourceDoc": "elohim-protocol/manifesto.md"
+        "questionType": "core",
+        "tags": ["manifesto", "governance", "constitution"]
       }
     },
     {
       "id": "manifesto-q4",
-      "version": {
-        "major": 1,
-        "minor": 0
-      },
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "What makes the Elohim security model different from traditional security approaches? Select the answer that best describes the 'Redemptive Security' concept.\n\n[[☃ radio 1]]",
+        "images": {},
         "widgets": {
           "radio 1": {
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "It blocks and excludes attackers more quickly",
-                  "correct": false
-                },
-                {
-                  "content": "It uses stronger encryption to prevent attacks",
-                  "correct": false
-                },
-                {
-                  "content": "It transforms adversaries into allies by addressing root causes",
-                  "correct": true
-                },
-                {
-                  "content": "It relies on centralized monitoring for faster response",
-                  "correct": false
-                }
+                { "content": "It blocks and excludes attackers more quickly", "correct": false, "id": "mf-q4-choice-0" },
+                { "content": "It uses stronger encryption to prevent attacks", "correct": false, "id": "mf-q4-choice-1" },
+                { "content": "It transforms adversaries into allies by addressing root causes", "correct": true, "id": "mf-q4-choice-2" },
+                { "content": "It relies on centralized monitoring for faster response", "correct": false, "id": "mf-q4-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
-            }
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
       "hints": [
         {
-          "content": "Traditional security: ATTACK -> BLOCK -> EXCLUDE -> ESCALATE"
+          "content": "Traditional security: ATTACK -> BLOCK -> EXCLUDE -> ESCALATE",
+          "images": {},
+          "widgets": {}
         },
         {
-          "content": "Elohim security follows a different pattern: ATTACK -> UNDERSTAND -> HEAL -> ?"
+          "content": "Elohim security follows a different pattern: ATTACK -> UNDERSTAND -> HEAL -> ?",
+          "images": {},
+          "widgets": {}
         }
       ],
       "metadata": {
+        "sourceContentId": "quiz-manifesto-foundations",
         "assessesContentId": "manifesto",
         "bloomsLevel": "understand",
         "difficulty": "medium",
         "estimatedTimeSeconds": 60,
-        "tags": [
-          "manifesto",
-          "security",
-          "redemption"
-        ],
-        "sourceDoc": "elohim-protocol/manifesto.md"
+        "questionType": "core",
+        "tags": ["manifesto", "security", "redemption"]
       }
     },
     {
       "id": "manifesto-q5",
-      "version": {
-        "major": 1,
-        "minor": 0
-      },
-      "question": {
+      "purpose": "mastery",
+      "content": {
         "content": "The manifesto concludes with a radical proposition about love. What does it propose about love and technology?\n\n[[☃ radio 1]]",
+        "images": {},
         "widgets": {
           "radio 1": {
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "Love is too abstract to be encoded in technology",
-                  "correct": false
-                },
-                {
-                  "content": "Love as committed action toward flourishing can be encoded into technological systems",
-                  "correct": true
-                },
-                {
-                  "content": "Technology should avoid matters of love and focus on efficiency",
-                  "correct": false
-                },
-                {
-                  "content": "Love and technology are fundamentally incompatible",
-                  "correct": false
-                }
+                { "content": "Love is too abstract to be encoded in technology", "correct": false, "id": "mf-q5-choice-0" },
+                { "content": "Love as committed action toward flourishing can be encoded into technological systems", "correct": true, "id": "mf-q5-choice-1" },
+                { "content": "Technology should avoid matters of love and focus on efficiency", "correct": false, "id": "mf-q5-choice-2" },
+                { "content": "Love and technology are fundamentally incompatible", "correct": false, "id": "mf-q5-choice-3" }
               ],
               "randomize": true,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
-            }
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
       "hints": [
         {
-          "content": "The conclusion is titled 'Love as Technology'"
+          "content": "The conclusion is titled 'Love as Technology'",
+          "images": {},
+          "widgets": {}
         },
         {
-          "content": "It distinguishes between love as sentiment vs love as committed action."
+          "content": "It distinguishes between love as sentiment vs love as committed action.",
+          "images": {},
+          "widgets": {}
         }
       ],
       "metadata": {
+        "sourceContentId": "quiz-manifesto-foundations",
         "assessesContentId": "manifesto",
         "bloomsLevel": "understand",
         "difficulty": "easy",
         "estimatedTimeSeconds": 45,
-        "tags": [
-          "manifesto",
-          "love",
-          "technology",
-          "conclusion"
-        ],
-        "sourceDoc": "elohim-protocol/manifesto.md"
+        "questionType": "core",
+        "tags": ["manifesto", "love", "technology"]
       }
     }
   ],
-  "contentFormat": "perseus-quiz-json",
-  "tags": [
-    "quiz",
-    "manifesto",
-    "assessment",
-    "foundations"
-  ],
-  "sourcePath": "elohim-protocol/manifesto.md",
-  "relatedNodeIds": [
-    "manifesto"
-  ],
+  "contentFormat": "sophia",
+  "tags": ["assessment", "manifesto", "foundations"],
+  "relatedNodeIds": ["manifesto"],
   "metadata": {
-    "category": "assessment",
-    "assessmentType": "formative",
+    "assessmentType": "mastery",
+    "category": "foundations",
+    "attestationId": "manifesto-foundations",
+    "difficulty": "medium",
     "questionCount": 5,
-    "estimatedMinutes": 5,
-    "difficulty": "beginner",
-    "bloomsLevels": [
-      "remember",
-      "understand"
-    ],
-    "passThreshold": 0.7,
-    "assessesContentId": "manifesto"
-  },
-  "openGraphMetadata": {
-    "ogTitle": "Manifesto Foundations Quiz - Elohim Protocol",
-    "ogDescription": "Test your understanding of the core concepts from the Elohim Protocol Manifesto",
-    "ogType": "quiz",
-    "ogUrl": "https://elohim-protocol.org/content/quiz-manifesto-foundations"
+    "migratedAt": "2026-01-24T00:00:00.000Z"
   },
   "createdAt": "2025-12-26T00:00:00Z",
-  "updatedAt": "2025-12-26T00:00:00Z"
+  "updatedAt": "2026-01-24T00:00:00.000Z"
 }
