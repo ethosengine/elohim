@@ -63,9 +63,43 @@ def withBuildVars(props, Closure body) {
 // STAGE HELPER METHODS (to reduce bytecode size)
 // ============================================================================
 
-def buildPerseusPlugin() {
-    dir('elohim-library/projects/perseus-plugin') {
-        sh 'npm ci && npm run build && ls -la dist/'
+def buildSophiaPlugin() {
+    // First, build the sophia monorepo (submodule) since its packages aren't on npm
+    echo 'Building sophia monorepo packages...'
+
+    // Initialize and update submodule if needed
+    sh '''
+        git submodule update --init --recursive sophia || true
+    '''
+
+    dir('sophia') {
+        sh '''
+            # Install pnpm if not available
+            if ! command -v pnpm &> /dev/null; then
+                npm install -g pnpm
+            fi
+
+            # Install dependencies
+            pnpm install --frozen-lockfile
+
+            # Build all packages (creates dist/ in each package)
+            pnpm build
+
+            echo "✅ Sophia packages built successfully"
+            ls -la packages/perseus/dist/ || true
+            ls -la packages/psyche-core/dist/ || true
+        '''
+    }
+
+    // Now build sophia-plugin which depends on sophia packages
+    echo 'Building sophia-plugin UMD bundle...'
+    dir('elohim-library/projects/sophia-plugin') {
+        sh '''
+            npm ci
+            npm run build
+            ls -la dist/
+            echo "✅ Sophia plugin built successfully"
+        '''
     }
 }
 
@@ -462,9 +496,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('Build Perseus Plugin') {
+        stage('Build Sophia Plugin') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
-            steps { container('builder') { script { buildPerseusPlugin() } } }
+            steps { container('builder') { script { buildSophiaPlugin() } } }
         }
 
         stage('Build App') {

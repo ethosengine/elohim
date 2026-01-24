@@ -110,6 +110,13 @@ components:
           targetPort: 8090
           exposure: public
           protocol: http
+        # Storybook - sophia component documentation
+        # Note: secure: false allows unauthenticated access to static assets
+        # The endpoint is still HTTPS via Che's ingress controller
+        - name: storybook
+          targetPort: 6006
+          exposure: public
+          protocol: http
       volumeMounts:
         - name: nix-store
           path: /nix
