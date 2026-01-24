@@ -499,8 +499,8 @@ All content should have a `contentFormat` that maps to a renderer. Valid values:
 | `video-embed` | Embedded video (YouTube, Vimeo, etc.) | IframeRenderer |
 | `video-file` | Direct video file (blob-based streaming) | VideoRenderer |
 | `audio-file` | Direct audio file (podcasts, lectures, music) | AudioRenderer |
-| `quiz-json` | Structured quiz/assessment data | QuizRenderer |
-| `assessment-json` | Formal assessment instruments | AssessmentRenderer |
+| `perseus-quiz-json` | Legacy Khan Academy Perseus quiz format | SophiaRenderer |
+| `sophia-quiz-json` | Sophia Moment format with purpose-based assessment (mastery/discovery/reflection). Uses psyche-core for psychometric aggregation. | SophiaRenderer |
 | `epub` | E-book format | EpubRenderer |
 | `external-link` | Link to external resource | ExternalLinkRenderer |
 
@@ -589,6 +589,27 @@ Path
 - `PathChapter` - contains `modules: PathModule[]` (required)
 - `PathModule` - contains `sections: PathSection[]` (required)
 - `PathSection` - contains `conceptIds: string[]` (required, links to ContentNode IDs)
+
+**Step Flattening with Module Metadata:**
+
+The seeder flattens the hierarchical structure (chapters → modules → sections → conceptIds) into a flat array of steps stored in Holochain. Each step includes metadata for UI filtering:
+
+```typescript
+interface PathStep {
+  stepType: string;        // 'learn', 'quiz', 'assessment', etc.
+  resourceId: string;      // ContentNode ID
+  orderIndex: number;      // Global step order (0-based)
+  // Module association metadata for UI filtering
+  chapterId?: string;      // Chapter this step belongs to
+  moduleId?: string;       // Module this step belongs to (enables "Step 2 of 5" filtering)
+  sectionId?: string;      // Section this step belongs to (fine-grained tracking)
+}
+```
+
+This enables the UI to:
+- Display total steps across entire path (e.g., 56 steps)
+- Filter steps by module when viewing a module (e.g., "Step 2 of 5" within current module)
+- Navigate between modules while preserving hierarchical context
 
 ### Relationship Types (DNA-aligned)
 
