@@ -385,6 +385,15 @@ export interface PathStep {
   resourceId: string;
 
   /**
+   * Module association metadata for UI filtering.
+   * When viewing a module, the UI filters steps to show only those
+   * with matching moduleId, enabling "Step 2 of 5" within the current module.
+   */
+  chapterId?: string;
+  moduleId?: string;
+  sectionId?: string;
+
+  /**
    * For stepType: 'path' - the nested path ID.
    * When present, this step represents completing an entire sub-journey.
    */

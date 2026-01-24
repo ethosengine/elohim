@@ -21,7 +21,52 @@ import {
 } from '../../interfaces/content-format-plugin.interface';
 import { ContentNode } from '../../../models/content-node.model';
 import { PerseusWrapperComponent } from './perseus-wrapper.component';
-import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
+import type { PerseusItem, PerseusScoreResult, RadioWidgetOptions } from './perseus-item.model';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Quiz Mode Configuration
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Quiz modes determine how questions are graded and presented.
+ * - 'mastery': Traditional graded quiz with correct/incorrect feedback
+ * - 'discovery': Self-assessment quiz that tracks subscale preferences
+ */
+type QuizMode = 'mastery' | 'discovery';
+
+/**
+ * Configuration for each quiz mode behavior.
+ */
+interface QuizModeConfig {
+  submitButtonText: string;
+  nextButtonText: string;
+  showFeedback: boolean;
+  showCorrectness: boolean;
+  trackSubscales: boolean;
+  trackStreak: boolean;
+}
+
+/**
+ * Preset configurations for each quiz mode.
+ */
+const QUIZ_MODE_PRESETS: Record<QuizMode, QuizModeConfig> = {
+  mastery: {
+    submitButtonText: 'Check Answer',
+    nextButtonText: 'Next Question',
+    showFeedback: true,
+    showCorrectness: true,
+    trackSubscales: false,
+    trackStreak: true
+  },
+  discovery: {
+    submitButtonText: 'Continue',
+    nextButtonText: 'Continue',
+    showFeedback: false,
+    showCorrectness: false,
+    trackSubscales: true,
+    trackStreak: false
+  }
+};
 
 /**
  * PerseusRendererComponent - Content renderer for Perseus quiz format.
@@ -79,8 +124,8 @@ import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
         </app-perseus-question>
       </div>
 
-      <!-- Answer Feedback -->
-      <div class="feedback-container" *ngIf="showFeedback">
+      <!-- Answer Feedback (mastery mode only) -->
+      <div class="feedback-container" *ngIf="showFeedback && modeConfig.showCorrectness">
         <div
           class="feedback"
           [class.correct]="lastResult?.correct"
@@ -117,12 +162,12 @@ import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
           class="btn btn-secondary"
           *ngIf="showNextButton"
           (click)="nextQuestion()">
-          {{ isLastQuestion ? 'Finish' : 'Next Question' }}
+          {{ isLastQuestion ? 'See Results' : modeConfig.nextButtonText }}
         </button>
       </footer>
 
-      <!-- Streak Indicator (for inline quizzes) -->
-      <div class="streak-indicator" *ngIf="showStreakIndicator">
+      <!-- Streak Indicator (mastery mode only, for inline quizzes) -->
+      <div class="streak-indicator" *ngIf="showStreakIndicator && modeConfig.trackStreak">
         <div class="streak-dots">
           <span
             *ngFor="let i of streakDots; let idx = index"
@@ -367,6 +412,11 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
   streakHistory: (boolean | null)[] = [];
   streakDots: number[] = [];
 
+  // Quiz mode (mastery vs discovery)
+  quizMode: QuizMode = 'mastery';
+  modeConfig: QuizModeConfig = QUIZ_MODE_PRESETS.mastery;
+  subscaleScores: Record<string, number> = {};
+
   // ─────────────────────────────────────────────────────────────────────────
   // Computed Properties
   // ─────────────────────────────────────────────────────────────────────────
@@ -398,9 +448,9 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
   }
 
   get submitButtonText(): string {
-    if (this.isSubmitting) return 'Checking...';
-    if (this.showFeedback) return 'Submitted';
-    return 'Check Answer';
+    if (this.isSubmitting) return this.quizMode === 'discovery' ? 'Recording...' : 'Checking...';
+    if (this.showFeedback && this.modeConfig.showFeedback) return 'Submitted';
+    return this.modeConfig.submitButtonText;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -462,22 +512,30 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
       this.lastResult = result;
       this.scores.push(result);
 
-      if (result.correct) {
-        this.correctCount++;
-        this.updateStreak(true);
+      if (this.quizMode === 'discovery') {
+        // Discovery mode: record subscale contributions, no correctness feedback
+        this.recordSubscaleContribution();
+        this.showNextButton = true;
+        // Don't show feedback for discovery mode
+        this.showFeedback = false;
       } else {
-        this.updateStreak(false);
+        // Mastery mode: track correctness and streak
+        if (result.correct) {
+          this.correctCount++;
+          this.updateStreak(true);
+        } else {
+          this.updateStreak(false);
+        }
+        this.showFeedback = true;
+        this.showNextButton = true;
       }
-
-      this.showFeedback = true;
-      this.showNextButton = true;
     }
 
     this.isSubmitting = false;
     this.cdr.markForCheck();
 
-    // Check if streak target reached
-    if (this.targetStreak > 0 && this.currentStreak >= this.targetStreak) {
+    // Check if streak target reached (mastery mode only)
+    if (this.modeConfig.trackStreak && this.targetStreak > 0 && this.currentStreak >= this.targetStreak) {
       this.emitCompletion(true);
     }
   }
@@ -543,8 +601,108 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
         hasWidgets: !!q.question?.widgets,
         widgetCount: q.question?.widgets ? Object.keys(q.question.widgets).length : 0,
         contentPreview: q.question?.content?.substring(0, 100) || 'no content',
-        fullQuestion: q  // Log the entire question object
+        discoveryMode: q.discoveryMode
       });
+    }
+
+    // Detect quiz mode after loading questions
+    this.quizMode = this.detectQuizMode();
+    this.modeConfig = QUIZ_MODE_PRESETS[this.quizMode];
+    console.log(`[PerseusRenderer] Quiz mode: ${this.quizMode}`);
+
+    // Initialize subscale tracking for discovery mode
+    if (this.quizMode === 'discovery') {
+      this.initializeSubscaleTracking();
+    }
+  }
+
+  /**
+   * Detect the quiz mode from question data.
+   * Discovery mode is indicated by the discoveryMode flag on questions.
+   */
+  private detectQuizMode(): QuizMode {
+    const firstQuestion = this.questions[0];
+    if (firstQuestion?.discoveryMode) {
+      return 'discovery';
+    }
+    // Check node metadata as fallback
+    const metadata = this.node?.metadata as Record<string, unknown> | undefined;
+    if (metadata?.['quizType'] === 'domain-discovery') {
+      return 'discovery';
+    }
+    return 'mastery';
+  }
+
+  /**
+   * Initialize subscale tracking for discovery assessments.
+   * Collects unique subscale names from all question choices.
+   */
+  private initializeSubscaleTracking(): void {
+    const subscales = new Set<string>();
+
+    // Collect all subscale names from choices
+    for (const question of this.questions) {
+      const widgets = question.question?.widgets ?? {};
+      for (const widgetKey of Object.keys(widgets)) {
+        const widget = widgets[widgetKey];
+        if (widget.type === 'radio') {
+          const options = widget.options as RadioWidgetOptions;
+          for (const choice of options.choices ?? []) {
+            if (choice.subscaleContributions) {
+              for (const subscale of Object.keys(choice.subscaleContributions)) {
+                subscales.add(subscale);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Initialize all subscales to 0
+    this.subscaleScores = {};
+    Array.from(subscales).forEach(subscale => {
+      this.subscaleScores[subscale] = 0;
+    });
+
+    console.log('[PerseusRenderer] Initialized subscales:', Object.keys(this.subscaleScores));
+  }
+
+  /**
+   * Record subscale contributions from the current answer selection.
+   * Called in discovery mode instead of tracking correctness.
+   */
+  private recordSubscaleContribution(): void {
+    const question = this.currentQuestion;
+    if (!question) return;
+
+    // Get selected choice index from the result
+    const result = this.lastResult;
+    if (!result || !result.guess) return;
+
+    // Get the radio widget
+    const widgets = question.question?.widgets ?? {};
+    const radioWidgetKey = Object.keys(widgets).find(key => widgets[key].type === 'radio');
+    if (!radioWidgetKey) return;
+
+    const widget = widgets[radioWidgetKey];
+    const options = widget.options as RadioWidgetOptions;
+    const choices = options?.choices ?? [];
+
+    // Extract selected index from guess
+    // Perseus radio guess format: { choicesSelected: [true, false, false, ...] }
+    const guess = result.guess as { choicesSelected?: boolean[] } | undefined;
+    const choicesSelected = guess?.choicesSelected;
+    if (!choicesSelected || !Array.isArray(choicesSelected)) return;
+
+    const selectedIndex = choicesSelected.findIndex(selected => selected);
+    if (selectedIndex < 0 || selectedIndex >= choices.length) return;
+
+    const selectedChoice = choices[selectedIndex];
+    if (selectedChoice?.subscaleContributions) {
+      for (const [subscale, value] of Object.entries(selectedChoice.subscaleContributions)) {
+        this.subscaleScores[subscale] = (this.subscaleScores[subscale] ?? 0) + value;
+      }
+      console.log('[PerseusRenderer] Updated subscale scores:', this.subscaleScores);
     }
   }
 
@@ -580,10 +738,15 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
   }
 
   private finishQuiz(): void {
-    const totalScore = this.calculateTotalScore();
-    const passed = totalScore >= 0.7; // 70% passing threshold
-
-    this.emitCompletion(passed, totalScore);
+    if (this.quizMode === 'discovery') {
+      // Discovery mode: emit subscale scores for path recommendation
+      this.emitDiscoveryCompletion();
+    } else {
+      // Mastery mode: calculate pass/fail based on score
+      const totalScore = this.calculateTotalScore();
+      const passed = totalScore >= 0.7; // 70% passing threshold
+      this.emitCompletion(passed, totalScore);
+    }
   }
 
   private calculateTotalScore(): number {
@@ -608,6 +771,47 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
           id: q.id,
           correct: this.scores[i]?.correct ?? false,
           score: this.scores[i]?.score ?? 0
+        }))
+      }
+    };
+
+    this.complete.emit(event);
+  }
+
+  /**
+   * Emit completion event for discovery assessments.
+   * Includes subscale scores and primary domain recommendation.
+   */
+  private emitDiscoveryCompletion(): void {
+    // Find the primary domain (highest subscale score)
+    let primaryDomain = '';
+    let maxScore = 0;
+    for (const [subscale, score] of Object.entries(this.subscaleScores)) {
+      if (score > maxScore) {
+        maxScore = score;
+        primaryDomain = subscale;
+      }
+    }
+
+    console.log('[PerseusRenderer] Discovery complete:', {
+      subscaleScores: this.subscaleScores,
+      primaryDomain
+    });
+
+    const event: RendererCompletionEvent = {
+      type: 'quiz',
+      passed: true, // Discovery assessments always "pass"
+      score: 100, // No score concept for discovery
+      details: {
+        quizMode: 'discovery',
+        subscaleScores: { ...this.subscaleScores },
+        primaryDomain,
+        total: this.questions.length,
+        correct: this.questions.length, // All answers are valid in discovery mode
+        questions: this.questions.map((q, i) => ({
+          id: q.id,
+          correct: true, // All answers are valid
+          score: 1
         }))
       }
     };

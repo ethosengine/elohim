@@ -792,16 +792,14 @@ body.focused-view-mode .site-header {
 }
 
 /* ============================================================================
-   Perseus Quiz Theme Support
+   Sophia Quiz Theme Support
    ============================================================================
-   Perseus theme overrides have been consolidated into a separate file:
-   /assets/perseus-plugin/perseus-theme-overrides.css
+   Sophia (assessment) theme overrides are loaded lazily by the
+   sophia-element-loader.ts when the first quiz is rendered.
+   This reduces initial page load and keeps quiz-specific styles
+   in one maintainable location.
 
-   This file is loaded lazily by the perseus-element-loader.ts when
-   the first quiz is rendered. This reduces initial page load and
-   keeps Perseus-specific styles in one maintainable location.
-
-   See: perseus-theme-overrides.css for:
+   Theme overrides include:
    - Dark mode text/background colors
    - Wonder Blocks CSS variable mappings
    - Multiple choice button fixes

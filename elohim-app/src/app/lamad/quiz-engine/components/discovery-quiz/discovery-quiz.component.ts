@@ -37,13 +37,22 @@ import {
 import { CommonModule } from '@angular/common';
 import { Subject, takeUntil } from 'rxjs';
 
-import { PerseusWrapperComponent } from '../../../content-io/plugins/perseus/perseus-wrapper.component';
+import { SophiaWrapperComponent } from '../../../content-io/plugins/sophia/sophia-wrapper.component';
+import type { Moment, Recognition } from '../../../content-io/plugins/sophia/sophia-moment.model';
 import {
-  PerseusItem,
-  PerseusScoreResult,
-  RadioWidgetOptions,
-  RadioChoice
-} from '../../../content-io/plugins/perseus/perseus-item.model';
+  getPsycheAPI,
+  type PsycheAPI,
+  type AggregatedReflection,
+  type PsychometricInterpretation,
+  type ReflectionRecognition
+} from '../../../content-io/plugins/sophia/sophia-element-loader';
+import {
+  EPIC_DOMAIN_SUBSCALES,
+  EPIC_DOMAIN_INSTRUMENT_ID,
+  EPIC_DOMAIN_INSTRUMENT_CONFIG,
+  getEpicSubscale,
+  getEpicResultType
+} from '../../instruments/epic-domain.instrument';
 import { QuestionPoolService } from '../../services/question-pool.service';
 import { DiscoveryAttestationService } from '../../services/discovery-attestation.service';
 import { type DiscoveryResultSummary } from '../../models/discovery-assessment.model';
@@ -54,34 +63,12 @@ import { type DiscoveryResultSummary } from '../../models/discovery-assessment.m
 
 /**
  * Subscale mappings for epic domains.
+ * Re-exported from epic-domain.instrument for backward compatibility.
  */
-export const EPIC_SUBSCALES: Record<string, { name: string; color: string; icon: string }> = {
-  governance: {
-    name: 'AI Constitutional',
-    color: '#8B5CF6', // Purple
-    icon: '🏛️'
-  },
-  care: {
-    name: 'Value Scanner',
-    color: '#EC4899', // Pink
-    icon: '💝'
-  },
-  economic: {
-    name: 'Economic Coordination',
-    color: '#10B981', // Green
-    icon: '📊'
-  },
-  public: {
-    name: 'Public Observer',
-    color: '#3B82F6', // Blue
-    icon: '🔍'
-  },
-  social: {
-    name: 'Social Medium',
-    color: '#F59E0B', // Amber
-    icon: '💬'
-  }
-};
+export const EPIC_SUBSCALES: Record<string, { name: string; color: string; icon: string }> =
+  Object.fromEntries(
+    EPIC_DOMAIN_SUBSCALES.map(s => [s.id, { name: s.name, color: s.color ?? '#888', icon: s.icon ?? '📌' }])
+  );
 
 /**
  * Completion event for discovery quiz.
@@ -113,7 +100,7 @@ export interface DiscoveryQuizCompletionEvent {
 @Component({
   selector: 'app-discovery-quiz',
   standalone: true,
-  imports: [CommonModule, PerseusWrapperComponent],
+  imports: [CommonModule, SophiaWrapperComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section
@@ -187,15 +174,16 @@ export interface DiscoveryQuizCompletionEvent {
           </div>
         } @else {
           <!-- Question display -->
-          @if (currentQuestion()) {
+          @if (currentMoment()) {
             <div class="question-container">
-              <app-perseus-question
-                [item]="currentQuestion()!"
+              <app-sophia-question
+                [moment]="currentMoment()!"
+                [mode]="'reflection'"
                 [reviewMode]="false"
                 [autoFocus]="true"
-                (scored)="onQuestionScored($event)"
-                (answerChanged)="onAnswerChanged()">
-              </app-perseus-question>
+                (recognized)="onMomentRecognized($event)"
+                (answerChanged)="onAnswerChanged($event)">
+              </app-sophia-question>
 
               <div class="answer-controls">
                 <button
@@ -489,25 +477,27 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
   protected showResults = signal(false);
   protected hasAnswer = signal(false);
 
-  protected questions = signal<PerseusItem[]>([]);
+  protected moments = signal<Moment[]>([]);
   protected currentQuestionIndex = signal(0);
-  protected subscaleScores = signal<Record<string, number>>({
-    governance: 0,
-    care: 0,
-    economic: 0,
-    public: 0,
-    social: 0
-  });
-  protected selectedChoiceIndex = signal<number | null>(null);
+
+  // Recognitions collected during quiz (used with psyche-core)
+  protected recognitions = signal<ReflectionRecognition[]>([]);
+
+  // Psyche-core aggregated results
+  protected aggregated = signal<AggregatedReflection | null>(null);
+  protected interpretation = signal<PsychometricInterpretation | null>(null);
 
   // Computed values
-  protected totalQuestions = computed(() => this.questions().length);
+  protected totalQuestions = computed(() => this.moments().length);
 
-  protected currentQuestion = computed(() => {
-    const qs = this.questions();
+  protected currentMoment = computed(() => {
+    const ms = this.moments();
     const idx = this.currentQuestionIndex();
-    return qs[idx] ?? null;
+    return ms[idx] ?? null;
   });
+
+  // Alias for backward compatibility
+  protected currentQuestion = this.currentMoment;
 
   protected progressPercent = computed(() => {
     const total = this.totalQuestions();
@@ -519,29 +509,53 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     return this.currentQuestionIndex() === this.totalQuestions() - 1;
   });
 
+  /**
+   * Get subscale scores from aggregated data or empty defaults.
+   */
+  protected subscaleScores = computed(() => {
+    const agg = this.aggregated();
+    if (agg) {
+      return agg.subscaleTotals;
+    }
+    // Default empty scores
+    return {
+      governance: 0,
+      care: 0,
+      economic: 0,
+      public: 0,
+      social: 0
+    };
+  });
+
   protected sortedSubscales = computed(() => {
-    const scores = this.subscaleScores();
+    const agg = this.aggregated();
+    const scores = agg?.normalizedScores ?? this.subscaleScores();
     const total = Object.values(scores).reduce((sum, v) => sum + v, 0) || 1;
 
-    return Object.entries(scores)
-      .map(([key, value]) => ({
-        key,
-        name: EPIC_SUBSCALES[key]?.name ?? key,
-        icon: EPIC_SUBSCALES[key]?.icon ?? '📌',
-        color: EPIC_SUBSCALES[key]?.color ?? '#888',
-        score: value,
-        percent: (value / total) * 100
+    return EPIC_DOMAIN_SUBSCALES
+      .map(subscale => ({
+        key: subscale.id,
+        name: subscale.name,
+        icon: subscale.icon ?? '📌',
+        color: subscale.color ?? '#888',
+        score: scores[subscale.id] ?? 0,
+        percent: ((scores[subscale.id] ?? 0) / total) * 100
       }))
       .sort((a, b) => b.score - a.score);
   });
 
   protected primarySubscale = computed(() => {
+    const interp = this.interpretation();
+    if (interp?.primaryType) {
+      return interp.primaryType.typeId;
+    }
     const sorted = this.sortedSubscales();
     return sorted[0]?.key ?? 'governance';
   });
 
   private destroy$ = new Subject<void>();
-  private lastScoreResult: PerseusScoreResult | null = null;
+  private lastRecognition: Recognition | null = null;
+  private psycheAPI: PsycheAPI | null = null;
 
   constructor(
     private readonly poolService: QuestionPoolService,
@@ -550,6 +564,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    this.initializePsycheAPI();
     this.loadQuestions();
   }
 
@@ -559,24 +574,61 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Handle answer change from Perseus.
+   * Initialize psyche-core API and register instrument.
+   *
+   * psyche-core is bundled within sophia-plugin and should always be available
+   * once the sophia element is registered. The API provides consistent
+   * aggregation and interpretation of reflection assessments.
    */
-  onAnswerChanged(): void {
-    this.hasAnswer.set(true);
+  private initializePsycheAPI(): void {
+    this.psycheAPI = getPsycheAPI();
+
+    if (!this.psycheAPI) {
+      console.error('[DiscoveryQuiz] psyche-core not available - sophia-plugin must be loaded first');
+      return;
+    }
+
+    // Register the Epic Domain instrument if not already registered
+    if (!this.psycheAPI.hasInstrument(EPIC_DOMAIN_INSTRUMENT_ID)) {
+      const instrument = this.psycheAPI.createInstrument(EPIC_DOMAIN_INSTRUMENT_CONFIG);
+      this.psycheAPI.registerInstrument(instrument);
+      console.log('[DiscoveryQuiz] Registered Epic Domain instrument');
+    }
   }
 
   /**
-   * Handle score result from Perseus (used to get selected choice).
+   * Handle answer change from Sophia.
+   * @param hasValidAnswer - Whether the user has provided a valid/complete answer
    */
-  onQuestionScored(result: PerseusScoreResult): void {
-    this.lastScoreResult = result;
+  onAnswerChanged(hasValidAnswer: boolean): void {
+    this.hasAnswer.set(hasValidAnswer);
+  }
+
+  /**
+   * Handle recognition result from Sophia.
+   * Captures subscale contributions from the response.
+   */
+  onMomentRecognized(recognition: Recognition): void {
+    this.lastRecognition = recognition;
+
+    // Always store recognitions - create minimal reflection if needed
+    const reflectionRecognition: ReflectionRecognition = {
+      momentId: recognition.momentId,
+      purpose: 'reflection',
+      userInput: recognition.userInput,
+      reflection: recognition.reflection ?? {
+        subscaleContributions: recognition.resonance?.subscaleContributions ?? {}
+      },
+      timestamp: recognition.timestamp ?? Date.now()
+    };
+    this.recognitions.update(rs => [...rs, reflectionRecognition]);
   }
 
   /**
    * Continue to next question or show results.
    */
   continueToNext(): void {
-    // Record subscale contributions from current answer
+    // Record subscale contribution and update aggregation
     this.recordSubscaleContribution();
 
     if (this.isLastQuestion()) {
@@ -585,8 +637,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
       // Move to next question
       this.currentQuestionIndex.update(idx => idx + 1);
       this.hasAnswer.set(false);
-      this.selectedChoiceIndex.set(null);
-      this.lastScoreResult = null;
+      this.lastRecognition = null;
       this.cdr.markForCheck();
     }
   }
@@ -619,18 +670,23 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
 
   /**
    * Get result description for the primary subscale.
+   * Uses psyche-core interpretation if available.
    */
   getResultDescription(): string {
-    const descriptions: Record<string, string> = {
-      governance: 'You\'re drawn to shaping how AI systems are governed and ensuring they serve humanity through proper constitutional frameworks.',
-      care: 'You\'re passionate about recognizing and valuing care work, supporting caregivers, and making invisible contributions visible.',
-      economic: 'You\'re interested in transforming workplace dynamics, promoting worker ownership, and creating more equitable economic systems.',
-      public: 'You\'re committed to strengthening democratic participation, increasing transparency, and empowering civic engagement.',
-      social: 'You\'re focused on building healthier digital spaces, fostering genuine connection, and improving online communication.'
-    };
+    // Use interpretation from psyche-core if available
+    const interp = this.interpretation();
+    if (interp?.primaryType?.description) {
+      return interp.primaryType.description;
+    }
 
+    // Fallback to result type definition
     const key = this.primarySubscale();
-    return descriptions[key] ?? 'Your interests align with this domain.';
+    const resultType = getEpicResultType(key);
+    if (resultType?.description) {
+      return resultType.description;
+    }
+
+    return 'Your interests align with this domain.';
   }
 
   /**
@@ -652,12 +708,19 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
       .subscribe({
         next: pool => {
           if (pool && pool.questions.length > 0) {
-            // Mark questions as discovery mode
-            const discoveryQuestions = pool.questions.map(q => ({
-              ...q,
-              discoveryMode: true
+            // Convert PerseusItems to Sophia Moments for discovery mode
+            const discoveryMoments: Moment[] = pool.questions.map(q => ({
+              id: q.id,
+              purpose: 'discovery' as const,
+              content: q.question,
+              hints: q.hints,
+              subscaleContributions: q.subscaleContributions,
+              metadata: {
+                discoveryMode: true,
+                originalItem: q
+              }
             }));
-            this.questions.set(discoveryQuestions);
+            this.moments.set(discoveryMoments);
             this.noQuestions.set(false);
           } else {
             this.noQuestions.set(true);
@@ -674,60 +737,63 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
       });
   }
 
+  /**
+   * Record subscale contribution using psyche-core aggregation.
+   *
+   * psyche-core is always available after sophia-plugin loads since it's
+   * bundled within the plugin. The aggregation functions provide consistent
+   * behavior across all discovery assessments.
+   */
   private recordSubscaleContribution(): void {
-    const question = this.currentQuestion();
-    if (!question || !this.lastScoreResult) return;
+    const moment = this.currentMoment();
+    if (!moment || !this.lastRecognition) return;
 
-    // Get the selected choice index from the score result
-    const guess = this.lastScoreResult.guess as { choicesSelected?: number[] };
-    const selectedIndex = guess?.choicesSelected?.[0];
+    if (!this.psycheAPI) {
+      console.error('[DiscoveryQuiz] psyche-core not available - ensure sophia-plugin is loaded');
+      return;
+    }
 
-    if (selectedIndex === undefined || selectedIndex === null) return;
-
-    // Get the choice from the question
-    const radioWidget = question.question.widgets['radio 1'] as { options: RadioWidgetOptions } | undefined;
-    if (!radioWidget) return;
-
-    const choices = radioWidget.options.choices as RadioChoice[];
-    const selectedChoice = choices[selectedIndex];
-
-    if (!selectedChoice) return;
-
-    // Check for subscale contributions
-    if (selectedChoice.subscaleContributions) {
-      // Use explicit subscale contributions
-      this.subscaleScores.update(scores => {
-        const newScores = { ...scores };
-        for (const [subscale, contribution] of Object.entries(selectedChoice.subscaleContributions!)) {
-          newScores[subscale] = (newScores[subscale] || 0) + contribution;
-        }
-        return newScores;
+    const allRecognitions = this.recognitions();
+    if (allRecognitions.length > 0) {
+      const aggregated = this.psycheAPI.aggregateReflections(allRecognitions, {
+        normalization: 'sum',
+        subscales: EPIC_DOMAIN_SUBSCALES
       });
-    } else {
-      // Fall back to index-based mapping (A=governance, B=care, etc.)
-      const subscaleOrder = ['governance', 'care', 'economic', 'public', 'social'];
-      const subscale = subscaleOrder[selectedIndex];
-      if (subscale) {
-        this.subscaleScores.update(scores => ({
-          ...scores,
-          [subscale]: (scores[subscale] || 0) + 1
-        }));
-      }
+      this.aggregated.set(aggregated);
+      console.log('[DiscoveryQuiz] Aggregated via psyche-core:', aggregated);
     }
   }
 
+  /**
+   * Complete the quiz and calculate final interpretation.
+   */
   private completeQuiz(): void {
     this.showResults.set(true);
 
+    // Get final aggregation
+    const agg = this.aggregated();
+    let interp: PsychometricInterpretation | null = null;
+
+    // Use psyche-core interpretation if available
+    if (this.psycheAPI && agg) {
+      try {
+        interp = this.psycheAPI.interpretReflection(EPIC_DOMAIN_INSTRUMENT_ID, agg);
+        this.interpretation.set(interp);
+        console.log('[DiscoveryQuiz] Interpretation via psyche-core:', interp);
+      } catch (err) {
+        console.error('[DiscoveryQuiz] Failed to interpret:', err);
+      }
+    }
+
     const scores = this.subscaleScores();
-    const primary = this.primarySubscale();
+    const primary = interp?.primaryType?.typeId ?? this.primarySubscale();
 
     // Create discovery attestation
     const primaryResult: DiscoveryResultSummary = {
       typeId: primary,
-      name: EPIC_SUBSCALES[primary]?.name ?? primary,
+      name: interp?.primaryType?.typeName ?? EPIC_SUBSCALES[primary]?.name ?? primary,
       shortCode: primary.substring(0, 3).toUpperCase(),
-      score: scores[primary] / this.totalQuestions(),
+      score: interp?.confidence ?? (scores[primary] / this.totalQuestions()),
       icon: EPIC_SUBSCALES[primary]?.icon,
       color: EPIC_SUBSCALES[primary]?.color
     };

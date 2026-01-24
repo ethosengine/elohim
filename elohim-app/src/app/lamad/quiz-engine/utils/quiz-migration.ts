@@ -14,7 +14,20 @@
  * - question.widgets.expression: for math expressions
  */
 
-import type { PerseusItem, PerseusWidget, RadioWidgetOptions } from '../../content-io/plugins/perseus/perseus-item.model';
+import type { PerseusItem, PerseusWidget } from '../../content-io/plugins/sophia/sophia-moment.model';
+
+// Radio widget options type for quiz migration
+interface RadioWidgetOptions {
+  choices: Array<{
+    content: string;
+    correct?: boolean;
+    isNoneOfTheAbove?: boolean;
+  }>;
+  hasNoneOfTheAbove?: boolean;
+  multipleSelect?: boolean;
+  deselectEnabled?: boolean;
+  randomize?: boolean;
+}
 import type { MasteryLevel } from '../../models/content-mastery.model';
 
 // ─────────────────────────────────────────────────────────────────────────────

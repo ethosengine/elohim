@@ -10,8 +10,9 @@
  */
 
 import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Observable, from, of } from 'rxjs';
-import { map, catchError, shareReplay } from 'rxjs/operators';
+import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 import { StorageClientService } from './storage-client.service';
@@ -164,10 +165,12 @@ export interface PathExtensionFilters {
 export class ContentService {
   private readonly client: ElohimClient = inject(ELOHIM_CLIENT);
   private readonly storageClient = inject(StorageClientService);
+  private readonly http = inject(HttpClient);
 
   // In-memory cache for hot paths
   private contentCache = new Map<string, Observable<ContentNode | null>>();
   private pathCache = new Map<string, Observable<LearningPath | null>>();
+  private blobCache = new Map<string, Observable<string>>();
 
   // =========================================================================
   // Content Operations
@@ -175,14 +178,40 @@ export class ContentService {
 
   /**
    * Get a single content node by ID
+   * Automatically fetches blob content when contentBody is null but blobCid exists
    */
   getContent(id: string): Observable<ContentNode | null> {
     // Check cache first
     const cached = this.contentCache.get(id);
     if (cached) return cached;
 
-    const obs = from(this.client.get<ContentNode>('content', id)).pipe(
-      map(data => data ? this.transformContent(data) : null),
+    const obs = from(this.client.get<any>('content', id)).pipe(
+      switchMap(data => {
+        if (!data) return of(null);
+
+        // Check if we need to fetch blob content
+        // contentBody may be a blob reference (sha256:... or sha256-...) instead of actual content
+        const contentBody = data.contentBody || '';
+        const isBlobReference = contentBody.startsWith('sha256:') || contentBody.startsWith('sha256-');
+        const blobCid = isBlobReference ? contentBody : data.blobCid;
+        const needsBlobFetch = isBlobReference || (!contentBody && data.blobCid);
+
+        if (needsBlobFetch && blobCid) {
+          return this.fetchBlobContent(blobCid).pipe(
+            map(blobContent => {
+              // Inject blob content as contentBody
+              return this.transformContent({ ...data, contentBody: blobContent });
+            }),
+            catchError(err => {
+              console.warn(`[ContentService] Failed to fetch blob ${blobCid}:`, err);
+              // Fall back to transforming without blob content
+              return of(this.transformContent(data));
+            })
+          );
+        }
+
+        return of(this.transformContent(data));
+      }),
       catchError(err => {
         console.debug(`[ContentService] getContent(${id}) failed:`, err);
         return of(null);
@@ -191,6 +220,29 @@ export class ContentService {
     );
 
     this.contentCache.set(id, obs);
+    return obs;
+  }
+
+  /**
+   * Fetch blob content by CID from storage
+   */
+  private fetchBlobContent(blobCid: string): Observable<string> {
+    // Normalize hash format: storage expects sha256- (hyphen) not sha256: (colon)
+    const normalizedCid = blobCid.replace('sha256:', 'sha256-');
+
+    // Check cache first
+    const cached = this.blobCache.get(normalizedCid);
+    if (cached) return cached;
+
+    // Use StorageClientService to get the correct blob URL (handles doorway vs direct mode)
+    const blobUrl = this.storageClient.getBlobUrl(normalizedCid);
+    console.debug(`[ContentService] Fetching blob from: ${blobUrl}`);
+
+    const obs = this.http.get(blobUrl, { responseType: 'text' }).pipe(
+      shareReplay(1)
+    );
+
+    this.blobCache.set(normalizedCid, obs);
     return obs;
   }
 
@@ -504,7 +556,10 @@ export class ContentService {
    */
   private parseContentBody(content: string, contentFormat: string): string | object {
     // Formats that store structured JSON content
-    const structuredFormats = ['html5-app', 'perseus', 'quiz-json', 'assessment'];
+    const structuredFormats = [
+      'html5-app', 'perseus', 'quiz-json', 'assessment',
+      'perseus-json', 'perseus-quiz-json', 'sophia-quiz-json', 'sophia',
+    ];
 
     if (!structuredFormats.includes(contentFormat) || !content) {
       return content;
@@ -535,11 +590,13 @@ export class ContentService {
    * Handles two response formats:
    * 1. Flat: { id, title, steps, chapters, ... }
    * 2. Nested: { path: {...}, chapters: [...], ungrouped_steps: [...] }
+   * 3. Metadata: { path: {..., metadata: { chapters: [...] } } }
    */
   private transformPath(data: any): LearningPath {
     // Handle nested response format from elohim-storage
     const pathData = data.path || data;
-    const rawChapters = data.chapters || pathData.chapters || [];
+    // Chapters can be at top-level, in path data, or in metadata
+    const rawChapters = data.chapters || pathData.chapters || pathData.metadata?.chapters || [];
     const ungroupedSteps = data.ungroupedSteps || [];
 
     // Transform chapters with their steps

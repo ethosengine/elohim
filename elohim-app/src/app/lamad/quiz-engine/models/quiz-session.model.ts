@@ -19,7 +19,7 @@
  * ```
  */
 
-import type { PerseusItem, PerseusScoreResult } from '../../content-io/plugins/perseus/perseus-item.model';
+import type { PerseusItem, PerseusScoreResult } from '../../content-io/plugins/sophia/sophia-moment.model';
 import type { MasteryLevel } from '../../models/content-mastery.model';
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Observable, of, map, switchMap, tap } from 'rxjs';
 import { QuestionPoolService } from './question-pool.service';
-import type { PerseusItem, PerseusScoreResult } from '../../content-io/plugins/perseus/perseus-item.model';
+import type { PerseusItem, PerseusScoreResult } from '../../content-io/plugins/sophia/sophia-moment.model';
 import {
   QuizSession,
   QuizSessionType,

@@ -13,10 +13,9 @@ import { DefaultCodeEditorComponent } from './components/default-code-editor/def
 // Unified format plugins
 import { MarkdownFormatPlugin } from './plugins/markdown/markdown-format.plugin';
 import { GherkinFormatPlugin } from './plugins/gherkin/gherkin-format.plugin';
-// Perseus enabled for build (npm run build passes)
-// Note: Tests run with Perseus disabled (Karma needs separate SVG loader config)
-import { PerseusFormatPlugin } from './plugins/perseus/perseus-format.plugin';
 import { Html5AppFormatPlugin } from './plugins/html5-app/html5-app-format.plugin';
+// Sophia plugin handles both mastery quizzes and discovery/reflection assessments
+import { SophiaFormatPlugin } from './plugins/sophia/sophia-format.plugin';
 
 /**
  * Initializer function to register unified format plugins.
@@ -31,12 +30,16 @@ function initializeFormatPlugins(): void {
   // Register built-in unified plugins
   registry.register(new MarkdownFormatPlugin());
   registry.register(new GherkinFormatPlugin());
-  registry.register(new PerseusFormatPlugin());
   registry.register(new Html5AppFormatPlugin());
+  registry.register(new SophiaFormatPlugin());
 
   // Register format aliases: map data formats to their renderers
   // This keeps content storage format-agnostic while providing flexible rendering
-  registry.registerAlias('perseus-quiz-json', 'perseus'); // Perseus quiz data schema → Perseus renderer
+  // Sophia handles both mastery quizzes (Perseus-compatible) and discovery assessments
+  registry.registerAlias('sophia', 'sophia-quiz-json');            // Short alias → canonical
+  registry.registerAlias('perseus', 'sophia-quiz-json');           // Legacy Perseus format → Sophia renderer
+  registry.registerAlias('perseus-quiz-json', 'sophia-quiz-json'); // Perseus quiz data schema → Sophia renderer
+  registry.registerAlias('sophia-discovery', 'sophia-quiz-json');  // Discovery assessments → Sophia renderer
 }
 
 /**

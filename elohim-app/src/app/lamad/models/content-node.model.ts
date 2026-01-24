@@ -503,8 +503,9 @@ export interface RoleMetadata {
  * - 'html5-app': Interactive web applications (e.g., https://github.com/ncase/trust)
  *   Rendered via iframe with sandbox. Ideal for simulations, games, explorable explanations.
  *   Can have attestation quizzes built to verify understanding.
- * - 'quiz-json': Structured quiz/assessment data
- * - 'assessment-json': Formal assessment instruments
+ * - 'perseus-quiz-json': Legacy Khan Academy Perseus quiz format
+ * - 'sophia-quiz-json': Sophia Moment format with purpose-based assessment (mastery/discovery/reflection)
+ *   Uses psyche-core for psychometric aggregation and interpretation
  *
  * Media formats:
  * - 'video-embed': Embedded video (YouTube, Vimeo, etc.)
@@ -521,7 +522,8 @@ export type ContentFormat =
   | 'video-embed'
   | 'video-file'
   | 'audio-file'
-  | 'perseus-quiz-json'  // Khan Academy Perseus quiz format
+  | 'perseus-quiz-json'  // Khan Academy Perseus quiz format (legacy)
+  | 'sophia-quiz-json'   // Sophia Moment format with purpose-based assessment
   | 'external-link'
   | 'epub'
   | 'gherkin'

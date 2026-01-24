@@ -6,8 +6,10 @@
  * - SQL metadata: Content nodes, paths, projections
  *
  * Routes requests based on connection strategy:
- * - Doorway mode (browser): https://doorway.elohim.host/api/...
- * - Direct mode (Tauri): http://localhost:8090/...
+ * - Doorway mode (browser): Blobs via /api/blob/{hash}, DB via /db/{table}
+ * - Direct mode (Tauri): http://localhost:8090/blob/{hash}, /db/{table}
+ *
+ * In Eclipse Che, doorway is accessed via the hc-dev endpoint URL.
  */
 
 import { Injectable, inject } from '@angular/core';
@@ -101,9 +103,11 @@ export class StorageClientService {
     // The strategy knows the appropriate base URL for current mode
     const baseUrl = this.getStorageBaseUrl();
 
-    // Doorway mode uses /api/blob/{hash}, direct mode uses /store/{hash}
+    // Route based on connection mode:
+    // - Direct mode: /blob/{hash} (directly to elohim-storage)
+    // - Doorway mode: /api/blob/{hash} (doorway proxies to storage's /blob/{hash})
     if (this.strategy.mode === 'direct') {
-      return `${baseUrl}/store/${blobHash}`;
+      return `${baseUrl}/blob/${blobHash}`;
     }
     return `${baseUrl}/api/blob/${blobHash}`;
   }
@@ -140,9 +144,8 @@ export class StorageClientService {
    */
   getContent(id: string): Observable<StorageContentNode | null> {
     const baseUrl = this.getStorageBaseUrl();
-    const endpoint = this.strategy.mode === 'direct'
-      ? `${baseUrl}/db/content/${encodeURIComponent(id)}`
-      : `${baseUrl}/api/db/content/${encodeURIComponent(id)}`;
+    // Doorway proxies /db/* routes to elohim-storage (no /api/ prefix for db)
+    const endpoint = `${baseUrl}/db/content/${encodeURIComponent(id)}`;
 
     return this.http.get<StorageContentNode>(endpoint).pipe(
       timeout(this.defaultTimeoutMs),
@@ -169,8 +172,8 @@ export class StorageClientService {
     if (filter.offset) params.set('offset', String(filter.offset));
 
     const queryString = params.toString();
-    const basePath = this.strategy.mode === 'direct' ? '/db/content' : '/api/db/content';
-    const url = queryString ? `${baseUrl}${basePath}?${queryString}` : `${baseUrl}${basePath}`;
+    // Doorway proxies /db/* routes (no /api/ prefix for db)
+    const url = queryString ? `${baseUrl}/db/content?${queryString}` : `${baseUrl}/db/content`;
 
     return this.http.get<ListResponse<StorageContentNode>>(url).pipe(
       timeout(this.defaultTimeoutMs),
@@ -187,9 +190,8 @@ export class StorageClientService {
    */
   getPath(id: string): Observable<StoragePath | null> {
     const baseUrl = this.getStorageBaseUrl();
-    const endpoint = this.strategy.mode === 'direct'
-      ? `${baseUrl}/db/paths/${encodeURIComponent(id)}`
-      : `${baseUrl}/api/db/paths/${encodeURIComponent(id)}`;
+    // Doorway proxies /db/* routes (no /api/ prefix for db)
+    const endpoint = `${baseUrl}/db/paths/${encodeURIComponent(id)}`;
 
     return this.http.get<StoragePath>(endpoint).pipe(
       timeout(this.defaultTimeoutMs),
@@ -207,9 +209,8 @@ export class StorageClientService {
    */
   getAllPaths(): Observable<ListResponse<StoragePath>> {
     const baseUrl = this.getStorageBaseUrl();
-    const endpoint = this.strategy.mode === 'direct'
-      ? `${baseUrl}/db/paths`
-      : `${baseUrl}/api/db/paths`;
+    // Doorway proxies /db/* routes (no /api/ prefix for db)
+    const endpoint = `${baseUrl}/db/paths`;
 
     return this.http.get<ListResponse<StoragePath>>(endpoint).pipe(
       timeout(this.defaultTimeoutMs),
@@ -246,7 +247,7 @@ export class StorageClientService {
   /**
    * Get the base URL for storage API based on connection strategy.
    */
-  private getStorageBaseUrl(): string {
+  getStorageBaseUrl(): string {
     // Strategy provides the base URL based on mode
     // In doorway mode: returns doorway URL (e.g., https://doorway-dev.elohim.host)
     // In direct mode: returns storage URL (e.g., http://localhost:8090)
@@ -292,9 +293,8 @@ export class StorageClientService {
    */
   bulkCreateContent(items: Partial<StorageContentNode>[]): Observable<BulkCreateResult> {
     const baseUrl = this.getStorageBaseUrl();
-    const endpoint = this.strategy.mode === 'direct'
-      ? `${baseUrl}/db/content/bulk`
-      : `${baseUrl}/api/db/content/bulk`;
+    // Doorway proxies /db/* routes (no /api/ prefix for db)
+    const endpoint = `${baseUrl}/db/content/bulk`;
 
     return this.http.post<BulkCreateResult>(endpoint, items).pipe(
       timeout(120000), // 2 min for bulk ops
@@ -309,9 +309,8 @@ export class StorageClientService {
    */
   bulkCreatePaths(items: Partial<StoragePath>[]): Observable<BulkCreateResult> {
     const baseUrl = this.getStorageBaseUrl();
-    const endpoint = this.strategy.mode === 'direct'
-      ? `${baseUrl}/db/paths/bulk`
-      : `${baseUrl}/api/db/paths/bulk`;
+    // Doorway proxies /db/* routes (no /api/ prefix for db)
+    const endpoint = `${baseUrl}/db/paths/bulk`;
 
     return this.http.post<BulkCreateResult>(endpoint, items).pipe(
       timeout(120000),
@@ -326,9 +325,8 @@ export class StorageClientService {
    */
   bulkCreateRelationships(items: StorageRelationship[]): Observable<BulkCreateResult> {
     const baseUrl = this.getStorageBaseUrl();
-    const endpoint = this.strategy.mode === 'direct'
-      ? `${baseUrl}/db/relationships/bulk`
-      : `${baseUrl}/api/db/relationships/bulk`;
+    // Doorway proxies /db/* routes (no /api/ prefix for db)
+    const endpoint = `${baseUrl}/db/relationships/bulk`;
 
     return this.http.post<BulkCreateResult>(endpoint, items).pipe(
       timeout(120000),

@@ -22,7 +22,7 @@
  * ```
  */
 
-import type { PerseusItem, BloomsLevel, QuestionDifficulty } from '../../content-io/plugins/perseus/perseus-item.model';
+import type { PerseusItem, BloomsLevel, QuestionDifficulty } from '../../content-io/plugins/sophia/sophia-moment.model';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Question Pool

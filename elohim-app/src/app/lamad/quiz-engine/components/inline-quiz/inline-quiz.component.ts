@@ -14,8 +14,8 @@ import { CommonModule } from '@angular/common';
 import { Subject, takeUntil } from 'rxjs';
 
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
-import { PerseusWrapperComponent } from '../../../content-io/plugins/perseus/perseus-wrapper.component';
-import { PerseusItem, PerseusScoreResult } from '../../../content-io/plugins/perseus/perseus-item.model';
+import { SophiaWrapperComponent } from '../../../content-io/plugins/sophia/sophia-wrapper.component';
+import { Moment, Recognition } from '../../../content-io/plugins/sophia/sophia-moment.model';
 import { StreakTrackerService } from '../../services/streak-tracker.service';
 import { QuizSoundService } from '../../services/quiz-sound.service';
 import { QuestionPoolService } from '../../services/question-pool.service';
@@ -80,7 +80,7 @@ export interface InlineQuizCompletionEvent {
 @Component({
   selector: 'app-inline-quiz',
   standalone: true,
-  imports: [CommonModule, PerseusWrapperComponent],
+  imports: [CommonModule, SophiaWrapperComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section
@@ -130,13 +130,13 @@ export interface InlineQuizCompletionEvent {
           <!-- Question display -->
           @if (currentQuestion()) {
             <div class="question-container">
-              <app-perseus-question
-                [item]="currentQuestion()!"
+              <app-sophia-question
+                [moment]="currentQuestion()!"
                 [reviewMode]="showFeedback()"
                 [autoFocus]="true"
-                (scored)="onQuestionScored($event)"
-                (answerChanged)="onAnswerChanged()">
-              </app-perseus-question>
+                (recognition)="onQuestionScored($event)"
+                (answerChanged)="onAnswerChanged($event)">
+              </app-sophia-question>
 
               <!-- Answer controls -->
               <div class="answer-controls">
@@ -544,7 +544,7 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
   protected celebrating = signal(false);
   protected hasAnswer = signal(false);
 
-  protected questions = signal<PerseusItem[]>([]);
+  protected questions = signal<Moment[]>([]);
   protected currentQuestionIndex = signal(0);
   protected streakState = signal<StreakState | null>(null);
 
@@ -574,8 +574,8 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
   });
 
   private destroy$ = new Subject<void>();
-  private perseusWrapper: PerseusWrapperComponent | null = null;
-  private pendingScore: PerseusScoreResult | null = null;
+  private sophiaWrapper: SophiaWrapperComponent | null = null;
+  private pendingRecognition: Recognition | null = null;
 
   constructor(
     private readonly streakTracker: StreakTrackerService,
@@ -603,26 +603,28 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Handle answer change from Perseus.
+   * Handle answer change from Sophia.
+   * @param hasValidAnswer - Whether the user has provided a valid/complete answer
    */
-  onAnswerChanged(): void {
-    this.hasAnswer.set(true);
+  onAnswerChanged(hasValidAnswer: boolean): void {
+    this.hasAnswer.set(hasValidAnswer);
   }
 
   /**
-   * Handle score result from Perseus.
+   * Handle recognition result from Sophia.
    */
-  onQuestionScored(result: PerseusScoreResult): void {
-    this.pendingScore = result;
+  onQuestionScored(result: Recognition): void {
+    this.pendingRecognition = result;
   }
 
   /**
    * Check the current answer.
    */
   checkAnswer(): void {
-    if (!this.pendingScore || !this.currentQuestion()) return;
+    if (!this.pendingRecognition || !this.currentQuestion()) return;
 
-    const correct = this.pendingScore.correct;
+    // For mastery quizzes, check if the answer is correct
+    const correct = this.pendingRecognition.mastery?.demonstrated ?? false;
     this.lastWasCorrect.set(correct);
     this.showFeedback.set(true);
 
@@ -674,7 +676,7 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
     this.showFeedback.set(false);
     this.hasAnswer.set(false);
     this.streakBroken.set(false);
-    this.pendingScore = null;
+    this.pendingRecognition = null;
 
     // Move to next question (wrap around if needed)
     const nextIdx = this.currentQuestionIndex() + 1;

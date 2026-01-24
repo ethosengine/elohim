@@ -5,6 +5,12 @@
     "changeOrigin": true,
     "logLevel": "debug"
   },
+  "/api/*": {
+    "target": "http://localhost:8888",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
   "/db/*": {
     "target": "http://localhost:8888",
     "secure": false,

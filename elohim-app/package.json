@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --disable-host-check",
+    "prebuild": "bash ../scripts/check-sophia.sh",
+    "build:sophia": "cd ../sophia && pnpm install && pnpm build && pnpm build:umd",
+    "start": "ng serve --proxy-config proxy.conf.mjs --disable-host-check",
     "stop": "pkill -f 'ng serve' 2>/dev/null && echo 'Stopped Angular dev server' || echo 'Angular dev server not running'",
     "start:staging": "ng serve --disable-host-check --configuration=staging",
     "build": "ng build",
