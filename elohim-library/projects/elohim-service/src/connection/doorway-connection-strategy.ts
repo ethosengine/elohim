@@ -213,6 +213,24 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   }
 
   getStorageBaseUrl(config: ConnectionConfig): string {
+    // Check for Eclipse Che environment first
+    if (this.isCheEnvironment() && config.useLocalProxy) {
+      // In Che, return the Angular dev server's origin so URLs are absolute
+      // but still same-origin. This allows:
+      // 1. <img src="..."> tags to work (browser requests same origin)
+      // 2. Angular proxy to intercept /api/* and /blob/* routes
+      // 3. CORS issues to be avoided (same-origin requests)
+      //
+      // Note: Empty string doesn't work because Angular's proxy only intercepts
+      // HttpClient requests, not browser resource loads like <img> tags.
+      if (typeof window !== 'undefined' && window.location?.origin) {
+        console.log('[DoorwayStrategy] Storage base URL (Che via Angular proxy):', window.location.origin);
+        return window.location.origin;
+      }
+      // SSR fallback - return empty and let requests be relative
+      return '';
+    }
+
     // Convert WebSocket URL to HTTPS for API access
     return config.adminUrl
       .replace('wss://', 'https://')
