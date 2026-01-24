@@ -39,6 +39,10 @@ interface ContentJson {
   title?: string;
   content?: string | object;  // String for markdown, object for quizzes/assessments
   contentFormat?: string;
+  metadata?: {
+    localZipPath?: string;  // For html5-app: path to ZIP file relative to genesis/
+    [key: string]: unknown;
+  };
   // ... other fields we don't need to pack
 }
 
@@ -120,13 +124,33 @@ function base32Encode(data: Buffer): string {
   return output;
 }
 
+// Root directory for resolving relative paths (genesis/)
+const GENESIS_DIR = path.resolve(__dirname, '../..');
+
 /**
  * Extract content body from JSON file
+ * For html5-app content, reads the actual ZIP file from metadata.localZipPath
  */
 function extractContentBody(json: ContentJson): { body: Buffer; format: string } | null {
   // Skip entries without content body
   if (!json.content) {
     return null;
+  }
+
+  // Determine format
+  const format = json.contentFormat || 'markdown';
+
+  // Special handling for html5-app: read the ZIP file, not the JSON content
+  if (format === 'html5-app' && json.metadata?.localZipPath) {
+    const zipPath = path.resolve(GENESIS_DIR, json.metadata.localZipPath);
+    if (fs.existsSync(zipPath)) {
+      const zipData = fs.readFileSync(zipPath);
+      console.log(`  📦 ${json.id}: Reading ZIP from ${json.metadata.localZipPath} (${(zipData.length / 1024 / 1024).toFixed(2)} MB)`);
+      return { body: zipData, format };
+    } else {
+      console.warn(`  ⚠️ ${json.id}: ZIP not found at ${zipPath}`);
+      return null;
+    }
   }
 
   // Handle both string and object content
@@ -138,13 +162,15 @@ function extractContentBody(json: ContentJson): { body: Buffer; format: string }
     }
   } else if (typeof json.content === 'object') {
     // Object content (quizzes, assessments) - serialize deterministically
-    contentStr = JSON.stringify(json.content, Object.keys(json.content).sort());
+    // For arrays, just stringify without a replacer to preserve all keys
+    if (Array.isArray(json.content)) {
+      contentStr = JSON.stringify(json.content);
+    } else {
+      contentStr = JSON.stringify(json.content, Object.keys(json.content).sort());
+    }
   } else {
     return null;
   }
-
-  // Determine format
-  const format = json.contentFormat || 'markdown';
 
   // Content body as UTF-8 buffer
   return {

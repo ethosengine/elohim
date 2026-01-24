@@ -176,6 +176,7 @@ impl ContentService {
         // Validate content_format
         let valid_formats = [
             "markdown", "html", "json", "text", "perseus",
+            "perseus-json", "perseus-quiz-json", "sophia-quiz-json", "sophia",
             "gherkin", "yaml", "toml", "latex", "asciidoc",
             "html5-app", "iframe", "embed",
         ];

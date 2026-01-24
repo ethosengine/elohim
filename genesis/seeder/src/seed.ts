@@ -783,7 +783,10 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
 
   // If blob entry exists, use sparse DHT pattern (just metadata + CID reference)
   // Otherwise, embed full content in DHT entry (legacy behavior)
-  const useSparsePattern = blobEntry !== undefined;
+  // Exception: html5-app keeps original content object (appId, entryPoint, fallbackUrl)
+  // because the renderer needs that to build the /apps/{appId}/{entryPoint} URL
+  const isHtml5App = concept.contentFormat === 'html5-app';
+  const useSparsePattern = blobEntry !== undefined && !isHtml5App;
 
   return {
     id: concept.id,
@@ -792,6 +795,7 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
     description: description,
     summary: summary,
     // Sparse: store hash reference, Full: store entire content
+    // html5-app: always store the content object with appId/entryPoint
     content: useSparsePattern ? `sha256:${blobEntry.hash}` : contentString,
     contentFormat: normalizeContentFormat(concept.contentFormat),
     tags: concept.tags || [],
@@ -1021,8 +1025,22 @@ async function seedViaDoorway(): Promise<SeedResult> {
   // ========================================
   // LOAD CONTENT
   // ========================================
+  let filteredConcepts: { concept: ConceptJson; file: string }[] = [];
+
   if (PATHS_ONLY) {
-    console.log('\n⏭️  Skipping content (--paths-only mode)');
+    console.log('\n⏭️  Skipping content import (--paths-only mode)');
+    // Still load content for title lookups
+    timer.startPhase('Content Loading');
+    const contentDir = path.join(DATA_DIR, 'content');
+    const conceptFiles = findJsonFiles(contentDir);
+    for (const file of conceptFiles) {
+      const concept = loadJson<ConceptJson>(file);
+      if (concept?.id && concept?.title) {
+        filteredConcepts.push({ concept, file });
+      }
+    }
+    console.log(`   Loaded ${filteredConcepts.length} concepts for title lookups`);
+    timer.endPhase('Content Loading');
   } else {
   timer.startPhase('Content Loading');
   console.log('\n📚 Loading content from data/lamad/content/...');
@@ -1053,7 +1071,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
   console.log(`   Loaded ${allConcepts.length} concepts (${loadErrorCount} failed)`);
 
   // Apply filters
-  let filteredConcepts = allConcepts;
+  filteredConcepts = allConcepts;
   if (IDS.length > 0) {
     filteredConcepts = allConcepts.filter(({ concept }) => IDS.includes(concept.id));
     console.log(`   Filtered to ${filteredConcepts.length} concepts matching IDs`);
@@ -1214,7 +1232,8 @@ async function seedViaDoorway(): Promise<SeedResult> {
     ].filter((i, idx, arr) => i < itemsToSeed.length && arr.indexOf(i) === idx);  // dedupe
     result.sampleIds = sampleIndices.map(i => itemsToSeed[i].id);
 
-    // Transform items to backend format (content → content_body)
+    // Transform items to backend format (content → contentBody)
+    // Backend uses serde rename_all = "camelCase" so expects camelCase field names
     // Coerce null values to undefined for optional fields (TypeScript compatibility)
     const transformedItems = itemsToSeed.map(item => ({
       id: item.id,
@@ -1222,7 +1241,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
       description: item.description,
       contentType: item.contentType,
       contentFormat: normalizeContentFormat(item.contentFormat),  // Ensure valid format
-      content_body: item.content,  // Backend expects content_body, not content
+      contentBody: item.content,  // Backend expects contentBody (camelCase)
       blobHash: item.blobHash ?? undefined,
       blobCid: item.blobCid ?? undefined,
       metadataJson: item.metadataJson,
@@ -1457,6 +1476,15 @@ async function seedViaDoorway(): Promise<SeedResult> {
     timer.startPhase('Path Import');
     console.log(`\n🚀 Importing ${allPaths.length} paths via doorway...`);
 
+    // Build content title lookup map from loaded concepts
+    // Used to resolve conceptIds to proper titles in path steps
+    const contentTitleMap = new Map<string, string>();
+    for (const { concept } of filteredConcepts) {
+      if (concept.id && concept.title) {
+        contentTitleMap.set(concept.id, concept.title);
+      }
+    }
+
     // Step type matching zome's PathImportStepInput struct
     interface StepInput {
       stepType: string;
@@ -1465,6 +1493,10 @@ async function seedViaDoorway(): Promise<SeedResult> {
       stepTitle?: string;
       stepNarrative?: string;
       isOptional?: boolean;
+      // Module association metadata for UI filtering
+      moduleId?: string;
+      chapterId?: string;
+      sectionId?: string;
     }
 
     // Valid step types per storage validation
@@ -1499,7 +1531,11 @@ async function seedViaDoorway(): Promise<SeedResult> {
     }
 
     // Helper to extract step data from a step object (preserves optional fields)
-    function extractStepData(step: any, orderIndex: number): StepInput {
+    function extractStepData(
+      step: any,
+      orderIndex: number,
+      metadata?: { chapterId?: string; moduleId?: string; sectionId?: string }
+    ): StepInput {
       return {
         stepType: normalizeStepType(step.stepType || step.stepType),
         resourceId: step.resourceId || step.resourceId || step.id,
@@ -1508,14 +1544,22 @@ async function seedViaDoorway(): Promise<SeedResult> {
         ...(step.stepTitle || step.stepTitle ? { stepTitle: step.stepTitle || step.stepTitle } : {}),
         ...(step.stepNarrative || step.stepNarrative ? { stepNarrative: step.stepNarrative || step.stepNarrative } : {}),
         ...((step.isOptional ?? step.optional) !== undefined ? { isOptional: step.isOptional ?? step.optional ?? false } : {}),
+        // Module association metadata
+        ...(metadata?.chapterId ? { chapterId: metadata.chapterId } : {}),
+        ...(metadata?.moduleId ? { moduleId: metadata.moduleId } : {}),
+        ...(metadata?.sectionId ? { sectionId: metadata.sectionId } : {}),
       };
     }
 
+    // DEPRECATED: This function globally flattens hierarchy, losing chapter structure.
+    // Use extractStepsFromChapter() instead which preserves per-chapter hierarchy.
+    // Kept for backward compatibility only.
     // Helper to flatten hierarchical path structure into steps
     // Paths can have: chapters → modules → sections → conceptIds
     function extractStepsFromPath(pathData: any): StepInput[] {
       const steps: StepInput[] = [];
       let orderIndex = 0;
+      let moduleCount = 0;
 
       // If path has explicit steps array, use it directly
       if (pathData.steps && Array.isArray(pathData.steps)) {
@@ -1535,48 +1579,205 @@ async function seedViaDoorway(): Promise<SeedResult> {
       // Each level can have either conceptIds (flat) or steps (structured)
       if (pathData.chapters && Array.isArray(pathData.chapters)) {
         for (const chapter of pathData.chapters) {
+          const chapterId = chapter.id;
+
           // Chapter-level steps array (structured) - preserves step metadata
           if (chapter.steps && Array.isArray(chapter.steps)) {
             for (const step of chapter.steps) {
-              steps.push(extractStepData(step, orderIndex++));
+              steps.push(extractStepData(step, orderIndex++, { chapterId }));
             }
           }
           // Chapter-level conceptIds (flat)
           if (chapter.conceptIds && Array.isArray(chapter.conceptIds)) {
             for (const id of chapter.conceptIds) {
-              steps.push({ stepType: 'learn', resourceId: id, orderIndex: orderIndex++ });
+              steps.push({
+                stepType: 'learn',
+                resourceId: id,
+                orderIndex: orderIndex++,
+                chapterId,
+              });
             }
           }
           // Modules within chapters
           if (chapter.modules && Array.isArray(chapter.modules)) {
             for (const module of chapter.modules) {
+              const moduleId = module.id;
+              moduleCount++;
+
               // Module-level steps array - preserves step metadata
               if (module.steps && Array.isArray(module.steps)) {
                 for (const step of module.steps) {
-                  steps.push(extractStepData(step, orderIndex++));
+                  steps.push(extractStepData(step, orderIndex++, { chapterId, moduleId }));
                 }
               }
               // Module-level conceptIds
               if (module.conceptIds && Array.isArray(module.conceptIds)) {
                 for (const id of module.conceptIds) {
-                  steps.push({ stepType: 'learn', resourceId: id, orderIndex: orderIndex++ });
+                  steps.push({
+                    stepType: 'learn',
+                    resourceId: id,
+                    orderIndex: orderIndex++,
+                    chapterId,
+                    moduleId,
+                  });
                 }
               }
               // Sections within modules
               if (module.sections && Array.isArray(module.sections)) {
                 for (const section of module.sections) {
+                  const sectionId = section.id;
+
                   // Section-level steps array - preserves step metadata
                   if (section.steps && Array.isArray(section.steps)) {
                     for (const step of section.steps) {
-                      steps.push(extractStepData(step, orderIndex++));
+                      steps.push(extractStepData(step, orderIndex++, { chapterId, moduleId, sectionId }));
                     }
                   }
                   // Section-level conceptIds
                   if (section.conceptIds && Array.isArray(section.conceptIds)) {
                     for (const id of section.conceptIds) {
-                      steps.push({ stepType: 'learn', resourceId: id, orderIndex: orderIndex++ });
+                      steps.push({
+                        stepType: 'learn',
+                        resourceId: id,
+                        orderIndex: orderIndex++,
+                        chapterId,
+                        moduleId,
+                        sectionId,
+                      });
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Log step extraction summary
+      if (moduleCount > 0) {
+        console.log(`   📍 Path "${pathData.id}": Extracted ${steps.length} steps from ${moduleCount} modules`);
+      }
+
+      return steps;
+    }
+
+    // Extract steps from a single chapter (not globally)
+    // Used for proper hierarchical transformation that preserves chapter structure
+    function extractStepsFromChapter(chapter: any, pathId: string): any[] {
+      const steps: any[] = [];
+      let orderIndex = 0;
+
+      // Direct chapter steps (2-level format: chapters → steps)
+      if (chapter.steps?.length) {
+        for (const step of chapter.steps) {
+          steps.push({
+            id: step.id || `${chapter.id}-step-${orderIndex + 1}`,
+            pathId,
+            chapterId: chapter.id,
+            title: step.stepTitle || step.title || `Step ${orderIndex + 1}`,
+            stepType: normalizeStepType(step.stepType),
+            resourceId: step.resourceId || null,
+            orderIndex: orderIndex++,
+            metadataJson: JSON.stringify({ moduleId: null, sectionId: null }),
+          });
+        }
+      }
+
+      // Chapter-level conceptIds (flat)
+      if (chapter.conceptIds?.length) {
+        for (const conceptId of chapter.conceptIds) {
+          steps.push({
+            id: `${chapter.id}-step-${orderIndex + 1}`,
+            pathId,
+            chapterId: chapter.id,
+            title: contentTitleMap.get(conceptId) || conceptId,  // Lookup title from content
+            stepType: 'learn',
+            resourceId: conceptId,
+            orderIndex: orderIndex++,
+            metadataJson: JSON.stringify({ moduleId: null, sectionId: null }),
+          });
+        }
+      }
+
+      // Module → Section → conceptIds (4-level format: chapters → modules → sections → conceptIds)
+      if (chapter.modules?.length) {
+        for (const module of chapter.modules) {
+          // Module-level conceptIds
+          if (module.conceptIds?.length) {
+            for (const conceptId of module.conceptIds) {
+              steps.push({
+                id: `${module.id}-step-${orderIndex + 1}`,
+                pathId,
+                chapterId: chapter.id,
+                title: contentTitleMap.get(conceptId) || conceptId,  // Lookup title from content
+                stepType: 'learn',
+                resourceId: conceptId,
+                orderIndex: orderIndex++,
+                metadataJson: JSON.stringify({
+                  moduleId: module.id,
+                  sectionId: null,
+                }),
+              });
+            }
+          }
+
+          // Module-level steps
+          if (module.steps?.length) {
+            for (const step of module.steps) {
+              steps.push({
+                id: step.id || `${module.id}-step-${orderIndex + 1}`,
+                pathId,
+                chapterId: chapter.id,
+                title: step.stepTitle || step.title || `Step ${orderIndex + 1}`,
+                stepType: normalizeStepType(step.stepType),
+                resourceId: step.resourceId || null,
+                orderIndex: orderIndex++,
+                metadataJson: JSON.stringify({
+                  moduleId: module.id,
+                  sectionId: null,
+                }),
+              });
+            }
+          }
+
+          // Sections within modules
+          if (module.sections?.length) {
+            for (const section of module.sections) {
+              // Section-level conceptIds
+              if (section.conceptIds?.length) {
+                for (const conceptId of section.conceptIds) {
+                  steps.push({
+                    id: `${section.id}-step-${orderIndex + 1}`,
+                    pathId,
+                    chapterId: chapter.id,
+                    title: contentTitleMap.get(conceptId) || conceptId,  // Lookup title from content
+                    stepType: 'learn',
+                    resourceId: conceptId,
+                    orderIndex: orderIndex++,
+                    metadataJson: JSON.stringify({
+                      moduleId: module.id,
+                      sectionId: section.id,
+                    }),
+                  });
+                }
+              }
+
+              // Section-level steps
+              if (section.steps?.length) {
+                for (const step of section.steps) {
+                  steps.push({
+                    id: step.id || `${section.id}-step-${orderIndex + 1}`,
+                    pathId,
+                    chapterId: chapter.id,
+                    title: step.stepTitle || step.title || `Step ${orderIndex + 1}`,
+                    stepType: normalizeStepType(step.stepType),
+                    resourceId: step.resourceId || null,
+                    orderIndex: orderIndex++,
+                    metadataJson: JSON.stringify({
+                      moduleId: module.id,
+                      sectionId: section.id,
+                    }),
+                  });
                 }
               }
             }
@@ -1587,79 +1788,95 @@ async function seedViaDoorway(): Promise<SeedResult> {
       return steps;
     }
 
-    // Convert paths to zome inputs
-    const pathInputs = allPaths.map(({ pathData }) => {
+    // Transform paths directly with proper chapter hierarchy (no global flattening)
+    const transformedPaths = allPaths.map(({ pathData }) => {
       const thumbnailHash = pathThumbnailHashes.get(pathData.id);
+
+      let chapters: any[];
+
+      if (pathData.chapters?.length) {
+        // Transform each source chapter directly (preserves hierarchy)
+        chapters = pathData.chapters.map((ch: any, idx: number) => {
+          const chapterSteps = extractStepsFromChapter(ch, pathData.id);
+          return {
+            id: ch.id,
+            title: ch.title || '',
+            description: ch.description || '',
+            orderIndex: ch.order ?? ch.orderIndex ?? idx,
+            estimatedDuration: ch.estimatedDuration || null,
+            steps: chapterSteps,
+          };
+        });
+
+        // Log chapter hierarchy summary
+        const totalSteps = chapters.reduce((sum, ch) => sum + ch.steps.length, 0);
+        console.log(`   📍 Path "${pathData.id}": ${chapters.length} chapters, ${totalSteps} total steps`);
+      } else if (pathData.steps?.length) {
+        // Legacy flat steps - wrap in default chapter
+        chapters = [{
+          id: `${pathData.id}-chapter-1`,
+          title: pathData.title || 'Main Content',
+          description: pathData.description || '',
+          orderIndex: 0,
+          estimatedDuration: null,
+          steps: pathData.steps.map((step: any, idx: number) => ({
+            id: step.id || `${pathData.id}-step-${idx + 1}`,
+            pathId: pathData.id,
+            chapterId: `${pathData.id}-chapter-1`,
+            title: step.stepTitle || step.title || `Step ${idx + 1}`,
+            stepType: normalizeStepType(step.stepType),
+            resourceId: step.resourceId || null,
+            orderIndex: idx,
+            metadataJson: JSON.stringify({}),
+          })),
+        }];
+        console.log(`   📍 Path "${pathData.id}": 1 default chapter, ${pathData.steps.length} steps (legacy format)`);
+      } else if (pathData.conceptIds?.length) {
+        // Legacy flat conceptIds - wrap in default chapter
+        chapters = [{
+          id: `${pathData.id}-chapter-1`,
+          title: pathData.title || 'Main Content',
+          description: pathData.description || '',
+          orderIndex: 0,
+          estimatedDuration: null,
+          steps: pathData.conceptIds.map((conceptId: string, idx: number) => ({
+            id: `${pathData.id}-step-${idx + 1}`,
+            pathId: pathData.id,
+            chapterId: `${pathData.id}-chapter-1`,
+            title: `Step ${idx + 1}`,
+            stepType: 'learn',
+            resourceId: conceptId,
+            orderIndex: idx,
+            metadataJson: JSON.stringify({}),
+          })),
+        }];
+        console.log(`   📍 Path "${pathData.id}": 1 default chapter, ${pathData.conceptIds.length} steps (conceptIds format)`);
+      } else {
+        chapters = [];
+        console.log(`   📍 Path "${pathData.id}": No chapters or steps found`);
+      }
 
       return {
         id: pathData.id,
-        version: pathData.version || '1.0.0',
         title: pathData.title,
         description: pathData.description || '',
-        purpose: pathData.purpose || null,
+        pathType: normalizePathType(pathData.pathType),
         difficulty: pathData.difficulty || 'beginner',
         estimatedDuration: pathData.estimatedDuration || null,
         visibility: pathData.visibility || 'public',
-        pathType: normalizePathType(pathData.pathType),
-        tags: pathData.tags || [],
-        // metadata_json must be an object with a `chapters` property for the UI to parse it
-        // The UI does: metadata.chapters (not just metadata as an array)
         metadataJson: JSON.stringify(
           pathData.chapters
             ? { chapters: pathData.chapters, ...pathData.metadata }
             : pathData.metadata || {}
         ),
-        steps: extractStepsFromPath(pathData),
-        // Thumbnail: use blob URL if we uploaded, otherwise keep original
-        thumbnailUrl: thumbnailHash
-          ? `/blob/${thumbnailHash}`
-          : pathData.thumbnailUrl || null,
+        tags: pathData.tags || [],
+        thumbnailUrl: thumbnailHash ? `/blob/${thumbnailHash}` : pathData.thumbnailUrl || null,
         thumbnailBlobHash: thumbnailHash || null,
+        chapters,
       };
     });
 
-    // Log step counts for debugging
-    for (const path of pathInputs) {
-      console.log(`   📍 Path "${path.id}": ${path.steps.length} steps`);
-    }
-    result.pathsAttempted = pathInputs.length;  // Track for verification
-
-    // Transform paths to backend format (flat steps → nested chapters)
-    const transformedPaths = pathInputs.map(pathInput => {
-      // Convert flat steps array to nested chapters structure
-      // Backend expects: chapters[].steps[], not flat steps[]
-      const defaultChapter = {
-        id: `${pathInput.id}-chapter-1`,
-        title: pathInput.title || 'Main Content',
-        description: pathInput.description || '',
-        orderIndex: 0,
-        steps: (pathInput.steps || []).map((step: any, idx: number) => ({
-          id: `${pathInput.id}-step-${idx + 1}`,
-          pathId: pathInput.id,
-          chapterId: `${pathInput.id}-chapter-1`,
-          title: step.stepTitle || step.title || `Step ${idx + 1}`,
-          stepType: step.stepType || 'learn',
-          resourceId: step.resourceId || null,
-          orderIndex: step.orderIndex ?? idx,
-          metadataJson: step.metadataJson || null,
-        })),
-      };
-
-      return {
-        id: pathInput.id,
-        title: pathInput.title,
-        description: pathInput.description,
-        pathType: normalizePathType(pathInput.pathType),
-        difficulty: pathInput.difficulty,
-        estimatedDuration: pathInput.estimatedDuration,
-        visibility: pathInput.visibility || 'public',
-        metadataJson: pathInput.metadataJson,
-        tags: pathInput.tags || [],
-        thumbnailUrl: pathInput.thumbnailUrl,
-        thumbnailBlobHash: pathInput.thumbnailBlobHash,
-        chapters: [defaultChapter],
-      };
-    });
+    result.pathsAttempted = transformedPaths.length;  // Track for verification
 
     // Bulk create paths via direct HTTP call
     console.log(`   📤 Bulk creating ${transformedPaths.length} paths...`);

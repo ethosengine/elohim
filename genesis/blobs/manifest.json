@@ -1,37 +1,37 @@
 {
   "version": 1,
-  "created_at": "2026-01-06T13:47:33.504Z",
-  "total_blobs": 3525,
-  "total_bytes": 5896960,
+  "created_at": "2026-01-24T20:32:20.206Z",
+  "total_blobs": 3526,
+  "total_bytes": 13022128,
   "entries": {
     "assessment-attachment-style": {
-      "cid": "bafkreicbywp2jged3anoa3qpqxguet65si62iigjjvelphnnzbc2s3xgd4",
-      "hash": "41c59fa49883d81ae06e0f85cd424fdd923da420c94d48b79dadc845a96ee61f",
-      "size_bytes": 16,
+      "cid": "bafkreidjt7llifx7bw362aytrbsd3iymo77tjqrxbqnrvabfry2w5z4lwq",
+      "hash": "699fd6b416ff0db7ed031388643da30c77ff34c2370c1b1a80258e356ee78bb4",
+      "size_bytes": 3587,
       "content_format": "perseus-quiz-json"
     },
     "assessment-constitutional-reasoning": {
-      "cid": "bafkreicbywp2jged3anoa3qpqxguet65si62iigjjvelphnnzbc2s3xgd4",
-      "hash": "41c59fa49883d81ae06e0f85cd424fdd923da420c94d48b79dadc845a96ee61f",
-      "size_bytes": 16,
+      "cid": "bafkreick7fnfywnbhao4tsdmzesp5snc7y2d5gwlkvbucdnadltbbbjlmq",
+      "hash": "4af95a5c59a1381dc9c86cc924fec9a2fe343e9acb5543410da01ae610852b64",
+      "size_bytes": 3900,
       "content_format": "perseus-quiz-json"
     },
     "assessment-personal-values": {
-      "cid": "bafkreiec5app7d63kgemxlnki5koigyk3qyqqvubewt7mx7m4bdv3ezpsq",
-      "hash": "82e81eff8fdb5188cbadaa4754e41b0adc3108568125a7f65fece0475d932f94",
-      "size_bytes": 10,
+      "cid": "bafkreifnytbvs2wgrruwqnt52rymznunr73j6pieh7iydfoztha33qwpgq",
+      "hash": "adc4c3596ac68c6968367dd470ccb68d8ff69f3d043fd18195d999c1bdc2cf34",
+      "size_bytes": 1827,
       "content_format": "perseus-quiz-json"
     },
     "assessment-strengths-finder": {
-      "cid": "bafkreihoonrvpo53saftl7ptqopswmiefjwbbxt5havhcmxz5ojloy7su4",
-      "hash": "ee736357bbbb900b35fdf3839f2b31042a6c10de7d382a7132f9eb92b763f2a7",
-      "size_bytes": 19,
+      "cid": "bafkreigayjk32fbwfyjr3fbinyjgllvz52hu22bysqi6rspus7oyysm3ui",
+      "hash": "c0c255bd14362e131d94286e1265aeb9ee8f4d68389411e8c9f497dd8c499ba2",
+      "size_bytes": 3867,
       "content_format": "perseus-quiz-json"
     },
     "assessment-values-hierarchy": {
-      "cid": "bafkreihoonrvpo53saftl7ptqopswmiefjwbbxt5havhcmxz5ojloy7su4",
-      "hash": "ee736357bbbb900b35fdf3839f2b31042a6c10de7d382a7132f9eb92b763f2a7",
-      "size_bytes": 19,
+      "cid": "bafkreiduu7p6wp2ge5vmrckrv5ppkegauvnexg3gas6mhbh2kjq73hdxia",
+      "hash": "74a7dfeb3f46276ac88951af5ef510c0a55a4b9b6604bcc384fa5261fd9c7740",
+      "size_bytes": 4262,
       "content_format": "perseus-quiz-json"
     },
     "autonomous-entity-community-investor-readme": {
@@ -4120,6 +4120,12 @@
       "size_bytes": 168,
       "content_format": "markdown"
     },
+    "human-matthew-dowell": {
+      "cid": "bafkreidjygkjmt7crhurexr22uwbgpn7npgd5v3esuanriif224s7mhwuu",
+      "hash": "69c194964fe289e9125e3ad52c133dbf6bcc3ed7649500d8a105d6b92fb0f6a5",
+      "size_bytes": 635,
+      "content_format": "markdown"
+    },
     "lamad-reference-implementation": {
       "cid": "bafkreieywdbxi67fuqcbsxnapkta76gbekagpdkafn6cpauyybwjdaayda",
       "hash": "98b0c3747be5a404195da07aa60ff8c12280678d402b7c278298c06c91801818",
@@ -4391,46 +4397,46 @@
       "content_format": "markdown"
     },
     "quiz-care-economics": {
-      "cid": "bafkreiec5app7d63kgemxlnki5koigyk3qyqqvubewt7mx7m4bdv3ezpsq",
-      "hash": "82e81eff8fdb5188cbadaa4754e41b0adc3108568125a7f65fece0475d932f94",
-      "size_bytes": 10,
-      "content_format": "perseus-quiz-json"
+      "cid": "bafkreidlxmw6m6sboobb54rdppqu5n2one7jpfsqs6fxtqoj7ystuv2fhq",
+      "hash": "6bbb2de67a4173821ef2237be14eb74e693e979650978b79c1c9fe253a57453c",
+      "size_bytes": 2725,
+      "content_format": "sophia"
     },
     "quiz-civic-engagement": {
-      "cid": "bafkreiec5app7d63kgemxlnki5koigyk3qyqqvubewt7mx7m4bdv3ezpsq",
-      "hash": "82e81eff8fdb5188cbadaa4754e41b0adc3108568125a7f65fece0475d932f94",
-      "size_bytes": 10,
-      "content_format": "perseus-quiz-json"
+      "cid": "bafkreigdfegq45hkwxthx5m4pw2bdcvxouqciowhqb33zaic75bbyit7sy",
+      "hash": "c3290d0e74eab5e67bf59c7db4118ab77520243ac78077bc8102ff421c227f96",
+      "size_bytes": 2730,
+      "content_format": "sophia"
     },
     "quiz-digital-dignity": {
-      "cid": "bafkreiec5app7d63kgemxlnki5koigyk3qyqqvubewt7mx7m4bdv3ezpsq",
-      "hash": "82e81eff8fdb5188cbadaa4754e41b0adc3108568125a7f65fece0475d932f94",
-      "size_bytes": 10,
-      "content_format": "perseus-quiz-json"
+      "cid": "bafkreicpahvxbcq6z2hfwncrubz5pjr3qwoocg33f7xeza6bjkgvfx2gbe",
+      "hash": "4f01eb708a1ece8e5b3451a073d7a63b859ce11b7b2fee4c83c14a8d52df4609",
+      "size_bytes": 2756,
+      "content_format": "sophia"
     },
     "quiz-distributed-ownership": {
-      "cid": "bafkreiec5app7d63kgemxlnki5koigyk3qyqqvubewt7mx7m4bdv3ezpsq",
-      "hash": "82e81eff8fdb5188cbadaa4754e41b0adc3108568125a7f65fece0475d932f94",
-      "size_bytes": 10,
-      "content_format": "perseus-quiz-json"
+      "cid": "bafkreibzn2kxa3wy6ordt5zmmtat4r5mlbpmg7gxs3lqq4gkwvsrz7d5lq",
+      "hash": "396e95706ed8f3a239f72c64c13e47ac585ec37cd796d70870cab5651cfc7d5c",
+      "size_bytes": 2723,
+      "content_format": "sophia"
     },
     "quiz-governance-foundations": {
-      "cid": "bafkreicbywp2jged3anoa3qpqxguet65si62iigjjvelphnnzbc2s3xgd4",
-      "hash": "41c59fa49883d81ae06e0f85cd424fdd923da420c94d48b79dadc845a96ee61f",
-      "size_bytes": 16,
-      "content_format": "perseus-quiz-json"
+      "cid": "bafkreie2nuvuc5epbvs23uiuvdyh34zwxn7s5r4mdlh6es4pm4sm2nexuq",
+      "hash": "9a6d2b41748f0d65add114a8f07df336bb7f2ec78c1acfe24b8f6724cd3497a4",
+      "size_bytes": 4770,
+      "content_format": "sophia"
     },
     "quiz-manifesto-foundations": {
-      "cid": "bafkreicbywp2jged3anoa3qpqxguet65si62iigjjvelphnnzbc2s3xgd4",
-      "hash": "41c59fa49883d81ae06e0f85cd424fdd923da420c94d48b79dadc845a96ee61f",
-      "size_bytes": 16,
-      "content_format": "perseus-quiz-json"
+      "cid": "bafkreignqfgnowu7rstegm7djz2nfnapichrx65rxziwbhyrdnls2rvyby",
+      "hash": "cd814cd75a9f8ca64333e34e74d2b40f408f1bfbb1be51609f111b572d46b80e",
+      "size_bytes": 6057,
+      "content_format": "sophia"
     },
     "quiz-who-are-you": {
-      "cid": "bafkreiagh5wdnptqcenrq4fb2cc4rtbzlrfkyl6atgeoowrndlypxxcgdq",
-      "hash": "063f6c36be70111b1870a1d085c8cc395c4aac2fc09988e75a2d1af0fbdc461c",
-      "size_bytes": 13,
-      "content_format": "perseus-quiz-json"
+      "cid": "bafkreiczix2hrq7jub2mdwknqna4v4awxqj66ukalo3s4v2tur5zjnqhri",
+      "hash": "5945f478c3e9a074c1d94d8341caf016bc13ef51405bb72e5753a47b94b6078a",
+      "size_bytes": 5476,
+      "content_format": "sophia"
     },
     "rea-foundations": {
       "cid": "bafkreifwsuqodiu76v77u5ulpleqdusgayslhdllprlp4xsl4vwgbjyzj4",
@@ -20627,9 +20633,9 @@
       "content_format": "gherkin"
     },
     "simulation-evolution-of-trust": {
-      "cid": "bafkreifhkfiptex764kp2slhwpnjkxsb5m6rnzdnxnlp62syaxko4gv3wi",
-      "hash": "a75150f992fff714fd4967b3da955e41eb3d16e46dbb56ff6a5805d4ee1abbb2",
-      "size_bytes": 96,
+      "cid": "bafkreihokma4tfmwp7y6bj5qpj7v4lpe6x2upozxdbkh2mzeqrj3o7ftb4",
+      "hash": "ee5301c995967ff1e0a7b07a7f5e2de4f5f547bb3718547d33248453b77cb30f",
+      "size_bytes": 7080114,
       "content_format": "html5-app"
     },
     "social-medium-activist-readme": {

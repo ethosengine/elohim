@@ -1203,6 +1203,13 @@ pub struct PathImportStepInput {
     pub step_narrative: Option<String>,
     #[serde(default)]
     pub is_optional: bool,
+    /// Module association metadata for UI filtering
+    #[serde(default)]
+    pub module_id: Option<String>,
+    #[serde(default)]
+    pub chapter_id: Option<String>,
+    #[serde(default)]
+    pub section_id: Option<String>,
 }
 
 /// Input for creating a learning path
@@ -1227,6 +1234,8 @@ pub struct CreatePathInput {
 pub struct AddPathStepInput {
     pub path_id: String,
     pub chapter_id: Option<String>,      // If part of a chapter
+    pub module_id: Option<String>,       // If part of a module (for UI filtering)
+    pub section_id: Option<String>,      // If part of a section (for fine-grained tracking)
     pub order_index: u32,
     pub step_type: String,               // content, path, external, checkpoint, reflection
     pub resource_id: String,
@@ -2166,7 +2175,9 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
                         for step in path_input.steps {
                             let step_input = AddPathStepInput {
                                 path_id: path_input.id.clone(),
-                                chapter_id: None,
+                                chapter_id: step.chapter_id,
+                                module_id: step.module_id,
+                                section_id: step.section_id,
                                 order_index: step.order_index,
                                 step_type: step.step_type,
                                 resource_id: step.resource_id,
@@ -2929,6 +2940,8 @@ pub fn add_path_step(input: AddPathStepInput) -> ExternResult<ActionHash> {
         id: step_id.clone(),
         path_id: input.path_id.clone(),
         chapter_id: input.chapter_id.clone(),
+        module_id: input.module_id.clone(),
+        section_id: input.section_id.clone(),
         order_index: input.order_index,
         step_type: input.step_type,
         resource_id: input.resource_id.clone(),
@@ -3737,6 +3750,8 @@ pub fn update_step(input: UpdateStepInput) -> ExternResult<PathStepOutput> {
         id: existing.id,
         path_id: existing.path_id.clone(),
         chapter_id: input.chapter_id.or(existing.chapter_id),
+        module_id: existing.module_id,
+        section_id: existing.section_id,
         order_index: input.order_index.unwrap_or(existing.order_index),
         step_type: existing.step_type,
         resource_id: existing.resource_id.clone(),

@@ -265,8 +265,8 @@ export class BlobManager {
     // Try metadata.localZipPath first (relative to genesis directory)
     const metadata = content.metadata as Record<string, unknown> | undefined;
     if (metadata?.localZipPath) {
-      // Genesis directory is parent of seeder directory
-      const genesisDir = path.resolve(path.dirname(path.dirname(contentDir)));
+      // Genesis directory is 3 levels up from content dir (content -> lamad -> data -> genesis)
+      const genesisDir = path.resolve(contentDir, '../../..');
       const zipPath = path.join(genesisDir, metadata.localZipPath as string);
       if (fs.existsSync(zipPath)) {
         console.log(`   📦 Found ZIP via metadata.localZipPath: ${metadata.localZipPath}`);

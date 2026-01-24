@@ -748,6 +748,8 @@ pub struct PathStep {
     pub id: String,
     pub path_id: String,
     pub chapter_id: Option<String>,      // If part of a chapter
+    pub module_id: Option<String>,       // If part of a module (for UI filtering)
+    pub section_id: Option<String>,      // If part of a section (for fine-grained tracking)
     pub order_index: u32,
     pub step_type: String,               // content, path, external, checkpoint, reflection
     pub resource_id: String,             // Content.id, nested LearningPath.id, or external URL

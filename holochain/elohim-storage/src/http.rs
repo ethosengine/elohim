@@ -190,6 +190,9 @@ impl HttpServer {
         debug!(method = %method, path = %path, "Incoming request");
 
         let result = match (method, path.as_str()) {
+            // CORS preflight for all routes
+            (Method::OPTIONS, _) => Ok(Self::cors_preflight()),
+
             // Health check
             (Method::GET, "/health") => self.handle_health().await,
 
@@ -609,6 +612,25 @@ impl HttpServer {
             .map(|s| s.to_string())
     }
 
+    /// CORS preflight response for cross-origin requests
+    fn cors_preflight() -> Response<Full<Bytes>> {
+        Response::builder()
+            .status(StatusCode::OK)
+            .header("Access-Control-Allow-Origin", "*")
+            .header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, HEAD, OPTIONS")
+            .header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Agent-Id")
+            .header("Access-Control-Max-Age", "86400")
+            .body(Full::new(Bytes::new()))
+            .unwrap()
+    }
+
+    /// Add CORS headers to a response
+    fn with_cors_headers(builder: hyper::http::response::Builder) -> hyper::http::response::Builder {
+        builder
+            .header("Access-Control-Allow-Origin", "*")
+            .header("Cross-Origin-Resource-Policy", "cross-origin")
+    }
+
     /// GET /blob/{hash} - Reassemble blob from shards
     /// Checks policy enforcement if agent_id is provided
     async fn handle_get_blob(
@@ -622,6 +644,21 @@ impl HttpServer {
                 .body(Full::new(Bytes::from("Missing blob hash")))
                 .unwrap());
         }
+
+        // Parse content address (accepts CID, sha256-prefixed hash, or raw hex)
+        let normalized_hash = match crate::blob_store::BlobStore::parse_content_address(hash) {
+            Ok(h) => format!("sha256-{}", h),
+            Err(_) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(Full::new(Bytes::from(format!(
+                        "Invalid content address: {}",
+                        hash
+                    ))))
+                    .unwrap());
+            }
+        };
+        let hash = normalized_hash.as_str();
 
         // Check policy enforcement if enabled and agent_id is provided
         if let (Some(ref enforcement), Some(agent)) = (&self.policy_enforcement, agent_id) {
@@ -678,15 +715,16 @@ impl HttpServer {
                 // Try direct blob lookup (for non-sharded blobs)
                 match self.blob_store.get(hash).await {
                     Ok(data) => {
-                        return Ok(Response::builder()
+                        return Ok(Self::with_cors_headers(Response::builder())
                             .status(StatusCode::OK)
                             .header(header::CONTENT_TYPE, "application/octet-stream")
                             .header(header::CONTENT_LENGTH, data.len())
+                            .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
                             .body(Full::new(Bytes::from(data)))
                             .unwrap());
                     }
                     Err(_) => {
-                        return Ok(Response::builder()
+                        return Ok(Self::with_cors_headers(Response::builder())
                             .status(StatusCode::NOT_FOUND)
                             .body(Full::new(Bytes::from("Blob not found")))
                             .unwrap());
@@ -713,11 +751,12 @@ impl HttpServer {
             "Serving reassembled blob"
         );
 
-        Ok(Response::builder()
+        Ok(Self::with_cors_headers(Response::builder())
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, &manifest.mime_type)
             .header(header::CONTENT_LENGTH, data.len())
             .header(header::ETAG, format!("\"{}\"", hash))
+            .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
             .body(Full::new(Bytes::from(data)))
             .unwrap())
     }
