@@ -48,3 +48,6 @@ target/
 *.dna
 bindings/
 research/matrix/pinecone
+
+# Genesis blob cache (regenerated during pack/seed)
+genesis/.blob-cache/
