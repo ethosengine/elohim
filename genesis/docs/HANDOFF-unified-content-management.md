@@ -5,7 +5,29 @@
 
 ---
 
-## Problem Statement
+## Vision: Digital Sovereignty Through Unified Storage
+
+The goal is a **"super Google Drive"** - a unified interface where humans can:
+
+1. **Own their entire digital footprint** across all life contexts (files, photos, videos, books, learning, economics, identity, community)
+2. **See at a glance** the status of every piece of content:
+   - **Safety**: Is it encrypted? Private? Public?
+   - **Reach**: Who can see it? How far has it spread?
+   - **Replication**: How safe is it? Where are the copies?
+   - **Context**: Which app/life-area does it belong to?
+3. **Trust the system** to protect, distribute, and preserve their content according to their preferences
+4. **Break free from silos** - no more fragmentation across Google/Apple/Amazon/Netflix/Spotify ecosystems
+
+This is not just "file storage" - it's **personal data infrastructure** that:
+- Survives platform shutdowns
+- Can be inherited by future generations
+- Respects privacy by default
+- Enables selective sharing with granular control
+- Leverages community (support network, households) for resilience
+
+---
+
+## Problem Statement (Current State)
 
 Content in the Elohim ecosystem is fragmented across multiple storage mechanisms:
 
@@ -64,7 +86,112 @@ The vision is a **unified content management experience** like Google Drive or S
 
 ## Content Dimensions Model
 
-Every piece of content should expose three key dimension categories:
+Every piece of content should expose **four** key dimension categories:
+
+### 4. Application Context Dimension
+
+What app/context does this content belong to?
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 APPLICATION CONTEXT MODEL                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  elohim-storage is NOT just for lamad learning content.        │
+│  It's the unified storage layer for a person's entire          │
+│  digital life - replacing fragmented cloud services:           │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                                                             ││
+│  │  TODAY'S FRAGMENTATION          ELOHIM UNIFIED STORAGE      ││
+│  │  ════════════════════          ══════════════════════       ││
+│  │                                                             ││
+│  │  Google Drive ─────────┐                                    ││
+│  │  Dropbox ──────────────┼──►  📁 PERSONAL FILES              ││
+│  │  OneDrive ─────────────┘       (documents, spreadsheets)    ││
+│  │                                                             ││
+│  │  Google Photos ────────┐                                    ││
+│  │  iCloud Photos ────────┼──►  📷 PHOTOS & ALBUMS             ││
+│  │  Photoprism ───────────┘       (memories, family, events)   ││
+│  │                                                             ││
+│  │  Netflix ──────────────┐                                    ││
+│  │  Plex ─────────────────┼──►  🎬 VIDEO LIBRARY               ││
+│  │  Jellyfin ─────────────┘       (movies, shows, home video)  ││
+│  │                                                             ││
+│  │  Spotify ──────────────┐                                    ││
+│  │  Apple Podcasts ───────┼──►  🎧 AUDIO LIBRARY               ││
+│  │  Pocket Casts ─────────┘       (podcasts, music, ambient)   ││
+│  │                                                             ││
+│  │  Audible ──────────────┐                                    ││
+│  │  Libby ────────────────┼──►  📚 BOOK LIBRARY                ││
+│  │  Kindle ───────────────┤       (ebooks, audiobooks)         ││
+│  │  Google Books ─────────┘                                    ││
+│  │                                                             ││
+│  │  Coursera ─────────────┐                                    ││
+│  │  Udemy ────────────────┼──►  🎓 LAMAD (Learning)            ││
+│  │  Khan Academy ─────────┘       (courses, paths, mastery)    ││
+│  │                                                             ││
+│  │  (Future contexts...)                                       ││
+│  │  ──────────────────────────►  💰 SHEFA (Economic)           ││
+│  │  ──────────────────────────►  👤 IMAGODEI (Identity)        ││
+│  │  ──────────────────────────►  🏛️ QAHAL (Community)          ││
+│  │                                                             ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  DESIGN PRINCIPLES:                                             │
+│                                                                 │
+│  1. UNIFIED SUBSTRATE                                           │
+│     Same blob storage, same metadata schema, same dimensions    │
+│     (safety, reach, replication) - regardless of app context    │
+│                                                                 │
+│  2. CONTEXT-AWARE UI                                            │
+│     Each app presents content appropriately:                    │
+│     - Photos app: gallery grid, timeline, faces, albums         │
+│     - Video app: poster art, watch progress, recommendations    │
+│     - Books app: cover art, reading progress, annotations       │
+│     - Lamad: learning paths, mastery tracking, quizzes          │
+│                                                                 │
+│  3. CROSS-CONTEXT RELATIONSHIPS                                 │
+│     Content can span contexts:                                  │
+│     - A photo from a family event → referenced in a learning    │
+│       path about family history                                 │
+│     - An audiobook → source for a book club community           │
+│     - A podcast episode → cited in research notes               │
+│                                                                 │
+│  4. OWNERSHIP CONTINUITY                                        │
+│     Unlike siloed services:                                     │
+│     - No vendor lock-in (your data, your nodes)                 │
+│     - Export/migrate entire contexts                            │
+│     - Survive service shutdowns                                 │
+│     - Inherit to next generation                                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**App Context Registry**:
+
+| Context ID | Display Name | Icon | Content Types | Special Features |
+|------------|--------------|------|---------------|------------------|
+| `files` | Personal Files | 📁 | `document`, `spreadsheet`, `presentation`, `archive` | Folder hierarchy, version history |
+| `photos` | Photos & Albums | 📷 | `photo`, `album`, `video-clip` | Face detection, location, timeline |
+| `video` | Video Library | 🎬 | `movie`, `episode`, `home-video` | Watch progress, subtitles, transcoding |
+| `audio` | Audio Library | 🎧 | `podcast`, `music`, `audiobook`, `ambient` | Playback position, playlists |
+| `books` | Book Library | 📚 | `ebook`, `audiobook`, `pdf-book` | Reading position, annotations, highlights |
+| `lamad` | Learning | 🎓 | `concept`, `article`, `quiz`, `path` | Mastery tracking, spaced repetition |
+| `shefa` | Economic | 💰 | `transaction`, `agreement`, `flow` | ValueFlows integration |
+| `imagodei` | Identity | 👤 | `profile`, `attestation`, `presence` | Verification, claims |
+| `qahal` | Community | 🏛️ | `post`, `discussion`, `event` | Governance, consensus |
+
+**UI Considerations**:
+- Global search across all contexts
+- Context switcher in navigation (like Google apps grid)
+- "Add to..." action to link content across contexts
+- Unified storage quota display across all contexts
+- Context-specific viewers/editors with shared dimension controls
+
+---
+
+The remaining three dimensions apply universally across all app contexts:
 
 ### 1. Safety Dimensions
 
