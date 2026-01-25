@@ -14,13 +14,15 @@
  */
 
 import { Component, OnInit, OnDestroy, Input } from '@angular/core';
-import { Observable, Subject, combineLatest } from 'rxjs';
+
 import { takeUntil, tap, debounceTime } from 'rxjs/operators';
 
+import { Observable, Subject, combineLatest } from 'rxjs';
+
 import { SheafaDashboardState } from '../../models/shefa-dashboard.model';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
-import { FamilyCommunityProtectionService } from '../../services/family-community-protection.service';
 import { ComputeEventService } from '../../services/compute-event.service';
+import { FamilyCommunityProtectionService } from '../../services/family-community-protection.service';
+import { ShefaComputeService } from '../../services/shefa-compute.service';
 
 /**
  * Display configuration for dashboard
@@ -101,14 +103,16 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
     }
 
     // Initialize dashboard
-    this.dashboardState$ = this.shefaCompute.initializeDashboard(this.operatorId, this.stewardedResourceId).pipe(
-      tap(state => {
-        this.currentState = state;
-        this.lastUpdateTime = new Date();
-        this.isLoading = false;
-      }),
-      takeUntil(this.destroy$)
-    );
+    this.dashboardState$ = this.shefaCompute
+      .initializeDashboard(this.operatorId, this.stewardedResourceId)
+      .pipe(
+        tap(state => {
+          this.currentState = state;
+          this.lastUpdateTime = new Date();
+          this.isLoading = false;
+        }),
+        takeUntil(this.destroy$)
+      );
 
     // Initialize family-community protection monitoring
     this.familyProtection
@@ -309,7 +313,9 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
    * Get critical alerts only
    */
   getCriticalAlerts() {
-    return this.currentState?.constitutionalLimits.alerts.filter(a => a.severity === 'critical') || [];
+    return (
+      this.currentState?.constitutionalLimits.alerts.filter(a => a.severity === 'critical') || []
+    );
   }
 
   /**
@@ -366,7 +372,11 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
 
     if (format === 'json') {
       const dataStr = JSON.stringify(this.currentState, null, 2);
-      this.downloadFile(dataStr, `shefa-dashboard-${new Date().toISOString()}.json`, 'application/json');
+      this.downloadFile(
+        dataStr,
+        `shefa-dashboard-${new Date().toISOString()}.json`,
+        'application/json'
+      );
     } else if (format === 'csv') {
       const csv = this.convertToCsv(this.currentState);
       this.downloadFile(csv, `shefa-dashboard-${new Date().toISOString()}.csv`, 'text/csv');
@@ -396,7 +406,9 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
     // Tokens
     rows.push('Infrastructure Tokens');
     rows.push(`Balance,${state.infrastructureTokens.balance.tokens.toFixed(2)} tokens`);
-    rows.push(`Earning Rate,${state.infrastructureTokens.earningRate.tokensPerHour.toFixed(4)} tokens/hour`);
+    rows.push(
+      `Earning Rate,${state.infrastructureTokens.earningRate.tokensPerHour.toFixed(4)} tokens/hour`
+    );
     rows.push('');
 
     // Protection

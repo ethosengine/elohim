@@ -14,9 +14,7 @@
         <div class="notice-content">
           <strong>Select a Doorway First</strong>
           <p>You need to select a doorway to initiate recovery.</p>
-          <button class="btn btn-primary" (click)="selectDoorway()">
-            Select Doorway
-          </button>
+          <button class="btn btn-primary" (click)="selectDoorway()">Select Doorway</button>
         </div>
       </div>
     }
@@ -43,8 +41,8 @@
 
         <h2>Claim Your Identity</h2>
         <p class="step-description">
-          Enter your known identifier or display name. Elohim network members
-          will interview you to verify your identity.
+          Enter your known identifier or display name. Elohim network members will interview you to
+          verify your identity.
         </p>
 
         <form class="claim-form" (ngSubmit)="initiateRecovery()">
@@ -76,8 +74,8 @@
           <div class="info-box">
             <span class="material-icons">info</span>
             <p>
-              Recovery requires attestations from network members. They will ask
-              questions about your activity history to verify you are who you claim.
+              Recovery requires attestations from network members. They will ask questions about
+              your activity history to verify you are who you claim.
             </p>
           </div>
 
@@ -112,8 +110,8 @@
 
         <h2>Awaiting Verification</h2>
         <p class="step-description">
-          Your recovery request is being reviewed by Elohim network members.
-          They will conduct interviews to verify your identity.
+          Your recovery request is being reviewed by Elohim network members. They will conduct
+          interviews to verify your identity.
         </p>
 
         <!-- Progress -->
@@ -143,18 +141,23 @@
           <div class="status-section">
             <div class="status-row">
               <span class="status-label">Status</span>
-              <span class="status-value" [style.color]="getRecoveryStatusDisplay(request.status).color">
-                <span class="material-icons">{{ getRecoveryStatusDisplay(request.status).icon }}</span>
+              <span
+                class="status-value"
+                [style.color]="getRecoveryStatusDisplay(request.status).color"
+              >
+                <span class="material-icons">
+                  {{ getRecoveryStatusDisplay(request.status).icon }}
+                </span>
                 {{ getRecoveryStatusDisplay(request.status).label }}
               </span>
             </div>
             <div class="status-row">
               <span class="status-label">Created</span>
-              <span class="status-value">{{ request.createdAt | date:'medium' }}</span>
+              <span class="status-value">{{ request.createdAt | date: 'medium' }}</span>
             </div>
             <div class="status-row">
               <span class="status-label">Expires</span>
-              <span class="status-value">{{ request.expiresAt | date:'medium' }}</span>
+              <span class="status-value">{{ request.expiresAt | date: 'medium' }}</span>
             </div>
           </div>
 
@@ -166,11 +169,17 @@
                 @for (att of request.attestations; track att.id) {
                   <div class="attestation-item" [class]="att.decision">
                     <span class="material-icons">
-                      {{ att.decision === 'affirm' ? 'check_circle' : att.decision === 'deny' ? 'cancel' : 'remove_circle' }}
+                      {{
+                        att.decision === 'affirm'
+                          ? 'check_circle'
+                          : att.decision === 'deny'
+                            ? 'cancel'
+                            : 'remove_circle'
+                      }}
                     </span>
                     <div class="attestation-info">
                       <span class="attester-name">{{ att.attesterDisplayName }}</span>
-                      <span class="attestation-time">{{ att.timestamp | date:'short' }}</span>
+                      <span class="attestation-time">{{ att.timestamp | date: 'short' }}</span>
                     </div>
                     <span class="confidence">{{ att.confidence }}% confidence</span>
                   </div>
@@ -209,8 +218,8 @@
 
         <h2>Recovery Approved</h2>
         <p class="step-description">
-          The Elohim network has verified your identity. You can now complete
-          the recovery process to restore access.
+          The Elohim network has verified your identity. You can now complete the recovery process
+          to restore access.
         </p>
 
         @if (credential(); as cred) {
@@ -221,7 +230,7 @@
             </div>
             <div class="info-row">
               <span class="info-label">Valid Until</span>
-              <span class="info-value">{{ cred.expiresAt | date:'medium' }}</span>
+              <span class="info-value">{{ cred.expiresAt | date: 'medium' }}</span>
             </div>
           </div>
         }

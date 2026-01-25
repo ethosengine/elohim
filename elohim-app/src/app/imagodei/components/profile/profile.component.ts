@@ -8,13 +8,11 @@
  * - Sovereignty stage indicator
  */
 
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { IdentityService } from '../../services/identity.service';
-import { SovereigntyService } from '../../services/sovereignty.service';
-import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
+
 import {
   type UpdateProfileRequest,
   type ProfileReach,
@@ -27,6 +25,10 @@ import {
   getFrameworkDisplayName,
   getCategoryIcon,
 } from '@app/lamad/quiz-engine/models/discovery-assessment.model';
+import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
+
+import { IdentityService } from '../../services/identity.service';
+import { SovereigntyService } from '../../services/sovereignty.service';
 
 @Component({
   selector: 'app-profile',
@@ -103,10 +105,22 @@ export class ProfileComponent implements OnInit {
 
   /** Profile reach options */
   readonly reachOptions: { value: ProfileReach; label: string; description: string }[] = [
-    { value: 'community', label: getReachLabel('community'), description: getReachDescription('community') },
+    {
+      value: 'community',
+      label: getReachLabel('community'),
+      description: getReachDescription('community'),
+    },
     { value: 'public', label: getReachLabel('public'), description: getReachDescription('public') },
-    { value: 'trusted', label: getReachLabel('trusted'), description: getReachDescription('trusted') },
-    { value: 'private', label: getReachLabel('private'), description: getReachDescription('private') },
+    {
+      value: 'trusted',
+      label: getReachLabel('trusted'),
+      description: getReachDescription('trusted'),
+    },
+    {
+      value: 'private',
+      label: getReachLabel('private'),
+      description: getReachDescription('private'),
+    },
   ];
 
   // ==========================================================================

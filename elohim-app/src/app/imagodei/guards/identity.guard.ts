@@ -12,9 +12,10 @@
 
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn, type UrlTree } from '@angular/router';
+
+import { isNetworkMode } from '../models/identity.model';
 import { IdentityService } from '../services/identity.service';
 import { SessionHumanService } from '../services/session-human.service';
-import { isNetworkMode } from '../models/identity.model';
 
 /**
  * Guard that requires network authentication.

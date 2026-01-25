@@ -38,19 +38,27 @@
       <div class="capacity-summary">
         <div class="capacity-item">
           <span class="label">CPU Cores</span>
-          <span class="value">{{ assessment.currentCapacity.totalCPUCores | number:'1.0-0' }}</span>
+          <span class="value">
+            {{ assessment.currentCapacity.totalCPUCores | number: '1.0-0' }}
+          </span>
         </div>
         <div class="capacity-item">
           <span class="label">Memory</span>
-          <span class="value">{{ assessment.currentCapacity.totalMemoryGB | number:'1.0-0' }} GB</span>
+          <span class="value">
+            {{ assessment.currentCapacity.totalMemoryGB | number: '1.0-0' }} GB
+          </span>
         </div>
         <div class="capacity-item">
           <span class="label">Storage</span>
-          <span class="value">{{ assessment.currentCapacity.totalStorageGB | number:'1.0-0' }} GB</span>
+          <span class="value">
+            {{ assessment.currentCapacity.totalStorageGB | number: '1.0-0' }} GB
+          </span>
         </div>
         <div class="capacity-item">
           <span class="label">Bandwidth</span>
-          <span class="value">{{ assessment.currentCapacity.totalBandwidthMbps | number:'1.0-0' }} Mbps</span>
+          <span class="value">
+            {{ assessment.currentCapacity.totalBandwidthMbps | number: '1.0-0' }} Mbps
+          </span>
         </div>
       </div>
     </div>
@@ -81,16 +89,16 @@
           <div class="gap-metrics">
             <div class="metric">
               <span class="metric-label">Current</span>
-              <span class="metric-value">{{ gap.currentValue | number:'1.0-0' }}</span>
+              <span class="metric-value">{{ gap.currentValue | number: '1.0-0' }}</span>
             </div>
             <div class="metric-arrow">→</div>
             <div class="metric">
               <span class="metric-label">Target</span>
-              <span class="metric-value">{{ gap.targetValue | number:'1.0-0' }}</span>
+              <span class="metric-value">{{ gap.targetValue | number: '1.0-0' }}</span>
             </div>
             <div class="metric gap-percent">
               <span class="metric-label">Gap</span>
-              <span class="metric-value">{{ gap.gapPercent | number:'1.0-0' }}%</span>
+              <span class="metric-value">{{ gap.gapPercent | number: '1.0-0' }}%</span>
             </div>
           </div>
         </div>
@@ -131,20 +139,14 @@
 
             <div class="rec-improvement">
               <div class="improvement-bar">
-                <div
-                  class="improvement-fill"
-                  [style.width.%]="rec.improvementPercent"
-                ></div>
+                <div class="improvement-fill" [style.width.%]="rec.improvementPercent"></div>
               </div>
               <span class="improvement-text">{{ rec.improvementPercent }}% improvement</span>
             </div>
           </div>
 
           <div class="rec-actions" *ngIf="selectedRecommendation === rec">
-            <button
-              class="btn-primary"
-              (click)="onOrderNode(rec); $event.stopPropagation()"
-            >
+            <button class="btn-primary" (click)="onOrderNode(rec); $event.stopPropagation()">
               Order {{ rec.displayName }}
             </button>
             <a
@@ -186,9 +188,9 @@
     <div class="capacity-footer" *ngIf="displayMode === 'card'">
       <span class="capacity-label">Current Capacity:</span>
       <span class="capacity-values">
-        {{ assessment.currentCapacity.totalCPUCores | number:'1.0-0' }} cores |
-        {{ assessment.currentCapacity.totalMemoryGB | number:'1.0-0' }} GB RAM |
-        {{ assessment.currentCapacity.totalStorageGB | number:'1.0-0' }} GB storage
+        {{ assessment.currentCapacity.totalCPUCores | number: '1.0-0' }} cores |
+        {{ assessment.currentCapacity.totalMemoryGB | number: '1.0-0' }} GB RAM |
+        {{ assessment.currentCapacity.totalStorageGB | number: '1.0-0' }} GB storage
       </span>
     </div>
   </ng-container>

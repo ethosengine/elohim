@@ -28,11 +28,12 @@
  */
 
 import { Injectable, signal, computed } from '@angular/core';
-import { Observable, of, from, combineLatest } from 'rxjs';
-import { map, switchMap, catchError, shareReplay } from 'rxjs/operators';
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { EconomicService } from './economic.service';
 
+import { map, switchMap, catchError, shareReplay } from 'rxjs/operators';
+
+import { Observable, of, from, combineLatest } from 'rxjs';
+
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import {
   StewardedResource,
   ResourceCategory,
@@ -58,16 +59,18 @@ import {
   getHealthStatus,
 } from '@app/shefa/models/stewarded-resources.model';
 
+import { EconomicService } from './economic.service';
+
 // =============================================================================
 // Stewardship View Alerts & Insights
 // =============================================================================
 
 const ALERT_THRESHOLDS = {
-  CRITICAL_UTILIZATION: 95,    // >95% capacity
-  WARNING_UTILIZATION: 75,     // >75% capacity
-  CRITICAL_DIGNITY_SHORTFALL: 0,  // Below dignity floor
+  CRITICAL_UTILIZATION: 95, // >95% capacity
+  WARNING_UTILIZATION: 75, // >75% capacity
+  CRITICAL_DIGNITY_SHORTFALL: 0, // Below dignity floor
   WARNING_DIGNITY_SHORTFALL: -50, // Within $50 of floor
-  CRITICAL_BURN_RATE: 0,       // Money runs out soon
+  CRITICAL_BURN_RATE: 0, // Money runs out soon
 };
 
 // =============================================================================
@@ -119,9 +122,10 @@ export class StewardedResourceService {
       totalCapacity,
       permanentReserve: options?.permanentReserve,
       allocatableCapacity: {
-        value: (options?.permanentReserve?.value || 0) > 0
-          ? totalCapacity.value - (options.permanentReserve?.value || 0)
-          : totalCapacity.value,
+        value:
+          (options?.permanentReserve?.value || 0) > 0
+            ? totalCapacity.value - (options.permanentReserve?.value || 0)
+            : totalCapacity.value,
         unit: totalCapacity.unit,
       },
       totalAllocated: { value: 0, unit: totalCapacity.unit },
@@ -289,7 +293,7 @@ export class StewardedResourceService {
 
     // Create economic event for immutability
     const event = await this.economicService.createEvent({
-      action: options?.action || 'use' as any,
+      action: options?.action || ('use' as any),
       providerId: resourceId,
       receiverId: resourceId,
       resourceQuantityValue: amount.value,
@@ -403,7 +407,8 @@ export class StewardedResourceService {
         categoriesCovered,
         overallUtilization,
         fullyAllocatedCount,
-        healthStatus: overallUtilization > 90 ? 'critical' : overallUtilization > 75 ? 'warning' : 'healthy',
+        healthStatus:
+          overallUtilization > 90 ? 'critical' : overallUtilization > 75 ? 'warning' : 'healthy',
       },
       alerts,
       insights,
@@ -426,34 +431,36 @@ export class StewardedResourceService {
         resourceCategory: 'financial-asset',
         name: 'Wealth Ceiling (Limitarianism)',
         description: 'Constitutional maximum for net worth holding',
-        floorValue: 75000,                // $75k minimum dignity floor
+        floorValue: 75000, // $75k minimum dignity floor
         floorUnit: 'USD',
         floorRationale: 'Enables basic needs: food, shelter, healthcare, education, dignity',
         floorEnforced: true,
-        ceilingValue: 10000000,           // $10M reasonable ceiling
+        ceilingValue: 10000000, // $10M reasonable ceiling
         ceilingUnit: 'USD',
-        ceilingRationale: 'Beyond this, accumulation enables extraction. Supports community stewardship.',
-        ceilingEnforced: false,           // Soft enforcement initially (voluntary → progressive → hard)
+        ceilingRationale:
+          'Beyond this, accumulation enables extraction. Supports community stewardship.',
+        ceilingEnforced: false, // Soft enforcement initially (voluntary → progressive → hard)
         safeMinValue: 75000,
         safeMaxValue: 10000000,
-        safeZoneDescription: 'Flourishing stewardship - adequate for personal/family + community contribution',
+        safeZoneDescription:
+          'Flourishing stewardship - adequate for personal/family + community contribution',
         governanceLevel: 'Elohim-network',
         constitutionalBasis: 'Part III: Constitutional Economics',
-        enforcementMethod: 'progressive',  // Starting with voluntary, moving to incentive-based
+        enforcementMethod: 'progressive', // Starting with voluntary, moving to incentive-based
         transitionDeadline: '2035-12-31', // 10 year transition period
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
-      'energy': {
+      energy: {
         id: 'limit-time-ceiling',
         resourceCategory: 'energy',
         name: 'Time Allocation Ceiling',
-        description: 'Constitutional maximum for work/extraction of another\'s time',
-        floorValue: 40,                   // 40 hours/week minimum stewardship of self
+        description: "Constitutional maximum for work/extraction of another's time",
+        floorValue: 40, // 40 hours/week minimum stewardship of self
         floorUnit: 'hours/week',
         floorRationale: 'Enables human flourishing - rest, relationships, learning',
         floorEnforced: true,
-        ceilingValue: 100,                // 100 hours max reasonable allocation
+        ceilingValue: 100, // 100 hours max reasonable allocation
         ceilingUnit: 'hours/week',
         ceilingRationale: 'Beyond this is extraction. Community work respects boundaries.',
         ceilingEnforced: false,
@@ -466,16 +473,16 @@ export class StewardedResourceService {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
-      'compute': {
+      compute: {
         id: 'limit-node-capacity',
         resourceCategory: 'compute',
         name: 'Node Capacity Ceiling',
         description: 'Constitutional sharing of node resources',
-        floorValue: 10,                   // 10% minimum for personal autonomy
+        floorValue: 10, // 10% minimum for personal autonomy
         floorUnit: 'percent',
         floorRationale: 'Minimum capacity for self-sovereign apps',
         floorEnforced: true,
-        ceilingValue: 80,                 // 80% max can be allocated before commonwealth kicks in
+        ceilingValue: 80, // 80% max can be allocated before commonwealth kicks in
         ceilingUnit: 'percent',
         ceilingRationale: 'Beyond this, excess capacity returns to commons for community benefit',
         ceilingEnforced: false,
@@ -512,14 +519,23 @@ export class StewardedResourceService {
     const distanceFromFloor = currentValue - limit.floorValue;
     const distanceFromCeiling = currentValue - limit.ceilingValue;
 
-    let positionRelativeToFloor: 'below-floor' | 'at-floor' | 'in-safe-zone' | 'above-ceiling' | 'far-above-ceiling';
-    let complianceStatus: 'compliant' | 'approaching-limit' | 'exceeds-ceiling' | 'far-exceeds-ceiling';
+    let positionRelativeToFloor:
+      | 'below-floor'
+      | 'at-floor'
+      | 'in-safe-zone'
+      | 'above-ceiling'
+      | 'far-above-ceiling';
+    let complianceStatus:
+      | 'compliant'
+      | 'approaching-limit'
+      | 'exceeds-ceiling'
+      | 'far-exceeds-ceiling';
     let warningLevel: 'none' | 'yellow' | 'orange' | 'red';
 
     if (currentValue < limit.floorValue) {
       positionRelativeToFloor = 'below-floor';
       complianceStatus = 'compliant';
-      warningLevel = 'red';  // Critical - dignity floor not met
+      warningLevel = 'red'; // Critical - dignity floor not met
     } else if (currentValue === limit.floorValue) {
       positionRelativeToFloor = 'at-floor';
       complianceStatus = 'compliant';
@@ -539,7 +555,8 @@ export class StewardedResourceService {
     }
 
     const excessAboveCeiling = Math.max(0, currentValue - limit.ceilingValue);
-    const excessPercentage = limit.ceilingValue > 0 ? (excessAboveCeiling / limit.ceilingValue) * 100 : 0;
+    const excessPercentage =
+      limit.ceilingValue > 0 ? (excessAboveCeiling / limit.ceilingValue) * 100 : 0;
 
     return {
       resourceId,
@@ -587,8 +604,10 @@ export class StewardedResourceService {
 
       const totalValue = resources.reduce((sum, r) => sum + r.totalCapacity.value, 0);
       const excess = Math.max(0, totalValue - limit.ceilingValue);
-      const complianceStatus = excess > 0 ? 'exceeds-ceiling' : totalValue >= limit.floorValue ? 'compliant' : 'at-risk';
-      const warningLevel = excess > limit.ceilingValue * 0.5 ? 'red' : excess > 0 ? 'orange' : 'none';
+      const complianceStatus =
+        excess > 0 ? 'exceeds-ceiling' : totalValue >= limit.floorValue ? 'compliant' : 'at-risk';
+      const warningLevel =
+        excess > limit.ceilingValue * 0.5 ? 'red' : excess > 0 ? 'orange' : 'none';
 
       byCategory.push({
         category,
@@ -631,7 +650,7 @@ export class StewardedResourceService {
       categories_at_risk: categoriesAtRisk,
       estimatedTimeToCompliance: totalExcess > 0 ? '18 months' : undefined,
       recommendations,
-      activeTransitionPaths: 0,  // Would query TransitionPath entries
+      activeTransitionPaths: 0, // Would query TransitionPath entries
       transitioningAmount: 0,
       completedTransitions: 0,
     };
@@ -645,7 +664,7 @@ export class StewardedResourceService {
     resourceId: string,
     stewardId: string,
     excessAmount: number,
-    proposedSplits: any[],  // AssetSplit[]
+    proposedSplits: any[], // AssetSplit[]
     governanceLevel: string
   ): Promise<TransitionPath> {
     const now = new Date().toISOString();
@@ -654,9 +673,9 @@ export class StewardedResourceService {
       id: `trans-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       resourceId,
       stewardId,
-      assetName: '',  // Would come from resource
+      assetName: '', // Would come from resource
       currentValue: 0, // Would come from resource
-      constitutionalCeiling: 0,  // Would come from limit
+      constitutionalCeiling: 0, // Would come from limit
       excess: excessAmount,
       proposedSplits,
       totalProposedExcess: proposedSplits.reduce((sum, s) => sum + s.amount, 0),
@@ -667,7 +686,7 @@ export class StewardedResourceService {
       approvalStatus: 'pending',
       executionPhases: [],
       transitionEventIds: [],
-      transparencyLevel: 'community',  // Transparent process
+      transparencyLevel: 'community', // Transparent process
       createdAt: now,
       updatedAt: now,
     };
@@ -693,7 +712,7 @@ export class StewardedResourceService {
   async executeTransitionPhase(
     transitionPathId: string,
     phaseNumber: number,
-    actions: any[]  // TransitionAction[]
+    actions: any[] // TransitionAction[]
   ): Promise<TransitionPhase> {
     const now = new Date().toISOString();
 
@@ -740,7 +759,10 @@ export class StewardedResourceService {
    * Integrates income, obligations, assets, and dignity floor
    */
   async buildFinancialView(stewardId: string): Promise<FinancialStewardshipView> {
-    const assets = await this.getResourcesByCategory(stewardId, 'financial-asset') as FinancialAsset[];
+    const assets = (await this.getResourcesByCategory(
+      stewardId,
+      'financial-asset'
+    )) as FinancialAsset[];
 
     // Aggregate income streams
     const allIncomeStreams: IncomeStream[] = [];
@@ -817,7 +839,7 @@ export class StewardedResourceService {
       totalLiabilities: totalLiability,
       obligations: allObligations,
       dignityFloor,
-      onTrackForDignity: monthlyDifference >= (dignityFloor.totalMonthlyFloor - monthlyObligations),
+      onTrackForDignity: monthlyDifference >= dignityFloor.totalMonthlyFloor - monthlyObligations,
       monthlyDifference,
       financialHealth,
       recommendations,
@@ -842,11 +864,11 @@ export class StewardedResourceService {
   ): DignityFloor {
     // These would come from governance constitution
     // For now, using reasonable minimums
-    const foodDailyAmount = 10;           // $10/day for food
-    const shelterMonthlyAmount = 800;     // $800/month rent minimum
-    const healthcareMonthlyAmount = 200;  // $200/month healthcare
-    const internetMonthlyAmount = 50;     // $50/month internet
-    const transportMonthlyAmount = 100;   // $100/month transport
+    const foodDailyAmount = 10; // $10/day for food
+    const shelterMonthlyAmount = 800; // $800/month rent minimum
+    const healthcareMonthlyAmount = 200; // $200/month healthcare
+    const internetMonthlyAmount = 50; // $50/month internet
+    const transportMonthlyAmount = 100; // $100/month transport
 
     const totalMonthlyFloor =
       foodDailyAmount * 30 +
@@ -883,18 +905,18 @@ export class StewardedResourceService {
     dignityFloor: DignityFloor
   ): 'healthy' | 'stable' | 'at-risk' | 'critical' {
     if (!dignityFloor.floorMet) {
-      return 'critical';  // Below dignity floor
+      return 'critical'; // Below dignity floor
     }
     if (income - obligations < 100) {
-      return 'at-risk';   // Little buffer
+      return 'at-risk'; // Little buffer
     }
     if (totalLiability > income * 6) {
-      return 'at-risk';   // High debt
+      return 'at-risk'; // High debt
     }
     if (income - obligations > 500) {
-      return 'healthy';   // Good surplus
+      return 'healthy'; // Good surplus
     }
-    return 'stable';      // Adequate
+    return 'stable'; // Adequate
   }
 
   /**
@@ -957,11 +979,7 @@ export class StewardedResourceService {
    */
   private async persistResource(resource: StewardedResource): Promise<void> {
     try {
-      await this.holochain.callZomeFunction(
-        'content_store',
-        'create_stewarded_resource',
-        resource
-      );
+      await this.holochain.callZomeFunction('content_store', 'create_stewarded_resource', resource);
     } catch (err) {
       console.error('Error persisting resource:', err);
       throw err;
@@ -973,11 +991,10 @@ export class StewardedResourceService {
    */
   private async persistAllocation(resourceId: string, allocation: AllocationBlock): Promise<void> {
     try {
-      await this.holochain.callZomeFunction(
-        'content_store',
-        'create_allocation_block',
-        { resource_id: resourceId, allocation }
-      );
+      await this.holochain.callZomeFunction('content_store', 'create_allocation_block', {
+        resource_id: resourceId,
+        allocation,
+      });
     } catch (err) {
       console.error('Error persisting allocation:', err);
       throw err;
@@ -989,11 +1006,10 @@ export class StewardedResourceService {
    */
   private async persistUsage(resourceId: string, usage: UsageRecord): Promise<void> {
     try {
-      await this.holochain.callZomeFunction(
-        'content_store',
-        'record_resource_usage',
-        { resource_id: resourceId, usage }
-      );
+      await this.holochain.callZomeFunction('content_store', 'record_resource_usage', {
+        resource_id: resourceId,
+        usage,
+      });
     } catch (err) {
       console.error('Error persisting usage:', err);
       throw err;
@@ -1007,19 +1023,19 @@ export class StewardedResourceService {
     if (categories.length === 0) return 0;
 
     const weights: Record<ResourceCategory, number> = {
-      'energy': 0.20,           // 20% weight - time/attention critical
-      'compute': 0.15,          // 15% weight - node capacity important
-      'water': 0.10,
-      'food': 0.10,
-      'shelter': 0.10,
-      'transportation': 0.05,
-      'property': 0.05,
-      'equipment': 0.05,
-      'inventory': 0.05,
-      'knowledge': 0.00,        // Knowledge is unlimited
-      'reputation': 0.00,       // Reputation is unlimited
-      'financial-asset': 0.15,  // 15% weight - money important
-      'uba': 0.00,              // UBA is safety net
+      energy: 0.2, // 20% weight - time/attention critical
+      compute: 0.15, // 15% weight - node capacity important
+      water: 0.1,
+      food: 0.1,
+      shelter: 0.1,
+      transportation: 0.05,
+      property: 0.05,
+      equipment: 0.05,
+      inventory: 0.05,
+      knowledge: 0.0, // Knowledge is unlimited
+      reputation: 0.0, // Reputation is unlimited
+      'financial-asset': 0.15, // 15% weight - money important
+      uba: 0.0, // UBA is safety net
     };
 
     let totalWeight = 0;
@@ -1082,7 +1098,7 @@ export class StewardedResourceService {
 
     // Find underutilized resources
     const underutilized = resources.filter(
-      r => r.totalAllocated.value > 0 && (r.totalUsed.value / r.totalAllocated.value) < 0.5
+      r => r.totalAllocated.value > 0 && r.totalUsed.value / r.totalAllocated.value < 0.5
     );
 
     if (underutilized.length > 0) {
@@ -1104,13 +1120,13 @@ export class StewardedResourceService {
    */
   private normalizeToMonthly(amount: number, frequency: string): number {
     const conversions: Record<string, number> = {
-      'daily': 30,
-      'weekly': 4.3,
-      'biweekly': 2.17,
-      'monthly': 1,
-      'quarterly': 0.33,
-      'annual': 0.083,
-      'irregular': 0,
+      daily: 30,
+      weekly: 4.3,
+      biweekly: 2.17,
+      monthly: 1,
+      quarterly: 0.33,
+      annual: 0.083,
+      irregular: 0,
     };
     return amount * (conversions[frequency] || 0);
   }
@@ -1120,7 +1136,8 @@ export class StewardedResourceService {
    */
   private assessIncomeStability(streams: IncomeStream[]): 'stable' | 'variable' | 'uncertain' {
     const guaranteedCount = streams.filter(s => s.isGuaranteed && s.status === 'active').length;
-    const averageConfidence = streams.reduce((sum, s) => sum + s.confidence, 0) / (streams.length || 1);
+    const averageConfidence =
+      streams.reduce((sum, s) => sum + s.confidence, 0) / (streams.length || 1);
 
     if (guaranteedCount > streams.length * 0.7 && averageConfidence > 80) {
       return 'stable';

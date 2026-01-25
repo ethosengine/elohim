@@ -1,6 +1,8 @@
 <!-- Main Message - Transition from content to footer -->
 <div class="main-message-transition">
-  <p class="primary-message"><strong>The time to build technology organized around love is now.</strong></p>
+  <p class="primary-message">
+    <strong>The time to build technology organized around love is now.</strong>
+  </p>
   <p class="subtitle">Elohim Protocol - Digital Infrastructure for Human Flourishing</p>
 </div>
 
@@ -12,52 +14,104 @@
         <a routerLink="/lamad" class="docs-link">📚 Lamad Learning Platform</a>
         <span class="separator">|</span>
         <span>Follow the Project</span>
-        <a href="https://github.com/ethosengine/elohim" class="social-icon" target="_blank" rel="noopener noreferrer">
+        <a
+          href="https://github.com/ethosengine/elohim"
+          class="social-icon"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <i class="fab fa-github"></i>
           <span>github.com/ethosengine/elohim</span>
         </a>
         <span class="separator">|</span>
-        <span>The Elohim Protocol is the AI alignment vision of <a href="https://ethosengine.com" target="_blank" rel="noopener noreferrer">https://ethosengine.com</a></span>
+        <span>
+          The Elohim Protocol is the AI alignment vision of
+          <a href="https://ethosengine.com" target="_blank" rel="noopener noreferrer">
+            https://ethosengine.com
+          </a>
+        </span>
       </div>
-      
+
       <p class="ethos-description">
-        The name '<span class="tech-term">ethosengine</span>' embodies my core mission. In our digital
-        world, we are saturated with emotional appeals (<span class="tech-term">pathos</span>) and technical
-        justifications (<span class="tech-term">logos</span>), yet what we urgently need is <span
-        class="tech-term">ethos</span> – ethical credibility. Building trust is the hardest thing to do
-        and the easiest to break, especially in an age of information overload. My aim is to build trust
-        into the tools we create, technology that not only functions effectively but also empowers us to
-        live wisely.
+        The name '
+        <span class="tech-term">ethosengine</span>
+        ' embodies my core mission. In our digital world, we are saturated with emotional appeals (
+        <span class="tech-term">pathos</span>
+        ) and technical justifications (
+        <span class="tech-term">logos</span>
+        ), yet what we urgently need is
+        <span class="tech-term">ethos</span>
+        – ethical credibility. Building trust is the hardest thing to do and the easiest to break,
+        especially in an age of information overload. My aim is to build trust into the tools we
+        create, technology that not only functions effectively but also empowers us to live wisely.
       </p>
     </div>
-    
+
     <!-- Support Section -->
     <div class="support-section">
-      <p class="support-text">If the Elohim Protocol vision inspired you today, consider supporting the work by sending a coffee to the developer. A contribution creates space, energy, and time for the future exploration of what technology organized around love could look like.</p>
+      <p class="support-text">
+        If the Elohim Protocol vision inspired you today, consider supporting the work by sending a
+        coffee to the developer. A contribution creates space, energy, and time for the future
+        exploration of what technology organized around love could look like.
+      </p>
       <div class="social-links">
-        <a href="https://www.linkedin.com/in/MatthewBDowell" class="social-icon" target="_blank" rel="noopener noreferrer">
+        <a
+          href="https://www.linkedin.com/in/MatthewBDowell"
+          class="social-icon"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <i class="fab fa-linkedin"></i>
           <span>Matthew B. Dowell</span>
         </a>
-        <a href="https://github.com/Mbd06b" class="social-icon" target="_blank" rel="noopener noreferrer">
+        <a
+          href="https://github.com/Mbd06b"
+          class="social-icon"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <i class="fab fa-github"></i>
           <span>github.com/Mbd06b</span>
         </a>
       </div>
       <div class="support-links">
-        <a href="https://www.buymeacoffee.com/mbd06b" target="_blank" rel="noopener noreferrer" class="support-btn">
-          <img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" />
+        <a
+          href="https://www.buymeacoffee.com/mbd06b"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="support-btn"
+        >
+          <img
+            src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png"
+            alt="Buy Me A Coffee"
+          />
         </a>
-        <a href="https://commerce.coinbase.com/checkout/81641625-3924-4635-93e8-4d01caae73fd" target="_blank" rel="noopener noreferrer" class="support-btn">
-          <img src="https://img.shields.io/badge/Buy%20me%20a-Crypto%20Coffee-blue.svg?style=for-the-badge&logo=ethereum" alt="Buy Me A Crypto Coffee" />
+        <a
+          href="https://commerce.coinbase.com/checkout/81641625-3924-4635-93e8-4d01caae73fd"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="support-btn"
+        >
+          <img
+            src="https://img.shields.io/badge/Buy%20me%20a-Crypto%20Coffee-blue.svg?style=for-the-badge&logo=ethereum"
+            alt="Buy Me A Crypto Coffee"
+          />
         </a>
       </div>
     </div>
-    
+
     <!-- Build Info -->
     <div class="build-info">
-      <a [href]="githubCommitUrl" data-cy="git-hash" class="git-hash" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'View commit ' + gitHash + ' on GitHub'">{{ gitHash }}</a>
+      <a
+        [href]="githubCommitUrl"
+        data-cy="git-hash"
+        class="git-hash"
+        target="_blank"
+        rel="noopener noreferrer"
+        [attr.aria-label]="'View commit ' + gitHash + ' on GitHub'"
+      >
+        {{ gitHash }}
+      </a>
     </div>
-    
   </div>
 </footer>

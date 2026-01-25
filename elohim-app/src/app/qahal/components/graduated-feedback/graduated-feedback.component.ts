@@ -1,7 +1,9 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+
 import { Subject, takeUntil } from 'rxjs';
+
 import {
   GovernanceSignalService,
   GraduatedFeedbackInput,
@@ -188,7 +190,8 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
       reasoning: this.reasoning.trim() || undefined,
     };
 
-    this.signalService.recordGraduatedFeedback(this.contentId, feedback)
+    this.signalService
+      .recordGraduatedFeedback(this.contentId, feedback)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: success => {
@@ -245,7 +248,8 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
   }
 
   private loadStats(): void {
-    this.signalService.getFeedbackStats(this.contentId)
+    this.signalService
+      .getFeedbackStats(this.contentId)
       .pipe(takeUntil(this.destroy$))
       .subscribe(stats => {
         this.stats = stats;
@@ -253,13 +257,11 @@ export class GraduatedFeedbackComponent implements OnInit, OnDestroy {
   }
 
   private subscribeToChanges(): void {
-    this.signalService.signalChanges$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(change => {
-        if (change?.type === 'graduated-feedback' && change.contentId === this.contentId) {
-          this.loadStats();
-        }
-      });
+    this.signalService.signalChanges$.pipe(takeUntil(this.destroy$)).subscribe(change => {
+      if (change?.type === 'graduated-feedback' && change.contentId === this.contentId) {
+        this.loadStats();
+      }
+    });
   }
 }
 

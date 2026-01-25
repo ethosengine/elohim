@@ -12,12 +12,13 @@
  * - Preparing for a contributor's arrival
  */
 
-import { Component, inject, signal, computed, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, signal, computed, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { PresenceService } from '../../services/presence.service';
+
 import { ContentService } from '@app/lamad/services/content.service';
+
 import {
   type CreatePresenceRequest,
   type ExternalIdentifier,
@@ -26,6 +27,7 @@ import {
   getProviderLabel,
   getProviderIcon,
 } from '../../models/presence.model';
+import { PresenceService } from '../../services/presence.service';
 
 /** External identifier being edited */
 interface IdentifierEntry {
@@ -82,7 +84,7 @@ export class CreatePresenceComponent {
   readonly contentSearch = signal('');
 
   /** Content search results */
-  readonly contentResults = signal<Array<{ id: string; title: string }>>([]);
+  readonly contentResults = signal<{ id: string; title: string }[]>([]);
 
   // ===========================================================================
   // Component State
@@ -175,12 +177,10 @@ export class CreatePresenceComponent {
     }
 
     this.contentService.searchContent(query).subscribe({
-      next: (results) => {
-        this.contentResults.set(
-          results.slice(0, 10).map(c => ({ id: c.id, title: c.title }))
-        );
+      next: results => {
+        this.contentResults.set(results.slice(0, 10).map(c => ({ id: c.id, title: c.title })));
       },
-      error: (err) => {
+      error: err => {
         console.error('[CreatePresence] Content search failed:', err);
         this.contentResults.set([]);
       },
@@ -239,9 +239,8 @@ export class CreatePresenceComponent {
       const request: CreatePresenceRequest = {
         displayName: this.form.displayName.trim(),
         externalIdentifiers: externalIdentifiers.length > 0 ? externalIdentifiers : undefined,
-        establishingContentIds: this.establishingContentIds().length > 0
-          ? this.establishingContentIds()
-          : undefined,
+        establishingContentIds:
+          this.establishingContentIds().length > 0 ? this.establishingContentIds() : undefined,
         note: this.form.note.trim() || undefined,
       };
 

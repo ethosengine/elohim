@@ -37,14 +37,14 @@
  * - Accumulated value tracked as EconomicResource
  */
 
+import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
 import {
   REAAgent,
   ExternalIdentifier,
   EconomicResource,
   Commitment,
-  Measure
+  Measure,
 } from '@app/elohim/models/rea-bridge.model';
-import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
 
 // ============================================================================
 // Presence State
@@ -54,17 +54,17 @@ import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
  * PresenceState - The lifecycle state of a contributor presence.
  */
 export type PresenceState =
-  | 'unclaimed'   // Presence exists, no steward assigned
-  | 'stewarded'   // Elohim actively stewarding, recognition accumulating
-  | 'claimed';    // Contributor has verified identity and claimed presence
+  | 'unclaimed' // Presence exists, no steward assigned
+  | 'stewarded' // Elohim actively stewarding, recognition accumulating
+  | 'claimed'; // Contributor has verified identity and claimed presence
 
 /**
  * State transition rules.
  */
 export const PRESENCE_STATE_TRANSITIONS: Record<PresenceState, PresenceState[]> = {
-  'unclaimed': ['stewarded'],           // Can only move to stewarded
-  'stewarded': ['claimed'],             // Can only move to claimed
-  'claimed': [],                        // Terminal state (within this model)
+  unclaimed: ['stewarded'], // Can only move to stewarded
+  stewarded: ['claimed'], // Can only move to claimed
+  claimed: [], // Terminal state (within this model)
 };
 
 // ============================================================================
@@ -269,14 +269,14 @@ export interface StewardshipActivity {
  * StewardshipActivityType - Types of stewardship activities.
  */
 export type StewardshipActivityType =
-  | 'recognition-audit'      // Verified recognition is legitimate
-  | 'fraud-prevention'       // Prevented fraudulent claims
-  | 'invitation-sent'        // Sent invitation to contributor
-  | 'identity-research'      // Researched contributor's identity
-  | 'content-verification'   // Verified content attribution
-  | 'nested-stewardship'     // Managed nested presences
-  | 'quality-review'         // Reviewed presence quality
-  | 'escalation';            // Escalated to higher governance
+  | 'recognition-audit' // Verified recognition is legitimate
+  | 'fraud-prevention' // Prevented fraudulent claims
+  | 'invitation-sent' // Sent invitation to contributor
+  | 'identity-research' // Researched contributor's identity
+  | 'content-verification' // Verified content attribution
+  | 'nested-stewardship' // Managed nested presences
+  | 'quality-review' // Reviewed presence quality
+  | 'escalation'; // Escalated to higher governance
 
 // ============================================================================
 // Presence Invitation
@@ -328,34 +328,34 @@ export interface PresenceInvitation {
  * InvitationChannel - How invitations can be sent.
  */
 export type InvitationChannel =
-  | 'email'           // Direct email
-  | 'twitter'         // Twitter DM or mention
-  | 'github'          // GitHub issue/discussion
+  | 'email' // Direct email
+  | 'twitter' // Twitter DM or mention
+  | 'github' // GitHub issue/discussion
   | 'website-contact' // Contact form on contributor's website
-  | 'orcid'           // ORCID messaging
-  | 'publisher'       // Through publisher
-  | 'community';      // Through mutual community connection
+  | 'orcid' // ORCID messaging
+  | 'publisher' // Through publisher
+  | 'community'; // Through mutual community connection
 
 /**
  * InvitationStatus - State of an invitation.
  */
 export type InvitationStatus =
-  | 'pending'     // Sent, awaiting response
-  | 'delivered'   // Confirmed delivered
-  | 'opened'      // Confirmed opened (if trackable)
-  | 'responded'   // Contributor responded
-  | 'bounced'     // Failed to deliver
-  | 'expired';    // No response within window
+  | 'pending' // Sent, awaiting response
+  | 'delivered' // Confirmed delivered
+  | 'opened' // Confirmed opened (if trackable)
+  | 'responded' // Contributor responded
+  | 'bounced' // Failed to deliver
+  | 'expired'; // No response within window
 
 /**
  * InvitationResponse - How the contributor responded.
  */
 export type InvitationResponse =
-  | 'interested'       // Wants to claim
-  | 'not-interested'   // Declined
-  | 'more-info'        // Wants more information
-  | 'not-me'           // Wrong person
-  | 'later';           // Interested but not now
+  | 'interested' // Wants to claim
+  | 'not-interested' // Declined
+  | 'more-info' // Wants more information
+  | 'not-me' // Wrong person
+  | 'later'; // Interested but not now
 
 // ============================================================================
 // Presence Claim
@@ -400,13 +400,13 @@ export interface PresenceClaim {
  * ClaimVerificationMethod - How identity was verified.
  */
 export type ClaimVerificationMethod =
-  | 'domain-verification'  // Prove control of website domain
-  | 'social-verification'  // Prove control of social account
-  | 'email-verification'   // Prove control of email
-  | 'orcid-verification'   // ORCID authentication
-  | 'github-verification'  // GitHub authentication
+  | 'domain-verification' // Prove control of website domain
+  | 'social-verification' // Prove control of social account
+  | 'email-verification' // Prove control of email
+  | 'orcid-verification' // ORCID authentication
+  | 'github-verification' // GitHub authentication
   | 'publisher-attestation' // Publisher vouches for identity
-  | 'community-vouching'   // Community members vouch
+  | 'community-vouching' // Community members vouch
   | 'cryptographic-proof'; // Existing cryptographic identity
 
 /**
@@ -613,11 +613,11 @@ export interface RecognitionFlowEvent {
  * RecognitionFlowType - Types of recognition that can flow.
  */
 export type RecognitionFlowType =
-  | 'view'              // Someone viewed the contributor's content
-  | 'affinity'          // Someone marked affinity with the content
-  | 'citation'          // Someone cited the content
-  | 'endorsement'       // Someone formally endorsed
-  | 'path-inclusion'    // Content included in a learning path
+  | 'view' // Someone viewed the contributor's content
+  | 'affinity' // Someone marked affinity with the content
+  | 'citation' // Someone cited the content
+  | 'endorsement' // Someone formally endorsed
+  | 'path-inclusion' // Content included in a learning path
   | 'synthesis-reference'; // Elohim referenced in synthesis
 
 // ============================================================================
@@ -663,11 +663,11 @@ export interface NestedStewardshipOffer {
  * NestedRelationship - How the nested presence relates to the steward.
  */
 export type NestedRelationship =
-  | 'cited-by'        // Nested presence cited the steward's work
-  | 'builds-upon'     // Nested presence's work builds on steward's
-  | 'same-domain'     // Same knowledge domain
-  | 'collaborator'    // Known collaborator
-  | 'student-of';     // Was a student/mentee
+  | 'cited-by' // Nested presence cited the steward's work
+  | 'builds-upon' // Nested presence's work builds on steward's
+  | 'same-domain' // Same knowledge domain
+  | 'collaborator' // Known collaborator
+  | 'student-of'; // Was a student/mentee
 
 // ============================================================================
 // Default Configurations

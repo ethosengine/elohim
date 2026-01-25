@@ -22,6 +22,7 @@
  */
 
 import { Injectable } from '@angular/core';
+
 import { Observable } from 'rxjs';
 
 import {
@@ -29,7 +30,6 @@ import {
   CreateEventRequest,
   LamadEventType,
 } from '@app/elohim/models/economic-event.model';
-
 import {
   Intent,
   Proposal,
@@ -38,7 +38,6 @@ import {
   Measure,
   GovernanceLayer,
 } from '@app/elohim/models/rea-bridge.model';
-
 import {
   ServiceRequest,
   ServiceOffer,
@@ -95,10 +94,7 @@ export class RequestsAndOffersService {
     if (!requestDetails.serviceTypeIds || requestDetails.serviceTypeIds.length === 0) {
       throw new Error('Request must specify at least one service type');
     }
-    if (
-      !requestDetails.mediumOfExchangeIds ||
-      requestDetails.mediumOfExchangeIds.length === 0
-    ) {
+    if (!requestDetails.mediumOfExchangeIds || requestDetails.mediumOfExchangeIds.length === 0) {
       throw new Error('Request must specify at least one payment method');
     }
 
@@ -121,7 +117,7 @@ export class RequestsAndOffersService {
       budget: requestDetails.budget,
       mediumOfExchangeIds: requestDetails.mediumOfExchangeIds,
       status: 'pending', // Awaiting admin approval
-      isPublic: false,   // Hidden until approved
+      isPublic: false, // Hidden until approved
       links: requestDetails.links || [],
       createdAt: now,
       updatedAt: now,
@@ -370,10 +366,7 @@ export class RequestsAndOffersService {
     if (!offerDetails.serviceTypeIds || offerDetails.serviceTypeIds.length === 0) {
       throw new Error('Offer must specify at least one service type');
     }
-    if (
-      !offerDetails.mediumOfExchangeIds ||
-      offerDetails.mediumOfExchangeIds.length === 0
-    ) {
+    if (!offerDetails.mediumOfExchangeIds || offerDetails.mediumOfExchangeIds.length === 0) {
       throw new Error('Offer must specify at least one payment method');
     }
 
@@ -398,7 +391,7 @@ export class RequestsAndOffersService {
       mediumOfExchangeIds: offerDetails.mediumOfExchangeIds,
       acceptsAlternativePayment: offerDetails.acceptsAlternativePayment || false,
       status: 'pending', // Awaiting admin approval
-      isPublic: false,   // Hidden until approved
+      isPublic: false, // Hidden until approved
       links: offerDetails.links || [],
       createdAt: now,
       updatedAt: now,
@@ -617,15 +610,15 @@ export class RequestsAndOffersService {
    */
   async searchRequests(
     filters: {
-      serviceTypeIds?: string[];        // Filter by service categories
-      searchText?: string;              // Text search (title + description)
-      timeZone?: string;                // Only show requests in this timezone
+      serviceTypeIds?: string[]; // Filter by service categories
+      searchText?: string; // Text search (title + description)
+      timeZone?: string; // Only show requests in this timezone
       interactionType?: InteractionType; // Virtual/InPerson/Hybrid
-      minDate?: string;                 // Requests needed by this date
-      maxDate?: string;                 // Requests available until this date
-      budgetMin?: number;               // Min budget
-      budgetMax?: number;               // Max budget
-      mediumOfExchangeIds?: string[];   // Only show requests accepting these
+      minDate?: string; // Requests needed by this date
+      maxDate?: string; // Requests available until this date
+      budgetMin?: number; // Min budget
+      budgetMax?: number; // Max budget
+      mediumOfExchangeIds?: string[]; // Only show requests accepting these
     },
     pagination?: { page: number; pageSize: number }
   ): Promise<{
@@ -715,7 +708,7 @@ export class RequestsAndOffersService {
    *
    * Return requests with high engagement (saves, contacts, etc).
    */
-  async getTrendingRequests(limit: number = 10): Promise<ServiceRequest[]> {
+  async getTrendingRequests(limit = 10): Promise<ServiceRequest[]> {
     // TODO: In production, query DHT for requests with highest:
     // - Number of matches suggested
     // - Number of saves
@@ -728,7 +721,7 @@ export class RequestsAndOffersService {
   /**
    * Get trending or featured offers.
    */
-  async getTrendingOffers(limit: number = 10): Promise<ServiceOffer[]> {
+  async getTrendingOffers(limit = 10): Promise<ServiceOffer[]> {
     // TODO: In production, query DHT for offers with highest:
     // - Number of matches suggested
     // - Number of saves
@@ -761,10 +754,7 @@ export class RequestsAndOffersService {
    *
    * See: docs/alignment-reviews/service-matching-algorithm.md
    */
-  async findMatchesForRequest(
-    requestId: string,
-    limit: number = 10
-  ): Promise<ServiceMatch[]> {
+  async findMatchesForRequest(requestId: string, limit = 10): Promise<ServiceMatch[]> {
     // PLACEHOLDER IMPLEMENTATION
     // TODO: Implement matching algorithm with alignment review
     //
@@ -800,7 +790,7 @@ export class RequestsAndOffersService {
    * Mirror of findMatchesForRequest for offers.
    * See ⚠️ notes on findMatchesForRequest about alignment review.
    */
-  async findMatchesForOffer(offerId: string, limit: number = 10): Promise<ServiceMatch[]> {
+  async findMatchesForOffer(offerId: string, limit = 10): Promise<ServiceMatch[]> {
     // PLACEHOLDER IMPLEMENTATION
     // TODO: Implement matching algorithm with alignment review
     // See findMatchesForRequest for design notes and governance requirements
@@ -841,10 +831,7 @@ export class RequestsAndOffersService {
   /**
    * Update match status (contacted, negotiating, agreed, etc).
    */
-  async updateMatchStatus(
-    matchId: string,
-    status: ServiceMatch['status']
-  ): Promise<ServiceMatch> {
+  async updateMatchStatus(matchId: string, status: ServiceMatch['status']): Promise<ServiceMatch> {
     // TODO: Implementation
     throw new Error('Not yet implemented');
   }
@@ -1002,7 +989,7 @@ export class RequestsAndOffersService {
     }
   ): Promise<{
     settlement: EconomicEvent;
-    reputation?: EconomicEvent;  // If creating reputation flow
+    reputation?: EconomicEvent; // If creating reputation flow
   }> {
     // TODO: Implementation
     // 1. Get match, request, offer
@@ -1047,7 +1034,7 @@ export class RequestsAndOffersService {
    *
    * Use their preferences (time zone, service types, skills) to suggest requests.
    */
-  async getRecommendedRequests(userId: string, limit: number = 10): Promise<ServiceRequest[]> {
+  async getRecommendedRequests(userId: string, limit = 10): Promise<ServiceRequest[]> {
     // TODO: Implementation
     throw new Error('Not yet implemented');
   }
@@ -1055,7 +1042,7 @@ export class RequestsAndOffersService {
   /**
    * Get recommended offers for user based on their needs.
    */
-  async getRecommendedOffers(userId: string, limit: number = 10): Promise<ServiceOffer[]> {
+  async getRecommendedOffers(userId: string, limit = 10): Promise<ServiceOffer[]> {
     // TODO: Implementation
     throw new Error('Not yet implemented');
   }
@@ -1069,11 +1056,7 @@ export class RequestsAndOffersService {
    *
    * User wants to remember this for later.
    */
-  async saveRequest(
-    userId: string,
-    requestId: string,
-    reason?: string
-  ): Promise<SavedRequest> {
+  async saveRequest(userId: string, requestId: string, reason?: string): Promise<SavedRequest> {
     // TODO: Implementation
     throw new Error('Not yet implemented');
   }
@@ -1235,7 +1218,10 @@ export class RequestsAndOffersService {
    *
    * Sets admin status to 'accepted' so it becomes visible.
    */
-  async approveRequest(requestId: string, adminId: string): Promise<{
+  async approveRequest(
+    requestId: string,
+    adminId: string
+  ): Promise<{
     request: ServiceRequest;
     adminStatus: ListingAdminStatus;
   }> {
@@ -1246,7 +1232,10 @@ export class RequestsAndOffersService {
   /**
    * Approve an offer (admin only).
    */
-  async approveOffer(offerId: string, adminId: string): Promise<{
+  async approveOffer(
+    offerId: string,
+    adminId: string
+  ): Promise<{
     offer: ServiceOffer;
     adminStatus: ListingAdminStatus;
   }> {

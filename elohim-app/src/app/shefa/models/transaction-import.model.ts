@@ -8,8 +8,9 @@
  * Plaid Bank API → PlaidTransaction[] → StagedTransaction[] → EconomicEvent[]
  */
 
-import { ResourceMeasure } from './stewarded-resources.model';
 import { EventState } from '@app/elohim/models/economic-event.model';
+
+import { ResourceMeasure } from './stewarded-resources.model';
 
 // ============================================================================
 // PLAID CONNECTION MANAGEMENT
@@ -354,10 +355,10 @@ export interface PlaidTransaction {
     primary: string;
     detailed: string;
   };
-  counterparties?: Array<{
+  counterparties?: {
     name: string;
     type: string;
-  }>;
+  }[];
   transaction_type: string;
   pending: boolean;
   [key: string]: unknown;

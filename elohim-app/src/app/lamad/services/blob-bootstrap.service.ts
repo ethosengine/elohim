@@ -11,9 +11,9 @@
  */
 
 import { Injectable, signal, computed, inject } from '@angular/core';
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { BlobManagerService } from './blob-manager.service';
-import { BlobCacheTiersService } from './blob-cache-tiers.service';
+
 import {
   BlobBootstrapEngine,
   BlobBootstrapState,
@@ -23,6 +23,8 @@ import {
   CacheIntegrityVerifier,
   BlobBootstrapConfig,
 } from './blob-bootstrap-engine';
+import { BlobCacheTiersService } from './blob-cache-tiers.service';
+import { BlobManagerService } from './blob-manager.service';
 
 // Re-export types for convenience
 export type { BlobBootstrapStatus, BlobBootstrapState } from './blob-bootstrap-engine';
@@ -51,12 +53,10 @@ export class BlobBootstrapService {
 
   // Convenience computed signals for UI reactivity
   readonly status = computed(() => this.bootstrapState().status);
-  readonly isReady = computed(() =>
-    ['ready', 'degraded'].includes(this.bootstrapState().status)
-  );
-  readonly canServeOffline = computed(() =>
-    this.bootstrapState().cacheInitialized &&
-    this.bootstrapState().preloadedContentIds.size > 0
+  readonly isReady = computed(() => ['ready', 'degraded'].includes(this.bootstrapState().status));
+  readonly canServeOffline = computed(
+    () =>
+      this.bootstrapState().cacheInitialized && this.bootstrapState().preloadedContentIds.size > 0
   );
 
   // The framework-agnostic engine (all bootstrap logic here)
@@ -98,16 +98,16 @@ export class BlobBootstrapService {
     this.engine = new BlobBootstrapEngine(holochainChecker, metadataFetcher, cacheVerifier, config);
 
     // Bridge engine events to Angular signals
-    this.engine.on('status-changed', (event) => {
-      this.bootstrapState.update((state) => ({ ...state, status: event.status }));
+    this.engine.on('status-changed', event => {
+      this.bootstrapState.update(state => ({ ...state, status: event.status }));
     });
 
     this.engine.on('holochain-connected', () => {
-      this.bootstrapState.update((state) => ({ ...state, holochainConnected: true }));
+      this.bootstrapState.update(state => ({ ...state, holochainConnected: true }));
     });
 
-    this.engine.on('metadata-loaded', (event) => {
-      this.bootstrapState.update((state) => ({
+    this.engine.on('metadata-loaded', event => {
+      this.bootstrapState.update(state => ({
         ...state,
         metadataLoaded: true,
         preloadedContentIds: new Set(event.contentIds),
@@ -115,19 +115,19 @@ export class BlobBootstrapService {
     });
 
     this.engine.on('cache-initialized', () => {
-      this.bootstrapState.update((state) => ({ ...state, cacheInitialized: true }));
+      this.bootstrapState.update(state => ({ ...state, cacheInitialized: true }));
     });
 
     this.engine.on('integrity-started', () => {
-      this.bootstrapState.update((state) => ({ ...state, integrityCheckStarted: true }));
+      this.bootstrapState.update(state => ({ ...state, integrityCheckStarted: true }));
     });
 
-    this.engine.on('error', (event) => {
-      this.bootstrapState.update((state) => ({ ...state, error: event.error }));
+    this.engine.on('error', event => {
+      this.bootstrapState.update(state => ({ ...state, error: event.error }));
     });
 
     this.engine.on('ready', () => {
-      this.bootstrapState.update((state) => ({ ...state, status: 'ready' }));
+      this.bootstrapState.update(state => ({ ...state, status: 'ready' }));
     });
   }
 
@@ -150,13 +150,13 @@ export class BlobBootstrapService {
       this.engine = new BlobBootstrapEngine(
         { isConnected: () => this.holochainService.isConnected() },
         {
-          getBlobsForContent: async (id) => {
+          getBlobsForContent: async id => {
             const result = await this.blobManager.getBlobsForContent(id).toPromise();
             return result || [];
           },
         },
         { startIntegrityVerification: () => this.blobCache.startIntegrityVerification() },
-        config,
+        config
       );
       // Re-attach event listeners (simplified - in production use a helper method)
     }

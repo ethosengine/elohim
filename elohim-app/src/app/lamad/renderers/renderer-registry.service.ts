@@ -1,4 +1,5 @@
 import { Injectable, Type, EventEmitter } from '@angular/core';
+
 import { ContentNode } from '../models/content-node.model';
 
 /**
@@ -45,7 +46,7 @@ export interface RendererCompletionEvent {
 interface RendererEntry {
   formats: string[];
   component: Type<any>;
-  priority: number;  // Higher priority = checked first
+  priority: number; // Higher priority = checked first
 }
 
 /**
@@ -85,7 +86,7 @@ export class RendererRegistryService {
         return entry.component;
       }
     }
-    return null;  // Caller should use fallback
+    return null; // Caller should use fallback
   }
 
   /**

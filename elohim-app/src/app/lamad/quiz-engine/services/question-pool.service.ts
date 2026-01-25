@@ -1,8 +1,22 @@
 import { Injectable, inject } from '@angular/core';
+
 import { Observable, of, forkJoin, map, catchError, shareReplay } from 'rxjs';
+
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+
 import { PathService } from '../../services/path.service';
-import type { PerseusItem, BloomsLevel, QuestionDifficulty } from '../../content-io/plugins/sophia/sophia-moment.model';
+import {
+  createEmptyPool,
+  canPractice,
+  canMastery,
+  calculateCompleteness,
+} from '../models/question-pool.model';
+
+import type {
+  PerseusItem,
+  BloomsLevel,
+  QuestionDifficulty,
+} from '../../content-io/plugins/sophia/sophia-moment.model';
 import type {
   QuestionPool,
   QuestionPoolMetadata,
@@ -10,9 +24,8 @@ import type {
   HierarchicalPoolStats,
   QuestionSelectionOptions,
   QuestionSelectionResult,
-  QuestionPoolQuery
+  QuestionPoolQuery,
 } from '../models/question-pool.model';
-import { createEmptyPool, canPractice, canMastery, calculateCompleteness } from '../models/question-pool.model';
 
 /**
  * QuestionPoolService - Manages question pools for content nodes.
@@ -40,7 +53,7 @@ import { createEmptyPool, canPractice, canMastery, calculateCompleteness } from 
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class QuestionPoolService {
   private readonly dataLoader = inject(DataLoaderService);
@@ -97,9 +110,7 @@ export class QuestionPoolService {
     }
 
     const poolObservables = contentIds.map(id =>
-      this.getPoolForContent(id).pipe(
-        map(pool => ({ id, pool }))
-      )
+      this.getPoolForContent(id).pipe(map(pool => ({ id, pool })))
     );
 
     return forkJoin(poolObservables).pipe(
@@ -164,7 +175,7 @@ export class QuestionPoolService {
           sectionId: currentSectionId,
           eligibleContentIds,
           combinedPool: [], // Will be populated after loading pools
-          stats: this.createEmptyStats()
+          stats: this.createEmptyStats(),
         };
       }),
       // Load pools for all eligible content
@@ -181,7 +192,9 @@ export class QuestionPoolService {
    * @param source - Hierarchical source with eligible content IDs
    * @returns Observable of source with populated pool
    */
-  loadHierarchicalPools(source: HierarchicalQuestionSource): Observable<HierarchicalQuestionSource> {
+  loadHierarchicalPools(
+    source: HierarchicalQuestionSource
+  ): Observable<HierarchicalQuestionSource> {
     if (source.eligibleContentIds.length === 0) {
       return of(source);
     }
@@ -196,12 +209,12 @@ export class QuestionPoolService {
           apply: 0,
           analyze: 0,
           evaluate: 0,
-          create: 0
+          create: 0,
         };
         const questionsByDifficulty: Record<QuestionDifficulty, number> = {
           easy: 0,
           medium: 0,
-          hard: 0
+          hard: 0,
         };
 
         // Aggregate all questions
@@ -210,10 +223,7 @@ export class QuestionPoolService {
             combinedPool.push(question);
 
             // Track stats
-            questionsByContent.set(
-              contentId,
-              (questionsByContent.get(contentId) ?? 0) + 1
-            );
+            questionsByContent.set(contentId, (questionsByContent.get(contentId) ?? 0) + 1);
 
             const bloomsLevel = question.metadata?.bloomsLevel ?? 'understand';
             questionsByBlooms[bloomsLevel]++;
@@ -230,8 +240,8 @@ export class QuestionPoolService {
             totalQuestions: combinedPool.length,
             questionsByContent,
             questionsByBlooms,
-            questionsByDifficulty
-          }
+            questionsByDifficulty,
+          },
         };
       })
     );
@@ -248,10 +258,7 @@ export class QuestionPoolService {
    * @param options - Selection options
    * @returns Selection result with questions and notes
    */
-  selectQuestions(
-    pool: PerseusItem[],
-    options: QuestionSelectionOptions
-  ): QuestionSelectionResult {
+  selectQuestions(pool: PerseusItem[], options: QuestionSelectionOptions): QuestionSelectionResult {
     let candidates = [...pool];
     const notes: string[] = [];
 
@@ -269,9 +276,7 @@ export class QuestionPoolService {
     }
 
     if (options.tags && options.tags.length > 0) {
-      candidates = candidates.filter(q =>
-        q.metadata?.tags?.some(t => options.tags!.includes(t))
-      );
+      candidates = candidates.filter(q => q.metadata?.tags?.some(t => options.tags!.includes(t)));
     }
 
     if (options.excludeIds && options.excludeIds.length > 0) {
@@ -308,7 +313,7 @@ export class QuestionPoolService {
       questions: selected,
       selectionComplete,
       selectionNotes: notes.length > 0 ? notes : undefined,
-      contentIds
+      contentIds,
     };
   }
 
@@ -321,15 +326,12 @@ export class QuestionPoolService {
    * @param count - Number of questions to select
    * @returns Selected questions
    */
-  selectPracticeQuestions(
-    source: HierarchicalQuestionSource,
-    count: number = 5
-  ): QuestionSelectionResult {
+  selectPracticeQuestions(source: HierarchicalQuestionSource, count = 5): QuestionSelectionResult {
     return this.selectQuestions(source.combinedPool, {
       count,
       randomize: true,
       ensureVariety: true,
-      bloomsLevels: ['remember', 'understand', 'apply']
+      bloomsLevels: ['remember', 'understand', 'apply'],
     });
   }
 
@@ -346,7 +348,7 @@ export class QuestionPoolService {
    */
   selectMasteryQuestions(
     pool: PerseusItem[],
-    count: number = 5,
+    count = 5,
     practicedContentIds: string[] = []
   ): QuestionSelectionResult {
     // Weight toward practiced content (2x for practiced)
@@ -360,7 +362,7 @@ export class QuestionPoolService {
       randomize: true,
       ensureVariety: true,
       weightedContentIds: weights,
-      bloomsLevels: ['understand', 'apply', 'analyze']
+      bloomsLevels: ['understand', 'apply', 'analyze'],
     });
   }
 
@@ -371,10 +373,7 @@ export class QuestionPoolService {
    * @param maxQuestions - Maximum questions to draw
    * @returns Observable of selected questions
    */
-  selectInlineQuestions(
-    contentId: string,
-    maxQuestions: number = 10
-  ): Observable<QuestionSelectionResult> {
+  selectInlineQuestions(contentId: string, maxQuestions = 10): Observable<QuestionSelectionResult> {
     return this.getPoolForContent(contentId).pipe(
       map(pool => {
         if (!pool || pool.questions.length === 0) {
@@ -382,14 +381,14 @@ export class QuestionPoolService {
             questions: [],
             selectionComplete: false,
             selectionNotes: ['No questions available for this content'],
-            contentIds: []
+            contentIds: [],
           };
         }
 
         return this.selectQuestions(pool.questions, {
           count: maxQuestions,
           randomize: true,
-          bloomsLevels: ['remember', 'understand']
+          bloomsLevels: ['remember', 'understand'],
         });
       })
     );
@@ -403,18 +402,14 @@ export class QuestionPoolService {
    * Check if content has enough questions for practice.
    */
   canPracticeContent(contentId: string): Observable<boolean> {
-    return this.getPoolForContent(contentId).pipe(
-      map(pool => pool !== null && canPractice(pool))
-    );
+    return this.getPoolForContent(contentId).pipe(map(pool => pool !== null && canPractice(pool)));
   }
 
   /**
    * Check if content has enough questions for mastery.
    */
   canMasteryContent(contentId: string): Observable<boolean> {
-    return this.getPoolForContent(contentId).pipe(
-      map(pool => pool !== null && canMastery(pool))
-    );
+    return this.getPoolForContent(contentId).pipe(map(pool => pool !== null && canMastery(pool)));
   }
 
   /**
@@ -422,7 +417,7 @@ export class QuestionPoolService {
    */
   getPoolCompleteness(contentId: string): Observable<number> {
     return this.getPoolForContent(contentId).pipe(
-      map(pool => pool ? calculateCompleteness(pool) : 0)
+      map(pool => (pool ? calculateCompleteness(pool) : 0))
     );
   }
 
@@ -450,9 +445,7 @@ export class QuestionPoolService {
         }
 
         if (query.tags && query.tags.length > 0) {
-          pools = pools.filter(p =>
-            query.tags!.some(t => p.metadata.tags.includes(t))
-          );
+          pools = pools.filter(p => query.tags!.some(t => p.metadata.tags.includes(t)));
         }
 
         return pools;
@@ -493,8 +486,8 @@ export class QuestionPoolService {
             questions: data,
             metadata: {
               ...createEmptyPool(contentId).metadata,
-              isComplete: data.length >= 5
-            }
+              isComplete: data.length >= 5,
+            },
           };
         }
 
@@ -514,7 +507,7 @@ export class QuestionPoolService {
       sectionId: currentSectionId,
       eligibleContentIds: [],
       combinedPool: [],
-      stats: this.createEmptyStats()
+      stats: this.createEmptyStats(),
     };
   }
 
@@ -528,20 +521,17 @@ export class QuestionPoolService {
         apply: 0,
         analyze: 0,
         evaluate: 0,
-        create: 0
+        create: 0,
       },
       questionsByDifficulty: {
         easy: 0,
         medium: 0,
-        hard: 0
-      }
+        hard: 0,
+      },
     };
   }
 
-  private applyWeighting(
-    candidates: PerseusItem[],
-    weights: Map<string, number>
-  ): PerseusItem[] {
+  private applyWeighting(candidates: PerseusItem[], weights: Map<string, number>): PerseusItem[] {
     // Duplicate questions based on weight
     const weighted: PerseusItem[] = [];
 

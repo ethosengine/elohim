@@ -15,6 +15,7 @@
  */
 
 import { Injectable } from '@angular/core';
+
 import { StagedTransaction } from '../models/transaction-import.model';
 
 /**
@@ -97,10 +98,10 @@ interface EventCreationResult {
   providedIn: 'root',
 })
 export class EconomicEventFactoryService {
-  constructor(
+  constructor() {
     // private economicService: EconomicService,  // TODO: Inject actual service
     // private holochainClient: HolochainClientService,
-  ) {}
+  }
 
   /**
    * Creates an immutable EconomicEvent from an approved StagedTransaction
@@ -138,14 +139,10 @@ export class EconomicEventFactoryService {
       };
 
       // Create the immutable event
-      const event = await this.createEvent(request, staged);
-
-      return event;
+      return await this.createEvent(request, staged);
     } else {
       // Event already exists for this staged transaction
-      throw new Error(
-        `Event already created for staged transaction: ${staged.economicEventId}`
-      );
+      throw new Error(`Event already created for staged transaction: ${staged.economicEventId}`);
     }
   }
 
@@ -189,9 +186,7 @@ export class EconomicEventFactoryService {
    * - Credit (income): external is provider (giving to steward), steward is receiver
    * - Fee: steward is provider (bank takes fee), bank is receiver
    */
-  private determineAgents(
-    staged: StagedTransaction
-  ): { providerId: string; receiverId: string } {
+  private determineAgents(staged: StagedTransaction): { providerId: string; receiverId: string } {
     switch (staged.type) {
       case 'credit':
         // Income: someone pays steward
@@ -349,9 +344,7 @@ export class EconomicEventFactoryService {
   /**
    * Determines the action based on event type
    */
-  private determineAction(
-    eventType: LamadEventType
-  ): 'produce' | 'consume' | 'transfer' | 'use' {
+  private determineAction(eventType: LamadEventType): 'produce' | 'consume' | 'transfer' | 'use' {
     switch (eventType) {
       case 'credit-transfer':
         return 'transfer';
@@ -369,9 +362,7 @@ export class EconomicEventFactoryService {
   /**
    * Batch creates events from multiple staged transactions
    */
-  async createMultipleFromStaged(
-    stagedList: StagedTransaction[]
-  ): Promise<EconomicEvent[]> {
+  async createMultipleFromStaged(stagedList: StagedTransaction[]): Promise<EconomicEvent[]> {
     const events: EconomicEvent[] = [];
 
     for (const staged of stagedList) {
@@ -380,10 +371,7 @@ export class EconomicEventFactoryService {
           const event = await this.createFromStaged(staged);
           events.push(event);
         } catch (error) {
-          console.error(
-            `Failed to create event from staged transaction ${staged.id}:`,
-            error
-          );
+          console.error(`Failed to create event from staged transaction ${staged.id}:`, error);
           // Continue with next transaction
         }
       }

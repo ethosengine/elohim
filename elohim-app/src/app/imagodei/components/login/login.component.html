@@ -10,123 +10,127 @@
 
   <!-- Step 2: Credentials -->
   @if (currentStep() === 'credentials') {
-  <div class="login-card">
-    <!-- Step Indicator -->
-    <div class="step-indicator">
-      <button
-        type="button"
-        class="step-back"
-        (click)="goBackToDoorway()"
-        aria-label="Change doorway"
-      >
-        <span class="material-icons">arrow_back</span>
-      </button>
-      <div class="step-info">
-        <span class="step-label">Signing in via</span>
-        <span class="step-doorway">{{ selectedDoorway()?.doorway?.name ?? 'Unknown Doorway' }}</span>
-      </div>
-    </div>
-
-    <!-- Header -->
-    <div class="login-header">
-      <h1>Welcome Back</h1>
-      <p class="subtitle">Sign in to your hosted identity</p>
-    </div>
-
-    <!-- Error Display -->
-    @if (error()) {
-      <div class="error-banner"
-           role="alert"
-           tabindex="0"
-           (click)="clearError()"
-           (keydown.enter)="clearError()"
-           (keydown.space)="clearError()">
-        <span class="error-icon" aria-hidden="true">✕</span>
-        <span>{{ error() }}</span>
-        <button type="button" class="error-dismiss" aria-label="Dismiss error">Dismiss</button>
-      </div>
-    }
-
-    <!-- Login Form -->
-    <form class="login-form" (ngSubmit)="onLogin()">
-      <!-- Identifier (Email/Username) -->
-      <div class="form-group">
-        <label for="identifier">Email or Username</label>
-        <input
-          id="identifier"
-          type="text"
-          [(ngModel)]="form.identifier"
-          name="identifier"
-          placeholder="you@example.com"
-          required
-          autocomplete="username"
-          [disabled]="isLoading()"
-        />
-      </div>
-
-      <!-- Password -->
-      <div class="form-group">
-        <label for="password">Password</label>
-        <div class="password-input-wrapper">
-          <input
-            id="password"
-            [type]="showPassword() ? 'text' : 'password'"
-            [(ngModel)]="form.password"
-            name="password"
-            placeholder="••••••••"
-            required
-            autocomplete="current-password"
-            [disabled]="isLoading()"
-          />
-          <button
-            type="button"
-            class="password-toggle"
-            (click)="togglePasswordVisibility()"
-            [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
-          >
-            {{ showPassword() ? 'Hide' : 'Show' }}
-          </button>
+    <div class="login-card">
+      <!-- Step Indicator -->
+      <div class="step-indicator">
+        <button
+          type="button"
+          class="step-back"
+          (click)="goBackToDoorway()"
+          aria-label="Change doorway"
+        >
+          <span class="material-icons">arrow_back</span>
+        </button>
+        <div class="step-info">
+          <span class="step-label">Signing in via</span>
+          <span class="step-doorway">
+            {{ selectedDoorway()?.doorway?.name ?? 'Unknown Doorway' }}
+          </span>
         </div>
       </div>
 
-      <!-- Remember Me -->
-      <div class="form-group checkbox-group">
-        <label class="checkbox-label">
+      <!-- Header -->
+      <div class="login-header">
+        <h1>Welcome Back</h1>
+        <p class="subtitle">Sign in to your hosted identity</p>
+      </div>
+
+      <!-- Error Display -->
+      @if (error()) {
+        <div
+          class="error-banner"
+          role="alert"
+          tabindex="0"
+          (click)="clearError()"
+          (keydown.enter)="clearError()"
+          (keydown.space)="clearError()"
+        >
+          <span class="error-icon" aria-hidden="true">✕</span>
+          <span>{{ error() }}</span>
+          <button type="button" class="error-dismiss" aria-label="Dismiss error">Dismiss</button>
+        </div>
+      }
+
+      <!-- Login Form -->
+      <form class="login-form" (ngSubmit)="onLogin()">
+        <!-- Identifier (Email/Username) -->
+        <div class="form-group">
+          <label for="identifier">Email or Username</label>
           <input
-            type="checkbox"
-            [(ngModel)]="form.rememberMe"
-            name="rememberMe"
+            id="identifier"
+            type="text"
+            [(ngModel)]="form.identifier"
+            name="identifier"
+            placeholder="you@example.com"
+            required
+            autocomplete="username"
             [disabled]="isLoading()"
           />
-          <span>Remember my email</span>
-        </label>
-      </div>
+        </div>
 
-      <!-- Submit -->
-      <div class="form-actions">
-        <button
-          type="submit"
-          class="btn btn-primary"
-          [disabled]="isLoading() || !form.identifier.trim() || !form.password"
-        >
-          @if (isLoading()) {
-            <span class="spinner"></span>
-            Signing in...
-          } @else {
-            Sign In
-          }
-        </button>
-      </div>
-    </form>
+        <!-- Password -->
+        <div class="form-group">
+          <label for="password">Password</label>
+          <div class="password-input-wrapper">
+            <input
+              id="password"
+              [type]="showPassword() ? 'text' : 'password'"
+              [(ngModel)]="form.password"
+              name="password"
+              placeholder="••••••••"
+              required
+              autocomplete="current-password"
+              [disabled]="isLoading()"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              (click)="togglePasswordVisibility()"
+              [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+            >
+              {{ showPassword() ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+        </div>
 
-    <!-- Footer Links -->
-    <div class="login-footer">
-      <p class="register-prompt">
-        Don't have an account?
-        <button type="button" (click)="goToRegister()" class="register-link">Create one</button>
-      </p>
-      <a routerLink="/" class="back-link">← Back to Home</a>
+        <!-- Remember Me -->
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              [(ngModel)]="form.rememberMe"
+              name="rememberMe"
+              [disabled]="isLoading()"
+            />
+            <span>Remember my email</span>
+          </label>
+        </div>
+
+        <!-- Submit -->
+        <div class="form-actions">
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="isLoading() || !form.identifier.trim() || !form.password"
+          >
+            @if (isLoading()) {
+              <span class="spinner"></span>
+              Signing in...
+            } @else {
+              Sign In
+            }
+          </button>
+        </div>
+      </form>
+
+      <!-- Footer Links -->
+      <div class="login-footer">
+        <p class="register-prompt">
+          Don't have an account?
+          <button type="button" (click)="goToRegister()" class="register-link">Create one</button>
+        </p>
+        <a routerLink="/" class="back-link">← Back to Home</a>
+      </div>
     </div>
-  </div>
   }
 </div>

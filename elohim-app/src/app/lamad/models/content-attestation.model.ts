@@ -22,6 +22,7 @@
  */
 
 import { REACH_LEVEL_VALUES } from '@app/elohim/models/protocol-core.model';
+
 import type { ContentReach } from './content-node.model';
 
 // Re-export ContentReach for backward compatibility
@@ -50,16 +51,16 @@ export const CONTENT_REACH_LEVELS: Record<ContentReach, number> = REACH_LEVEL_VA
  * Multiple attestations can stack to increase reach.
  */
 export type ContentAttestationType =
-  | 'author-verified'       // Author identity confirmed (baseline)
-  | 'steward-approved'      // Domain steward reviewed and approved
-  | 'community-endorsed'    // Received N endorsements from community
-  | 'peer-reviewed'         // Formal review by qualified peers
-  | 'governance-ratified'   // Approved through governance process
-  | 'curriculum-canonical'  // Official learning content for a path
-  | 'safety-reviewed'       // Checked for harmful content
-  | 'accuracy-verified'     // Factual accuracy validated
+  | 'author-verified' // Author identity confirmed (baseline)
+  | 'steward-approved' // Domain steward reviewed and approved
+  | 'community-endorsed' // Received N endorsements from community
+  | 'peer-reviewed' // Formal review by qualified peers
+  | 'governance-ratified' // Approved through governance process
+  | 'curriculum-canonical' // Official learning content for a path
+  | 'safety-reviewed' // Checked for harmful content
+  | 'accuracy-verified' // Factual accuracy validated
   | 'accessibility-checked' // Meets accessibility standards
-  | 'license-cleared';      // IP/licensing verified
+  | 'license-cleared'; // IP/licensing verified
 
 /**
  * AttestationReachGrant - What reach level each attestation type can grant.
@@ -76,7 +77,7 @@ export const DEFAULT_ATTESTATION_REACH_GRANTS: Record<ContentAttestationType, Co
   'safety-reviewed': 'regional',
   'accuracy-verified': 'regional',
   'accessibility-checked': 'municipal',
-  'license-cleared': 'commons'
+  'license-cleared': 'commons',
 };
 
 // ============================================================================
@@ -171,15 +172,15 @@ export interface AttestationRevocation {
 }
 
 export type RevocationReason =
-  | 'harmful-content'       // Content causes harm
-  | 'misinformation'        // Factually incorrect
-  | 'copyright-violation'   // IP issues
-  | 'author-request'        // Author requested removal
-  | 'policy-violation'      // Violates community policies
-  | 'superseded'            // Replaced by newer attestation
-  | 'expired-not-renewed'   // Time-based expiration
-  | 'grantor-revoked'       // Grantor lost their authority
-  | 'governance-decision';  // Formal governance process
+  | 'harmful-content' // Content causes harm
+  | 'misinformation' // Factually incorrect
+  | 'copyright-violation' // IP issues
+  | 'author-request' // Author requested removal
+  | 'policy-violation' // Violates community policies
+  | 'superseded' // Replaced by newer attestation
+  | 'expired-not-renewed' // Time-based expiration
+  | 'grantor-revoked' // Grantor lost their authority
+  | 'governance-decision'; // Formal governance process
 
 /**
  * AttestationEvidence - Proof/justification for attestation.
@@ -308,48 +309,48 @@ export interface ContentReachRequirement {
  * Default reach requirements - what attestations are needed for each reach level.
  */
 export const DEFAULT_REACH_REQUIREMENTS: Record<ContentReach, ContentReachRequirement> = {
-  'private': {
+  private: {
     reach: 'private',
     // No requirements - author always has private access
   },
-  'invited': {
+  invited: {
     reach: 'invited',
     requiredAttestations: ['author-verified'],
   },
-  'local': {
+  local: {
     reach: 'local',
     requiredAttestations: ['author-verified'],
     minimumTrustScore: 0.2,
   },
-  'neighborhood': {
+  neighborhood: {
     reach: 'neighborhood',
     requiredAttestations: ['author-verified', 'community-endorsed'],
     minimumTrustScore: 0.3,
   },
-  'municipal': {
+  municipal: {
     reach: 'municipal',
     requiredAttestations: ['steward-approved', 'community-endorsed', 'safety-reviewed'],
     minimumTrustScore: 0.4,
   },
-  'bioregional': {
+  bioregional: {
     reach: 'bioregional',
     requiredAttestations: ['steward-approved', 'peer-reviewed', 'safety-reviewed'],
     minimumTrustScore: 0.5,
     noFlags: ['disputed'],
   },
-  'regional': {
+  regional: {
     reach: 'regional',
     requiredAttestations: ['peer-reviewed', 'governance-ratified'],
     minimumTrustScore: 0.6,
     noFlags: ['disputed', 'under-review'],
   },
-  'commons': {
+  commons: {
     reach: 'commons',
     requiredAllAttestations: ['safety-reviewed', 'license-cleared'],
     requiredAttestations: ['governance-ratified', 'curriculum-canonical'],
     minimumTrustScore: 0.8,
     noFlags: ['disputed', 'under-review', 'appeal-pending'],
-  }
+  },
 };
 
 // ============================================================================
@@ -379,7 +380,7 @@ export interface AttestationDecision {
   decidedAt: string;
   reason?: string;
   attestationId?: string; // If approved, the created attestation
-  conditions?: string[];  // Conditions for approval
+  conditions?: string[]; // Conditions for approval
   deferredUntil?: string; // If deferred
 }
 

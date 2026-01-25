@@ -15,6 +15,7 @@
  * ```
  */
 
+import { CommonModule } from '@angular/common';
 import {
   Component,
   Input,
@@ -29,16 +30,17 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
-  inject
+  inject,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import type { Moment, Recognition } from './sophia-moment.model';
+
 import {
   registerSophiaElement,
   type SophiaQuestionElement,
   type UserInputMap,
-  getSophiaElement
+  getSophiaElement,
 } from './sophia-element-loader';
+
+import type { Moment, Recognition } from './sophia-moment.model';
 
 @Component({
   selector: 'app-sophia-question',
@@ -49,29 +51,31 @@ import {
       <sophia-question
         #sophiaElement
         [attr.review-mode]="reviewMode ? '' : null"
-        [attr.mode]="mode">
-      </sophia-question>
+        [attr.mode]="mode"
+      ></sophia-question>
     </div>
   `,
-  styles: [`
-    :host {
-      display: block;
-    }
+  styles: [
+    `
+      :host {
+        display: block;
+      }
 
-    .sophia-wrapper {
-      min-height: 100px;
-    }
+      .sophia-wrapper {
+        min-height: 100px;
+      }
 
-    .sophia-wrapper:empty::before {
-      content: 'Loading assessment...';
-      display: block;
-      padding: 2rem;
-      text-align: center;
-      color: var(--text-secondary, #666);
-    }
-  `],
+      .sophia-wrapper:empty::before {
+        content: 'Loading assessment...';
+        display: block;
+        padding: 2rem;
+        text-align: center;
+        color: var(--text-secondary, #666);
+      }
+    `,
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SophiaWrapperComponent implements AfterViewInit, OnDestroy, OnChanges {
   private readonly cdr = inject(ChangeDetectorRef);
@@ -216,13 +220,19 @@ export class SophiaWrapperComponent implements AfterViewInit, OnDestroy, OnChang
     }
 
     if (!this.sophiaElement || !this.initialized) {
-      console.log('[SophiaWrapper] Element not ready, storing pending moment:', this.pendingMoment?.id || 'null');
+      console.log(
+        '[SophiaWrapper] Element not ready, storing pending moment:',
+        this.pendingMoment?.id || 'null'
+      );
       return;
     }
 
     // Handle initialUserInput changes BEFORE moment changes (important for answer restoration)
     if (changes['initialUserInput']) {
-      console.log('[SophiaWrapper] Updating initialUserInput:', this.initialUserInput ? 'has value' : 'null');
+      console.log(
+        '[SophiaWrapper] Updating initialUserInput:',
+        this.initialUserInput ? 'has value' : 'null'
+      );
       this.sophiaElement.initialUserInput = this.initialUserInput;
     }
 

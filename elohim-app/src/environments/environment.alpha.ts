@@ -17,7 +17,7 @@ export const environment: Environment = {
   client: {
     doorwayUrl: 'https://doorway-dev.elohim.host',
     apiKey: 'dev-elohim-auth-2024',
-    nodeUrls: [],  // No personal nodes in alpha
+    nodeUrls: [], // No personal nodes in alpha
     holochainAppId: 'elohim',
     holochainConductorUrl: 'wss://doorway-dev.elohim.host',
   },

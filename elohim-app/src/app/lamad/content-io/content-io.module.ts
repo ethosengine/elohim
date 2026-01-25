@@ -1,21 +1,21 @@
-import { NgModule, ModuleWithProviders, inject, provideAppInitializer } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { NgModule, ModuleWithProviders, inject, provideAppInitializer } from '@angular/core';
 
 // Core services
-import { ContentFormatRegistryService } from './services/content-format-registry.service';
-import { ContentEditorService } from './services/content-editor.service';
-import { ContentIOService } from './services/content-io.service';
 
 // Components
 import { ContentDownloadComponent } from './components/content-download/content-download.component';
 import { DefaultCodeEditorComponent } from './components/default-code-editor/default-code-editor.component';
 
 // Unified format plugins
-import { MarkdownFormatPlugin } from './plugins/markdown/markdown-format.plugin';
 import { GherkinFormatPlugin } from './plugins/gherkin/gherkin-format.plugin';
 import { Html5AppFormatPlugin } from './plugins/html5-app/html5-app-format.plugin';
+import { MarkdownFormatPlugin } from './plugins/markdown/markdown-format.plugin';
 // Sophia plugin handles both mastery quizzes and discovery/reflection assessments
 import { SophiaFormatPlugin } from './plugins/sophia/sophia-format.plugin';
+import { ContentEditorService } from './services/content-editor.service';
+import { ContentFormatRegistryService } from './services/content-format-registry.service';
+import { ContentIOService } from './services/content-io.service';
 
 /**
  * Initializer function to register unified format plugins.
@@ -36,10 +36,10 @@ function initializeFormatPlugins(): void {
   // Register format aliases: map data formats to their renderers
   // This keeps content storage format-agnostic while providing flexible rendering
   // Sophia handles both mastery quizzes (Perseus-compatible) and discovery assessments
-  registry.registerAlias('sophia', 'sophia-quiz-json');            // Short alias → canonical
-  registry.registerAlias('perseus', 'sophia-quiz-json');           // Legacy Perseus format → Sophia renderer
+  registry.registerAlias('sophia', 'sophia-quiz-json'); // Short alias → canonical
+  registry.registerAlias('perseus', 'sophia-quiz-json'); // Legacy Perseus format → Sophia renderer
   registry.registerAlias('perseus-quiz-json', 'sophia-quiz-json'); // Perseus quiz data schema → Sophia renderer
-  registry.registerAlias('sophia-discovery', 'sophia-quiz-json');  // Discovery assessments → Sophia renderer
+  registry.registerAlias('sophia-discovery', 'sophia-quiz-json'); // Discovery assessments → Sophia renderer
 }
 
 /**
@@ -63,20 +63,9 @@ function initializeFormatPlugins(): void {
  * ```
  */
 @NgModule({
-  imports: [
-    CommonModule,
-    ContentDownloadComponent,
-    DefaultCodeEditorComponent
-  ],
-  exports: [
-    ContentDownloadComponent,
-    DefaultCodeEditorComponent
-  ],
-  providers: [
-    ContentFormatRegistryService,
-    ContentEditorService,
-    ContentIOService
-  ]
+  imports: [CommonModule, ContentDownloadComponent, DefaultCodeEditorComponent],
+  exports: [ContentDownloadComponent, DefaultCodeEditorComponent],
+  providers: [ContentFormatRegistryService, ContentEditorService, ContentIOService],
 })
 export class ContentIOModule {
   /**
@@ -90,8 +79,8 @@ export class ContentIOModule {
         ContentEditorService,
         ContentIOService,
         // Register unified plugins at environment initialization
-        provideAppInitializer(initializeFormatPlugins)
-      ]
+        provideAppInitializer(initializeFormatPlugins),
+      ],
     };
   }
 }
@@ -100,11 +89,7 @@ export class ContentIOModule {
  * ContentIO module with built-in plugins pre-loaded.
  */
 @NgModule({
-  imports: [
-    ContentIOModule
-  ],
-  exports: [
-    ContentIOModule
-  ]
+  imports: [ContentIOModule],
+  exports: [ContentIOModule],
 })
 export class ContentIOModuleWithPlugins {}

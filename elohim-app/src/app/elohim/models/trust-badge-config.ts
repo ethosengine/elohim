@@ -13,7 +13,7 @@ import type {
   ContentReach,
   BadgeDisplay,
   BadgeWarning,
-  BadgeColor
+  BadgeColor,
 } from '@app/elohim/models/trust-badge.model';
 
 // ============================================================================
@@ -23,14 +23,17 @@ import type {
 /**
  * Badge display configuration for each attestation type.
  */
-export const ATTESTATION_BADGE_CONFIG: Record<ContentAttestationType, Omit<BadgeDisplay, 'grantedBy' | 'grantedAt' | 'attestationType'>> = {
+export const ATTESTATION_BADGE_CONFIG: Record<
+  ContentAttestationType,
+  Omit<BadgeDisplay, 'grantedBy' | 'grantedAt' | 'attestationType'>
+> = {
   'author-verified': {
     type: 'author',
     icon: '✓',
     label: 'Verified Author',
     description: 'Author identity has been cryptographically verified',
     color: 'gray',
-    verified: true
+    verified: true,
   },
   'steward-approved': {
     type: 'review',
@@ -38,7 +41,7 @@ export const ATTESTATION_BADGE_CONFIG: Record<ContentAttestationType, Omit<Badge
     label: 'Steward Approved',
     description: 'Reviewed and approved by a domain steward',
     color: 'green',
-    verified: true
+    verified: true,
   },
   'community-endorsed': {
     type: 'community',
@@ -46,7 +49,7 @@ export const ATTESTATION_BADGE_CONFIG: Record<ContentAttestationType, Omit<Badge
     label: 'Community Endorsed',
     description: 'Endorsed by community members',
     color: 'green',
-    verified: false
+    verified: false,
   },
   'peer-reviewed': {
     type: 'review',
@@ -54,7 +57,7 @@ export const ATTESTATION_BADGE_CONFIG: Record<ContentAttestationType, Omit<Badge
     label: 'Peer Reviewed',
     description: 'Formally reviewed by qualified peers',
     color: 'blue',
-    verified: true
+    verified: true,
   },
   'governance-ratified': {
     type: 'canonical',
@@ -62,7 +65,7 @@ export const ATTESTATION_BADGE_CONFIG: Record<ContentAttestationType, Omit<Badge
     label: 'Governance Ratified',
     description: 'Approved through formal governance process',
     color: 'gold',
-    verified: true
+    verified: true,
   },
   'curriculum-canonical': {
     type: 'canonical',
@@ -70,7 +73,7 @@ export const ATTESTATION_BADGE_CONFIG: Record<ContentAttestationType, Omit<Badge
     label: 'Official Curriculum',
     description: 'Designated as official learning content',
     color: 'gold',
-    verified: true
+    verified: true,
   },
   'safety-reviewed': {
     type: 'safety',
@@ -78,7 +81,7 @@ export const ATTESTATION_BADGE_CONFIG: Record<ContentAttestationType, Omit<Badge
     label: 'Safety Reviewed',
     description: 'Checked for harmful content and constitutional alignment',
     color: 'blue',
-    verified: true
+    verified: true,
   },
   'accuracy-verified': {
     type: 'review',
@@ -86,7 +89,7 @@ export const ATTESTATION_BADGE_CONFIG: Record<ContentAttestationType, Omit<Badge
     label: 'Accuracy Verified',
     description: 'Factual accuracy has been validated',
     color: 'blue',
-    verified: true
+    verified: true,
   },
   'accessibility-checked': {
     type: 'accessibility',
@@ -94,7 +97,7 @@ export const ATTESTATION_BADGE_CONFIG: Record<ContentAttestationType, Omit<Badge
     label: 'Accessible',
     description: 'Meets accessibility standards',
     color: 'green',
-    verified: true
+    verified: true,
   },
   'license-cleared': {
     type: 'license',
@@ -102,101 +105,104 @@ export const ATTESTATION_BADGE_CONFIG: Record<ContentAttestationType, Omit<Badge
     label: 'License Cleared',
     description: 'Intellectual property and licensing verified',
     color: 'gray',
-    verified: true
-  }
+    verified: true,
+  },
 };
 
 /**
  * Reach level display configuration.
  */
-export const REACH_BADGE_CONFIG: Record<ContentReach, { icon: string; label: string; color: BadgeColor; description: string }> = {
-  'private': {
+export const REACH_BADGE_CONFIG: Record<
+  ContentReach,
+  { icon: string; label: string; color: BadgeColor; description: string }
+> = {
+  private: {
     icon: '🔐',
     label: 'Private',
     color: 'gray',
-    description: 'Only visible to the author'
+    description: 'Only visible to the author',
   },
-  'invited': {
+  invited: {
     icon: '✉️',
     label: 'Invited',
     color: 'gray',
-    description: 'Shared with specific people'
+    description: 'Shared with specific people',
   },
-  'local': {
+  local: {
     icon: '🏠',
     label: 'Local',
     color: 'gray',
-    description: 'Visible to household'
+    description: 'Visible to household',
   },
-  'neighborhood': {
+  neighborhood: {
     icon: '🏘️',
     label: 'Neighborhood',
     color: 'gray',
-    description: 'Visible to immediate area'
+    description: 'Visible to immediate area',
   },
-  'municipal': {
+  municipal: {
     icon: '🏛️',
     label: 'Municipal',
     color: 'green',
-    description: 'Available to city/town'
+    description: 'Available to city/town',
   },
-  'bioregional': {
+  bioregional: {
     icon: '🌿',
     label: 'Bioregional',
     color: 'green',
-    description: 'Available to watershed/ecosystem'
+    description: 'Available to watershed/ecosystem',
   },
-  'regional': {
+  regional: {
     icon: '🗺️',
     label: 'Regional',
     color: 'blue',
-    description: 'Available to state/province'
+    description: 'Available to state/province',
   },
-  'commons': {
+  commons: {
     icon: '🌍',
     label: 'Commons',
     color: 'gold',
-    description: 'Public - available to everyone'
-  }
+    description: 'Public - available to everyone',
+  },
 };
 
 /**
  * Warning display configuration.
  */
 export const WARNING_CONFIG: Record<BadgeWarning['type'], Omit<BadgeWarning, 'flaggedAt'>> = {
-  'disputed': {
+  disputed: {
     type: 'disputed',
     icon: '⚠️',
     label: 'Disputed',
     description: 'The accuracy or appropriateness of this content is being disputed',
-    color: 'orange'
+    color: 'orange',
   },
-  'outdated': {
+  outdated: {
     type: 'outdated',
     icon: '📅',
     label: 'Outdated',
     description: 'This content may be out of date',
-    color: 'orange'
+    color: 'orange',
   },
   'under-review': {
     type: 'under-review',
     icon: '🔍',
     label: 'Under Review',
     description: 'This content is currently being reviewed',
-    color: 'orange'
+    color: 'orange',
   },
   'appeal-pending': {
     type: 'appeal-pending',
     icon: '⏳',
     label: 'Appeal Pending',
     description: 'A decision about this content is being appealed',
-    color: 'orange'
+    color: 'orange',
   },
   'partial-revocation': {
     type: 'partial-revocation',
     icon: '⚡',
     label: 'Partially Revoked',
     description: 'Some attestations for this content have been revoked',
-    color: 'red'
-  }
+    color: 'red',
+  },
 };

@@ -5,11 +5,12 @@
  * Shows current stage, connection status, and provides link to detailed view.
  */
 
-import { Component, inject, signal, output, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, signal, output, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import { SovereigntyService } from '@app/imagodei/services/sovereignty.service';
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { SovereigntyService } from '@app/imagodei/services/sovereignty.service';
 
 @Component({
   selector: 'app-sovereignty-badge',
@@ -62,7 +63,7 @@ export class SovereigntyBadgeComponent {
    * Toggle expanded state.
    */
   toggleExpand(): void {
-    this.expanded.update((v) => !v);
+    this.expanded.update(v => !v);
   }
 
   /**

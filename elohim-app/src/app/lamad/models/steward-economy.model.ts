@@ -46,11 +46,11 @@ export const STEWARD_TIER_DESCRIPTIONS: Record<StewardTier, string> = {
  * PricingModel - How access to gated content is priced.
  */
 export type PricingModel =
-  | 'one_time'              // Single payment for lifetime access
-  | 'subscription'          // Recurring payment for continued access
-  | 'pay_what_you_can'      // Learner chooses amount (with optional minimum)
+  | 'one_time' // Single payment for lifetime access
+  | 'subscription' // Recurring payment for continued access
+  | 'pay_what_you_can' // Learner chooses amount (with optional minimum)
   | 'free_with_attribution' // Free but requires attribution/citation
-  | 'commons_sponsored';    // Free, sponsored by commons fund
+  | 'commons_sponsored'; // Free, sponsored by commons fund
 
 /**
  * Pricing model descriptions.
@@ -71,11 +71,11 @@ export const PRICING_MODEL_DESCRIPTIONS: Record<PricingModel, string> = {
  * GrantType - How access was granted to a learner.
  */
 export type GrantType =
-  | 'lifetime'      // Permanent access via payment
-  | 'subscription'  // Time-limited recurring access
-  | 'scholarship'   // Sponsored access for qualifying learners
-  | 'creator_gift'  // Gift from steward/contributor
-  | 'trial';        // Temporary trial access
+  | 'lifetime' // Permanent access via payment
+  | 'subscription' // Time-limited recurring access
+  | 'scholarship' // Sponsored access for qualifying learners
+  | 'creator_gift' // Gift from steward/contributor
+  | 'trial'; // Temporary trial access
 
 // ============================================================================
 // Access Requirements
@@ -472,10 +472,10 @@ export interface LamadContributorDashboard {
  */
 export interface LamadContributorRecognition {
   id: string;
-  contributorId: string;   // ContributorPresence ID
+  contributorId: string; // ContributorPresence ID
   contentId: string;
   learnerId: string;
-  appreciationOfEventId: string;  // References the triggering EconomicEvent
+  appreciationOfEventId: string; // References the triggering EconomicEvent
   flowType: string;
   recognitionPoints: number;
   pathId: string | null;

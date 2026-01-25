@@ -90,7 +90,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Loading / Empty States */
@@ -431,7 +433,7 @@
   background: var(--primary-50, #eff6ff);
 }
 
-.decision-option input[type="radio"] {
+.decision-option input[type='radio'] {
   display: none;
 }
 

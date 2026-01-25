@@ -1,6 +1,12 @@
-import { Component, Input, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, OnInit, OnDestroy } from '@angular/core';
+
 import { Subject, takeUntil } from 'rxjs';
+
+import {
+  GovernanceSignalService,
+  ReactionCounts,
+} from '@app/elohim/services/governance-signal.service';
 import {
   EmotionalReactionType,
   EmotionalReactionConstraints,
@@ -10,10 +16,6 @@ import {
   MediatedReaction,
   DEFAULT_REACTION_CONSTRAINTS,
 } from '@app/lamad/models/feedback-profile.model';
-import {
-  GovernanceSignalService,
-  ReactionCounts,
-} from '@app/elohim/services/governance-signal.service';
 
 /**
  * ReactionBarComponent - Low-Friction Emotional Feedback
@@ -59,14 +61,14 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
 
   // Icons for reaction types
   private readonly reactionIcons: Record<EmotionalReactionType, string> = {
-    'moved': '💫',
-    'grateful': '🙏',
-    'inspired': '✨',
-    'hopeful': '🌱',
-    'grieving': '🕊️',
-    'challenged': '🤔',
-    'concerned': '⚠️',
-    'uncomfortable': '😟',
+    moved: '💫',
+    grateful: '🙏',
+    inspired: '✨',
+    hopeful: '🌱',
+    grieving: '🕊️',
+    challenged: '🤔',
+    concerned: '⚠️',
+    uncomfortable: '😟',
   };
 
   constructor(private readonly signalService: GovernanceSignalService) {}
@@ -109,7 +111,8 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
       responderId: '', // Will be filled by service
     };
 
-    this.signalService.recordReaction(this.contentId, reaction)
+    this.signalService
+      .recordReaction(this.contentId, reaction)
       .pipe(takeUntil(this.destroy$))
       .subscribe(success => {
         if (success) {
@@ -146,15 +149,17 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
     if (proceed) {
       // User chose to proceed despite mediation
       // Log this for pattern monitoring
-      this.signalService.recordMediationProceed({
-        userId: '', // Filled by service
-        contentId: this.contentId,
-        contentType: this.contentType,
-        reactionType: reaction.type,
-        reasoningShown: mediationConfig.constitutionalReasoning,
-        proceededAnyway: true,
-        loggedAt: new Date().toISOString(),
-      }).subscribe();
+      this.signalService
+        .recordMediationProceed({
+          userId: '', // Filled by service
+          contentId: this.contentId,
+          contentType: this.contentType,
+          reactionType: reaction.type,
+          reasoningShown: mediationConfig.constitutionalReasoning,
+          proceededAnyway: true,
+          loggedAt: new Date().toISOString(),
+        })
+        .subscribe();
 
       // Submit reaction with mediated behavior
       if (mediationConfig.proceedBehavior.visibleToOthers) {
@@ -165,16 +170,18 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
       }
     } else if (alternativeChosen) {
       // User chose an alternative reaction
-      this.signalService.recordMediationProceed({
-        userId: '',
-        contentId: this.contentId,
-        contentType: this.contentType,
-        reactionType: reaction.type,
-        reasoningShown: mediationConfig.constitutionalReasoning,
-        proceededAnyway: false,
-        alternativeChosen,
-        loggedAt: new Date().toISOString(),
-      }).subscribe();
+      this.signalService
+        .recordMediationProceed({
+          userId: '',
+          contentId: this.contentId,
+          contentType: this.contentType,
+          reactionType: reaction.type,
+          reasoningShown: mediationConfig.constitutionalReasoning,
+          proceededAnyway: false,
+          alternativeChosen,
+          loggedAt: new Date().toISOString(),
+        })
+        .subscribe();
 
       this.submitReaction(alternativeChosen);
     }
@@ -215,13 +222,15 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
    * Build the list of available reactions based on constraints.
    */
   private buildAvailableReactions(): void {
-    const effectiveConstraints = this.constraints
-      ?? DEFAULT_REACTION_CONSTRAINTS[this.contentType]
-      ?? DEFAULT_REACTION_CONSTRAINTS['learning-content'];
+    const effectiveConstraints =
+      this.constraints ??
+      DEFAULT_REACTION_CONSTRAINTS[this.contentType] ??
+      DEFAULT_REACTION_CONSTRAINTS['learning-content'];
 
-    const permittedTypes = this.allowedReactions.length > 0
-      ? this.allowedReactions
-      : effectiveConstraints.permittedTypes;
+    const permittedTypes =
+      this.allowedReactions.length > 0
+        ? this.allowedReactions
+        : effectiveConstraints.permittedTypes;
 
     const mediatedTypes = effectiveConstraints.mediatedTypes ?? [];
     const mediatedMap = new Map(mediatedTypes.map(m => [m.type, m]));
@@ -257,20 +266,21 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
 
   private getReactionLabel(type: EmotionalReactionType): string {
     const labels: Record<EmotionalReactionType, string> = {
-      'moved': 'Moved',
-      'grateful': 'Grateful',
-      'inspired': 'Inspired',
-      'hopeful': 'Hopeful',
-      'grieving': 'Grieving',
-      'challenged': 'Challenged',
-      'concerned': 'Concerned',
-      'uncomfortable': 'Uncomfortable',
+      moved: 'Moved',
+      grateful: 'Grateful',
+      inspired: 'Inspired',
+      hopeful: 'Hopeful',
+      grieving: 'Grieving',
+      challenged: 'Challenged',
+      concerned: 'Concerned',
+      uncomfortable: 'Uncomfortable',
     };
     return labels[type];
   }
 
   private loadReactionCounts(): void {
-    this.signalService.getReactionCounts(this.contentId)
+    this.signalService
+      .getReactionCounts(this.contentId)
       .pipe(takeUntil(this.destroy$))
       .subscribe(counts => {
         this.reactionCounts = counts;
@@ -278,13 +288,11 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
   }
 
   private subscribeToChanges(): void {
-    this.signalService.signalChanges$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(change => {
-        if (change?.type === 'reaction' && change.contentId === this.contentId) {
-          this.loadReactionCounts();
-        }
-      });
+    this.signalService.signalChanges$.pipe(takeUntil(this.destroy$)).subscribe(change => {
+      if (change?.type === 'reaction' && change.contentId === this.contentId) {
+        this.loadReactionCounts();
+      }
+    });
   }
 }
 

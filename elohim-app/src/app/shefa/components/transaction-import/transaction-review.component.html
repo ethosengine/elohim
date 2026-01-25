@@ -47,7 +47,9 @@
         </div>
 
         <div class="transaction-details">
-          <div class="merchant-name">{{ currentTransaction.merchantName || 'Unknown Merchant' }}</div>
+          <div class="merchant-name">
+            {{ currentTransaction.merchantName || 'Unknown Merchant' }}
+          </div>
           <div class="description">{{ currentTransaction.description }}</div>
           <div class="transaction-date">{{ formatDate(currentTransaction.timestamp) }}</div>
         </div>
@@ -69,10 +71,7 @@
                 ✎
               </button>
             </div>
-            <span
-              [ngClass]="getConfidenceBadgeClass()"
-              class="confidence-badge"
-            >
+            <span [ngClass]="getConfidenceBadgeClass()" class="confidence-badge">
               {{ getConfidenceBadgeText() }} ({{ currentTransaction.categoryConfidence }}%)
             </span>
           </div>
@@ -124,9 +123,7 @@
           <strong>Possible Duplicate</strong>
           <p>
             This transaction appears to be a duplicate of another transaction.
-            <button class="btn-link" (click)="markAsNotDuplicate()">
-              Override
-            </button>
+            <button class="btn-link" (click)="markAsNotDuplicate()">Override</button>
           </p>
         </div>
       </div>
@@ -137,7 +134,12 @@
         <div class="impact-info">
           <strong>{{ currentTransaction._budgetName || currentTransaction.budgetId }}</strong>
           <span class="impact-amount">
-            +{{ formatCurrency(currentTransaction._varianceImpact || 0, currentTransaction.amount.unit) }}
+            +{{
+              formatCurrency(
+                currentTransaction._varianceImpact || 0,
+                currentTransaction.amount.unit
+              )
+            }}
           </span>
         </div>
       </div>
@@ -186,9 +188,7 @@
         ← Previous
       </button>
 
-      <div class="nav-counter">
-        {{ currentIndex + 1 }} / {{ stagedTransactions.length }}
-      </div>
+      <div class="nav-counter">{{ currentIndex + 1 }} / {{ stagedTransactions.length }}</div>
 
       <button
         class="btn-nav next"

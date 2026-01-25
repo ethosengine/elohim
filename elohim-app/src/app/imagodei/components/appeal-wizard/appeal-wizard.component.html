@@ -2,9 +2,7 @@
   <!-- Header -->
   <header class="wizard-header">
     <h1>File an Appeal</h1>
-    <p class="subtitle">
-      Appeals are your right. This process cannot be restricted.
-    </p>
+    <p class="subtitle">Appeals are your right. This process cannot be restricted.</p>
   </header>
 
   <!-- Error Banner -->
@@ -33,7 +31,8 @@
           [class.active]="currentStep() === step.id"
           [class.completed]="step.completed && currentStep() !== step.id"
           [disabled]="i > currentStepIndex() && !steps()[i - 1].completed"
-          (click)="goToStep(step.id)">
+          (click)="goToStep(step.id)"
+        >
           <span class="step-number">{{ i + 1 }}</span>
           <span class="step-label">{{ step.label }}</span>
         </button>
@@ -68,16 +67,15 @@
       @if (currentStep() === 'type') {
         <section class="step-panel">
           <h2>What type of appeal are you filing?</h2>
-          <p class="step-description">
-            Select the category that best describes your concern.
-          </p>
+          <p class="step-description">Select the category that best describes your concern.</p>
 
           <div class="type-options">
             @for (option of appealTypeOptions; track option.value) {
               <button
                 class="type-option"
                 [class.selected]="appealType() === option.value"
-                (click)="selectAppealType(option.value)">
+                (click)="selectAppealType(option.value)"
+              >
                 <div class="option-header">
                   <span class="option-radio">
                     @if (appealType() === option.value) {
@@ -99,9 +97,7 @@
       @if (currentStep() === 'grounds') {
         <section class="step-panel">
           <h2>What are your grounds for this appeal?</h2>
-          <p class="step-description">
-            Select all that apply, or write your own.
-          </p>
+          <p class="step-description">Select all that apply, or write your own.</p>
 
           <div class="grounds-list">
             @for (ground of availableGrounds(); track ground) {
@@ -109,7 +105,8 @@
                 <input
                   type="checkbox"
                   [checked]="isGroundSelected(ground)"
-                  (change)="toggleGround(ground)">
+                  (change)="toggleGround(ground)"
+                />
                 <span class="ground-text">{{ ground }}</span>
               </label>
             }
@@ -122,8 +119,8 @@
               [ngModel]="customGrounds()"
               (ngModelChange)="customGrounds.set($event)"
               placeholder="Describe your specific situation..."
-              rows="4">
-            </textarea>
+              rows="4"
+            ></textarea>
           </div>
 
           <div class="evidence-section">
@@ -133,8 +130,8 @@
               [ngModel]="evidenceDescription()"
               (ngModelChange)="evidenceDescription.set($event)"
               placeholder="Describe any evidence that supports your appeal..."
-              rows="3">
-            </textarea>
+              rows="3"
+            ></textarea>
           </div>
         </section>
       }
@@ -143,9 +140,7 @@
       @if (currentStep() === 'advocate') {
         <section class="step-panel">
           <h2>Would you like an advocate?</h2>
-          <p class="step-description">
-            An advocate can help present your case during arbitration.
-          </p>
+          <p class="step-description">An advocate can help present your case during arbitration.</p>
 
           <div class="advocate-options">
             <label class="advocate-option" [class.selected]="!wantsAdvocate()">
@@ -153,7 +148,8 @@
                 type="radio"
                 name="advocate"
                 [checked]="!wantsAdvocate()"
-                (change)="wantsAdvocate.set(false)">
+                (change)="wantsAdvocate.set(false)"
+              />
               <div class="option-content">
                 <span class="option-title">No advocate needed</span>
                 <span class="option-desc">I will present my own case.</span>
@@ -165,7 +161,8 @@
                 type="radio"
                 name="advocate"
                 [checked]="wantsAdvocate()"
-                (change)="wantsAdvocate.set(true)">
+                (change)="wantsAdvocate.set(true)"
+              />
               <div class="option-content">
                 <span class="option-title">Request Elohim advocate</span>
                 <span class="option-desc">
@@ -183,8 +180,8 @@
                 [ngModel]="advocateNotes()"
                 (ngModelChange)="advocateNotes.set($event)"
                 placeholder="Any additional context you'd like Elohim to consider..."
-                rows="3">
-              </textarea>
+                rows="3"
+              ></textarea>
             </div>
           }
         </section>
@@ -194,9 +191,7 @@
       @if (currentStep() === 'review') {
         <section class="step-panel">
           <h2>Review Your Appeal</h2>
-          <p class="step-description">
-            Please review your appeal before submitting.
-          </p>
+          <p class="step-description">Please review your appeal before submitting.</p>
 
           <div class="review-section">
             <h3>Appeal Type</h3>
@@ -210,7 +205,9 @@
                 <li>{{ ground }}</li>
               }
               @if (customGrounds()) {
-                <li class="custom"><em>{{ customGrounds() }}</em></li>
+                <li class="custom">
+                  <em>{{ customGrounds() }}</em>
+                </li>
               }
             </ul>
           </div>
@@ -236,9 +233,9 @@
           <div class="review-notice">
             <span class="icon">&#9432;</span>
             <p>
-              After submission, your appeal will be reviewed by the arbitration layer.
-              You will receive notification of any decisions within 7 days.
-              You can check the status of your appeal at any time from your dashboard.
+              After submission, your appeal will be reviewed by the arbitration layer. You will
+              receive notification of any decisions within 7 days. You can check the status of your
+              appeal at any time from your dashboard.
             </p>
           </div>
         </section>
@@ -260,18 +257,12 @@
       }
 
       @if (currentStep() !== 'review') {
-        <button
-          class="nav-btn primary"
-          [disabled]="!canProceed()"
-          (click)="nextStep()">
+        <button class="nav-btn primary" [disabled]="!canProceed()" (click)="nextStep()">
           Continue
           <span class="icon">&#8594;</span>
         </button>
       } @else {
-        <button
-          class="nav-btn primary submit"
-          [disabled]="isSubmitting()"
-          (click)="submitAppeal()">
+        <button class="nav-btn primary submit" [disabled]="isSubmitting()" (click)="submitAppeal()">
           @if (isSubmitting()) {
             <span class="spinner-small"></span>
             Submitting...

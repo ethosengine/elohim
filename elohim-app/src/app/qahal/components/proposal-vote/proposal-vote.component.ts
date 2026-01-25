@@ -1,9 +1,11 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+
 import { Subject, interval, takeUntil } from 'rxjs';
-import { GovernanceService, Vote } from '@app/elohim/services/governance.service';
+
 import { ProposalRecord } from '@app/elohim/services/data-loader.service';
+import { GovernanceService, Vote } from '@app/elohim/services/governance.service';
 
 /**
  * ProposalVoteComponent - Loomio-style 4-Position Voting
@@ -54,7 +56,7 @@ export class ProposalVoteComponent implements OnInit, OnDestroy {
       label: 'Disagree',
       icon: '👎',
       color: '#e67e22',
-      description: 'I have concerns but won\'t block',
+      description: "I have concerns but won't block",
     },
     {
       id: 'block',
@@ -161,10 +163,11 @@ export class ProposalVoteComponent implements OnInit, OnDestroy {
       reasoning: this.reasoning.trim() || undefined,
     };
 
-    this.governanceService.voteOnProposal(vote)
+    this.governanceService
+      .voteOnProposal(vote)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (success) => {
+        next: success => {
           this.isSubmitting = false;
           if (success) {
             this.hasExistingVote = true;
@@ -248,7 +251,8 @@ export class ProposalVoteComponent implements OnInit, OnDestroy {
    * Load existing vote for current user.
    */
   private loadExistingVote(): void {
-    this.governanceService.getMyVote(this.proposal.id)
+    this.governanceService
+      .getMyVote(this.proposal.id)
       .pipe(takeUntil(this.destroy$))
       .subscribe(vote => {
         if (vote) {

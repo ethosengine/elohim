@@ -7,7 +7,7 @@ export interface AccessControlEntity {
   ownerId?: string;
   extendedBy?: string; // for PathExtension
   sharedWith?: string[];
-  collaborators?: Array<{ agentId: string; role: string }>;
+  collaborators?: { agentId: string; role: string }[];
 }
 
 /**
@@ -55,9 +55,11 @@ export function canEdit(entity: AccessControlEntity, currentAgentId: string): bo
   }
 
   // Collaborators with 'editor' or 'admin' role can edit
-  if (entity.collaborators?.some(c =>
-    c.agentId === currentAgentId && (c.role === 'editor' || c.role === 'admin')
-  )) {
+  if (
+    entity.collaborators?.some(
+      c => c.agentId === currentAgentId && (c.role === 'editor' || c.role === 'admin')
+    )
+  ) {
     return true;
   }
 
@@ -78,9 +80,7 @@ export function canDelete(entity: AccessControlEntity, currentAgentId: string): 
   }
 
   // Collaborators with 'admin' role can delete
-  if (entity.collaborators?.some(c =>
-    c.agentId === currentAgentId && c.role === 'admin'
-  )) {
+  if (entity.collaborators?.some(c => c.agentId === currentAgentId && c.role === 'admin')) {
     return true;
   }
 

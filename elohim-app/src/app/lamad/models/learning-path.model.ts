@@ -1,6 +1,7 @@
-import { ContentNode } from './content-node.model';
-import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
 import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
+import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
+
+import { ContentNode } from './content-node.model';
 
 /**
  * LearningPath - A curated journey through Territory resources.
@@ -38,7 +39,7 @@ export interface LearningPath {
   createdBy: string;
   contributors: string[];
   forkedFrom?: string;
-  createdAt: string;  // ISO 8601
+  createdAt: string; // ISO 8601
   updatedAt: string;
 
   /**
@@ -485,11 +486,11 @@ export interface PathOverviewView {
   nestedPathSummaries?: PathIndexEntry[];
 
   /** Prerequisites with completion status */
-  prerequisites?: Array<{
+  prerequisites?: {
     pathId: string;
     title: string;
     isCompleted: boolean;
-  }>;
+  }[];
 }
 
 /**

@@ -20,13 +20,13 @@ import { ResourceMeasure, ResourceCategory } from './stewarded-resources.model';
 // =============================================================================
 
 export type TimeHorizon =
-  | 'daily'       // Day-to-day planning
-  | 'weekly'      // Week-by-week
-  | 'monthly'     // Monthly planning
-  | 'quarterly'   // Quarterly goals
-  | 'annual'      // Yearly planning
-  | 'multi-year'  // 3-5 year horizon
-  | 'lifecycle';  // Major life milestones
+  | 'daily' // Day-to-day planning
+  | 'weekly' // Week-by-week
+  | 'monthly' // Monthly planning
+  | 'quarterly' // Quarterly goals
+  | 'annual' // Yearly planning
+  | 'multi-year' // 3-5 year horizon
+  | 'lifecycle'; // Major life milestones
 
 export type Frequency =
   | 'daily'
@@ -41,12 +41,27 @@ export type Frequency =
 
 export type PlanStatus = 'draft' | 'active' | 'on-track' | 'at-risk' | 'completed' | 'archived';
 export type BudgetStatus = 'draft' | 'active' | 'under-budget' | 'over-budget' | 'closed';
-export type GoalStatus = 'draft' | 'active' | 'on-track' | 'behind' | 'at-risk' | 'completed' | 'abandoned';
+export type GoalStatus =
+  | 'draft'
+  | 'active'
+  | 'on-track'
+  | 'behind'
+  | 'at-risk'
+  | 'completed'
+  | 'abandoned';
 export type ScenarioStatus = 'draft' | 'simulated' | 'analyzing' | 'selected' | 'archived';
 export type ScenarioType = 'optimistic' | 'pessimistic' | 'baseline' | 'target' | 'what-if';
 export type MilestoneStatus = 'pending' | 'in-progress' | 'achieved' | 'missed' | 'deferred';
-export type ProjectionMethod = 'trend-extrapolation' | 'pattern-based' | 'constraint-optimized' | 'scenario-driven';
-export type BreakpointType = 'zero-crossing' | 'threshold-breach' | 'trend-reversal' | 'milestone-achievement';
+export type ProjectionMethod =
+  | 'trend-extrapolation'
+  | 'pattern-based'
+  | 'constraint-optimized'
+  | 'scenario-driven';
+export type BreakpointType =
+  | 'zero-crossing'
+  | 'threshold-breach'
+  | 'trend-reversal'
+  | 'milestone-achievement';
 export type BreakpointSeverity = 'info' | 'warning' | 'critical';
 export type ConfidenceLevel = 'low' | 'medium' | 'high';
 
@@ -62,36 +77,36 @@ export type ConfidenceLevel = 'low' | 'medium' | 'high';
  */
 export interface RecurringPattern {
   id: string;
-  patternNumber: string;           // RP-XXXXXXXXXX
+  patternNumber: string; // RP-XXXXXXXXXX
   stewardId: string;
 
   // Pattern identity
-  label: string;                   // "Monthly rent payment"
+  label: string; // "Monthly rent payment"
   description?: string;
 
   // Frequency specification
   frequency: Frequency;
-  frequencyValue?: number;         // For "every N" patterns (e.g., every 2 weeks)
+  frequencyValue?: number; // For "every N" patterns (e.g., every 2 weeks)
 
   // Amount specification
   expectedAmount: ResourceMeasure;
-  varianceExpected: number;        // Percentage variance (0-100)
+  varianceExpected: number; // Percentage variance (0-100)
 
   // Schedule
-  startDate: string;               // ISO 8601, when pattern begins
-  endDate?: string;                // ISO 8601, when pattern ends (if known)
-  nextDueDate: string;             // Auto-calculated
+  startDate: string; // ISO 8601, when pattern begins
+  endDate?: string; // ISO 8601, when pattern ends (if known)
+  nextDueDate: string; // Auto-calculated
 
   // Pattern metadata
   resourceCategory: ResourceCategory;
   patternType: 'income' | 'expense' | 'allocation' | 'event';
-  autoGenerate: boolean;           // Auto-create expected events?
+  autoGenerate: boolean; // Auto-create expected events?
 
   // Historical tracking
   historicalOccurrences: string[]; // Event IDs of past occurrences
-  missedOccurrences: number;       // How many were missed/skipped
+  missedOccurrences: number; // How many were missed/skipped
   averageActualAmount?: ResourceMeasure; // Actual average from history
-  reliability: number;             // 0-100, how consistently it occurs
+  reliability: number; // 0-100, how consistently it occurs
 
   // Status
   status: 'active' | 'paused' | 'ended';
@@ -117,31 +132,31 @@ export interface RecurringPattern {
  */
 export interface FlowPlan {
   id: string;
-  planNumber: string;              // FP-XXXXXXXXXX
+  planNumber: string; // FP-XXXXXXXXXX
   stewardId: string;
 
   // Plan scope
-  name: string;                    // "2025 Financial Stability Plan"
+  name: string; // "2025 Financial Stability Plan"
   description?: string;
   timeHorizon: TimeHorizon;
-  planPeriodStart: string;         // ISO 8601
-  planPeriodEnd: string;           // ISO 8601
+  planPeriodStart: string; // ISO 8601
+  planPeriodEnd: string; // ISO 8601
 
   // Resource coverage
   resourceScopes: ResourceCategory[]; // Which resources are included
-  includedResourceIds: string[];   // Specific resources tracked
+  includedResourceIds: string[]; // Specific resources tracked
 
   // Goals & milestones
-  goals: string[];                 // FlowGoal IDs
-  milestones: string[];            // FlowMilestone IDs
+  goals: string[]; // FlowGoal IDs
+  milestones: string[]; // FlowMilestone IDs
 
   // Budget allocations
-  budgets: string[];               // FlowBudget IDs
+  budgets: string[]; // FlowBudget IDs
 
   // Status
   status: PlanStatus;
-  confidenceScore: number;         // 0-100, confidence in achieving goals
-  completionPercent: number;       // How much of plan is executed
+  confidenceScore: number; // 0-100, confidence in achieving goals
+  completionPercent: number; // How much of plan is executed
 
   // Tracking
   createdAt: string;
@@ -151,7 +166,7 @@ export interface FlowPlan {
   nextReviewDue: string;
 
   // Events
-  planEventIds: string[];          // EconomicEvent IDs for plan lifecycle
+  planEventIds: string[]; // EconomicEvent IDs for plan lifecycle
 
   metadata?: Record<string, unknown>;
 }
@@ -174,25 +189,25 @@ export interface FlowPlan {
  */
 export interface FlowBudget {
   id: string;
-  budgetNumber: string;            // FB-XXXXXXXXXX
-  planId: string;                  // Parent FlowPlan
+  budgetNumber: string; // FB-XXXXXXXXXX
+  planId: string; // Parent FlowPlan
   stewardId: string;
 
   // Budget identity
-  name: string;                    // "Monthly Household Budget"
+  name: string; // "Monthly Household Budget"
   description?: string;
   budgetPeriod: 'weekly' | 'monthly' | 'quarterly' | 'annual';
 
   // Period tracking
-  periodStart: string;             // ISO 8601
-  periodEnd: string;               // ISO 8601
+  periodStart: string; // ISO 8601
+  periodEnd: string; // ISO 8601
 
   // Categories and allocations
   categories: BudgetCategory[];
   totalPlanned: ResourceMeasure;
   totalActual: ResourceMeasure;
-  variance: number;                // Difference: actual - planned
-  variancePercent: number;         // (variance / planned) * 100
+  variance: number; // Difference: actual - planned
+  variancePercent: number; // (variance / planned) * 100
 
   // Status
   status: BudgetStatus;
@@ -201,14 +216,14 @@ export interface FlowBudget {
   // Tracking
   createdAt: string;
   updatedAt: string;
-  lastReconciled: string;          // When was actual vs planned last calculated
+  lastReconciled: string; // When was actual vs planned last calculated
 
-  budgetEventIds: string[];        // Economic events linked to budget
+  budgetEventIds: string[]; // Economic events linked to budget
 }
 
 export interface BudgetCategory {
   id: string;
-  categoryName: string;            // "Housing", "Food", "Learning", "Community Service"
+  categoryName: string; // "Housing", "Food", "Learning", "Community Service"
   categoryType: 'fixed' | 'variable' | 'discretionary';
 
   // Allocations
@@ -221,13 +236,13 @@ export interface BudgetCategory {
   subcategories?: BudgetCategory[];
 
   // Limits
-  hardLimit?: ResourceMeasure;     // Cannot exceed
-  targetAmount?: ResourceMeasure;  // Ideal spending
+  hardLimit?: ResourceMeasure; // Cannot exceed
+  targetAmount?: ResourceMeasure; // Ideal spending
   minimumAmount?: ResourceMeasure; // Cannot go below
 
   // Tracking
-  transactionIds: string[];        // Actual transactions in this category
-  recurringPatternIds: string[];   // Recurring patterns contributing
+  transactionIds: string[]; // Actual transactions in this category
+  recurringPatternIds: string[]; // Recurring patterns contributing
 
   notes?: string;
 }
@@ -247,37 +262,43 @@ export interface BudgetCategory {
  */
 export interface FlowGoal {
   id: string;
-  goalNumber: string;              // FG-XXXXXXXXXX
+  goalNumber: string; // FG-XXXXXXXXXX
   planId: string;
   stewardId: string;
 
   // Goal definition
-  name: string;                    // "Build 6-month emergency fund"
+  name: string; // "Build 6-month emergency fund"
   description?: string;
-  goalType: 'savings' | 'debt-reduction' | 'income-increase' | 'allocation-shift' | 'milestone' | 'custom';
+  goalType:
+    | 'savings'
+    | 'debt-reduction'
+    | 'income-increase'
+    | 'allocation-shift'
+    | 'milestone'
+    | 'custom';
 
   // Target
-  targetMetric: string;            // "emergency_fund_months", "debt_paid_down", etc.
+  targetMetric: string; // "emergency_fund_months", "debt_paid_down", etc.
   targetValue: number;
   targetUnit: string;
   currentValue: number;
   startingValue: number;
 
   // Timeline
-  deadline: string;                // ISO 8601
+  deadline: string; // ISO 8601
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
 
   // Progress
-  progressPercent: number;         // (current - starting) / (target - starting) * 100
+  progressPercent: number; // (current - starting) / (target - starting) * 100
   onTrack: boolean;
   estimatedCompletionDate?: string; // ISO 8601
 
   // Dependencies
-  linkedResourceIds: string[];     // Resources this goal depends on
-  linkedBudgetIds: string[];       // Budgets supporting this goal
-  blockedBy?: string[];            // Other goals blocking this
+  linkedResourceIds: string[]; // Resources this goal depends on
+  linkedBudgetIds: string[]; // Budgets supporting this goal
+  blockedBy?: string[]; // Other goals blocking this
 
   // Status
   status: GoalStatus;
@@ -300,37 +321,37 @@ export interface FlowGoal {
  */
 export interface FlowMilestone {
   id: string;
-  milestoneNumber: string;         // FM-XXXXXXXXXX
+  milestoneNumber: string; // FM-XXXXXXXXXX
   planId: string;
 
   // Milestone definition
-  name: string;                    // "Reach dignity floor income"
+  name: string; // "Reach dignity floor income"
   description?: string;
 
   // Checkpoint
-  targetDate: string;              // ISO 8601
-  actualDate?: string;             // ISO 8601
+  targetDate: string; // ISO 8601
+  actualDate?: string; // ISO 8601
 
   // Success criteria
   successCriteria: MilestoneSuccessCriterion[];
   allCriteriaMet: boolean;
 
   // Dependencies
-  dependsOnGoals: string[];        // FlowGoal IDs
-  dependsOnMilestones: string[];   // Other milestone IDs
-  blocksGoals: string[];           // Goals waiting for this
+  dependsOnGoals: string[]; // FlowGoal IDs
+  dependsOnMilestones: string[]; // Other milestone IDs
+  blocksGoals: string[]; // Goals waiting for this
 
   // Status
   status: MilestoneStatus;
 
-  achievedAt?: string;             // ISO 8601
+  achievedAt?: string; // ISO 8601
   milestoneEventIds: string[];
   metadata?: Record<string, unknown>;
 }
 
 export interface MilestoneSuccessCriterion {
   id: string;
-  criterionName: string;           // "Monthly income >= $4,000"
+  criterionName: string; // "Monthly income >= $4,000"
   metric: string;
   operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
   targetValue: number;
@@ -352,12 +373,12 @@ export interface MilestoneSuccessCriterion {
  */
 export interface FlowScenario {
   id: string;
-  scenarioNumber: string;          // FS-XXXXXXXXXX
+  scenarioNumber: string; // FS-XXXXXXXXXX
   planId: string;
   stewardId: string;
 
   // Scenario definition
-  name: string;                    // "20% Income Increase Scenario"
+  name: string; // "20% Income Increase Scenario"
   description?: string;
   scenarioType: ScenarioType;
 
@@ -365,15 +386,15 @@ export interface FlowScenario {
   changes: ScenarioChange[];
 
   // Projection results
-  projections: string[];           // FlowProjection IDs
+  projections: string[]; // FlowProjection IDs
 
   // Comparison
-  baselineScenarioId?: string;     // Compare against this
+  baselineScenarioId?: string; // Compare against this
   deltaMetrics: Record<string, number>; // Key differences from baseline
 
   // Status
   status: ScenarioStatus;
-  simulatedAt?: string;            // ISO 8601
+  simulatedAt?: string; // ISO 8601
 
   createdAt: string;
   updatedAt: string;
@@ -397,12 +418,12 @@ export interface ScenarioChange {
   changeUnit?: string;
 
   // Description
-  label: string;                   // "Increase salary by 20%"
+  label: string; // "Increase salary by 20%"
   rationale?: string;
 
   // Timing
-  effectiveFrom: string;           // ISO 8601
-  effectiveUntil?: string;         // ISO 8601
+  effectiveFrom: string; // ISO 8601
+  effectiveUntil?: string; // ISO 8601
 }
 
 // =============================================================================
@@ -420,28 +441,28 @@ export interface ScenarioChange {
  */
 export interface FlowProjection {
   id: string;
-  projectionNumber: string;        // FP-XXXXXXXXXX
+  projectionNumber: string; // FP-XXXXXXXXXX
   planId?: string;
-  scenarioId?: string;             // If from a scenario simulation
+  scenarioId?: string; // If from a scenario simulation
   stewardId: string;
 
   // Projection scope
   resourceCategory: ResourceCategory;
-  resourceId?: string;             // Specific resource (optional)
+  resourceId?: string; // Specific resource (optional)
 
   // Time series
-  projectionStart: string;         // ISO 8601
-  projectionEnd: string;           // ISO 8601
+  projectionStart: string; // ISO 8601
+  projectionEnd: string; // ISO 8601
   projectionHorizon: TimeHorizon;
   dataPoints: ProjectionDataPoint[];
 
   // Confidence
   confidenceLevel: ConfidenceLevel;
-  confidencePercent: number;       // 0-100
+  confidencePercent: number; // 0-100
 
   // Methodology
   projectionMethod: ProjectionMethod;
-  assumptionsMade: string[];       // List of assumptions
+  assumptionsMade: string[]; // List of assumptions
 
   // Breakpoints
   breakpoints: ProjectionBreakpoint[]; // Key inflection points
@@ -451,13 +472,13 @@ export interface FlowProjection {
 }
 
 export interface ProjectionDataPoint {
-  timestamp: string;               // ISO 8601 point in time
+  timestamp: string; // ISO 8601 point in time
   projectedValue: number;
   unit: string;
 
   // Confidence bands
-  lowEstimate?: number;            // Pessimistic bound
-  highEstimate?: number;           // Optimistic bound
+  lowEstimate?: number; // Pessimistic bound
+  highEstimate?: number; // Optimistic bound
 
   // Contributing factors
   trendContribution?: number;
@@ -466,9 +487,9 @@ export interface ProjectionDataPoint {
 }
 
 export interface ProjectionBreakpoint {
-  timestamp: string;               // ISO 8601
+  timestamp: string; // ISO 8601
   breakpointType: BreakpointType;
-  description: string;             // "Emergency fund depleted"
+  description: string; // "Emergency fund depleted"
   severity: BreakpointSeverity;
   relatedGoalId?: string;
   relatedMilestoneId?: string;
@@ -503,14 +524,14 @@ export interface AllocationConstraint {
   // Relationships
   relativeToCategory?: ResourceCategory;
   ratioOperator?: 'eq' | 'gt' | 'gte' | 'lt' | 'lte';
-  ratioValue?: number;             // e.g., "time:community >= 0.15" (15% of time)
+  ratioValue?: number; // e.g., "time:community >= 0.15" (15% of time)
 
   // Priority
   priority: 'required' | 'preferred' | 'optional';
-  weight: number;                  // For optimization (1-10)
+  weight: number; // For optimization (1-10)
 
   // Constitutional basis
-  constitutionalLimitId?: string;  // Link to ConstitutionalLimit
+  constitutionalLimitId?: string; // Link to ConstitutionalLimit
 
   description: string;
   rationale?: string;
@@ -522,11 +543,15 @@ export interface OptimizationResult {
 
   // Input
   constraints: AllocationConstraint[];
-  objectiveFunction: 'maximize-surplus' | 'minimize-variance' | 'achieve-targets' | 'balance-categories';
+  objectiveFunction:
+    | 'maximize-surplus'
+    | 'minimize-variance'
+    | 'achieve-targets'
+    | 'balance-categories';
 
   // Output
   optimalAllocations: Record<string, number>; // category -> amount
-  objectiveValue: number;          // Achieved objective score
+  objectiveValue: number; // Achieved objective score
   constraintsSatisfied: number;
   constraintsViolated: number;
 
@@ -588,7 +613,11 @@ export interface FlowPlanningInsight {
 export interface FlowPlanningRecommendation {
   id: string;
   priority: 'critical' | 'high' | 'medium' | 'low';
-  recommendationType: 'budget-adjustment' | 'goal-revision' | 'allocation-shift' | 'pattern-optimization';
+  recommendationType:
+    | 'budget-adjustment'
+    | 'goal-revision'
+    | 'allocation-shift'
+    | 'pattern-optimization';
   title: string;
   description: string;
   suggestedAction: string;

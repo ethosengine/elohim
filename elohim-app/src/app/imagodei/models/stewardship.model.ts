@@ -20,10 +20,10 @@
  * Power scales with demonstrated responsibility, not assigned role.
  */
 export type StewardCapabilityTier =
-  | 'self'          // Manage own settings only
-  | 'guide'         // Help others navigate their settings (advisory)
-  | 'guardian'      // Manage settings for verified dependents
-  | 'coordinator'   // Manage settings across organization/community
+  | 'self' // Manage own settings only
+  | 'guide' // Help others navigate their settings (advisory)
+  | 'guardian' // Manage settings for verified dependents
+  | 'coordinator' // Manage settings across organization/community
   | 'constitutional'; // Elohim-level governance capabilities
 
 export const STEWARD_CAPABILITY_TIERS: StewardCapabilityTier[] = [
@@ -39,12 +39,12 @@ export const STEWARD_CAPABILITY_TIERS: StewardCapabilityTier[] = [
  * Must be verifiable and reviewable.
  */
 export type AuthorityBasis =
-  | 'minor_guardianship'   // Legal guardian of minor
-  | 'court_order'          // Court-appointed custody
-  | 'medical_necessity'    // Disability requiring care
-  | 'community_consensus'  // Community-determined intervention
-  | 'organizational_role'  // Device managed by organization
-  | 'mutual_consent';      // Subject explicitly consented
+  | 'minor_guardianship' // Legal guardian of minor
+  | 'court_order' // Court-appointed custody
+  | 'medical_necessity' // Disability requiring care
+  | 'community_consensus' // Community-determined intervention
+  | 'organizational_role' // Device managed by organization
+  | 'mutual_consent'; // Subject explicitly consented
 
 export const AUTHORITY_BASIS_TYPES: AuthorityBasis[] = [
   'minor_guardianship',
@@ -69,9 +69,9 @@ export type AppealStatus = 'filed' | 'reviewing' | 'decided' | 'closed';
  * Appeal types
  */
 export type AppealType =
-  | 'scope'              // Challenging scope of capabilities granted
-  | 'excessive'          // Claiming restrictions are disproportionate
-  | 'invalid_evidence'   // Questioning authority basis evidence
+  | 'scope' // Challenging scope of capabilities granted
+  | 'excessive' // Claiming restrictions are disproportionate
+  | 'invalid_evidence' // Questioning authority basis evidence
   | 'capability_request'; // Requesting additional capabilities
 
 /**
@@ -87,7 +87,7 @@ export const CONTENT_CATEGORIES = [
   'spam',
   'misinformation',
 ] as const;
-export type ContentCategory = typeof CONTENT_CATEGORIES[number];
+export type ContentCategory = (typeof CONTENT_CATEGORIES)[number];
 
 /**
  * Age ratings for content
@@ -99,7 +99,7 @@ export const AGE_RATINGS = [
   { value: 'R', label: 'R - Restricted' },
   { value: 'NC-17', label: 'NC-17 - Adults Only' },
 ] as const;
-export type AgeRating = typeof AGE_RATINGS[number]['value'];
+export type AgeRating = (typeof AGE_RATINGS)[number]['value'];
 
 /**
  * Features that can be restricted
@@ -116,7 +116,7 @@ export const RESTRICTABLE_FEATURES = [
   'external_links',
   'download',
 ] as const;
-export type RestrictableFeature = typeof RESTRICTABLE_FEATURES[number];
+export type RestrictableFeature = (typeof RESTRICTABLE_FEATURES)[number];
 
 /**
  * Inalienable rights that cannot be disabled even by coordinators
@@ -129,7 +129,7 @@ export const INALIENABLE_FEATURES = [
   'emergency_call',
   'time_status',
 ] as const;
-export type InalienableFeature = typeof INALIENABLE_FEATURES[number];
+export type InalienableFeature = (typeof INALIENABLE_FEATURES)[number];
 
 // =============================================================================
 // Stewardship Grant Types
@@ -221,9 +221,9 @@ export interface DelegateGrantInput {
  * Time window for allowed access
  */
 export interface TimeWindow {
-  daysOfWeek: number[];  // 0=Sun, 1=Mon, etc.
-  startHour: number;    // 0-23
-  startMinute: number;  // 0-59
+  daysOfWeek: number[]; // 0=Sun, 1=Mon, etc.
+  startHour: number; // 0-23
+  startMinute: number; // 0-59
   endHour: number;
   endMinute: number;
 }
@@ -408,9 +408,7 @@ export interface ComputedPolicy {
 /**
  * Policy decision result
  */
-export type PolicyDecision =
-  | { type: 'allow' }
-  | { type: 'block'; reason: string };
+export type PolicyDecision = { type: 'allow' } | { type: 'block'; reason: string };
 
 // =============================================================================
 // Time Access Types
@@ -528,7 +526,7 @@ export interface ActivityLog {
 export interface PolicyChainLink {
   policyId: string;
   authorTier: StewardCapabilityTier;
-  layerOrder: number;  // 0=org, 1=guardian, 2=elohim, 3=subject
+  layerOrder: number; // 0=org, 1=guardian, 2=elohim, 3=subject
 }
 
 /**
@@ -659,14 +657,14 @@ export const COMMUNITY_INTERVENTION_THRESHOLD = 10.0;
  * Intervention status lifecycle
  */
 export type InterventionStatus =
-  | 'gathering'      // Still gathering community support
-  | 'threshold_met'  // Threshold reached, subject notified
+  | 'gathering' // Still gathering community support
+  | 'threshold_met' // Threshold reached, subject notified
   | 'response_window' // 7-day response period
-  | 'arbitration'    // Under Elohim review
-  | 'decided'        // Decision made
-  | 'active'         // Stewardship active
-  | 'completed'      // Stewardship ended, restored
-  | 'cancelled';     // Intervention cancelled
+  | 'arbitration' // Under Elohim review
+  | 'decided' // Decision made
+  | 'active' // Stewardship active
+  | 'completed' // Stewardship ended, restored
+  | 'cancelled'; // Intervention cancelled
 
 /**
  * Community support for an intervention
@@ -764,15 +762,39 @@ export interface SupportInterventionInput {
  * Categories of concerning patterns (for intervention)
  */
 export const INTERVENTION_CATEGORIES = [
-  { value: 'authoritarian_rhetoric', label: 'Authoritarian Rhetoric', description: 'Justifying violence or oppression by authorities' },
-  { value: 'victim_blaming', label: 'Victim Blaming', description: 'Blaming victims for harm done to them' },
-  { value: 'dehumanization', label: 'Dehumanization', description: 'Dehumanizing language toward groups' },
+  {
+    value: 'authoritarian_rhetoric',
+    label: 'Authoritarian Rhetoric',
+    description: 'Justifying violence or oppression by authorities',
+  },
+  {
+    value: 'victim_blaming',
+    label: 'Victim Blaming',
+    description: 'Blaming victims for harm done to them',
+  },
+  {
+    value: 'dehumanization',
+    label: 'Dehumanization',
+    description: 'Dehumanizing language toward groups',
+  },
   { value: 'harassment', label: 'Harassment', description: 'Persistent targeting of individuals' },
-  { value: 'manipulation', label: 'Manipulation', description: 'Exploitative or manipulative behavior' },
-  { value: 'misinformation', label: 'Misinformation', description: 'Spreading harmful false information' },
-  { value: 'exploitation', label: 'Exploitation', description: 'Financial, emotional, or other exploitation' },
+  {
+    value: 'manipulation',
+    label: 'Manipulation',
+    description: 'Exploitative or manipulative behavior',
+  },
+  {
+    value: 'misinformation',
+    label: 'Misinformation',
+    description: 'Spreading harmful false information',
+  },
+  {
+    value: 'exploitation',
+    label: 'Exploitation',
+    description: 'Financial, emotional, or other exploitation',
+  },
 ] as const;
-export type InterventionCategory = typeof INTERVENTION_CATEGORIES[number]['value'];
+export type InterventionCategory = (typeof INTERVENTION_CATEGORIES)[number]['value'];
 
 /**
  * Calculate weighted support total

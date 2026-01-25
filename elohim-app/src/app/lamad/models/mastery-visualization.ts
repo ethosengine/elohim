@@ -22,14 +22,14 @@ import type { MasteryLevel } from './content-mastery.model';
  * Used for badges, progress indicators, and chart fills.
  */
 export const MASTERY_COLORS: Record<MasteryLevel, string> = {
-  not_started: '#e0e0e0',   // Gray - no progress
-  seen: '#fff3e0',          // Light orange - just viewed
-  remember: '#ffe0b2',      // Orange - can recall
-  understand: '#fff9c4',    // Yellow - comprehends
-  apply: '#c8e6c9',         // Green - GATE LEVEL (can apply)
-  analyze: '#b3e5fc',       // Light blue - can analyze
-  evaluate: '#b2ebf2',      // Cyan - can evaluate
-  create: '#e1bee7',        // Purple - can create
+  not_started: '#e0e0e0', // Gray - no progress
+  seen: '#fff3e0', // Light orange - just viewed
+  remember: '#ffe0b2', // Orange - can recall
+  understand: '#fff9c4', // Yellow - comprehends
+  apply: '#c8e6c9', // Green - GATE LEVEL (can apply)
+  analyze: '#b3e5fc', // Light blue - can analyze
+  evaluate: '#b2ebf2', // Cyan - can evaluate
+  create: '#e1bee7', // Purple - can create
 };
 
 /**
@@ -40,7 +40,7 @@ export const MASTERY_ACCENT_COLORS: Record<MasteryLevel, string> = {
   seen: '#ffb74d',
   remember: '#ff9800',
   understand: '#ffc107',
-  apply: '#4caf50',         // Green accent - gate level
+  apply: '#4caf50', // Green accent - gate level
   analyze: '#03a9f4',
   evaluate: '#00bcd4',
   create: '#9c27b0',
@@ -73,7 +73,7 @@ export const MASTERY_ICONS: Record<MasteryLevel, string> = {
   seen: 'visibility',
   remember: 'psychology',
   understand: 'lightbulb',
-  apply: 'construction',    // Gate level - tools/application
+  apply: 'construction', // Gate level - tools/application
   analyze: 'analytics',
   evaluate: 'balance',
   create: 'stars',
@@ -148,13 +148,13 @@ export const MASTERY_DESCRIPTIONS: Record<MasteryLevel, string> = {
  */
 export const MASTERY_PROGRESS: Record<MasteryLevel, number> = {
   not_started: 0,
-  seen: 14,       // 1/7
-  remember: 28,   // 2/7
+  seen: 14, // 1/7
+  remember: 28, // 2/7
   understand: 42, // 3/7
-  apply: 57,      // 4/7 - gate level
-  analyze: 71,    // 5/7
-  evaluate: 85,   // 6/7
-  create: 100,    // 7/7
+  apply: 57, // 4/7 - gate level
+  analyze: 71, // 5/7
+  evaluate: 85, // 6/7
+  create: 100, // 7/7
 };
 
 /**
@@ -179,9 +179,9 @@ export const MASTERY_CSS_CLASSES: Record<MasteryLevel, string> = {
  * Colors for freshness indicators.
  */
 export const FRESHNESS_COLORS = {
-  fresh: '#4caf50',      // Green - recently engaged
-  stale: '#ff9800',      // Orange - needs review
-  critical: '#f44336',   // Red - needs relearning
+  fresh: '#4caf50', // Green - recently engaged
+  stale: '#ff9800', // Orange - needs review
+  critical: '#f44336', // Red - needs relearning
 };
 
 /**
@@ -201,9 +201,9 @@ export const FRESHNESS_ICONS = {
  * Colors for level change indicators.
  */
 export const LEVEL_CHANGE_COLORS = {
-  up: '#4caf50',     // Green - level up
-  down: '#f44336',   // Red - level down
-  same: '#9e9e9e',   // Gray - no change
+  up: '#4caf50', // Green - level up
+  down: '#f44336', // Red - level down
+  same: '#9e9e9e', // Gray - no change
 };
 
 /**
@@ -267,8 +267,14 @@ export function getMasteryCssClasses(level: MasteryLevel): string {
 export function isAtOrAboveGate(level: MasteryLevel): boolean {
   const gateIndex = 4; // apply = index 4
   const levels: MasteryLevel[] = [
-    'not_started', 'seen', 'remember', 'understand',
-    'apply', 'analyze', 'evaluate', 'create'
+    'not_started',
+    'seen',
+    'remember',
+    'understand',
+    'apply',
+    'analyze',
+    'evaluate',
+    'create',
   ];
   return levels.indexOf(level) >= gateIndex;
 }

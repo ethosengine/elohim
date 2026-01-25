@@ -1,6 +1,9 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, combineLatest } from 'rxjs';
+
 import { map, shareReplay } from 'rxjs/operators';
+
+import { Observable, of, combineLatest } from 'rxjs';
+
 // Services
 import {
   DataLoaderService,
@@ -9,7 +12,7 @@ import {
   ProposalRecord,
   PrecedentRecord,
   DiscussionRecord,
-  GovernanceStateRecord
+  GovernanceStateRecord,
 } from '@app/elohim/services/data-loader.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
@@ -21,11 +24,11 @@ export interface ChallengeSubmission {
   entityId: string;
   grounds: ChallengeGrounds;
   description: string;
-  evidence?: Array<{
+  evidence?: {
     type: 'document-reference' | 'external-reference' | 'testimony';
     reference: string;
     description?: string;
-  }>;
+  }[];
 }
 
 export type ChallengeGrounds =
@@ -124,7 +127,7 @@ export class GovernanceService {
       this.getChallenges(),
       this.getProposals(),
       this.getPrecedents(),
-      this.getDiscussions()
+      this.getDiscussions(),
     ]).pipe(
       map(([challenges, proposals, precedents, discussions]) => ({
         activeChallenges: challenges.filter(c =>
@@ -132,7 +135,7 @@ export class GovernanceService {
         ).length,
         votingProposals: proposals.filter(p => p.status === 'voting').length,
         recentPrecedents: precedents.filter(p => p.status === 'active').length,
-        activeDiscussions: discussions.filter(d => d.status === 'active').length
+        activeDiscussions: discussions.filter(d => d.status === 'active').length,
       }))
     );
   }
@@ -145,7 +148,10 @@ export class GovernanceService {
    * Get governance state for a specific entity.
    * Returns null if no explicit state exists (defaults to 'unreviewed').
    */
-  getGovernanceState(entityType: string, entityId: string): Observable<GovernanceStateRecord | null> {
+  getGovernanceState(
+    entityType: string,
+    entityId: string
+  ): Observable<GovernanceStateRecord | null> {
     return this.dataLoader.getGovernanceState(entityType, entityId);
   }
 
@@ -164,22 +170,23 @@ export class GovernanceService {
    */
   isEntityChallenged(entityType: string, entityId: string): Observable<boolean> {
     return this.getChallengesForEntity(entityType, entityId).pipe(
-      map(challenges => challenges.some(c =>
-        ['acknowledged', 'under-review'].includes(c.status)
-      ))
+      map(challenges => challenges.some(c => ['acknowledged', 'under-review'].includes(c.status)))
     );
   }
 
   /**
    * Get active labels/flags on an entity.
    */
-  getEntityLabels(entityType: string, entityId: string): Observable<Array<{
-    labelType: string;
-    severity: string;
-  }>> {
-    return this.getGovernanceState(entityType, entityId).pipe(
-      map(state => state?.labels ?? [])
-    );
+  getEntityLabels(
+    entityType: string,
+    entityId: string
+  ): Observable<
+    {
+      labelType: string;
+      severity: string;
+    }[]
+  > {
+    return this.getGovernanceState(entityType, entityId).pipe(map(state => state?.labels ?? []));
   }
 
   // =========================================================================
@@ -190,9 +197,7 @@ export class GovernanceService {
    * Get all challenges.
    */
   getChallenges(): Observable<ChallengeRecord[]> {
-    this.challengesCache$ ??= this.dataLoader.getChallenges().pipe(
-      shareReplay(1)
-    );
+    this.challengesCache$ ??= this.dataLoader.getChallenges().pipe(shareReplay(1));
     return this.challengesCache$;
   }
 
@@ -237,13 +242,13 @@ export class GovernanceService {
       challenger: {
         agentId,
         displayName: userName,
-        standing: 'community-member'
+        standing: 'community-member',
       },
       grounds: submission.grounds,
       description: submission.description,
       status: 'pending',
       filedAt: new Date().toISOString(),
-      slaDeadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+      slaDeadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     };
 
     // Save to localStorage
@@ -263,9 +268,7 @@ export class GovernanceService {
    * Get all proposals.
    */
   getProposals(): Observable<ProposalRecord[]> {
-    this.proposalsCache$ ??= this.dataLoader.getProposals().pipe(
-      shareReplay(1)
-    );
+    this.proposalsCache$ ??= this.dataLoader.getProposals().pipe(shareReplay(1));
     return this.proposalsCache$;
   }
 
@@ -308,11 +311,11 @@ export class GovernanceService {
       description: submission.description,
       proposer: {
         agentId,
-        displayName: userName
+        displayName: userName,
       },
       status: 'discussion',
       phase: 'discussion',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     // Save to localStorage
@@ -333,11 +336,14 @@ export class GovernanceService {
     const key = `${this.STORAGE_PREFIX}vote-${agentId}-${vote.proposalId}`;
 
     try {
-      localStorage.setItem(key, JSON.stringify({
-        ...vote,
-        votedAt: new Date().toISOString(),
-        agentId
-      }));
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          ...vote,
+          votedAt: new Date().toISOString(),
+          agentId,
+        })
+      );
       return of(true);
     } catch {
       return of(false);
@@ -362,9 +368,7 @@ export class GovernanceService {
    * Get all precedents.
    */
   getPrecedents(): Observable<PrecedentRecord[]> {
-    this.precedentsCache$ ??= this.dataLoader.getPrecedents().pipe(
-      shareReplay(1)
-    );
+    this.precedentsCache$ ??= this.dataLoader.getPrecedents().pipe(shareReplay(1));
     return this.precedentsCache$;
   }
 
@@ -388,10 +392,13 @@ export class GovernanceService {
   searchPrecedents(query: string): Observable<PrecedentRecord[]> {
     const lowerQuery = query.toLowerCase();
     return this.getPrecedents().pipe(
-      map(precedents => precedents.filter(p =>
-        p.title.toLowerCase().includes(lowerQuery) ||
-        p.summary.toLowerCase().includes(lowerQuery)
-      ))
+      map(precedents =>
+        precedents.filter(
+          p =>
+            p.title.toLowerCase().includes(lowerQuery) ||
+            p.summary.toLowerCase().includes(lowerQuery)
+        )
+      )
     );
   }
 
@@ -427,7 +434,7 @@ export class GovernanceService {
       authorName: userName,
       content: message.content,
       createdAt: new Date().toISOString(),
-      replyToId: message.replyToId
+      replyToId: message.replyToId,
     };
 
     // Save to localStorage
@@ -447,13 +454,13 @@ export class GovernanceService {
   /**
    * Get local messages for a discussion (MVP supplement to server data).
    */
-  getLocalMessages(discussionId: string): Array<{
+  getLocalMessages(discussionId: string): {
     id: string;
     authorId: string;
     authorName: string;
     content: string;
     createdAt: string;
-  }> {
+  }[] {
     const key = `${this.STORAGE_PREFIX}discussion-messages-${discussionId}`;
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : [];
@@ -466,17 +473,19 @@ export class GovernanceService {
   /**
    * Get challenges approaching SLA deadline.
    */
-  getChallengesNearingDeadline(withinDays: number = 3): Observable<ChallengeRecord[]> {
+  getChallengesNearingDeadline(withinDays = 3): Observable<ChallengeRecord[]> {
     const cutoff = new Date(Date.now() + withinDays * 24 * 60 * 60 * 1000);
 
     return this.getChallenges().pipe(
-      map(challenges => challenges.filter(c => {
-        if (!c.slaDeadline) return false;
-        if (!['acknowledged', 'under-review'].includes(c.status)) return false;
+      map(challenges =>
+        challenges.filter(c => {
+          if (!c.slaDeadline) return false;
+          if (!['acknowledged', 'under-review'].includes(c.status)) return false;
 
-        const deadline = new Date(c.slaDeadline);
-        return deadline <= cutoff;
-      }))
+          const deadline = new Date(c.slaDeadline);
+          return deadline <= cutoff;
+        })
+      )
     );
   }
 

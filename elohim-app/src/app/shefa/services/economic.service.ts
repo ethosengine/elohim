@@ -23,9 +23,11 @@
  */
 
 import { Injectable, signal, computed } from '@angular/core';
-import { Observable, of, from, defer } from 'rxjs';
+
 import { map, catchError, shareReplay } from 'rxjs/operators';
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+
+import { Observable, of, from, defer } from 'rxjs';
+
 import {
   EconomicEvent,
   REAAction,
@@ -33,6 +35,7 @@ import {
   EventState,
   ResourceClassification,
 } from '@app/elohim/models';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 // =============================================================================
 // Holochain Types (match Rust DNA structures)
@@ -160,11 +163,9 @@ export class EconomicService {
     const cacheKey = `${agentId}:${direction}`;
 
     if (!this.eventsByAgentCache.has(cacheKey)) {
-      const request = defer(() =>
-        from(this.fetchEventsForAgent(agentId, direction))
-      ).pipe(
+      const request = defer(() => from(this.fetchEventsForAgent(agentId, direction))).pipe(
         shareReplay(1),
-        catchError((err) => {
+        catchError(err => {
           console.warn(`[EconomicService] Failed to fetch events for "${agentId}":`, err);
           return of([]);
         })
@@ -187,10 +188,8 @@ export class EconomicService {
       return of([]);
     }
 
-    return defer(() =>
-      from(this.fetchEventsByAction(action))
-    ).pipe(
-      catchError((err) => {
+    return defer(() => from(this.fetchEventsByAction(action))).pipe(
+      catchError(err => {
         console.warn(`[EconomicService] Failed to fetch events by action "${action}":`, err);
         return of([]);
       })
@@ -208,10 +207,8 @@ export class EconomicService {
       return of([]);
     }
 
-    return defer(() =>
-      from(this.fetchEventsByLamadType(lamadType))
-    ).pipe(
-      catchError((err) => {
+    return defer(() => from(this.fetchEventsByLamadType(lamadType))).pipe(
+      catchError(err => {
         console.warn(`[EconomicService] Failed to fetch events by type "${lamadType}":`, err);
         return of([]);
       })
@@ -236,10 +233,8 @@ export class EconomicService {
       throw new Error('Economic service not available');
     }
 
-    return defer(() =>
-      from(this.doCreateEvent(input))
-    ).pipe(
-      catchError((err) => {
+    return defer(() => from(this.doCreateEvent(input))).pipe(
+      catchError(err => {
         console.error('[EconomicService] Failed to create event:', err);
         throw err;
       })
@@ -320,8 +315,8 @@ export class EconomicService {
     }
 
     // Sort by time, most recent first
-    return events.sort((a, b) =>
-      new Date(b.hasPointInTime).getTime() - new Date(a.hasPointInTime).getTime()
+    return events.sort(
+      (a, b) => new Date(b.hasPointInTime).getTime() - new Date(a.hasPointInTime).getTime()
     );
   }
 
@@ -415,15 +410,24 @@ export class EconomicService {
       resourceConformsTo: hc.resourceConformsTo ?? undefined,
       resourceInventoriedAs: hc.resourceInventoriedAs ?? undefined,
       toResourceInventoriedAs: hc.toResourceInventoriedAs ?? undefined,
-      resourceClassifiedAs: resourceClassifiedAs.length > 0 ? resourceClassifiedAs as ResourceClassification[] : undefined,
-      resourceQuantity: hc.resourceQuantityValue != null ? {
-        hasNumericalValue: hc.resourceQuantityValue,
-        hasUnit: hc.resourceQuantityUnit ?? 'unit',
-      } : undefined,
-      effortQuantity: hc.effortQuantityValue != null ? {
-        hasNumericalValue: hc.effortQuantityValue,
-        hasUnit: hc.effortQuantityUnit ?? 'unit',
-      } : undefined,
+      resourceClassifiedAs:
+        resourceClassifiedAs.length > 0
+          ? (resourceClassifiedAs as ResourceClassification[])
+          : undefined,
+      resourceQuantity:
+        hc.resourceQuantityValue != null
+          ? {
+              hasNumericalValue: hc.resourceQuantityValue,
+              hasUnit: hc.resourceQuantityUnit ?? 'unit',
+            }
+          : undefined,
+      effortQuantity:
+        hc.effortQuantityValue != null
+          ? {
+              hasNumericalValue: hc.effortQuantityValue,
+              hasUnit: hc.effortQuantityUnit ?? 'unit',
+            }
+          : undefined,
       hasPointInTime: hc.hasPointInTime,
       hasDuration: hc.hasDuration ?? undefined,
       inputOf: hc.inputOf ?? undefined,

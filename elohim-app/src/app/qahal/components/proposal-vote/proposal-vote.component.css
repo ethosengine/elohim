@@ -119,8 +119,13 @@
 }
 
 @keyframes pulse-critical {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 .sla-icon {
@@ -164,10 +169,7 @@
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg 360deg
-  );
+  background: conic-gradient(from 0deg, transparent 0deg 360deg);
   flex-shrink: 0;
 }
 
@@ -480,7 +482,9 @@
   background: var(--surface-color, #ffffff);
   color: var(--text-primary, #1a1a1a);
   resize: vertical;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .reasoning-textarea:focus {

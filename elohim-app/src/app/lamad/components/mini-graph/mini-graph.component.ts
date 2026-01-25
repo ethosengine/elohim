@@ -1,3 +1,4 @@
+import { CommonModule } from '@angular/common';
 import {
   Component,
   Input,
@@ -10,20 +11,21 @@ import {
   ViewChild,
   AfterViewInit,
   ChangeDetectionStrategy,
-  ChangeDetectorRef
+  ChangeDetectorRef,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
-import * as d3 from 'd3';
 
-import { RelatedConceptsService } from '../../services/related-concepts.service';
+import { takeUntil } from 'rxjs/operators';
+
+import * as d3 from 'd3';
+import { Subject } from 'rxjs';
+
 import {
   MiniGraphData,
   MiniGraphNode,
   MiniGraphEdge,
-  RelationshipType
+  RelationshipType,
 } from '../../models/exploration-context.model';
+import { RelatedConceptsService } from '../../services/related-concepts.service';
 
 /**
  * D3 node interface extending MiniGraphNode with simulation properties.
@@ -99,166 +101,171 @@ interface D3Link extends d3.SimulationLinkDatum<D3Node> {
         class="expand-button"
         (click)="onExpandClick()"
         title="Explore in full graph"
-        aria-label="Open full graph explorer">
+        aria-label="Open full graph explorer"
+      >
         ⤢
       </button>
     </div>
   `,
-  styles: [`
-    .mini-graph-container {
-      position: relative;
-      width: 100%;
-      background: var(--surface-secondary, #f8f9fa);
-      border-radius: var(--radius-md, 8px);
-      overflow: hidden;
-    }
+  styles: [
+    `
+      .mini-graph-container {
+        position: relative;
+        width: 100%;
+        background: var(--surface-secondary, #f8f9fa);
+        border-radius: var(--radius-md, 8px);
+        overflow: hidden;
+      }
 
-    .graph-viewport {
-      width: 100%;
-      height: 100%;
-    }
+      .graph-viewport {
+        width: 100%;
+        height: 100%;
+      }
 
-    .loading-overlay,
-    .empty-state {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--surface-secondary, #f8f9fa);
-    }
+      .loading-overlay,
+      .empty-state {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--surface-secondary, #f8f9fa);
+      }
 
-    .loading-spinner {
-      width: 1.5rem;
-      height: 1.5rem;
-      border: 2px solid var(--border-color, #e9ecef);
-      border-top-color: var(--primary, #4285f4);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+      .loading-spinner {
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 2px solid var(--border-color, #e9ecef);
+        border-top-color: var(--primary, #4285f4);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
 
-    .empty-state {
-      color: var(--text-tertiary, #80868b);
-      font-size: 0.875rem;
-    }
+      .empty-state {
+        color: var(--text-tertiary, #80868b);
+        font-size: 0.875rem;
+      }
 
-    .node-tooltip {
-      position: absolute;
-      padding: 0.375rem 0.625rem;
-      background: var(--surface-elevated, #fff);
-      border: 1px solid var(--border-color, #e9ecef);
-      border-radius: var(--radius-sm, 4px);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      pointer-events: none;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      gap: 0.125rem;
-      transform: translate(-50%, -100%);
-      margin-top: -8px;
-    }
+      .node-tooltip {
+        position: absolute;
+        padding: 0.375rem 0.625rem;
+        background: var(--surface-elevated, #fff);
+        border: 1px solid var(--border-color, #e9ecef);
+        border-radius: var(--radius-sm, 4px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        pointer-events: none;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+        transform: translate(-50%, -100%);
+        margin-top: -8px;
+      }
 
-    .tooltip-title {
-      font-weight: 500;
-      font-size: 0.8125rem;
-      color: var(--text-primary, #202124);
-      white-space: nowrap;
-      max-width: 150px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+      .tooltip-title {
+        font-weight: 500;
+        font-size: 0.8125rem;
+        color: var(--text-primary, #202124);
+        white-space: nowrap;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
 
-    .tooltip-type {
-      font-size: 0.6875rem;
-      color: var(--text-tertiary, #80868b);
-      text-transform: uppercase;
-    }
+      .tooltip-type {
+        font-size: 0.6875rem;
+        color: var(--text-tertiary, #80868b);
+        text-transform: uppercase;
+      }
 
-    .expand-button {
-      position: absolute;
-      bottom: 0.5rem;
-      right: 0.5rem;
-      width: 1.75rem;
-      height: 1.75rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--surface-elevated, #fff);
-      border: 1px solid var(--border-color, #e9ecef);
-      border-radius: var(--radius-sm, 4px);
-      cursor: pointer;
-      font-size: 1rem;
-      color: var(--text-secondary, #5f6368);
-      transition: all 0.15s ease;
-    }
+      .expand-button {
+        position: absolute;
+        bottom: 0.5rem;
+        right: 0.5rem;
+        width: 1.75rem;
+        height: 1.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--surface-elevated, #fff);
+        border: 1px solid var(--border-color, #e9ecef);
+        border-radius: var(--radius-sm, 4px);
+        cursor: pointer;
+        font-size: 1rem;
+        color: var(--text-secondary, #5f6368);
+        transition: all 0.15s ease;
+      }
 
-    .expand-button:hover {
-      background: var(--primary, #4285f4);
-      color: white;
-      border-color: var(--primary, #4285f4);
-    }
+      .expand-button:hover {
+        background: var(--primary, #4285f4);
+        color: white;
+        border-color: var(--primary, #4285f4);
+      }
 
-    /* SVG Styles (applied via D3) */
-    :host ::ng-deep .mini-graph-svg {
-      display: block;
-    }
+      /* SVG Styles (applied via D3) */
+      :host ::ng-deep .mini-graph-svg {
+        display: block;
+      }
 
-    :host ::ng-deep .node-circle {
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
+      :host ::ng-deep .node-circle {
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
 
-    :host ::ng-deep .node-circle:hover {
-      stroke-width: 3px;
-    }
+      :host ::ng-deep .node-circle:hover {
+        stroke-width: 3px;
+      }
 
-    :host ::ng-deep .node-circle.focus {
-      fill: var(--primary, #4285f4);
-      stroke: var(--primary-dark, #1967d2);
-      stroke-width: 3px;
-    }
+      :host ::ng-deep .node-circle.focus {
+        fill: var(--primary, #4285f4);
+        stroke: var(--primary-dark, #1967d2);
+        stroke-width: 3px;
+      }
 
-    :host ::ng-deep .node-circle.neighbor {
-      fill: var(--accent, #fbbc04);
-      stroke: var(--accent-dark, #e37400);
-    }
+      :host ::ng-deep .node-circle.neighbor {
+        fill: var(--accent, #fbbc04);
+        stroke: var(--accent-dark, #e37400);
+      }
 
-    :host ::ng-deep .edge-line {
-      stroke: var(--border-color, #dadce0);
-      stroke-width: 1.5px;
-      fill: none;
-    }
+      :host ::ng-deep .edge-line {
+        stroke: var(--border-color, #dadce0);
+        stroke-width: 1.5px;
+        fill: none;
+      }
 
-    :host ::ng-deep .edge-line.prerequisite {
-      stroke: var(--warning, #ea8600);
-      stroke-dasharray: 4, 2;
-    }
+      :host ::ng-deep .edge-line.prerequisite {
+        stroke: var(--warning, #ea8600);
+        stroke-dasharray: 4, 2;
+      }
 
-    :host ::ng-deep .edge-line.extension {
-      stroke: var(--success, #34a853);
-    }
+      :host ::ng-deep .edge-line.extension {
+        stroke: var(--success, #34a853);
+      }
 
-    :host ::ng-deep .edge-line.related {
-      stroke: var(--info, #4285f4);
-      stroke-dasharray: 2, 2;
-    }
+      :host ::ng-deep .edge-line.related {
+        stroke: var(--info, #4285f4);
+        stroke-dasharray: 2, 2;
+      }
 
-    :host ::ng-deep .edge-line.contains {
-      stroke: var(--text-tertiary, #80868b);
-    }
+      :host ::ng-deep .edge-line.contains {
+        stroke: var(--text-tertiary, #80868b);
+      }
 
-    :host ::ng-deep .node-label {
-      font-size: 10px;
-      fill: var(--text-primary, #202124);
-      text-anchor: middle;
-      pointer-events: none;
-      user-select: none;
-    }
-  `]
+      :host ::ng-deep .node-label {
+        font-size: 10px;
+        fill: var(--text-primary, #202124);
+        text-anchor: middle;
+        pointer-events: none;
+        user-select: none;
+      }
+    `,
+  ],
 })
 export class MiniGraphComponent implements OnChanges, OnDestroy, AfterViewInit {
   /** Focus node ID (center of the graph) */
@@ -335,7 +342,8 @@ export class MiniGraphComponent implements OnChanges, OnDestroy, AfterViewInit {
     d3.select(container).selectAll('*').remove();
 
     // Create SVG
-    this.svg = d3.select(container)
+    this.svg = d3
+      .select(container)
       .append('svg')
       .attr('class', 'mini-graph-svg')
       .attr('width', '100%')
@@ -367,23 +375,23 @@ export class MiniGraphComponent implements OnChanges, OnDestroy, AfterViewInit {
     this.relatedConceptsService
       .getNeighborhood(this.focusNodeId, {
         depth: this.depth,
-        maxNodes: this.maxNodes
+        maxNodes: this.maxNodes,
       })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (data) => {
+        next: data => {
           this.graphData = data;
           this.isEmpty = data.neighbors.length === 0;
           this.isLoading = false;
           this.cdr.markForCheck();
           this.renderGraph();
         },
-        error: (err) => {
+        error: err => {
           console.error('Failed to load neighborhood:', err);
           this.isLoading = false;
           this.isEmpty = true;
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -397,23 +405,25 @@ export class MiniGraphComponent implements OnChanges, OnDestroy, AfterViewInit {
     this.stopSimulation();
 
     // Prepare nodes
-    const nodes: D3Node[] = [
-      { ...this.graphData.focus },
-      ...this.graphData.neighbors
-    ];
+    const nodes: D3Node[] = [{ ...this.graphData.focus }, ...this.graphData.neighbors];
 
     // Prepare links (convert string IDs to node references)
     const links: D3Link[] = this.graphData.edges.map(edge => ({
       source: edge.source,
       target: edge.target,
-      relationshipType: edge.relationshipType
+      relationshipType: edge.relationshipType,
     }));
 
     // Create simulation
-    this.simulation = d3.forceSimulation<D3Node, D3Link>(nodes)
-      .force('link', d3.forceLink<D3Node, D3Link>(links)
-        .id(d => d.id)
-        .distance(60))
+    this.simulation = d3
+      .forceSimulation<D3Node, D3Link>(nodes)
+      .force(
+        'link',
+        d3
+          .forceLink<D3Node, D3Link>(links)
+          .id(d => d.id)
+          .distance(60)
+      )
       .force('charge', d3.forceManyBody().strength(-150))
       .force('center', d3.forceCenter(0, 0))
       .force('collision', d3.forceCollide().radius(25));
@@ -446,7 +456,7 @@ export class MiniGraphComponent implements OnChanges, OnDestroy, AfterViewInit {
       .enter()
       .append('circle')
       .attr('class', d => `node-circle ${d.isFocus ? 'focus' : 'neighbor'}`)
-      .attr('r', d => d.isFocus ? 14 : 10)
+      .attr('r', d => (d.isFocus ? 14 : 10))
       .on('click', (_event, d) => {
         if (!d.isFocus) {
           this.nodeSelected.emit(d.id);
@@ -482,11 +492,10 @@ export class MiniGraphComponent implements OnChanges, OnDestroy, AfterViewInit {
         .attr('x2', d => (d.target as D3Node).x ?? 0)
         .attr('y2', d => (d.target as D3Node).y ?? 0);
 
-      nodeSelection
-        .attr('cx', d => d.x ?? 0)
-        .attr('cy', d => d.y ?? 0);
+      nodeSelection.attr('cx', d => d.x ?? 0).attr('cy', d => d.y ?? 0);
 
-      nodesGroup.selectAll<SVGTextElement, D3Node>('text')
+      nodesGroup
+        .selectAll<SVGTextElement, D3Node>('text')
         .attr('x', d => d.x ?? 0)
         .attr('y', d => d.y ?? 0);
     });
@@ -513,12 +522,12 @@ export class MiniGraphComponent implements OnChanges, OnDestroy, AfterViewInit {
    */
   private getEdgeClass(type: RelationshipType): string {
     const classMap: Record<string, string> = {
-      'PREREQUISITE': 'prerequisite',
-      'FOUNDATION': 'prerequisite',
-      'DEPENDS_ON': 'prerequisite',
-      'EXTENDS': 'extension',
-      'RELATES_TO': 'related',
-      'CONTAINS': 'contains'
+      PREREQUISITE: 'prerequisite',
+      FOUNDATION: 'prerequisite',
+      DEPENDS_ON: 'prerequisite',
+      EXTENDS: 'extension',
+      RELATES_TO: 'related',
+      CONTAINS: 'contains',
     };
     return classMap[type] || '';
   }

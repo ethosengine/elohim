@@ -15,11 +15,9 @@
  */
 
 import { Injectable, inject, signal, computed, effect, untracked } from '@angular/core';
+
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
-import { SessionHumanService } from './session-human.service';
-import { SovereigntyService } from './sovereignty.service';
-import { AuthService } from './auth.service';
-import { PasswordAuthProvider } from './providers/password-auth.provider';
+import { type PasswordCredentials, type AuthResult } from '../models/auth.model';
 import {
   type IdentityState,
   type IdentityMode,
@@ -36,7 +34,11 @@ import {
   isStewardMode,
   isNetworkMode,
 } from '../models/identity.model';
-import { type PasswordCredentials, type AuthResult } from '../models/auth.model';
+
+import { AuthService } from './auth.service';
+import { PasswordAuthProvider } from './providers/password-auth.provider';
+import { SessionHumanService } from './session-human.service';
+import { SovereigntyService } from './sovereignty.service';
 
 // Re-export utility functions for consumers
 export { isNetworkMode, isStewardMode, getInitials } from '../models/identity.model';
@@ -315,18 +317,14 @@ export class IdentityService {
   });
 
   /** Whether user has a session (can be upgraded) */
-  readonly hasSession = computed(() =>
-    this.sessionHumanService.hasSession()
-  );
+  readonly hasSession = computed(() => this.sessionHumanService.hasSession());
 
   /** Whether Holochain is connected */
-  readonly isHolochainConnected = computed(() =>
-    this.holochainClient.isConnected()
-  );
+  readonly isHolochainConnected = computed(() => this.holochainClient.isConnected());
 
   /** Whether user can upgrade from session to Holochain */
-  readonly canUpgrade = computed(() =>
-    this.hasSession() && this.isHolochainConnected() && this.mode() === 'session'
+  readonly canUpgrade = computed(
+    () => this.hasSession() && this.isHolochainConnected() && this.mode() === 'session'
   );
 
   // ==========================================================================
@@ -392,7 +390,12 @@ export class IdentityService {
       const mode: IdentityMode = session.isAnonymous ? 'session' : 'session';
 
       // Generate DID for session identity
-      const did = generateDID(mode, session.sessionId, session.linkedAgentPubKey ?? null, session.sessionId);
+      const did = generateDID(
+        mode,
+        session.sessionId,
+        session.linkedAgentPubKey ?? null,
+        session.sessionId
+      );
 
       this.updateState({
         mode,
@@ -488,7 +491,7 @@ export class IdentityService {
         zomeName: 'imagodei',
         fnName: 'get_my_human',
         payload: null,
-        roleName: 'imagodei',  // Use imagodei DNA for identity
+        roleName: 'imagodei', // Use imagodei DNA for identity
       });
 
       if (result.success && result.data) {
@@ -558,9 +561,10 @@ export class IdentityService {
       // This is expected for visitors - the zome function may not exist or user may not be registered
       // Don't treat this as an error - just stay in session mode
       const errorMessage = err instanceof Error ? err.message : String(err);
-      const isExpectedError = errorMessage.includes("doesn't exist") ||
-                              errorMessage.includes('not found') ||
-                              errorMessage.includes('No human found');
+      const isExpectedError =
+        errorMessage.includes("doesn't exist") ||
+        errorMessage.includes('not found') ||
+        errorMessage.includes('No human found');
 
       if (isExpectedError) {
         console.log('[IdentityService] No Holochain identity found, staying in session mode');
@@ -587,11 +591,9 @@ export class IdentityService {
 
     // Use appUrl to determine if local or remote
     const url = displayInfo.appUrl ?? null;
-    const isLocal = url ? (
-      url.includes('localhost') ||
-      url.includes('127.0.0.1') ||
-      url.includes('[::1]')
-    ) : false;
+    const isLocal = url
+      ? url.includes('localhost') || url.includes('127.0.0.1') || url.includes('[::1]')
+      : false;
 
     return { isLocal, url };
   }
@@ -620,7 +622,12 @@ export class IdentityService {
       const isAuthenticated = session.sessionState !== 'migrated';
 
       // Generate DID for session identity
-      const did = generateDID(mode, session.sessionId, session.linkedAgentPubKey ?? null, session.sessionId);
+      const did = generateDID(
+        mode,
+        session.sessionId,
+        session.linkedAgentPubKey ?? null,
+        session.sessionId
+      );
 
       this.updateState({
         mode,
@@ -713,7 +720,12 @@ export class IdentityService {
 
       // Update state with registered profile
       const session = this.sessionHumanService.getSession();
-      const did = generateDID('hosted', authResult.humanId, authResult.agentPubKey, session?.sessionId ?? null);
+      const did = generateDID(
+        'hosted',
+        authResult.humanId,
+        authResult.agentPubKey,
+        session?.sessionId ?? null
+      );
 
       this.updateState({
         mode: 'hosted',
@@ -771,7 +783,7 @@ export class IdentityService {
         zomeName: 'imagodei',
         fnName: 'create_human',
         payload,
-        roleName: 'imagodei',  // Use imagodei DNA for identity
+        roleName: 'imagodei', // Use imagodei DNA for identity
       });
 
       if (!result.success || !result.data) {
@@ -816,10 +828,7 @@ export class IdentityService {
 
       // Mark session as migrated if it exists
       if (session) {
-        this.sessionHumanService.markAsMigrated(
-          sessionResult.agentPubkey,
-          sessionResult.human.id
-        );
+        this.sessionHumanService.markAsMigrated(sessionResult.agentPubkey, sessionResult.human.id);
       }
 
       return profile;
@@ -848,7 +857,7 @@ export class IdentityService {
         zomeName: 'imagodei',
         fnName: 'get_my_human',
         payload: null,
-        roleName: 'imagodei',  // Use imagodei DNA for identity
+        roleName: 'imagodei', // Use imagodei DNA for identity
       });
 
       if (result.success && result.data) {
@@ -886,7 +895,7 @@ export class IdentityService {
         zomeName: 'imagodei',
         fnName: 'update_human',
         payload,
-        roleName: 'imagodei',  // Use imagodei DNA for identity
+        roleName: 'imagodei', // Use imagodei DNA for identity
       });
 
       if (!result.success || !result.data) {
@@ -960,7 +969,7 @@ export class IdentityService {
     }
 
     // Wait for mode to change or timeout
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const startTime = Date.now();
       const checkInterval = setInterval(() => {
         const mode = this.mode();
@@ -990,7 +999,9 @@ export class IdentityService {
       // Wait up to 10 seconds for connection
       const connected = await this.waitForHolochainConnection(10000);
       if (!connected) {
-        console.warn('[IdentityService] Timeout waiting for Holochain - setting hosted mode without profile');
+        console.warn(
+          '[IdentityService] Timeout waiting for Holochain - setting hosted mode without profile'
+        );
         // Still update state to show logged-in UI, just without full profile
         this.setMinimalAuthenticatedState(humanId, agentPubKey);
         return;
@@ -1003,7 +1014,7 @@ export class IdentityService {
         zomeName: 'imagodei',
         fnName: 'get_my_human',
         payload: null,
-        roleName: 'imagodei',  // Use imagodei DNA for identity
+        roleName: 'imagodei', // Use imagodei DNA for identity
       });
 
       if (result.success && result.data) {
@@ -1048,7 +1059,10 @@ export class IdentityService {
           error: null,
         });
 
-        console.log('[IdentityService] Connected as authenticated user:', sessionResult.human.displayName);
+        console.log(
+          '[IdentityService] Connected as authenticated user:',
+          sessionResult.human.displayName
+        );
       }
     } catch (err) {
       console.error('[IdentityService] Failed to verify authenticated user:', err);

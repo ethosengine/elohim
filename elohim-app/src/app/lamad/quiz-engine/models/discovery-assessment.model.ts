@@ -29,14 +29,14 @@ import type { ContentNode } from '../../models/content-node.model';
  * Categories of discovery assessments.
  */
 export type DiscoveryCategory =
-  | 'personality'      // Enneagram, MBTI, Big Five
-  | 'strengths'        // CliftonStrengths, VIA Character Strengths
-  | 'values'           // Personal values, political compass
-  | 'learning'         // Learning styles, cognitive preferences
-  | 'emotional'        // Attachment style, emotional intelligence
-  | 'relational'       // Love languages, communication styles
-  | 'vocational'       // Career interests, work preferences
-  | 'spiritual';       // Spiritual gifts, faith journey
+  | 'personality' // Enneagram, MBTI, Big Five
+  | 'strengths' // CliftonStrengths, VIA Character Strengths
+  | 'values' // Personal values, political compass
+  | 'learning' // Learning styles, cognitive preferences
+  | 'emotional' // Attachment style, emotional intelligence
+  | 'relational' // Love languages, communication styles
+  | 'vocational' // Career interests, work preferences
+  | 'spiritual'; // Spiritual gifts, faith journey
 
 /**
  * Well-known discovery assessment frameworks.
@@ -146,7 +146,7 @@ export interface DiscoveryOption {
   label: string;
 
   /** Which subscales this option contributes to */
-  contributes?: { [subscale: string]: number };
+  contributes?: Record<string, number>;
 }
 
 /**
@@ -160,7 +160,7 @@ export interface DiscoveryScoringConfig {
   method: 'highest-subscale' | 'threshold' | 'combination' | 'custom';
 
   /** Thresholds for threshold-based scoring */
-  thresholds?: { [subscale: string]: { low: number; high: number } };
+  thresholds?: Record<string, { low: number; high: number }>;
 
   /** Custom scoring function name (if method is 'custom') */
   customScorer?: string;
@@ -235,7 +235,7 @@ export interface DiscoveryResult {
   secondaryTypes?: DiscoveryResultSummary[];
 
   /** Raw subscale scores */
-  subscaleScores: { [subscale: string]: number };
+  subscaleScores: Record<string, number>;
 
   /** Formatted display string (e.g., "1w2", "ISTP", "Belief • Learner • Analytical") */
   displayString: string;
@@ -448,18 +448,18 @@ export function formatDiscoveryShort(result: DiscoveryResult): string {
  */
 export function getFrameworkDisplayName(framework: DiscoveryFramework): string {
   const names: Record<DiscoveryFramework, string> = {
-    'enneagram': 'Enneagram',
-    'mbti': 'MBTI',
+    enneagram: 'Enneagram',
+    mbti: 'MBTI',
     'big-five': 'Big Five',
     'clifton-strengths': 'CliftonStrengths',
     'via-strengths': 'VIA Character Strengths',
-    'disc': 'DISC',
+    disc: 'DISC',
     'love-languages': 'Love Languages',
     'attachment-style': 'Attachment Style',
     'learning-style': 'Learning Style',
     'political-compass': 'Political Compass',
     'values-hierarchy': 'Values Hierarchy',
-    'custom': 'Assessment'
+    custom: 'Assessment',
   };
   return names[framework] || framework;
 }
@@ -469,14 +469,14 @@ export function getFrameworkDisplayName(framework: DiscoveryFramework): string {
  */
 export function getCategoryIcon(category: DiscoveryCategory): string {
   const icons: Record<DiscoveryCategory, string> = {
-    'personality': '🎭',
-    'strengths': '💪',
-    'values': '💎',
-    'learning': '📚',
-    'emotional': '💝',
-    'relational': '🤝',
-    'vocational': '💼',
-    'spiritual': '✨'
+    personality: '🎭',
+    strengths: '💪',
+    values: '💎',
+    learning: '📚',
+    emotional: '💝',
+    relational: '🤝',
+    vocational: '💼',
+    spiritual: '✨',
   };
   return icons[category] || '🔍';
 }

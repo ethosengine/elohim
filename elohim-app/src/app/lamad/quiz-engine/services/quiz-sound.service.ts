@@ -4,15 +4,15 @@ import { Injectable } from '@angular/core';
  * Sound types for quiz feedback.
  */
 export type QuizSoundType =
-  | 'correct'           // Single correct answer
-  | 'incorrect'         // Single incorrect answer
-  | 'streak_progress'   // Progress toward streak (not yet achieved)
-  | 'streak_achieved'   // Streak target reached (e.g., 3 in a row)
-  | 'mastery_passed'    // Mastery quiz passed
-  | 'mastery_failed'    // Mastery quiz failed (but can retry)
-  | 'level_up'          // Bloom's level increased
-  | 'quiz_start'        // Quiz beginning
-  | 'quiz_complete';    // Quiz completed (neutral)
+  | 'correct' // Single correct answer
+  | 'incorrect' // Single incorrect answer
+  | 'streak_progress' // Progress toward streak (not yet achieved)
+  | 'streak_achieved' // Streak target reached (e.g., 3 in a row)
+  | 'mastery_passed' // Mastery quiz passed
+  | 'mastery_failed' // Mastery quiz failed (but can retry)
+  | 'level_up' // Bloom's level increased
+  | 'quiz_start' // Quiz beginning
+  | 'quiz_complete'; // Quiz completed (neutral)
 
 /**
  * Sound configuration.
@@ -57,49 +57,49 @@ const DEFAULT_SOUND_CONFIG: SoundConfig = {
     correct: {
       file: 'correct.mp3',
       volume: 0.6,
-      allowOverlap: false
+      allowOverlap: false,
     },
     incorrect: {
       file: 'incorrect.mp3',
       volume: 0.5,
-      allowOverlap: false
+      allowOverlap: false,
     },
     streak_progress: {
       file: 'streak-progress.mp3',
       volume: 0.7,
-      allowOverlap: false
+      allowOverlap: false,
     },
     streak_achieved: {
       file: 'success-jingle.mp3',
       volume: 0.8,
-      allowOverlap: false
+      allowOverlap: false,
     },
     mastery_passed: {
       file: 'mastery-passed.mp3',
       volume: 0.9,
-      allowOverlap: false
+      allowOverlap: false,
     },
     mastery_failed: {
       file: 'mastery-failed.mp3',
       volume: 0.5,
-      allowOverlap: false
+      allowOverlap: false,
     },
     level_up: {
       file: 'level-up.mp3',
       volume: 0.9,
-      allowOverlap: false
+      allowOverlap: false,
     },
     quiz_start: {
       file: 'quiz-start.mp3',
       volume: 0.4,
-      allowOverlap: false
+      allowOverlap: false,
     },
     quiz_complete: {
       file: 'quiz-complete.mp3',
       volume: 0.6,
-      allowOverlap: false
-    }
-  }
+      allowOverlap: false,
+    },
+  },
 };
 
 /**
@@ -128,7 +128,7 @@ const DEFAULT_SOUND_CONFIG: SoundConfig = {
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class QuizSoundService {
   private config: SoundConfig = { ...DEFAULT_SOUND_CONFIG };
@@ -351,8 +351,8 @@ export class QuizSoundService {
       ...config,
       sounds: {
         ...this.config.sounds,
-        ...config.sounds
-      }
+        ...config.sounds,
+      },
     };
 
     // Clear cache to reload with new config
@@ -366,7 +366,7 @@ export class QuizSoundService {
   setSound(type: QuizSoundType, file: string): void {
     this.config.sounds[type] = {
       ...this.config.sounds[type],
-      file
+      file,
     };
     this.audioCache.delete(type); // Clear cached audio
   }
@@ -375,10 +375,7 @@ export class QuizSoundService {
   // Private Helpers
   // ═══════════════════════════════════════════════════════════════════════════
 
-  private createAudioElement(
-    type: QuizSoundType,
-    soundDef: SoundDefinition
-  ): HTMLAudioElement {
+  private createAudioElement(type: QuizSoundType, soundDef: SoundDefinition): HTMLAudioElement {
     const audio = new Audio();
     audio.src = `${this.config.basePath}/${soundDef.file}`;
     audio.preload = 'auto';
@@ -396,11 +393,7 @@ export class QuizSoundService {
 
   private preloadSounds(): void {
     // Preload critical sounds
-    const criticalSounds: QuizSoundType[] = [
-      'correct',
-      'incorrect',
-      'streak_achieved'
-    ];
+    const criticalSounds: QuizSoundType[] = ['correct', 'incorrect', 'streak_achieved'];
 
     for (const type of criticalSounds) {
       const soundDef = this.config.sounds[type];

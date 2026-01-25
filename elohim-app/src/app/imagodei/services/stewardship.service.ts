@@ -13,7 +13,9 @@
  */
 
 import { Injectable, signal, computed, inject } from '@angular/core';
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+
 import type {
   StewardshipGrant,
   CreateGrantInput,
@@ -436,7 +438,7 @@ export class StewardshipService {
     contentHash: string,
     categories: string[],
     ageRating?: string,
-    reachLevel?: number,
+    reachLevel?: number
   ): Promise<PolicyDecision> {
     const result = await this.holochain.callZome<RawPolicyDecision>({
       zomeName: 'imagodei',
@@ -600,12 +602,8 @@ export class StewardshipService {
 
     if (result.success) {
       // Update local state
-      this.mySubjectsSignal.update(subjects =>
-        subjects.filter(g => g.id !== grantId)
-      );
-      this.myStewardsSignal.update(stewards =>
-        stewards.filter(g => g.id !== grantId)
-      );
+      this.mySubjectsSignal.update(subjects => subjects.filter(g => g.id !== grantId));
+      this.myStewardsSignal.update(stewards => stewards.filter(g => g.id !== grantId));
       return true;
     }
 
@@ -852,7 +850,7 @@ export class StewardshipService {
     sessionId: string,
     sessionDurationMinutes: number,
     categoriesAccessed: string[],
-    policyEvents: PolicyEvent[],
+    policyEvents: PolicyEvent[]
   ): Promise<ActivityLog | null> {
     const result = await this.holochain.callZome<ZomeActivityLogOutput>({
       zomeName: 'imagodei',
@@ -903,11 +901,7 @@ export class StewardshipService {
     this.errorSignal.set(null);
 
     try {
-      await Promise.all([
-        this.getMyPolicy(),
-        this.getMySubjects(),
-        this.getMyStewards(),
-      ]);
+      await Promise.all([this.getMyPolicy(), this.getMySubjects(), this.getMyStewards()]);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to initialize stewardship';
       this.errorSignal.set(message);

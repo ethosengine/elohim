@@ -29,10 +29,11 @@ export const COMMUNITY_ROUTES: Routes = [
           title: 'Community & Governance',
           seo: {
             title: 'Community',
-            description: 'Community coordination layer implementing consent-based relationships and collective governance.',
-          }
-        }
-      }
-    ]
-  }
+            description:
+              'Community coordination layer implementing consent-based relationships and collective governance.',
+          },
+        },
+      },
+    ],
+  },
 ];

@@ -1,5 +1,5 @@
-import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 /**
@@ -48,72 +48,74 @@ import { RouterModule } from '@angular/router';
       <p class="coming-soon">Full dashboard coming soon...</p>
     </div>
   `,
-  styles: [`
-    .learner-dashboard {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
+  styles: [
+    `
+      .learner-dashboard {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
 
-    .dashboard-header {
-      padding-bottom: 1.5rem;
-      border-bottom: 1px solid var(--border-color, #e5e7eb);
-      margin-bottom: 2rem;
-    }
+      .dashboard-header {
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--border-color, #e5e7eb);
+        margin-bottom: 2rem;
+      }
 
-    .dashboard-header h1 {
-      font-size: 2rem;
-      font-weight: 800;
-      color: var(--text-primary, #111827);
-      margin: 0 0 0.5rem 0;
-    }
+      .dashboard-header h1 {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--text-primary, #111827);
+        margin: 0 0 0.5rem 0;
+      }
 
-    .subtitle {
-      color: var(--text-secondary, #6b7280);
-    }
+      .subtitle {
+        color: var(--text-secondary, #6b7280);
+      }
 
-    .placeholder-section {
-      display: grid;
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
+      .placeholder-section {
+        display: grid;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+      }
 
-    .placeholder-card {
-      background: var(--bg-secondary, #f9fafb);
-      border: 1px solid var(--border-color, #e5e7eb);
-      border-radius: 8px;
-      padding: 1.5rem;
-    }
+      .placeholder-card {
+        background: var(--bg-secondary, #f9fafb);
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 8px;
+        padding: 1.5rem;
+      }
 
-    .placeholder-card h2 {
-      font-size: 1.125rem;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-    }
+      .placeholder-card h2 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+      }
 
-    .placeholder-card p {
-      color: var(--text-secondary, #6b7280);
-      margin-bottom: 1rem;
-    }
+      .placeholder-card p {
+        color: var(--text-secondary, #6b7280);
+        margin-bottom: 1rem;
+      }
 
-    .btn {
-      display: inline-block;
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      text-decoration: none;
-      font-weight: 500;
-    }
+      .btn {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+      }
 
-    .btn-primary {
-      background: var(--primary-color, #3b82f6);
-      color: white;
-    }
+      .btn-primary {
+        background: var(--primary-color, #3b82f6);
+        color: white;
+      }
 
-    .coming-soon {
-      text-align: center;
-      color: var(--text-tertiary, #9ca3af);
-      font-style: italic;
-    }
-  `]
+      .coming-soon {
+        text-align: center;
+        color: var(--text-tertiary, #9ca3af);
+        font-style: italic;
+      }
+    `,
+  ],
 })
 export class LearnerDashboardComponent {}

@@ -1,8 +1,9 @@
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { ContentNode } from '../../models/content-node.model';
+
 import { environment } from '../../../../environments/environment';
+import { ContentNode } from '../../models/content-node.model';
 
 /**
  * HTML5 app content structure for doorway-served apps.
@@ -64,7 +65,7 @@ export interface Html5AppContent {
       }
     </div>
   `,
-  styleUrls: ['./iframe-renderer.component.css']
+  styleUrls: ['./iframe-renderer.component.css'],
 })
 export class IframeRendererComponent implements OnChanges {
   @Input() node!: ContentNode;
@@ -149,7 +150,10 @@ export class IframeRendererComponent implements OnChanges {
 
     // If no doorway URL configured, try fallback
     if (!doorwayUrl && content.fallbackUrl) {
-      console.warn('[IframeRenderer] No doorwayUrl configured, using fallbackUrl:', content.fallbackUrl);
+      console.warn(
+        '[IframeRenderer] No doorwayUrl configured, using fallbackUrl:',
+        content.fallbackUrl
+      );
       return content.fallbackUrl;
     }
 
@@ -178,13 +182,11 @@ export class IframeRendererComponent implements OnChanges {
     // For localhost development, use relative URL (assumes ng serve proxy or same-origin doorway)
     if (this.isLocalDevelopment()) {
       console.log('[IframeRenderer] Using relative URL for local dev');
-      return '';  // Relative URL - /apps/... will be proxied
+      return ''; // Relative URL - /apps/... will be proxied
     }
 
     // Fallback to environment config
-    return environment.client?.doorwayUrl
-      || environment.doorwayUrl
-      || '';
+    return environment.client?.doorwayUrl || environment.doorwayUrl || '';
   }
 
   /**
@@ -225,5 +227,4 @@ export class IframeRendererComponent implements OnChanges {
     const obj = content as Record<string, unknown>;
     return typeof obj['appId'] === 'string' && typeof obj['entryPoint'] === 'string';
   }
-
 }

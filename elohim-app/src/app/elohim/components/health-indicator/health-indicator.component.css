@@ -39,8 +39,13 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .indicator-label {
@@ -53,10 +58,18 @@
 }
 
 /* Status colors */
-.status-healthy .indicator-dot { color: var(--color-success, #22c55e); }
-.status-degraded .indicator-dot { color: var(--color-warning, #eab308); }
-.status-unhealthy .indicator-dot { color: var(--color-error, #ef4444); }
-.status-unknown .indicator-dot { color: var(--text-muted, #999); }
+.status-healthy .indicator-dot {
+  color: var(--color-success, #22c55e);
+}
+.status-degraded .indicator-dot {
+  color: var(--color-warning, #eab308);
+}
+.status-unhealthy .indicator-dot {
+  color: var(--color-error, #ef4444);
+}
+.status-unknown .indicator-dot {
+  color: var(--text-muted, #999);
+}
 
 /* Details panel */
 .details-panel {
@@ -113,8 +126,12 @@
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Checks list */

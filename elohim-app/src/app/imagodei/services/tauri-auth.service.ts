@@ -12,19 +12,18 @@
 
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
+
+import { environment } from '../../../environments/environment';
+
 import { AuthService } from './auth.service';
 import { DoorwayRegistryService } from './doorway-registry.service';
-import { environment } from '../../../environments/environment';
 
 /** Tauri global interface for event listening */
 declare global {
   interface Window {
     __TAURI__?: {
       event: {
-        listen: <T>(
-          event: string,
-          handler: (event: { payload: T }) => void
-        ) => Promise<() => void>;
+        listen: <T>(event: string, handler: (event: { payload: T }) => void) => Promise<() => void>;
       };
     };
   }
@@ -162,21 +161,18 @@ export class TauriAuthService {
     // Listen for OAuth callback from deep link
     this.unsubscribeOAuthCallback = await listen<OAuthCallbackPayload>(
       'oauth-callback',
-      async (event) => {
+      async event => {
         console.log('[TauriAuth] OAuth callback received');
         await this.handleOAuthCallback(event.payload);
       }
     );
 
     // Listen for deep link errors
-    this.unsubscribeDeepLinkError = await listen<DeepLinkError>(
-      'deep-link-error',
-      (event) => {
-        console.error('[TauriAuth] Deep link error:', event.payload.message);
-        this.status.set('error');
-        this.errorMessage.set(event.payload.message);
-      }
-    );
+    this.unsubscribeDeepLinkError = await listen<DeepLinkError>('deep-link-error', event => {
+      console.error('[TauriAuth] Deep link error:', event.payload.message);
+      this.status.set('error');
+      this.errorMessage.set(event.payload.message);
+    });
 
     console.log('[TauriAuth] Event listeners registered');
   }

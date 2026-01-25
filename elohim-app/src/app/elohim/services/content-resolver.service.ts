@@ -31,16 +31,25 @@
  */
 
 import { Injectable, OnDestroy, inject } from '@angular/core';
+
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 
 // Import services for actual fetching
-import { IndexedDBCacheService } from './indexeddb-cache.service';
-import { ProjectionAPIService } from './projection-api.service';
-import { HolochainContentService, HolochainPathWithSteps } from './holochain-content.service';
+import {
+  SourceTier,
+  createContentResolver,
+  isWasmResolverAvailable,
+  TsContentResolver,
+} from '@elohim/service/cache/content-resolver';
 
-// Import models
 import { ContentNode } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
+
+import { HolochainContentService, HolochainPathWithSteps } from './holochain-content.service';
+import { IndexedDBCacheService } from './indexeddb-cache.service';
+import { ProjectionAPIService } from './projection-api.service';
+
+// Import models
 
 // Import from framework-agnostic content resolver
 import type {
@@ -51,13 +60,6 @@ import type {
   ResolverStats,
   SourceInfo,
   ResolverConfig,
-} from '@elohim/service/cache/content-resolver';
-
-import {
-  SourceTier,
-  createContentResolver,
-  isWasmResolverAvailable,
-  TsContentResolver,
 } from '@elohim/service/cache/content-resolver';
 
 // Import connection strategy types
@@ -228,7 +230,9 @@ export class ContentResolverService implements OnDestroy {
       this.implementation = result.implementation;
 
       this.stateSubject.next('ready');
-      console.log(`[ContentResolverService] Initialized with ${this.implementation} implementation`);
+      console.log(
+        `[ContentResolverService] Initialized with ${this.implementation} implementation`
+      );
 
       return {
         success: true,
@@ -349,10 +353,7 @@ export class ContentResolverService implements OnDestroy {
    * await resolver.initializeForMode(strategy, connectionConfig);
    * ```
    */
-  async initializeForMode(
-    strategy: IConnectionStrategy,
-    config: ConnectionConfig
-  ): Promise<void> {
+  async initializeForMode(strategy: IConnectionStrategy, config: ConnectionConfig): Promise<void> {
     // Ensure resolver is initialized first
     if (this.state !== 'ready') {
       await this.initialize();
@@ -925,9 +926,7 @@ export class ContentResolverService implements OnDestroy {
 
   private ensureReady(): void {
     if (!this.isReady) {
-      throw new Error(
-        '[ContentResolverService] Service not initialized. Call initialize() first.'
-      );
+      throw new Error('[ContentResolverService] Service not initialized. Call initialize() first.');
     }
   }
 

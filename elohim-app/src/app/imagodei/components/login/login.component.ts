@@ -11,17 +11,18 @@
  * - Connection status indicator
  */
 
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
-import { AuthService } from '../../services/auth.service';
-import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
-import { IdentityService } from '../../services/identity.service';
-import { DoorwayRegistryService } from '../../services/doorway-registry.service';
-import { DoorwayPickerComponent } from '../doorway-picker/doorway-picker.component';
+
 import { type PasswordCredentials, AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
 import { type DoorwayInfo } from '../../models/doorway.model';
+import { AuthService } from '../../services/auth.service';
+import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { IdentityService } from '../../services/identity.service';
+import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
+import { DoorwayPickerComponent } from '../doorway-picker/doorway-picker.component';
 
 /** Login step type */
 type LoginStep = 'doorway' | 'credentials';

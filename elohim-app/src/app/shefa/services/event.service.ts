@@ -20,15 +20,14 @@
  */
 
 import { Injectable } from '@angular/core';
-import { Observable, forkJoin, of } from 'rxjs';
+
 import { map } from 'rxjs/operators';
 
-import {
-  StorageApiService,
-  CreateEventInput,
-} from '@app/elohim/services/storage-api.service';
+import { Observable, forkJoin, of } from 'rxjs';
+
 import { EconomicEventView } from '@app/elohim/adapters/storage-types.adapter';
 import { EventQuery } from '@app/elohim/models/economic-event.model';
+import { StorageApiService, CreateEventInput } from '@app/elohim/services/storage-api.service';
 
 /**
  * Lamad-specific event types (extends hREA actions with domain semantics)
@@ -46,7 +45,7 @@ export const LamadEventTypes = {
   RECOGNITION_RECEIVED: 'recognition-received',
 } as const;
 
-export type LamadEventType = typeof LamadEventTypes[keyof typeof LamadEventTypes];
+export type LamadEventType = (typeof LamadEventTypes)[keyof typeof LamadEventTypes];
 
 /**
  * hREA action types
@@ -59,7 +58,7 @@ export const REAActions = {
   APPRECIATE: 'appreciate',
 } as const;
 
-export type REAAction = typeof REAActions[keyof typeof REAActions];
+export type REAAction = (typeof REAActions)[keyof typeof REAActions];
 
 @Injectable({
   providedIn: 'root',
@@ -204,7 +203,7 @@ export class EventService {
     fromAgentId: string,
     toPresenceId: string,
     contentId: string,
-    amount: number = 1
+    amount = 1
   ): Observable<EconomicEventView> {
     return this.storageApi.createEconomicEvent({
       action: REAActions.APPRECIATE,
@@ -252,7 +251,7 @@ export class EventService {
   /**
    * Get recent events for an agent.
    */
-  getRecentEvents(agentId: string, limit: number = 50): Observable<EconomicEventView[]> {
+  getRecentEvents(agentId: string, limit = 50): Observable<EconomicEventView[]> {
     return this.storageApi.getEconomicEvents({ agentId, limit });
   }
 
@@ -263,16 +262,13 @@ export class EventService {
   /**
    * Count events of a specific type for content.
    */
-  countEventsForContent(
-    contentId: string,
-    lamadEventType?: LamadEventType
-  ): Observable<number> {
-    return this.storageApi.getEconomicEvents({
-      contentId,
-      lamadEventType,
-    }).pipe(
-      map(events => events.length)
-    );
+  countEventsForContent(contentId: string, lamadEventType?: LamadEventType): Observable<number> {
+    return this.storageApi
+      .getEconomicEvents({
+        contentId,
+        lamadEventType,
+      })
+      .pipe(map(events => events.length));
   }
 
   /**
@@ -293,25 +289,25 @@ export class EventService {
    * Check if an agent has viewed content.
    */
   hasViewed(agentId: string, contentId: string): Observable<boolean> {
-    return this.storageApi.getEconomicEvents({
-      agentId,
-      contentId,
-      lamadEventType: LamadEventTypes.CONTENT_VIEW,
-    }).pipe(
-      map(events => events.length > 0)
-    );
+    return this.storageApi
+      .getEconomicEvents({
+        agentId,
+        contentId,
+        lamadEventType: LamadEventTypes.CONTENT_VIEW,
+      })
+      .pipe(map(events => events.length > 0));
   }
 
   /**
    * Check if an agent has completed content.
    */
   hasCompleted(agentId: string, contentId: string): Observable<boolean> {
-    return this.storageApi.getEconomicEvents({
-      agentId,
-      contentId,
-      lamadEventType: LamadEventTypes.CONTENT_COMPLETE,
-    }).pipe(
-      map(events => events.length > 0)
-    );
+    return this.storageApi
+      .getEconomicEvents({
+        agentId,
+        contentId,
+        lamadEventType: LamadEventTypes.CONTENT_COMPLETE,
+      })
+      .pipe(map(events => events.length > 0));
   }
 }

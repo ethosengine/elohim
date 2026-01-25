@@ -49,11 +49,21 @@
               <span class="link-tier">{{ getStewardTierLabel(link.authorTier) }}</span>
               <span class="link-label">
                 @switch (link.layerOrder) {
-                  @case (0) { Organization }
-                  @case (1) { Guardian }
-                  @case (2) { Elohim }
-                  @case (3) { Personal }
-                  @default { Layer {{ link.layerOrder }} }
+                  @case (0) {
+                    Organization
+                  }
+                  @case (1) {
+                    Guardian
+                  }
+                  @case (2) {
+                    Elohim
+                  }
+                  @case (3) {
+                    Personal
+                  }
+                  @default {
+                    Layer {{ link.layerOrder }}
+                  }
                 }
               </span>
             </div>
@@ -63,7 +73,9 @@
           }
         </div>
         <p class="chain-note">
-          Each layer can only <strong>add</strong> restrictions, never remove them.
+          Each layer can only
+          <strong>add</strong>
+          restrictions, never remove them.
         </p>
       </section>
     }
@@ -73,21 +85,24 @@
       <button
         class="tab-btn"
         [class.active]="activeTab() === 'content'"
-        (click)="setActiveTab('content')">
+        (click)="setActiveTab('content')"
+      >
         <span class="icon">🚫</span>
         Content
       </button>
       <button
         class="tab-btn"
         [class.active]="activeTab() === 'time'"
-        (click)="setActiveTab('time')">
+        (click)="setActiveTab('time')"
+      >
         <span class="icon">⏰</span>
         Time
       </button>
       <button
         class="tab-btn"
         [class.active]="activeTab() === 'features'"
-        (click)="setActiveTab('features')">
+        (click)="setActiveTab('features')"
+      >
         <span class="icon">🔒</span>
         Features
       </button>
@@ -95,7 +110,8 @@
         <button
           class="tab-btn"
           [class.active]="activeTab() === 'monitoring'"
-          (click)="setActiveTab('monitoring')">
+          (click)="setActiveTab('monitoring')"
+        >
           <span class="icon">👁</span>
           Monitoring
         </button>
@@ -108,9 +124,7 @@
       @if (activeTab() === 'content') {
         <section class="tab-panel">
           <h2>Content Filtering</h2>
-          <p class="tab-description">
-            Control what types of content are accessible.
-          </p>
+          <p class="tab-description">Control what types of content are accessible.</p>
 
           <!-- Blocked Categories -->
           <div class="rule-group">
@@ -120,12 +134,14 @@
                 <label
                   class="category-item"
                   [class.inherited]="isCategoryInherited(cat)"
-                  [class.blocked]="isCategoryBlocked(cat)">
+                  [class.blocked]="isCategoryBlocked(cat)"
+                >
                   <input
                     type="checkbox"
                     [checked]="isCategoryBlocked(cat) || isCategoryInherited(cat)"
                     [disabled]="!canEditContent() || isCategoryInherited(cat)"
-                    (change)="toggleCategory(cat)">
+                    (change)="toggleCategory(cat)"
+                  />
                   <span class="category-name">{{ formatCategory(cat) }}</span>
                   @if (isCategoryInherited(cat)) {
                     <span class="inherited-badge" title="Set by parent policy">inherited</span>
@@ -138,14 +154,13 @@
           <!-- Age Rating -->
           <div class="rule-group">
             <h3>Maximum Age Rating</h3>
-            <p class="rule-description">
-              Content above this rating will be filtered.
-            </p>
+            <p class="rule-description">Content above this rating will be filtered.</p>
             <select
               class="age-select"
               [disabled]="!canEditContent()"
               [ngModel]="editingContentRules().ageRatingMax"
-              (ngModelChange)="setAgeRating($event)">
+              (ngModelChange)="setAgeRating($event)"
+            >
               <option [ngValue]="undefined">No limit</option>
               @for (rating of availableAgeRatings; track rating.value) {
                 <option [ngValue]="rating.value">{{ rating.label }}</option>
@@ -166,7 +181,8 @@
                 max="7"
                 [disabled]="!canEditContent()"
                 [ngModel]="editingContentRules().reachLevelMax ?? 7"
-                (ngModelChange)="setReachLevel($event)">
+                (ngModelChange)="setReachLevel($event)"
+              />
               <span class="reach-value">
                 @if (editingContentRules().reachLevelMax !== undefined) {
                   {{ editingContentRules().reachLevelMax }}
@@ -183,16 +199,12 @@
       @if (activeTab() === 'time') {
         <section class="tab-panel">
           <h2>Time Limits</h2>
-          <p class="tab-description">
-            Set session and daily usage limits.
-          </p>
+          <p class="tab-description">Set session and daily usage limits.</p>
 
           <!-- Session Limit -->
           <div class="rule-group">
             <h3>Session Time Limit</h3>
-            <p class="rule-description">
-              Maximum minutes per session before a break is required.
-            </p>
+            <p class="rule-description">Maximum minutes per session before a break is required.</p>
             <div class="time-input-group">
               <input
                 type="number"
@@ -202,7 +214,8 @@
                 placeholder="No limit"
                 [disabled]="!canEditTime()"
                 [ngModel]="editingTimeRules().sessionMaxMinutes"
-                (ngModelChange)="setSessionLimit($event)">
+                (ngModelChange)="setSessionLimit($event)"
+              />
               <span class="unit">minutes</span>
             </div>
           </div>
@@ -210,9 +223,7 @@
           <!-- Daily Limit -->
           <div class="rule-group">
             <h3>Daily Time Limit</h3>
-            <p class="rule-description">
-              Maximum total minutes per day.
-            </p>
+            <p class="rule-description">Maximum total minutes per day.</p>
             <div class="time-input-group">
               <input
                 type="number"
@@ -222,7 +233,8 @@
                 placeholder="No limit"
                 [disabled]="!canEditTime()"
                 [ngModel]="editingTimeRules().dailyMaxMinutes"
-                (ngModelChange)="setDailyLimit($event)">
+                (ngModelChange)="setDailyLimit($event)"
+              />
               <span class="unit">minutes</span>
             </div>
           </div>
@@ -230,9 +242,7 @@
           <!-- Cooldown -->
           <div class="rule-group">
             <h3>Break Duration</h3>
-            <p class="rule-description">
-              Required break time after session limit is reached.
-            </p>
+            <p class="rule-description">Required break time after session limit is reached.</p>
             <div class="time-input-group">
               <input
                 type="number"
@@ -242,7 +252,8 @@
                 placeholder="No break"
                 [disabled]="!canEditTime()"
                 [ngModel]="editingTimeRules().cooldownMinutes"
-                (ngModelChange)="setCooldown($event)">
+                (ngModelChange)="setCooldown($event)"
+              />
               <span class="unit">minutes</span>
             </div>
           </div>
@@ -264,7 +275,19 @@
                         type="time"
                         [value]="formatTime(window.startHour, window.startMinute)"
                         [disabled]="!canEditTime()"
-                        (change)="updateTimeWindow(i, 'startHour', +$any($event.target).value.split(':')[0]); updateTimeWindow(i, 'startMinute', +$any($event.target).value.split(':')[1])">
+                        (change)="
+                          updateTimeWindow(
+                            i,
+                            'startHour',
+                            +$any($event.target).value.split(':')[0]
+                          );
+                          updateTimeWindow(
+                            i,
+                            'startMinute',
+                            +$any($event.target).value.split(':')[1]
+                          )
+                        "
+                      />
                     </label>
                     <label>
                       <span>To</span>
@@ -272,17 +295,22 @@
                         type="time"
                         [value]="formatTime(window.endHour, window.endMinute)"
                         [disabled]="!canEditTime()"
-                        (change)="updateTimeWindow(i, 'endHour', +$any($event.target).value.split(':')[0]); updateTimeWindow(i, 'endMinute', +$any($event.target).value.split(':')[1])">
+                        (change)="
+                          updateTimeWindow(i, 'endHour', +$any($event.target).value.split(':')[0]);
+                          updateTimeWindow(i, 'endMinute', +$any($event.target).value.split(':')[1])
+                        "
+                      />
                     </label>
                   </div>
 
                   <div class="window-days">
-                    @for (day of [0,1,2,3,4,5,6]; track day) {
+                    @for (day of [0, 1, 2, 3, 4, 5, 6]; track day) {
                       <label class="day-toggle" [class.active]="window.daysOfWeek.includes(day)">
                         <input
                           type="checkbox"
                           [checked]="window.daysOfWeek.includes(day)"
-                          [disabled]="!canEditTime()">
+                          [disabled]="!canEditTime()"
+                        />
                         {{ getDayName(day) }}
                       </label>
                     }
@@ -292,7 +320,8 @@
                     <button
                       class="remove-window-btn"
                       (click)="removeTimeWindow(i)"
-                      title="Remove window">
+                      title="Remove window"
+                    >
                       &times;
                     </button>
                   }
@@ -314,9 +343,7 @@
       @if (activeTab() === 'features') {
         <section class="tab-panel">
           <h2>Feature Restrictions</h2>
-          <p class="tab-description">
-            Control which features and sections are accessible.
-          </p>
+          <p class="tab-description">Control which features and sections are accessible.</p>
 
           <!-- Disabled Features -->
           <div class="rule-group">
@@ -327,18 +354,24 @@
                   class="feature-item"
                   [class.inherited]="isFeatureInherited(feat)"
                   [class.disabled]="isFeatureDisabled(feat)"
-                  [class.inalienable]="isFeatureInalienable(feat)">
+                  [class.inalienable]="isFeatureInalienable(feat)"
+                >
                   <input
                     type="checkbox"
                     [checked]="isFeatureDisabled(feat) || isFeatureInherited(feat)"
-                    [disabled]="!canEditFeatures() || isFeatureInherited(feat) || isFeatureInalienable(feat)"
-                    (change)="toggleFeature(feat)">
+                    [disabled]="
+                      !canEditFeatures() || isFeatureInherited(feat) || isFeatureInalienable(feat)
+                    "
+                    (change)="toggleFeature(feat)"
+                  />
                   <span class="feature-name">{{ formatFeature(feat) }}</span>
                   @if (isFeatureInherited(feat)) {
                     <span class="inherited-badge">inherited</span>
                   }
                   @if (isFeatureInalienable(feat)) {
-                    <span class="inalienable-badge" title="This feature cannot be disabled">protected</span>
+                    <span class="inalienable-badge" title="This feature cannot be disabled">
+                      protected
+                    </span>
                   }
                 </label>
               }
@@ -349,7 +382,9 @@
           <div class="inalienable-notice">
             <h4>🔒 Protected Features</h4>
             <p>
-              These features can <strong>never</strong> be disabled, regardless of stewardship level:
+              These features can
+              <strong>never</strong>
+              be disabled, regardless of stewardship level:
             </p>
             <ul>
               @for (feat of inalienableFeatures; track feat) {
@@ -364,14 +399,16 @@
       @if (activeTab() === 'monitoring' && canViewMonitoring()) {
         <section class="tab-panel">
           <h2>Activity Monitoring</h2>
-          <p class="tab-description">
-            Configure what activity is logged and for how long.
-          </p>
+          <p class="tab-description">Configure what activity is logged and for how long.</p>
 
           @if (!canEditMonitoring()) {
             <div class="view-only-notice">
               <span class="icon">👁</span>
-              <p>As a <strong>guide</strong>, you can view monitoring settings but cannot change them.</p>
+              <p>
+                As a
+                <strong>guide</strong>
+                , you can view monitoring settings but cannot change them.
+              </p>
             </div>
           }
 
@@ -387,10 +424,7 @@
     <!-- Save Bar -->
     <div class="save-bar">
       @if (!isEditingSelf() || canEditContent() || canEditTime() || canEditFeatures()) {
-        <button
-          class="save-btn"
-          [disabled]="isSaving()"
-          (click)="savePolicy()">
+        <button class="save-btn" [disabled]="isSaving()" (click)="savePolicy()">
           @if (isSaving()) {
             <span class="spinner-small"></span>
             Saving...
@@ -400,9 +434,7 @@
         </button>
       }
 
-      <a routerLink="../capabilities" class="view-capabilities-link">
-        View resulting capabilities
-      </a>
+      <a routerLink="../capabilities" class="view-capabilities-link">View resulting capabilities</a>
     </div>
   }
 </div>

@@ -13,7 +13,7 @@
   /* backdrop-filter removed to fix mobile tray fixed positioning */
 }
 
-:host-context(body[data-theme="light"]) .elohim-header {
+:host-context(body[data-theme='light']) .elohim-header {
   background: rgba(255, 255, 255, 0.95);
 }
 
@@ -626,8 +626,13 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 /* Edge Node Details Panel */
@@ -1275,7 +1280,6 @@
     padding: 0.75rem 1rem; /* Larger touch target */
   }
 }
-
 
 @keyframes slideUp {
   from {

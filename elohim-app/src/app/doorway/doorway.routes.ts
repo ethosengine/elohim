@@ -23,9 +23,10 @@ export const DOORWAY_ROUTES: Routes = [
       title: 'Doorway - Web Hosting',
       seo: {
         title: 'Doorway Web Hosting',
-        description: 'Configure web hosting, SSL, and domain settings for your always-on Holochain nodes.',
-      }
-    }
+        description:
+          'Configure web hosting, SSL, and domain settings for your always-on Holochain nodes.',
+      },
+    },
   },
   {
     path: 'config',
@@ -38,7 +39,7 @@ export const DOORWAY_ROUTES: Routes = [
       seo: {
         title: 'Doorway Configuration',
         description: 'SSL certificates, custom domains, and reverse proxy settings.',
-      }
-    }
-  }
+      },
+    },
+  },
 ];

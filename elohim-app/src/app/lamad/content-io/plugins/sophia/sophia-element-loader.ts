@@ -39,14 +39,14 @@ let cssLoaded = false;
 // CSS URLs
 const getSophiaStylesUrl = (): string => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (window as any)['__SOPHIA_STYLES_URL__'] as string
-    || '/assets/sophia-plugin/index.css';
+  return ((window as any)['__SOPHIA_STYLES_URL__'] as string) || '/assets/sophia-plugin/index.css';
 };
 
 const getSophiaThemeOverridesUrl = (): string => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (window as any)['__SOPHIA_THEME_OVERRIDES_URL__'] as string
-    || '/assets/sophia-plugin/sophia-theme-overrides.css';
+  return (
+    ((window as any)['__SOPHIA_THEME_OVERRIDES_URL__'] as string) ||
+    '/assets/sophia-plugin/sophia-theme-overrides.css'
+  );
 };
 
 /**
@@ -111,14 +111,13 @@ function loadScript(url: string): Promise<void> {
 // React URLs - local assets for offline support, CDN fallback for development
 const getReactUrl = (): string => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (window as any)['__REACT_URL__'] as string
-    || '/assets/react/react.production.min.js';
+  return ((window as any)['__REACT_URL__'] as string) || '/assets/react/react.production.min.js';
 };
 
 const getReactDomUrl = (): string => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (window as any)['__REACT_DOM_URL__'] as string
-    || '/assets/react/react-dom.production.min.js';
+  return (
+    ((window as any)['__REACT_DOM_URL__'] as string) || '/assets/react/react-dom.production.min.js'
+  );
 };
 
 // CDN fallback URLs
@@ -201,7 +200,11 @@ export async function registerSophiaElement(): Promise<void> {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const g = globalThis as any;
       console.log('[Sophia] Pre-load check - globalThis.React:', typeof g.React, g.React?.version);
-      console.log('[Sophia] Pre-load check - globalThis.ReactDOM:', typeof g.ReactDOM, g.ReactDOM?.version);
+      console.log(
+        '[Sophia] Pre-load check - globalThis.ReactDOM:',
+        typeof g.ReactDOM,
+        g.ReactDOM?.version
+      );
 
       // Load the UMD bundle
       await loadScript(pluginUrl);
@@ -225,7 +228,7 @@ export async function registerSophiaElement(): Promise<void> {
         SophiaElement.Sophia.configure({
           theme: 'auto',
           detectThemeFrom: 'attribute',
-          logLevel: 'debug'
+          logLevel: 'debug',
         });
         console.log('[Sophia] Configured with attribute-based theme detection');
       } else {
@@ -290,17 +293,38 @@ export interface PsycheAPI {
   createInstrument: (options: CreateInstrumentOptions) => PsychometricInstrument;
 
   // Reflection processing
-  recognizeReflection: (moment: ReflectionMoment, userInput: Record<string, unknown>) => ReflectionRecognition;
-  aggregateReflections: (recognitions: ReflectionRecognition[], options?: AggregateReflectionOptions) => AggregatedReflection;
-  mergeAggregatedReflections: (a: AggregatedReflection, b: AggregatedReflection) => AggregatedReflection;
+  recognizeReflection: (
+    moment: ReflectionMoment,
+    userInput: Record<string, unknown>
+  ) => ReflectionRecognition;
+  aggregateReflections: (
+    recognitions: ReflectionRecognition[],
+    options?: AggregateReflectionOptions
+  ) => AggregatedReflection;
+  mergeAggregatedReflections: (
+    a: AggregatedReflection,
+    b: AggregatedReflection
+  ) => AggregatedReflection;
   getTopSubscales: (aggregated: AggregatedReflection, n?: number) => [string, number][];
   getPrimarySubscale: (aggregated: AggregatedReflection) => string | undefined;
-  hasSufficientData: (aggregated: AggregatedReflection, minMoments?: number, minSubscales?: number) => boolean;
+  hasSufficientData: (
+    aggregated: AggregatedReflection,
+    minMoments?: number,
+    minSubscales?: number
+  ) => boolean;
   createEmptyAggregation: (subscales?: SubscaleDefinition[]) => AggregatedReflection;
 
   // Interpretation
-  interpretReflection: (instrumentId: string, aggregated: AggregatedReflection, options?: InterpretReflectionOptions) => PsychometricInterpretation;
-  interpretWithInstrument: (instrument: PsychometricInstrument, aggregated: AggregatedReflection, options?: InterpretReflectionOptions) => PsychometricInterpretation;
+  interpretReflection: (
+    instrumentId: string,
+    aggregated: AggregatedReflection,
+    options?: InterpretReflectionOptions
+  ) => PsychometricInterpretation;
+  interpretWithInstrument: (
+    instrument: PsychometricInstrument,
+    aggregated: AggregatedReflection,
+    options?: InterpretReflectionOptions
+  ) => PsychometricInterpretation;
 }
 
 /**
@@ -309,7 +333,15 @@ export interface PsycheAPI {
 export interface PsychometricInstrument {
   id: string;
   name: string;
-  category: 'personality' | 'values' | 'interests' | 'skills' | 'vocational' | 'wellbeing' | 'learning' | 'custom';
+  category:
+    | 'personality'
+    | 'values'
+    | 'interests'
+    | 'skills'
+    | 'vocational'
+    | 'wellbeing'
+    | 'learning'
+    | 'custom';
   subscales: SubscaleDefinition[];
   scoringConfig: ScoringConfig;
   interpret: (aggregated: AggregatedReflection) => unknown;
@@ -449,7 +481,10 @@ export function getPsycheAPI(): PsycheAPI | null {
   // Create a facade using available SophiaElement exports + local implementations
   return {
     // Local implementation for reflection aggregation
-    aggregateReflections: (recognitions: ReflectionRecognition[], _options?: AggregateReflectionOptions): AggregatedReflection => {
+    aggregateReflections: (
+      recognitions: ReflectionRecognition[],
+      _options?: AggregateReflectionOptions
+    ): AggregatedReflection => {
       const subscaleTotals: Record<string, number> = {};
       const subscaleCounts: Record<string, number> = {};
       const momentIds: string[] = [];
@@ -477,7 +512,7 @@ export function getPsycheAPI(): PsycheAPI | null {
         normalizedScores,
         momentCount: recognitions.length,
         momentIds,
-        aggregatedAt: Date.now()
+        aggregatedAt: Date.now(),
       };
     },
 
@@ -490,33 +525,49 @@ export function getPsycheAPI(): PsycheAPI | null {
       // Fallback: find highest scoring subscale
       const entries = Object.entries(aggregated.subscaleTotals);
       if (entries.length === 0) return undefined;
-      return entries.reduce((max, curr) => curr[1] > max[1] ? curr : max)[0];
+      return entries.reduce((max, curr) => (curr[1] > max[1] ? curr : max))[0];
     },
 
     // Local implementation for data sufficiency check
-    hasSufficientData: (aggregated: AggregatedReflection, minMoments = 3, minSubscales = 1): boolean => {
-      return aggregated.momentCount >= minMoments &&
-             Object.keys(aggregated.subscaleTotals).length >= minSubscales;
+    hasSufficientData: (
+      aggregated: AggregatedReflection,
+      minMoments = 3,
+      minSubscales = 1
+    ): boolean => {
+      return (
+        aggregated.momentCount >= minMoments &&
+        Object.keys(aggregated.subscaleTotals).length >= minSubscales
+      );
     },
 
     // Stub implementations for interface completeness
     // These are not needed for basic discovery/reflection flow
-    registerInstrument: () => { /* Not implemented */ },
-    updateInstrument: () => { /* Not implemented */ },
+    registerInstrument: () => {
+      /* Not implemented */
+    },
+    updateInstrument: () => {
+      /* Not implemented */
+    },
     unregisterInstrument: () => false,
     getInstrument: () => undefined,
     getAllInstruments: () => [],
     hasInstrument: () => false,
-    clearInstruments: () => { /* Not implemented */ },
-    createInstrument: () => { throw new Error('Not implemented'); },
-    recognizeReflection: () => { throw new Error('Not implemented'); },
+    clearInstruments: () => {
+      /* Not implemented */
+    },
+    createInstrument: () => {
+      throw new Error('Not implemented');
+    },
+    recognizeReflection: () => {
+      throw new Error('Not implemented');
+    },
     mergeAggregatedReflections: (a, b) => ({
       subscaleTotals: { ...a.subscaleTotals, ...b.subscaleTotals },
       subscaleCounts: { ...a.subscaleCounts, ...b.subscaleCounts },
       normalizedScores: { ...a.normalizedScores, ...b.normalizedScores },
       momentCount: a.momentCount + b.momentCount,
       momentIds: [...a.momentIds, ...b.momentIds],
-      aggregatedAt: Date.now()
+      aggregatedAt: Date.now(),
     }),
     getTopSubscales: (aggregated, n = 3) => {
       return Object.entries(aggregated.subscaleTotals)
@@ -529,10 +580,14 @@ export function getPsycheAPI(): PsycheAPI | null {
       normalizedScores: {},
       momentCount: 0,
       momentIds: [],
-      aggregatedAt: Date.now()
+      aggregatedAt: Date.now(),
     }),
-    interpretReflection: () => { throw new Error('Not implemented'); },
-    interpretWithInstrument: () => { throw new Error('Not implemented'); }
+    interpretReflection: () => {
+      throw new Error('Not implemented');
+    },
+    interpretWithInstrument: () => {
+      throw new Error('Not implemented');
+    },
   } as PsycheAPI;
 }
 

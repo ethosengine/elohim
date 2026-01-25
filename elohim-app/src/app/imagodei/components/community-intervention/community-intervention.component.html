@@ -3,7 +3,8 @@
   <header class="intervention-header">
     <h1>Community Intervention</h1>
     <p class="subtitle">
-      For patterns of behavior that harm the community. Requires weighted support from people who know the person.
+      For patterns of behavior that harm the community. Requires weighted support from people who
+      know the person.
     </p>
   </header>
 
@@ -12,7 +13,8 @@
     <div class="notice-icon">&#9432;</div>
     <div class="notice-content">
       <p>
-        <strong>This is not mob rule.</strong> Community intervention requires:
+        <strong>This is not mob rule.</strong>
+        Community intervention requires:
       </p>
       <ul>
         <li>{{ threshold }} weighted support (people who know you have more weight)</li>
@@ -74,7 +76,7 @@
             </p>
           } @else {
             <p class="threshold-met">
-              Threshold met on {{ intervention()!.thresholdMetAt | date:'mediumDate' }}
+              Threshold met on {{ intervention()!.thresholdMetAt | date: 'mediumDate' }}
             </p>
           }
         </div>
@@ -119,14 +121,17 @@
               <button
                 class="relationship-btn"
                 [class.selected]="relationshipLevel() === level.value"
-                (click)="setRelationshipLevel(level.value)">
+                (click)="setRelationshipLevel(level.value)"
+              >
                 <span class="level-weight">{{ level.weight }}x</span>
                 <span class="level-name">{{ getRelationshipLevelLabel(level.value) }}</span>
               </button>
             }
           </div>
           <p class="weight-note">
-            Your support will add <strong>{{ currentWeight() }}</strong> weight to the total.
+            Your support will add
+            <strong>{{ currentWeight() }}</strong>
+            weight to the total.
           </p>
         </div>
 
@@ -138,8 +143,8 @@
             [ngModel]="supportReason()"
             (ngModelChange)="supportReason.set($event)"
             placeholder="Describe the patterns you've observed and why intervention is needed..."
-            rows="4">
-          </textarea>
+            rows="4"
+          ></textarea>
         </div>
 
         <!-- Submit -->
@@ -147,7 +152,8 @@
           <button
             class="submit-btn"
             [disabled]="!canSubmit() || isSubmitting()"
-            (click)="submitSupport()">
+            (click)="submitSupport()"
+          >
             @if (isSubmitting()) {
               <span class="spinner-small"></span>
               Submitting...
@@ -173,7 +179,8 @@
             id="subjectId"
             [ngModel]="subjectId()"
             (ngModelChange)="subjectId.set($event)"
-            placeholder="Agent ID or handle">
+            placeholder="Agent ID or handle"
+          />
         </div>
 
         <!-- Relationship Level -->
@@ -184,15 +191,19 @@
               <button
                 class="relationship-btn"
                 [class.selected]="relationshipLevel() === level.value"
-                (click)="setRelationshipLevel(level.value)">
+                (click)="setRelationshipLevel(level.value)"
+              >
                 <span class="level-weight">{{ level.weight }}x</span>
                 <span class="level-name">{{ getRelationshipLevelLabel(level.value) }}</span>
               </button>
             }
           </div>
           <p class="weight-note">
-            Your initial support will be <strong>{{ currentWeight() }}</strong> weight.
-            Threshold is <strong>{{ threshold }}</strong>.
+            Your initial support will be
+            <strong>{{ currentWeight() }}</strong>
+            weight. Threshold is
+            <strong>{{ threshold }}</strong>
+            .
           </p>
         </div>
 
@@ -204,8 +215,8 @@
             [ngModel]="patternDescription()"
             (ngModelChange)="patternDescription.set($event)"
             placeholder="Be specific. Describe observable patterns, not personality judgments. Example: 'Repeatedly justifies violence against protestors. Victim-blames in discussions about police shootings. Dehumanizes people with different political views.'"
-            rows="5">
-          </textarea>
+            rows="5"
+          ></textarea>
         </div>
 
         <!-- Categories -->
@@ -213,13 +224,12 @@
           <label>Categories (select all that apply):</label>
           <div class="category-options">
             @for (cat of categories; track cat.value) {
-              <label
-                class="category-option"
-                [class.selected]="isCategorySelected(cat.value)">
+              <label class="category-option" [class.selected]="isCategorySelected(cat.value)">
                 <input
                   type="checkbox"
                   [checked]="isCategorySelected(cat.value)"
-                  (change)="toggleCategory(cat.value)">
+                  (change)="toggleCategory(cat.value)"
+                />
                 <div class="category-content">
                   <span class="category-name">{{ cat.label }}</span>
                   <span class="category-desc">{{ cat.description }}</span>
@@ -237,8 +247,8 @@
             [ngModel]="evidence()"
             (ngModelChange)="evidence.set($event)"
             placeholder="Links, screenshots, quotes, or other evidence of the pattern..."
-            rows="3">
-          </textarea>
+            rows="3"
+          ></textarea>
         </div>
 
         <!-- Submit -->
@@ -246,7 +256,8 @@
           <button
             class="submit-btn"
             [disabled]="!canSubmit() || isSubmitting()"
-            (click)="submitInitiation()">
+            (click)="submitInitiation()"
+          >
             @if (isSubmitting()) {
               <span class="spinner-small"></span>
               Submitting...
@@ -260,9 +271,9 @@
         <div class="warning-notice">
           <span class="icon">&#9888;</span>
           <p>
-            <strong>Initiating an intervention is serious.</strong> False or malicious reports
-            will be flagged and may result in intervention against the reporter. The subject
-            will be notified and have full opportunity to respond.
+            <strong>Initiating an intervention is serious.</strong>
+            False or malicious reports will be flagged and may result in intervention against the
+            reporter. The subject will be notified and have full opportunity to respond.
           </p>
         </div>
       </section>

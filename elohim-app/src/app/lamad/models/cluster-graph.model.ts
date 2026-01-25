@@ -36,12 +36,12 @@ export interface ClusterNode extends d3.SimulationNodeDatum {
   // Cluster hierarchy
   isCluster: boolean;
   clusterType: ClusterType;
-  clusterLevel: number;  // 0=path, 1=chapter, 2=module, 3=section, 4=concept
+  clusterLevel: number; // 0=path, 1=chapter, 2=module, 3=section, 4=concept
 
   // Hierarchy relationships
   parentClusterId: string | null;
   childClusterIds: string[];
-  conceptIds: string[];  // Leaf concepts (populated for sections)
+  conceptIds: string[]; // Leaf concepts (populated for sections)
 
   // Visual state
   isExpanded: boolean;
@@ -204,9 +204,8 @@ export function createClusterConnectionDetail(
 
   // Calculate confidence stats
   const confidences = relationships.map(r => r.confidence);
-  const avgConfidence = confidences.length > 0
-    ? confidences.reduce((a, b) => a + b, 0) / confidences.length
-    : 0;
+  const avgConfidence =
+    confidences.length > 0 ? confidences.reduce((a, b) => a + b, 0) / confidences.length : 0;
   const minConfidence = confidences.length > 0 ? Math.min(...confidences) : 0;
   const maxConfidence = confidences.length > 0 ? Math.max(...confidences) : 0;
 
@@ -231,7 +230,7 @@ export interface ClusterEdge extends d3.SimulationLinkDatum<ClusterNode> {
   source: string | ClusterNode;
   target: string | ClusterNode;
   type: string;
-  isAggregated: boolean;  // True if this represents multiple underlying relationships
+  isAggregated: boolean; // True if this represents multiple underlying relationships
   connectionCount?: number;
 }
 
@@ -275,12 +274,15 @@ export interface ClusterConnectionSummary {
 /**
  * HierarchyLevel maps cluster levels to their properties.
  */
-export const CLUSTER_LEVEL_CONFIG: Record<number, {
-  name: string;
-  baseRadius: number;
-  color: string;
-  strokeColor: string;
-}> = {
+export const CLUSTER_LEVEL_CONFIG: Record<
+  number,
+  {
+    name: string;
+    baseRadius: number;
+    color: string;
+    strokeColor: string;
+  }
+> = {
   0: { name: 'Path', baseRadius: 60, color: 'rgba(99, 102, 241, 0.3)', strokeColor: '#6366f1' },
   1: { name: 'Chapter', baseRadius: 50, color: 'rgba(99, 102, 241, 0.2)', strokeColor: '#6366f1' },
   2: { name: 'Module', baseRadius: 35, color: 'rgba(34, 197, 94, 0.2)', strokeColor: '#22c55e' },
@@ -292,7 +294,14 @@ export const CLUSTER_LEVEL_CONFIG: Record<number, {
  * Create a cluster node from path chapter data.
  */
 export function createChapterCluster(
-  chapter: { id: string; title: string; description?: string; order: number; estimatedDuration?: string; attestationGranted?: string },
+  chapter: {
+    id: string;
+    title: string;
+    description?: string;
+    order: number;
+    estimatedDuration?: string;
+    attestationGranted?: string;
+  },
   pathId: string,
   moduleCount: number,
   totalConceptCount: number
@@ -306,7 +315,7 @@ export function createChapterCluster(
     clusterType: 'chapter',
     clusterLevel: 1,
     parentClusterId: pathId,
-    childClusterIds: [],  // Will be populated with module IDs
+    childClusterIds: [], // Will be populated with module IDs
     conceptIds: [],
     isExpanded: false,
     isLoading: false,
@@ -338,7 +347,7 @@ export function createModuleCluster(
     clusterType: 'module',
     clusterLevel: 2,
     parentClusterId: chapterId,
-    childClusterIds: [],  // Will be populated with section IDs
+    childClusterIds: [], // Will be populated with section IDs
     conceptIds: [],
     isExpanded: false,
     isLoading: false,
@@ -355,7 +364,14 @@ export function createModuleCluster(
  * Create a cluster node from path section data.
  */
 export function createSectionCluster(
-  section: { id: string; title: string; description?: string; order: number; conceptIds: string[]; estimatedMinutes?: number },
+  section: {
+    id: string;
+    title: string;
+    description?: string;
+    order: number;
+    conceptIds: string[];
+    estimatedMinutes?: number;
+  },
   moduleId: string
 ): ClusterNode {
   return {
@@ -390,7 +406,7 @@ export function createConceptNode(
   contentType: string,
   sectionId: string,
   state: ClusterNode['state'] = 'unseen',
-  affinityScore: number = 0
+  affinityScore = 0
 ): ClusterNode {
   return {
     id,

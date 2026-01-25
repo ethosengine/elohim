@@ -21,11 +21,20 @@
  */
 
 import { Injectable, computed, signal, inject } from '@angular/core';
-import { Observable, of, from, defer, Subject, BehaviorSubject } from 'rxjs';
+
 import { map, catchError, shareReplay, switchMap, tap, debounceTime, buffer } from 'rxjs/operators';
-import { HolochainClientService } from './holochain-client.service';
+
+import { Observable, of, from, defer, Subject, BehaviorSubject } from 'rxjs';
+
+import {
+  ContentNode,
+  ContentType,
+  ContentFormat,
+  ContentMetadata,
+} from '../../lamad/models/content-node.model';
+
 import { CustodianSelectionService } from './custodian-selection.service';
-import { ContentNode, ContentType, ContentFormat, ContentMetadata } from '../../lamad/models/content-node.model';
+import { HolochainClientService } from './holochain-client.service';
 
 // =============================================================================
 // Holochain Content Types (match Rust DNA structures)
@@ -207,10 +216,10 @@ export interface HolochainLearningPath {
 export interface HolochainPathWithSteps {
   actionHash: Uint8Array;
   path: HolochainLearningPath;
-  steps: Array<{
+  steps: {
     actionHash: Uint8Array;
     step: HolochainPathStep;
-  }>;
+  }[];
 }
 
 /**
@@ -233,12 +242,12 @@ export interface HolochainPathOverview {
  */
 export interface HolochainAgentEntry {
   id: string;
-  agentType: string;           // human, organization, ai-agent, elohim
+  agentType: string; // human, organization, ai-agent, elohim
   displayName: string;
   bio: string | null;
   avatar: string | null;
   affinities: string[];
-  visibility: string;           // public, connections, private
+  visibility: string; // public, connections, private
   location: string | null;
   holochainAgentKey: string | null;
   did: string | null;
@@ -275,12 +284,12 @@ export interface QueryAgentsInput {
 export interface HolochainAttestationEntry {
   id: string;
   agentId: string;
-  category: string;             // domain-mastery, path-completion, role-credential, achievement
+  category: string; // domain-mastery, path-completion, role-credential, achievement
   attestationType: string;
   displayName: string;
   description: string;
   iconUrl: string | null;
-  tier: string | null;          // bronze, silver, gold, platinum
+  tier: string | null; // bronze, silver, gold, platinum
   earnedVia: unknown;
   issuedAt: string;
   issuedBy: string;
@@ -320,15 +329,15 @@ export interface QueryAttestationsInput {
 export interface HolochainContentAttestationEntry {
   id: string;
   contentId: string;
-  attestationType: string;        // author-verified, steward-approved, etc.
-  reachGranted: string;           // private, local, community, commons
-  grantedBy: unknown;             // AttestationGrantor parsed
+  attestationType: string; // author-verified, steward-approved, etc.
+  reachGranted: string; // private, local, community, commons
+  grantedBy: unknown; // AttestationGrantor parsed
   grantedAt: string;
   expiresAt: string | null;
-  status: string;                  // active, expired, revoked, superseded
-  revocation: unknown | null;     // AttestationRevocation if revoked
-  evidence: unknown | null;       // AttestationEvidence
-  scope: unknown | null;          // AttestationScope (optional)
+  status: string; // active, expired, revoked, superseded
+  revocation: unknown | null; // AttestationRevocation if revoked
+  evidence: unknown | null; // AttestationEvidence
+  scope: unknown | null; // AttestationScope (optional)
   metadata: unknown;
   createdAt: string;
   updatedAt: string;
@@ -403,9 +412,9 @@ export interface HolochainRelationshipEntry {
   id: string;
   sourceId: string;
   targetId: string;
-  relationshipType: string;    // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
-  confidence: number;           // 0.0 - 1.0
-  inferenceSource: string;     // explicit, path, tag, semantic
+  relationshipType: string; // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
+  confidence: number; // 0.0 - 1.0
+  inferenceSource: string; // explicit, path, tag, semantic
   metadata: unknown | null;
   createdAt: string;
 }
@@ -426,8 +435,8 @@ export interface HolochainRelationshipOutput {
  * updating the Rust zome and running a DNA migration.
  */
 export interface GetRelationshipsInput {
-  content_id: string;           // snake_case for zome
-  direction: string;            // outgoing, incoming, both
+  content_id: string; // snake_case for zome
+  direction: string; // outgoing, incoming, both
 }
 
 /**
@@ -467,7 +476,7 @@ export interface HolochainContentGraph {
  */
 export interface HolochainKnowledgeMapEntry {
   id: string;
-  mapType: string;             // domain, self, person, collective
+  mapType: string; // domain, self, person, collective
   ownerId: string;
   title: string;
   description: string | null;
@@ -784,7 +793,10 @@ export class HolochainContentService {
   private statsCache$: Observable<HolochainContentStats> | null = null;
 
   // Request coalescing for batch loading
-  private readonly pendingBatchRequests = new Map<string, { resolve: (content: ContentNode | null) => void; reject: (err: any) => void }[]>();
+  private readonly pendingBatchRequests = new Map<
+    string,
+    { resolve: (content: ContentNode | null) => void; reject: (err: any) => void }[]
+  >();
   private batchRequestTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly BATCH_DEBOUNCE_MS = 50; // Collect requests for 50ms before batching
 
@@ -810,7 +822,7 @@ export class HolochainContentService {
     // Check cache first
     if (this.contentCache.has(resourceId)) {
       try {
-        return await this.contentCache.get(resourceId)!.toPromise() ?? null;
+        return (await this.contentCache.get(resourceId)!.toPromise()) ?? null;
       } catch {
         // Cache error, continue to fetch
       }
@@ -907,11 +919,9 @@ export class HolochainContentService {
     }
 
     if (!this.contentCache.has(resourceId)) {
-      const request = defer(() =>
-        from(this.fetchContentById(resourceId))
-      ).pipe(
+      const request = defer(() => from(this.fetchContentById(resourceId))).pipe(
         shareReplay(1),
-        catchError((err) => {
+        catchError(err => {
           console.warn(`[HolochainContent] Failed to fetch "${resourceId}":`, err);
           return of(null);
         })
@@ -935,7 +945,9 @@ export class HolochainContentService {
    * @param ids Array of content IDs to fetch
    * @returns Map of id → ContentNode for found items, plus list of not found IDs
    */
-  async batchGetContent(ids: string[]): Promise<{ found: Map<string, ContentNode>; notFound: string[] }> {
+  async batchGetContent(
+    ids: string[]
+  ): Promise<{ found: Map<string, ContentNode>; notFound: string[] }> {
     if (!this.isAvailable() || ids.length === 0) {
       return { found: new Map(), notFound: ids };
     }
@@ -1042,10 +1054,8 @@ export class HolochainContentService {
       return of([]);
     }
 
-    return defer(() =>
-      from(this.fetchContentByType(contentType, limit))
-    ).pipe(
-      catchError((err) => {
+    return defer(() => from(this.fetchContentByType(contentType, limit))).pipe(
+      catchError(err => {
         console.warn(`[HolochainContent] Failed to fetch type "${contentType}":`, err);
         return of([]);
       })
@@ -1170,9 +1180,7 @@ export class HolochainContentService {
       return of({ totalCount: 0, byType: {} });
     }
 
-    this.statsCache$ ??= defer(() =>
-      from(this.fetchStats())
-    ).pipe(
+    this.statsCache$ ??= defer(() => from(this.fetchStats())).pipe(
       shareReplay(1),
       catchError(() => of({ totalCount: 0, byType: {} }))
     );
@@ -1204,7 +1212,10 @@ export class HolochainContentService {
 
       if (result.success) {
         this.availableSignal.set(true);
-        console.log('[HolochainContent] Service available, content count:', result.data?.totalCount);
+        console.log(
+          '[HolochainContent] Service available, content count:',
+          result.data?.totalCount
+        );
         return true;
       }
 
@@ -1359,7 +1370,9 @@ export class HolochainContentService {
   /**
    * Create a content attestation.
    */
-  async createContentAttestation(input: CreateContentAttestationInput): Promise<HolochainContentAttestationOutput | null> {
+  async createContentAttestation(
+    input: CreateContentAttestationInput
+  ): Promise<HolochainContentAttestationOutput | null> {
     const result = await this.holochainClient.callZome<HolochainContentAttestationOutput>({
       zomeName: 'content_store',
       fnName: 'create_content_attestation',
@@ -1410,7 +1423,9 @@ export class HolochainContentService {
   /**
    * Query content attestations with filters.
    */
-  async queryContentAttestations(input: QueryContentAttestationsInput): Promise<HolochainContentAttestationOutput[]> {
+  async queryContentAttestations(
+    input: QueryContentAttestationsInput
+  ): Promise<HolochainContentAttestationOutput[]> {
     const result = await this.holochainClient.callZome<HolochainContentAttestationOutput[]>({
       zomeName: 'content_store',
       fnName: 'query_content_attestations',
@@ -1427,7 +1442,9 @@ export class HolochainContentService {
   /**
    * Update a content attestation.
    */
-  async updateContentAttestation(input: UpdateContentAttestationInput): Promise<HolochainContentAttestationOutput | null> {
+  async updateContentAttestation(
+    input: UpdateContentAttestationInput
+  ): Promise<HolochainContentAttestationOutput | null> {
     const result = await this.holochainClient.callZome<HolochainContentAttestationOutput>({
       zomeName: 'content_store',
       fnName: 'update_content_attestation',
@@ -1444,7 +1461,9 @@ export class HolochainContentService {
   /**
    * Revoke a content attestation.
    */
-  async revokeContentAttestation(input: RevokeContentAttestationInput): Promise<HolochainContentAttestationOutput | null> {
+  async revokeContentAttestation(
+    input: RevokeContentAttestationInput
+  ): Promise<HolochainContentAttestationOutput | null> {
     const result = await this.holochainClient.callZome<HolochainContentAttestationOutput>({
       zomeName: 'content_store',
       fnName: 'revoke_content_attestation',
@@ -1488,7 +1507,10 @@ export class HolochainContentService {
    * @deprecated Use ContentService.getContentGraph() instead.
    * This method will be removed in a future release.
    */
-  async getContentGraph(contentId: string, relationshipTypes?: string[]): Promise<HolochainContentGraph | null> {
+  async getContentGraph(
+    contentId: string,
+    relationshipTypes?: string[]
+  ): Promise<HolochainContentGraph | null> {
     const input: QueryRelatedContentInput = {
       content_id: contentId,
       relationship_types: relationshipTypes,
@@ -1581,7 +1603,9 @@ export class HolochainContentService {
    * @deprecated Use ContentService.queryPathExtensions() instead.
    * This method will be removed in a future release.
    */
-  async queryPathExtensions(input: QueryPathExtensionsInput): Promise<HolochainPathExtensionOutput[]> {
+  async queryPathExtensions(
+    input: QueryPathExtensionsInput
+  ): Promise<HolochainPathExtensionOutput[]> {
     const result = await this.holochainClient.callZome<HolochainPathExtensionOutput[]>({
       zomeName: 'content_store',
       fnName: 'query_path_extensions',
@@ -1738,7 +1762,9 @@ export class HolochainContentService {
   /**
    * Get governance state for an entity.
    */
-  async getGovernanceState(input: GetGovernanceStateInput): Promise<HolochainGovernanceStateOutput | null> {
+  async getGovernanceState(
+    input: GetGovernanceStateInput
+  ): Promise<HolochainGovernanceStateOutput | null> {
     const result = await this.holochainClient.callZome<HolochainGovernanceStateOutput | null>({
       zomeName: 'content_store',
       fnName: 'get_governance_state',
@@ -1755,7 +1781,9 @@ export class HolochainContentService {
   /**
    * Query governance states.
    */
-  async queryGovernanceStates(input: QueryGovernanceStatesInput): Promise<HolochainGovernanceStateOutput[]> {
+  async queryGovernanceStates(
+    input: QueryGovernanceStatesInput
+  ): Promise<HolochainGovernanceStateOutput[]> {
     const result = await this.holochainClient.callZome<HolochainGovernanceStateOutput[]>({
       zomeName: 'content_store',
       fnName: 'query_governance_states',
@@ -1822,7 +1850,7 @@ export class HolochainContentService {
       return [];
     }
 
-    return result.data.map((output) => this.transformToContentNode(output));
+    return result.data.map(output => this.transformToContentNode(output));
   }
 
   /**
@@ -1856,7 +1884,7 @@ export class HolochainContentService {
     const entry = output.content;
 
     // Use parsed metadata from Rust API
-    const metadata: ContentMetadata = entry.metadata as any ?? {};
+    const metadata: ContentMetadata = (entry.metadata as any) ?? {};
 
     return {
       id: entry.id,
@@ -1885,17 +1913,17 @@ export class HolochainContentService {
   private mapReachLevel(reach: string): ContentNode['reach'] {
     // Handle various reach string formats
     const reachMap: Record<string, ContentNode['reach']> = {
-      'private': 'private',
-      'invited': 'invited',
-      'local': 'local',
-      'neighborhood': 'neighborhood',
-      'municipal': 'municipal',
-      'community': 'municipal',       // Alias: community → municipal
-      'bioregional': 'bioregional',
-      'regional': 'regional',
-      'federated': 'regional',        // Alias: federated → regional
-      'commons': 'commons',
-      'public': 'commons',            // Alias: public → commons
+      private: 'private',
+      invited: 'invited',
+      local: 'local',
+      neighborhood: 'neighborhood',
+      municipal: 'municipal',
+      community: 'municipal', // Alias: community → municipal
+      bioregional: 'bioregional',
+      regional: 'regional',
+      federated: 'regional', // Alias: federated → regional
+      commons: 'commons',
+      public: 'commons', // Alias: public → commons
     };
 
     return reachMap[reach.toLowerCase()] ?? 'commons';

@@ -18,8 +18,7 @@
  */
 
 import { Injectable, inject, signal, computed } from '@angular/core';
-import { DoorwayRegistryService } from './doorway-registry.service';
-import { IdentityService } from './identity.service';
+
 import {
   type RecoveryRequest,
   type RecoveryAttestation,
@@ -33,6 +32,9 @@ import {
   type RecoveryRequestStatus,
   calculateProgress,
 } from '../models/recovery.model';
+
+import { DoorwayRegistryService } from './doorway-registry.service';
+import { IdentityService } from './identity.service';
 
 /** Recovery request expiry (7 days) */
 const RECOVERY_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
@@ -257,7 +259,7 @@ export class RecoveryCoordinatorService {
       }
 
       // Credential is now claimed
-      this._credential.update(c => c ? { ...c, claimed: true } : null);
+      this._credential.update(c => (c ? { ...c, claimed: true } : null));
 
       // Clear request
       this._activeRequest.set(null);
@@ -344,10 +346,9 @@ export class RecoveryCoordinatorService {
     if (!doorwayUrl) return [];
 
     try {
-      const response = await fetch(
-        `${doorwayUrl}/api/recovery/${requestId}/interview/questions`,
-        { credentials: 'include' }
-      );
+      const response = await fetch(`${doorwayUrl}/api/recovery/${requestId}/interview/questions`, {
+        credentials: 'include',
+      });
 
       if (!response.ok) return [];
 
@@ -385,10 +386,14 @@ export class RecoveryCoordinatorService {
       const data = await response.json();
 
       // Update interview with new response
-      this._conductingInterview.update(i => i ? {
-        ...i,
-        responses: [...i.responses, data.response],
-      } : null);
+      this._conductingInterview.update(i =>
+        i
+          ? {
+              ...i,
+              responses: [...i.responses, data.response],
+            }
+          : null
+      );
 
       return data.response;
     } catch (err) {

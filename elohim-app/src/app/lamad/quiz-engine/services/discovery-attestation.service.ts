@@ -14,6 +14,9 @@
  */
 
 import { Injectable, inject, signal, computed } from '@angular/core';
+
+import { type Attestation } from '@app/imagodei/models/attestations.model';
+
 import {
   type DiscoveryAssessment,
   type DiscoveryResult,
@@ -26,7 +29,6 @@ import {
   getFrameworkDisplayName,
   getCategoryIcon,
 } from '../models/discovery-assessment.model';
-import { type Attestation } from '@app/imagodei/models/attestations.model';
 
 // =============================================================================
 // Storage Keys
@@ -132,7 +134,7 @@ export class DiscoveryAttestationService {
     assessment: DiscoveryAssessment,
     subscaleScores: Record<string, number>,
     primaryType: DiscoveryResultSummary,
-    secondaryTypes?: DiscoveryResultSummary[],
+    secondaryTypes?: DiscoveryResultSummary[]
   ): DiscoveryResult {
     const now = new Date().toISOString();
     const id = `discovery-${assessment.id}-${Date.now()}`;
@@ -150,8 +152,8 @@ export class DiscoveryAttestationService {
       secondaryTypes,
       subscaleScores,
       displayString: '', // Will be set below
-      shortDisplay: '',  // Will be set below
-      isPublic: true,    // Default to public, user can change
+      shortDisplay: '', // Will be set below
+      isPublic: true, // Default to public, user can change
     };
 
     // Generate display strings
@@ -214,7 +216,7 @@ export class DiscoveryAttestationService {
    */
   updateVisibility(
     resultId: string,
-    visibility: 'private' | 'trusted' | 'community' | 'public',
+    visibility: 'private' | 'trusted' | 'community' | 'public'
   ): void {
     // Update result
     this.resultsSignal.update(results =>
@@ -229,7 +231,14 @@ export class DiscoveryAttestationService {
     this.attestationsSignal.update(attestations =>
       attestations.map(a =>
         a.result.id === resultId
-          ? { ...a, visibility, result: { ...a.result, isPublic: visibility === 'public' || visibility === 'community' } }
+          ? {
+              ...a,
+              visibility,
+              result: {
+                ...a.result,
+                isPublic: visibility === 'public' || visibility === 'community',
+              },
+            }
           : a
       )
     );
@@ -242,11 +251,7 @@ export class DiscoveryAttestationService {
    */
   toggleFeatured(resultId: string): void {
     this.attestationsSignal.update(attestations =>
-      attestations.map(a =>
-        a.result.id === resultId
-          ? { ...a, featured: !a.featured }
-          : a
-      )
+      attestations.map(a => (a.result.id === resultId ? { ...a, featured: !a.featured } : a))
     );
 
     this.saveToStorage();
@@ -257,11 +262,7 @@ export class DiscoveryAttestationService {
    */
   updateDisplayOrder(resultId: string, newOrder: number): void {
     this.attestationsSignal.update(attestations =>
-      attestations.map(a =>
-        a.result.id === resultId
-          ? { ...a, displayOrder: newOrder }
-          : a
-      )
+      attestations.map(a => (a.result.id === resultId ? { ...a, displayOrder: newOrder } : a))
     );
 
     this.saveToStorage();
@@ -272,18 +273,12 @@ export class DiscoveryAttestationService {
    */
   addReflection(resultId: string, reflection: string): void {
     this.resultsSignal.update(results =>
-      results.map(r =>
-        r.id === resultId
-          ? { ...r, reflection }
-          : r
-      )
+      results.map(r => (r.id === resultId ? { ...r, reflection } : r))
     );
 
     this.attestationsSignal.update(attestations =>
       attestations.map(a =>
-        a.result.id === resultId
-          ? { ...a, result: { ...a.result, reflection } }
-          : a
+        a.result.id === resultId ? { ...a, result: { ...a.result, reflection } } : a
       )
     );
 
@@ -370,13 +365,13 @@ export class DiscoveryAttestationService {
   } {
     const colors: Record<DiscoveryCategory, string> = {
       personality: '#8B5CF6', // Purple
-      strengths: '#10B981',   // Green
-      values: '#F59E0B',      // Amber
-      learning: '#3B82F6',    // Blue
-      emotional: '#EC4899',   // Pink
-      relational: '#F97316',  // Orange
-      vocational: '#6366F1',  // Indigo
-      spiritual: '#14B8A6',   // Teal
+      strengths: '#10B981', // Green
+      values: '#F59E0B', // Amber
+      learning: '#3B82F6', // Blue
+      emotional: '#EC4899', // Pink
+      relational: '#F97316', // Orange
+      vocational: '#6366F1', // Indigo
+      spiritual: '#14B8A6', // Teal
     };
 
     return {
@@ -431,10 +426,7 @@ export class DiscoveryAttestationService {
 
   private saveToStorage(): void {
     try {
-      localStorage.setItem(
-        STORAGE_KEYS.DISCOVERY_RESULTS,
-        JSON.stringify(this.resultsSignal())
-      );
+      localStorage.setItem(STORAGE_KEYS.DISCOVERY_RESULTS, JSON.stringify(this.resultsSignal()));
       localStorage.setItem(
         STORAGE_KEYS.DISCOVERY_ATTESTATIONS,
         JSON.stringify(this.attestationsSignal())

@@ -23,8 +23,8 @@
         *ngFor="let position of positions; let i = index"
         class="pie-segment"
         [style]="getSegmentStyle(position, i)"
-        [class.has-votes]="voteResults[position.id] > 0">
-      </div>
+        [class.has-votes]="voteResults[position.id] > 0"
+      ></div>
       <div class="pie-center">
         <span class="vote-count">{{ voteResults.total }}</span>
         <span class="vote-label">votes</span>
@@ -35,11 +35,14 @@
       <div
         *ngFor="let position of positions"
         class="legend-item"
-        [class.has-votes]="voteResults[position.id] > 0">
+        [class.has-votes]="voteResults[position.id] > 0"
+      >
         <span class="legend-dot" [style.background-color]="position.color"></span>
         <span class="legend-label">{{ position.label }}</span>
         <span class="legend-count">{{ voteResults[position.id] }}</span>
-        <span class="legend-percent">({{ getVotePercentage(position.id) | number:'1.0-0' }}%)</span>
+        <span class="legend-percent">
+          ({{ getVotePercentage(position.id) | number: '1.0-0' }}%)
+        </span>
       </div>
     </div>
   </div>
@@ -61,8 +64,8 @@
       <div
         class="quorum-fill"
         [style.width.%]="quorumProgress > 100 ? 100 : quorumProgress"
-        [class.complete]="quorumMet">
-      </div>
+        [class.complete]="quorumMet"
+      ></div>
     </div>
   </div>
 
@@ -80,7 +83,8 @@
         [style.--position-color]="position.color"
         [attr.aria-label]="position.description"
         (click)="selectPosition(position)"
-        type="button">
+        type="button"
+      >
         <span class="position-icon">{{ position.icon }}</span>
         <span class="position-label">{{ position.label }}</span>
         <span class="position-description">{{ position.description }}</span>
@@ -93,31 +97,38 @@
     <!-- Current Vote Indicator -->
     <div class="current-vote" *ngIf="currentVote">
       <span class="current-vote-label">Your position:</span>
-      <span
-        class="current-vote-badge"
-        [style.background-color]="getPosition(currentVote)?.color">
+      <span class="current-vote-badge" [style.background-color]="getPosition(currentVote)?.color">
         {{ getPosition(currentVote)?.icon }} {{ getPosition(currentVote)?.label }}
       </span>
     </div>
 
     <!-- Reasoning Field -->
-    <div class="reasoning-section" *ngIf="showReasoningField || getPosition(currentVote!)?.requiresReasoning">
+    <div
+      class="reasoning-section"
+      *ngIf="showReasoningField || getPosition(currentVote!)?.requiresReasoning"
+    >
       <label class="reasoning-label">
-        {{ getPosition(currentVote!)?.requiresReasoning ? 'Explain your objection:' : 'Add reasoning (optional):' }}
+        {{
+          getPosition(currentVote!)?.requiresReasoning
+            ? 'Explain your objection:'
+            : 'Add reasoning (optional):'
+        }}
         <span class="required" *ngIf="getPosition(currentVote!)?.requiresReasoning">*</span>
       </label>
       <textarea
         [(ngModel)]="reasoning"
         rows="3"
-        placeholder="{{ getPosition(currentVote!)?.requiresReasoning
-          ? 'Please explain the principled basis for your objection (minimum 20 characters)...'
-          : 'Share your perspective...' }}"
+        placeholder="{{
+          getPosition(currentVote!)?.requiresReasoning
+            ? 'Please explain the principled basis for your objection (minimum 20 characters)...'
+            : 'Share your perspective...'
+        }}"
         class="reasoning-textarea"
-        [class.error]="getPosition(currentVote!)?.requiresReasoning && !reasoningValid">
-      </textarea>
+        [class.error]="getPosition(currentVote!)?.requiresReasoning && !reasoningValid"
+      ></textarea>
       <p class="reasoning-hint" *ngIf="getPosition(currentVote!)?.requiresReasoning">
-        Blocking requires a substantive objection based on constitutional principles.
-        This ensures accountability while protecting minority voices.
+        Blocking requires a substantive objection based on constitutional principles. This ensures
+        accountability while protecting minority voices.
       </p>
       <p class="char-count" *ngIf="getPosition(currentVote!)?.requiresReasoning">
         {{ reasoning.length }} / 20 minimum characters
@@ -130,15 +141,14 @@
         class="submit-btn"
         [disabled]="!canSubmit || isSubmitting"
         (click)="submitVote()"
-        type="button">
+        type="button"
+      >
         <span *ngIf="!isSubmitting">
           {{ hasExistingVote ? 'Update Vote' : 'Submit Vote' }}
         </span>
         <span *ngIf="isSubmitting">Submitting...</span>
       </button>
-      <p class="changeable-note">
-        Votes can be changed until voting closes.
-      </p>
+      <p class="changeable-note">Votes can be changed until voting closes.</p>
     </div>
   </div>
 </div>

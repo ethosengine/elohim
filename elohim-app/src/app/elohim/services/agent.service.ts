@@ -1,17 +1,31 @@
 import { Injectable, Optional, OnDestroy } from '@angular/core';
-import { BehaviorSubject, Observable, of, Subject } from 'rxjs';
+
 import { map, tap, switchMap, take, takeUntil } from 'rxjs/operators';
+
+import { BehaviorSubject, Observable, of, Subject } from 'rxjs';
+
+import { SessionHumanService } from '../../imagodei/services/session-human.service';
+import {
+  AccessLevel,
+  ContentAccessMetadata,
+  AccessCheckResult,
+} from '../../lamad/models/content-access.model';
+import {
+  Agent,
+  AgentProgress,
+  FrontierItem,
+  MasteryLevel,
+  MASTERY_LEVEL_VALUES,
+} from '../models/agent.model';
+
 import { DataLoaderService } from './data-loader.service';
 
 // Models from elohim (local)
-import { Agent, AgentProgress, FrontierItem, MasteryLevel, MASTERY_LEVEL_VALUES } from '../models/agent.model';
 
 // Models from lamad pillar (content-specific access control)
-import { AccessLevel, ContentAccessMetadata, AccessCheckResult } from '../../lamad/models/content-access.model';
 
 // Services from imagodei pillar (identity)
 // Using relative import for now; will update to @app/imagodei after full migration
-import { SessionHumanService } from '../../imagodei/services/session-human.service';
 
 /**
  * AgentService - Manages the current agent (session or authenticated).
@@ -61,9 +75,7 @@ export class AgentService implements OnDestroy {
   private initializeAgent(): void {
     if (this.sessionHumanService) {
       // Create agent from session
-      this.sessionHumanService.session$.pipe(
-        takeUntil(this.destroy$)
-      ).subscribe(session => {
+      this.sessionHumanService.session$.pipe(takeUntil(this.destroy$)).subscribe(session => {
         if (session) {
           const agent: Agent = {
             id: session.sessionId,
@@ -224,7 +236,7 @@ export class AgentService implements OnDestroy {
           stepAffinity: {},
           stepNotes: {},
           reflectionResponses: {},
-          attestationsEarned: []
+          attestationsEarned: [],
         };
 
         // Check if this is starting a new path
@@ -235,10 +247,7 @@ export class AgentService implements OnDestroy {
           progress.completedStepIndices.sort((a, b) => a - b);
         }
 
-        progress.currentStepIndex = Math.max(
-          progress.currentStepIndex,
-          stepIndex + 1
-        );
+        progress.currentStepIndex = Math.max(progress.currentStepIndex, stepIndex + 1);
         progress.lastActivityAt = now;
 
         this.progressCache.set(pathId, progress);
@@ -253,9 +262,9 @@ export class AgentService implements OnDestroy {
 
         // Track content completion globally if resourceId provided
         if (resourceId) {
-          return this.dataLoader.saveAgentProgress(progress).pipe(
-            switchMap(() => this.completeContentNode(resourceId, agentId))
-          );
+          return this.dataLoader
+            .saveAgentProgress(progress)
+            .pipe(switchMap(() => this.completeContentNode(resourceId, agentId)));
         }
 
         return this.dataLoader.saveAgentProgress(progress);
@@ -305,7 +314,7 @@ export class AgentService implements OnDestroy {
           stepAffinity: {},
           stepNotes: {},
           reflectionResponses: {},
-          attestationsEarned: []
+          attestationsEarned: [],
         };
 
         progress.stepNotes[stepIndex] = notes;
@@ -326,7 +335,11 @@ export class AgentService implements OnDestroy {
   /**
    * Save reflection responses for a step.
    */
-  saveReflectionResponses(pathId: string, stepIndex: number, responses: string[]): Observable<void> {
+  saveReflectionResponses(
+    pathId: string,
+    stepIndex: number,
+    responses: string[]
+  ): Observable<void> {
     return this.getProgressForPath(pathId).pipe(
       switchMap(existingProgress => {
         if (!existingProgress) {
@@ -395,7 +408,7 @@ export class AgentService implements OnDestroy {
           stepNotes: {},
           reflectionResponses: {},
           attestationsEarned: [],
-          completedContentIds: []
+          completedContentIds: [],
         };
 
         // Add to completed content (avoid duplicates)
@@ -570,7 +583,7 @@ export class AgentService implements OnDestroy {
               frontier.push({
                 pathId: progress.pathId,
                 nextStepIndex: progress.currentStepIndex,
-                lastActivity: progress.lastActivityAt
+                lastActivity: progress.lastActivityAt,
               });
             }
           }
@@ -581,8 +594,8 @@ export class AgentService implements OnDestroy {
     }
 
     // Sort by most recent activity
-    frontier.sort((a, b) =>
-      new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+    frontier.sort(
+      (a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
     );
 
     return of(frontier);
@@ -648,11 +661,14 @@ export class AgentService implements OnDestroy {
       ...dateMetrics,
       ...pathMetrics,
       ...affinityMetrics,
-      ...attestationMetrics
+      ...attestationMetrics,
     };
   }
 
-  private calculateBasicCounts(pathProgress: AgentProgress[], globalProgress: AgentProgress | undefined): {
+  private calculateBasicCounts(
+    pathProgress: AgentProgress[],
+    globalProgress: AgentProgress | undefined
+  ): {
     totalPathsStarted: number;
     totalPathsCompleted: number;
     totalContentNodesCompleted: number;
@@ -662,7 +678,7 @@ export class AgentService implements OnDestroy {
       totalPathsStarted: pathProgress.length,
       totalPathsCompleted: pathProgress.filter(p => p.completedAt).length,
       totalContentNodesCompleted: globalProgress?.completedContentIds?.length ?? 0,
-      totalStepsCompleted: pathProgress.reduce((sum, p) => sum + p.completedStepIndices.length, 0)
+      totalStepsCompleted: pathProgress.reduce((sum, p) => sum + p.completedStepIndices.length, 0),
     };
   }
 
@@ -677,27 +693,36 @@ export class AgentService implements OnDestroy {
     let lastActivityDate = '';
 
     if (pathProgress.length > 0) {
-      const startDates = pathProgress.map(p => new Date(p.startedAt).getTime()).filter(d => !isNaN(d));
-      const endDates = pathProgress.map(p => new Date(p.lastActivityAt).getTime()).filter(d => !isNaN(d));
+      const startDates = pathProgress
+        .map(p => new Date(p.startedAt).getTime())
+        .filter(d => !isNaN(d));
+      const endDates = pathProgress
+        .map(p => new Date(p.lastActivityAt).getTime())
+        .filter(d => !isNaN(d));
 
-      if (startDates.length > 0) firstActivityDate = new Date(Math.min(...startDates)).toISOString();
+      if (startDates.length > 0)
+        firstActivityDate = new Date(Math.min(...startDates)).toISOString();
       if (endDates.length > 0) lastActivityDate = new Date(Math.max(...endDates)).toISOString();
     }
 
-    const totalLearningTime = firstActivityDate && lastActivityDate
-      ? Math.floor((new Date(lastActivityDate).getTime() - new Date(firstActivityDate).getTime()) / (1000 * 60 * 60 * 24))
-      : 0;
+    const totalLearningTime =
+      firstActivityDate && lastActivityDate
+        ? Math.floor(
+            (new Date(lastActivityDate).getTime() - new Date(firstActivityDate).getTime()) /
+              (1000 * 60 * 60 * 24)
+          )
+        : 0;
 
-    const activityDates = Array.from(new Set(
-      pathProgress.map(p => new Date(p.lastActivityAt).toISOString().split('T')[0])
-    ));
+    const activityDates = Array.from(
+      new Set(pathProgress.map(p => new Date(p.lastActivityAt).toISOString().split('T')[0]))
+    );
 
     return {
       firstActivityDate,
       lastActivityDate,
       totalLearningTime,
       currentStreak: this.calculateCurrentStreak(activityDates),
-      longestStreak: this.calculateLongestStreak(activityDates)
+      longestStreak: this.calculateLongestStreak(activityDates),
     };
   }
 
@@ -714,11 +739,14 @@ export class AgentService implements OnDestroy {
       }
     }
 
-    const mostRecentPathId = pathProgress.length > 0
-      ? pathProgress.reduce((latest, p) =>
-          new Date(p.lastActivityAt) > new Date(latest.lastActivityAt) ? p : latest, pathProgress[0]
-        ).pathId
-      : null;
+    const mostRecentPathId =
+      pathProgress.length > 0
+        ? pathProgress.reduce(
+            (latest, p) =>
+              new Date(p.lastActivityAt) > new Date(latest.lastActivityAt) ? p : latest,
+            pathProgress[0]
+          ).pathId
+        : null;
 
     return { mostActivePathId, mostRecentPathId };
   }
@@ -740,7 +768,7 @@ export class AgentService implements OnDestroy {
       if (affinityValues.length > 0) {
         pathAffinities.set(p.pathId, {
           sum: affinityValues.reduce((sum, a) => sum + a, 0),
-          count: affinityValues.length
+          count: affinityValues.length,
         });
       }
     }
@@ -752,7 +780,7 @@ export class AgentService implements OnDestroy {
 
     return {
       averageAffinity: affinityCount > 0 ? totalAffinity / affinityCount : 0,
-      highAffinityPaths
+      highAffinityPaths,
     };
   }
 
@@ -768,7 +796,7 @@ export class AgentService implements OnDestroy {
     }
     return {
       totalAttestationsEarned: allAttestations.size,
-      attestationIds: Array.from(allAttestations)
+      attestationIds: Array.from(allAttestations),
     };
   }
 
@@ -780,9 +808,7 @@ export class AgentService implements OnDestroy {
     if (activityDates.length === 0) return 0;
 
     // Sort dates descending (most recent first)
-    const sorted = activityDates
-      .map(d => new Date(d))
-      .sort((a, b) => b.getTime() - a.getTime());
+    const sorted = activityDates.map(d => new Date(d)).sort((a, b) => b.getTime() - a.getTime());
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -815,9 +841,7 @@ export class AgentService implements OnDestroy {
     if (activityDates.length === 0) return 0;
 
     // Sort dates ascending
-    const sorted = activityDates
-      .map(d => new Date(d))
-      .sort((a, b) => a.getTime() - b.getTime());
+    const sorted = activityDates.map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime());
 
     let longestStreak = 1;
     let currentStreak = 1;

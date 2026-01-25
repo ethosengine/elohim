@@ -10,10 +10,13 @@
  * - Encrypted tokens stored in Holochain DHT
  */
 
-import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, Subject, throwError, of, firstValueFrom } from 'rxjs';
+import { Injectable } from '@angular/core';
+
 import { catchError, retry, timeout, tap } from 'rxjs/operators';
+
+import { Observable, Subject, throwError, of, firstValueFrom } from 'rxjs';
+
 import { environment } from '../../../environments/environment';
 
 // Plaid configuration (stubbed - environment.plaid not yet configured)
@@ -47,13 +50,13 @@ interface PlaidOAuthCallback {
   publicToken: string;
   metadata: {
     institution: { name: string; institutionId: string };
-    accounts: Array<{
+    accounts: {
       id: string;
       name: string;
       subtype: string;
       type: string;
       mask?: string;
-    }>;
+    }[];
   };
 }
 
@@ -88,7 +91,9 @@ export class PlaidIntegrationService {
    * Note: Plaid integration is stubbed - environment.plaid config not yet added
    */
   private validateEnvironmentConfig(): void {
-    console.warn('[PlaidIntegration] STUB MODE: Plaid integration not configured - will use mock responses');
+    console.warn(
+      '[PlaidIntegration] STUB MODE: Plaid integration not configured - will use mock responses'
+    );
   }
 
   // ============================================================================
@@ -144,14 +149,9 @@ export class PlaidIntegrationService {
   async handlePlaidCallback(publicToken: string): Promise<PlaidConnection> {
     try {
       // Exchange public token for access token
-      const accessTokenResponse = await firstValueFrom(
-        this.exchangePublicToken(publicToken)
-      );
+      const accessTokenResponse = await firstValueFrom(this.exchangePublicToken(publicToken));
 
-      if (
-        !accessTokenResponse?.accessToken ||
-        !accessTokenResponse?.itemId
-      ) {
+      if (!accessTokenResponse?.accessToken || !accessTokenResponse?.itemId) {
         throw new Error('Invalid token exchange response');
       }
 
@@ -161,26 +161,20 @@ export class PlaidIntegrationService {
       );
 
       // Encrypt the access token before storing
-      const encryptedToken = await this.encryptAccessToken(
-        accessTokenResponse.accessToken
-      );
+      const encryptedToken = await this.encryptAccessToken(accessTokenResponse.accessToken);
 
       // Get account details
-      const accountsResponse = await this.getAccounts(
-        accessTokenResponse.accessToken
-      );
+      const accountsResponse = await this.getAccounts(accessTokenResponse.accessToken);
 
-      const linkedAccounts = (accountsResponse?.accounts || []).map(
-        (account: any) => ({
-          plaidAccountId: account.accountId,
-          plaidAccountName: account.name,
-          plaidAccountSubtype: account.subtype,
-          financialAssetId: '', // Will be linked by user in UI
-          balanceAmount: account.balances?.current || 0,
-          currency: account.balances?.isoCurrencyCode || 'USD',
-          lastLinkedAt: new Date().toISOString(),
-        })
-      );
+      const linkedAccounts = (accountsResponse?.accounts || []).map((account: any) => ({
+        plaidAccountId: account.accountId,
+        plaidAccountName: account.name,
+        plaidAccountSubtype: account.subtype,
+        financialAssetId: '', // Will be linked by user in UI
+        balanceAmount: account.balances?.current || 0,
+        currency: account.balances?.isoCurrencyCode || 'USD',
+        lastLinkedAt: new Date().toISOString(),
+      }));
 
       // Create PlaidConnection entity
       const connection: PlaidConnection = {
@@ -223,9 +217,7 @@ export class PlaidIntegrationService {
     ).pipe(
       catchError(error => {
         console.error('[PlaidIntegration] Token exchange failed', error);
-        return throwError(
-          () => new Error('Failed to exchange Plaid token')
-        );
+        return throwError(() => new Error('Failed to exchange Plaid token'));
       })
     );
   }
@@ -245,9 +237,7 @@ export class PlaidIntegrationService {
   ): Promise<PlaidTransaction[]> {
     try {
       // Decrypt access token
-      const accessToken = await this.decryptAccessToken(
-        connection.plaidAccessToken
-      );
+      const accessToken = await this.decryptAccessToken(connection.plaidAccessToken);
 
       let allTransactions: PlaidTransaction[] = [];
       let cursor: string | undefined;
@@ -256,13 +246,7 @@ export class PlaidIntegrationService {
       // Paginate through results
       do {
         const response = await firstValueFrom(
-          this.getTransactions(
-            accessToken,
-            dateRange.start,
-            dateRange.end,
-            cursor,
-            pageSize
-          )
+          this.getTransactions(accessToken, dateRange.start, dateRange.end, cursor, pageSize)
         );
 
         if (!response?.transactions) {
@@ -276,9 +260,7 @@ export class PlaidIntegrationService {
         await this.delay(100);
       } while (cursor);
 
-      console.log(
-        `[PlaidIntegration] Fetched ${allTransactions.length} transactions`
-      );
+      console.log(`[PlaidIntegration] Fetched ${allTransactions.length} transactions`);
       return allTransactions;
     } catch (error) {
       console.error('[PlaidIntegration] Transaction fetch failed', error);
@@ -290,18 +272,11 @@ export class PlaidIntegrationService {
    * Fetches recent transactions using sync API (incremental).
    * More efficient than full fetch for ongoing sync.
    */
-  async syncRecentTransactions(
-    connection: PlaidConnection,
-    cursor?: string
-  ): Promise<SyncResult> {
+  async syncRecentTransactions(connection: PlaidConnection, cursor?: string): Promise<SyncResult> {
     try {
-      const accessToken = await this.decryptAccessToken(
-        connection.plaidAccessToken
-      );
+      const accessToken = await this.decryptAccessToken(connection.plaidAccessToken);
 
-      const response = await firstValueFrom(
-        this.getTransactionSync(accessToken, cursor)
-      );
+      const response = await firstValueFrom(this.getTransactionSync(accessToken, cursor));
 
       if (!response) {
         throw new Error('No response from transaction sync');
@@ -357,10 +332,7 @@ export class PlaidIntegrationService {
   /**
    * Internal: Uses sync API for incremental transaction updates
    */
-  private getTransactionSync(
-    accessToken: string,
-    cursor?: string
-  ): Observable<any> {
+  private getTransactionSync(accessToken: string, cursor?: string): Observable<any> {
     const requestBody: any = {
       access_token: accessToken,
       options: {
@@ -385,9 +357,7 @@ export class PlaidIntegrationService {
    */
   async getAccounts(accessToken: string): Promise<any> {
     const decryptedToken = await this.decryptAccessToken(accessToken);
-    return firstValueFrom(
-      this.callPlaidAPI('/accounts/get', { access_token: decryptedToken })
-    );
+    return firstValueFrom(this.callPlaidAPI('/accounts/get', { access_token: decryptedToken }));
   }
 
   /**
@@ -404,18 +374,12 @@ export class PlaidIntegrationService {
    */
   async refreshConnection(connection: PlaidConnection): Promise<void> {
     try {
-      const accessToken = await this.decryptAccessToken(
-        connection.plaidAccessToken
-      );
+      const accessToken = await this.decryptAccessToken(connection.plaidAccessToken);
 
       // Force refresh of accounts and balances
-      await firstValueFrom(
-        this.callPlaidAPI('/accounts/get', { access_token: accessToken })
-      );
+      await firstValueFrom(this.callPlaidAPI('/accounts/get', { access_token: accessToken }));
 
-      console.log(
-        `[PlaidIntegration] Connection ${connection.connectionNumber} refreshed`
-      );
+      console.log(`[PlaidIntegration] Connection ${connection.connectionNumber} refreshed`);
     } catch (error) {
       console.error('[PlaidIntegration] Connection refresh failed', error);
       throw new Error('Failed to refresh connection: ' + String(error));
@@ -490,10 +454,7 @@ export class PlaidIntegrationService {
       );
       combined.set(iv, 0);
       combined.set(new Uint8Array(encryptedData), iv.length);
-      combined.set(
-        derivedKey.salt,
-        iv.length + new Uint8Array(encryptedData).length
-      );
+      combined.set(derivedKey.salt, iv.length + new Uint8Array(encryptedData).length);
 
       // Base64 encode for storage
       return btoa(String.fromCharCode.apply(null, Array.from(combined)));
@@ -540,9 +501,7 @@ export class PlaidIntegrationService {
   /**
    * Derives encryption key from steward context using PBKDF2
    */
-  private async deriveEncryptionKey(
-    salt?: Uint8Array
-  ): Promise<DerivedKey> {
+  private async deriveEncryptionKey(salt?: Uint8Array): Promise<DerivedKey> {
     try {
       // Use a combination of factors for key derivation
       // In production, this would use the steward's identity key
@@ -593,10 +552,7 @@ export class PlaidIntegrationService {
   /**
    * Makes a call to Plaid API with proper headers and error handling
    */
-  private callPlaidAPI<T = any>(
-    endpoint: string,
-    body: any
-  ): Observable<T> {
+  private callPlaidAPI<T = any>(endpoint: string, body: any): Observable<T> {
     const headers = new HttpHeaders({
       'Content-Type': 'application/json',
     });

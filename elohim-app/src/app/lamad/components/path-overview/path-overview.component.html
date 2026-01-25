@@ -12,9 +12,7 @@
     <div class="error-state">
       <h2>Unable to load path</h2>
       <p>{{ error }}</p>
-      <button class="btn btn-primary" (click)="goHome()">
-        Back to Home
-      </button>
+      <button class="btn btn-primary" (click)="goHome()">Back to Home</button>
     </div>
   }
 
@@ -44,7 +42,8 @@
         <p class="path-description">{{ path.description }}</p>
 
         <div class="path-purpose" *ngIf="path.purpose">
-          <strong>Goal:</strong> {{ path.purpose }}
+          <strong>Goal:</strong>
+          {{ path.purpose }}
         </div>
 
         <div class="path-tags" *ngIf="path.tags && path.tags.length > 0">
@@ -53,10 +52,12 @@
       </div>
 
       <div class="path-thumbnail-container">
-        <img [src]="path.thumbnailUrl || 'assets/images/path-placeholder.svg'"
-             [alt]="path.thumbnailAlt || path.title"
-             class="path-thumbnail-image"
-             (error)="onImageError($event)">
+        <img
+          [src]="path.thumbnailUrl || 'assets/images/path-placeholder.svg'"
+          [alt]="path.thumbnailAlt || path.title"
+          class="path-thumbnail-image"
+          (error)="onImageError($event)"
+        />
       </div>
     </div>
 
@@ -71,15 +72,21 @@
 
         <div class="territory-bar">
           <!-- Mastered Here -->
-          <div class="bar-segment mastered-here" 
-               [style.width.%]="pathCompletion?.stepCompletionPercentage"
-               title="Mastered in this journey"></div>
+          <div
+            class="bar-segment mastered-here"
+            [style.width.%]="pathCompletion?.stepCompletionPercentage"
+            title="Mastered in this journey"
+          ></div>
           <!-- Mastered Elsewhere -->
-          <div class="bar-segment mastered-elsewhere" 
-               [style.width.%]="(pathCompletion?.contentCompletionPercentage - pathCompletion?.stepCompletionPercentage)"
-               title="Mastered in other journeys"></div>
+          <div
+            class="bar-segment mastered-elsewhere"
+            [style.width.%]="
+              pathCompletion?.contentCompletionPercentage - pathCompletion?.stepCompletionPercentage
+            "
+            title="Mastered in other journeys"
+          ></div>
         </div>
-        
+
         <div class="shared-mastery-note" *ngIf="pathCompletion?.sharedContentCompleted > 0">
           <span class="checkmark-green">✓</span>
           {{ pathCompletion.sharedContentCompleted }} concepts mastered in other paths!
@@ -109,7 +116,9 @@
                   @if (item.chapter.estimatedDuration) {
                     <span class="duration-badge">⏱ {{ item.chapter.estimatedDuration }}</span>
                   }
-                  <span class="chapter-meta">{{ item.completedConcepts }}/{{ item.totalConcepts }}</span>
+                  <span class="chapter-meta">
+                    {{ item.completedConcepts }}/{{ item.totalConcepts }}
+                  </span>
                   <span class="chapter-percent">{{ item.completionPercentage }}%</span>
                 </div>
               </div>
@@ -139,15 +148,22 @@
                         </div>
                         <div class="module-header-right">
                           @if (mod.module.estimatedDuration) {
-                            <span class="duration-badge small">{{ mod.module.estimatedDuration }}</span>
+                            <span class="duration-badge small">
+                              {{ mod.module.estimatedDuration }}
+                            </span>
                           }
-                          <span class="module-meta">{{ mod.completedConcepts }}/{{ mod.totalConcepts }}</span>
+                          <span class="module-meta">
+                            {{ mod.completedConcepts }}/{{ mod.totalConcepts }}
+                          </span>
                         </div>
                       </div>
 
                       <!-- Module Progress Bar -->
                       <div class="module-bar-container">
-                        <div class="module-bar-fill" [style.width.%]="mod.completionPercentage"></div>
+                        <div
+                          class="module-bar-fill"
+                          [style.width.%]="mod.completionPercentage"
+                        ></div>
                       </div>
 
                       <!-- Module Body -->
@@ -157,7 +173,9 @@
                         }
 
                         <!-- Learning Objectives -->
-                        @if (mod.module.learningObjectives && mod.module.learningObjectives.length > 0) {
+                        @if (
+                          mod.module.learningObjectives && mod.module.learningObjectives.length > 0
+                        ) {
                           <div class="learning-objectives">
                             <span class="objectives-label">🎯 Learning Objectives:</span>
                             <ul class="objectives-list">
@@ -173,11 +191,13 @@
                           @for (sec of mod.sections; track sec.section.id; let secIdx = $index) {
                             <div class="section-card">
                               <!-- Section Header - clickable link to lesson view -->
-                              <a class="section-header section-link"
-                                 (click)="goToSection(sec.concepts.at(0)?.conceptId)"
-                                 (keydown.enter)="goToSection(sec.concepts.at(0)?.conceptId)"
-                                 role="link"
-                                 tabindex="0">
+                              <a
+                                class="section-header section-link"
+                                (click)="goToSection(sec.concepts.at(0)?.conceptId)"
+                                (keydown.enter)="goToSection(sec.concepts.at(0)?.conceptId)"
+                                role="link"
+                                tabindex="0"
+                              >
                                 <div class="section-header-left">
                                   <h5 class="section-title">{{ sec.section.title }}</h5>
                                   @if (sec.section.optional) {
@@ -186,12 +206,19 @@
                                 </div>
                                 <div class="section-header-right">
                                   @if (sec.section.estimatedDuration) {
-                                    <span class="duration-badge tiny">{{ sec.section.estimatedDuration }}</span>
+                                    <span class="duration-badge tiny">
+                                      {{ sec.section.estimatedDuration }}
+                                    </span>
                                   }
-                                  <span class="section-meta">{{ sec.completedConcepts }}/{{ sec.totalConcepts }}</span>
+                                  <span class="section-meta">
+                                    {{ sec.completedConcepts }}/{{ sec.totalConcepts }}
+                                  </span>
                                   <!-- Mini progress indicator -->
                                   <div class="section-mini-progress">
-                                    <div class="section-mini-fill" [style.width.%]="sec.completionPercentage"></div>
+                                    <div
+                                      class="section-mini-fill"
+                                      [style.width.%]="sec.completionPercentage"
+                                    ></div>
                                   </div>
                                   <span class="section-arrow">→</span>
                                 </div>
@@ -206,19 +233,29 @@
                                 <!-- Concepts -->
                                 @if (sec.concepts.length > 0) {
                                   <ul class="concept-list">
-                                    @for (concept of sec.concepts; track concept.conceptId || $index) {
-                                      <li class="concept-item"
-                                          [class.completed]="concept.isCompleted"
-                                          [class.global-complete]="concept.isGlobalCompletion"
-                                          (click)="goToConcept(concept.conceptId)"
-                                          (keydown.enter)="goToConcept(concept.conceptId)"
-                                          role="button"
-                                          tabindex="0">
+                                    @for (
+                                      concept of sec.concepts;
+                                      track concept.conceptId || $index
+                                    ) {
+                                      <li
+                                        class="concept-item"
+                                        [class.completed]="concept.isCompleted"
+                                        [class.global-complete]="concept.isGlobalCompletion"
+                                        (click)="goToConcept(concept.conceptId)"
+                                        (keydown.enter)="goToConcept(concept.conceptId)"
+                                        role="button"
+                                        tabindex="0"
+                                      >
                                         <span class="concept-status-icon">
                                           @if (concept.isCompleted) {
                                             <span class="checkmark">✓</span>
                                           } @else if (concept.isGlobalCompletion) {
-                                            <span class="checkmark global" title="Mastered in another journey">✓</span>
+                                            <span
+                                              class="checkmark global"
+                                              title="Mastered in another journey"
+                                            >
+                                              ✓
+                                            </span>
                                           } @else {
                                             <span class="circle">○</span>
                                           }
@@ -226,7 +263,9 @@
                                         <span class="concept-icon">{{ concept.icon }}</span>
                                         <span class="concept-name">{{ concept.title }}</span>
                                         @if (concept.contentType) {
-                                          <span class="content-type-tag">{{ concept.contentType }}</span>
+                                          <span class="content-type-tag">
+                                            {{ concept.contentType }}
+                                          </span>
                                         }
                                       </li>
                                     }
@@ -250,7 +289,7 @@
             </div>
           }
         </div>
-      } 
+      }
       <!-- Flat List Fallback -->
       @else {
         <ol class="steps-list">
@@ -284,8 +323,13 @@
                   <span class="step-icon">{{ s.icon }}</span>
                   <h3 class="step-title">{{ s.step.stepTitle }}</h3>
                   @if (s.masteryTier !== 'unseen') {
-                    <span class="mastery-badge" [class]="getMasteryTierClass(s.masteryTier)" [title]="getMasteryTierLabel(s.masteryTier)">
-                      {{ getMasteryTierIcon(s.masteryTier) }} {{ getMasteryTierLabel(s.masteryTier) }}
+                    <span
+                      class="mastery-badge"
+                      [class]="getMasteryTierClass(s.masteryTier)"
+                      [title]="getMasteryTierLabel(s.masteryTier)"
+                    >
+                      {{ getMasteryTierIcon(s.masteryTier) }}
+                      {{ getMasteryTierLabel(s.masteryTier) }}
                     </span>
                   }
                 </div>
@@ -314,7 +358,11 @@
           Path Completed!
         </div>
 
-        <button *ngIf="hasStarted() && !isCompleted()" class="btn btn-primary btn-large" (click)="continueJourney()">
+        <button
+          *ngIf="hasStarted() && !isCompleted()"
+          class="btn btn-primary btn-large"
+          (click)="continueJourney()"
+        >
           Continue Journey
         </button>
 
@@ -325,7 +373,8 @@
         <button class="btn btn-secondary" (click)="goHome()">Back to All Paths</button>
 
         <a [routerLink]="['/lamad/resource', 'path-' + pathId]" class="view-resource-link">
-          <span class="icon">↗</span> View as Content
+          <span class="icon">↗</span>
+          View as Content
         </a>
       </section>
 
@@ -338,10 +387,15 @@
               <div class="concept-chip" [class.mastered]="concept.completionPercentage === 100">
                 <div class="concept-header">
                   <span class="concept-title">{{ concept.title }}</span>
-                  <span class="concept-stats">{{ concept.completedSteps }}/{{ concept.totalSteps }}</span>
+                  <span class="concept-stats">
+                    {{ concept.completedSteps }}/{{ concept.totalSteps }}
+                  </span>
                 </div>
                 <div class="concept-bar">
-                  <div class="concept-bar-fill" [style.width.%]="concept.completionPercentage"></div>
+                  <div
+                    class="concept-bar-fill"
+                    [style.width.%]="concept.completionPercentage"
+                  ></div>
                 </div>
               </div>
             }
@@ -349,8 +403,6 @@
         </section>
       }
     </div>
-
-
 
     <!-- Path Metadata Footer -->
     <footer class="path-footer">

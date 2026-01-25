@@ -12,19 +12,21 @@
  * - Quick actions: claim stewardship, view details
  */
 
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { IdentityService } from '../../services/identity.service';
-import { PresenceService } from '../../services/presence.service';
-import {
-  StewardshipAllocationService,
-  type StewardPortfolio,
-} from '@app/lamad/services/stewardship-allocation.service';
+
 import {
   type StewardshipAllocation,
   type GovernanceState,
 } from '@app/lamad/models/stewardship-allocation.model';
+import {
+  StewardshipAllocationService,
+  type StewardPortfolio,
+} from '@app/lamad/services/stewardship-allocation.service';
+
+import { IdentityService } from '../../services/identity.service';
+import { PresenceService } from '../../services/presence.service';
 
 /** Display-ready allocation with content info */
 interface AllocationDisplay {
@@ -118,14 +120,12 @@ export class StewardshipDashboardComponent implements OnInit {
     this.error.set(null);
 
     this.stewardshipService.getStewardPortfolio(presenceId).subscribe({
-      next: (portfolio) => {
+      next: portfolio => {
         this.portfolio.set(portfolio);
-        this.allocations.set(
-          portfolio.allocations.map(a => this.toAllocationDisplay(a))
-        );
+        this.allocations.set(portfolio.allocations.map(a => this.toAllocationDisplay(a)));
         this.isLoading.set(false);
       },
-      error: (err) => {
+      error: err => {
         console.error('[StewardshipDashboard] Failed to load portfolio:', err);
         this.error.set('Failed to load stewardship portfolio.');
         this.isLoading.set(false);

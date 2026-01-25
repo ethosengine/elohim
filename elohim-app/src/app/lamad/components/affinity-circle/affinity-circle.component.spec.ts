@@ -7,7 +7,7 @@ describe('AffinityCircleComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [AffinityCircleComponent]
+      imports: [AffinityCircleComponent],
     }).compileComponents();
 
     fixture = TestBed.createComponent(AffinityCircleComponent);

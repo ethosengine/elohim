@@ -696,9 +696,33 @@ describe('RecoveryCoordinatorService', () => {
       const requestWithThreshold: RecoveryRequest = {
         ...mockRecoveryRequest,
         attestations: [
-          { id: 'a1', requestId: 'r', attesterId: 'x', attesterDisplayName: 'X', decision: 'affirm', confidence: 90, timestamp: new Date() },
-          { id: 'a2', requestId: 'r', attesterId: 'y', attesterDisplayName: 'Y', decision: 'affirm', confidence: 85, timestamp: new Date() },
-          { id: 'a3', requestId: 'r', attesterId: 'z', attesterDisplayName: 'Z', decision: 'affirm', confidence: 80, timestamp: new Date() },
+          {
+            id: 'a1',
+            requestId: 'r',
+            attesterId: 'x',
+            attesterDisplayName: 'X',
+            decision: 'affirm',
+            confidence: 90,
+            timestamp: new Date(),
+          },
+          {
+            id: 'a2',
+            requestId: 'r',
+            attesterId: 'y',
+            attesterDisplayName: 'Y',
+            decision: 'affirm',
+            confidence: 85,
+            timestamp: new Date(),
+          },
+          {
+            id: 'a3',
+            requestId: 'r',
+            attesterId: 'z',
+            attesterDisplayName: 'Z',
+            decision: 'affirm',
+            confidence: 80,
+            timestamp: new Date(),
+          },
         ],
       };
 
@@ -712,8 +736,24 @@ describe('RecoveryCoordinatorService', () => {
       const deniedRequest: RecoveryRequest = {
         ...mockRecoveryRequest,
         attestations: [
-          { id: 'a1', requestId: 'r', attesterId: 'x', attesterDisplayName: 'X', decision: 'deny', confidence: 90, timestamp: new Date() },
-          { id: 'a2', requestId: 'r', attesterId: 'y', attesterDisplayName: 'Y', decision: 'deny', confidence: 85, timestamp: new Date() },
+          {
+            id: 'a1',
+            requestId: 'r',
+            attesterId: 'x',
+            attesterDisplayName: 'X',
+            decision: 'deny',
+            confidence: 90,
+            timestamp: new Date(),
+          },
+          {
+            id: 'a2',
+            requestId: 'r',
+            attesterId: 'y',
+            attesterDisplayName: 'Y',
+            decision: 'deny',
+            confidence: 85,
+            timestamp: new Date(),
+          },
         ],
       };
 

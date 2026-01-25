@@ -1,10 +1,19 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, forkJoin } from 'rxjs';
+
 import { map, switchMap, catchError } from 'rxjs/operators';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { ContentNode, ContentType, ContentReach, ContentPreview } from '../models/content-node.model';
-import { LearningPath } from '../models/learning-path.model';
+
+import { Observable, of, forkJoin } from 'rxjs';
+
 import { AgentService } from '@app/elohim/services/agent.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+
+import {
+  ContentNode,
+  ContentType,
+  ContentReach,
+  ContentPreview,
+} from '../models/content-node.model';
+import { LearningPath } from '../models/learning-path.model';
 
 /**
  * Content index entry (metadata only).
@@ -59,7 +68,7 @@ const REACH_HIERARCHY: ContentReach[] = [
   'municipal',
   'bioregional',
   'regional',
-  'commons'
+  'commons',
 ];
 
 /**
@@ -100,9 +109,7 @@ export class ContentService {
    * The caller should load specific related resources as needed.
    */
   getRelatedResourceIds(resourceId: string): Observable<string[]> {
-    return this.dataLoader.getContent(resourceId).pipe(
-      map(node => node.relatedNodeIds ?? [])
-    );
+    return this.dataLoader.getContent(resourceId).pipe(map(node => node.relatedNodeIds ?? []));
   }
 
   /**
@@ -115,9 +122,9 @@ export class ContentService {
         if (relatedIndex < 0 || relatedIndex >= relatedIds.length) {
           return of(null);
         }
-        return this.dataLoader.getContent(relatedIds[relatedIndex]).pipe(
-          catchError(() => of(null))
-        );
+        return this.dataLoader
+          .getContent(relatedIds[relatedIndex])
+          .pipe(catchError(() => of(null)));
       })
     );
   }
@@ -134,10 +141,11 @@ export class ContentService {
         }
 
         const lowerQuery = query.toLowerCase().trim();
-        return (index.nodes ?? []).filter((node: ContentIndexEntry) =>
-          node.title.toLowerCase().includes(lowerQuery) ||
-          node.description?.toLowerCase().includes(lowerQuery) ||
-          node.tags?.some((tag: string) => tag.toLowerCase().includes(lowerQuery))
+        return (index.nodes ?? []).filter(
+          (node: ContentIndexEntry) =>
+            node.title.toLowerCase().includes(lowerQuery) ||
+            node.description?.toLowerCase().includes(lowerQuery) ||
+            node.tags?.some((tag: string) => tag.toLowerCase().includes(lowerQuery))
         );
       })
     );
@@ -231,7 +239,7 @@ export class ContentService {
           return {
             canAccess: true,
             content,
-            agentReach
+            agentReach,
           } as ContentAccessResult;
         } else {
           const reason: 'unauthenticated' | 'insufficient-reach' =
@@ -240,14 +248,16 @@ export class ContentService {
             canAccess: false,
             reason,
             requiredReach: contentReach,
-            agentReach
+            agentReach,
           } as ContentAccessResult;
         }
       }),
-      catchError(() => of({
-        canAccess: false,
-        reason: 'not-found' as const
-      }))
+      catchError(() =>
+        of({
+          canAccess: false,
+          reason: 'not-found' as const,
+        })
+      )
     );
   }
 
@@ -294,7 +304,10 @@ export class ContentService {
     const attestations = this.agentService.getAttestations();
 
     // Check attestations to determine reach level (geographic scope)
-    if (attestations.includes('commons-contributor') || attestations.includes('governance-ratifier')) {
+    if (
+      attestations.includes('commons-contributor') ||
+      attestations.includes('governance-ratifier')
+    ) {
       return 'commons';
     }
     if (attestations.includes('regional-member') || attestations.includes('peer-reviewer')) {
@@ -303,7 +316,10 @@ export class ContentService {
     if (attestations.includes('bioregional-member')) {
       return 'bioregional';
     }
-    if (attestations.includes('municipal-member') || attestations.includes('path-completion:elohim-protocol')) {
+    if (
+      attestations.includes('municipal-member') ||
+      attestations.includes('path-completion:elohim-protocol')
+    ) {
       return 'municipal';
     }
     if (attestations.includes('neighborhood-member')) {
@@ -368,7 +384,7 @@ export class ContentService {
     return {
       path,
       stepIndex,
-      stepNarrative: path.steps[stepIndex].stepNarrative
+      stepNarrative: path.steps[stepIndex].stepNarrative,
     };
   }
 
@@ -376,17 +392,21 @@ export class ContentService {
    * Get a summary of paths containing this resource (lightweight).
    * Returns just path metadata without loading full paths.
    */
-  getContainingPathsSummary(resourceId: string): Observable<Array<{
-    pathId: string;
-    pathTitle: string;
-    stepIndex: number;
-  }>> {
+  getContainingPathsSummary(resourceId: string): Observable<
+    {
+      pathId: string;
+      pathTitle: string;
+      stepIndex: number;
+    }[]
+  > {
     return this.getContainingPaths(resourceId).pipe(
-      map(refs => refs.map(ref => ({
-        pathId: ref.path.id,
-        pathTitle: ref.path.title,
-        stepIndex: ref.stepIndex
-      })))
+      map(refs =>
+        refs.map(ref => ({
+          pathId: ref.path.id,
+          pathTitle: ref.path.title,
+          stepIndex: ref.stepIndex,
+        }))
+      )
     );
   }
 
@@ -401,9 +421,9 @@ export class ContentService {
    * Use case: Displaying rich media cards on a category overview page.
    */
   getContentPreviewsForCategory(category: string): Observable<ContentPreview[]> {
-    return this.dataLoader.getContentIndex().pipe(
-      map(index => this.filterAndMapToPreview(index.nodes ?? [], category))
-    );
+    return this.dataLoader
+      .getContentIndex()
+      .pipe(map(index => this.filterAndMapToPreview(index.nodes ?? [], category)));
   }
 
   /**
@@ -434,7 +454,7 @@ export class ContentService {
         videos: previews.filter(p => p.contentType === 'video'),
         organizations: previews.filter(p => p.contentType === 'organization'),
         books: previews.filter(p => p.contentType === 'book-chapter'),
-        tools: previews.filter(p => p.contentType === 'tool')
+        tools: previews.filter(p => p.contentType === 'tool'),
       }))
     );
   }
@@ -526,7 +546,7 @@ export class ContentService {
       category: entry.category,
       isPlayable: ['video', 'audio'].includes(entry.contentType),
       // contributorPresenceId will be populated when ContributorPresence data is generated
-      contributorPresenceId: entry.contributorPresenceId
+      contributorPresenceId: entry.contributorPresenceId,
     };
 
     // Generate YouTube thumbnail if URL is a YouTube link
@@ -551,7 +571,7 @@ export class ContentService {
     const patterns = [
       /youtube\.com\/watch\?v=([^&]+)/,
       /youtu\.be\/([^?]+)/,
-      /youtube\.com\/embed\/([^?]+)/
+      /youtube\.com\/embed\/([^?]+)/,
     ];
 
     for (const pattern of patterns) {
@@ -626,7 +646,7 @@ export class ContentService {
           content: content.description,
           published: content.createdAt,
           updated: content.updatedAt,
-          url: content.url ?? `https://elohim-protocol.org/content/${content.id}`
+          url: content.url ?? `https://elohim-protocol.org/content/${content.id}`,
         };
 
         // Add author if available
@@ -638,7 +658,7 @@ export class ContentService {
         if (content.tags && content.tags.length > 0) {
           apObject.tag = content.tags.map(tag => ({
             type: 'Hashtag',
-            name: `#${tag}`
+            name: `#${tag}`,
           }));
         }
 
@@ -718,15 +738,17 @@ export class ContentService {
         activityPubType: content.activityPubType ?? null,
         activityPubObject: content.activityPubType ? this.buildActivityPubObject(content) : null,
         openGraph: content.openGraphMetadata ?? null,
-        jsonLd: content.linkedData ?? null
+        jsonLd: content.linkedData ?? null,
       })),
-      catchError(() => of({
-        did: null,
-        activityPubType: null,
-        activityPubObject: null,
-        openGraph: null,
-        jsonLd: null
-      }))
+      catchError(() =>
+        of({
+          did: null,
+          activityPubType: null,
+          activityPubObject: null,
+          openGraph: null,
+          jsonLd: null,
+        })
+      )
     );
   }
 
@@ -743,7 +765,7 @@ export class ContentService {
       content: content.description,
       published: content.createdAt,
       updated: content.updatedAt,
-      url: content.url ?? `https://elohim-protocol.org/content/${content.id}`
+      url: content.url ?? `https://elohim-protocol.org/content/${content.id}`,
     };
 
     if (content.authorId) {
@@ -753,7 +775,7 @@ export class ContentService {
     if (content.tags && content.tags.length > 0) {
       apObject.tag = content.tags.map(tag => ({
         type: 'Hashtag',
-        name: `#${tag}`
+        name: `#${tag}`,
       }));
     }
 

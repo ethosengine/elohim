@@ -17,10 +17,8 @@
  */
 
 import { Injectable } from '@angular/core';
-import {
-  StagedTransaction,
-  ReconciliationResult,
-} from '../models/transaction-import.model';
+
+import { StagedTransaction, ReconciliationResult } from '../models/transaction-import.model';
 
 /**
  * ResourceMeasure
@@ -117,11 +115,11 @@ export class BudgetReconciliationService {
   private readonly CRITICAL_THRESHOLD = 0.2; // 20% over budget
   private readonly WARNING_THRESHOLD = 0.1; // 10% over budget
 
-  constructor(
+  constructor() {
     // private flowPlanning: FlowPlanningService,  // TODO: Inject actual service
     // private budgetService: BudgetService,
     // private notificationService: NotificationService,
-  ) {}
+  }
 
   /**
    * Main reconciliation method
@@ -141,9 +139,7 @@ export class BudgetReconciliationService {
   ): Promise<ReconciliationResult> {
     // Skip if no budget linkage
     if (!staged.budgetId || !staged.budgetCategoryId) {
-      console.log(
-        `[BudgetReconciliation] No budget linkage for transaction ${staged.id}`
-      );
+      console.log(`[BudgetReconciliation] No budget linkage for transaction ${staged.id}`);
       return {
         budgetId: '',
         budgetCategoryId: '',
@@ -165,9 +161,7 @@ export class BudgetReconciliationService {
       // Mock budget retrieval
       const budget = this.createMockBudget(staged.budgetId, staged.stewardId);
 
-      const category = budget.categories.find(
-        c => c.id === staged.budgetCategoryId
-      );
+      const category = budget.categories.find(c => c.id === staged.budgetCategoryId);
 
       if (!category) {
         throw new Error(
@@ -185,8 +179,7 @@ export class BudgetReconciliationService {
 
       // Recalculate variance for this category
       category.variance = category.actualAmount.value - category.plannedAmount.value;
-      category.variancePercent =
-        (category.variance / category.plannedAmount.value) * 100;
+      category.variancePercent = (category.variance / category.plannedAmount.value) * 100;
 
       // Link transaction
       if (!category.transactionIds) {
@@ -218,8 +211,7 @@ export class BudgetReconciliationService {
         previousActualAmount,
         newActualAmount,
         amountAdded: amountToAdd,
-        varianceBeforeReconciliation: previousActualAmount -
-          category.plannedAmount.value,
+        varianceBeforeReconciliation: previousActualAmount - category.plannedAmount.value,
         varianceAfterReconciliation: category.variance,
         newHealthStatus: budget.healthStatus,
         reconciled: true,
@@ -245,7 +237,7 @@ export class BudgetReconciliationService {
    * Bulk reconcile multiple transactions
    */
   async reconcileMultiple(
-    transactions: Array<{ staged: StagedTransaction; eventId: string }>
+    transactions: { staged: StagedTransaction; eventId: string }[]
   ): Promise<ReconciliationResult[]> {
     const results: ReconciliationResult[] = [];
 
@@ -254,10 +246,7 @@ export class BudgetReconciliationService {
         const result = await this.reconcileBudget(staged, eventId);
         results.push(result);
       } catch (error) {
-        console.error(
-          `Failed to reconcile transaction ${staged.id}:`,
-          error
-        );
+        console.error(`Failed to reconcile transaction ${staged.id}:`, error);
       }
     }
 
@@ -283,8 +272,7 @@ export class BudgetReconciliationService {
     budget.totalPlanned.value = totalPlannedValue;
     budget.totalActual.value = totalActualValue;
     budget.totalVariance = budget.totalActual.value - budget.totalPlanned.value;
-    budget.totalVariancePercent =
-      (budget.totalVariance / budget.totalPlanned.value) * 100;
+    budget.totalVariancePercent = (budget.totalVariance / budget.totalPlanned.value) * 100;
   }
 
   /**
@@ -303,11 +291,8 @@ export class BudgetReconciliationService {
     }
 
     // Count categories over budget
-    const overBudgetCategories = budget.categories.filter(
-      c => c.variance > 0
-    );
-    const overBudgetPercent =
-      (overBudgetCategories.length / budget.categories.length) * 100;
+    const overBudgetCategories = budget.categories.filter(c => c.variance > 0);
+    const overBudgetPercent = (overBudgetCategories.length / budget.categories.length) * 100;
 
     // Warning: >50% categories over budget OR 10% over total
     if (
@@ -375,10 +360,7 @@ export class BudgetReconciliationService {
     }
 
     // Budget-level alerts
-    if (
-      previousHealthStatus !== budget.healthStatus &&
-      budget.healthStatus !== 'healthy'
-    ) {
+    if (previousHealthStatus !== budget.healthStatus && budget.healthStatus !== 'healthy') {
       alerts.push({
         budgetId: budget.id,
         severity: budget.healthStatus === 'critical' ? 'critical' : 'warning',
@@ -431,9 +413,7 @@ export class BudgetReconciliationService {
       description: 'Mock budget for testing',
 
       periodStart: new Date().toISOString().split('T')[0],
-      periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split('T')[0],
+      periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
 
       categories: [
         {

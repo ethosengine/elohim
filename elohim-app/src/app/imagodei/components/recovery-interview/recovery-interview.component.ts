@@ -8,10 +8,10 @@
  * - Submit attestation decisions with confidence levels
  */
 
-import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RecoveryCoordinatorService } from '../../services/recovery-coordinator.service';
+
 import {
   type PendingRecoveryRequest,
   type InterviewQuestion,
@@ -20,6 +20,7 @@ import {
   getQuestionTypeDisplay,
   maskIdentity,
 } from '../../models/recovery.model';
+import { RecoveryCoordinatorService } from '../../services/recovery-coordinator.service';
 
 type ViewMode = 'queue' | 'interview' | 'attestation';
 
@@ -200,9 +201,12 @@ export class RecoveryInterviewComponent implements OnInit {
 
   getDecisionClass(): string {
     switch (this.decision) {
-      case 'affirm': return 'decision-affirm';
-      case 'deny': return 'decision-deny';
-      default: return 'decision-abstain';
+      case 'affirm':
+        return 'decision-affirm';
+      case 'deny':
+        return 'decision-deny';
+      default:
+        return 'decision-abstain';
     }
   }
 }

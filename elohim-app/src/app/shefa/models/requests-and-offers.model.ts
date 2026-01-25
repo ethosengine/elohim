@@ -50,11 +50,11 @@ export type ContactPreference = 'email' | 'phone' | 'in-app' | 'other';
  * Helps match people with compatible schedules.
  */
 export type TimePreference =
-  | 'morning'      // 6am - 12pm
-  | 'afternoon'    // 12pm - 6pm
-  | 'evening'      // 6pm - midnight
-  | 'flexible'     // No strong preference
-  | 'other';       // Custom (described in note)
+  | 'morning' // 6am - 12pm
+  | 'afternoon' // 12pm - 6pm
+  | 'evening' // 6pm - midnight
+  | 'flexible' // No strong preference
+  | 'other'; // Custom (described in note)
 
 /**
  * InteractionType - Virtual or in-person.
@@ -69,9 +69,9 @@ export type InteractionType = 'virtual' | 'in-person' | 'hybrid' | 'either';
  * Optional start and end dates for when availability exists.
  */
 export interface DateRange {
-  startDate?: string;      // ISO 8601 date
-  endDate?: string;        // ISO 8601 date
-  flexibleDates: boolean;  // Can dates shift?
+  startDate?: string; // ISO 8601 date
+  endDate?: string; // ISO 8601 date
+  flexibleDates: boolean; // Can dates shift?
 }
 
 /**
@@ -91,7 +91,7 @@ export interface UserPreferences {
   contactPreference: ContactPreference;
 
   /** Preferred contact address for that method */
-  contactValue: string;  // email@example.com or +1-555-1234
+  contactValue: string; // email@example.com or +1-555-1234
 
   /** Time zone (e.g., "UTC", "EST", "PST") */
   timeZone: string;
@@ -287,7 +287,7 @@ export interface ServiceRequest extends Omit<Intent, 'id' | 'createdAt'> {
   /** Budget or payment options */
   budget?: {
     amount: Measure;
-    mediumOfExchangeId: string;  // What they can pay with
+    mediumOfExchangeId: string; // What they can pay with
   };
 
   /** Alternative exchange options (time, barter, etc.) */
@@ -612,11 +612,11 @@ export interface ListingAdminStatus {
 
   /** Status of the listing */
   statusType:
-    | 'pending'                    // Awaiting admin review
-    | 'accepted'                   // Approved and visible
-    | 'rejected'                   // Rejected by admin
-    | 'suspended-temporarily'      // Suspended with end date
-    | 'suspended-indefinitely';    // Suspended without end date
+    | 'pending' // Awaiting admin review
+    | 'accepted' // Approved and visible
+    | 'rejected' // Rejected by admin
+    | 'suspended-temporarily' // Suspended with end date
+    | 'suspended-indefinitely'; // Suspended without end date
 
   /** Reason for status (especially for suspended/rejected) */
   reason?: string;

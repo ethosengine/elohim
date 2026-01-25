@@ -15,9 +15,11 @@
  * works with ANY doorway (like choosing a Mastodon instance).
  */
 
-import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Injectable, inject, signal } from '@angular/core';
+
 import { firstValueFrom } from 'rxjs';
+
 import {
   type AuthProvider,
   type AuthCredentials,
@@ -36,7 +38,7 @@ interface OAuthState {
   state: string;
   doorwayUrl: string;
   redirectUri: string;
-  codeVerifier?: string;  // For PKCE (future)
+  codeVerifier?: string; // For PKCE (future)
   timestamp: number;
 }
 
@@ -276,12 +278,16 @@ export class OAuthAuthProvider implements AuthProvider {
 
     try {
       const response = await firstValueFrom(
-        this.http.post<OAuthTokenResponse>(url, {}, {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        })
+        this.http.post<OAuthTokenResponse>(
+          url,
+          {},
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        )
       );
 
       const expiresAt = new Date(Date.now() + response.expiresIn * 1000);
@@ -325,7 +331,11 @@ export class OAuthAuthProvider implements AuthProvider {
     const error = url.searchParams.get('error');
 
     if (error) {
-      console.error('[OAuthProvider] OAuth error:', error, url.searchParams.get('errorDescription'));
+      console.error(
+        '[OAuthProvider] OAuth error:',
+        error,
+        url.searchParams.get('errorDescription')
+      );
       return null;
     }
 

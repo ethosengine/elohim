@@ -19,18 +19,18 @@
  */
 
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, Subject, interval, from, of } from 'rxjs';
+
 import { map, switchMap, tap, catchError, debounceTime, startWith } from 'rxjs/operators';
 
-import {
-  AllocationSnapshot,
-  ComputeMetrics,
-} from '../models/shefa-dashboard.model';
+import { BehaviorSubject, Observable, Subject, interval, from, of } from 'rxjs';
 
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { EconomicService, CreateEconomicEventInput } from './economic.service';
 import { EconomicEvent } from '@app/elohim/models/economic-event.model';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+
+import { AllocationSnapshot, ComputeMetrics } from '../models/shefa-dashboard.model';
 import { ResourceMeasure } from '../models/stewarded-resources.model';
+
+import { EconomicService, CreateEconomicEventInput } from './economic.service';
 
 // CreateEventRequest is an alias for the EconomicEvent creation input
 type CreateEventRequest = CreateEconomicEventInput;
@@ -105,7 +105,10 @@ export class ComputeEventService {
    * Initialize event emission for an operator
    * Starts tracking compute usage and emitting events on interval
    */
-  initializeEventEmission(operatorId: string, stewardedResourceId: string): Observable<ComputeEventPayload> {
+  initializeEventEmission(
+    operatorId: string,
+    stewardedResourceId: string
+  ): Observable<ComputeEventPayload> {
     // Emit events on configured interval
     return interval(this.config.eventEmissionInterval).pipe(
       startWith(0), // Emit immediately
@@ -302,7 +305,11 @@ export class ComputeEventService {
     totalBandwidthHours: number,
     allocations: AllocationSnapshot
   ): ComputeEventPayload {
-    const tokensEarned = this.calculateTokensEarned(totalCpuHours, totalStorageGBHours, totalBandwidthHours);
+    const tokensEarned = this.calculateTokensEarned(
+      totalCpuHours,
+      totalStorageGBHours,
+      totalBandwidthHours
+    );
 
     return {
       eventId: this.generateEventId(),
@@ -326,16 +333,17 @@ export class ComputeEventService {
     events: ComputeEventPayload[]
   ): Observable<ComputeEventPayload[]> {
     // Skip if no events or if emission is too frequent
-    if (events.length === 0 || Date.now() - this.lastEmissionTime < this.config.eventEmissionInterval * 0.8) {
+    if (
+      events.length === 0 ||
+      Date.now() - this.lastEmissionTime < this.config.eventEmissionInterval * 0.8
+    ) {
       return of([]);
     }
 
     this.lastEmissionTime = Date.now();
 
     // Convert to EconomicEvent requests and create via EconomicService
-    const eventRequests = events.map(e =>
-      this.convertToEconomicEvent(operatorId, e)
-    );
+    const eventRequests = events.map(e => this.convertToEconomicEvent(operatorId, e));
 
     // Batch create events
     return from(
@@ -345,7 +353,7 @@ export class ComputeEventService {
         payload: { events: eventRequests },
       })
     ).pipe(
-      map((result) => {
+      map(result => {
         const results = result.success ? result.data || [] : [];
         // Link persisted event IDs back to payloads
         return events.map((e, i) => ({
@@ -363,14 +371,17 @@ export class ComputeEventService {
   /**
    * Convert ComputeEventPayload to EconomicEvent request
    */
-  private convertToEconomicEvent(operatorId: string, payload: ComputeEventPayload): CreateEventRequest {
+  private convertToEconomicEvent(
+    operatorId: string,
+    payload: ComputeEventPayload
+  ): CreateEventRequest {
     const { cpuHours, storageHours, bandwidthHours } = this.getUsageSummary(payload);
 
     // Determine action and quantity based on primary resource type
-    let action: 'produce' | 'use' | 'transfer' = 'produce';
+    const action: 'produce' | 'use' | 'transfer' = 'produce';
     let quantity: number = cpuHours;
-    let unit: string = 'cpu-hour';
-    let lamadEventType: string = 'compute-provided';
+    let unit = 'cpu-hour';
+    let lamadEventType = 'compute-provided';
 
     if (storageHours > cpuHours && storageHours > bandwidthHours) {
       quantity = storageHours;
@@ -408,14 +419,22 @@ export class ComputeEventService {
   /**
    * Helper: Calculate CPU core-hours from metrics
    */
-  private calculateCpuCoreHours(lastMetrics: ComputeMetrics | null, currentMetrics: ComputeMetrics): number {
+  private calculateCpuCoreHours(
+    lastMetrics: ComputeMetrics | null,
+    currentMetrics: ComputeMetrics
+  ): number {
     if (!lastMetrics) {
       // First measurement - estimate average usage over last interval
-      return (currentMetrics.cpu.usagePercent / 100) * currentMetrics.cpu.totalCores * (this.config.eventEmissionInterval / 3600000);
+      return (
+        (currentMetrics.cpu.usagePercent / 100) *
+        currentMetrics.cpu.totalCores *
+        (this.config.eventEmissionInterval / 3600000)
+      );
     }
 
     // Use average usage over period
-    const avgUsagePercent = (lastMetrics.cpu.usagePercent + currentMetrics.cpu.usagePercent) / 2 / 100;
+    const avgUsagePercent =
+      (lastMetrics.cpu.usagePercent + currentMetrics.cpu.usagePercent) / 2 / 100;
     const hoursElapsed = this.config.eventEmissionInterval / 3600000;
 
     return avgUsagePercent * currentMetrics.cpu.totalCores * hoursElapsed;
@@ -424,7 +443,10 @@ export class ComputeEventService {
   /**
    * Helper: Calculate storage GB-hours
    */
-  private calculateStorageGBHours(lastMetrics: ComputeMetrics | null, currentMetrics: ComputeMetrics): number {
+  private calculateStorageGBHours(
+    lastMetrics: ComputeMetrics | null,
+    currentMetrics: ComputeMetrics
+  ): number {
     if (!lastMetrics) {
       // First measurement
       return currentMetrics.storage.usedGB * (this.config.eventEmissionInterval / 3600000);
@@ -440,15 +462,25 @@ export class ComputeEventService {
   /**
    * Helper: Calculate bandwidth Mbps-hours
    */
-  private calculateBandwidthMbpsHours(lastMetrics: ComputeMetrics | null, currentMetrics: ComputeMetrics): number {
+  private calculateBandwidthMbpsHours(
+    lastMetrics: ComputeMetrics | null,
+    currentMetrics: ComputeMetrics
+  ): number {
     if (!lastMetrics) {
-      return currentMetrics.network.bandwidth.usedUpstreamMbps * (this.config.eventEmissionInterval / 3600000);
+      return (
+        currentMetrics.network.bandwidth.usedUpstreamMbps *
+        (this.config.eventEmissionInterval / 3600000)
+      );
     }
 
-    const avgMbps = (
-      (lastMetrics.network.bandwidth.usedUpstreamMbps + currentMetrics.network.bandwidth.usedUpstreamMbps) / 2 +
-      (lastMetrics.network.bandwidth.usedDownstreamMbps + currentMetrics.network.bandwidth.usedDownstreamMbps) / 2
-    ) / 2;
+    const avgMbps =
+      ((lastMetrics.network.bandwidth.usedUpstreamMbps +
+        currentMetrics.network.bandwidth.usedUpstreamMbps) /
+        2 +
+        (lastMetrics.network.bandwidth.usedDownstreamMbps +
+          currentMetrics.network.bandwidth.usedDownstreamMbps) /
+          2) /
+      2;
 
     const hoursElapsed = this.config.eventEmissionInterval / 3600000;
     return avgMbps * hoursElapsed;
@@ -458,7 +490,11 @@ export class ComputeEventService {
    * Helper: Calculate tokens earned from compute
    * Formula: (cpu_hours * cpu_rate + storage_gb_hours * storage_rate + bandwidth_mbps_hours * bandwidth_rate)
    */
-  private calculateTokensEarned(cpuHours: number, storageGBHours: number, bandwidthMbpsHours: number): number {
+  private calculateTokensEarned(
+    cpuHours: number,
+    storageGBHours: number,
+    bandwidthMbpsHours: number
+  ): number {
     return (
       cpuHours * this.config.cpuHourRate +
       storageGBHours * this.config.storageGBHourRate +

@@ -11,17 +11,18 @@
  * 3. Complete recovery (receive new credentials)
  */
 
-import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { RecoveryCoordinatorService } from '../../services/recovery-coordinator.service';
-import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+
 import {
   type RecoveryRequest,
   type RecoveryProgress,
   getRecoveryStatusDisplay,
 } from '../../models/recovery.model';
+import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { RecoveryCoordinatorService } from '../../services/recovery-coordinator.service';
 
 type RecoveryStep = 'claim' | 'awaiting' | 'complete';
 

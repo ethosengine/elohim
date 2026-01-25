@@ -27,11 +27,11 @@ export type DoorwayTrustTier = 'emerging' | 'established' | 'trusted' | 'anchor'
  * Capabilities a doorway can offer.
  */
 export type DoorwayCapability =
-  | 'projection'  // Can serve content projection queries
-  | 'storage'     // Can accept blob uploads
-  | 'recovery'    // Can process disaster recovery requests
-  | 'import'      // Can process bulk content imports
-  | 'streaming';  // Supports WebSocket streaming
+  | 'projection' // Can serve content projection queries
+  | 'storage' // Can accept blob uploads
+  | 'recovery' // Can process disaster recovery requests
+  | 'import' // Can process bulk content imports
+  | 'streaming'; // Supports WebSocket streaming
 
 /**
  * A doorway the user has registered with for potential recovery.
@@ -148,10 +148,10 @@ export interface DoorwayInfo {
  * Default trust tiers with minimum uptime thresholds.
  */
 export const TRUST_TIER_THRESHOLDS = {
-  emerging: 0,                    // No minimum
-  established: 7 * 24 * 60 * 60,  // 7 days in seconds
-  trusted: 30 * 24 * 60 * 60,     // 30 days in seconds
-  anchor: 180 * 24 * 60 * 60,     // 180 days in seconds
+  emerging: 0, // No minimum
+  established: 7 * 24 * 60 * 60, // 7 days in seconds
+  trusted: 30 * 24 * 60 * 60, // 30 days in seconds
+  anchor: 180 * 24 * 60 * 60, // 180 days in seconds
 } as const;
 
 /**
@@ -214,9 +214,7 @@ export function sortDoorwaysByTrust(doorways: RegisteredDoorway[]): RegisteredDo
  * Get doorways that support recovery capability.
  */
 export function getRecoveryDoorways(registry: DoorwayRegistry): RegisteredDoorway[] {
-  return registry.doorways.filter(
-    d => d.capabilities.includes('recovery') && d.recoveryEnabled
-  );
+  return registry.doorways.filter(d => d.capabilities.includes('recovery') && d.recoveryEnabled);
 }
 
 /**

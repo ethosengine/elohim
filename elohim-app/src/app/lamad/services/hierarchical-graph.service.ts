@@ -1,11 +1,15 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, forkJoin } from 'rxjs';
+
 import { map, tap, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
-import { DataLoaderService, ClusterConnectionSummary } from '@app/elohim/services/data-loader.service';
+import { Observable, of, forkJoin } from 'rxjs';
+
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
-import { LearningPath, PathChapter, PathModule, PathSection } from '../models/learning-path.model';
-import { ContentNode } from '../models/content-node.model';
+import {
+  DataLoaderService,
+  ClusterConnectionSummary,
+} from '@app/elohim/services/data-loader.service';
+
 import {
   ClusterNode,
   ClusterEdge,
@@ -18,8 +22,10 @@ import {
   createSectionCluster,
   createConceptNode,
   calculateClusterRadius,
-  CLUSTER_LEVEL_CONFIG
+  CLUSTER_LEVEL_CONFIG,
 } from '../models/cluster-graph.model';
+import { ContentNode } from '../models/content-node.model';
+import { LearningPath, PathChapter, PathModule, PathSection } from '../models/learning-path.model';
 
 /**
  * LRU Cache for cluster data.
@@ -28,7 +34,7 @@ class LRUCache<K, V> {
   private cache = new Map<K, V>();
   private readonly maxSize: number;
 
-  constructor(maxSize: number = 50) {
+  constructor(maxSize = 50) {
     this.maxSize = maxSize;
   }
 
@@ -159,7 +165,7 @@ export class HierarchicalGraphService {
         clusterId,
         children: cachedChildren,
         edges: this.createChildEdges(clusterId, cachedChildren),
-        connections: []
+        connections: [],
       });
     }
 
@@ -188,7 +194,7 @@ export class HierarchicalGraphService {
             clusterId,
             children,
             edges: this.createChildEdges(clusterId, children),
-            connections: []
+            connections: [],
           });
         }
       })
@@ -220,8 +226,7 @@ export class HierarchicalGraphService {
     const addVisibleChildren = (parentId: string) => {
       if (!this.expandedClusters.has(parentId)) return;
 
-      const children = this.childrenCache.get(parentId) ||
-        this.getChildClusters(graph, parentId);
+      const children = this.childrenCache.get(parentId) || this.getChildClusters(graph, parentId);
 
       for (const child of children) {
         visible.push(child);
@@ -234,8 +239,7 @@ export class HierarchicalGraphService {
     // Start with root's children (chapters)
     addVisibleChildren(graph.root.id);
     // Also include chapters even if root isn't "expanded" - they're always visible
-    const chapters = Array.from(graph.clusters.values())
-      .filter(c => c.clusterType === 'chapter');
+    const chapters = Array.from(graph.clusters.values()).filter(c => c.clusterType === 'chapter');
     for (const chapter of chapters) {
       if (!visible.includes(chapter)) {
         visible.push(chapter);
@@ -283,7 +287,7 @@ export class HierarchicalGraphService {
             source: current.id,
             target: next.id,
             type: 'NEXT',
-            isAggregated: false
+            isAggregated: false,
           });
         }
       }
@@ -347,12 +351,13 @@ export class HierarchicalGraphService {
 
             // Convert outgoing connections
             for (const [targetId, conn] of summary.outgoingByCluster) {
-              if (targetId !== clusterId) {  // Skip self-connections
+              if (targetId !== clusterId) {
+                // Skip self-connections
                 connections.push({
                   sourceClusterId: clusterId,
                   targetClusterId: targetId,
                   connectionCount: conn.connectionCount,
-                  relationshipTypes: conn.relationshipTypes
+                  relationshipTypes: conn.relationshipTypes,
                 });
               }
             }
@@ -400,13 +405,13 @@ export class HierarchicalGraphService {
       parentClusterId: null,
       childClusterIds: [],
       conceptIds: [],
-      isExpanded: true,  // Root is always expanded
+      isExpanded: true, // Root is always expanded
       isLoading: false,
       totalConceptCount: 0,
       completedConceptCount: 0,
       externalConnectionCount: 0,
       state: 'unseen',
-      affinityScore: 0
+      affinityScore: 0,
     };
 
     clusters.set(root.id, root);
@@ -428,7 +433,7 @@ export class HierarchicalGraphService {
       root,
       clusters,
       edges: [],
-      connections: []
+      connections: [],
     };
   }
 
@@ -566,7 +571,7 @@ export class HierarchicalGraphService {
           clusterId: section.id,
           children,
           edges: this.createChildEdges(section.id, children),
-          connections: []
+          connections: [],
         };
       }),
       catchError(err => {
@@ -596,7 +601,7 @@ export class HierarchicalGraphService {
       source: parentId,
       target: child.id,
       type: 'CONTAINS',
-      isAggregated: false
+      isAggregated: false,
     }));
   }
 
@@ -648,7 +653,10 @@ export class HierarchicalGraphService {
   /**
    * Calculate aggregate affinity score for a cluster.
    */
-  private calculateClusterAffinity(cluster: ClusterNode, clusters: Map<string, ClusterNode>): number {
+  private calculateClusterAffinity(
+    cluster: ClusterNode,
+    clusters: Map<string, ClusterNode>
+  ): number {
     if (cluster.clusterType === 'section') {
       // Average affinity of concepts
       if (cluster.conceptIds.length === 0) return 0;
@@ -722,11 +730,11 @@ export class HierarchicalGraphService {
         completedConceptCount: 0,
         externalConnectionCount: 0,
         state: 'unseen',
-        affinityScore: 0
+        affinityScore: 0,
       },
       clusters: new Map(),
       edges: [],
-      connections: []
+      connections: [],
     };
   }
 }

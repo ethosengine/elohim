@@ -9,16 +9,20 @@
  * which uses HttpClient directly.
  */
 
-import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, from, of } from 'rxjs';
+import { Injectable, inject } from '@angular/core';
+
 import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
-import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
-import { StorageClientService } from './storage-client.service';
-import type { ContentQuery } from '@elohim/service/client';
+import { Observable, from, of } from 'rxjs';
+
 import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
+import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
+
+import { StorageClientService } from './storage-client.service';
+
+import type { ContentQuery } from '@elohim/service/client';
 
 /**
  * Content query filters
@@ -55,9 +59,9 @@ export interface Relationship {
   id: string;
   sourceId: string;
   targetId: string;
-  relationshipType: string;  // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
+  relationshipType: string; // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
   confidence: number;
-  inferenceSource: string;   // explicit, path, tag, semantic
+  inferenceSource: string; // explicit, path, tag, semantic
   metadata?: Record<string, any>;
   createdAt?: string;
 }
@@ -99,7 +103,7 @@ export interface KnowledgeMap {
   subjectName: string;
   visibility: string;
   sharedWith?: string[];
-  nodes: any;  // Graph node data
+  nodes: any; // Graph node data
   pathIds?: string[];
   overallAffinity: number;
   contentGraphId?: string;
@@ -192,7 +196,8 @@ export class ContentService {
         // Check if we need to fetch blob content
         // contentBody may be a blob reference (sha256:... or sha256-...) instead of actual content
         const contentBody = data.contentBody || '';
-        const isBlobReference = contentBody.startsWith('sha256:') || contentBody.startsWith('sha256-');
+        const isBlobReference =
+          contentBody.startsWith('sha256:') || contentBody.startsWith('sha256-');
         const blobCid = isBlobReference ? contentBody : data.blobCid;
         const needsBlobFetch = isBlobReference || (!contentBody && data.blobCid);
 
@@ -238,9 +243,7 @@ export class ContentService {
     const blobUrl = this.storageClient.getBlobUrl(normalizedCid);
     console.debug(`[ContentService] Fetching blob from: ${blobUrl}`);
 
-    const obs = this.http.get(blobUrl, { responseType: 'text' }).pipe(
-      shareReplay(1)
-    );
+    const obs = this.http.get(blobUrl, { responseType: 'text' }).pipe(shareReplay(1));
 
     this.blobCache.set(normalizedCid, obs);
     return obs;
@@ -311,7 +314,7 @@ export class ContentService {
     if (cached) return cached;
 
     const obs = from(this.client.get<LearningPath>('path', id)).pipe(
-      map(data => data ? this.transformPath(data) : null),
+      map(data => (data ? this.transformPath(data) : null)),
       catchError(err => {
         console.debug(`[ContentService] getPath(${id}) failed:`, err);
         return of(null);
@@ -362,7 +365,7 @@ export class ContentService {
   getRelationships(
     contentId: string,
     direction: 'outgoing' | 'incoming' | 'both' = 'both',
-    relationshipType?: string,
+    relationshipType?: string
   ): Observable<Relationship[]> {
     const params = new URLSearchParams({
       contentId: contentId,
@@ -377,25 +380,28 @@ export class ContentService {
       catchError(err => {
         console.debug('[ContentService] getRelationships failed:', err);
         return of([]);
-      }),
+      })
     );
   }
 
   /**
    * Get content graph starting from a root node
    */
-  getContentGraph(contentId: string, relationshipTypes?: string[]): Observable<ContentGraph | null> {
+  getContentGraph(
+    contentId: string,
+    relationshipTypes?: string[]
+  ): Observable<ContentGraph | null> {
     let url = `/db/relationships/graph/${contentId}`;
     if (relationshipTypes?.length) {
       url += `?types=${relationshipTypes.join(',')}`;
     }
 
     return from(this.client.fetch<any>(url)).pipe(
-      map(data => data ? this.transformContentGraph(data) : null),
+      map(data => (data ? this.transformContentGraph(data) : null)),
       catchError(err => {
         console.debug(`[ContentService] getContentGraph(${contentId}) failed:`, err);
         return of(null);
-      }),
+      })
     );
   }
 
@@ -408,11 +414,11 @@ export class ContentService {
    */
   getKnowledgeMap(id: string): Observable<KnowledgeMap | null> {
     return from(this.client.fetch<any>(`/db/knowledge-maps/${id}`)).pipe(
-      map(data => data ? this.transformKnowledgeMap(data) : null),
+      map(data => (data ? this.transformKnowledgeMap(data) : null)),
       catchError(err => {
         console.debug(`[ContentService] getKnowledgeMap(${id}) failed:`, err);
         return of(null);
-      }),
+      })
     );
   }
 
@@ -433,7 +439,7 @@ export class ContentService {
       catchError(err => {
         console.debug('[ContentService] queryKnowledgeMaps failed:', err);
         return of([]);
-      }),
+      })
     );
   }
 
@@ -446,11 +452,11 @@ export class ContentService {
    */
   getPathExtension(id: string): Observable<PathExtension | null> {
     return from(this.client.fetch<any>(`/db/path-extensions/${id}`)).pipe(
-      map(data => data ? this.transformPathExtension(data) : null),
+      map(data => (data ? this.transformPathExtension(data) : null)),
       catchError(err => {
         console.debug(`[ContentService] getPathExtension(${id}) failed:`, err);
         return of(null);
-      }),
+      })
     );
   }
 
@@ -470,7 +476,7 @@ export class ContentService {
       catchError(err => {
         console.debug('[ContentService] queryPathExtensions failed:', err);
         return of([]);
-      }),
+      })
     );
   }
 
@@ -557,8 +563,14 @@ export class ContentService {
   private parseContentBody(content: string, contentFormat: string): string | object {
     // Formats that store structured JSON content
     const structuredFormats = [
-      'html5-app', 'perseus', 'quiz-json', 'assessment',
-      'perseus-json', 'perseus-quiz-json', 'sophia-quiz-json', 'sophia',
+      'html5-app',
+      'perseus',
+      'quiz-json',
+      'assessment',
+      'perseus-json',
+      'perseus-quiz-json',
+      'sophia-quiz-json',
+      'sophia',
     ];
 
     if (!structuredFormats.includes(contentFormat) || !content) {

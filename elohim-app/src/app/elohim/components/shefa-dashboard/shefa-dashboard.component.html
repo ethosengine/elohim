@@ -7,9 +7,7 @@
       <p>Network Health & Custodian Metrics</p>
     </div>
     <div class="header-right">
-      <button class="btn-refresh" (click)="refreshData()" title="Refresh data">
-        🔄 Refresh
-      </button>
+      <button class="btn-refresh" (click)="refreshData()" title="Refresh data">🔄 Refresh</button>
     </div>
   </div>
 
@@ -133,7 +131,9 @@
             <div class="performer-name">{{ c.custodianId.slice(0, 12) }}...</div>
             <div class="performer-metric">
               <span class="metric-label">Score:</span>
-              <span class="metric-value">{{ c.reputation.reputation_score | number: '1.0-0' }}/100</span>
+              <span class="metric-value">
+                {{ c.reputation.reputation_score | number: '1.0-0' }}/100
+              </span>
             </div>
           </div>
         </div>
@@ -207,8 +207,8 @@
             </td>
             <td>{{ c.health.response_time_p95_ms }}ms</td>
             <td>
-              {{ (c.storage.used_bytes / 1024 / 1024 / 1024) | number: '1.0-0' }}GB /
-              {{ (c.storage.total_capacity_bytes / 1024 / 1024 / 1024) | number: '1.0-0' }}GB
+              {{ c.storage.used_bytes / 1024 / 1024 / 1024 | number: '1.0-0' }}GB /
+              {{ c.storage.total_capacity_bytes / 1024 / 1024 / 1024 | number: '1.0-0' }}GB
             </td>
             <td>
               {{ c.bandwidth.current_usage_mbps | number: '1.0-0' }}/
@@ -217,9 +217,7 @@
             <td class="reputation-score">
               {{ c.reputation.reputation_score | number: '1.0-0' }}/100
             </td>
-            <td class="earnings">
-              ${{ c.economic.monthly_earnings | number: '1.0-2' }}
-            </td>
+            <td class="earnings">${{ c.economic.monthly_earnings | number: '1.0-2' }}</td>
           </tr>
         </tbody>
       </table>
@@ -233,7 +231,11 @@
     </div>
 
     <div *ngIf="alerts().length > 0" class="alerts-list">
-      <div *ngFor="let alert of alerts()" class="card alert-card" [attr.data-severity]="alert.severity">
+      <div
+        *ngFor="let alert of alerts()"
+        class="card alert-card"
+        [attr.data-severity]="alert.severity"
+      >
         <div class="alert-header">
           <span class="alert-icon">{{ getAlertIcon(alert.severity) }}</span>
           <span class="alert-severity" [attr.data-severity]="alert.severity">
@@ -244,9 +246,7 @@
         <div class="alert-body">
           <div class="alert-custodian">{{ alert.custodianId.slice(0, 16) }}...</div>
           <div class="alert-message">{{ alert.message }}</div>
-          <div *ngIf="alert.suggestion" class="alert-suggestion">
-            💡 {{ alert.suggestion }}
-          </div>
+          <div *ngIf="alert.suggestion" class="alert-suggestion">💡 {{ alert.suggestion }}</div>
         </div>
       </div>
     </div>
@@ -276,9 +276,14 @@
           <div *ngFor="let c of filteredCustodians().slice(0, 10)" class="usage-bar">
             <div class="usage-label">{{ c.custodianId.slice(0, 8) }}</div>
             <div class="usage-bar-container">
-              <div class="usage-bar-fill" [style.width.%]="c.computation.memory_usage_percent"></div>
+              <div
+                class="usage-bar-fill"
+                [style.width.%]="c.computation.memory_usage_percent"
+              ></div>
             </div>
-            <div class="usage-value">{{ c.computation.memory_usage_percent | number: '1.0-0' }}%</div>
+            <div class="usage-value">
+              {{ c.computation.memory_usage_percent | number: '1.0-0' }}%
+            </div>
           </div>
         </div>
       </div>

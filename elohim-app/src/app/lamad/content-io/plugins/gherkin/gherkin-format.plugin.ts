@@ -1,16 +1,24 @@
 import { Injectable, Type } from '@angular/core';
+
+import { GherkinParser, GherkinStep } from '../../../parsers/gherkin-parser';
+import { GherkinRendererComponent } from '../../../renderers/gherkin-renderer/gherkin-renderer.component';
 import {
   ContentFormatPlugin,
   ContentRenderer,
   ContentEditorComponent,
   EditorConfig,
-  DEFAULT_EDITOR_CONFIG
+  DEFAULT_EDITOR_CONFIG,
 } from '../../interfaces/content-format-plugin.interface';
-import { ContentIOImportResult, ContentIOExportInput } from '../../interfaces/content-io-plugin.interface';
+import {
+  ContentIOImportResult,
+  ContentIOExportInput,
+} from '../../interfaces/content-io-plugin.interface';
 import { FormatMetadata } from '../../interfaces/format-metadata.interface';
-import { ValidationResult, ValidationError, ValidationWarning } from '../../interfaces/validation-result.interface';
-import { GherkinParser, GherkinStep } from '../../../parsers/gherkin-parser';
-import { GherkinRendererComponent } from '../../../renderers/gherkin-renderer/gherkin-renderer.component';
+import {
+  ValidationResult,
+  ValidationError,
+  ValidationWarning,
+} from '../../interfaces/validation-result.interface';
 
 /**
  * GherkinFormatPlugin - Unified plugin for Gherkin/BDD content.
@@ -26,7 +34,7 @@ import { GherkinRendererComponent } from '../../../renderers/gherkin-renderer/gh
  * RendererRegistryService registration.
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class GherkinFormatPlugin implements ContentFormatPlugin {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -80,10 +88,10 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
           id: s.id,
           title: s.title,
           type: s.scenarioType,
-          stepCount: s.steps.length
-        }))
+          stepCount: s.steps.length,
+        })),
       },
-      relatedNodeIds: [...feature.scenarioIds, ...feature.epicIds]
+      relatedNodeIds: [...feature.scenarioIds, ...feature.epicIds],
     };
   }
 
@@ -116,7 +124,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
       errors.push({
         code: 'NO_FEATURE',
         message: 'No Feature declaration found. Gherkin files must start with "Feature:"',
-        line: 1
+        line: 1,
       });
       return { valid: false, errors, warnings };
     }
@@ -127,7 +135,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
       warnings.push({
         code: 'NO_SCENARIOS',
         message: 'No scenarios found. Feature files should contain at least one Scenario.',
-        suggestion: 'Add a Scenario: block after the feature description'
+        suggestion: 'Add a Scenario: block after the feature description',
       });
     }
 
@@ -149,7 +157,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
           title: imported.title,
           description: imported.description,
           contentType: imported.contentType,
-          tags: imported.tags
+          tags: imported.tags,
         };
       } catch {
         // Preview generation failed
@@ -161,7 +169,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
       scenarioCount,
       stepCount: (content.match(/^\s*(Given|When|Then|And|But)\s+/gm) ?? []).length,
       lineCount: content.split('\n').length,
-      tagCount: (content.match(/@[\w-]+/g) ?? []).length
+      tagCount: (content.match(/@[\w-]+/g) ?? []).length,
     };
 
     return {
@@ -169,7 +177,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
       errors,
       warnings,
       parsedPreview,
-      stats
+      stats,
     };
   }
 
@@ -211,8 +219,8 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
           { id: 'then', label: 'Then', icon: 'done', type: 'button' },
           { id: 'save', label: 'Save', icon: 'save', shortcut: 'Ctrl+S', type: 'button' },
           { id: 'cancel', label: 'Cancel', icon: 'close', shortcut: 'Escape', type: 'button' },
-        ]
-      }
+        ],
+      },
     };
   }
 
@@ -260,7 +268,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
       icon: 'checklist',
       category: 'code',
       supportsRoundTrip: true,
-      priority: 10
+      priority: 10,
     };
   }
 
@@ -311,12 +319,13 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
     }
 
     // If we have scenario data in metadata, generate them
-    const scenarios = (node.metadata?.['scenarios'] as Array<{
-      id: string;
-      title: string;
-      type: string;
-      steps?: GherkinStep[];
-    }>) || [];
+    const scenarios =
+      (node.metadata?.['scenarios'] as {
+        id: string;
+        title: string;
+        type: string;
+        steps?: GherkinStep[];
+      }[]) || [];
 
     for (const scenario of scenarios) {
       lines.push('');
@@ -344,7 +353,10 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
     return lines.join('\n');
   }
 
-  private validateSteps(content: string): { errors: ValidationError[]; warnings: ValidationWarning[] } {
+  private validateSteps(content: string): {
+    errors: ValidationError[];
+    warnings: ValidationWarning[];
+  } {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
     const lines = content.split('\n');
@@ -362,7 +374,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
           warnings.push({
             code: 'NO_GIVEN',
             message: 'Scenario without Given step. Consider adding context.',
-            line: lineNum - 1
+            line: lineNum - 1,
           });
         }
         inScenario = true;
@@ -384,7 +396,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
             code: 'KEYWORD_CASE',
             message: `Step keyword "${keyword}" should be "${properKeyword}"`,
             line: lineNum,
-            suggestion: `Use "${properKeyword}" instead`
+            suggestion: `Use "${properKeyword}" instead`,
           });
         }
       }
@@ -403,14 +415,19 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
 
       // Check for tags on wrong lines
       const tagMatch = /^(\s*)(@[\w-]+)/.exec(line);
-      if (tagMatch && tagMatch[1].length > 0 && !line.includes('Feature:') && !line.includes('Scenario')) {
+      if (
+        tagMatch &&
+        tagMatch[1].length > 0 &&
+        !line.includes('Feature:') &&
+        !line.includes('Scenario')
+      ) {
         // Tag is indented but not on a Feature/Scenario line
         const nextLine = lines[i + 1] || '';
         if (!/^\s*(Feature|Scenario|Scenario Outline):/.test(nextLine)) {
           warnings.push({
             code: 'ORPHAN_TAG',
             message: `Tag "${tagMatch[2]}" appears to be orphaned. Tags should precede Feature or Scenario.`,
-            line: lineNum
+            line: lineNum,
           });
         }
       }

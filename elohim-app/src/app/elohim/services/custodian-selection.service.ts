@@ -1,6 +1,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
-import { ShefaService } from './shefa.service';
+
 import { CustodianCommitmentService } from './custodian-commitment.service';
+import { ShefaService } from './shefa.service';
 
 /**
  * CustodianSelectionService
@@ -17,7 +18,7 @@ import { CustodianCommitmentService } from './custodian-commitment.service';
 
 export interface Custodian {
   id: string;
-  endpoint: string;  // HTTP endpoint for doorway
+  endpoint: string; // HTTP endpoint for doorway
   domain: string;
   epic: string;
 }
@@ -40,17 +41,14 @@ export interface CustodianScore {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class CustodianSelectionService {
   private readonly shefa = inject(ShefaService);
   private readonly commitments = inject(CustodianCommitmentService);
 
   // Cache selection results (2 minute TTL for stability)
-  private selectionCache = new Map<
-    string,
-    { score: CustodianScore; timestamp: number }
-  >();
+  private selectionCache = new Map<string, { score: CustodianScore; timestamp: number }>();
   private readonly CACHE_TTL_MS = 2 * 60 * 1000;
 
   // Statistics for monitoring
@@ -58,7 +56,7 @@ export class CustodianSelectionService {
     selectionsAttempted: 0,
     selectionsSuccessful: 0,
     cacheHits: 0,
-    cacheMisses: 0
+    cacheMisses: 0,
   });
 
   readonly selectionStats = this.statistics.asReadonly();
@@ -111,7 +109,7 @@ export class CustodianSelectionService {
             id: commitment.custodianId,
             endpoint: commitment.doorwayEndpoint,
             domain: commitment.domain,
-            epic: commitment.epic
+            epic: commitment.epic,
           };
 
           const score = await this.scoreCustodian(custodian, commitment.stewardTier);
@@ -138,7 +136,7 @@ export class CustodianSelectionService {
       // Cache result
       this.selectionCache.set(contentId, {
         score: best,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       stats.selectionsSuccessful++;
@@ -148,7 +146,7 @@ export class CustodianSelectionService {
         score: best.finalScore.toFixed(1),
         health: best.breakdown.healthScore.toFixed(1),
         latency: best.breakdown.latencyScore.toFixed(1),
-        bandwidth: best.breakdown.bandwidthScore.toFixed(1)
+        bandwidth: best.breakdown.bandwidthScore.toFixed(1),
       });
 
       return best;
@@ -185,7 +183,7 @@ export class CustodianSelectionService {
       if (metrics.health.uptimePercent < 50 || !metrics.health.availability) {
         console.log(
           `[CustodianSelection] Skipping unhealthy custodian ${custodian.id}: ` +
-          `uptime=${metrics.health.uptimePercent}%, available=${metrics.health.availability}`
+            `uptime=${metrics.health.uptimePercent}%, available=${metrics.health.availability}`
         );
         return null;
       }
@@ -193,9 +191,7 @@ export class CustodianSelectionService {
       // Calculate component scores (0-1)
       const healthScore = this.calculateHealthScore(metrics.health.uptimePercent);
 
-      const latencyScore = this.calculateLatencyScore(
-        metrics.health.responseTimeP95Ms
-      );
+      const latencyScore = this.calculateLatencyScore(metrics.health.responseTimeP95Ms);
 
       const bandwidthScore = this.calculateBandwidthScore(
         metrics.bandwidth.currentUsageMbps,
@@ -228,8 +224,7 @@ export class CustodianSelectionService {
         custodian,
         health: metrics.health.uptimePercent,
         latency: metrics.health.responseTimeP95Ms,
-        bandwidth:
-          metrics.bandwidth.currentUsageMbps / metrics.bandwidth.declaredMbps,
+        bandwidth: metrics.bandwidth.currentUsageMbps / metrics.bandwidth.declaredMbps,
         specialization: metrics.reputation.specializationBonus,
         commitment: true, // We only score committed custodians
         finalScore,
@@ -238,8 +233,8 @@ export class CustodianSelectionService {
           latencyScore: Math.round(latencyScore * 100 * 10) / 10,
           bandwidthScore: Math.round(bandwidthScore * 100 * 10) / 10,
           specializationScore: Math.round(specializationScore * 100 * 10) / 10,
-          commitmentBonus: 5
-        }
+          commitmentBonus: 5,
+        },
       };
     } catch (err) {
       console.error(`[CustodianSelection] Failed to score ${custodian.id}:`, err);
@@ -281,10 +276,7 @@ export class CustodianSelectionService {
    * High utilization (80-95%) = 0.25 (limited capacity)
    * >95% = 0 (no capacity)
    */
-  private calculateBandwidthScore(
-    currentMbps: number,
-    declaredMbps: number
-  ): number {
+  private calculateBandwidthScore(currentMbps: number, declaredMbps: number): number {
     const utilizationPercent = (currentMbps / declaredMbps) * 100;
 
     if (utilizationPercent > 95) return 0;
@@ -314,9 +306,9 @@ export class CustodianSelectionService {
   private getTierBonus(tier: 1 | 2 | 3 | 4): number {
     const bonuses: Record<number, number> = {
       1: 0.0125, // 25% of 0.05
-      2: 0.025,  // 50% of 0.05
+      2: 0.025, // 50% of 0.05
       3: 0.0375, // 75% of 0.05
-      4: 0.05    // 100% of 0.05
+      4: 0.05, // 100% of 0.05
     };
 
     return bonuses[tier] || 0;
@@ -337,7 +329,7 @@ export class CustodianSelectionService {
           id: metrics.custodianId,
           endpoint: `https://${metrics.custodianId}.example.com`,
           domain: 'unknown',
-          epic: 'unknown'
+          epic: 'unknown',
         };
 
         const score = await this.scoreCustodian(custodian, metrics.economic.stewardTier);
@@ -357,7 +349,7 @@ export class CustodianSelectionService {
   /**
    * Get top N custodians by score
    */
-  async getTopCustodians(limit: number = 10): Promise<CustodianScore[]> {
+  async getTopCustodians(limit = 10): Promise<CustodianScore[]> {
     const scores = await this.scoreAllCustodians();
     return scores.slice(0, limit);
   }

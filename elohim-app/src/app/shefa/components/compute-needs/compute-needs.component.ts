@@ -10,16 +10,17 @@
  * This guides users from "I have a problem" to "here's how to fix it"
  */
 
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
+
 import { Subject, takeUntil } from 'rxjs';
 
-import { ShefaComputeService } from '../../services/shefa-compute.service';
 import {
   ComputeNeedsAssessment,
   ComputeGap,
   NodeRecommendation,
 } from '../../models/shefa-dashboard.model';
+import { ShefaComputeService } from '../../services/shefa-compute.service';
 
 @Component({
   selector: 'app-compute-needs',
@@ -74,12 +75,12 @@ export class ComputeNeedsComponent implements OnInit, OnDestroy {
       .getComputeNeedsAssessment(this.operatorId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (assessment) => {
+        next: assessment => {
           this.assessment = assessment;
           this.isLoading = false;
           this.assessmentComplete.emit(assessment);
         },
-        error: (err) => {
+        error: err => {
           console.error('[ComputeNeeds] Failed to load:', err);
           this.error = 'Failed to assess compute needs';
           this.isLoading = false;

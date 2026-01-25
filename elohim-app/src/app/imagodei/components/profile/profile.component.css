@@ -241,10 +241,16 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, var(--primary-50, #eff6ff) 0%, var(--purple-50, #faf5ff) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-50, #eff6ff) 0%,
+    var(--purple-50, #faf5ff) 100%
+  );
   border: 1px solid var(--primary-100, #dbeafe);
   border-radius: 10px;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
 }
 
 .discovery-card:hover {
@@ -310,7 +316,9 @@
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
 }
 
 .discovery-add-btn:hover {
@@ -448,14 +456,16 @@
   color: var(--text-color, #1a1a2e);
 }
 
-.form-group input[type="text"],
+.form-group input[type='text'],
 .form-group textarea {
   padding: 0.75rem 1rem;
   border: 1px solid var(--surface-border, #dee2e6);
   border-radius: 8px;
   font-size: 1rem;
   font-family: inherit;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
   background: var(--surface-ground, #f8f9fa);
 }
 
@@ -498,7 +508,9 @@
   border: 1px solid var(--surface-border, #dee2e6);
   border-radius: 8px;
   cursor: pointer;
-  transition: border-color 0.2s, background-color 0.2s;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s;
 }
 
 .reach-option:hover {
@@ -511,7 +523,7 @@
   background: var(--primary-50, #eff6ff);
 }
 
-.reach-option input[type="radio"] {
+.reach-option input[type='radio'] {
   margin-top: 0.25rem;
   accent-color: var(--primary-500, #3b82f6);
 }
@@ -551,7 +563,9 @@
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.1s;
+  transition:
+    background-color 0.2s,
+    transform 0.1s;
 }
 
 .btn:disabled {

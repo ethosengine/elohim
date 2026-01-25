@@ -8,9 +8,8 @@ describe('VisionComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [VisionComponent]
-    })
-    .compileComponents();
+      imports: [VisionComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(VisionComponent);
     component = fixture.componentInstance;
@@ -44,7 +43,9 @@ describe('VisionComponent', () => {
 
     expect(itemTexts.some((text: string) => text.includes('Technology serves love'))).toBe(true);
     expect(itemTexts.some((text: string) => text.includes('Communities self-govern'))).toBe(true);
-    expect(itemTexts.some((text: string) => text.includes('Dark patterns are impossible'))).toBe(true);
+    expect(itemTexts.some((text: string) => text.includes('Dark patterns are impossible'))).toBe(
+      true
+    );
   });
 
   it('should render introductory and closing paragraphs', () => {

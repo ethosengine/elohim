@@ -22,6 +22,7 @@
  * ```
  */
 
+import { CommonModule } from '@angular/common';
 import {
   Component,
   Input,
@@ -32,30 +33,31 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   signal,
-  computed
+  computed,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { Subject, takeUntil } from 'rxjs';
 
-import { SophiaWrapperComponent } from '../../../content-io/plugins/sophia/sophia-wrapper.component';
-import type { Moment, Recognition } from '../../../content-io/plugins/sophia/sophia-moment.model';
 import {
   getPsycheAPI,
   type PsycheAPI,
   type AggregatedReflection,
   type PsychometricInterpretation,
-  type ReflectionRecognition
+  type ReflectionRecognition,
 } from '../../../content-io/plugins/sophia/sophia-element-loader';
+import { SophiaWrapperComponent } from '../../../content-io/plugins/sophia/sophia-wrapper.component';
 import {
   EPIC_DOMAIN_SUBSCALES,
   EPIC_DOMAIN_INSTRUMENT_ID,
   EPIC_DOMAIN_INSTRUMENT_CONFIG,
   getEpicSubscale,
-  getEpicResultType
+  getEpicResultType,
 } from '../../instruments/epic-domain.instrument';
-import { QuestionPoolService } from '../../services/question-pool.service';
-import { DiscoveryAttestationService } from '../../services/discovery-attestation.service';
 import { type DiscoveryResultSummary } from '../../models/discovery-assessment.model';
+import { DiscoveryAttestationService } from '../../services/discovery-attestation.service';
+import { QuestionPoolService } from '../../services/question-pool.service';
+
+import type { Moment, Recognition } from '../../../content-io/plugins/sophia/sophia-moment.model';
 
 // =============================================================================
 // Types
@@ -67,7 +69,10 @@ import { type DiscoveryResultSummary } from '../../models/discovery-assessment.m
  */
 export const EPIC_SUBSCALES: Record<string, { name: string; color: string; icon: string }> =
   Object.fromEntries(
-    EPIC_DOMAIN_SUBSCALES.map(s => [s.id, { name: s.name, color: s.color ?? '#888', icon: s.icon ?? '📌' }])
+    EPIC_DOMAIN_SUBSCALES.map(s => [
+      s.id,
+      { name: s.name, color: s.color ?? '#888', icon: s.icon ?? '📌' },
+    ])
   );
 
 /**
@@ -103,11 +108,7 @@ export interface DiscoveryQuizCompletionEvent {
   imports: [CommonModule, SophiaWrapperComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section
-      class="discovery-quiz"
-      [class.completed]="showResults()"
-      [class.loading]="loading()">
-
+    <section class="discovery-quiz" [class.completed]="showResults()" [class.loading]="loading()">
       <!-- Header -->
       <header class="quiz-header">
         <div class="header-content">
@@ -160,10 +161,10 @@ export interface DiscoveryQuizCompletionEvent {
                     <div
                       class="subscale-fill"
                       [style.width.%]="subscale.percent"
-                      [style.backgroundColor]="subscale.color">
-                    </div>
+                      [style.backgroundColor]="subscale.color"
+                    ></div>
                   </div>
-                  <span class="subscale-percent">{{ subscale.percent | number:'1.0-0' }}%</span>
+                  <span class="subscale-percent">{{ subscale.percent | number: '1.0-0' }}%</span>
                 </div>
               }
             </div>
@@ -182,14 +183,11 @@ export interface DiscoveryQuizCompletionEvent {
                 [reviewMode]="false"
                 [autoFocus]="true"
                 (recognized)="onMomentRecognized($event)"
-                (answerChanged)="onAnswerChanged($event)">
-              </app-sophia-question>
+                (answerChanged)="onAnswerChanged($event)"
+              ></app-sophia-question>
 
               <div class="answer-controls">
-                <button
-                  class="btn-continue"
-                  [disabled]="!hasAnswer()"
-                  (click)="continueToNext()">
+                <button class="btn-continue" [disabled]="!hasAnswer()" (click)="continueToNext()">
                   {{ isLastQuestion() ? 'See Results' : 'Continue' }}
                 </button>
               </div>
@@ -199,264 +197,268 @@ export interface DiscoveryQuizCompletionEvent {
       </div>
     </section>
   `,
-  styles: [`
-    .discovery-quiz {
-      margin-top: 2rem;
-      border: 1px solid var(--border-color, #e9ecef);
-      border-radius: var(--radius-lg, 12px);
-      background: var(--surface-secondary, #f8f9fa);
-      overflow: hidden;
-      transition: all 0.3s ease;
-    }
+  styles: [
+    `
+      .discovery-quiz {
+        margin-top: 2rem;
+        border: 1px solid var(--border-color, #e9ecef);
+        border-radius: var(--radius-lg, 12px);
+        background: var(--surface-secondary, #f8f9fa);
+        overflow: hidden;
+        transition: all 0.3s ease;
+      }
 
-    .discovery-quiz.completed {
-      border-color: var(--primary, #4285f4);
-      background: linear-gradient(
-        to bottom,
-        var(--primary-surface, #e8f0fe) 0%,
-        var(--surface-secondary, #f8f9fa) 100%
-      );
-    }
+      .discovery-quiz.completed {
+        border-color: var(--primary, #4285f4);
+        background: linear-gradient(
+          to bottom,
+          var(--primary-surface, #e8f0fe) 0%,
+          var(--surface-secondary, #f8f9fa) 100%
+        );
+      }
 
-    /* Header */
-    .quiz-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1rem 1.25rem;
-      background: var(--surface-elevated, #fff);
-      border-bottom: 1px solid var(--border-color, #e9ecef);
-    }
+      /* Header */
+      .quiz-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.25rem;
+        background: var(--surface-elevated, #fff);
+        border-bottom: 1px solid var(--border-color, #e9ecef);
+      }
 
-    .header-content {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
+      .header-content {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
 
-    .quiz-icon {
-      font-size: 1.5rem;
-    }
+      .quiz-icon {
+        font-size: 1.5rem;
+      }
 
-    .quiz-title {
-      margin: 0;
-      font-size: 1.125rem;
-      font-weight: 600;
-      color: var(--text-primary, #202124);
-    }
+      .quiz-title {
+        margin: 0;
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-primary, #202124);
+      }
 
-    /* Progress */
-    .progress-bar {
-      height: 4px;
-      background: var(--surface-tertiary, #e8eaed);
-      overflow: hidden;
-    }
+      /* Progress */
+      .progress-bar {
+        height: 4px;
+        background: var(--surface-tertiary, #e8eaed);
+        overflow: hidden;
+      }
 
-    .progress-fill {
-      height: 100%;
-      background: var(--primary, #4285f4);
-      transition: width 0.3s ease;
-    }
+      .progress-fill {
+        height: 100%;
+        background: var(--primary, #4285f4);
+        transition: width 0.3s ease;
+      }
 
-    .progress-label {
-      padding: 0.5rem 1.25rem;
-      font-size: 0.875rem;
-      color: var(--text-secondary, #5f6368);
-      text-align: center;
-    }
+      .progress-label {
+        padding: 0.5rem 1.25rem;
+        font-size: 0.875rem;
+        color: var(--text-secondary, #5f6368);
+        text-align: center;
+      }
 
-    /* Content */
-    .quiz-content {
-      padding: 1.25rem;
-    }
+      /* Content */
+      .quiz-content {
+        padding: 1.25rem;
+      }
 
-    /* Question container */
-    .question-container {
-      background: var(--surface-elevated, #fff);
-      border-radius: var(--radius-md, 8px);
-      border: 1px solid var(--border-color, #e9ecef);
-      padding: 1.25rem;
-    }
+      /* Question container */
+      .question-container {
+        background: var(--surface-elevated, #fff);
+        border-radius: var(--radius-md, 8px);
+        border: 1px solid var(--border-color, #e9ecef);
+        padding: 1.25rem;
+      }
 
-    /* Controls */
-    .answer-controls {
-      margin-top: 1.25rem;
-      padding-top: 1.25rem;
-      border-top: 1px solid var(--border-color, #e9ecef);
-      display: flex;
-      justify-content: flex-end;
-    }
+      /* Controls */
+      .answer-controls {
+        margin-top: 1.25rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--border-color, #e9ecef);
+        display: flex;
+        justify-content: flex-end;
+      }
 
-    .btn-continue,
-    .btn-explore {
-      padding: 0.75rem 1.5rem;
-      font-size: 1rem;
-      font-weight: 500;
-      border-radius: var(--radius-md, 8px);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
+      .btn-continue,
+      .btn-explore {
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 500;
+        border-radius: var(--radius-md, 8px);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
 
-    .btn-continue {
-      background: var(--primary, #4285f4);
-      color: white;
-      border: none;
-    }
+      .btn-continue {
+        background: var(--primary, #4285f4);
+        color: white;
+        border: none;
+      }
 
-    .btn-continue:hover:not(:disabled) {
-      background: var(--primary-dark, #1a73e8);
-    }
+      .btn-continue:hover:not(:disabled) {
+        background: var(--primary-dark, #1a73e8);
+      }
 
-    .btn-continue:disabled {
-      background: var(--surface-tertiary, #e8eaed);
-      color: var(--text-disabled, #9aa0a6);
-      cursor: not-allowed;
-    }
+      .btn-continue:disabled {
+        background: var(--surface-tertiary, #e8eaed);
+        color: var(--text-disabled, #9aa0a6);
+        cursor: not-allowed;
+      }
 
-    /* Results */
-    .results-section {
-      text-align: center;
-    }
+      /* Results */
+      .results-section {
+        text-align: center;
+      }
 
-    .result-card {
-      padding: 2rem;
-      margin-bottom: 1.5rem;
-      background: var(--surface-elevated, #fff);
-      border-radius: var(--radius-md, 8px);
-      border: 1px solid var(--border-color, #e9ecef);
-    }
+      .result-card {
+        padding: 2rem;
+        margin-bottom: 1.5rem;
+        background: var(--surface-elevated, #fff);
+        border-radius: var(--radius-md, 8px);
+        border: 1px solid var(--border-color, #e9ecef);
+      }
 
-    .result-icon {
-      font-size: 3rem;
-      margin-bottom: 0.75rem;
-    }
+      .result-icon {
+        font-size: 3rem;
+        margin-bottom: 0.75rem;
+      }
 
-    .result-title {
-      margin: 0 0 0.5rem;
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: var(--text-secondary, #5f6368);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
+      .result-title {
+        margin: 0 0 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-secondary, #5f6368);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
 
-    .result-name {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--primary, #4285f4);
-      margin-bottom: 0.5rem;
-    }
+      .result-name {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary, #4285f4);
+        margin-bottom: 0.5rem;
+      }
 
-    .result-description {
-      margin: 0;
-      color: var(--text-secondary, #5f6368);
-      font-size: 0.9375rem;
-      line-height: 1.5;
-      max-width: 400px;
-      margin-inline: auto;
-    }
+      .result-description {
+        margin: 0;
+        color: var(--text-secondary, #5f6368);
+        font-size: 0.9375rem;
+        line-height: 1.5;
+        max-width: 400px;
+        margin-inline: auto;
+      }
 
-    /* Subscale breakdown */
-    .subscale-breakdown {
-      text-align: left;
-      padding: 1.25rem;
-      margin-bottom: 1.5rem;
-      background: var(--surface-elevated, #fff);
-      border-radius: var(--radius-md, 8px);
-      border: 1px solid var(--border-color, #e9ecef);
-    }
+      /* Subscale breakdown */
+      .subscale-breakdown {
+        text-align: left;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        background: var(--surface-elevated, #fff);
+        border-radius: var(--radius-md, 8px);
+        border: 1px solid var(--border-color, #e9ecef);
+      }
 
-    .subscale-breakdown h5 {
-      margin: 0 0 1rem;
-      font-size: 0.9375rem;
-      font-weight: 600;
-      color: var(--text-primary, #202124);
-    }
+      .subscale-breakdown h5 {
+        margin: 0 0 1rem;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--text-primary, #202124);
+      }
 
-    .subscale-row {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 0.75rem;
-    }
+      .subscale-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
 
-    .subscale-row:last-child {
-      margin-bottom: 0;
-    }
+      .subscale-row:last-child {
+        margin-bottom: 0;
+      }
 
-    .subscale-label {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      width: 160px;
-      font-size: 0.875rem;
-      color: var(--text-primary, #202124);
-    }
+      .subscale-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: 160px;
+        font-size: 0.875rem;
+        color: var(--text-primary, #202124);
+      }
 
-    .subscale-icon {
-      font-size: 1rem;
-    }
+      .subscale-icon {
+        font-size: 1rem;
+      }
 
-    .subscale-bar {
-      flex: 1;
-      height: 8px;
-      background: var(--surface-tertiary, #e8eaed);
-      border-radius: 4px;
-      overflow: hidden;
-    }
+      .subscale-bar {
+        flex: 1;
+        height: 8px;
+        background: var(--surface-tertiary, #e8eaed);
+        border-radius: 4px;
+        overflow: hidden;
+      }
 
-    .subscale-fill {
-      height: 100%;
-      border-radius: 4px;
-      transition: width 0.5s ease;
-    }
+      .subscale-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+      }
 
-    .subscale-percent {
-      width: 3rem;
-      text-align: right;
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: var(--text-secondary, #5f6368);
-    }
+      .subscale-percent {
+        width: 3rem;
+        text-align: right;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-secondary, #5f6368);
+      }
 
-    .btn-explore {
-      background: var(--primary, #4285f4);
-      color: white;
-      border: none;
-      width: 100%;
-      max-width: 300px;
-    }
+      .btn-explore {
+        background: var(--primary, #4285f4);
+        color: white;
+        border: none;
+        width: 100%;
+        max-width: 300px;
+      }
 
-    .btn-explore:hover {
-      background: var(--primary-dark, #1a73e8);
-    }
+      .btn-explore:hover {
+        background: var(--primary-dark, #1a73e8);
+      }
 
-    /* Loading & empty states */
-    .loading-state,
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem;
-      text-align: center;
-      color: var(--text-secondary, #5f6368);
-    }
+      /* Loading & empty states */
+      .loading-state,
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        text-align: center;
+        color: var(--text-secondary, #5f6368);
+      }
 
-    .loading-spinner {
-      width: 1.5rem;
-      height: 1.5rem;
-      border: 2px solid var(--border-color, #e9ecef);
-      border-top-color: var(--primary, #4285f4);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-bottom: 0.75rem;
-    }
+      .loading-spinner {
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 2px solid var(--border-color, #e9ecef);
+        border-top-color: var(--primary, #4285f4);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin-bottom: 0.75rem;
+      }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  `]
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    `,
+  ],
 })
 export class DiscoveryQuizComponent implements OnInit, OnDestroy {
   /** Quiz ID to load */
@@ -523,7 +525,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
       care: 0,
       economic: 0,
       public: 0,
-      social: 0
+      social: 0,
     };
   });
 
@@ -532,16 +534,14 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     const scores = agg?.normalizedScores ?? this.subscaleScores();
     const total = Object.values(scores).reduce((sum, v) => sum + v, 0) || 1;
 
-    return EPIC_DOMAIN_SUBSCALES
-      .map(subscale => ({
-        key: subscale.id,
-        name: subscale.name,
-        icon: subscale.icon ?? '📌',
-        color: subscale.color ?? '#888',
-        score: scores[subscale.id] ?? 0,
-        percent: ((scores[subscale.id] ?? 0) / total) * 100
-      }))
-      .sort((a, b) => b.score - a.score);
+    return EPIC_DOMAIN_SUBSCALES.map(subscale => ({
+      key: subscale.id,
+      name: subscale.name,
+      icon: subscale.icon ?? '📌',
+      color: subscale.color ?? '#888',
+      score: scores[subscale.id] ?? 0,
+      percent: ((scores[subscale.id] ?? 0) / total) * 100,
+    })).sort((a, b) => b.score - a.score);
   });
 
   protected primarySubscale = computed(() => {
@@ -584,7 +584,9 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     this.psycheAPI = getPsycheAPI();
 
     if (!this.psycheAPI) {
-      console.error('[DiscoveryQuiz] psyche-core not available - sophia-plugin must be loaded first');
+      console.error(
+        '[DiscoveryQuiz] psyche-core not available - sophia-plugin must be loaded first'
+      );
       return;
     }
 
@@ -617,9 +619,9 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
       purpose: 'reflection',
       userInput: recognition.userInput,
       reflection: recognition.reflection ?? {
-        subscaleContributions: recognition.resonance?.subscaleContributions ?? {}
+        subscaleContributions: recognition.resonance?.subscaleContributions ?? {},
       },
-      timestamp: recognition.timestamp ?? Date.now()
+      timestamp: recognition.timestamp ?? Date.now(),
     };
     this.recognitions.update(rs => [...rs, reflectionRecognition]);
   }
@@ -703,7 +705,8 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
   private loadQuestions(): void {
     this.loading.set(true);
 
-    this.poolService.getPoolForContent(this.quizId)
+    this.poolService
+      .getPoolForContent(this.quizId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: pool => {
@@ -717,8 +720,8 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
               subscaleContributions: q.subscaleContributions,
               metadata: {
                 discoveryMode: true,
-                originalItem: q
-              }
+                originalItem: q,
+              },
             }));
             this.moments.set(discoveryMoments);
             this.noQuestions.set(false);
@@ -733,7 +736,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
           this.noQuestions.set(true);
           this.loading.set(false);
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 
@@ -757,7 +760,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     if (allRecognitions.length > 0) {
       const aggregated = this.psycheAPI.aggregateReflections(allRecognitions, {
         normalization: 'sum',
-        subscales: EPIC_DOMAIN_SUBSCALES
+        subscales: EPIC_DOMAIN_SUBSCALES,
       });
       this.aggregated.set(aggregated);
       console.log('[DiscoveryQuiz] Aggregated via psyche-core:', aggregated);
@@ -793,9 +796,9 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
       typeId: primary,
       name: interp?.primaryType?.typeName ?? EPIC_SUBSCALES[primary]?.name ?? primary,
       shortCode: primary.substring(0, 3).toUpperCase(),
-      score: interp?.confidence ?? (scores[primary] / this.totalQuestions()),
+      score: interp?.confidence ?? scores[primary] / this.totalQuestions(),
       icon: EPIC_SUBSCALES[primary]?.icon,
-      color: EPIC_SUBSCALES[primary]?.color
+      color: EPIC_SUBSCALES[primary]?.color,
     };
 
     // Emit completion event
@@ -805,7 +808,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
       subscaleScores: scores,
       primarySubscale: primary,
       recommendedEpic: primary,
-      totalAnswered: this.totalQuestions()
+      totalAnswered: this.totalQuestions(),
     };
 
     this.completed.emit(event);

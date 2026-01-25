@@ -21,6 +21,7 @@
  */
 
 import { Injectable } from '@angular/core';
+
 import { Observable, Subject, BehaviorSubject } from 'rxjs';
 
 import {
@@ -32,11 +33,11 @@ import {
   CategorizationResult,
 } from '../models/transaction-import.model';
 
-import { PlaidIntegrationService } from './plaid-integration.service';
-import { DuplicateDetectionService } from './duplicate-detection.service';
 import { AICategorizationService } from './ai-categorization.service';
-import { EconomicEventFactoryService } from './economic-event-factory.service';
 import { BudgetReconciliationService } from './budget-reconciliation.service';
+import { DuplicateDetectionService } from './duplicate-detection.service';
+import { EconomicEventFactoryService } from './economic-event-factory.service';
+import { PlaidIntegrationService } from './plaid-integration.service';
 
 /**
  * Pipeline progress tracking
@@ -104,10 +105,10 @@ export class TransactionImportService {
   private errors$ = new Subject<{ stage: string; error: string }>();
 
   // Batch status tracking (in-memory, would be backed by DHT in production)
-  private batches: Map<string, ImportBatch> = new Map();
+  private batches = new Map<string, ImportBatch>();
 
   // Staged transactions (in-memory)
-  private stagedTransactions: Map<string, StagedTransaction> = new Map();
+  private stagedTransactions = new Map<string, StagedTransaction>();
 
   constructor(
     private plaid: PlaidIntegrationService,
@@ -174,9 +175,7 @@ export class TransactionImportService {
 
       // Stage 3: Deduplicate
       this.updateProgress('deduplicating', 40, 'Detecting duplicates...');
-      const unique = await this.duplicates.filterDuplicates(
-        plaidTransactions
-      );
+      const unique = await this.duplicates.filterDuplicates(plaidTransactions);
       batch.duplicateTransactions = normalized.length - unique.length;
       batch.newTransactions = unique.length;
 
@@ -187,11 +186,7 @@ export class TransactionImportService {
 
       // Stage 5: Categorize (async, non-blocking)
       if (request.aiCategorizationEnabled !== false) {
-        this.updateProgress(
-          'categorizing',
-          70,
-          'Starting AI categorization (background)'
-        );
+        this.updateProgress('categorizing', 70, 'Starting AI categorization (background)');
         this.categorizeTransactionsAsync(staged, batch);
       }
 
@@ -284,7 +279,7 @@ export class TransactionImportService {
    * User bulk-approves multiple transactions
    */
   async approveBatch(stagedIds: string[]): Promise<void> {
-    const errors: Array<{ id: string; error: string }> = [];
+    const errors: { id: string; error: string }[] = [];
 
     for (const id of stagedIds) {
       try {
@@ -310,9 +305,7 @@ export class TransactionImportService {
   /**
    * Normalizes Plaid transactions to internal format
    */
-  private normalizeTransactions(
-    plaidTransactions: PlaidTransaction[]
-  ): NormalizedTransaction[] {
+  private normalizeTransactions(plaidTransactions: PlaidTransaction[]): NormalizedTransaction[] {
     return plaidTransactions.map(txn => ({
       plaidTransactionId: txn.transactionId,
       plaidAccountId: txn.accountId,
@@ -329,9 +322,7 @@ export class TransactionImportService {
   /**
    * Determines transaction type (debit/credit/fee/transfer)
    */
-  private determineTransactionType(
-    txn: PlaidTransaction
-  ): 'debit' | 'credit' | 'transfer' | 'fee' {
+  private determineTransactionType(txn: PlaidTransaction): 'debit' | 'credit' | 'transfer' | 'fee' {
     const description = txn.name.toLowerCase();
 
     // Check for fee
@@ -454,9 +445,7 @@ export class TransactionImportService {
 
           // Store categorization results
           for (const catResult of result.results) {
-            const stagedTxn = this.stagedTransactions.get(
-              catResult.transactionId
-            );
+            const stagedTxn = this.stagedTransactions.get(catResult.transactionId);
             if (stagedTxn) {
               stagedTxn.category = catResult.category;
               stagedTxn.categoryConfidence = catResult.confidence;
@@ -535,9 +524,7 @@ export class TransactionImportService {
    * Gets all batches for a steward
    */
   getBatchesForSteward(stewardId: string): ImportBatch[] {
-    return Array.from(this.batches.values()).filter(
-      b => b.stewardId === stewardId
-    );
+    return Array.from(this.batches.values()).filter(b => b.stewardId === stewardId);
   }
 
   /**
@@ -564,9 +551,7 @@ export class TransactionImportService {
    * Gets all staged transactions for a batch
    */
   getStagedTransactionsForBatch(batchId: string): StagedTransaction[] {
-    return Array.from(this.stagedTransactions.values()).filter(
-      s => s.batchId === batchId
-    );
+    return Array.from(this.stagedTransactions.values()).filter(s => s.batchId === batchId);
   }
 
   /**

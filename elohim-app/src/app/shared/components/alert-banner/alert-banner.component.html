@@ -11,10 +11,15 @@
     aria-live="polite"
   >
     <!-- Summary Row -->
-    <div class="banner-row" (click)="expandable && activeAlerts.length > 1 ? toggleExpanded() : null">
+    <div
+      class="banner-row"
+      (click)="expandable && activeAlerts.length > 1 ? toggleExpanded() : null"
+    >
       <!-- Icon -->
       <ng-container *ngIf="iconTemplate; else defaultIcon">
-        <ng-container *ngTemplateOutlet="iconTemplate; context: { $implicit: primaryAlert }"></ng-container>
+        <ng-container
+          *ngTemplateOutlet="iconTemplate; context: { $implicit: primaryAlert }"
+        ></ng-container>
       </ng-container>
       <ng-template #defaultIcon>
         <span class="alert-icon">{{ getIcon(primaryAlert!) }}</span>
@@ -22,7 +27,9 @@
 
       <!-- Content -->
       <ng-container *ngIf="contentTemplate; else defaultContent">
-        <ng-container *ngTemplateOutlet="contentTemplate; context: { $implicit: primaryAlert }"></ng-container>
+        <ng-container
+          *ngTemplateOutlet="contentTemplate; context: { $implicit: primaryAlert }"
+        ></ng-container>
       </ng-container>
       <ng-template #defaultContent>
         <div class="alert-content">
@@ -39,7 +46,9 @@
       <!-- Actions -->
       <div class="alert-actions">
         <ng-container *ngIf="actionsTemplate; else defaultActions">
-          <ng-container *ngTemplateOutlet="actionsTemplate; context: { $implicit: primaryAlert }"></ng-container>
+          <ng-container
+            *ngTemplateOutlet="actionsTemplate; context: { $implicit: primaryAlert }"
+          ></ng-container>
         </ng-container>
         <ng-template #defaultActions>
           <ng-container *ngFor="let action of primaryAlert!.actions">
@@ -101,10 +110,7 @@
           </div>
           <div class="item-actions">
             <ng-container *ngFor="let action of alert.actions?.slice(0, 2)">
-              <button
-                class="btn-small"
-                (click)="onActionClick(alert, action, $event)"
-              >
+              <button class="btn-small" (click)="onActionClick(alert, action, $event)">
                 {{ action.label }}
               </button>
             </ng-container>
@@ -158,11 +164,7 @@
 
       <div class="card-footer" *ngIf="alert.actions && alert.actions.length > 0">
         <ng-container *ngFor="let action of alert.actions">
-          <a
-            *ngIf="action.href"
-            [href]="action.href"
-            [class]="getActionClass(action)"
-          >
+          <a *ngIf="action.href" [href]="action.href" [class]="getActionClass(action)">
             {{ action.label }}
           </a>
           <button

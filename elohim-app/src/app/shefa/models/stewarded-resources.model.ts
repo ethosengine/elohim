@@ -45,19 +45,19 @@
  * Financial assets are tracked transparently; no mystique around currency.
  */
 export type ResourceCategory =
-  | 'energy'             // Time, attention, currency
-  | 'compute'            // Processing power, storage, bandwidth
-  | 'water'              // Fresh water, wastewater
-  | 'food'               // Calories, nutrition, ingredients
-  | 'shelter'            // Housing, square footage, utilities
-  | 'transportation'     // Vehicles, fuel, mobility
-  | 'property'           // Personal property, goods
-  | 'equipment'          // Tools, instruments, machines
-  | 'inventory'          // Raw materials, supplies, stock
-  | 'knowledge'          // Expertise, learning, skills
-  | 'reputation'         // Trust, credentials, standing
-  | 'financial-asset'    // Fiat currency, mutual credit, assets
-  | 'uba';               // Universal Basic Assets (transitional)
+  | 'energy' // Time, attention, currency
+  | 'compute' // Processing power, storage, bandwidth
+  | 'water' // Fresh water, wastewater
+  | 'food' // Calories, nutrition, ingredients
+  | 'shelter' // Housing, square footage, utilities
+  | 'transportation' // Vehicles, fuel, mobility
+  | 'property' // Personal property, goods
+  | 'equipment' // Tools, instruments, machines
+  | 'inventory' // Raw materials, supplies, stock
+  | 'knowledge' // Expertise, learning, skills
+  | 'reputation' // Trust, credentials, standing
+  | 'financial-asset' // Fiat currency, mutual credit, assets
+  | 'uba'; // Universal Basic Assets (transitional)
 
 /**
  * ResourceSubcategory - More specific resource types
@@ -73,11 +73,11 @@ export interface ResourceSubcategory {
  * ResourceDimension - How a resource is measured
  */
 export interface ResourceDimension {
-  unit: string;                    // kWh, GB, liters, kg, m², etc.
-  unitLabel: string;               // "kilowatt-hours", "gigabytes", etc.
-  unitAbbreviation: string;        // "kWh", "GB", "L", etc.
-  conversionFactor?: number;       // For converting to standard unit
-  standardUnit?: string;           // Base unit for this category
+  unit: string; // kWh, GB, liters, kg, m², etc.
+  unitLabel: string; // "kilowatt-hours", "gigabytes", etc.
+  unitAbbreviation: string; // "kWh", "GB", "L", etc.
+  conversionFactor?: number; // For converting to standard unit
+  standardUnit?: string; // Base unit for this category
 }
 
 /**
@@ -92,11 +92,11 @@ export interface ResourceMeasure {
  * AllocationStatus - Where the resource is allocated
  */
 export type AllocationStatus =
-  | 'unallocated'     // Available but not assigned
-  | 'allocated'       // Assigned to a purpose/person
-  | 'reserved'        // Held for future use
-  | 'available'       // Could be allocated if needed
-  | 'fully-used';     // All allocated capacity is being used
+  | 'unallocated' // Available but not assigned
+  | 'allocated' // Assigned to a purpose/person
+  | 'reserved' // Held for future use
+  | 'available' // Could be allocated if needed
+  | 'fully-used'; // All allocated capacity is being used
 
 /**
  * AllocationBlock - An allocation of resource to a purpose
@@ -104,16 +104,16 @@ export type AllocationStatus =
 export interface AllocationBlock {
   id: string;
   resourceId: string;
-  label: string;                    // "Learning", "Work", "Community", etc.
+  label: string; // "Learning", "Work", "Community", etc.
   description?: string;
-  allocated: ResourceMeasure;       // How much is allocated
-  used: ResourceMeasure;            // How much is currently used
-  reserved: ResourceMeasure;        // How much is reserved for future use
-  governanceLevel?: string;         // individual, household, community, etc.
-  governedBy?: string;              // Who controls this allocation
-  commitmentId?: string;            // hREA Commitment if governed
-  priority: number;                 // 1-10 relative priority
-  utilization: number;              // Percentage: used / allocated
+  allocated: ResourceMeasure; // How much is allocated
+  used: ResourceMeasure; // How much is currently used
+  reserved: ResourceMeasure; // How much is reserved for future use
+  governanceLevel?: string; // individual, household, community, etc.
+  governedBy?: string; // Who controls this allocation
+  commitmentId?: string; // hREA Commitment if governed
+  priority: number; // 1-10 relative priority
+  utilization: number; // Percentage: used / allocated
   createdAt: string;
   updatedAt: string;
 }
@@ -124,12 +124,12 @@ export interface AllocationBlock {
 export interface UsageRecord {
   id: string;
   resourceId: string;
-  economicEventId?: string;         // Link to EconomicEvent for immutability
-  allocationBlockId?: string;       // Which allocation was this from
-  action: string;                   // 'use', 'consume', 'produce', 'transfer', etc.
+  economicEventId?: string; // Link to EconomicEvent for immutability
+  allocationBlockId?: string; // Which allocation was this from
+  action: string; // 'use', 'consume', 'produce', 'transfer', etc.
   quantity: ResourceMeasure;
-  duration?: string;                // ISO 8601 duration if time-based
-  observerAttestationId?: string;   // Observer protocol verification
+  duration?: string; // ISO 8601 duration if time-based
+  observerAttestationId?: string; // Observer protocol verification
   timestamp: string;
   note?: string;
 }
@@ -164,33 +164,33 @@ export interface StewardedResource {
   // Identity
   // ─────────────────────────────────────────────────────────────────
   id: string;
-  resourceNumber: string;           // RES-XXXXXXXXXX
-  stewardId: string;                // Human ID who stewards this
+  resourceNumber: string; // RES-XXXXXXXXXX
+  stewardId: string; // Human ID who stewards this
   category: ResourceCategory;
-  subcategory: string;              // More specific type
-  name: string;                     // User-friendly name
+  subcategory: string; // More specific type
+  name: string; // User-friendly name
   description?: string;
 
   // ─────────────────────────────────────────────────────────────────
   // Capacity & Measurement
   // ─────────────────────────────────────────────────────────────────
-  dimension: ResourceDimension;     // How it's measured
-  totalCapacity: ResourceMeasure;   // Maximum available
+  dimension: ResourceDimension; // How it's measured
+  totalCapacity: ResourceMeasure; // Maximum available
   permanentReserve?: ResourceMeasure; // Constitutional minimum (cannot allocate)
   allocatableCapacity: ResourceMeasure; // What can actually be allocated
 
   // ─────────────────────────────────────────────────────────────────
   // Current State
   // ─────────────────────────────────────────────────────────────────
-  totalAllocated: ResourceMeasure;  // Sum of all allocations
-  totalReserved: ResourceMeasure;   // Sum of all reserves
-  totalUsed: ResourceMeasure;       // Sum of actual usage
-  available: ResourceMeasure;       // totalCapacity - allocated
+  totalAllocated: ResourceMeasure; // Sum of all allocations
+  totalReserved: ResourceMeasure; // Sum of all reserves
+  totalUsed: ResourceMeasure; // Sum of actual usage
+  available: ResourceMeasure; // totalCapacity - allocated
 
   // ─────────────────────────────────────────────────────────────────
   // Allocations
   // ─────────────────────────────────────────────────────────────────
-  allocations: AllocationBlock[];   // How resource is divided
+  allocations: AllocationBlock[]; // How resource is divided
   allocationStrategy: 'manual' | 'automatic' | 'hybrid';
   allocationNotes?: string;
 
@@ -198,34 +198,34 @@ export interface StewardedResource {
   // Governance
   // ─────────────────────────────────────────────────────────────────
   governanceLevel: 'individual' | 'household' | 'community' | 'network' | 'constitutional';
-  governedBy?: string;              // ID of entity making decisions
-  constitutionalBasis?: string;     // Reference to governance document
-  canModifyAllocations: boolean;    // Individual can change allocations?
-  requiresApprovalFor?: string[];   // Actions needing governance approval
+  governedBy?: string; // ID of entity making decisions
+  constitutionalBasis?: string; // Reference to governance document
+  canModifyAllocations: boolean; // Individual can change allocations?
+  requiresApprovalFor?: string[]; // Actions needing governance approval
 
   // ─────────────────────────────────────────────────────────────────
   // Tracking & Verification
   // ─────────────────────────────────────────────────────────────────
-  observerEnabled: boolean;         // Is this measured by Observer protocol?
-  observerAgentId?: string;         // Who verifies actual usage
-  recentUsage: UsageRecord[];       // Last N usage events
-  trends: ResourceTrend[];          // Historical trends
+  observerEnabled: boolean; // Is this measured by Observer protocol?
+  observerAgentId?: string; // Who verifies actual usage
+  recentUsage: UsageRecord[]; // Last N usage events
+  trends: ResourceTrend[]; // Historical trends
 
   // ─────────────────────────────────────────────────────────────────
   // Economic Integration
   // ─────────────────────────────────────────────────────────────────
-  resourceSpecId?: string;          // hREA ResourceSpecification
-  commonsPoolId?: string;           // CommonsPool if shared resource
-  allocationEventIds: string[];     // EconomicEvent IDs that set allocations
-  usageEventIds: string[];          // EconomicEvent IDs for all usage
+  resourceSpecId?: string; // hREA ResourceSpecification
+  commonsPoolId?: string; // CommonsPool if shared resource
+  allocationEventIds: string[]; // EconomicEvent IDs that set allocations
+  usageEventIds: string[]; // EconomicEvent IDs for all usage
 
   // ─────────────────────────────────────────────────────────────────
   // Metadata
   // ─────────────────────────────────────────────────────────────────
-  isShared: boolean;                // Is this shared with others?
+  isShared: boolean; // Is this shared with others?
   visibility: 'private' | 'household' | 'community' | 'public';
   dataQuality: 'measured' | 'estimated' | 'manual' | 'mixed';
-  lastVerifiedAt?: string;          // When Observer last confirmed actual usage
+  lastVerifiedAt?: string; // When Observer last confirmed actual usage
   createdAt: string;
   updatedAt: string;
 }
@@ -253,7 +253,7 @@ export interface CategorySummary {
 export interface StewardedResourceDashboard {
   stewardId: string;
   stewardName: string;
-  governanceLevel: string;          // Their level in governance
+  governanceLevel: string; // Their level in governance
 
   // Overview by category
   categories: CategorySummary[];
@@ -262,8 +262,8 @@ export interface StewardedResourceDashboard {
   metrics: {
     totalResourcesTracked: number;
     categoriesCovered: number;
-    overallUtilization: number;     // Weighted average
-    fullyAllocatedCount: number;    // How many at capacity
+    overallUtilization: number; // Weighted average
+    fullyAllocatedCount: number; // How many at capacity
     healthStatus: 'healthy' | 'warning' | 'critical';
   };
 
@@ -284,7 +284,7 @@ export interface StewardedResourceDashboard {
 export interface ResourceAlert {
   id: string;
   severity: 'info' | 'warning' | 'critical';
-  resource: string;                 // Resource ID or category
+  resource: string; // Resource ID or category
   title: string;
   message: string;
   recommendedAction?: string;
@@ -300,8 +300,8 @@ export interface ResourceInsight {
   title: string;
   description: string;
   resource?: string;
-  basedOnPeriod: string;            // e.g., "last 30 days"
-  confidence: number;               // 0-100, how sure we are
+  basedOnPeriod: string; // e.g., "last 30 days"
+  confidence: number; // 0-100, how sure we are
 }
 
 // =============================================================================
@@ -327,18 +327,18 @@ export interface ComputeResource extends StewardedResource {
 
   // Node-specific
   nodeType: 'personal' | 'household' | 'community' | 'network';
-  nodeId: string;                   // Identity in the network
-  uptime: number;                   // Percentage online
-  healthScore: number;              // 0-100 node health
+  nodeId: string; // Identity in the network
+  uptime: number; // Percentage online
+  healthScore: number; // 0-100 node health
 
   // Load allocation
   loadAllocation: {
-    lamad: number;                  // Learning system percentage
-    shefa: number;                  // Economic coordination
-    qahal: number;                  // Governance
-    holochain: number;              // Holochain runtime
-    userApplications: number;        // User's own apps
-    overhead: number;               // System overhead
+    lamad: number; // Learning system percentage
+    shefa: number; // Economic coordination
+    qahal: number; // Governance
+    holochain: number; // Holochain runtime
+    userApplications: number; // User's own apps
+    overhead: number; // System overhead
   };
 
   // Physical constraints
@@ -362,18 +362,18 @@ export interface EnergyResource extends StewardedResource {
   category: 'energy';
 
   // Time-based (human availability)
-  hoursPerWeek?: number;            // Available hours per week
-  attentionCapacity?: number;       // Max concurrent engagements
-  recoveryTime?: number;            // Hours needed for rest
+  hoursPerWeek?: number; // Available hours per week
+  attentionCapacity?: number; // Max concurrent engagements
+  recoveryTime?: number; // Hours needed for rest
 
   // Currency/value
-  currencyType?: string;            // USD, EUR, mutual-credit, etc.
-  accountBalance?: number;          // Current balance
-  incomeSources?: string[];         // Where money comes from
+  currencyType?: string; // USD, EUR, mutual-credit, etc.
+  accountBalance?: number; // Current balance
+  incomeSources?: string[]; // Where money comes from
 
   // Social energy
-  relationshipCapacity?: number;    // Max people to maintain relationships with
-  collaborativeCapacity?: number;   // Max projects simultaneously
+  relationshipCapacity?: number; // Max people to maintain relationships with
+  collaborativeCapacity?: number; // Max projects simultaneously
 }
 
 // =============================================================================
@@ -393,45 +393,53 @@ export interface FinancialAsset extends StewardedResource {
   category: 'financial-asset';
 
   // Asset identification
-  assetType: 'fiat-currency' | 'mutual-credit' | 'cryptocurrency' | 'stock' | 'bond' | 'property-equity' | 'debt' | 'other';
-  currencyCode?: string;            // USD, EUR, BTC, etc.
-  accountNumber?: string;           // Bank/platform account (hashed for privacy)
-  accountInstitution?: string;      // Bank, exchange, service name
+  assetType:
+    | 'fiat-currency'
+    | 'mutual-credit'
+    | 'cryptocurrency'
+    | 'stock'
+    | 'bond'
+    | 'property-equity'
+    | 'debt'
+    | 'other';
+  currencyCode?: string; // USD, EUR, BTC, etc.
+  accountNumber?: string; // Bank/platform account (hashed for privacy)
+  accountInstitution?: string; // Bank, exchange, service name
 
   // Account state
-  accountBalance: number;           // Current balance
-  availableBalance: number;         // Balance available to spend
+  accountBalance: number; // Current balance
+  availableBalance: number; // Balance available to spend
   pendingTransactions: Transaction[];
   accountStatus: 'active' | 'frozen' | 'closed';
 
   // Income streams (for dignity floors)
   incomeStreams: IncomeStream[];
-  monthlyIncome: number;            // Total income per month
-  expectedMonthlyIncome: number;    // Projected income
+  monthlyIncome: number; // Total income per month
+  expectedMonthlyIncome: number; // Projected income
 
   // Liabilities & Obligations
   obligations: FinancialObligation[];
-  totalLiability: number;           // Total amount owed
-  monthlyObligations: number;       // Regular monthly obligations
+  totalLiability: number; // Total amount owed
+  monthlyObligations: number; // Regular monthly obligations
 
   // Dignity floor (UBI/UBA tracking)
-  ubaEligible: boolean;             // Is this person eligible for UBA?
+  ubaEligible: boolean; // Is this person eligible for UBA?
   ubaStatus: 'active' | 'pending' | 'paused' | 'inactive';
-  ubaMonthlyAmount?: number;        // Amount allocated monthly
-  ubaLastPayment?: string;          // When was last UBA payment
-  ubaPaymentSchedule?: string;      // How often paid (weekly, biweekly, monthly)
+  ubaMonthlyAmount?: number; // Amount allocated monthly
+  ubaLastPayment?: string; // When was last UBA payment
+  ubaPaymentSchedule?: string; // How often paid (weekly, biweekly, monthly)
 
   // Financial health metrics
-  burnRate?: number;                // How fast they spend per day
-  runwayDays?: number;              // Days until account depleted (if no income)
-  debtToIncomeRatio?: number;       // Monthly obligations / monthly income
-  creditScore?: number;             // If tracked by legacy system
-  confidenceScore?: number;         // System's confidence in this data (0-100)
+  burnRate?: number; // How fast they spend per day
+  runwayDays?: number; // Days until account depleted (if no income)
+  debtToIncomeRatio?: number; // Monthly obligations / monthly income
+  creditScore?: number; // If tracked by legacy system
+  confidenceScore?: number; // System's confidence in this data (0-100)
 
   // Transparency & Verification
   dataSource: 'bank-api' | 'manual' | 'blockchain' | 'mixed';
-  lastVerifiedAt?: string;          // When was data last confirmed
-  verificationMethod?: string;      // How was it verified
+  lastVerifiedAt?: string; // When was data last confirmed
+  verificationMethod?: string; // How was it verified
 }
 
 /**
@@ -439,15 +447,15 @@ export interface FinancialAsset extends StewardedResource {
  */
 export interface IncomeStream {
   id: string;
-  source: string;                   // "Employment", "Gig Work", "UBA", "Inheritance", etc.
+  source: string; // "Employment", "Gig Work", "UBA", "Inheritance", etc.
   amount: number;
   frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'annual' | 'irregular';
-  frequency_value?: number;         // For "every N days/weeks/months"
+  frequency_value?: number; // For "every N days/weeks/months"
   status: 'active' | 'paused' | 'ended';
   startDate: string;
   endDate?: string;
-  isGuaranteed: boolean;            // Is this guaranteed (job vs gig)?
-  confidence: number;               // 0-100, how sure we are this continues
+  isGuaranteed: boolean; // Is this guaranteed (job vs gig)?
+  confidence: number; // 0-100, how sure we are this continues
   note?: string;
 }
 
@@ -461,9 +469,9 @@ export interface Transaction {
   amount: number;
   currency: string;
   description: string;
-  category?: string;                // 'food', 'housing', 'transport', etc.
-  counterparty?: string;            // Who did we transact with
-  economicEventId?: string;         // Link to hREA EconomicEvent
+  category?: string; // 'food', 'housing', 'transport', etc.
+  counterparty?: string; // Who did we transact with
+  economicEventId?: string; // Link to hREA EconomicEvent
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
 }
 
@@ -472,18 +480,18 @@ export interface Transaction {
  */
 export interface FinancialObligation {
   id: string;
-  creditorId: string;               // Who we owe
+  creditorId: string; // Who we owe
   creditorName?: string;
-  principalAmount: number;          // Original amount borrowed
-  remainingAmount: number;          // Still owed
-  interest?: number;                // Interest rate (if applicable)
-  monthlyPayment: number;           // Regular payment amount
-  minimumPayment?: number;          // Minimum required (credit cards)
-  paymentDueDate?: string;          // When is next payment due
+  principalAmount: number; // Original amount borrowed
+  remainingAmount: number; // Still owed
+  interest?: number; // Interest rate (if applicable)
+  monthlyPayment: number; // Regular payment amount
+  minimumPayment?: number; // Minimum required (credit cards)
+  paymentDueDate?: string; // When is next payment due
   obligationType: 'loan' | 'credit-card' | 'rent' | 'mortgage' | 'tax' | 'child-support' | 'other';
-  daysOverdue: number;              // If applicable
+  daysOverdue: number; // If applicable
   status: 'current' | 'overdue' | 'defaulted' | 'paid-off';
-  governanceLevel?: string;         // Some obligations may be community-governed
+  governanceLevel?: string; // Some obligations may be community-governed
   transparencyLevel: 'private' | 'household' | 'community' | 'public';
 }
 
@@ -501,29 +509,29 @@ export interface FinancialObligation {
 export interface UBAEligibility {
   humanId: string;
   eligible: boolean;
-  eligibilityReason?: string;       // Why are they eligible/ineligible
+  eligibilityReason?: string; // Why are they eligible/ineligible
 
   // Entitlements
   basicAssets: BasicAssetEntitlement[];
   basicIncome?: BasicIncomeEntitlement;
 
   // Proof of life (from Elohim governance)
-  verifiedAt?: string;              // When was eligibility last verified
-  verifiedBy?: string;              // Governance entity that verified
-  documentationLinks?: string[];    // References to eligibility docs
+  verifiedAt?: string; // When was eligibility last verified
+  verifiedBy?: string; // Governance entity that verified
+  documentationLinks?: string[]; // References to eligibility docs
 }
 
 /**
  * BasicAssetEntitlement - What basic assets a human is entitled to
  */
 export interface BasicAssetEntitlement {
-  assetType: string;                // 'food', 'shelter', 'healthcare', 'internet', etc.
-  monthlyAllocation: number;        // Amount per month in currency
-  unit?: string;                    // If not currency (kg, m², etc.)
-  governanceLevel: string;          // Who funds this (municipal, national, Elohim?)
-  provider?: string;                // Where they get it (food bank, co-op, etc.)
-  implemented: boolean;             // Is this actually available?
-  claimedAt?: string;               // When did they start receiving it
+  assetType: string; // 'food', 'shelter', 'healthcare', 'internet', etc.
+  monthlyAllocation: number; // Amount per month in currency
+  unit?: string; // If not currency (kg, m², etc.)
+  governanceLevel: string; // Who funds this (municipal, national, Elohim?)
+  provider?: string; // Where they get it (food bank, co-op, etc.)
+  implemented: boolean; // Is this actually available?
+  claimedAt?: string; // When did they start receiving it
 }
 
 /**
@@ -534,16 +542,16 @@ export interface BasicAssetEntitlement {
  * resources and participate in autonomous economic coordination.
  */
 export interface BasicIncomeEntitlement {
-  currency: string;                 // USD, EUR, etc.
-  monthlyAmount: number;            // Amount guaranteed per month
+  currency: string; // USD, EUR, etc.
+  monthlyAmount: number; // Amount guaranteed per month
   distributionSchedule: 'weekly' | 'biweekly' | 'monthly';
-  distributionDay?: number;         // Day of week/month to distribute
-  provider: string;                 // Government, foundation, Elohim community?
-  implemented: boolean;             // Is this being paid?
-  paidSince?: string;               // When did payments start
-  expectedDuration?: string;        // Until when (years, indefinite, etc.)
-  requirements?: string[];          // Any requirements to continue receiving
-  governanceLevel: string;          // At what level is this governed (city, nation, etc.)
+  distributionDay?: number; // Day of week/month to distribute
+  provider: string; // Government, foundation, Elohim community?
+  implemented: boolean; // Is this being paid?
+  paidSince?: string; // When did payments start
+  expectedDuration?: string; // Until when (years, indefinite, etc.)
+  requirements?: string[]; // Any requirements to continue receiving
+  governanceLevel: string; // At what level is this governed (city, nation, etc.)
 }
 
 /**
@@ -557,22 +565,22 @@ export interface DignityFloor {
   eligible: boolean;
 
   // Basic survival needs (in local currency equivalent)
-  foodDailyAmount: number;          // Minimum food subsidy per day
-  shelterMonthlyAmount: number;     // Minimum housing support
-  healthcareMonthlyAmount: number;  // Medical coverage
-  internetMonthlyAmount: number;    // Digital access
-  transportMonthlyAmount?: number;  // Getting around
+  foodDailyAmount: number; // Minimum food subsidy per day
+  shelterMonthlyAmount: number; // Minimum housing support
+  healthcareMonthlyAmount: number; // Medical coverage
+  internetMonthlyAmount: number; // Digital access
+  transportMonthlyAmount?: number; // Getting around
 
   // Total dignity floor per month
   totalMonthlyFloor: number;
 
   // Current status
-  floorMet: boolean;                // Is current income meeting minimum?
-  monthlyShortfall?: number;        // How much below floor (if applicable)
-  gapCovered?: string;              // What's covering the gap (if not income)
+  floorMet: boolean; // Is current income meeting minimum?
+  monthlyShortfall?: number; // How much below floor (if applicable)
+  gapCovered?: string; // What's covering the gap (if not income)
 
   // Constitutional base
-  governanceDocument?: string;      // Reference to constitution providing this
+  governanceDocument?: string; // Reference to constitution providing this
   verifiedAt?: string;
 }
 
@@ -598,25 +606,25 @@ export interface FinancialStewardshipView {
   humanName: string;
 
   // Income picture
-  monthlyIncome: number;            // Guaranteed income
-  expectedMonthlyIncome: number;    // Including likely/uncertain sources
+  monthlyIncome: number; // Guaranteed income
+  expectedMonthlyIncome: number; // Including likely/uncertain sources
   incomeStreams: IncomeStream[];
   incomeStability: 'stable' | 'variable' | 'uncertain';
 
   // Obligations
-  monthlyObligations: number;       // Fixed obligations
-  totalLiabilities: number;         // Total amount owed
+  monthlyObligations: number; // Fixed obligations
+  totalLiabilities: number; // Total amount owed
   obligations: FinancialObligation[];
 
   // Dignity floor
   dignityFloor: DignityFloor;
-  onTrackForDignity: boolean;       // Will they meet minimum needs?
+  onTrackForDignity: boolean; // Will they meet minimum needs?
 
   // Financial health
-  monthlyDifference: number;        // Income - obligations
-  netWorth?: number;                // Assets - liabilities
+  monthlyDifference: number; // Income - obligations
+  netWorth?: number; // Assets - liabilities
   financialHealth: 'healthy' | 'stable' | 'at-risk' | 'critical';
-  burnoutDate?: string;             // When will money run out (if no change)
+  burnoutDate?: string; // When will money run out (if no change)
 
   // Recommendations
   recommendations: FinancialRecommendation[];
@@ -637,9 +645,9 @@ export interface FinancialRecommendation {
   title: string;
   description: string;
   recommendedAction: string;
-  estimatedImpact?: string;         // How much this could help
-  relatedTo?: string[];             // Income stream, obligation, etc. IDs
-  governanceLevel?: string;         // Can be help at this level
+  estimatedImpact?: string; // How much this could help
+  relatedTo?: string[]; // Income stream, obligation, etc. IDs
+  governanceLevel?: string; // Can be help at this level
 }
 
 // =============================================================================
@@ -668,39 +676,39 @@ export interface ConstitutionalLimit {
   // Identity
   id: string;
   resourceCategory: ResourceCategory;
-  name: string;                         // "Wealth Ceiling", "Energy Allocation", etc.
+  name: string; // "Wealth Ceiling", "Energy Allocation", etc.
   description: string;
 
   // Floor (Dignity Minimum)
-  floorValue: number;                   // Minimum every human needs
+  floorValue: number; // Minimum every human needs
   floorUnit: string;
-  floorRationale: string;               // Why this floor (constitutional basis)
-  floorEnforced: boolean;               // Is this currently enforced?
+  floorRationale: string; // Why this floor (constitutional basis)
+  floorEnforced: boolean; // Is this currently enforced?
 
   // Ceiling (Constitutional Maximum)
-  ceilingValue: number;                 // Maximum wise stewardship allows
+  ceilingValue: number; // Maximum wise stewardship allows
   ceilingUnit: string;
-  ceilingRationale: string;             // Why this ceiling (constitutional basis)
-  ceilingEnforced: boolean;             // Is this currently enforced?
+  ceilingRationale: string; // Why this ceiling (constitutional basis)
+  ceilingEnforced: boolean; // Is this currently enforced?
 
   // Safe Operating Space (between floor and ceiling)
   safeMinValue: number;
   safeMaxValue: number;
-  safeZoneDescription: string;          // Optimal stewardship zone
+  safeZoneDescription: string; // Optimal stewardship zone
 
   // Governance
-  governanceLevel: string;              // municipal, national, Elohim-network?
-  constitutionalBasis: string;          // Reference to governance document
+  governanceLevel: string; // municipal, national, Elohim-network?
+  constitutionalBasis: string; // Reference to governance document
   adoptionDate?: string;
-  reviewSchedule?: string;              // How often is this revisited?
+  reviewSchedule?: string; // How often is this revisited?
 
   // Enforcement & Transition
   enforcementMethod: 'voluntary' | 'progressive' | 'hard';
   // voluntary: honor system, trust-based
   // progressive: incentive-based (positive rewards for compliance, gradually increasing)
   // hard: mandatory enforcement
-  transitionDeadline?: string;          // When must people be within bounds?
-  hardStopDate?: string;                // Point of no return
+  transitionDeadline?: string; // When must people be within bounds?
+  hardStopDate?: string; // Point of no return
 
   // Metadata
   createdAt: string;
@@ -719,13 +727,18 @@ export interface ResourcePosition {
 
   // Relative to Constitutional Limits
   constitutionalLimit: ConstitutionalLimit;
-  positionRelativeToFloor: 'below-floor' | 'at-floor' | 'in-safe-zone' | 'above-ceiling' | 'far-above-ceiling';
-  distanceFromFloor: number;            // Negative if below, positive if above
-  distanceFromCeiling: number;          // Positive if above ceiling
+  positionRelativeToFloor:
+    | 'below-floor'
+    | 'at-floor'
+    | 'in-safe-zone'
+    | 'above-ceiling'
+    | 'far-above-ceiling';
+  distanceFromFloor: number; // Negative if below, positive if above
+  distanceFromCeiling: number; // Positive if above ceiling
 
   // Excess/Surplus Calculation
-  excessAboveCeiling?: number;          // How much is above constitutional max
-  excessPercentage?: number;            // Percentage above ceiling
+  excessAboveCeiling?: number; // How much is above constitutional max
+  excessPercentage?: number; // Percentage above ceiling
   surplusAvailableForTransition?: number; // Amount that could be reallocated
 
   // Health Status
@@ -756,11 +769,11 @@ export interface TransitionPath {
   // Current Position
   currentValue: number;
   constitutionalCeiling: number;
-  excess: number;                       // Amount above ceiling
+  excess: number; // Amount above ceiling
 
   // Proposed Transition (Negotiation Phase)
-  proposedSplits: AssetSplit[];        // How to divide the asset
-  totalProposedExcess: number;          // Sum of all proposed transitions
+  proposedSplits: AssetSplit[]; // How to divide the asset
+  totalProposedExcess: number; // Sum of all proposed transitions
 
   // Timeline
   status: 'proposal' | 'negotiating' | 'agreed' | 'executing' | 'completed';
@@ -771,16 +784,16 @@ export interface TransitionPath {
   actualCompletionDate?: string;
 
   // Governance
-  governanceLevel: string;              // Who decides this transition
-  governingBody?: string;               // Committee, Qahal, etc.
+  governanceLevel: string; // Who decides this transition
+  governingBody?: string; // Committee, Qahal, etc.
   approvalStatus: 'pending' | 'approved' | 'rejected' | 'negotiating';
 
   // Tracking
-  executionPhases: TransitionPhase[];   // Step-by-step execution
+  executionPhases: TransitionPhase[]; // Step-by-step execution
   notes?: string;
 
   // Constitutional Record
-  transitionEventIds: string[];         // EconomicEvent IDs for all transfers
+  transitionEventIds: string[]; // EconomicEvent IDs for all transfers
   transparencyLevel: 'private' | 'household' | 'community' | 'public';
 
   // Metadata
@@ -793,13 +806,19 @@ export interface TransitionPath {
  */
 export interface AssetSplit {
   id: string;
-  splitName: string;                    // "Commons Pool", "Community Benefit Corp", etc.
-  destinationType: 'commons-pool' | 'community-benefit-corp' | 'cooperative' | 'trust' | 'foundation' | 'other';
-  destinationId: string;                // ID of receiving entity
+  splitName: string; // "Commons Pool", "Community Benefit Corp", etc.
+  destinationType:
+    | 'commons-pool'
+    | 'community-benefit-corp'
+    | 'cooperative'
+    | 'trust'
+    | 'foundation'
+    | 'other';
+  destinationId: string; // ID of receiving entity
   amount: number;
-  percentage: number;                   // Percentage of excess
-  governance?: string;                  // Does steward keep role in transitioned asset?
-  rationale: string;                    // Why this split
+  percentage: number; // Percentage of excess
+  governance?: string; // Does steward keep role in transitioned asset?
+  rationale: string; // Why this split
   status: 'proposed' | 'agreed' | 'executing' | 'completed';
 }
 
@@ -809,7 +828,7 @@ export interface AssetSplit {
 export interface TransitionPhase {
   id: string;
   sequenceNumber: number;
-  name: string;                         // "Convert to mutual fund", "Transfer to commons", etc.
+  name: string; // "Convert to mutual fund", "Transfer to commons", etc.
   description: string;
   targetDate: string;
   actualDate?: string;
@@ -826,12 +845,12 @@ export interface TransitionAction {
   id: string;
   actionType: 'sell' | 'transfer' | 'liquidate' | 'convert' | 'register' | 'authorize' | 'other';
   description: string;
-  responsible: string;                  // Who does this (steward, advisor, governance?)
+  responsible: string; // Who does this (steward, advisor, governance?)
   targetDate: string;
   completedDate?: string;
   amount?: number;
   notes?: string;
-  economicEventId?: string;             // Link to EconomicEvent for immutability
+  economicEventId?: string; // Link to EconomicEvent for immutability
   status: 'pending' | 'completed' | 'failed';
 }
 
@@ -855,16 +874,16 @@ export interface ConstitutionalCompliance {
 
   // Overall
   overallCompliant: boolean;
-  totalExcess: number;                  // Sum across all categories
-  categories_at_risk: number;           // How many over ceiling
-  estimatedTimeToCompliance?: string;   // "18 months", "3 years", etc.
+  totalExcess: number; // Sum across all categories
+  categories_at_risk: number; // How many over ceiling
+  estimatedTimeToCompliance?: string; // "18 months", "3 years", etc.
 
   // Recommendations
   recommendations: ComplianceRecommendation[];
 
   // Transition Activity
   activeTransitionPaths: number;
-  transitioningAmount: number;          // Currently being reallocated
+  transitioningAmount: number; // Currently being reallocated
   completedTransitions: number;
 }
 
@@ -878,9 +897,9 @@ export interface ComplianceRecommendation {
   title: string;
   description: string;
   action: string;
-  estimatedImpact: string;              // How much this moves toward compliance
-  timeline: string;                     // How long this would take
-  governanceRequired?: string;          // Any community approval needed?
+  estimatedImpact: string; // How much this moves toward compliance
+  timeline: string; // How long this would take
+  governanceRequired?: string; // Any community approval needed?
 }
 
 /**
@@ -890,23 +909,23 @@ export interface ComplianceRecommendation {
 export interface CommonsContribution {
   id: string;
   contributorId: string;
-  originalHolding: string;              // What was this (e.g., "$5M Apple stock")
+  originalHolding: string; // What was this (e.g., "$5M Apple stock")
   contributedAmount: number;
   contributedUnit: string;
-  destinationCommonsPool: string;       // Which commons received this
-  conversionRate?: number;              // How was it valued during transfer
-  legacyRole?: string;                  // Does contributor maintain any governance role?
-  governanceCredit?: number;            // Recognition in community (reputation, voting power, etc.)
+  destinationCommonsPool: string; // Which commons received this
+  conversionRate?: number; // How was it valued during transfer
+  legacyRole?: string; // Does contributor maintain any governance role?
+  governanceCredit?: number; // Recognition in community (reputation, voting power, etc.)
   contributionDate: string;
-  transitionPathId: string;             // Link back to transition
+  transitionPathId: string; // Link back to transition
 
   // Transparency
-  publicRecognition: boolean;           // Is this publicly acknowledged?
+  publicRecognition: boolean; // Is this publicly acknowledged?
   visibilityLevel: 'private' | 'household' | 'community' | 'public';
 
   // Economic Integration
-  economicEventId: string;              // EconomicEvent for immutability
-  commitmentToCommons?: string;         // hREA Commitment if ongoing role
+  economicEventId: string; // EconomicEvent for immutability
+  commitmentToCommons?: string; // hREA Commitment if ongoing role
 }
 
 // =============================================================================

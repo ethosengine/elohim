@@ -27,12 +27,10 @@
  * - Uses Attestation patterns from protocol-core
  */
 
-import {
-  type ReachLevel,
-  type GeographicContext,
-} from '@app/elohim/models/protocol-core.model';
-import type { Place } from '@app/qahal/models/place.model';
 import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
+import { type ReachLevel, type GeographicContext } from '@app/elohim/models/protocol-core.model';
+
+import type { Place } from '@app/qahal/models/place.model';
 
 // Re-export GeographicContext for backward compatibility
 export type { GeographicContext } from '@app/elohim/models/protocol-core.model';
@@ -522,8 +520,8 @@ export type ContentFormat =
   | 'video-embed'
   | 'video-file'
   | 'audio-file'
-  | 'perseus-quiz-json'  // Khan Academy Perseus quiz format (legacy)
-  | 'sophia-quiz-json'   // Sophia Moment format with purpose-based assessment
+  | 'perseus-quiz-json' // Khan Academy Perseus quiz format (legacy)
+  | 'sophia-quiz-json' // Sophia Moment format with purpose-based assessment
   | 'external-link'
   | 'epub'
   | 'gherkin'
@@ -852,12 +850,12 @@ export interface ContentRelationshipDetail {
  * RelationshipInferenceSource - How a relationship was discovered.
  */
 export type RelationshipInferenceSource =
-  | 'author'      // Explicitly defined by content author
-  | 'structural'  // Inferred from path/chapter structure
-  | 'semantic'    // Inferred from content similarity
-  | 'usage'       // Inferred from user navigation patterns
-  | 'citation'    // Extracted from references/links
-  | 'system';     // System-generated (e.g., inverse relationships)
+  | 'author' // Explicitly defined by content author
+  | 'structural' // Inferred from path/chapter structure
+  | 'semantic' // Inferred from content similarity
+  | 'usage' // Inferred from user navigation patterns
+  | 'citation' // Extracted from references/links
+  | 'system'; // System-generated (e.g., inverse relationships)
 
 /**
  * Wire format for ContentRelationshipDetail (camelCase from backend).
@@ -870,7 +868,7 @@ export interface ContentRelationshipDetailWire {
   relationshipType: string;
   confidence: number;
   inferenceSource: string;
-  isBidirectional: number;  // SQLite stores boolean as 0/1
+  isBidirectional: number; // SQLite stores boolean as 0/1
   inverseRelationshipId: string | null;
   provenanceChain: any | null;
   governanceLayer: string | null;
@@ -883,7 +881,9 @@ export interface ContentRelationshipDetailWire {
 /**
  * Transform wire format to ContentRelationshipDetail.
  */
-export function transformRelationshipDetailFromWire(wire: ContentRelationshipDetailWire): ContentRelationshipDetail {
+export function transformRelationshipDetailFromWire(
+  wire: ContentRelationshipDetailWire
+): ContentRelationshipDetail {
   return {
     id: wire.id,
     appId: wire.appId,

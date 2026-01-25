@@ -1,3 +1,4 @@
+import { CommonModule } from '@angular/common';
 import {
   Component,
   Input,
@@ -12,17 +13,19 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
-  inject
+  inject,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
-// Use the lazy loader instead of direct import to avoid bundling React at compile time
+
 import {
   registerPerseusElement,
   type PerseusQuestionElement,
   getPerseusElement,
-  refreshPerseusDarkMode
+  refreshPerseusDarkMode,
 } from './perseus-element-loader';
+
+import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
+
+// Use the lazy loader instead of direct import to avoid bundling React at compile time
 
 /**
  * PerseusWrapperComponent - Angular component wrapping Perseus custom element.
@@ -60,30 +63,32 @@ import {
     <div class="perseus-wrapper" #container>
       <perseus-question
         #perseusElement
-        [attr.review-mode]="reviewMode ? '' : null">
-      </perseus-question>
+        [attr.review-mode]="reviewMode ? '' : null"
+      ></perseus-question>
     </div>
   `,
-  styles: [`
-    :host {
-      display: block;
-    }
+  styles: [
+    `
+      :host {
+        display: block;
+      }
 
-    .perseus-wrapper {
-      min-height: 100px;
-    }
+      .perseus-wrapper {
+        min-height: 100px;
+      }
 
-    /* Fallback loading state if element not ready */
-    .perseus-wrapper:empty::before {
-      content: 'Loading question...';
-      display: block;
-      padding: 2rem;
-      text-align: center;
-      color: var(--text-secondary, #666);
-    }
-  `],
+      /* Fallback loading state if element not ready */
+      .perseus-wrapper:empty::before {
+        content: 'Loading question...';
+        display: block;
+        padding: 2rem;
+        text-align: center;
+        color: var(--text-secondary, #666);
+      }
+    `,
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PerseusWrapperComponent implements AfterViewInit, OnDestroy, OnChanges {
   private readonly cdr = inject(ChangeDetectorRef);
@@ -179,12 +184,15 @@ export class PerseusWrapperComponent implements AfterViewInit, OnDestroy, OnChan
           console.log('[PerseusWrapper] Setting item:', itemToApply.id, {
             hasQuestion: !!itemToApply.question,
             hasWidgets: !!itemToApply.question?.widgets,
-            fullItem: itemToApply
+            fullItem: itemToApply,
           });
           this.perseusElement.item = itemToApply;
           this.hasPendingItemChange = false;
           // Verify item was set
-          console.log('[PerseusWrapper] After setting, element.item:', this.perseusElement.item?.id || 'null');
+          console.log(
+            '[PerseusWrapper] After setting, element.item:',
+            this.perseusElement.item?.id || 'null'
+          );
           // Dark mode refresh disabled for debugging
           // refreshPerseusDarkMode();
         } else {
@@ -228,7 +236,10 @@ export class PerseusWrapperComponent implements AfterViewInit, OnDestroy, OnChan
     }
 
     if (!this.perseusElement || !this.initialized) {
-      console.log('[PerseusWrapper] Element not ready, storing pending item:', this.pendingItem?.id || 'null');
+      console.log(
+        '[PerseusWrapper] Element not ready, storing pending item:',
+        this.pendingItem?.id || 'null'
+      );
       return;
     }
 

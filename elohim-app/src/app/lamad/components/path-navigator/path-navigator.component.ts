@@ -1,19 +1,38 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject, HostListener, Inject } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  ChangeDetectorRef,
+  inject,
+  HostListener,
+  Inject,
+} from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { Subject } from 'rxjs';
+
 import { takeUntil } from 'rxjs/operators';
-import { PathService } from '../../services/path.service';
+
+import { Subject } from 'rxjs';
+
 import { AgentService } from '@app/elohim/services/agent.service';
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
+
 import { SeoService } from '../../../services/seo.service';
-import { PathStepView, LearningPath, PathChapter, PathModule, PathSection } from '../../models/learning-path.model';
 import { MasteryLevel } from '../../models/content-mastery.model';
 import { PathContext } from '../../models/exploration-context.model';
-import { PathContextService } from '../../services/path-context.service';
-import { LessonViewComponent } from '../lesson-view/lesson-view.component';
+import {
+  PathStepView,
+  LearningPath,
+  PathChapter,
+  PathModule,
+  PathSection,
+} from '../../models/learning-path.model';
 import { RendererCompletionEvent } from '../../renderers/renderer-registry.service';
+import { PathContextService } from '../../services/path-context.service';
+import { PathService } from '../../services/path.service';
+import { getIconForContent, inferContentTypeFromId } from '../../utils/content-icons';
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
+import { LessonViewComponent } from '../lesson-view/lesson-view.component';
 
 /**
  * Concept item in the lesson sidebar - represents one concept within the current section/lesson
@@ -24,6 +43,7 @@ interface LessonConcept {
   isCompleted: boolean;
   isCurrent: boolean;
   index: number; // Index within the lesson
+  icon: string; // Icon based on content type
 }
 
 /**
@@ -58,12 +78,12 @@ interface LessonContext {
   standalone: true,
   imports: [CommonModule, RouterModule, LessonViewComponent, FocusedViewToggleComponent],
   templateUrl: './path-navigator.component.html',
-  styleUrls: ['./path-navigator.component.css']
+  styleUrls: ['./path-navigator.component.css'],
 })
 export class PathNavigatorComponent implements OnInit, OnDestroy {
   // Route params
-  pathId: string = '';
-  stepIndex: number = 0; // Global concept index across all sections
+  pathId = '';
+  stepIndex = 0; // Global concept index across all sections
 
   // Data
   stepView: PathStepView | null = null;
@@ -82,7 +102,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     'apply',
     'analyze',
     'evaluate',
-    'create'
+    'create',
   ];
 
   // UI state
@@ -141,27 +161,31 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     this.error = null;
 
     // Load path metadata first
-    this.pathService.getPath(this.pathId).pipe(takeUntil(this.destroy$)).subscribe({
-      next: (path) => {
-        this.path = path;
+    this.pathService
+      .getPath(this.pathId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: path => {
+          this.path = path;
 
-        // Build lesson context (find current position in hierarchy)
-        this.buildLessonContext(path);
+          // Build lesson context (find current position in hierarchy)
+          this.buildLessonContext(path);
 
-        // Load the current concept's content
-        if (this.lessonContext) {
-          const currentConcept = this.lessonContext.concepts[this.lessonContext.currentConceptIndex];
-          this.loadConceptContent(currentConcept.conceptId, path);
-        } else {
-          // Fallback for paths without hierarchical structure
-          this.pathService.getPathStep(this.pathId, this.stepIndex).subscribe({
-            next: (stepView) => this.handleStepLoaded(stepView, path),
-            error: (err) => this.handleError(err)
-          });
-        }
-      },
-      error: (err) => this.handleError(err)
-    });
+          // Load the current concept's content
+          if (this.lessonContext) {
+            const currentConcept =
+              this.lessonContext.concepts[this.lessonContext.currentConceptIndex];
+            this.loadConceptContent(currentConcept.conceptId, path);
+          } else {
+            // Fallback for paths without hierarchical structure
+            this.pathService.getPathStep(this.pathId, this.stepIndex).subscribe({
+              next: stepView => this.handleStepLoaded(stepView, path),
+              error: err => this.handleError(err),
+            });
+          }
+        },
+        error: err => this.handleError(err),
+      });
   }
 
   /**
@@ -169,78 +193,88 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
    */
   private loadConceptContent(conceptId: string, path: LearningPath): void {
     // Use the content service to load the concept
-    this.pathService.getContentById(conceptId).pipe(takeUntil(this.destroy$)).subscribe({
-      next: (content) => {
-        // Handle case where content is not found
-        if (!content) {
-          this.error = `Content not found: ${conceptId}`;
-          this.isLoading = false;
-          return;
-        }
-
-        // Build a PathStepView-like structure from the concept content
-        this.stepView = {
-          step: {
-            order: this.stepIndex,
-            resourceId: conceptId,
-            stepTitle: content.title ?? this.formatConceptTitle(conceptId),
-            stepNarrative: content.description ?? '',
-            learningObjectives: [],
-            optional: false,
-            completionCriteria: []
-          },
-          content: content,
-          isCompleted: false,
-          hasPrevious: this.stepIndex > 0,
-          hasNext: this.stepIndex < this.getTotalConcepts() - 1,
-          previousStepIndex: this.stepIndex > 0 ? this.stepIndex - 1 : undefined,
-          nextStepIndex: this.stepIndex < this.getTotalConcepts() - 1 ? this.stepIndex + 1 : undefined
-        };
-
-        // Update SEO
-        const conceptTitle = content?.title ?? this.formatConceptTitle(conceptId);
-        const lessonTitle = this.lessonContext?.section.title ?? '';
-        this.seoService.updateSeo({
-          title: `${conceptTitle} - ${lessonTitle} - ${path.title}`,
-          description: content?.description ?? `Learning ${conceptTitle}`,
-          openGraph: {
-            ogType: 'article',
-            ogImage: content?.metadata?.['thumbnailUrl'] ?? path.thumbnailUrl,
-            articleSection: 'Learning'
+    this.pathService
+      .getContentById(conceptId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: content => {
+          // Handle case where content is not found
+          if (!content) {
+            this.error = `Content not found: ${conceptId}`;
+            this.isLoading = false;
+            return;
           }
-        });
 
-        // Mark content as seen and emit learning signal
-        if (content) {
-          this.agentService.markContentSeen(conceptId).pipe(takeUntil(this.destroy$)).subscribe();
-          this.agentService.getContentMastery(conceptId).pipe(takeUntil(this.destroy$)).subscribe(level => {
-            this.currentBloomLevel = level;
+          // Build a PathStepView-like structure from the concept content
+          this.stepView = {
+            step: {
+              order: this.stepIndex,
+              resourceId: conceptId,
+              stepTitle: content.title ?? this.formatConceptTitle(conceptId),
+              stepNarrative: content.description ?? '',
+              learningObjectives: [],
+              optional: false,
+              completionCriteria: [],
+            },
+            content: content,
+            isCompleted: false,
+            hasPrevious: this.stepIndex > 0,
+            hasNext: this.stepIndex < this.getTotalConcepts() - 1,
+            previousStepIndex: this.stepIndex > 0 ? this.stepIndex - 1 : undefined,
+            nextStepIndex:
+              this.stepIndex < this.getTotalConcepts() - 1 ? this.stepIndex + 1 : undefined,
+          };
+
+          // Update SEO
+          const conceptTitle = content?.title ?? this.formatConceptTitle(conceptId);
+          const lessonTitle = this.lessonContext?.section.title ?? '';
+          this.seoService.updateSeo({
+            title: `${conceptTitle} - ${lessonTitle} - ${path.title}`,
+            description: content?.description ?? `Learning ${conceptTitle}`,
+            openGraph: {
+              ogType: 'article',
+              ogImage: content?.metadata?.['thumbnailUrl'] ?? path.thumbnailUrl,
+              articleSection: 'Learning',
+            },
           });
 
-          // Track view start time for learning signals
-          this.contentViewStartTime = Date.now();
+          // Mark content as seen and emit learning signal
+          if (content) {
+            this.agentService.markContentSeen(conceptId).pipe(takeUntil(this.destroy$)).subscribe();
+            this.agentService
+              .getContentMastery(conceptId)
+              .pipe(takeUntil(this.destroy$))
+              .subscribe(level => {
+                this.currentBloomLevel = level;
+              });
 
-          // Emit content viewed learning signal
-          this.governanceSignalService.recordLearningSignal({
-            contentId: conceptId,
-            signalType: 'content_viewed',
-            payload: {
-              pathId: this.pathId,
-              stepIndex: this.stepIndex,
-              contentType: content.contentType,
-              chapter: this.lessonContext?.chapter.title,
-              module: this.lessonContext?.module.title,
-              section: this.lessonContext?.section.title,
-            },
-          }).pipe(takeUntil(this.destroy$)).subscribe();
-        }
+            // Track view start time for learning signals
+            this.contentViewStartTime = Date.now();
 
-        this.isLoading = false;
-        this.pathContextService.enterPath(this.buildPathContext());
-        this.cdr.detectChanges();
-      },
-      error: (err) => this.handleError(err)
-    });
+            // Emit content viewed learning signal
+            this.governanceSignalService
+              .recordLearningSignal({
+                contentId: conceptId,
+                signalType: 'content_viewed',
+                payload: {
+                  pathId: this.pathId,
+                  stepIndex: this.stepIndex,
+                  contentType: content.contentType,
+                  chapter: this.lessonContext?.chapter.title,
+                  module: this.lessonContext?.module.title,
+                  section: this.lessonContext?.section.title,
+                },
+              })
+              .pipe(takeUntil(this.destroy$))
+              .subscribe();
+          }
+
+          this.isLoading = false;
+          this.pathContextService.enterPath(this.buildPathContext());
+          this.cdr.detectChanges();
+        },
+        error: err => this.handleError(err),
+      });
   }
 
   /**
@@ -256,15 +290,21 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       openGraph: {
         ogType: 'article',
         ogImage: stepView.content?.metadata?.['thumbnailUrl'] ?? path.thumbnailUrl,
-        articleSection: 'Learning'
-      }
+        articleSection: 'Learning',
+      },
     });
 
     if (stepView.step.resourceId) {
-      this.agentService.markContentSeen(stepView.step.resourceId).pipe(takeUntil(this.destroy$)).subscribe();
-      this.agentService.getContentMastery(stepView.step.resourceId).pipe(takeUntil(this.destroy$)).subscribe(level => {
-        this.currentBloomLevel = level;
-      });
+      this.agentService
+        .markContentSeen(stepView.step.resourceId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe();
+      this.agentService
+        .getContentMastery(stepView.step.resourceId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(level => {
+          this.currentBloomLevel = level;
+        });
     }
 
     this.isLoading = false;
@@ -344,7 +384,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
           title: step.stepTitle || this.formatConceptTitle(step.resourceId),
           isCompleted: false, // TODO: Load from progress
           isCurrent: idx === currentConceptIndex,
-          index: globalIndex + idx
+          index: globalIndex + idx,
+          icon: getIconForContent(step.resourceId, inferContentTypeFromId(step.resourceId)),
         }));
 
         // Create a synthetic section for the UI
@@ -352,18 +393,23 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
           id: `${chapter.id}-section`,
           title: chapter.title,
           order: 0,
-          conceptIds: chapterSteps.map(s => s.resourceId)
+          conceptIds: chapterSteps.map(s => s.resourceId),
         };
 
         this.lessonContext = {
           chapter,
           chapterIndex: ci,
-          module: { id: `${chapter.id}-module`, title: chapter.title, order: 0, sections: [syntheticSection] },
+          module: {
+            id: `${chapter.id}-module`,
+            title: chapter.title,
+            order: 0,
+            sections: [syntheticSection],
+          },
           moduleIndex: 0,
           section: syntheticSection,
           sectionIndex: 0,
           concepts,
-          currentConceptIndex
+          currentConceptIndex,
         };
         return;
       }
@@ -379,12 +425,17 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
           id: `${chapter.id}-section`,
           title: chapter.title,
           order: 0,
-          conceptIds: chapterSteps.map(s => s.resourceId)
+          conceptIds: chapterSteps.map(s => s.resourceId),
         };
         this.lessonContext = {
           chapter,
           chapterIndex: 0,
-          module: { id: `${chapter.id}-module`, title: chapter.title, order: 0, sections: [syntheticSection] },
+          module: {
+            id: `${chapter.id}-module`,
+            title: chapter.title,
+            order: 0,
+            sections: [syntheticSection],
+          },
           moduleIndex: 0,
           section: syntheticSection,
           sectionIndex: 0,
@@ -393,9 +444,10 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
             title: step.stepTitle || this.formatConceptTitle(step.resourceId),
             isCompleted: false,
             isCurrent: idx === 0,
-            index: idx
+            index: idx,
+            icon: getIconForContent(step.resourceId, inferContentTypeFromId(step.resourceId)),
           })),
-          currentConceptIndex: 0
+          currentConceptIndex: 0,
         };
       }
     }
@@ -424,7 +476,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
               title: this.formatConceptTitle(conceptId),
               isCompleted: false, // TODO: Load from progress
               isCurrent: idx === currentConceptIndex,
-              index: globalIndex + idx
+              index: globalIndex + idx,
+              icon: getIconForContent(conceptId, inferContentTypeFromId(conceptId)),
             }));
 
             this.lessonContext = {
@@ -435,7 +488,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
               section,
               sectionIndex: si,
               concepts,
-              currentConceptIndex
+              currentConceptIndex,
             };
             return;
           }
@@ -463,9 +516,10 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
               title: this.formatConceptTitle(conceptId),
               isCompleted: false,
               isCurrent: idx === 0,
-              index: idx
+              index: idx,
+              icon: getIconForContent(conceptId, inferContentTypeFromId(conceptId)),
             })),
-            currentConceptIndex: 0
+            currentConceptIndex: 0,
           };
         }
       }
@@ -480,40 +534,6 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       .split('-')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
-  }
-
-  private getContentIcon(contentType: string): string {
-    const icons: Record<string, string> = {
-      'epic': '📖',
-      'feature': '⚡',
-      'scenario': '✓',
-      'concept': '💡',
-      'simulation': '🎮',
-      'video': '🎥',
-      'assessment': '📝',
-      'organization': '🏢',
-      'book-chapter': '📚',
-      'tool': '🛠️'
-    };
-    return icons[contentType] || '📄';
-  }
-
-  /**
-   * Get icon for step type (used for sidebar, doesn't require content loading)
-   */
-  private getStepIcon(stepType: string): string {
-    const icons: Record<string, string> = {
-      'content': '📄',
-      'read': '📖',
-      'assessment': '📝',
-      'quiz': '📝',
-      'checkpoint': '🏁',
-      'path': '🛤️',
-      'external': '🔗',
-      'video': '🎥',
-      'simulation': '🎮'
-    };
-    return icons[stepType] || '📄';
   }
 
   toggleSidebar(): void {
@@ -567,8 +587,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       this.agentService.completeStep(this.pathId, this.stepIndex).subscribe({
         next: () => {
           // Refresh sidebar
-          this.loadContext(); 
-        }
+          this.loadContext();
+        },
       });
     }
   }
@@ -634,7 +654,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       stepIndex: this.stepIndex,
       totalSteps: this.getTotalSteps(),
       chapterTitle: this.getCurrentChapterTitle(),
-      returnRoute: ['/lamad/path', this.pathId, 'step', String(this.stepIndex)]
+      returnRoute: ['/lamad/path', this.pathId, 'step', String(this.stepIndex)],
     };
   }
 
@@ -654,7 +674,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       fromContentId: this.stepView?.content?.id || '',
       toContentId: contentId,
       detourType: 'related',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     // Navigate to the content
@@ -673,7 +693,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       fromContentId: contentId,
       toContentId: contentId,
       detourType: 'graph-explore',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     // Navigate to graph explorer with context
@@ -681,8 +701,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       queryParams: {
         focus: contentId,
         fromPath: this.pathId,
-        returnStep: this.stepIndex
-      }
+        returnStep: this.stepIndex,
+      },
     });
   }
 
@@ -699,20 +719,23 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       : 0;
 
     // Emit interactive completion learning signal
-    this.governanceSignalService.recordInteractiveCompletion({
-      contentId,
-      interactionType: event.type || 'interactive',
-      passed: event.passed,
-      score: event.score,
-      details: {
-        ...event.details,
-        pathId: this.pathId,
-        stepIndex: this.stepIndex,
-        timeSpentSeconds: timeSpent,
-        chapter: this.lessonContext?.chapter.title,
-        module: this.lessonContext?.module.title,
-      },
-    }).pipe(takeUntil(this.destroy$)).subscribe();
+    this.governanceSignalService
+      .recordInteractiveCompletion({
+        contentId,
+        interactionType: event.type || 'interactive',
+        passed: event.passed,
+        score: event.score,
+        details: {
+          ...event.details,
+          pathId: this.pathId,
+          stepIndex: this.stepIndex,
+          timeSpentSeconds: timeSpent,
+          chapter: this.lessonContext?.chapter.title,
+          module: this.lessonContext?.module.title,
+        },
+      })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe();
 
     // If passed, advance mastery level
     if (event.passed) {
@@ -731,17 +754,20 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
 
     // Only emit if meaningful time was spent (>5 seconds)
     if (timeSpent > 5) {
-      this.governanceSignalService.recordLearningSignal({
-        contentId,
-        signalType: 'progress_update',
-        payload: {
-          pathId: this.pathId,
-          stepIndex: this.stepIndex,
-          timeSpentSeconds: timeSpent,
-          masteryLevel: this.currentBloomLevel,
-          progressPercent: this.getProgressPercentage(),
-        },
-      }).pipe(takeUntil(this.destroy$)).subscribe();
+      this.governanceSignalService
+        .recordLearningSignal({
+          contentId,
+          signalType: 'progress_update',
+          payload: {
+            pathId: this.pathId,
+            stepIndex: this.stepIndex,
+            timeSpentSeconds: timeSpent,
+            masteryLevel: this.currentBloomLevel,
+            progressPercent: this.getProgressPercentage(),
+          },
+        })
+        .pipe(takeUntil(this.destroy$))
+        .subscribe();
     }
 
     this.contentViewStartTime = null;

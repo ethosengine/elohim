@@ -26,7 +26,7 @@ export const PresenceStates = {
   CLAIMED: 'claimed',
 } as const;
 
-export type PresenceState = typeof PresenceStates[keyof typeof PresenceStates];
+export type PresenceState = (typeof PresenceStates)[keyof typeof PresenceStates];
 
 // =============================================================================
 // External Identifiers
@@ -46,7 +46,8 @@ export const ExternalIdentifierProviders = {
   MASTODON: 'mastodon',
 } as const;
 
-export type ExternalIdentifierProvider = typeof ExternalIdentifierProviders[keyof typeof ExternalIdentifierProviders];
+export type ExternalIdentifierProvider =
+  (typeof ExternalIdentifierProviders)[keyof typeof ExternalIdentifierProviders];
 
 /**
  * External identifier for linking to other platforms.
@@ -168,7 +169,7 @@ export function getPresenceStateLabel(state: PresenceState): string {
 export function getPresenceStateDescription(state: PresenceState): string {
   const descriptions: Record<PresenceState, string> = {
     unclaimed: 'This contributor has not yet been claimed and has no steward',
-    stewarded: 'A steward is caring for this contributor\'s recognition',
+    stewarded: "A steward is caring for this contributor's recognition",
     claimed: 'This contributor has verified ownership of their presence',
   };
   return descriptions[state] ?? '';

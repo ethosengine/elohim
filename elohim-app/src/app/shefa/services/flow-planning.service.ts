@@ -23,8 +23,7 @@
  */
 
 import { Injectable } from '@angular/core';
-import { EconomicService } from './economic.service';
-import { StewardedResourceService } from './stewarded-resources.service';
+
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import {
   FlowPlan,
@@ -64,6 +63,9 @@ import {
   ProjectionMethod,
 } from '../models/flow-planning.model';
 import { ResourceCategory } from '../models/stewarded-resources.model';
+
+import { EconomicService } from './economic.service';
+import { StewardedResourceService } from './stewarded-resources.service';
 
 /**
  * Flow Planning Service
@@ -524,7 +526,11 @@ export class FlowPlanningService {
   async optimizeAllocation(
     planId: string,
     constraints: AllocationConstraint[],
-    objectiveFunction: 'maximize-surplus' | 'minimize-variance' | 'achieve-targets' | 'balance-categories'
+    objectiveFunction:
+      | 'maximize-surplus'
+      | 'minimize-variance'
+      | 'achieve-targets'
+      | 'balance-categories'
   ): Promise<OptimizationResult> {
     throw new Error('Not yet implemented');
   }
@@ -569,7 +575,7 @@ export class FlowPlanningService {
   async generateRecurringEvents(
     patternId: string,
     durationMonths: number
-  ): Promise<Array<{ timestamp: string; expectedAmount: number; label: string }>> {
+  ): Promise<{ timestamp: string; expectedAmount: number; label: string }[]> {
     throw new Error('Not yet implemented');
   }
 
@@ -616,7 +622,10 @@ export class FlowPlanningService {
    * @param actualEventId - Economic event ID of actual occurrence
    * @returns Updated RecurringPattern with learned data
    */
-  async updatePatternFromActual(patternId: string, actualEventId: string): Promise<RecurringPattern> {
+  async updatePatternFromActual(
+    patternId: string,
+    actualEventId: string
+  ): Promise<RecurringPattern> {
     throw new Error('Not yet implemented');
   }
 
@@ -672,7 +681,10 @@ export class FlowPlanningService {
    * @param lookbackMonths - How much history to analyze
    * @returns Array of FlowPlanningInsights
    */
-  async generatePlanningInsights(stewardId: string, lookbackMonths?: number): Promise<FlowPlanningInsight[]> {
+  async generatePlanningInsights(
+    stewardId: string,
+    lookbackMonths?: number
+  ): Promise<FlowPlanningInsight[]> {
     throw new Error('Not yet implemented');
   }
 
@@ -793,7 +805,7 @@ export class FlowPlanningService {
    * @private
    */
   private calculateTrendExtrapolation(
-    historical: Array<{ timestamp: string; value: number }>,
+    historical: { timestamp: string; value: number }[],
     projectionHorizon: number
   ): ProjectionDataPoint[] {
     // TODO: Implement linear regression algorithm
@@ -854,7 +866,7 @@ export class FlowPlanningService {
    * @private
    */
   private detectRecurringPatterns(
-    events: Array<{ timestamp: string; amount: number }>,
+    events: { timestamp: string; amount: number }[],
     minOccurrences?: number
   ): RecurringPattern[] {
     // TODO: Implement pattern detection algorithm
@@ -871,7 +883,7 @@ export class FlowPlanningService {
    */
   private calculateBudgetVariance(
     budget: FlowBudget,
-    actualTransactions: Array<{ category: string; amount: number }>
+    actualTransactions: { category: string; amount: number }[]
   ): BudgetVarianceReport {
     // TODO: Implement variance calculation
     // For each category:

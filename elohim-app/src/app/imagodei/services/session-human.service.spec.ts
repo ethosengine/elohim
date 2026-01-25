@@ -447,7 +447,7 @@ describe('SessionHumanService', () => {
   });
 
   describe('session observable', () => {
-    it('should emit session changes', (done) => {
+    it('should emit session changes', done => {
       const emissions: (SessionHuman | null)[] = [];
 
       service.session$.subscribe(session => {

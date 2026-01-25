@@ -30,8 +30,8 @@ describe('AgentService', () => {
       stepsCompleted: 0,
       totalSessionTime: 0,
       averageSessionLength: 0,
-      sessionCount: 1
-    }
+      sessionCount: 1,
+    },
   };
 
   const mockAgent: Agent = {
@@ -40,7 +40,7 @@ describe('AgentService', () => {
     type: 'human',
     visibility: 'private',
     createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z'
+    updatedAt: '2025-01-01T00:00:00.000Z',
   };
 
   const mockProgress: AgentProgress = {
@@ -53,7 +53,7 @@ describe('AgentService', () => {
     stepAffinity: {},
     stepNotes: {},
     reflectionResponses: {},
-    attestationsEarned: []
+    attestationsEarned: [],
   };
 
   beforeEach(() => {
@@ -61,7 +61,7 @@ describe('AgentService', () => {
       'getAgent',
       'getAgentProgress',
       'getLocalProgress',
-      'saveAgentProgress'
+      'saveAgentProgress',
     ]);
     const sessionHumanServiceSpyObj = jasmine.createSpyObj('SessionHumanService', [
       'getSessionId',
@@ -69,7 +69,7 @@ describe('AgentService', () => {
       'checkContentAccess',
       'recordPathStarted',
       'recordStepCompleted',
-      'recordNotesSaved'
+      'recordNotesSaved',
     ]);
 
     // Mock localStorage
@@ -78,11 +78,19 @@ describe('AgentService', () => {
     // Create a complete Storage mock
     mockStorage = {
       getItem: (key: string) => localStorageMock[key] || null,
-      setItem: (key: string, value: string) => { localStorageMock[key] = value; },
-      removeItem: (key: string) => { delete localStorageMock[key]; },
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key];
+      },
       key: (index: number) => Object.keys(localStorageMock)[index] || null,
-      get length() { return Object.keys(localStorageMock).length; },
-      clear: () => { localStorageMock = {}; }
+      get length() {
+        return Object.keys(localStorageMock).length;
+      },
+      clear: () => {
+        localStorageMock = {};
+      },
     };
 
     // Replace global localStorage with our mock
@@ -92,17 +100,19 @@ describe('AgentService', () => {
       providers: [
         AgentService,
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
-        { provide: SessionHumanService, useValue: sessionHumanServiceSpyObj }
-      ]
+        { provide: SessionHumanService, useValue: sessionHumanServiceSpyObj },
+      ],
     });
 
     dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
-    sessionHumanServiceSpy = TestBed.inject(SessionHumanService) as jasmine.SpyObj<SessionHumanService>;
+    sessionHumanServiceSpy = TestBed.inject(
+      SessionHumanService
+    ) as jasmine.SpyObj<SessionHumanService>;
 
     // Default spy return values
     const sessionSubject = new BehaviorSubject<SessionHuman | null>(mockSessionHuman);
     Object.defineProperty(sessionHumanServiceSpy, 'session$', {
-      get: () => sessionSubject.asObservable()
+      get: () => sessionSubject.asObservable(),
     });
     sessionHumanServiceSpy.getSessionId.and.returnValue('session-123');
     sessionHumanServiceSpy.getAccessLevel.and.returnValue('visitor');
@@ -124,7 +134,7 @@ describe('AgentService', () => {
   });
 
   describe('initialization with session service', () => {
-    it('should initialize agent from session user', (done) => {
+    it('should initialize agent from session user', done => {
       service.getCurrentAgent().subscribe(agent => {
         expect(agent).toBeTruthy();
         expect(agent?.id).toBe('session-123');
@@ -151,7 +161,7 @@ describe('AgentService', () => {
     it('should check content access via session service', () => {
       const metadata: ContentAccessMetadata = {
         accessLevel: 'gated',
-        requirements: { minLevel: 'member' }
+        requirements: { minLevel: 'member' },
       };
       const result = service.checkContentAccess(metadata);
       expect(sessionHumanServiceSpy.checkContentAccess).toHaveBeenCalledWith(metadata);
@@ -159,7 +169,7 @@ describe('AgentService', () => {
   });
 
   describe('getProgressForPath', () => {
-    it('should get progress from localStorage first', (done) => {
+    it('should get progress from localStorage first', done => {
       dataLoaderSpy.getLocalProgress.and.returnValue(mockProgress);
 
       service.getProgressForPath('test-path').subscribe(progress => {
@@ -170,7 +180,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should fall back to JSON file if no localStorage data', (done) => {
+    it('should fall back to JSON file if no localStorage data', done => {
       dataLoaderSpy.getLocalProgress.and.returnValue(null);
 
       service.getProgressForPath('test-path').subscribe(progress => {
@@ -181,7 +191,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should cache progress for subsequent calls', (done) => {
+    it('should cache progress for subsequent calls', done => {
       service.getProgressForPath('test-path').subscribe(() => {
         dataLoaderSpy.getLocalProgress.calls.reset();
         dataLoaderSpy.getAgentProgress.calls.reset();
@@ -195,10 +205,10 @@ describe('AgentService', () => {
       });
     });
 
-    it('should collect attestations from progress', (done) => {
+    it('should collect attestations from progress', done => {
       const progressWithAttestations: AgentProgress = {
         ...mockProgress,
-        attestationsEarned: ['test-attestation']
+        attestationsEarned: ['test-attestation'],
       };
       dataLoaderSpy.getAgentProgress.and.returnValue(of(progressWithAttestations));
 
@@ -215,13 +225,15 @@ describe('AgentService', () => {
       dataLoaderSpy.getAgentProgress.calls.reset();
       dataLoaderSpy.saveAgentProgress.calls.reset();
       // Return a fresh copy of mockProgress to avoid mutation between tests
-      dataLoaderSpy.getAgentProgress.and.returnValue(of({
-        ...mockProgress,
-        completedStepIndices: [...mockProgress.completedStepIndices]
-      }));
+      dataLoaderSpy.getAgentProgress.and.returnValue(
+        of({
+          ...mockProgress,
+          completedStepIndices: [...mockProgress.completedStepIndices],
+        })
+      );
     });
 
-    it('should mark step as completed', (done) => {
+    it('should mark step as completed', done => {
       service.completeStep('test-path', 2).subscribe(() => {
         expect(dataLoaderSpy.saveAgentProgress).toHaveBeenCalled();
         const savedProgress = dataLoaderSpy.saveAgentProgress.calls.mostRecent().args[0];
@@ -230,7 +242,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should not duplicate completed steps', (done) => {
+    it('should not duplicate completed steps', done => {
       service.completeStep('test-path', 0).subscribe(() => {
         const savedProgress = dataLoaderSpy.saveAgentProgress.calls.mostRecent().args[0];
         expect(savedProgress.completedStepIndices.filter((i: number) => i === 0).length).toBe(1);
@@ -238,7 +250,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should update current step index', (done) => {
+    it('should update current step index', done => {
       service.completeStep('test-path', 2).subscribe(() => {
         const savedProgress = dataLoaderSpy.saveAgentProgress.calls.mostRecent().args[0];
         expect(savedProgress.currentStepIndex).toBe(3);
@@ -246,7 +258,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should create new progress if none exists', (done) => {
+    it('should create new progress if none exists', done => {
       dataLoaderSpy.getAgentProgress.and.returnValue(of(null as any));
       dataLoaderSpy.getLocalProgress.and.returnValue(null);
 
@@ -259,7 +271,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should record path started in session on first step', (done) => {
+    it('should record path started in session on first step', done => {
       dataLoaderSpy.getAgentProgress.and.returnValue(of(null as any));
       dataLoaderSpy.getLocalProgress.and.returnValue(null);
 
@@ -269,14 +281,14 @@ describe('AgentService', () => {
       });
     });
 
-    it('should record step completed in session', (done) => {
+    it('should record step completed in session', done => {
       service.completeStep('test-path', 1).subscribe(() => {
         expect(sessionHumanServiceSpy.recordStepCompleted).toHaveBeenCalledWith('test-path', 1);
         done();
       });
     });
 
-    it('should keep steps sorted', (done) => {
+    it('should keep steps sorted', done => {
       service.completeStep('test-path', 3).subscribe(() => {
         service.completeStep('test-path', 2).subscribe(() => {
           const savedProgress = dataLoaderSpy.saveAgentProgress.calls.mostRecent().args[0];
@@ -296,13 +308,15 @@ describe('AgentService', () => {
       dataLoaderSpy.getAgentProgress.calls.reset();
       dataLoaderSpy.saveAgentProgress.calls.reset();
       // Return a fresh copy of mockProgress to avoid mutation between tests
-      dataLoaderSpy.getAgentProgress.and.returnValue(of({
-        ...mockProgress,
-        stepAffinity: {}
-      }));
+      dataLoaderSpy.getAgentProgress.and.returnValue(
+        of({
+          ...mockProgress,
+          stepAffinity: {},
+        })
+      );
     });
 
-    it('should update affinity for a step', (done) => {
+    it('should update affinity for a step', done => {
       service.updateAffinity('test-path', 1, 0.3).subscribe(() => {
         const savedProgress = dataLoaderSpy.saveAgentProgress.calls.mostRecent().args[0];
         expect(savedProgress.stepAffinity[1]).toBe(0.3);
@@ -310,7 +324,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should clamp affinity to 0.0-1.0 range (upper)', (done) => {
+    it('should clamp affinity to 0.0-1.0 range (upper)', done => {
       service.updateAffinity('test-path', 1, 2.0).subscribe(() => {
         const savedProgress = dataLoaderSpy.saveAgentProgress.calls.mostRecent().args[0];
         expect(savedProgress.stepAffinity[1]).toBe(1.0);
@@ -318,7 +332,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should clamp affinity to 0.0-1.0 range (lower)', (done) => {
+    it('should clamp affinity to 0.0-1.0 range (lower)', done => {
       service.updateAffinity('test-path', 1, -2.0).subscribe(() => {
         const savedProgress = dataLoaderSpy.saveAgentProgress.calls.mostRecent().args[0];
         expect(savedProgress.stepAffinity[1]).toBe(0.0);
@@ -326,10 +340,10 @@ describe('AgentService', () => {
       });
     });
 
-    it('should handle delta updates', (done) => {
+    it('should handle delta updates', done => {
       const progressWithAffinity: AgentProgress = {
         ...mockProgress,
-        stepAffinity: { 1: 0.5 }
+        stepAffinity: { 1: 0.5 },
       };
       dataLoaderSpy.getAgentProgress.and.returnValue(of(progressWithAffinity));
 
@@ -340,7 +354,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should not update affinity without progress', (done) => {
+    it('should not update affinity without progress', done => {
       dataLoaderSpy.getAgentProgress.and.returnValue(of(null as any));
       dataLoaderSpy.getLocalProgress.and.returnValue(null);
 
@@ -352,7 +366,7 @@ describe('AgentService', () => {
   });
 
   describe('saveStepNotes', () => {
-    it('should save notes for a step', (done) => {
+    it('should save notes for a step', done => {
       service.saveStepNotes('test-path', 1, 'My notes').subscribe(() => {
         const savedProgress = dataLoaderSpy.saveAgentProgress.calls.mostRecent().args[0];
         expect(savedProgress.stepNotes[1]).toBe('My notes');
@@ -360,7 +374,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should create progress if none exists', (done) => {
+    it('should create progress if none exists', done => {
       dataLoaderSpy.getAgentProgress.and.returnValue(of(null as any));
       dataLoaderSpy.getLocalProgress.and.returnValue(null);
 
@@ -372,7 +386,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should record notes saved in session', (done) => {
+    it('should record notes saved in session', done => {
       service.saveStepNotes('test-path', 1, 'Notes').subscribe(() => {
         expect(sessionHumanServiceSpy.recordNotesSaved).toHaveBeenCalledWith('test-path', 1);
         done();
@@ -381,7 +395,7 @@ describe('AgentService', () => {
   });
 
   describe('saveReflectionResponses', () => {
-    it('should save reflection responses', (done) => {
+    it('should save reflection responses', done => {
       const responses = ['Response 1', 'Response 2'];
       service.saveReflectionResponses('test-path', 1, responses).subscribe(() => {
         const savedProgress = dataLoaderSpy.saveAgentProgress.calls.mostRecent().args[0];
@@ -390,7 +404,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should not save reflections without progress', (done) => {
+    it('should not save reflections without progress', done => {
       dataLoaderSpy.getAgentProgress.and.returnValue(of(null as any));
       dataLoaderSpy.getLocalProgress.and.returnValue(null);
 
@@ -424,7 +438,7 @@ describe('AgentService', () => {
   });
 
   describe('getLearningFrontier', () => {
-    it('should return active paths from localStorage', (done) => {
+    it('should return active paths from localStorage', done => {
       const progress1: AgentProgress = {
         agentId: 'session-123',
         pathId: 'path-1',
@@ -435,7 +449,7 @@ describe('AgentService', () => {
         stepAffinity: {},
         stepNotes: {},
         reflectionResponses: {},
-        attestationsEarned: []
+        attestationsEarned: [],
       };
 
       const progress2: AgentProgress = {
@@ -448,7 +462,7 @@ describe('AgentService', () => {
         stepAffinity: {},
         stepNotes: {},
         reflectionResponses: {},
-        attestationsEarned: []
+        attestationsEarned: [],
       };
 
       localStorageMock['lamad-progress-session-123-path-1'] = JSON.stringify(progress1);
@@ -464,7 +478,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should exclude completed paths', (done) => {
+    it('should exclude completed paths', done => {
       const completedProgress: AgentProgress = {
         agentId: 'session-123',
         pathId: 'completed-path',
@@ -476,10 +490,11 @@ describe('AgentService', () => {
         stepAffinity: {},
         stepNotes: {},
         reflectionResponses: {},
-        attestationsEarned: []
+        attestationsEarned: [],
       };
 
-      localStorageMock['lamad-progress-session-123-completed-path'] = JSON.stringify(completedProgress);
+      localStorageMock['lamad-progress-session-123-completed-path'] =
+        JSON.stringify(completedProgress);
 
       service.getLearningFrontier().subscribe(frontier => {
         expect(frontier.length).toBe(0);
@@ -487,7 +502,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should handle malformed localStorage entries', (done) => {
+    it('should handle malformed localStorage entries', done => {
       localStorageMock['lamad-progress-session-123-bad'] = 'invalid json';
 
       service.getLearningFrontier().subscribe(frontier => {
@@ -496,7 +511,7 @@ describe('AgentService', () => {
       });
     });
 
-    it('should only include paths for current agent', (done) => {
+    it('should only include paths for current agent', done => {
       const otherAgentProgress: AgentProgress = {
         agentId: 'other-agent',
         pathId: 'path-1',
@@ -507,7 +522,7 @@ describe('AgentService', () => {
         stepAffinity: {},
         stepNotes: {},
         reflectionResponses: {},
-        attestationsEarned: []
+        attestationsEarned: [],
       };
 
       localStorageMock['lamad-progress-other-agent-path-1'] = JSON.stringify(otherAgentProgress);
@@ -520,7 +535,7 @@ describe('AgentService', () => {
   });
 
   describe('clearProgressCache', () => {
-    it('should clear the progress cache', (done) => {
+    it('should clear the progress cache', done => {
       service.getProgressForPath('test-path').subscribe(() => {
         service.clearProgressCache();
         dataLoaderSpy.getAgentProgress.calls.reset();

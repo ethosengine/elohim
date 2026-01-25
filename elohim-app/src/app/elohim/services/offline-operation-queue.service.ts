@@ -1,4 +1,5 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
+
 import { HolochainClientService } from './holochain-client.service';
 import { LoggerService } from './logger.service';
 
@@ -46,7 +47,7 @@ export interface OfflineOperation {
  * 5. Failed operations → retry or dismiss
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class OfflineOperationQueueService {
   private readonly logger = inject(LoggerService).createChild('OfflineQueue');
@@ -68,8 +69,8 @@ export class OfflineOperationQueueService {
   readonly lastSync = this.lastSyncTime.asReadonly();
 
   // Event callbacks
-  private onQueueChangedCallbacks: Array<(queue: OfflineOperation[]) => void> = [];
-  private onSyncCompleteCallbacks: Array<(succeeded: number, failed: number) => void> = [];
+  private onQueueChangedCallbacks: ((queue: OfflineOperation[]) => void)[] = [];
+  private onSyncCompleteCallbacks: ((succeeded: number, failed: number) => void)[] = [];
 
   constructor() {
     // Watch Holochain connection - auto-sync when connected
@@ -96,7 +97,10 @@ export class OfflineOperationQueueService {
       // For now, queue starts empty
       this.logger.debug('Loaded queue from storage');
     } catch (err) {
-      this.logger.error('Failed to load queue from storage', err instanceof Error ? err : new Error(String(err)));
+      this.logger.error(
+        'Failed to load queue from storage',
+        err instanceof Error ? err : new Error(String(err))
+      );
     }
   }
 
@@ -109,14 +113,21 @@ export class OfflineOperationQueueService {
       const queueData = this.queue();
       this.logger.debug('Saved queue to storage', { count: queueData.length });
     } catch (err) {
-      this.logger.error('Failed to save queue to storage', err instanceof Error ? err : new Error(String(err)));
+      this.logger.error(
+        'Failed to save queue to storage',
+        err instanceof Error ? err : new Error(String(err))
+      );
     }
   }
 
   /**
    * Enqueue an operation that failed or was performed offline
    */
-  enqueue(operation: Omit<OfflineOperation, 'id' | 'timestamp' | 'retryCount' | 'maxRetries'> & { maxRetries?: number }): string {
+  enqueue(
+    operation: Omit<OfflineOperation, 'id' | 'timestamp' | 'retryCount' | 'maxRetries'> & {
+      maxRetries?: number;
+    }
+  ): string {
     const id = this.generateOperationId();
 
     const fullOperation: OfflineOperation = {
@@ -124,7 +135,7 @@ export class OfflineOperationQueueService {
       id,
       timestamp: Date.now(),
       retryCount: 0,
-      maxRetries: operation.maxRetries ?? 3
+      maxRetries: operation.maxRetries ?? 3,
     };
 
     const currentQueue = this.queue();
@@ -198,7 +209,9 @@ export class OfflineOperationQueueService {
         }
       } catch (err) {
         failed++;
-        this.logger.error('Operation failed', err instanceof Error ? err : new Error(String(err)), { operationId: operation.id });
+        this.logger.error('Operation failed', err instanceof Error ? err : new Error(String(err)), {
+          operationId: operation.id,
+        });
         this.retryOperation(operation);
       }
     }
@@ -235,7 +248,11 @@ export class OfflineOperationQueueService {
         return false;
       }
     } catch (err) {
-      this.logger.error('Operation sync failed', err instanceof Error ? err : new Error(String(err)), { operationId });
+      this.logger.error(
+        'Operation sync failed',
+        err instanceof Error ? err : new Error(String(err)),
+        { operationId }
+      );
       this.retryOperation(operation);
       return false;
     }
@@ -254,12 +271,14 @@ export class OfflineOperationQueueService {
       const result = await this.holochainClient.callZome({
         zomeName: operation.zomeName,
         fnName: operation.fnName,
-        payload: operation.payload
+        payload: operation.payload,
       });
 
       return result.success;
     } catch (err) {
-      this.logger.error('Zome call failed', err instanceof Error ? err : new Error(String(err)), { operationId: operation.id });
+      this.logger.error('Zome call failed', err instanceof Error ? err : new Error(String(err)), {
+        operationId: operation.id,
+      });
       return false;
     }
   }
@@ -291,9 +310,7 @@ export class OfflineOperationQueueService {
     // Increment retry count and update queue
     const currentQueue = this.queue();
     const updatedQueue = currentQueue.map(op =>
-      op.id === operation.id
-        ? { ...op, retryCount: op.retryCount + 1 }
-        : op
+      op.id === operation.id ? { ...op, retryCount: op.retryCount + 1 } : op
     );
 
     this.queue.set(updatedQueue);
@@ -420,10 +437,8 @@ export class OfflineOperationQueueService {
       size: queue.length,
       totalRetries,
       averageRetries: Math.round(averageRetries * 10) / 10,
-      oldestOperation: queue.length > 0
-        ? Math.round((Date.now() - queue[0].timestamp) / 1000)
-        : 0,
-      lastSync: this.lastSyncTime()
+      oldestOperation: queue.length > 0 ? Math.round((Date.now() - queue[0].timestamp) / 1000) : 0,
+      lastSync: this.lastSyncTime(),
     };
   }
 }

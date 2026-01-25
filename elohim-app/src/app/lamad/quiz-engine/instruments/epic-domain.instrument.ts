@@ -37,26 +37,29 @@ export const EPIC_DOMAIN_SUBSCALES: SubscaleDefinition[] = [
   {
     id: 'governance',
     name: 'AI Constitutional',
-    description: 'Interest in AI governance, constitutional frameworks, and ensuring AI serves humanity',
+    description:
+      'Interest in AI governance, constitutional frameworks, and ensuring AI serves humanity',
     dimension: 'epic-domain',
     color: '#8B5CF6', // Purple
-    icon: '🏛️'
+    icon: '🏛️',
   },
   {
     id: 'care',
     name: 'Value Scanner',
-    description: 'Passion for recognizing care work, supporting caregivers, and making invisible contributions visible',
+    description:
+      'Passion for recognizing care work, supporting caregivers, and making invisible contributions visible',
     dimension: 'epic-domain',
     color: '#EC4899', // Pink
-    icon: '💝'
+    icon: '💝',
   },
   {
     id: 'economic',
     name: 'Economic Coordination',
-    description: 'Interest in transforming workplace dynamics, worker ownership, and equitable economic systems',
+    description:
+      'Interest in transforming workplace dynamics, worker ownership, and equitable economic systems',
     dimension: 'epic-domain',
     color: '#10B981', // Green
-    icon: '📊'
+    icon: '📊',
   },
   {
     id: 'public',
@@ -64,16 +67,17 @@ export const EPIC_DOMAIN_SUBSCALES: SubscaleDefinition[] = [
     description: 'Commitment to democratic participation, transparency, and civic engagement',
     dimension: 'epic-domain',
     color: '#3B82F6', // Blue
-    icon: '🔍'
+    icon: '🔍',
   },
   {
     id: 'social',
     name: 'Social Medium',
-    description: 'Focus on building healthier digital spaces, fostering connection, and improving online communication',
+    description:
+      'Focus on building healthier digital spaces, fostering connection, and improving online communication',
     dimension: 'epic-domain',
     color: '#F59E0B', // Amber
-    icon: '💬'
-  }
+    icon: '💬',
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,28 +88,33 @@ export const EPIC_DOMAIN_RESULT_TYPES: ResultTypeDefinition[] = [
   {
     id: 'governance',
     name: 'AI Constitutional',
-    description: 'You\'re drawn to shaping how AI systems are governed and ensuring they serve humanity through proper constitutional frameworks.'
+    description:
+      "You're drawn to shaping how AI systems are governed and ensuring they serve humanity through proper constitutional frameworks.",
   },
   {
     id: 'care',
     name: 'Value Scanner',
-    description: 'You\'re passionate about recognizing and valuing care work, supporting caregivers, and making invisible contributions visible.'
+    description:
+      "You're passionate about recognizing and valuing care work, supporting caregivers, and making invisible contributions visible.",
   },
   {
     id: 'economic',
     name: 'Economic Coordination',
-    description: 'You\'re interested in transforming workplace dynamics, promoting worker ownership, and creating more equitable economic systems.'
+    description:
+      "You're interested in transforming workplace dynamics, promoting worker ownership, and creating more equitable economic systems.",
   },
   {
     id: 'public',
     name: 'Public Observer',
-    description: 'You\'re committed to strengthening democratic participation, increasing transparency, and empowering civic engagement.'
+    description:
+      "You're committed to strengthening democratic participation, increasing transparency, and empowering civic engagement.",
   },
   {
     id: 'social',
     name: 'Social Medium',
-    description: 'You\'re focused on building healthier digital spaces, fostering genuine connection, and improving online communication.'
-  }
+    description:
+      "You're focused on building healthier digital spaces, fostering genuine connection, and improving online communication.",
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,13 +129,14 @@ export const EPIC_DOMAIN_INSTRUMENT_CONFIG: CreateInstrumentOptions = {
   id: EPIC_DOMAIN_INSTRUMENT_ID,
   name: 'Epic Domain Discovery',
   category: 'vocational',
-  description: 'Discover which Elohim Protocol epic domain resonates most with your interests and values',
+  description:
+    'Discover which Elohim Protocol epic domain resonates most with your interests and values',
   version: '1.0.0',
   subscales: EPIC_DOMAIN_SUBSCALES,
   resultTypes: EPIC_DOMAIN_RESULT_TYPES,
   scoringConfig: {
     method: 'highest-subscale',
-    normalize: true
+    normalize: true,
   },
   // Default interpret function - psyche-core handles this based on scoringConfig
   interpret: (aggregated: AggregatedReflection) => {
@@ -141,10 +151,10 @@ export const EPIC_DOMAIN_INSTRUMENT_CONFIG: CreateInstrumentOptions = {
       primaryType: {
         typeId: primaryId,
         typeName: resultType?.name ?? primaryId,
-        description: resultType?.description
-      }
+        description: resultType?.description,
+      },
     };
-  }
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -208,33 +218,29 @@ export function findPrimaryEpicDomain(subscaleTotals: Record<string, number>): {
     name: subscale.name,
     score: maxScore,
     icon: subscale.icon ?? '📌',
-    color: subscale.color ?? '#888'
+    color: subscale.color ?? '#888',
   };
 }
 
 /**
  * @deprecated Use psyche-core's getTopSubscales() instead
  */
-export function sortEpicDomainsByScore(
-  subscaleTotals: Record<string, number>
-): Array<{
+export function sortEpicDomainsByScore(subscaleTotals: Record<string, number>): {
   id: string;
   name: string;
   icon: string;
   color: string;
   score: number;
   percent: number;
-}> {
+}[] {
   const total = Object.values(subscaleTotals).reduce((sum, v) => sum + v, 0) || 1;
 
-  return EPIC_DOMAIN_SUBSCALES
-    .map(subscale => ({
-      id: subscale.id,
-      name: subscale.name,
-      icon: subscale.icon ?? '📌',
-      color: subscale.color ?? '#888',
-      score: subscaleTotals[subscale.id] || 0,
-      percent: ((subscaleTotals[subscale.id] || 0) / total) * 100
-    }))
-    .sort((a, b) => b.score - a.score);
+  return EPIC_DOMAIN_SUBSCALES.map(subscale => ({
+    id: subscale.id,
+    name: subscale.name,
+    icon: subscale.icon ?? '📌',
+    color: subscale.color ?? '#888',
+    score: subscaleTotals[subscale.id] || 0,
+    percent: ((subscaleTotals[subscale.id] || 0) / total) * 100,
+  })).sort((a, b) => b.score - a.score);
 }

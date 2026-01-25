@@ -1,9 +1,11 @@
 import { Injectable } from '@angular/core';
-import { RendererRegistryService } from './renderer-registry.service';
-import { MarkdownRendererComponent } from './markdown-renderer/markdown-renderer.component';
-import { IframeRendererComponent } from './iframe-renderer/iframe-renderer.component';
-import { GherkinRendererComponent } from './gherkin-renderer/gherkin-renderer.component';
+
 import { SophiaRendererComponent } from '../content-io/plugins/sophia/sophia-renderer.component';
+
+import { GherkinRendererComponent } from './gherkin-renderer/gherkin-renderer.component';
+import { IframeRendererComponent } from './iframe-renderer/iframe-renderer.component';
+import { MarkdownRendererComponent } from './markdown-renderer/markdown-renderer.component';
+import { RendererRegistryService } from './renderer-registry.service';
 
 /**
  * Legacy renderer initializer - registers renderers for the older RendererRegistryService.
@@ -23,6 +25,10 @@ export class RendererInitializerService {
     this.registry.register(['html5-app', 'video-embed'], IframeRendererComponent, 10);
     this.registry.register(['gherkin'], GherkinRendererComponent, 5);
     // Sophia quiz renderer - handles all quiz/assessment formats (including legacy Perseus)
-    this.registry.register(['perseus-quiz-json', 'perseus', 'sophia', 'sophia-quiz-json'], SophiaRendererComponent, 15);
+    this.registry.register(
+      ['perseus-quiz-json', 'perseus', 'sophia', 'sophia-quiz-json'],
+      SophiaRendererComponent,
+      15
+    );
   }
 }

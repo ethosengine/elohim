@@ -41,7 +41,10 @@
         <div class="stat-value">{{ cluster()?.onlineNodes }}/{{ cluster()?.totalNodes }}</div>
         <div class="stat-label">Nodes Online</div>
         <div class="stat-bar">
-          <div class="stat-bar-fill health" [style.width.%]="(cluster()?.healthRatio ?? 0) * 100"></div>
+          <div
+            class="stat-bar-fill health"
+            [style.width.%]="(cluster()?.healthRatio ?? 0) * 100"
+          ></div>
         </div>
       </div>
 
@@ -49,7 +52,10 @@
         <div class="stat-value">{{ formatPercent(cluster()?.avgTrustScore ?? null) }}</div>
         <div class="stat-label">Avg Trust Score</div>
         <div class="stat-bar">
-          <div class="stat-bar-fill trust" [style.width.%]="(cluster()?.avgTrustScore ?? 0) * 100"></div>
+          <div
+            class="stat-bar-fill trust"
+            [style.width.%]="(cluster()?.avgTrustScore ?? 0) * 100"
+          ></div>
         </div>
       </div>
 
@@ -57,37 +63,40 @@
         <div class="stat-value">{{ formatPercent(cluster()?.avgImpactScore ?? null) }}</div>
         <div class="stat-label">Avg Impact Score</div>
         <div class="stat-bar">
-          <div class="stat-bar-fill impact" [style.width.%]="(cluster()?.avgImpactScore ?? 0) * 100"></div>
+          <div
+            class="stat-bar-fill impact"
+            [style.width.%]="(cluster()?.avgImpactScore ?? 0) * 100"
+          ></div>
         </div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-value">{{ formatPercent(cluster()?.clusterDeliverySuccessRate ?? null) }}</div>
+        <div class="stat-value">
+          {{ formatPercent(cluster()?.clusterDeliverySuccessRate ?? null) }}
+        </div>
         <div class="stat-label">Delivery Success</div>
         <div class="stat-bar">
-          <div class="stat-bar-fill success" [style.width.%]="(cluster()?.clusterDeliverySuccessRate ?? 0) * 100"></div>
+          <div
+            class="stat-bar-fill success"
+            [style.width.%]="(cluster()?.clusterDeliverySuccessRate ?? 0) * 100"
+          ></div>
         </div>
       </div>
     </section>
 
     <!-- Tabs -->
     <nav class="tabs">
-      <button
-        class="tab"
-        [class.active]="activeTab() === 'overview'"
-        (click)="setTab('overview')">
+      <button class="tab" [class.active]="activeTab() === 'overview'" (click)="setTab('overview')">
         Overview
       </button>
-      <button
-        class="tab"
-        [class.active]="activeTab() === 'nodes'"
-        (click)="setTab('nodes')">
+      <button class="tab" [class.active]="activeTab() === 'nodes'" (click)="setTab('nodes')">
         Nodes ({{ nodes().length }})
       </button>
       <button
         class="tab"
         [class.active]="activeTab() === 'resources'"
-        (click)="setTab('resources')">
+        (click)="setTab('resources')"
+      >
         Resources
       </button>
     </nav>
@@ -111,7 +120,9 @@
                   <span class="capacity-label">Memory</span>
                 </div>
                 <div class="capacity-item">
-                  <span class="capacity-value">{{ totalCapacity()?.storage | number:'1.1-1' }} TB</span>
+                  <span class="capacity-value">
+                    {{ totalCapacity()?.storage | number: '1.1-1' }} TB
+                  </span>
                   <span class="capacity-label">Storage</span>
                 </div>
                 <div class="capacity-item">
@@ -130,7 +141,11 @@
                 <div class="tier-row">
                   <span class="tier-name">{{ tier.tier }}</span>
                   <div class="tier-bar">
-                    <div class="tier-bar-fill" [class]="tier.tier.toLowerCase()" [style.width.%]="tier.pct * 100"></div>
+                    <div
+                      class="tier-bar-fill"
+                      [class]="tier.tier.toLowerCase()"
+                      [style.width.%]="tier.pct * 100"
+                    ></div>
                   </div>
                   <span class="tier-count">{{ tier.count }}</span>
                 </div>
@@ -143,7 +158,7 @@
             <h3>Reach Coverage</h3>
             @if (cluster()?.reachCoverage) {
               <div class="reach-grid">
-                @for (level of [0,1,2,3,4,5,6,7]; track level) {
+                @for (level of [0, 1, 2, 3, 4, 5, 6, 7]; track level) {
                   <div class="reach-item" [class.active]="getReachCount(level) > 0">
                     <span class="reach-count">{{ getReachCount(level) }}</span>
                     <span class="reach-name">{{ reachLevelName(level) }}</span>
@@ -163,7 +178,9 @@
                   <span class="cache-label">Entries</span>
                 </div>
                 <div class="cache-stat">
-                  <span class="cache-value">{{ formatPercent(resources()?.cache?.hitRate ?? null) }}</span>
+                  <span class="cache-value">
+                    {{ formatPercent(resources()?.cache?.hitRate ?? null) }}
+                  </span>
                   <span class="cache-label">Hit Rate</span>
                 </div>
                 <div class="cache-stat">
@@ -196,7 +213,9 @@
                   <span class="label">Blobs Tracked</span>
                 </div>
                 <div class="custodian-stat">
-                  <span class="value">{{ formatPercent(custodians()?.probeSuccessRate ?? null) }}</span>
+                  <span class="value">
+                    {{ formatPercent(custodians()?.probeSuccessRate ?? null) }}
+                  </span>
                   <span class="label">Probe Success</span>
                 </div>
               </div>
@@ -241,31 +260,41 @@
                 <th (click)="setSort('nodeId')" class="sortable">
                   Node ID
                   @if (sortField() === 'nodeId') {
-                    <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                    <span class="sort-icon">
+                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                    </span>
                   }
                 </th>
                 <th (click)="setSort('status')" class="sortable">
                   Status
                   @if (sortField() === 'status') {
-                    <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                    <span class="sort-icon">
+                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                    </span>
                   }
                 </th>
                 <th (click)="setSort('stewardTier')" class="sortable">
                   Tier
                   @if (sortField() === 'stewardTier') {
-                    <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                    <span class="sort-icon">
+                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                    </span>
                   }
                 </th>
                 <th (click)="setSort('trustScore')" class="sortable">
                   Trust
                   @if (sortField() === 'trustScore') {
-                    <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                    <span class="sort-icon">
+                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                    </span>
                   }
                 </th>
                 <th (click)="setSort('combinedScore')" class="sortable">
                   Score
                   @if (sortField() === 'combinedScore') {
-                    <span class="sort-icon">{{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}</span>
+                    <span class="sort-icon">
+                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                    </span>
                   }
                 </th>
                 <th>Last Heartbeat</th>
@@ -275,7 +304,7 @@
             <tbody>
               @for (node of sortedNodes(); track node.nodeId) {
                 <tr [class]="node.status">
-                  <td class="node-id">{{ node.nodeId | slice:0:12 }}...</td>
+                  <td class="node-id">{{ node.nodeId | slice: 0 : 12 }}...</td>
                   <td>
                     <span class="status-badge" [class]="node.status">
                       {{ node.status | titlecase }}
@@ -290,7 +319,9 @@
                   <td>
                     <div class="score-bar">
                       <div class="score-fill" [style.width.%]="node.combinedScore * 100"></div>
-                      <span class="score-text">{{ (node.combinedScore * 100) | number:'1.0-0' }}%</span>
+                      <span class="score-text">
+                        {{ node.combinedScore * 100 | number: '1.0-0' }}%
+                      </span>
                     </div>
                   </td>
                   <td>{{ formatTime(node.lastHeartbeatSecsAgo) }}</td>
@@ -315,7 +346,10 @@
               <div class="resource-card">
                 <h4>CPU</h4>
                 <div class="resource-gauge">
-                  <div class="gauge-fill" [style.width.%]="resources()?.cpu?.utilizationPercent ?? 0"></div>
+                  <div
+                    class="gauge-fill"
+                    [style.width.%]="resources()?.cpu?.utilizationPercent ?? 0"
+                  ></div>
                 </div>
                 <div class="resource-details">
                   <div class="detail">
@@ -328,7 +362,9 @@
                   </div>
                   <div class="detail">
                     <span class="label">Utilization</span>
-                    <span class="value">{{ resources()?.cpu?.utilizationPercent | number:'1.1-1' }}%</span>
+                    <span class="value">
+                      {{ resources()?.cpu?.utilizationPercent | number: '1.1-1' }}%
+                    </span>
                   </div>
                 </div>
               </div>
@@ -337,7 +373,10 @@
               <div class="resource-card">
                 <h4>Memory</h4>
                 <div class="resource-gauge">
-                  <div class="gauge-fill" [style.width.%]="resources()?.memory?.utilizationPercent ?? 0"></div>
+                  <div
+                    class="gauge-fill"
+                    [style.width.%]="resources()?.memory?.utilizationPercent ?? 0"
+                  ></div>
                 </div>
                 <div class="resource-details">
                   <div class="detail">
@@ -350,7 +389,9 @@
                   </div>
                   <div class="detail">
                     <span class="label">Utilization</span>
-                    <span class="value">{{ resources()?.memory?.utilizationPercent | number:'1.1-1' }}%</span>
+                    <span class="value">
+                      {{ resources()?.memory?.utilizationPercent | number: '1.1-1' }}%
+                    </span>
                   </div>
                 </div>
               </div>
@@ -359,20 +400,29 @@
               <div class="resource-card">
                 <h4>Storage</h4>
                 <div class="resource-gauge">
-                  <div class="gauge-fill" [style.width.%]="resources()?.storage?.utilizationPercent ?? 0"></div>
+                  <div
+                    class="gauge-fill"
+                    [style.width.%]="resources()?.storage?.utilizationPercent ?? 0"
+                  ></div>
                 </div>
                 <div class="resource-details">
                   <div class="detail">
                     <span class="label">Total</span>
-                    <span class="value">{{ resources()?.storage?.totalTb | number:'1.1-1' }} TB</span>
+                    <span class="value">
+                      {{ resources()?.storage?.totalTb | number: '1.1-1' }} TB
+                    </span>
                   </div>
                   <div class="detail">
                     <span class="label">Available</span>
-                    <span class="value">{{ resources()?.storage?.availableTb | number:'1.1-1' }} TB</span>
+                    <span class="value">
+                      {{ resources()?.storage?.availableTb | number: '1.1-1' }} TB
+                    </span>
                   </div>
                   <div class="detail">
                     <span class="label">Custodied Content</span>
-                    <span class="value">{{ resources()?.storage?.custodiedContentGb | number }} GB</span>
+                    <span class="value">
+                      {{ resources()?.storage?.custodiedContentGb | number }} GB
+                    </span>
                   </div>
                 </div>
               </div>
@@ -387,11 +437,16 @@
                   </div>
                   <div class="detail">
                     <span class="label">Active Connections</span>
-                    <span class="value">{{ resources()?.bandwidth?.activeConnections | number }}</span>
+                    <span class="value">
+                      {{ resources()?.bandwidth?.activeConnections | number }}
+                    </span>
                   </div>
                   <div class="detail">
                     <span class="label">Avg per Connection</span>
-                    <span class="value">{{ resources()?.bandwidth?.avgBandwidthPerConnectionMbps | number:'1.1-1' }} Mbps</span>
+                    <span class="value">
+                      {{ resources()?.bandwidth?.avgBandwidthPerConnectionMbps | number: '1.1-1' }}
+                      Mbps
+                    </span>
                   </div>
                 </div>
               </div>

@@ -66,11 +66,7 @@
     >
       Overview
     </button>
-    <button
-      class="tab-btn"
-      [class.active]="activeTab === 'paths'"
-      (click)="setActiveTab('paths')"
-    >
+    <button class="tab-btn" [class.active]="activeTab === 'paths'" (click)="setActiveTab('paths')">
       Paths
     </button>
     <button
@@ -114,8 +110,10 @@
                   <h3 class="resume-title">{{ resumePoint.title }}</h3>
                   <p class="resume-reason">{{ resumePoint.reason }}</p>
                 </div>
-                <a [routerLink]="['/lamad/path', resumePoint.pathId, 'step', resumePoint.stepIndex]"
-                   class="resume-action">
+                <a
+                  [routerLink]="['/lamad/path', resumePoint.pathId, 'step', resumePoint.stepIndex]"
+                  class="resume-action"
+                >
                   <span>Continue</span>
                   <span class="material-icons">arrow_forward</span>
                 </a>
@@ -215,8 +213,12 @@
             <div class="activity-list">
               @for (activity of activityHistory.slice(-5).reverse(); track activity.timestamp) {
                 <div class="activity-item">
-                  <span class="activity-icon material-icons">{{ getActivityIcon(activity.type) }}</span>
-                  <span class="activity-text">{{ getActivityLabel(activity.type) }}: {{ activity.resourceId }}</span>
+                  <span class="activity-icon material-icons">
+                    {{ getActivityIcon(activity.type) }}
+                  </span>
+                  <span class="activity-text">
+                    {{ getActivityLabel(activity.type) }}: {{ activity.resourceId }}
+                  </span>
                   <span class="activity-time">{{ formatTimestamp(activity.timestamp) }}</span>
                 </div>
               }
@@ -230,7 +232,12 @@
     <!-- Paths Tab -->
     @if (activeTab === 'paths') {
       <div class="tab-panel paths-panel">
-        @if (!pathsOverview || (pathsOverview.inProgress.length === 0 && pathsOverview.completed.length === 0 && pathsOverview.suggested.length === 0)) {
+        @if (
+          !pathsOverview ||
+          (pathsOverview.inProgress.length === 0 &&
+            pathsOverview.completed.length === 0 &&
+            pathsOverview.suggested.length === 0)
+        ) {
           <div class="empty-state">
             <span class="empty-icon material-icons">route</span>
             <h3>No paths started yet</h3>
@@ -242,7 +249,9 @@
           @if (pathsOverview.inProgress.length > 0) {
             <section class="paths-section">
               <div class="paths-section-header">
-                <span class="material-icons paths-section-icon paths-section-icon--progress">schedule</span>
+                <span class="material-icons paths-section-icon paths-section-icon--progress">
+                  schedule
+                </span>
                 <h3 class="paths-section-title">In Progress</h3>
                 <span class="paths-section-count">{{ pathsOverview.inProgress.length }}</span>
               </div>
@@ -250,18 +259,28 @@
                 @for (path of pathsOverview.inProgress; track path.pathId) {
                   <div class="path-card path-card--in-progress">
                     <div class="path-card-header">
-                      <span class="path-difficulty path-difficulty--{{ path.difficulty }}">{{ path.difficulty }}</span>
+                      <span class="path-difficulty path-difficulty--{{ path.difficulty }}">
+                        {{ path.difficulty }}
+                      </span>
                     </div>
                     <h4 class="path-card-title">{{ path.title }}</h4>
                     <p class="path-card-description">{{ path.description }}</p>
                     <div class="path-card-progress">
                       <div class="progress-bar-enhanced">
-                        <div class="progress-fill-enhanced" [style.width.%]="path.progressPercent"></div>
+                        <div
+                          class="progress-fill-enhanced"
+                          [style.width.%]="path.progressPercent"
+                        ></div>
                       </div>
-                      <span class="progress-text">{{ path.completedSteps }}/{{ path.totalSteps }} steps · {{ path.progressPercent }}%</span>
+                      <span class="progress-text">
+                        {{ path.completedSteps }}/{{ path.totalSteps }} steps ·
+                        {{ path.progressPercent }}%
+                      </span>
                     </div>
-                    <a [routerLink]="['/lamad/path', path.pathId, 'step', path.currentStepIndex]"
-                       class="path-card-action">
+                    <a
+                      [routerLink]="['/lamad/path', path.pathId, 'step', path.currentStepIndex]"
+                      class="path-card-action"
+                    >
                       Continue
                       <span class="material-icons">arrow_forward</span>
                     </a>
@@ -275,7 +294,9 @@
           @if (pathsOverview.completed.length > 0) {
             <section class="paths-section">
               <div class="paths-section-header">
-                <span class="material-icons paths-section-icon paths-section-icon--completed">emoji_events</span>
+                <span class="material-icons paths-section-icon paths-section-icon--completed">
+                  emoji_events
+                </span>
                 <h3 class="paths-section-title">Completed</h3>
                 <span class="paths-section-count">{{ pathsOverview.completed.length }}</span>
               </div>
@@ -298,12 +319,16 @@
                       @if (path.attestationsGranted?.length) {
                         <span class="meta-item attestation">
                           <span class="material-icons">workspace_premium</span>
-                          {{ path.attestationsGranted?.length }} attestation{{ path.attestationsGranted?.length !== 1 ? 's' : '' }}
+                          {{ path.attestationsGranted?.length }} attestation{{
+                            path.attestationsGranted?.length !== 1 ? 's' : ''
+                          }}
                         </span>
                       }
                     </div>
-                    <a [routerLink]="['/lamad/path', path.pathId]"
-                       class="path-card-action path-card-action--review">
+                    <a
+                      [routerLink]="['/lamad/path', path.pathId]"
+                      class="path-card-action path-card-action--review"
+                    >
                       Review
                       <span class="material-icons">visibility</span>
                     </a>
@@ -317,14 +342,18 @@
           @if (pathsOverview.suggested.length > 0) {
             <section class="paths-section">
               <div class="paths-section-header">
-                <span class="material-icons paths-section-icon paths-section-icon--suggested">auto_awesome</span>
+                <span class="material-icons paths-section-icon paths-section-icon--suggested">
+                  auto_awesome
+                </span>
                 <h3 class="paths-section-title">Suggested for You</h3>
               </div>
               <div class="paths-grid">
                 @for (path of pathsOverview.suggested; track path.pathId) {
                   <div class="path-card path-card--suggested">
                     <div class="path-card-header">
-                      <span class="path-difficulty path-difficulty--{{ path.difficulty }}">{{ path.difficulty }}</span>
+                      <span class="path-difficulty path-difficulty--{{ path.difficulty }}">
+                        {{ path.difficulty }}
+                      </span>
                     </div>
                     <h4 class="path-card-title">{{ path.title }}</h4>
                     <p class="path-card-description">{{ path.description }}</p>
@@ -334,8 +363,10 @@
                         {{ path.totalSteps }} steps
                       </span>
                     </div>
-                    <a [routerLink]="['/lamad/path', path.pathId]"
-                       class="path-card-action path-card-action--start">
+                    <a
+                      [routerLink]="['/lamad/path', path.pathId]"
+                      class="path-card-action path-card-action--start"
+                    >
                       Start Path
                       <span class="material-icons">arrow_forward</span>
                     </a>
@@ -371,21 +402,35 @@
           <div class="timeline-enhanced">
             <div class="timeline-line"></div>
             @for (event of timelineEvents; track event.id; let i = $index) {
-              <div class="timeline-event" [class.timeline-event--milestone]="event.significance === 'milestone'">
-                <div class="timeline-event-marker" [style.background]="getTimelineEventColor(event.significance)">
+              <div
+                class="timeline-event"
+                [class.timeline-event--milestone]="event.significance === 'milestone'"
+              >
+                <div
+                  class="timeline-event-marker"
+                  [style.background]="getTimelineEventColor(event.significance)"
+                >
                   <span class="material-icons">{{ getTimelineEventIcon(event.type) }}</span>
                 </div>
                 <div class="timeline-event-content">
                   <div class="timeline-event-header">
                     <span class="timeline-event-title">{{ event.title }}</span>
-                    <span class="timeline-event-date">{{ formatTimelineDate(event.timestamp) }}</span>
+                    <span class="timeline-event-date">
+                      {{ formatTimelineDate(event.timestamp) }}
+                    </span>
                   </div>
                   @if (event.description) {
                     <p class="timeline-event-description">{{ event.description }}</p>
                   }
                   @if (event.resourceId) {
-                    <a [routerLink]="event.resourceType === 'path' ? ['/lamad/path', event.resourceId] : ['/lamad/content', event.resourceId]"
-                       class="timeline-event-link">
+                    <a
+                      [routerLink]="
+                        event.resourceType === 'path'
+                          ? ['/lamad/path', event.resourceId]
+                          : ['/lamad/content', event.resourceId]
+                      "
+                      class="timeline-event-link"
+                    >
                       View {{ event.resourceType }}
                       <span class="material-icons">open_in_new</span>
                     </a>
@@ -404,27 +449,37 @@
               class="filter-btn"
               [class.active]="activityFilter === 'all'"
               (click)="setActivityFilter('all')"
-            >All</button>
+            >
+              All
+            </button>
             <button
               class="filter-btn"
               [class.active]="activityFilter === 'view'"
               (click)="setActivityFilter('view')"
-            >Views</button>
+            >
+              Views
+            </button>
             <button
               class="filter-btn"
               [class.active]="activityFilter === 'affinity'"
               (click)="setActivityFilter('affinity')"
-            >Affinity</button>
+            >
+              Affinity
+            </button>
             <button
               class="filter-btn"
               [class.active]="activityFilter === 'path-start'"
               (click)="setActivityFilter('path-start')"
-            >Path Starts</button>
+            >
+              Path Starts
+            </button>
             <button
               class="filter-btn"
               [class.active]="activityFilter === 'step-complete'"
               (click)="setActivityFilter('step-complete')"
-            >Steps</button>
+            >
+              Steps
+            </button>
           </div>
           @if (filteredActivities.length > 0) {
             <div class="timeline-list">
@@ -496,7 +551,11 @@
           @if (canUpgrade()) {
             <div class="upgrade-cta">
               <span class="material-icons">arrow_upward</span>
-              <span>Ready to upgrade? Move to <strong>{{ sovereigntyState().migrationTarget }}</strong> for more control.</span>
+              <span>
+                Ready to upgrade? Move to
+                <strong>{{ sovereigntyState().migrationTarget }}</strong>
+                for more control.
+              </span>
               <button class="btn-primary">Learn About Upgrading</button>
             </div>
           }
@@ -509,7 +568,8 @@
             Where Your Data Lives
           </h2>
           <p class="section-description">
-            Understanding where your data is stored helps you make informed decisions about your digital sovereignty.
+            Understanding where your data is stored helps you make informed decisions about your
+            digital sovereignty.
           </p>
 
           <div class="residency-grid">
@@ -521,7 +581,9 @@
                     <span class="residency-label">{{ item.label }}</span>
                     <span class="residency-location">{{ item.locationLabel }}</span>
                   </div>
-                  <span class="material-icons location-icon">{{ getLocationIcon(item.location) }}</span>
+                  <span class="material-icons location-icon">
+                    {{ getLocationIcon(item.location) }}
+                  </span>
                 </div>
                 <p class="residency-description">{{ item.description }}</p>
                 <div class="residency-meta">
@@ -533,9 +595,7 @@
                     <span class="material-icons">{{ item.deletable ? 'delete' : 'lock' }}</span>
                     {{ item.deletable ? 'Deletable' : 'Permanent' }}
                   </span>
-                  <span class="meta-item controller">
-                    Controlled by: {{ item.controlledBy }}
-                  </span>
+                  <span class="meta-item controller">Controlled by: {{ item.controlledBy }}</span>
                 </div>
               </div>
             }
@@ -595,7 +655,9 @@
               @if (edgeNodeInfo().connectedAt) {
                 <div class="connection-row">
                   <span class="connection-label">Connected Since</span>
-                  <span class="connection-value">{{ edgeNodeInfo().connectedAt?.toLocaleString() }}</span>
+                  <span class="connection-value">
+                    {{ edgeNodeInfo().connectedAt?.toLocaleString() }}
+                  </span>
                 </div>
               }
 
@@ -634,11 +696,7 @@
                   <div class="key-value">
                     <code [title]="key.value">{{ key.truncated }}</code>
                     @if (key.canExport) {
-                      <button
-                        class="copy-btn"
-                        (click)="copyToClipboard(key.value)"
-                        title="Copy"
-                      >
+                      <button class="copy-btn" (click)="copyToClipboard(key.value)" title="Copy">
                         <span class="material-icons">content_copy</span>
                       </button>
                     }
@@ -646,12 +704,14 @@
                   <div class="key-actions">
                     @if (key.canExport) {
                       <span class="key-action exportable">
-                        <span class="material-icons">download</span> Exportable
+                        <span class="material-icons">download</span>
+                        Exportable
                       </span>
                     }
                     @if (key.canRevoke) {
                       <span class="key-action revokable">
-                        <span class="material-icons">cancel</span> Revokable
+                        <span class="material-icons">cancel</span>
+                        Revokable
                       </span>
                     }
                   </div>
@@ -717,7 +777,9 @@
                 </div>
               }
               <div class="field-row">
-                <span class="field-label">{{ isNetworkAuthenticated() ? 'Affinities' : 'Interests' }}</span>
+                <span class="field-label">
+                  {{ isNetworkAuthenticated() ? 'Affinities' : 'Interests' }}
+                </span>
                 <span class="field-value">{{ interests().join(', ') || '(not set)' }}</span>
               </div>
               <button class="btn-primary" (click)="startEditing()">Edit Profile</button>
@@ -769,7 +831,9 @@
                 </div>
               }
               <div class="form-group">
-                <label for="interests">{{ isNetworkAuthenticated() ? 'Affinities' : 'Interests' }} (comma-separated)</label>
+                <label for="interests">
+                  {{ isNetworkAuthenticated() ? 'Affinities' : 'Interests' }} (comma-separated)
+                </label>
                 <input
                   id="interests"
                   type="text"
@@ -780,7 +844,9 @@
               </div>
               <div class="form-actions">
                 <button type="submit" class="btn-primary">Save Changes</button>
-                <button type="button" class="btn-secondary" (click)="cancelEditing()">Cancel</button>
+                <button type="button" class="btn-secondary" (click)="cancelEditing()">
+                  Cancel
+                </button>
               </div>
             </form>
           }
@@ -791,11 +857,13 @@
           <h2 class="section-title">Data Management</h2>
           @if (isNetworkAuthenticated()) {
             <p class="section-description">
-              Your data is stored on the Elohim network. You have full control over your identity and can export your data at any time.
+              Your data is stored on the Elohim network. You have full control over your identity
+              and can export your data at any time.
             </p>
           } @else {
             <p class="section-description">
-              Your session data is stored locally in your browser. Export it to save a backup or transfer to another device.
+              Your session data is stored locally in your browser. Export it to save a backup or
+              transfer to another device.
             </p>
           }
           <div class="settings-actions">
@@ -814,7 +882,9 @@
 
         <!-- Identity Info -->
         <section class="settings-section">
-          <h2 class="section-title">{{ isNetworkAuthenticated() ? 'Identity Information' : 'Session Information' }}</h2>
+          <h2 class="section-title">
+            {{ isNetworkAuthenticated() ? 'Identity Information' : 'Session Information' }}
+          </h2>
           <div class="info-grid">
             @if (isNetworkAuthenticated()) {
               <div class="info-row">
@@ -823,11 +893,15 @@
               </div>
               <div class="info-row">
                 <span class="info-label">Identity Mode</span>
-                <span class="info-value identity-mode" [class]="'mode-' + identityMode()">{{ modeBadgeText() }}</span>
+                <span class="info-value identity-mode" [class]="'mode-' + identityMode()">
+                  {{ modeBadgeText() }}
+                </span>
               </div>
               <div class="info-row">
                 <span class="info-label">Member Since</span>
-                <span class="info-value">{{ memberSince() ? formatTimestamp(memberSince()!) : 'N/A' }}</span>
+                <span class="info-value">
+                  {{ memberSince() ? formatTimestamp(memberSince()!) : 'N/A' }}
+                </span>
               </div>
             } @else {
               <div class="info-row">
@@ -836,11 +910,15 @@
               </div>
               <div class="info-row">
                 <span class="info-label">Created</span>
-                <span class="info-value">{{ session?.createdAt ? formatTimestamp(session!.createdAt) : 'N/A' }}</span>
+                <span class="info-value">
+                  {{ session?.createdAt ? formatTimestamp(session!.createdAt) : 'N/A' }}
+                </span>
               </div>
               <div class="info-row">
                 <span class="info-label">Last Active</span>
-                <span class="info-value">{{ session?.lastActiveAt ? formatTimestamp(session!.lastActiveAt) : 'N/A' }}</span>
+                <span class="info-value">
+                  {{ session?.lastActiveAt ? formatTimestamp(session!.lastActiveAt) : 'N/A' }}
+                </span>
               </div>
               <div class="info-row">
                 <span class="info-label">Access Level</span>

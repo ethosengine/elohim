@@ -16,6 +16,7 @@
  */
 
 import { Injectable } from '@angular/core';
+
 import { Observable, of, delay } from 'rxjs';
 
 import {
@@ -44,7 +45,7 @@ export interface CategorizationRequest {
   transactions: StagedTransaction[];
   categories: string[];
   stewardId: string;
-  historicalExamples?: Array<{ description: string; category: string }>;
+  historicalExamples?: { description: string; category: string }[];
 }
 
 /**
@@ -82,36 +83,36 @@ export class ElohimStubService {
 
   // Default keyword → category mappings for stub categorization
   private readonly DEFAULT_PATTERNS: Record<string, string> = {
-    'amazon': 'Shopping',
+    amazon: 'Shopping',
     'whole foods': 'Groceries',
-    'safeway': 'Groceries',
-    'kroger': 'Groceries',
-    'target': 'Shopping',
-    'walmart': 'Shopping',
-    'starbucks': 'Dining',
-    'coffee': 'Dining',
-    'restaurant': 'Dining',
-    'uber': 'Transportation',
-    'lyft': 'Transportation',
-    'gas': 'Transportation',
-    'shell': 'Transportation',
-    'chevron': 'Transportation',
-    'netflix': 'Entertainment',
-    'spotify': 'Entertainment',
-    'hulu': 'Entertainment',
-    'gym': 'Health & Fitness',
-    'pharmacy': 'Health',
-    'cvs': 'Health',
-    'walgreens': 'Health',
-    'doctor': 'Health',
-    'rent': 'Housing',
-    'mortgage': 'Housing',
-    'electric': 'Utilities',
-    'water': 'Utilities',
-    'internet': 'Utilities',
-    'comcast': 'Utilities',
+    safeway: 'Groceries',
+    kroger: 'Groceries',
+    target: 'Shopping',
+    walmart: 'Shopping',
+    starbucks: 'Dining',
+    coffee: 'Dining',
+    restaurant: 'Dining',
+    uber: 'Transportation',
+    lyft: 'Transportation',
+    gas: 'Transportation',
+    shell: 'Transportation',
+    chevron: 'Transportation',
+    netflix: 'Entertainment',
+    spotify: 'Entertainment',
+    hulu: 'Entertainment',
+    gym: 'Health & Fitness',
+    pharmacy: 'Health',
+    cvs: 'Health',
+    walgreens: 'Health',
+    doctor: 'Health',
+    rent: 'Housing',
+    mortgage: 'Housing',
+    electric: 'Utilities',
+    water: 'Utilities',
+    internet: 'Utilities',
+    comcast: 'Utilities',
     'at&t': 'Utilities',
-    'verizon': 'Utilities',
+    verizon: 'Utilities',
   };
 
   constructor() {
@@ -126,9 +127,7 @@ export class ElohimStubService {
    * Stub for AI-powered transaction categorization.
    * Logs the prompt and returns keyword-based categorization.
    */
-  categorizeTransactions(
-    request: CategorizationRequest
-  ): Observable<CategorizationResult[]> {
+  categorizeTransactions(request: CategorizationRequest): Observable<CategorizationResult[]> {
     const startTime = Date.now();
 
     // Build the prompt that would be sent to the AI
@@ -195,9 +194,8 @@ Instructions: For each transaction, determine the most appropriate category base
     for (const [pattern, category] of Object.entries(this.DEFAULT_PATTERNS)) {
       if (searchText.includes(pattern)) {
         // Only use the category if it's in the available list
-        const matchedCategory = availableCategories.find(
-          c => c.toLowerCase() === category.toLowerCase()
-        ) || category;
+        const matchedCategory =
+          availableCategories.find(c => c.toLowerCase() === category.toLowerCase()) || category;
 
         return {
           transactionId: txn.id,
@@ -212,7 +210,9 @@ Instructions: For each transaction, determine the most appropriate category base
     // No pattern match - return uncategorized with low confidence
     return {
       transactionId: txn.id,
-      category: availableCategories.includes('Uncategorized') ? 'Uncategorized' : availableCategories[0],
+      category: availableCategories.includes('Uncategorized')
+        ? 'Uncategorized'
+        : availableCategories[0],
       confidence: 25 + Math.floor(Math.random() * 25), // 25-50
       reasoning: '[STUB] No pattern match - manual review recommended',
       alternatives: this.generateAlternatives(availableCategories, ''),
@@ -316,7 +316,8 @@ Instructions:
     if (riskScore > 80 || !hasEvidence) {
       return {
         decision: 'review',
-        reasoning: '[STUB] Flagged for review due to ' +
+        reasoning:
+          '[STUB] Flagged for review due to ' +
           (riskScore > 80 ? 'high risk score' : 'insufficient evidence'),
         confidence: 60,
         flagsForReview: riskScore > 80 ? ['High risk member'] : ['Insufficient evidence'],
@@ -327,7 +328,8 @@ Instructions:
     if (isLowAmount && hasEvidence) {
       return {
         decision: 'approve',
-        reasoning: '[STUB] Low amount claim with supporting evidence - approved per generosity principle',
+        reasoning:
+          '[STUB] Low amount claim with supporting evidence - approved per generosity principle',
         confidence: 85,
         suggestedPayout: request.amount,
       };

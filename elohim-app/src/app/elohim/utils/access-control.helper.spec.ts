@@ -13,7 +13,7 @@ describe('access-control helper', () => {
     it('should allow owner to view their entity', () => {
       const entity: AccessControlEntity = {
         visibility: 'private',
-        ownerId: currentAgentId
+        ownerId: currentAgentId,
       };
       expect(canView(entity, currentAgentId)).toBe(true);
     });
@@ -22,7 +22,7 @@ describe('access-control helper', () => {
       const entity: AccessControlEntity = {
         visibility: 'shared',
         ownerId: otherAgentId,
-        sharedWith: [currentAgentId]
+        sharedWith: [currentAgentId],
       };
       expect(canView(entity, currentAgentId)).toBe(true);
     });
@@ -31,7 +31,7 @@ describe('access-control helper', () => {
       const entity: AccessControlEntity = {
         visibility: 'private',
         ownerId: otherAgentId,
-        collaborators: [{ agentId: currentAgentId, role: 'viewer' }]
+        collaborators: [{ agentId: currentAgentId, role: 'viewer' }],
       };
       expect(canView(entity, currentAgentId)).toBe(true);
     });
@@ -39,7 +39,7 @@ describe('access-control helper', () => {
     it('should deny viewing private entities by non-owners', () => {
       const entity: AccessControlEntity = {
         visibility: 'private',
-        ownerId: otherAgentId
+        ownerId: otherAgentId,
       };
       expect(canView(entity, currentAgentId)).toBe(false);
     });
@@ -47,7 +47,7 @@ describe('access-control helper', () => {
     it('should handle entities with extendedBy instead of ownerId', () => {
       const entity: AccessControlEntity = {
         visibility: 'private',
-        extendedBy: currentAgentId
+        extendedBy: currentAgentId,
       };
       expect(canView(entity, currentAgentId)).toBe(true);
     });
@@ -56,7 +56,7 @@ describe('access-control helper', () => {
   describe('canEdit', () => {
     it('should allow owner to edit', () => {
       const entity: AccessControlEntity = {
-        ownerId: currentAgentId
+        ownerId: currentAgentId,
       };
       expect(canEdit(entity, currentAgentId)).toBe(true);
     });
@@ -64,7 +64,7 @@ describe('access-control helper', () => {
     it('should allow editor collaborators to edit', () => {
       const entity: AccessControlEntity = {
         ownerId: otherAgentId,
-        collaborators: [{ agentId: currentAgentId, role: 'editor' }]
+        collaborators: [{ agentId: currentAgentId, role: 'editor' }],
       };
       expect(canEdit(entity, currentAgentId)).toBe(true);
     });
@@ -72,7 +72,7 @@ describe('access-control helper', () => {
     it('should allow admin collaborators to edit', () => {
       const entity: AccessControlEntity = {
         ownerId: otherAgentId,
-        collaborators: [{ agentId: currentAgentId, role: 'admin' }]
+        collaborators: [{ agentId: currentAgentId, role: 'admin' }],
       };
       expect(canEdit(entity, currentAgentId)).toBe(true);
     });
@@ -80,21 +80,21 @@ describe('access-control helper', () => {
     it('should deny viewers from editing', () => {
       const entity: AccessControlEntity = {
         ownerId: otherAgentId,
-        collaborators: [{ agentId: currentAgentId, role: 'viewer' }]
+        collaborators: [{ agentId: currentAgentId, role: 'viewer' }],
       };
       expect(canEdit(entity, currentAgentId)).toBe(false);
     });
 
     it('should deny non-collaborators from editing', () => {
       const entity: AccessControlEntity = {
-        ownerId: otherAgentId
+        ownerId: otherAgentId,
       };
       expect(canEdit(entity, currentAgentId)).toBe(false);
     });
 
     it('should handle entities with extendedBy', () => {
       const entity: AccessControlEntity = {
-        extendedBy: currentAgentId
+        extendedBy: currentAgentId,
       };
       expect(canEdit(entity, currentAgentId)).toBe(true);
     });
@@ -103,7 +103,7 @@ describe('access-control helper', () => {
   describe('canDelete', () => {
     it('should allow owner to delete', () => {
       const entity: AccessControlEntity = {
-        ownerId: currentAgentId
+        ownerId: currentAgentId,
       };
       expect(canDelete(entity, currentAgentId)).toBe(true);
     });
@@ -111,7 +111,7 @@ describe('access-control helper', () => {
     it('should allow admin collaborators to delete', () => {
       const entity: AccessControlEntity = {
         ownerId: otherAgentId,
-        collaborators: [{ agentId: currentAgentId, role: 'admin' }]
+        collaborators: [{ agentId: currentAgentId, role: 'admin' }],
       };
       expect(canDelete(entity, currentAgentId)).toBe(true);
     });
@@ -119,7 +119,7 @@ describe('access-control helper', () => {
     it('should deny editors from deleting', () => {
       const entity: AccessControlEntity = {
         ownerId: otherAgentId,
-        collaborators: [{ agentId: currentAgentId, role: 'editor' }]
+        collaborators: [{ agentId: currentAgentId, role: 'editor' }],
       };
       expect(canDelete(entity, currentAgentId)).toBe(false);
     });
@@ -127,21 +127,21 @@ describe('access-control helper', () => {
     it('should deny viewers from deleting', () => {
       const entity: AccessControlEntity = {
         ownerId: otherAgentId,
-        collaborators: [{ agentId: currentAgentId, role: 'viewer' }]
+        collaborators: [{ agentId: currentAgentId, role: 'viewer' }],
       };
       expect(canDelete(entity, currentAgentId)).toBe(false);
     });
 
     it('should deny non-collaborators from deleting', () => {
       const entity: AccessControlEntity = {
-        ownerId: otherAgentId
+        ownerId: otherAgentId,
       };
       expect(canDelete(entity, currentAgentId)).toBe(false);
     });
 
     it('should handle entities with extendedBy', () => {
       const entity: AccessControlEntity = {
-        extendedBy: currentAgentId
+        extendedBy: currentAgentId,
       };
       expect(canDelete(entity, currentAgentId)).toBe(true);
     });

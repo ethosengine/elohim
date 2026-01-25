@@ -1,3 +1,4 @@
+import { CommonModule } from '@angular/common';
 import {
   Component,
   Input,
@@ -10,17 +11,20 @@ import {
   SimpleChanges,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
-  inject
+  inject,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { Subject, takeUntil } from 'rxjs';
+
+import { ContentNode } from '../../../models/content-node.model';
 import {
   ContentRenderer,
   InteractiveRenderer,
-  RendererCompletionEvent
+  RendererCompletionEvent,
 } from '../../interfaces/content-format-plugin.interface';
-import { ContentNode } from '../../../models/content-node.model';
+
 import { PerseusWrapperComponent } from './perseus-wrapper.component';
+
 import type { PerseusItem, PerseusScoreResult, RadioWidgetOptions } from './perseus-item.model';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -56,7 +60,7 @@ const QUIZ_MODE_PRESETS: Record<QuizMode, QuizModeConfig> = {
     showFeedback: true,
     showCorrectness: true,
     trackSubscales: false,
-    trackStreak: true
+    trackStreak: true,
   },
   discovery: {
     submitButtonText: 'Continue',
@@ -64,8 +68,8 @@ const QUIZ_MODE_PRESETS: Record<QuizMode, QuizModeConfig> = {
     showFeedback: false,
     showCorrectness: false,
     trackSubscales: true,
-    trackStreak: false
-  }
+    trackStreak: false,
+  },
 };
 
 /**
@@ -104,10 +108,7 @@ const QUIZ_MODE_PRESETS: Record<QuizMode, QuizModeConfig> = {
             Question {{ currentQuestionIndex + 1 }} of {{ totalQuestions }}
           </span>
           <div class="progress-bar">
-            <div
-              class="progress-fill"
-              [style.width.%]="progressPercentage">
-            </div>
+            <div class="progress-fill" [style.width.%]="progressPercentage"></div>
           </div>
         </div>
       </header>
@@ -120,8 +121,8 @@ const QUIZ_MODE_PRESETS: Record<QuizMode, QuizModeConfig> = {
           [reviewMode]="reviewMode"
           (scored)="handleScore($event)"
           (answerChanged)="handleAnswerChange($event)"
-          (ready)="handleReady()">
-        </app-perseus-question>
+          (ready)="handleReady()"
+        ></app-perseus-question>
       </div>
 
       <!-- Answer Feedback (mastery mode only) -->
@@ -129,7 +130,8 @@ const QUIZ_MODE_PRESETS: Record<QuizMode, QuizModeConfig> = {
         <div
           class="feedback"
           [class.correct]="lastResult?.correct"
-          [class.incorrect]="lastResult && !lastResult.correct">
+          [class.incorrect]="lastResult && !lastResult.correct"
+        >
           <span class="feedback-icon">
             {{ lastResult?.correct ? '✓' : '✗' }}
           </span>
@@ -144,24 +146,19 @@ const QUIZ_MODE_PRESETS: Record<QuizMode, QuizModeConfig> = {
 
       <!-- Controls -->
       <footer class="quiz-controls" *ngIf="!reviewMode">
-        <button
-          class="btn btn-secondary"
-          *ngIf="showHintButton && !hintShown"
-          (click)="showHint()">
+        <button class="btn btn-secondary" *ngIf="showHintButton && !hintShown" (click)="showHint()">
           Show Hint
         </button>
 
         <button
           class="btn btn-primary"
           [disabled]="!hasAnswer || isSubmitting"
-          (click)="submitAnswer()">
+          (click)="submitAnswer()"
+        >
           {{ submitButtonText }}
         </button>
 
-        <button
-          class="btn btn-secondary"
-          *ngIf="showNextButton"
-          (click)="nextQuestion()">
+        <button class="btn btn-secondary" *ngIf="showNextButton" (click)="nextQuestion()">
           {{ isLastQuestion ? 'See Results' : modeConfig.nextButtonText }}
         </button>
       </footer>
@@ -174,185 +171,189 @@ const QUIZ_MODE_PRESETS: Record<QuizMode, QuizModeConfig> = {
             class="streak-dot"
             [class.filled]="idx < currentStreak"
             [class.correct]="streakHistory[idx] === true"
-            [class.incorrect]="streakHistory[idx] === false">
-          </span>
+            [class.incorrect]="streakHistory[idx] === false"
+          ></span>
         </div>
-        <span class="streak-text">
-          {{ currentStreak }} / {{ targetStreak }} correct
-        </span>
+        <span class="streak-text">{{ currentStreak }} / {{ targetStreak }} correct</span>
       </div>
     </div>
   `,
-  styles: [`
-    :host {
-      display: block;
-    }
+  styles: [
+    `
+      :host {
+        display: block;
+      }
 
-    .perseus-renderer {
-      padding: 1rem;
-    }
+      .perseus-renderer {
+        padding: 1rem;
+      }
 
-    .quiz-header {
-      margin-bottom: 1.5rem;
-    }
+      .quiz-header {
+        margin-bottom: 1.5rem;
+      }
 
-    .quiz-title {
-      margin: 0 0 0.5rem;
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text-primary, #1a1a1a);
-    }
+      .quiz-title {
+        margin: 0 0 0.5rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-primary, #1a1a1a);
+      }
 
-    .quiz-progress {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
+      .quiz-progress {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
 
-    .progress-text {
-      font-size: 0.875rem;
-      color: var(--text-secondary, #666);
-    }
+      .progress-text {
+        font-size: 0.875rem;
+        color: var(--text-secondary, #666);
+      }
 
-    .progress-bar {
-      flex: 1;
-      height: 6px;
-      background: var(--bg-tertiary, #e0e0e0);
-      border-radius: 3px;
-      overflow: hidden;
-    }
+      .progress-bar {
+        flex: 1;
+        height: 6px;
+        background: var(--bg-tertiary, #e0e0e0);
+        border-radius: 3px;
+        overflow: hidden;
+      }
 
-    .progress-fill {
-      height: 100%;
-      background: var(--primary-color, #1976d2);
-      border-radius: 3px;
-      transition: width 0.3s ease;
-    }
+      .progress-fill {
+        height: 100%;
+        background: var(--primary-color, #1976d2);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+      }
 
-    .question-container {
-      margin-bottom: 1.5rem;
-    }
+      .question-container {
+        margin-bottom: 1.5rem;
+      }
 
-    .feedback-container {
-      margin-bottom: 1rem;
-    }
+      .feedback-container {
+        margin-bottom: 1rem;
+      }
 
-    .feedback {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      font-size: 0.9375rem;
-    }
+      .feedback {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.9375rem;
+      }
 
-    .feedback.correct {
-      background: var(--success-bg, #e8f5e9);
-      color: var(--success-color, #2e7d32);
-    }
+      .feedback.correct {
+        background: var(--success-bg, #e8f5e9);
+        color: var(--success-color, #2e7d32);
+      }
 
-    .feedback.incorrect {
-      background: var(--error-bg, #ffebee);
-      color: var(--error-color, #c62828);
-    }
+      .feedback.incorrect {
+        background: var(--error-bg, #ffebee);
+        color: var(--error-color, #c62828);
+      }
 
-    .feedback-icon {
-      font-size: 1.25rem;
-      font-weight: bold;
-    }
+      .feedback-icon {
+        font-size: 1.25rem;
+        font-weight: bold;
+      }
 
-    .feedback-message {
-      margin-left: auto;
-      font-size: 0.875rem;
-      opacity: 0.8;
-    }
+      .feedback-message {
+        margin-left: auto;
+        font-size: 0.875rem;
+        opacity: 0.8;
+      }
 
-    .quiz-controls {
-      display: flex;
-      gap: 0.75rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--border-color, #e0e0e0);
-    }
+      .quiz-controls {
+        display: flex;
+        gap: 0.75rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-color, #e0e0e0);
+      }
 
-    .btn {
-      padding: 0.625rem 1.25rem;
-      border: none;
-      border-radius: 6px;
-      font-size: 0.9375rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background-color 0.2s, opacity 0.2s;
-    }
+      .btn {
+        padding: 0.625rem 1.25rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.9375rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition:
+          background-color 0.2s,
+          opacity 0.2s;
+      }
 
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
 
-    .btn-primary {
-      background: var(--primary-color, #1976d2);
-      color: white;
-    }
+      .btn-primary {
+        background: var(--primary-color, #1976d2);
+        color: white;
+      }
 
-    .btn-primary:hover:not(:disabled) {
-      background: var(--primary-dark, #1565c0);
-    }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--primary-dark, #1565c0);
+      }
 
-    .btn-secondary {
-      background: var(--bg-secondary, #f5f5f5);
-      color: var(--text-primary, #1a1a1a);
-    }
+      .btn-secondary {
+        background: var(--bg-secondary, #f5f5f5);
+        color: var(--text-primary, #1a1a1a);
+      }
 
-    .btn-secondary:hover:not(:disabled) {
-      background: var(--bg-tertiary, #e0e0e0);
-    }
+      .btn-secondary:hover:not(:disabled) {
+        background: var(--bg-tertiary, #e0e0e0);
+      }
 
-    .streak-indicator {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      margin-top: 1rem;
-      padding: 0.75rem 1rem;
-      background: var(--bg-secondary, #f5f5f5);
-      border-radius: 8px;
-    }
+      .streak-indicator {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        background: var(--bg-secondary, #f5f5f5);
+        border-radius: 8px;
+      }
 
-    .streak-dots {
-      display: flex;
-      gap: 0.5rem;
-    }
+      .streak-dots {
+        display: flex;
+        gap: 0.5rem;
+      }
 
-    .streak-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      border: 2px solid var(--border-color, #ccc);
-      background: transparent;
-      transition: all 0.2s ease;
-    }
+      .streak-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 2px solid var(--border-color, #ccc);
+        background: transparent;
+        transition: all 0.2s ease;
+      }
 
-    .streak-dot.filled {
-      border-color: var(--primary-color, #1976d2);
-    }
+      .streak-dot.filled {
+        border-color: var(--primary-color, #1976d2);
+      }
 
-    .streak-dot.correct {
-      background: var(--success-color, #4caf50);
-      border-color: var(--success-color, #4caf50);
-    }
+      .streak-dot.correct {
+        background: var(--success-color, #4caf50);
+        border-color: var(--success-color, #4caf50);
+      }
 
-    .streak-dot.incorrect {
-      background: var(--error-color, #f44336);
-      border-color: var(--error-color, #f44336);
-    }
+      .streak-dot.incorrect {
+        background: var(--error-color, #f44336);
+        border-color: var(--error-color, #f44336);
+      }
 
-    .streak-text {
-      font-size: 0.875rem;
-      color: var(--text-secondary, #666);
-    }
-  `],
-  changeDetection: ChangeDetectionStrategy.OnPush
+      .streak-text {
+        font-size: 0.875rem;
+        color: var(--text-secondary, #666);
+      }
+    `,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PerseusRendererComponent implements ContentRenderer, InteractiveRenderer, OnInit, OnChanges, OnDestroy {
+export class PerseusRendererComponent
+  implements ContentRenderer, InteractiveRenderer, OnInit, OnChanges, OnDestroy
+{
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly destroy$ = new Subject<void>();
 
@@ -443,8 +444,7 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
   }
 
   get showHintButton(): boolean {
-    return this.currentQuestion?.hints !== undefined &&
-           this.currentQuestion.hints.length > 0;
+    return this.currentQuestion?.hints !== undefined && this.currentQuestion.hints.length > 0;
   }
 
   get submitButtonText(): string {
@@ -535,7 +535,11 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
     this.cdr.markForCheck();
 
     // Check if streak target reached (mastery mode only)
-    if (this.modeConfig.trackStreak && this.targetStreak > 0 && this.currentStreak >= this.targetStreak) {
+    if (
+      this.modeConfig.trackStreak &&
+      this.targetStreak > 0 &&
+      this.currentStreak >= this.targetStreak
+    ) {
       this.emitCompletion(true);
     }
   }
@@ -601,7 +605,7 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
         hasWidgets: !!q.question?.widgets,
         widgetCount: q.question?.widgets ? Object.keys(q.question.widgets).length : 0,
         contentPreview: q.question?.content?.substring(0, 100) || 'no content',
-        discoveryMode: q.discoveryMode
+        discoveryMode: q.discoveryMode,
       });
     }
 
@@ -708,7 +712,9 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
 
   private initializeStreakTracking(): void {
     if (this.targetStreak > 0) {
-      this.streakDots = Array(this.targetStreak).fill(0).map((_, i) => i);
+      this.streakDots = Array(this.targetStreak)
+        .fill(0)
+        .map((_, i) => i);
       this.streakHistory = Array(this.targetStreak).fill(null);
     }
   }
@@ -757,7 +763,7 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
   }
 
   private emitCompletion(passed: boolean, score?: number): void {
-    const finalScore = score ?? (this.correctCount / Math.max(this.scores.length, 1));
+    const finalScore = score ?? this.correctCount / Math.max(this.scores.length, 1);
 
     const event: RendererCompletionEvent = {
       type: 'quiz',
@@ -770,9 +776,9 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
         questions: this.questions.map((q, i) => ({
           id: q.id,
           correct: this.scores[i]?.correct ?? false,
-          score: this.scores[i]?.score ?? 0
-        }))
-      }
+          score: this.scores[i]?.score ?? 0,
+        })),
+      },
     };
 
     this.complete.emit(event);
@@ -795,7 +801,7 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
 
     console.log('[PerseusRenderer] Discovery complete:', {
       subscaleScores: this.subscaleScores,
-      primaryDomain
+      primaryDomain,
     });
 
     const event: RendererCompletionEvent = {
@@ -811,9 +817,9 @@ export class PerseusRendererComponent implements ContentRenderer, InteractiveRen
         questions: this.questions.map((q, i) => ({
           id: q.id,
           correct: true, // All answers are valid
-          score: 1
-        }))
-      }
+          score: 1,
+        })),
+      },
     };
 
     this.complete.emit(event);

@@ -12,12 +12,11 @@
  * Philosophy: "Power scales with responsibility, not role assignment."
  */
 
-import { Component, OnInit, inject, signal, computed, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal, computed, input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 
-import { StewardshipService } from '../../services/stewardship.service';
 import {
   type ComputedPolicy,
   type DevicePolicy,
@@ -35,6 +34,7 @@ import {
   AGE_RATINGS,
   INALIENABLE_FEATURES,
 } from '../../models/stewardship.model';
+import { StewardshipService } from '../../services/stewardship.service';
 
 /** Active tab in the policy editor */
 type PolicyTab = 'content' | 'time' | 'features' | 'monitoring';

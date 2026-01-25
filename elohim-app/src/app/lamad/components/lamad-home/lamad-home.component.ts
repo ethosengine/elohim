@@ -1,15 +1,19 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
-import { Subject, forkJoin, of } from 'rxjs';
+
 import { takeUntil, catchError } from 'rxjs/operators';
-import { PathService } from '../../services/path.service';
-import { PathFilterService } from '../../services/path-filter.service';
-import { ProfileService } from '@app/elohim/services/profile.service';
+
+import { Subject, forkJoin, of } from 'rxjs';
+
 import { AgentService } from '@app/elohim/services/agent.service';
+import { ProfileService } from '@app/elohim/services/profile.service';
 import { IdentityService, isNetworkMode } from '@app/imagodei/services/identity.service';
+
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 import { CurrentFocus } from '../../models/profile.model';
+import { PathFilterService } from '../../services/path-filter.service';
+import { PathService } from '../../services/path.service';
 
 /**
  * LamadHomeComponent - Dual-mode landing page.
@@ -30,7 +34,7 @@ import { CurrentFocus } from '../../models/profile.model';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './lamad-home.component.html',
-  styleUrls: ['./lamad-home.component.css']
+  styleUrls: ['./lamad-home.component.css'],
 })
 export class LamadHomeComponent implements OnInit, OnDestroy {
   /** Featured paths shown initially (limited for performance) */
@@ -49,7 +53,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   activeFocus: CurrentFocus | null = null;
 
   /** Map of pathId to progress percentage (0-100) */
-  pathProgressMap: Map<string, number> = new Map();
+  pathProgressMap = new Map<string, number>();
 
   isLoading = true;
   error: string | null = null;
@@ -94,62 +98,73 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
       ? [
           this.pathService.listPaths(),
           this.profileService.getCurrentFocus().pipe(catchError(() => of([]))),
-          this.agentService.getAgentProgress().pipe(catchError(() => of([])))
+          this.agentService.getAgentProgress().pipe(catchError(() => of([]))),
         ]
       : [this.pathService.listPaths()];
 
-    forkJoin(tasks).pipe(
-      takeUntil(this.destroy$)
-    ).subscribe({
-      next: (results) => {
-        const index = results[0] as PathIndex;
-        // Store full path list for "View All" expansion
-        this.allPaths = index.paths || [];
+    forkJoin(tasks)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: results => {
+          const index = results[0] as PathIndex;
+          // Store full path list for "View All" expansion
+          this.allPaths = index.paths || [];
 
-        // Show only featured paths initially (performance optimization)
-        this.paths = this.pathFilterService.getFeaturedPaths(
-          this.allPaths,
-          this.FEATURED_PATH_LIMIT
-        );
+          // Show only featured paths initially (performance optimization)
+          this.paths = this.pathFilterService.getFeaturedPaths(
+            this.allPaths,
+            this.FEATURED_PATH_LIMIT
+          );
 
-        if (isAuth && results.length > 1 && results[1] && Array.isArray(results[1]) && results[1].length > 0) {
+          if (
+            isAuth &&
+            results.length > 1 &&
+            results[1] &&
+            Array.isArray(results[1]) &&
+            results[1].length > 0
+          ) {
             // Sort by most recent activity
-            const focus = (results[1] as CurrentFocus[]).sort((a, b) =>
-                new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime()
+            const focus = (results[1] as CurrentFocus[]).sort(
+              (a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime()
             );
             this.activeFocus = focus[0];
-        }
+          }
 
-        // Build progress map from agent progress records
-        if (isAuth && results.length > 2 && results[2]) {
-          const progressRecords = results[2] as Array<{ pathId: string; completedStepIndices: number[]; completedAt?: string }>;
-          this.pathProgressMap.clear();
+          // Build progress map from agent progress records
+          if (isAuth && results.length > 2 && results[2]) {
+            const progressRecords = results[2] as {
+              pathId: string;
+              completedStepIndices: number[];
+              completedAt?: string;
+            }[];
+            this.pathProgressMap.clear();
 
-          // Calculate progress for each path (use allPaths for lookup)
-          progressRecords
-            .filter(p => p.pathId !== '__global__') // Skip global progress record
-            .forEach(progress => {
-              // Find the path to get total step count
-              const path = this.allPaths.find(p => p.id === progress.pathId);
-              if (path && path.stepCount > 0) {
-                const percent = progress.completedAt
-                  ? 100
-                  : Math.round((progress.completedStepIndices.length / path.stepCount) * 100);
-                this.pathProgressMap.set(progress.pathId, percent);
-              }
-            });
-        }
+            // Calculate progress for each path (use allPaths for lookup)
+            progressRecords
+              .filter(p => p.pathId !== '__global__') // Skip global progress record
+              .forEach(progress => {
+                // Find the path to get total step count
+                const path = this.allPaths.find(p => p.id === progress.pathId);
+                if (path && path.stepCount > 0) {
+                  const percent = progress.completedAt
+                    ? 100
+                    : Math.round((progress.completedStepIndices.length / path.stepCount) * 100);
+                  this.pathProgressMap.set(progress.pathId, percent);
+                }
+              });
+          }
 
-        // Feature the Elohim Protocol path
-        this.featuredPath = this.allPaths.find(p => p.id === 'elohim-protocol') || this.allPaths[0] || null;
+          // Feature the Elohim Protocol path
+          this.featuredPath =
+            this.allPaths.find(p => p.id === 'elohim-protocol') || this.allPaths[0] || null;
 
-        this.isLoading = false;
-      },
-      error: () => {
-        this.error = 'Unable to load learning paths';
-        this.isLoading = false;
-      }
-    });
+          this.isLoading = false;
+        },
+        error: () => {
+          this.error = 'Unable to load learning paths';
+          this.isLoading = false;
+        },
+      });
   }
 
   /**
@@ -197,7 +212,12 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
    */
   continueActiveJourney(): void {
     if (this.activeFocus) {
-      this.router.navigate(['/lamad/path', this.activeFocus.pathId, 'step', this.activeFocus.currentStepIndex]);
+      this.router.navigate([
+        '/lamad/path',
+        this.activeFocus.pathId,
+        'step',
+        this.activeFocus.currentStepIndex,
+      ]);
     }
   }
 
@@ -234,9 +254,9 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
    */
   formatDifficulty(difficulty: string): string {
     const displays: Record<string, string> = {
-      'beginner': 'Beginner',
-      'intermediate': 'Intermediate',
-      'advanced': 'Advanced'
+      beginner: 'Beginner',
+      intermediate: 'Intermediate',
+      advanced: 'Advanced',
     };
     return displays[difficulty] || difficulty;
   }

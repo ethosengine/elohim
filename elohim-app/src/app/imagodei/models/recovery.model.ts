@@ -25,13 +25,13 @@
 
 /** Status of a recovery request */
 export type RecoveryRequestStatus =
-  | 'pending'       // Waiting for interviewers
-  | 'interviewing'  // One or more interviews in progress
-  | 'attested'      // Threshold reached, awaiting finalization
-  | 'denied'        // Threshold of denials reached
-  | 'completed'     // Recovery successful, credentials issued
-  | 'expired'       // Request expired without resolution
-  | 'cancelled';    // Claimant cancelled the request
+  | 'pending' // Waiting for interviewers
+  | 'interviewing' // One or more interviews in progress
+  | 'attested' // Threshold reached, awaiting finalization
+  | 'denied' // Threshold of denials reached
+  | 'completed' // Recovery successful, credentials issued
+  | 'expired' // Request expired without resolution
+  | 'cancelled'; // Claimant cancelled the request
 
 /**
  * A request to recover an identity.
@@ -139,12 +139,12 @@ export interface RecoveryAttestation {
 
 /** Type of interview question */
 export type QuestionType =
-  | 'network-history'  // Questions about their activity on the network
-  | 'relationship'     // Questions about their connections
-  | 'content'          // Questions about content they've engaged with
-  | 'preference'       // Questions about their preferences/settings
-  | 'challenge'        // Open-ended challenge questions
-  | 'temporal';        // Questions about when things happened
+  | 'network-history' // Questions about their activity on the network
+  | 'relationship' // Questions about their connections
+  | 'content' // Questions about content they've engaged with
+  | 'preference' // Questions about their preferences/settings
+  | 'challenge' // Open-ended challenge questions
+  | 'temporal'; // Questions about when things happened
 
 /**
  * A question to ask during a recovery interview.
@@ -188,10 +188,10 @@ export interface InterviewResponse {
 
 /** Assessment of a response */
 export type ResponseAssessment =
-  | 'correct'          // Answer matches network data
+  | 'correct' // Answer matches network data
   | 'partially-correct' // Some accuracy, some errors
-  | 'incorrect'        // Answer doesn't match
-  | 'unverifiable';    // Cannot be verified against data
+  | 'incorrect' // Answer doesn't match
+  | 'unverifiable'; // Cannot be verified against data
 
 /**
  * A complete interview session.
@@ -233,11 +233,11 @@ export interface RecoveryInterview {
 
 /** Status of an interview session */
 export type InterviewStatus =
-  | 'scheduled'   // Interview is scheduled
+  | 'scheduled' // Interview is scheduled
   | 'in-progress' // Interview is happening now
-  | 'completed'   // Interview finished, attestation pending
-  | 'attested'    // Interview resulted in attestation
-  | 'abandoned';  // Interview was abandoned
+  | 'completed' // Interview finished, attestation pending
+  | 'attested' // Interview resulted in attestation
+  | 'abandoned'; // Interview was abandoned
 
 // =============================================================================
 // Recovery Credentials
@@ -401,11 +401,15 @@ export function calculateProgress(
 /**
  * Get display info for attestation decision.
  */
-export function getDecisionDisplay(decision: AttestationDecision): { label: string; color: string; icon: string } {
+export function getDecisionDisplay(decision: AttestationDecision): {
+  label: string;
+  color: string;
+  icon: string;
+} {
   const displays: Record<AttestationDecision, { label: string; color: string; icon: string }> = {
-    'affirm': { label: 'Affirmed', color: '#22c55e', icon: 'check_circle' },
-    'deny': { label: 'Denied', color: '#ef4444', icon: 'cancel' },
-    'abstain': { label: 'Abstained', color: '#6b7280', icon: 'remove_circle' },
+    affirm: { label: 'Affirmed', color: '#22c55e', icon: 'check_circle' },
+    deny: { label: 'Denied', color: '#ef4444', icon: 'cancel' },
+    abstain: { label: 'Abstained', color: '#6b7280', icon: 'remove_circle' },
   };
   return displays[decision];
 }
@@ -413,15 +417,19 @@ export function getDecisionDisplay(decision: AttestationDecision): { label: stri
 /**
  * Get display info for recovery status.
  */
-export function getRecoveryStatusDisplay(status: RecoveryRequestStatus): { label: string; color: string; icon: string } {
+export function getRecoveryStatusDisplay(status: RecoveryRequestStatus): {
+  label: string;
+  color: string;
+  icon: string;
+} {
   const displays: Record<RecoveryRequestStatus, { label: string; color: string; icon: string }> = {
-    'pending': { label: 'Pending', color: '#f59e0b', icon: 'hourglass_empty' },
-    'interviewing': { label: 'Interviewing', color: '#3b82f6', icon: 'record_voice_over' },
-    'attested': { label: 'Attested', color: '#22c55e', icon: 'verified' },
-    'denied': { label: 'Denied', color: '#ef4444', icon: 'gpp_bad' },
-    'completed': { label: 'Completed', color: '#22c55e', icon: 'check_circle' },
-    'expired': { label: 'Expired', color: '#6b7280', icon: 'schedule' },
-    'cancelled': { label: 'Cancelled', color: '#6b7280', icon: 'cancel' },
+    pending: { label: 'Pending', color: '#f59e0b', icon: 'hourglass_empty' },
+    interviewing: { label: 'Interviewing', color: '#3b82f6', icon: 'record_voice_over' },
+    attested: { label: 'Attested', color: '#22c55e', icon: 'verified' },
+    denied: { label: 'Denied', color: '#ef4444', icon: 'gpp_bad' },
+    completed: { label: 'Completed', color: '#22c55e', icon: 'check_circle' },
+    expired: { label: 'Expired', color: '#6b7280', icon: 'schedule' },
+    cancelled: { label: 'Cancelled', color: '#6b7280', icon: 'cancel' },
   };
   return displays[status];
 }
@@ -432,11 +440,11 @@ export function getRecoveryStatusDisplay(status: RecoveryRequestStatus): { label
 export function getQuestionTypeDisplay(type: QuestionType): { label: string; icon: string } {
   const displays: Record<QuestionType, { label: string; icon: string }> = {
     'network-history': { label: 'Network History', icon: 'history' },
-    'relationship': { label: 'Relationships', icon: 'people' },
-    'content': { label: 'Content', icon: 'article' },
-    'preference': { label: 'Preferences', icon: 'settings' },
-    'challenge': { label: 'Challenge', icon: 'psychology' },
-    'temporal': { label: 'Timeline', icon: 'schedule' },
+    relationship: { label: 'Relationships', icon: 'people' },
+    content: { label: 'Content', icon: 'article' },
+    preference: { label: 'Preferences', icon: 'settings' },
+    challenge: { label: 'Challenge', icon: 'psychology' },
+    temporal: { label: 'Timeline', icon: 'schedule' },
   };
   return displays[type];
 }

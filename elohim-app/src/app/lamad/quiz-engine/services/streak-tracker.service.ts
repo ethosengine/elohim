@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
+
 import { BehaviorSubject, Observable } from 'rxjs';
+
 import {
   StreakState,
   StreakProgress,
@@ -12,7 +14,7 @@ import {
   getStreakProgress,
   resetStreak,
   serializeStreakState,
-  deserializeStreakState
+  deserializeStreakState,
 } from '../models/streak-state.model';
 
 /**
@@ -46,7 +48,7 @@ import {
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class StreakTrackerService {
   /** Active streak states by content ID */
@@ -99,11 +101,7 @@ export class StreakTrackerService {
    * @param correct - Whether the answer was correct
    * @returns Updated streak state
    */
-  recordAnswer(
-    contentId: string,
-    questionId: string,
-    correct: boolean
-  ): StreakState | null {
+  recordAnswer(contentId: string, questionId: string, correct: boolean): StreakState | null {
     const current = this.getState(contentId);
     if (!current) {
       console.warn(`No streak tracking for ${contentId}`);
@@ -248,10 +246,7 @@ export class StreakTrackerService {
     const state = this.streaks.get(contentId);
     if (state) {
       try {
-        localStorage.setItem(
-          this.STORAGE_PREFIX + contentId,
-          serializeStreakState(state)
-        );
+        localStorage.setItem(this.STORAGE_PREFIX + contentId, serializeStreakState(state));
       } catch (e) {
         console.warn('Failed to save streak state:', e);
       }

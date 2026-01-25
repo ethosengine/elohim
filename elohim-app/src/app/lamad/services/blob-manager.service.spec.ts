@@ -1,6 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { BlobManagerService, BlobDownloadResult, BlobDownloadProgress } from './blob-manager.service';
+import {
+  BlobManagerService,
+  BlobDownloadResult,
+  BlobDownloadProgress,
+} from './blob-manager.service';
 import { BlobVerificationService } from './blob-verification.service';
 import { BlobFallbackService, UrlHealth } from './blob-fallback.service';
 import { ContentBlob } from '../models/content-node.model';
@@ -173,14 +177,12 @@ describe('BlobManagerService', () => {
       spyOn(console, 'warn');
       await service['cacheBlob']('large_hash', largeBlob, largeBlob.size);
 
-      expect(console.warn).toHaveBeenCalledWith(
-        jasmine.stringMatching(/Blob too large to cache/)
-      );
+      expect(console.warn).toHaveBeenCalledWith(jasmine.stringMatching(/Blob too large to cache/));
     });
   });
 
   describe('Progress Tracking', () => {
-    it('should call progress callback during fetch', (done) => {
+    it('should call progress callback during fetch', done => {
       const contentBlob = createMockContentBlob();
       const progressUpdates: BlobDownloadProgress[] = [];
 
@@ -215,7 +217,7 @@ describe('BlobManagerService', () => {
       done();
     });
 
-    it('should report 100% progress when cached', (done) => {
+    it('should report 100% progress when cached', done => {
       const contentBlob = createMockContentBlob();
       const progressUpdates: BlobDownloadProgress[] = [];
 
@@ -227,7 +229,7 @@ describe('BlobManagerService', () => {
       const testBlob = new Blob(['cached data']);
       service['blobCache'].set(contentBlob.hash, testBlob);
 
-      service.downloadBlob(contentBlob, progressCallback).subscribe((result) => {
+      service.downloadBlob(contentBlob, progressCallback).subscribe(result => {
         expect(result.wasCached).toBe(true);
         expect(progressUpdates.length).toBeGreaterThan(0);
         expect(progressUpdates[0].percentComplete).toBe(100);
@@ -313,7 +315,7 @@ describe('BlobManagerService', () => {
   });
 
   describe('Multiple Blob Download', () => {
-    it('should download multiple blobs in parallel', (done) => {
+    it('should download multiple blobs in parallel', done => {
       const blob1 = createMockContentBlob();
       const blob2 = createMockContentBlob();
       blob2.hash = 'hash2';
@@ -332,50 +334,50 @@ describe('BlobManagerService', () => {
   });
 
   describe('Metadata Retrieval from Holochain', () => {
-    it('should retrieve blobs for content from Holochain', (done) => {
+    it('should retrieve blobs for content from Holochain', done => {
       const contentId = 'content_123';
 
-      service.getBlobsForContent(contentId).subscribe((blobs) => {
+      service.getBlobsForContent(contentId).subscribe(blobs => {
         // Will return empty array since Holochain is mocked, but should not error
         expect(Array.isArray(blobs)).toBe(true);
         done();
       });
     });
 
-    it('should return empty array on metadata retrieval error', (done) => {
+    it('should return empty array on metadata retrieval error', done => {
       const contentId = 'content_nonexistent';
 
-      service.getBlobsForContent(contentId).subscribe((blobs) => {
+      service.getBlobsForContent(contentId).subscribe(blobs => {
         expect(blobs).toEqual([]);
         done();
       });
     });
 
-    it('should retrieve specific blob metadata by hash', (done) => {
+    it('should retrieve specific blob metadata by hash', done => {
       const contentId = 'content_123';
       const blobHash = 'test_hash_123';
 
-      service.getBlobMetadata(contentId, blobHash).subscribe((metadata) => {
+      service.getBlobMetadata(contentId, blobHash).subscribe(metadata => {
         // Will be null since Holochain is mocked, but should not error
         expect(metadata === null || metadata instanceof Object).toBe(true);
         done();
       });
     });
 
-    it('should check if blob exists in DHT', (done) => {
+    it('should check if blob exists in DHT', done => {
       const contentId = 'content_123';
       const blobHash = 'test_hash_123';
 
-      service.blobExists(contentId, blobHash).subscribe((exists) => {
+      service.blobExists(contentId, blobHash).subscribe(exists => {
         expect(typeof exists).toBe('boolean');
         done();
       });
     });
 
-    it('should retrieve blobs for multiple content nodes in parallel', (done) => {
+    it('should retrieve blobs for multiple content nodes in parallel', done => {
       const contentIds = ['content_1', 'content_2', 'content_3'];
 
-      service.getBlobsForMultipleContent(contentIds).subscribe((blobMap) => {
+      service.getBlobsForMultipleContent(contentIds).subscribe(blobMap => {
         expect(blobMap instanceof Map).toBe(true);
         expect(blobMap.size).toBeLessThanOrEqual(contentIds.length);
         done();

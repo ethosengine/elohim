@@ -1,9 +1,12 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Injectable, inject, signal, computed } from '@angular/core';
+
 import { catchError, map, timeout } from 'rxjs/operators';
+
 import { of, Observable } from 'rxjs';
-import { IdentityService } from '@app/imagodei/services/identity.service';
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { IdentityService } from '@app/imagodei/services/identity.service';
 
 /**
  * Registered node information
@@ -96,8 +99,8 @@ export class RunningContextService {
   /**
    * Whether user is using Holochain natively (has nodes or is connected)
    */
-  readonly isHolochainNative = computed(() =>
-    this._context().hasRegisteredNodes || this.holochainClient.state() === 'connected'
+  readonly isHolochainNative = computed(
+    () => this._context().hasRegisteredNodes || this.holochainClient.state() === 'connected'
   );
 
   // Detection interval
@@ -164,8 +167,10 @@ export class RunningContextService {
     try {
       const nodes = await this.getRegisteredNodes();
       const onlineNodes = nodes.filter(n => n.status === 'online').length;
-      const primaryNode = nodes.find(n => n.nodeType === 'holoport' || n.nodeType === 'holoport-plus')
-        ?? nodes[0] ?? null;
+      const primaryNode =
+        nodes.find(n => n.nodeType === 'holoport' || n.nodeType === 'holoport-plus') ??
+        nodes[0] ??
+        null;
 
       // Find nodes with doorway/web hosting capability
       // Holoports and holoport-plus always have doorway
@@ -220,9 +225,7 @@ export class RunningContextService {
         // Holoports always have doorway capability
         // Self-hosted/cloud nodes have doorway if doorwayUrl is configured
         const hasDoorway =
-          nodeType === 'holoport' ||
-          nodeType === 'holoport-plus' ||
-          doorwayUrl !== null;
+          nodeType === 'holoport' || nodeType === 'holoport-plus' || doorwayUrl !== null;
 
         return {
           nodeId: n.node_id,
@@ -244,10 +247,14 @@ export class RunningContextService {
    */
   private mapStatus(status: string | undefined): 'online' | 'offline' | 'degraded' | 'unknown' {
     switch (status?.toLowerCase()) {
-      case 'online': return 'online';
-      case 'offline': return 'offline';
-      case 'degraded': return 'degraded';
-      default: return 'unknown';
+      case 'online':
+        return 'online';
+      case 'offline':
+        return 'offline';
+      case 'degraded':
+        return 'degraded';
+      default:
+        return 'unknown';
     }
   }
 

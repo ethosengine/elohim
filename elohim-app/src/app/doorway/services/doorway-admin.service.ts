@@ -1,7 +1,10 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Observable, Subject, catchError, map, of, retry, timeout } from 'rxjs';
+import { Injectable, inject, signal, computed } from '@angular/core';
+
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
+
+import { Observable, Subject, catchError, map, of, retry, timeout } from 'rxjs';
+
 import { environment } from '../../../environments/environment';
 import {
   NodesResponse,
@@ -63,11 +66,20 @@ export class DoorwayAdminService {
     return this.http.get<NodesResponse>(`${this.baseUrl}/admin/nodes`).pipe(
       timeout(this.timeout),
       retry(2),
-      catchError(this.handleError<NodesResponse>('getNodes', {
-        total: 0,
-        byStatus: { online: 0, degraded: 0, offline: 0, failed: 0, discovering: 0, registering: 0 },
-        nodes: [],
-      }))
+      catchError(
+        this.handleError<NodesResponse>('getNodes', {
+          total: 0,
+          byStatus: {
+            online: 0,
+            degraded: 0,
+            offline: 0,
+            failed: 0,
+            discovering: 0,
+            registering: 0,
+          },
+          nodes: [],
+        })
+      )
     );
   }
 
@@ -75,44 +87,52 @@ export class DoorwayAdminService {
    * Get specific node details
    */
   getNode(nodeId: string): Observable<NodeDetails | null> {
-    return this.http.get<NodeDetails>(`${this.baseUrl}/admin/nodes/${nodeId}`).pipe(
-      timeout(this.timeout),
-      retry(2),
-      catchError(this.handleError<NodeDetails | null>('getNode', null))
-    );
+    return this.http
+      .get<NodeDetails>(`${this.baseUrl}/admin/nodes/${nodeId}`)
+      .pipe(
+        timeout(this.timeout),
+        retry(2),
+        catchError(this.handleError<NodeDetails | null>('getNode', null))
+      );
   }
 
   /**
    * Get cluster-wide aggregated metrics
    */
   getClusterMetrics(): Observable<ClusterMetrics | null> {
-    return this.http.get<ClusterMetrics>(`${this.baseUrl}/admin/cluster`).pipe(
-      timeout(this.timeout),
-      retry(2),
-      catchError(this.handleError<ClusterMetrics | null>('getClusterMetrics', null))
-    );
+    return this.http
+      .get<ClusterMetrics>(`${this.baseUrl}/admin/cluster`)
+      .pipe(
+        timeout(this.timeout),
+        retry(2),
+        catchError(this.handleError<ClusterMetrics | null>('getClusterMetrics', null))
+      );
   }
 
   /**
    * Get resource utilization summary
    */
   getResources(): Observable<ResourceSummary | null> {
-    return this.http.get<ResourceSummary>(`${this.baseUrl}/admin/resources`).pipe(
-      timeout(this.timeout),
-      retry(2),
-      catchError(this.handleError<ResourceSummary | null>('getResources', null))
-    );
+    return this.http
+      .get<ResourceSummary>(`${this.baseUrl}/admin/resources`)
+      .pipe(
+        timeout(this.timeout),
+        retry(2),
+        catchError(this.handleError<ResourceSummary | null>('getResources', null))
+      );
   }
 
   /**
    * Get custodian network overview
    */
   getCustodians(): Observable<CustodianNetwork | null> {
-    return this.http.get<CustodianNetwork>(`${this.baseUrl}/admin/custodians`).pipe(
-      timeout(this.timeout),
-      retry(2),
-      catchError(this.handleError<CustodianNetwork | null>('getCustodians', null))
-    );
+    return this.http
+      .get<CustodianNetwork>(`${this.baseUrl}/admin/custodians`)
+      .pipe(
+        timeout(this.timeout),
+        retry(2),
+        catchError(this.handleError<CustodianNetwork | null>('getCustodians', null))
+      );
   }
 
   // ============================================================================
@@ -131,9 +151,7 @@ export class DoorwayAdminService {
 
     // Determine WebSocket URL
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = this.baseUrl
-      ? new URL(this.baseUrl).host
-      : window.location.host;
+    const host = this.baseUrl ? new URL(this.baseUrl).host : window.location.host;
     const wsUrl = `${wsProtocol}//${host}/admin/ws`;
 
     console.log('[DoorwayAdmin] Connecting to WebSocket:', wsUrl);
@@ -157,13 +175,13 @@ export class DoorwayAdminService {
 
     // Subscribe to messages
     this.ws$.subscribe({
-      next: (msg) => {
+      next: msg => {
         if (this.isDashboardMessage(msg)) {
           this.handleMessage(msg);
           this.wsMessages$.next(msg);
         }
       },
-      error: (err) => {
+      error: err => {
         console.error('[DoorwayAdmin] WebSocket error:', err);
         this._connectionState.set('error');
         this.ws$ = null;

@@ -15,12 +15,11 @@
  * just not at others' expense."
  */
 
-import { Component, OnInit, inject, signal, computed, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 
-import { StewardshipService } from '../../services/stewardship.service';
 import {
   type CommunityIntervention,
   type InterventionSupport,
@@ -34,6 +33,7 @@ import {
   getInterventionStatusLabel,
   calculateInterventionWeight,
 } from '../../models/stewardship.model';
+import { StewardshipService } from '../../services/stewardship.service';
 
 @Component({
   selector: 'app-community-intervention',
@@ -139,7 +139,8 @@ export class CommunityInterventionComponent implements OnInit {
   // ===========================================================================
 
   ngOnInit(): void {
-    const interventionId = this.route.snapshot.paramMap.get('interventionId') || this.interventionIdInput();
+    const interventionId =
+      this.route.snapshot.paramMap.get('interventionId') || this.interventionIdInput();
     const subjectId = this.route.snapshot.paramMap.get('subjectId') || this.subjectIdInput();
 
     if (interventionId) {
@@ -255,9 +256,7 @@ export class CommunityInterventionComponent implements OnInit {
       // TODO: Call zome function to support intervention
       console.log('[CommunityIntervention] Support:', input);
 
-      this.successMessage.set(
-        `Your support (weight: ${this.currentWeight()}) has been recorded.`
-      );
+      this.successMessage.set(`Your support (weight: ${this.currentWeight()}) has been recorded.`);
 
       // Clear form
       this.supportReason.set('');

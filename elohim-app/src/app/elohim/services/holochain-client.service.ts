@@ -17,9 +17,9 @@
  * @see https://github.com/holochain/holochain-client-js
  */
 
-import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { Injectable, signal, computed, inject } from '@angular/core';
+
 import {
   AdminWebsocket,
   AppWebsocket,
@@ -27,6 +27,7 @@ import {
   type CellId,
   type AppInfo,
 } from '@holochain/client';
+import { firstValueFrom } from 'rxjs';
 
 import {
   type HolochainConnection,
@@ -40,10 +41,11 @@ import {
   INITIAL_CONNECTION_STATE,
   SIGNING_CREDENTIALS_KEY,
 } from '../models/holochain-connection.model';
-
-import { PerformanceMetricsService } from './performance-metrics.service';
-import { LoggerService } from './logger.service';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
+
+import { LoggerService } from './logger.service';
+import { PerformanceMetricsService } from './performance-metrics.service';
+
 import type { IConnectionStrategy, ConnectionConfig } from '@elohim/service/connection';
 
 @Injectable({
@@ -208,7 +210,7 @@ export class HolochainClientService {
 
       // List apps to verify connection works
       const apps = await adminWs.listApps({});
-      const appIds = apps.map((app) => app.installed_app_id);
+      const appIds = apps.map(app => app.installed_app_id);
 
       this.updateState({
         state: 'connected',
@@ -327,7 +329,9 @@ export class HolochainClientService {
       await this.strategy.disconnect();
       this.logger.info('Disconnected', { strategy: this.strategy.name });
     } catch (err) {
-      this.logger.warn('Error during disconnect', { error: err instanceof Error ? err.message : String(err) });
+      this.logger.warn('Error during disconnect', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     this.connectionSignal.set(INITIAL_CONNECTION_STATE);
@@ -450,7 +454,7 @@ export class HolochainClientService {
    * Default timeout is 30 seconds to accommodate doorway connections
    * which can take 15-20 seconds on first connect.
    */
-  async waitForConnection(timeoutMs: number = 30000): Promise<boolean> {
+  async waitForConnection(timeoutMs = 30000): Promise<boolean> {
     const startTime = Date.now();
     const pollInterval = 100;
 
@@ -570,10 +574,11 @@ export class HolochainClientService {
       this.metrics.recordQuery(duration, false);
 
       // Detect connection-related errors and only log once
-      const isConnectionError = errorMessage.includes('Websocket') ||
-                                errorMessage.includes('InvalidToken') ||
-                                errorMessage.includes('not open') ||
-                                errorMessage.includes('not connected');
+      const isConnectionError =
+        errorMessage.includes('Websocket') ||
+        errorMessage.includes('InvalidToken') ||
+        errorMessage.includes('not open') ||
+        errorMessage.includes('not connected');
 
       if (isConnectionError) {
         if (!this.connectionErrorLogged) {
@@ -632,7 +637,10 @@ export class HolochainClientService {
       const duration = Date.now() - startTime;
       this.metrics.recordQuery(duration, false);
       const availableRoles = Array.from(cellIds.keys()).join(', ');
-      return { success: false, error: `No cell found for role '${roleName}'. Available roles: ${availableRoles}` };
+      return {
+        success: false,
+        error: `No cell found for role '${roleName}'. Available roles: ${availableRoles}`,
+      };
     }
 
     // Build REST API URL
@@ -669,7 +677,11 @@ export class HolochainClientService {
       const duration = Date.now() - startTime;
       this.metrics.recordQuery(duration, false);
 
-      this.logger.error('REST call failed', undefined, { zomeName: input.zomeName, fnName: input.fnName, error: errorMessage });
+      this.logger.error('REST call failed', undefined, {
+        zomeName: input.zomeName,
+        fnName: input.fnName,
+        error: errorMessage,
+      });
       return { success: false, error: errorMessage };
     }
   }
@@ -700,7 +712,7 @@ export class HolochainClientService {
   private async getInstalledApp(adminWs: AdminWebsocket): Promise<AppInfo | null> {
     try {
       const apps = await adminWs.listApps({});
-      return apps.find((app) => app.installed_app_id === this.config.appId) || null;
+      return apps.find(app => app.installed_app_id === this.config.appId) || null;
     } catch {
       return null;
     }
@@ -722,7 +734,7 @@ export class HolochainClientService {
     const cellInfoEntries = Object.entries(appInfo.cell_info);
 
     for (const [roleName, cells] of cellInfoEntries) {
-      const cellArray = cells as Array<{ type: string; value: { cell_id: CellId } }>;
+      const cellArray = cells as { type: string; value: { cell_id: CellId } }[];
       for (const cell of cellArray) {
         if (cell.type === 'provisioned' && cell.value?.cell_id) {
           cellIds.set(roleName, cell.value.cell_id);
@@ -742,7 +754,7 @@ export class HolochainClientService {
    * Update connection state
    */
   private updateState(partial: Partial<HolochainConnection>): void {
-    this.connectionSignal.update((current) => ({
+    this.connectionSignal.update(current => ({
       ...current,
       ...partial,
     }));
@@ -765,7 +777,9 @@ export class HolochainClientService {
 
       localStorage.setItem(SIGNING_CREDENTIALS_KEY, JSON.stringify(serialized));
     } catch (err) {
-      this.logger.warn('Could not store signing credentials', { error: err instanceof Error ? err.message : String(err) });
+      this.logger.warn('Could not store signing credentials', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -826,7 +840,8 @@ export class HolochainClientService {
 
     // Extract network seed from appInfo if available
     // AppInfo structure may have network_seed in manifest_network_seed
-    const networkSeed = (conn.appInfo as { manifest_network_seed?: string })?.manifest_network_seed ?? null;
+    const networkSeed =
+      (conn.appInfo as { manifest_network_seed?: string })?.manifest_network_seed ?? null;
 
     return {
       state: conn.state,

@@ -30,7 +30,7 @@
  * For Elohim agents, additional properties are available.
  */
 export interface Agent {
-  id: string;  // Future: DID or AgentPubKey in Holochain
+  id: string; // Future: DID or AgentPubKey in Holochain
   displayName: string;
   type: 'human' | 'organization' | 'ai-agent' | 'elohim';
 
@@ -192,10 +192,10 @@ export function getMasteryProgress(level: MasteryLevel): number {
  * AttestationCategory - Types of attestations
  */
 export type AttestationCategory =
-  | 'domain-mastery'    // Earned via sustained concept mastery
-  | 'path-completion'   // All concepts at impression+ level
-  | 'role-credential'   // Granted by governance process
-  | 'achievement';      // One-time participation recognition
+  | 'domain-mastery' // Earned via sustained concept mastery
+  | 'path-completion' // All concepts at impression+ level
+  | 'role-credential' // Granted by governance process
+  | 'achievement'; // One-time participation recognition
 
 /**
  * MasteryLevel - Content mastery based on Bloom's Taxonomy.
@@ -263,13 +263,9 @@ export function isAboveGate(level: MasteryLevel): boolean {
  * Compare two mastery levels.
  * Returns negative if a < b, zero if equal, positive if a > b.
  */
-export function compareMasteryLevels(
-  a: MasteryLevel,
-  b: MasteryLevel
-): number {
+export function compareMasteryLevels(a: MasteryLevel, b: MasteryLevel): number {
   return MASTERY_LEVEL_VALUES[a] - MASTERY_LEVEL_VALUES[b];
 }
-
 
 /**
  * NewAttestation - Refined attestation model for v2
@@ -283,7 +279,7 @@ export interface NewAttestation {
 
   // What kind of attestation is this?
   category: AttestationCategory;
-  attestationType: string;        // Specific type within category
+  attestationType: string; // Specific type within category
 
   // How it was earned (depends on category)
   earnedVia: {
@@ -308,15 +304,15 @@ export interface NewAttestation {
 
   // Verification
   issuedAt: string;
-  issuedBy: string;               // System, steward, governance, or peer
-  expiresAt?: string;             // Optional expiration (for role credentials)
-  proof?: string;                 // Cryptographic signature in production
+  issuedBy: string; // System, steward, governance, or peer
+  expiresAt?: string; // Optional expiration (for role credentials)
+  proof?: string; // Cryptographic signature in production
 
   // Display metadata
   displayName: string;
   description: string;
   iconUrl?: string;
-  tier?: 'bronze' | 'silver' | 'gold' | 'platinum';  // Visual distinction
+  tier?: 'bronze' | 'silver' | 'gold' | 'platinum'; // Visual distinction
 }
 
 /**

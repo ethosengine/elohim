@@ -19,11 +19,19 @@ describe('SessionHumanService', () => {
     // Create a complete Storage mock
     mockStorage = {
       getItem: (key: string) => localStorageMock[key] || null,
-      setItem: (key: string, value: string) => { localStorageMock[key] = value; },
-      removeItem: (key: string) => { delete localStorageMock[key]; },
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key];
+      },
       key: (index: number) => Object.keys(localStorageMock)[index] || null,
-      get length() { return Object.keys(localStorageMock).length; },
-      clear: () => { localStorageMock = {}; }
+      get length() {
+        return Object.keys(localStorageMock).length;
+      },
+      clear: () => {
+        localStorageMock = {};
+      },
     };
 
     // Replace global localStorage with our mock
@@ -293,7 +301,7 @@ describe('SessionHumanService', () => {
         stepAffinity: {},
         stepNotes: {},
         startedAt: '2025-01-01T00:00:00.000Z',
-        lastActivityAt: '2025-01-02T00:00:00.000Z'
+        lastActivityAt: '2025-01-02T00:00:00.000Z',
       };
 
       service.savePathProgress(progress);
@@ -318,7 +326,7 @@ describe('SessionHumanService', () => {
         stepAffinity: {},
         stepNotes: {},
         startedAt: '2025-01-01T00:00:00.000Z',
-        lastActivityAt: '2025-01-02T00:00:00.000Z'
+        lastActivityAt: '2025-01-02T00:00:00.000Z',
       };
 
       const progress2: SessionPathProgress = {
@@ -328,7 +336,7 @@ describe('SessionHumanService', () => {
         stepAffinity: {},
         stepNotes: {},
         startedAt: '2025-01-01T00:00:00.000Z',
-        lastActivityAt: '2025-01-02T00:00:00.000Z'
+        lastActivityAt: '2025-01-02T00:00:00.000Z',
       };
 
       service.savePathProgress(progress1);
@@ -411,7 +419,7 @@ describe('SessionHumanService', () => {
         stepAffinity: {},
         stepNotes: {},
         startedAt: '2025-01-01T00:00:00.000Z',
-        lastActivityAt: '2025-01-02T00:00:00.000Z'
+        lastActivityAt: '2025-01-02T00:00:00.000Z',
       };
       service.savePathProgress(progress);
 
@@ -451,8 +459,8 @@ describe('SessionHumanService', () => {
         accessLevel: 'gated',
         restrictionReason: 'Test restriction',
         requirements: {
-          minLevel: 'member'
-        }
+          minLevel: 'member',
+        },
       });
       expect(result.canAccess).toBe(false);
       expect(result.reason).toBe('not-authenticated');
@@ -465,8 +473,8 @@ describe('SessionHumanService', () => {
         requirements: {
           minLevel: 'attested',
           requiredAttestations: ['att-1'],
-          requiredPaths: ['path-1']
-        }
+          requiredPaths: ['path-1'],
+        },
       });
       expect(result.canAccess).toBe(false);
       expect(result.missingAttestations).toEqual(['att-1']);
@@ -475,10 +483,12 @@ describe('SessionHumanService', () => {
 
     it('should check if content is accessible', () => {
       expect(service.canAccessContent({ accessLevel: 'open' })).toBe(true);
-      expect(service.canAccessContent({
-        accessLevel: 'gated',
-        requirements: { minLevel: 'member' }
-      })).toBe(false);
+      expect(
+        service.canAccessContent({
+          accessLevel: 'gated',
+          requirements: { minLevel: 'member' },
+        })
+      ).toBe(false);
     });
 
     it('should trigger upgrade prompt on gated content access', () => {

@@ -42,12 +42,8 @@
 
       <!-- Header Actions -->
       <div class="header-actions">
-        <button class="btn-icon" (click)="toggleConfigPanel()" title="Settings">
-          ⚙️
-        </button>
-        <button class="btn-icon" [matMenuTriggerFor]="exportMenu" title="Export">
-          📥
-        </button>
+        <button class="btn-icon" (click)="toggleConfigPanel()" title="Settings">⚙️</button>
+        <button class="btn-icon" [matMenuTriggerFor]="exportMenu" title="Export">📥</button>
       </div>
     </div>
 
@@ -175,7 +171,13 @@
     <!-- Panels Grid / Detailed View -->
     <div class="panels-container" [class]="'mode-' + mergedConfig.displayMode">
       <!-- Compute Metrics Panel -->
-      <div class="panel compute-panel" *ngIf="isComputeMetricsVisible() && (selectedPanel === 'compute' || mergedConfig.displayMode !== 'detailed')">
+      <div
+        class="panel compute-panel"
+        *ngIf="
+          isComputeMetricsVisible() &&
+          (selectedPanel === 'compute' || mergedConfig.displayMode !== 'detailed')
+        "
+      >
         <div class="panel-header">
           <h2>💻 Compute Metrics</h2>
           <span class="panel-subtitle">Real-time node performance</span>
@@ -192,7 +194,8 @@
               <span class="metric-value">{{ getCpuUsage() | number: '1.1-1' }}%</span>
             </div>
             <div class="metric-detail">
-              {{ state.computeMetrics.cpu.available | number: '1.1-1' }} / {{ state.computeMetrics.cpu.totalCores | number: '1.1-1' }} cores
+              {{ state.computeMetrics.cpu.available | number: '1.1-1' }} /
+              {{ state.computeMetrics.cpu.totalCores | number: '1.1-1' }} cores
               <span *ngIf="state.computeMetrics.cpu.temperature">
                 | {{ state.computeMetrics.cpu.temperature }}°C
               </span>
@@ -209,7 +212,8 @@
               <span class="metric-value">{{ getMemoryUsage() | number: '1.1-1' }}%</span>
             </div>
             <div class="metric-detail">
-              {{ state.computeMetrics.memory.usedGB | number: '1.1-1' }} / {{ state.computeMetrics.memory.totalGB | number: '1.1-1' }} GB
+              {{ state.computeMetrics.memory.usedGB | number: '1.1-1' }} /
+              {{ state.computeMetrics.memory.totalGB | number: '1.1-1' }} GB
             </div>
           </div>
 
@@ -223,12 +227,17 @@
               <span class="metric-value">{{ getStorageUsage() | number: '1.1-1' }}%</span>
             </div>
             <div class="metric-detail">
-              {{ state.computeMetrics.storage.usedGB | number: '1.1-1' }} / {{ state.computeMetrics.storage.totalGB | number: '1.1-1' }} GB
+              {{ state.computeMetrics.storage.usedGB | number: '1.1-1' }} /
+              {{ state.computeMetrics.storage.totalGB | number: '1.1-1' }} GB
               <div class="storage-breakdown">
                 <span>Holochain: {{ state.computeMetrics.storage.breakdown.holochain }}GB</span>
                 <span>Cache: {{ state.computeMetrics.storage.breakdown.cache }}GB</span>
-                <span>Custodian Data: {{ state.computeMetrics.storage.breakdown.custodianData }}GB</span>
-                <span>User Apps: {{ state.computeMetrics.storage.breakdown.userApplications }}GB</span>
+                <span>
+                  Custodian Data: {{ state.computeMetrics.storage.breakdown.custodianData }}GB
+                </span>
+                <span>
+                  User Apps: {{ state.computeMetrics.storage.breakdown.userApplications }}GB
+                </span>
               </div>
             </div>
           </div>
@@ -239,18 +248,28 @@
             <div class="network-stats">
               <div class="network-stat">
                 <span class="label">Bandwidth</span>
-                <span class="value">{{ state.computeMetrics.network.bandwidth.usedUpstreamMbps | number: '1.1-1' }} / {{ state.computeMetrics.network.bandwidth.upstreamMbps | number: '1.1-1' }} Mbps up</span>
+                <span class="value">
+                  {{ state.computeMetrics.network.bandwidth.usedUpstreamMbps | number: '1.1-1' }} /
+                  {{ state.computeMetrics.network.bandwidth.upstreamMbps | number: '1.1-1' }} Mbps
+                  up
+                </span>
               </div>
               <div class="network-stat">
                 <span class="label">Latency</span>
                 <span class="value">
-                  p50: {{ state.computeMetrics.network.latency.p50 }}ms | p95: {{ state.computeMetrics.network.latency.p95 }}ms | p99: {{ state.computeMetrics.network.latency.p99 }}ms
+                  p50: {{ state.computeMetrics.network.latency.p50 }}ms | p95:
+                  {{ state.computeMetrics.network.latency.p95 }}ms | p99:
+                  {{ state.computeMetrics.network.latency.p99 }}ms
                 </span>
               </div>
               <div class="network-stat">
                 <span class="label">Connections</span>
                 <span class="value">
-                  {{ state.computeMetrics.network.connections.total }} total ({{ state.computeMetrics.network.connections.holochain }} DHT, {{ state.computeMetrics.network.connections.cache }} cache, {{ state.computeMetrics.network.connections.custodian }} custodian)
+                  {{ state.computeMetrics.network.connections.total }} total ({{
+                    state.computeMetrics.network.connections.holochain
+                  }}
+                  DHT, {{ state.computeMetrics.network.connections.cache }} cache,
+                  {{ state.computeMetrics.network.connections.custodian }} custodian)
                 </span>
               </div>
             </div>
@@ -262,14 +281,22 @@
             <div class="load-average">
               <span>1m: {{ state.computeMetrics.loadAverage.oneMinute | number: '1.2-2' }}</span>
               <span>5m: {{ state.computeMetrics.loadAverage.fiveMinutes | number: '1.2-2' }}</span>
-              <span>15m: {{ state.computeMetrics.loadAverage.fifteenMinutes | number: '1.2-2' }}</span>
+              <span>
+                15m: {{ state.computeMetrics.loadAverage.fifteenMinutes | number: '1.2-2' }}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Family-Community Protection Panel -->
-      <div class="panel protection-panel" *ngIf="isFamilyProtectionVisible() && (selectedPanel === 'protection' || mergedConfig.displayMode !== 'detailed')">
+      <div
+        class="panel protection-panel"
+        *ngIf="
+          isFamilyProtectionVisible() &&
+          (selectedPanel === 'protection' || mergedConfig.displayMode !== 'detailed')
+        "
+      >
         <div class="panel-header">
           <h2>🛡️ Data Protection</h2>
           <span class="panel-subtitle">Who's protecting your data?</span>
@@ -279,7 +306,9 @@
           <!-- Protection Status -->
           <div class="protection-status" [ngClass]="getProtectionLevelClass()">
             <div class="status-main">
-              <span class="protection-level">{{ state.familyCommunityProtection.protectionLevel | titlecase }}</span>
+              <span class="protection-level">
+                {{ state.familyCommunityProtection.protectionLevel | titlecase }}
+              </span>
               <span class="custodian-count">{{ getTotalCustodians() }} custodian(s)</span>
             </div>
             <div class="recovery-info">
@@ -292,12 +321,18 @@
           <div class="redundancy-info">
             <h4>Redundancy Strategy</h4>
             <div class="strategy-details">
-              <span class="strategy-type">{{ state.familyCommunityProtection.redundancy.strategy | titlecase }}</span>
+              <span class="strategy-type">
+                {{ state.familyCommunityProtection.redundancy.strategy | titlecase }}
+              </span>
               <span class="factor">
-                Redundancy Factor: {{ state.familyCommunityProtection.redundancy.redundancyFactor }}-of-{{ getTotalCustodians() }}
+                Redundancy Factor:
+                {{ state.familyCommunityProtection.redundancy.redundancyFactor }}-of-{{
+                  getTotalCustodians()
+                }}
               </span>
               <span class="threshold">
-                Recovery Threshold: {{ state.familyCommunityProtection.redundancy.recoveryThreshold }} shard(s)
+                Recovery Threshold:
+                {{ state.familyCommunityProtection.redundancy.recoveryThreshold }} shard(s)
               </span>
             </div>
           </div>
@@ -306,10 +341,16 @@
           <div class="geographic-distribution">
             <h4>Geographic Distribution</h4>
             <div class="regions-list">
-              <div class="region-item" *ngFor="let region of state.familyCommunityProtection.geographicDistribution">
-                <span class="region-name">{{ region.region }}, {{ region.country || 'Unknown' }}</span>
+              <div
+                class="region-item"
+                *ngFor="let region of state.familyCommunityProtection.geographicDistribution"
+              >
+                <span class="region-name">
+                  {{ region.region }}, {{ region.country || 'Unknown' }}
+                </span>
                 <span class="region-stats">
-                  {{ region.custodianCount }} custodian(s) | {{ region.dataShards }} shards | Redundancy: {{ region.redundancy }}
+                  {{ region.custodianCount }} custodian(s) | {{ region.dataShards }} shards |
+                  Redundancy: {{ region.redundancy }}
                 </span>
                 <div class="risk-factors" *ngIf="region.riskFactors.length > 0">
                   <span class="risk-badge" *ngFor="let risk of region.riskFactors">{{ risk }}</span>
@@ -322,25 +363,33 @@
           <div class="custodian-list">
             <h4>Data Custodians</h4>
             <div class="custodians">
-              <div class="custodian-card" *ngFor="let custodian of state.familyCommunityProtection.custodians">
+              <div
+                class="custodian-card"
+                *ngFor="let custodian of state.familyCommunityProtection.custodians"
+              >
                 <div class="custodian-header">
                   <span class="name">{{ custodian.name }}</span>
-                  <span class="type-badge" [ngClass]="'type-' + custodian.type">{{ custodian.type }}</span>
+                  <span class="type-badge" [ngClass]="'type-' + custodian.type">
+                    {{ custodian.type }}
+                  </span>
                 </div>
                 <div class="custodian-info">
                   <span class="location" *ngIf="custodian.location">
                     📍 {{ custodian.location.region }}, {{ custodian.location.country }}
                   </span>
-                  <span class="storage">📦 {{ custodian.dataStored.totalGB }} GB ({{ custodian.dataStored.shardCount }} shards)</span>
-                  <span class="trust-level">
-                    ⭐ Trust: {{ custodian.trustLevel }}/100
+                  <span class="storage">
+                    📦 {{ custodian.dataStored.totalGB }} GB ({{ custodian.dataStored.shardCount }}
+                    shards)
                   </span>
+                  <span class="trust-level">⭐ Trust: {{ custodian.trustLevel }}/100</span>
                 </div>
                 <div class="custodian-health">
                   <div class="health-bar">
                     <div class="health-fill" [style.width.%]="custodian.health.upPercent"></div>
                   </div>
-                  <span class="health-text">{{ custodian.health.upPercent | number: '1.1-1' }}% uptime</span>
+                  <span class="health-text">
+                    {{ custodian.health.upPercent | number: '1.1-1' }}% uptime
+                  </span>
                 </div>
               </div>
             </div>
@@ -349,7 +398,13 @@
       </div>
 
       <!-- Infrastructure Token Earnings Panel -->
-      <div class="panel tokens-panel" *ngIf="isTokenEarningsVisible() && (selectedPanel === 'tokens' || mergedConfig.displayMode !== 'detailed')">
+      <div
+        class="panel tokens-panel"
+        *ngIf="
+          isTokenEarningsVisible() &&
+          (selectedPanel === 'tokens' || mergedConfig.displayMode !== 'detailed')
+        "
+      >
         <div class="panel-header">
           <h2>💰 Infrastructure Tokens</h2>
           <span class="panel-subtitle">How much compute are you earning?</span>
@@ -363,7 +418,10 @@
               <span class="unit">tokens</span>
             </div>
             <div class="balance-secondary">
-              <span class="value">≈ ${{ state.infrastructureTokens.balance.estimatedValue.value | number: '1.2-2' }} {{ state.infrastructureTokens.balance.estimatedValue.currency }}</span>
+              <span class="value">
+                ≈ ${{ state.infrastructureTokens.balance.estimatedValue.value | number: '1.2-2' }}
+                {{ state.infrastructureTokens.balance.estimatedValue.currency }}
+              </span>
             </div>
           </div>
 
@@ -371,24 +429,26 @@
           <div class="earning-rate">
             <h4>Earning Rate</h4>
             <div class="rate-details">
-              <div class="rate-main">
-                {{ getTokenEarningRate() | number: '1.4-4' }} tokens/hour
-              </div>
+              <div class="rate-main">{{ getTokenEarningRate() | number: '1.4-4' }} tokens/hour</div>
               <div class="rate-breakdown">
                 <span>Based on:</span>
                 <span class="breakdown-item">
                   {{ state.infrastructureTokens.earningRate.basedOn.cpuAllocation }}% CPU allocation
                 </span>
                 <span class="breakdown-item">
-                  {{ state.infrastructureTokens.earningRate.basedOn.storageAllocation }}% Storage allocation
+                  {{ state.infrastructureTokens.earningRate.basedOn.storageAllocation }}% Storage
+                  allocation
                 </span>
                 <span class="breakdown-item">
-                  {{ state.infrastructureTokens.earningRate.basedOn.bandwidthAllocation }}% Bandwidth allocation
+                  {{ state.infrastructureTokens.earningRate.basedOn.bandwidthAllocation }}%
+                  Bandwidth allocation
                 </span>
               </div>
               <div class="estimated-monthly">
                 <span class="label">Estimated Monthly:</span>
-                <span class="value">{{ getEstimatedMonthlyEarnings() | number: '1.0-0' }} tokens</span>
+                <span class="value">
+                  {{ getEstimatedMonthlyEarnings() | number: '1.0-0' }} tokens
+                </span>
               </div>
             </div>
           </div>
@@ -400,12 +460,13 @@
               <span class="decay-rate">
                 {{ state.infrastructureTokens.decay.demurrageRate }}% monthly decay
               </span>
-              <span class="decay-reason">
-                (Encourages circulation and prevents hoarding)
-              </span>
+              <span class="decay-reason">(Encourages circulation and prevents hoarding)</span>
               <div class="projected-decay">
                 <span class="label">Projected balance next month:</span>
-                <span class="value">{{ state.infrastructureTokens.decay.projectedNextMonth.tokens | number: '1.2-2' }} tokens</span>
+                <span class="value">
+                  {{ state.infrastructureTokens.decay.projectedNextMonth.tokens | number: '1.2-2' }}
+                  tokens
+                </span>
               </div>
             </div>
           </div>
@@ -428,17 +489,32 @@
           <div class="token-history">
             <h4>Token History</h4>
             <div class="history-list">
-              <span class="history-item">Last 24h: {{ state.infrastructureTokens.tokenHistory.last24Hours | number: '1.2-2' }}</span>
-              <span class="history-item">Last 7d: {{ state.infrastructureTokens.tokenHistory.last7Days | number: '1.2-2' }}</span>
-              <span class="history-item">Last 30d: {{ state.infrastructureTokens.tokenHistory.last30Days | number: '1.2-2' }}</span>
-              <span class="history-item">All Time: {{ state.infrastructureTokens.tokenHistory.allTime | number: '1.2-2' }}</span>
+              <span class="history-item">
+                Last 24h:
+                {{ state.infrastructureTokens.tokenHistory.last24Hours | number: '1.2-2' }}
+              </span>
+              <span class="history-item">
+                Last 7d: {{ state.infrastructureTokens.tokenHistory.last7Days | number: '1.2-2' }}
+              </span>
+              <span class="history-item">
+                Last 30d: {{ state.infrastructureTokens.tokenHistory.last30Days | number: '1.2-2' }}
+              </span>
+              <span class="history-item">
+                All Time: {{ state.infrastructureTokens.tokenHistory.allTime | number: '1.2-2' }}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Economic Events Panel -->
-      <div class="panel events-panel" *ngIf="isEconomicEventsVisible() && (selectedPanel === 'events' || mergedConfig.displayMode !== 'detailed')">
+      <div
+        class="panel events-panel"
+        *ngIf="
+          isEconomicEventsVisible() &&
+          (selectedPanel === 'events' || mergedConfig.displayMode !== 'detailed')
+        "
+      >
         <div class="panel-header">
           <h2>📊 Recent Economic Events</h2>
           <span class="panel-subtitle">Compute flows and transactions</span>
@@ -456,7 +532,9 @@
               </div>
               <div class="event-note">{{ event.note }}</div>
               <div class="event-tokens" *ngIf="event.tokensMinted">
-                <span class="tokens-minted">+{{ event.tokensMinted | number: '1.2-2' }} tokens</span>
+                <span class="tokens-minted">
+                  +{{ event.tokensMinted | number: '1.2-2' }} tokens
+                </span>
               </div>
             </div>
           </div>
@@ -467,7 +545,13 @@
       </div>
 
       <!-- Constitutional Limits Panel -->
-      <div class="panel limits-panel" *ngIf="isConstitutionalLimitsVisible() && (selectedPanel === 'limits' || mergedConfig.displayMode !== 'detailed')">
+      <div
+        class="panel limits-panel"
+        *ngIf="
+          isConstitutionalLimitsVisible() &&
+          (selectedPanel === 'limits' || mergedConfig.displayMode !== 'detailed')
+        "
+      >
         <div class="panel-header">
           <h2>⚖️ Constitutional Limits</h2>
           <span class="panel-subtitle">Dignity floor & ceiling enforcement</span>
@@ -477,26 +561,41 @@
           <!-- Dignity Floor -->
           <div class="limits-section dignity-floor">
             <h4>Dignity Floor (Minimum Entitlements)</h4>
-            <div class="limit-status" [ngClass]="'status-' + state.constitutionalLimits.dignityFloor.status">
-              <span class="status-label">{{ state.constitutionalLimits.dignityFloor.status | titlecase }}</span>
-              <span class="status-percent">{{ state.constitutionalLimits.dignityFloor.percentOfFloor | number: '1.1-1' }}%</span>
+            <div
+              class="limit-status"
+              [ngClass]="'status-' + state.constitutionalLimits.dignityFloor.status"
+            >
+              <span class="status-label">
+                {{ state.constitutionalLimits.dignityFloor.status | titlecase }}
+              </span>
+              <span class="status-percent">
+                {{ state.constitutionalLimits.dignityFloor.percentOfFloor | number: '1.1-1' }}%
+              </span>
             </div>
             <div class="floor-details">
               <div class="floor-item">
                 <span class="label">CPU:</span>
-                <span class="value">{{ state.constitutionalLimits.dignityFloor.computeMinCores }} core(s)</span>
+                <span class="value">
+                  {{ state.constitutionalLimits.dignityFloor.computeMinCores }} core(s)
+                </span>
               </div>
               <div class="floor-item">
                 <span class="label">Memory:</span>
-                <span class="value">{{ state.constitutionalLimits.dignityFloor.computeMinMemoryGB }} GB</span>
+                <span class="value">
+                  {{ state.constitutionalLimits.dignityFloor.computeMinMemoryGB }} GB
+                </span>
               </div>
               <div class="floor-item">
                 <span class="label">Storage:</span>
-                <span class="value">{{ state.constitutionalLimits.dignityFloor.computeMinStorageGB }} GB</span>
+                <span class="value">
+                  {{ state.constitutionalLimits.dignityFloor.computeMinStorageGB }} GB
+                </span>
               </div>
               <div class="floor-item">
                 <span class="label">Bandwidth:</span>
-                <span class="value">{{ state.constitutionalLimits.dignityFloor.computeMinBandwidthMbps }} Mbps</span>
+                <span class="value">
+                  {{ state.constitutionalLimits.dignityFloor.computeMinBandwidthMbps }} Mbps
+                </span>
               </div>
             </div>
           </div>
@@ -504,26 +603,45 @@
           <!-- Ceiling Limit -->
           <div class="limits-section ceiling-limit">
             <h4>Ceiling Limit (Wise Stewardship Bound)</h4>
-            <div class="limit-status" [ngClass]="'status-' + state.constitutionalLimits.ceilingLimit.status">
-              <span class="status-label">{{ state.constitutionalLimits.ceilingLimit.status | titlecase }}</span>
-              <span class="status-percent">{{ state.constitutionalLimits.ceilingLimit.percentOfCeiling | number: '1.1-1' }}%</span>
+            <div
+              class="limit-status"
+              [ngClass]="'status-' + state.constitutionalLimits.ceilingLimit.status"
+            >
+              <span class="status-label">
+                {{ state.constitutionalLimits.ceilingLimit.status | titlecase }}
+              </span>
+              <span class="status-percent">
+                {{ state.constitutionalLimits.ceilingLimit.percentOfCeiling | number: '1.1-1' }}%
+              </span>
             </div>
             <div class="ceiling-details">
               <div class="ceiling-item">
                 <span class="label">Max CPU:</span>
-                <span class="value">{{ state.constitutionalLimits.ceilingLimit.computeMaxCores }} core(s)</span>
+                <span class="value">
+                  {{ state.constitutionalLimits.ceilingLimit.computeMaxCores }} core(s)
+                </span>
               </div>
               <div class="ceiling-item">
                 <span class="label">Max Memory:</span>
-                <span class="value">{{ state.constitutionalLimits.ceilingLimit.computeMaxMemoryGB }} GB</span>
+                <span class="value">
+                  {{ state.constitutionalLimits.ceilingLimit.computeMaxMemoryGB }} GB
+                </span>
               </div>
               <div class="ceiling-item">
                 <span class="label">Max Storage:</span>
-                <span class="value">{{ state.constitutionalLimits.ceilingLimit.computeMaxStorageGB }} GB</span>
+                <span class="value">
+                  {{ state.constitutionalLimits.ceilingLimit.computeMaxStorageGB }} GB
+                </span>
               </div>
               <div class="ceiling-item">
                 <span class="label">Token Ceiling:</span>
-                <span class="value">{{ state.constitutionalLimits.ceilingLimit.tokenAccumulationCeiling | number: '1.0-0' }} tokens</span>
+                <span class="value">
+                  {{
+                    state.constitutionalLimits.ceilingLimit.tokenAccumulationCeiling
+                      | number: '1.0-0'
+                  }}
+                  tokens
+                </span>
               </div>
             </div>
           </div>
@@ -535,30 +653,50 @@
               <div class="zone-bar">
                 <span class="label">CPU</span>
                 <div class="zone-visual">
-                  <div class="zone-fill" [style.width.%]="state.constitutionalLimits.safeZone.cpu"></div>
+                  <div
+                    class="zone-fill"
+                    [style.width.%]="state.constitutionalLimits.safeZone.cpu"
+                  ></div>
                 </div>
-                <span class="value">{{ state.constitutionalLimits.safeZone.cpu | number: '1.1-1' }}%</span>
+                <span class="value">
+                  {{ state.constitutionalLimits.safeZone.cpu | number: '1.1-1' }}%
+                </span>
               </div>
               <div class="zone-bar">
                 <span class="label">Memory</span>
                 <div class="zone-visual">
-                  <div class="zone-fill" [style.width.%]="state.constitutionalLimits.safeZone.memory"></div>
+                  <div
+                    class="zone-fill"
+                    [style.width.%]="state.constitutionalLimits.safeZone.memory"
+                  ></div>
                 </div>
-                <span class="value">{{ state.constitutionalLimits.safeZone.memory | number: '1.1-1' }}%</span>
+                <span class="value">
+                  {{ state.constitutionalLimits.safeZone.memory | number: '1.1-1' }}%
+                </span>
               </div>
               <div class="zone-bar">
                 <span class="label">Storage</span>
                 <div class="zone-visual">
-                  <div class="zone-fill" [style.width.%]="state.constitutionalLimits.safeZone.storage"></div>
+                  <div
+                    class="zone-fill"
+                    [style.width.%]="state.constitutionalLimits.safeZone.storage"
+                  ></div>
                 </div>
-                <span class="value">{{ state.constitutionalLimits.safeZone.storage | number: '1.1-1' }}%</span>
+                <span class="value">
+                  {{ state.constitutionalLimits.safeZone.storage | number: '1.1-1' }}%
+                </span>
               </div>
               <div class="zone-bar">
                 <span class="label">Bandwidth</span>
                 <div class="zone-visual">
-                  <div class="zone-fill" [style.width.%]="state.constitutionalLimits.safeZone.bandwidth"></div>
+                  <div
+                    class="zone-fill"
+                    [style.width.%]="state.constitutionalLimits.safeZone.bandwidth"
+                  ></div>
                 </div>
-                <span class="value">{{ state.constitutionalLimits.safeZone.bandwidth | number: '1.1-1' }}%</span>
+                <span class="value">
+                  {{ state.constitutionalLimits.safeZone.bandwidth | number: '1.1-1' }}%
+                </span>
               </div>
             </div>
           </div>
@@ -567,7 +705,11 @@
           <div class="limit-alerts" *ngIf="state.constitutionalLimits.alerts.length > 0">
             <h4>Alerts</h4>
             <div class="alerts-list">
-              <div class="alert-card" *ngFor="let alert of state.constitutionalLimits.alerts" [ngClass]="'severity-' + alert.severity">
+              <div
+                class="alert-card"
+                *ngFor="let alert of state.constitutionalLimits.alerts"
+                [ngClass]="'severity-' + alert.severity"
+              >
                 <div class="alert-title">{{ alert.type | titlecase }}</div>
                 <div class="alert-message">{{ alert.message }}</div>
                 <div class="alert-action">{{ alert.recommendedAction }}</div>

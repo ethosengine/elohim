@@ -4,7 +4,9 @@
     <div class="list-header">
       <div class="header-title">
         <h1>Contributor Presences</h1>
-        <p class="subtitle">Honor absent contributors by establishing their presence in the network</p>
+        <p class="subtitle">
+          Honor absent contributors by establishing their presence in the network
+        </p>
       </div>
       @if (isAuthenticated()) {
         <button type="button" class="btn btn-primary" (click)="openCreateForm()">
@@ -35,8 +37,8 @@
         <div class="modal-content" (click)="$event.stopPropagation()">
           <h2>Create Contributor Presence</h2>
           <p class="modal-subtitle">
-            Create a presence for a contributor who isn't yet in the network.
-            Recognition will accumulate until they claim their presence.
+            Create a presence for a contributor who isn't yet in the network. Recognition will
+            accumulate until they claim their presence.
           </p>
 
           <form class="create-form" (ngSubmit)="createPresence()">
@@ -124,7 +126,7 @@
               </div>
               <div class="presence-stats">
                 <div class="stat">
-                  <span class="stat-value">{{ presence.recognitionScore | number:'1.0-0' }}</span>
+                  <span class="stat-value">{{ presence.recognitionScore | number: '1.0-0' }}</span>
                   <span class="stat-label">Recognition</span>
                 </div>
                 <div class="stat">
@@ -180,11 +182,11 @@
 
               <div class="presence-stats">
                 <div class="stat">
-                  <span class="stat-value">{{ presence.recognitionScore | number:'1.0-0' }}</span>
+                  <span class="stat-value">{{ presence.recognitionScore | number: '1.0-0' }}</span>
                   <span class="stat-label">Recognition</span>
                 </div>
                 <div class="stat">
-                  <span class="stat-value">{{ presence.affinityTotal | number:'1.0-0' }}</span>
+                  <span class="stat-value">{{ presence.affinityTotal | number: '1.0-0' }}</span>
                   <span class="stat-label">Affinity</span>
                 </div>
                 <div class="stat">

@@ -129,35 +129,35 @@ export interface PerseusHint {
  * Widgets are interactive elements that can be embedded in question content.
  */
 export type PerseusWidgetType =
-  | 'radio'              // Multiple choice (single select)
-  | 'numeric-input'      // Number entry with validation
-  | 'expression'         // Mathematical expression input
-  | 'input-number'       // Simple number input
-  | 'interactive-graph'  // Graphing and geometry
-  | 'image'              // Image with optional interaction
-  | 'transformer'        // Geometric transformations
-  | 'number-line'        // Number line interactions
-  | 'sorter'             // Ordering/sorting items
-  | 'categorizer'        // Categorize items into groups
-  | 'matcher'            // Match items between columns
-  | 'orderer'            // Put items in order
-  | 'graded-group'       // Group of graded questions
-  | 'graded-group-set'   // Set of graded groups
-  | 'iframe'             // Custom interactive via iframe
-  | 'definition'         // Term definition tooltip
-  | 'dropdown'           // Dropdown selection
-  | 'explanation'        // Expandable explanation
-  | 'passage'            // Reading passage
-  | 'passage-ref'        // Reference to passage
-  | 'phet-simulation'    // PhET interactive simulation
-  | 'plotter'            // Bar chart/histogram plotter
-  | 'table'              // Data table
-  | 'grapher'            // Function graphing
-  | 'measurer'           // Measurement tool
-  | 'matrix'             // Matrix input
-  | 'cs-program'         // Computer science code
-  | 'video'              // Embedded video
-  | 'label-image';       // Image with labels
+  | 'radio' // Multiple choice (single select)
+  | 'numeric-input' // Number entry with validation
+  | 'expression' // Mathematical expression input
+  | 'input-number' // Simple number input
+  | 'interactive-graph' // Graphing and geometry
+  | 'image' // Image with optional interaction
+  | 'transformer' // Geometric transformations
+  | 'number-line' // Number line interactions
+  | 'sorter' // Ordering/sorting items
+  | 'categorizer' // Categorize items into groups
+  | 'matcher' // Match items between columns
+  | 'orderer' // Put items in order
+  | 'graded-group' // Group of graded questions
+  | 'graded-group-set' // Set of graded groups
+  | 'iframe' // Custom interactive via iframe
+  | 'definition' // Term definition tooltip
+  | 'dropdown' // Dropdown selection
+  | 'explanation' // Expandable explanation
+  | 'passage' // Reading passage
+  | 'passage-ref' // Reference to passage
+  | 'phet-simulation' // PhET interactive simulation
+  | 'plotter' // Bar chart/histogram plotter
+  | 'table' // Data table
+  | 'grapher' // Function graphing
+  | 'measurer' // Measurement tool
+  | 'matrix' // Matrix input
+  | 'cs-program' // Computer science code
+  | 'video' // Embedded video
+  | 'label-image'; // Image with labels
 
 /**
  * Base widget structure. Each widget type has specific options.
@@ -270,7 +270,15 @@ export interface NumericInputWidgetOptions {
   coefficient?: boolean;
 
   /** Whether answer is a vector */
-  answerType?: 'number' | 'decimal' | 'integer' | 'rational' | 'improper' | 'mixed' | 'percent' | 'pi';
+  answerType?:
+    | 'number'
+    | 'decimal'
+    | 'integer'
+    | 'rational'
+    | 'improper'
+    | 'mixed'
+    | 'percent'
+    | 'pi';
 
   /** Right-hand side content */
   rightAlign?: boolean;
@@ -304,7 +312,15 @@ export interface ExpressionWidgetOptions {
   answerForms: ExpressionAnswerForm[];
 
   /** Button sets to show */
-  buttonSets?: ('basic' | 'basic+div' | 'trig' | 'prealgebra' | 'logarithms' | 'basic relations' | 'advanced relations')[];
+  buttonSets?: (
+    | 'basic'
+    | 'basic+div'
+    | 'trig'
+    | 'prealgebra'
+    | 'logarithms'
+    | 'basic relations'
+    | 'advanced relations'
+  )[];
 
   /** Available functions */
   functions?: string[];
@@ -339,7 +355,18 @@ export interface ExpressionAnswerForm {
 export interface InteractiveGraphWidgetOptions {
   /** Graph type */
   graph: {
-    type: 'linear' | 'quadratic' | 'sinusoid' | 'circle' | 'point' | 'polygon' | 'segment' | 'ray' | 'linear-system' | 'angle' | 'none';
+    type:
+      | 'linear'
+      | 'quadratic'
+      | 'sinusoid'
+      | 'circle'
+      | 'point'
+      | 'polygon'
+      | 'segment'
+      | 'ray'
+      | 'linear-system'
+      | 'angle'
+      | 'none';
     numPoints?: number;
     coords?: [number, number][];
     startCoords?: [number, number][];
@@ -541,12 +568,12 @@ export interface PerseusItemMetadata {
  * Bloom's taxonomy levels for question targeting.
  */
 export type BloomsLevel =
-  | 'remember'    // Recall facts and basic concepts
-  | 'understand'  // Explain ideas or concepts
-  | 'apply'       // Use information in new situations
-  | 'analyze'     // Draw connections among ideas
-  | 'evaluate'    // Justify a decision or course of action
-  | 'create';     // Produce new or original work
+  | 'remember' // Recall facts and basic concepts
+  | 'understand' // Explain ideas or concepts
+  | 'apply' // Use information in new situations
+  | 'analyze' // Draw connections among ideas
+  | 'evaluate' // Justify a decision or course of action
+  | 'create'; // Produce new or original work
 
 /**
  * Question difficulty levels.
@@ -557,8 +584,8 @@ export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
  * Question types for path integration.
  */
 export type QuestionType =
-  | 'core'      // Essential understanding check
-  | 'applied'   // Practical application
+  | 'core' // Essential understanding check
+  | 'applied' // Practical application
   | 'synthesis'; // Combining multiple concepts
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -625,7 +652,7 @@ export function createPerseusItem(
     question: {
       content: '',
       widgets: {},
-      images: {}
+      images: {},
     },
     hints: [],
     metadata: {
@@ -635,8 +662,8 @@ export function createPerseusItem(
       estimatedTimeSeconds: metadata.estimatedTimeSeconds ?? 60,
       tags: metadata.tags ?? [],
       questionType: metadata.questionType ?? 'core',
-      ...metadata
-    }
+      ...metadata,
+    },
   };
 }
 
@@ -646,7 +673,7 @@ export function createPerseusItem(
 export function createRadioQuestion(
   id: string,
   questionText: string,
-  choices: Array<{ text: string; correct?: boolean }>,
+  choices: { text: string; correct?: boolean }[],
   metadata: Partial<PerseusItemMetadata> = {}
 ): PerseusItem {
   const item = createPerseusItem(id, metadata);
@@ -658,12 +685,12 @@ export function createRadioQuestion(
       options: {
         choices: choices.map(c => ({
           content: c.text,
-          correct: c.correct ?? false
+          correct: c.correct ?? false,
         })),
         randomize: true,
-        multipleSelect: false
-      }
-    }
+        multipleSelect: false,
+      },
+    },
   };
 
   return item;
@@ -685,14 +712,16 @@ export function createNumericQuestion(
     'numeric-input 1': {
       type: 'numeric-input',
       options: {
-        answers: [{
-          value: correctAnswer,
-          status: 'correct',
-          simplify: 'optional'
-        }],
-        size: 'normal'
-      }
-    }
+        answers: [
+          {
+            value: correctAnswer,
+            status: 'correct',
+            simplify: 'optional',
+          },
+        ],
+        size: 'normal',
+      },
+    },
   };
 
   return item;

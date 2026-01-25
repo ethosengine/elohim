@@ -1,4 +1,5 @@
 import { Component, OnInit, ElementRef, ViewEncapsulation } from '@angular/core';
+
 import { DomInteractionService } from '../../services/dom-interaction.service';
 
 @Component({
@@ -6,11 +7,11 @@ import { DomInteractionService } from '../../services/dom-interaction.service';
   imports: [],
   templateUrl: './hero.component.html',
   styleUrl: './hero.component.css',
-  encapsulation: ViewEncapsulation.None
+  encapsulation: ViewEncapsulation.None,
 })
 export class HeroComponent implements OnInit {
-  isVideoVisible: boolean = false;
-  isDeepDiveVisible: boolean = false;
+  isVideoVisible = false;
+  isDeepDiveVisible = false;
 
   constructor(
     private readonly el: ElementRef,

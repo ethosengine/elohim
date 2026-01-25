@@ -18,7 +18,12 @@
 /**
  * Bootstrap status for UI feedback
  */
-export type BlobBootstrapStatus = 'initializing' | 'waiting-holochain' | 'metadata-loading' | 'ready' | 'degraded';
+export type BlobBootstrapStatus =
+  | 'initializing'
+  | 'waiting-holochain'
+  | 'metadata-loading'
+  | 'ready'
+  | 'degraded';
 
 /**
  * Unambiguous state of bootstrap process
@@ -124,7 +129,10 @@ export class BlobBootstrapEngine {
   };
 
   // Event listeners (simple pub/sub)
-  private listeners: Map<BlobBootstrapEvent['type'], Set<(event: BlobBootstrapEvent) => void>> = new Map();
+  private listeners = new Map<
+    BlobBootstrapEvent['type'],
+    Set<(event: BlobBootstrapEvent) => void>
+  >();
 
   // Track initialization to prevent multiple runs
   private initializationStarted = false;
@@ -133,7 +141,7 @@ export class BlobBootstrapEngine {
     private holochainChecker: HolochainConnectionChecker,
     private metadataFetcher: BlobMetadataFetcher,
     private cacheVerifier: CacheIntegrityVerifier,
-    private config: BlobBootstrapConfig = {},
+    private config: BlobBootstrapConfig = {}
   ) {}
 
   /**
@@ -150,7 +158,7 @@ export class BlobBootstrapEngine {
     this.updateState({ status: 'initializing' });
 
     // Run in background - don't await
-    this.runBootstrapSequence().catch((error) => {
+    this.runBootstrapSequence().catch(error => {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.updateState({ status: 'degraded', error: message });
       this.emitEvent({ type: 'error', error: message });
@@ -215,7 +223,7 @@ export class BlobBootstrapEngine {
    */
   private async waitForHolochainConnection(
     timeoutMs: number,
-    pollIntervalMs: number,
+    pollIntervalMs: number
   ): Promise<boolean> {
     const startTime = Date.now();
 
@@ -224,7 +232,7 @@ export class BlobBootstrapEngine {
         return true;
       }
       // Wait before next poll
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
     }
 
     return false;
@@ -248,7 +256,7 @@ export class BlobBootstrapEngine {
     return new Promise((resolve, reject) => {
       const dbRequest = indexedDB.open('elohim-blob-cache', 1);
 
-      dbRequest.onupgradeneeded = (event) => {
+      dbRequest.onupgradeneeded = event => {
         const db = (event.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains('blobs')) {
           db.createObjectStore('blobs', { keyPath: 'hash' });
@@ -281,10 +289,7 @@ export class BlobBootstrapEngine {
           loaded.add(contentId);
         }
       } catch (error) {
-        console.warn(
-          `[BlobBootstrapEngine] Failed to preload metadata for ${contentId}:`,
-          error,
-        );
+        console.warn(`[BlobBootstrapEngine] Failed to preload metadata for ${contentId}:`, error);
       }
     }
 
@@ -312,11 +317,11 @@ export class BlobBootstrapEngine {
   preloadContent(contentIds: string[]): void {
     if (this.holochainChecker.isConnected()) {
       this.preloadMetadata(contentIds)
-        .then((loaded) => {
-          this.state.preloadedContentIds.forEach((id) => loaded.add(id));
+        .then(loaded => {
+          this.state.preloadedContentIds.forEach(id => loaded.add(id));
           this.updateState({ preloadedContentIds: loaded });
         })
-        .catch((error) => {
+        .catch(error => {
           console.warn('[BlobBootstrapEngine] Runtime preload failed:', error);
         });
     }
@@ -335,7 +340,7 @@ export class BlobBootstrapEngine {
    */
   on<T extends BlobBootstrapEvent['type']>(
     eventType: T,
-    handler: (event: Extract<BlobBootstrapEvent, { type: T }>) => void,
+    handler: (event: Extract<BlobBootstrapEvent, { type: T }>) => void
   ): () => void {
     if (!this.listeners.has(eventType)) {
       this.listeners.set(eventType, new Set());
@@ -375,7 +380,7 @@ export class BlobBootstrapEngine {
   private emitEvent(event: BlobBootstrapEvent): void {
     const handlers = this.listeners.get(event.type);
     if (handlers) {
-      handlers.forEach((handler) => handler(event as any));
+      handlers.forEach(handler => handler(event as any));
     }
   }
 }

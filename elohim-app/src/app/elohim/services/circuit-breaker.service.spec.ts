@@ -3,7 +3,11 @@
  */
 
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { CircuitBreakerService, CircuitState, CircuitBreakerResult } from './circuit-breaker.service';
+import {
+  CircuitBreakerService,
+  CircuitState,
+  CircuitBreakerResult,
+} from './circuit-breaker.service';
 import { LoggerService } from './logger.service';
 
 describe('CircuitBreakerService', () => {
@@ -17,10 +21,7 @@ describe('CircuitBreakerService', () => {
     mockLogger.createChild.and.returnValue(mockChildLogger);
 
     TestBed.configureTestingModule({
-      providers: [
-        CircuitBreakerService,
-        { provide: LoggerService, useValue: mockLogger },
-      ],
+      providers: [CircuitBreakerService, { provide: LoggerService, useValue: mockLogger }],
     });
 
     service = TestBed.inject(CircuitBreakerService);

@@ -11,12 +11,15 @@
  * is done by Doorway. This service is a thin UI layer.
  */
 
-import { Injectable } from '@angular/core';
-import { Observable, Subject, interval } from 'rxjs';
-import { map, takeUntil, catchError } from 'rxjs/operators';
 import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
-import { ContentBlob } from '../models/content-node.model';
+import { Injectable } from '@angular/core';
+
+import { map, takeUntil, catchError } from 'rxjs/operators';
+
+import { Observable, Subject, interval } from 'rxjs';
+
 import { DoorwayClientService } from '../../elohim/services/doorway-client.service';
+import { ContentBlob } from '../models/content-node.model';
 
 /**
  * Range request options
@@ -153,7 +156,7 @@ export class BlobStreamingService {
 
   constructor(
     private http: HttpClient,
-    private doorway: DoorwayClientService,
+    private doorway: DoorwayClientService
   ) {}
 
   /**
@@ -225,7 +228,7 @@ export class BlobStreamingService {
     // Calculate average metrics from recent history
     const recent = this.performanceHistory.slice(-5);
     const avgSuccessRate = recent.reduce((sum, m) => sum + m.successRate, 0) / recent.length;
-    const congestionCount = recent.filter((m) => m.wasCongested).length;
+    const congestionCount = recent.filter(m => m.wasCongested).length;
 
     let newValue = this.maxParallelChunks;
 
@@ -233,12 +236,18 @@ export class BlobStreamingService {
       // Network issues detected - reduce parallelism
       newValue = Math.max(this.minParallelChunks, this.maxParallelChunks - 1);
       console.info(
-        `[BlobStreaming] Reducing parallelism to ${newValue} (success rate: ${(avgSuccessRate * 100).toFixed(0)}%)`,
+        `[BlobStreaming] Reducing parallelism to ${newValue} (success rate: ${(avgSuccessRate * 100).toFixed(0)}%)`
       );
-    } else if (avgSuccessRate > 0.95 && congestionCount === 0 && this.maxParallelChunks < this.maxMaxParallelChunks) {
+    } else if (
+      avgSuccessRate > 0.95 &&
+      congestionCount === 0 &&
+      this.maxParallelChunks < this.maxMaxParallelChunks
+    ) {
       // Network performing well - try to increase parallelism
       newValue = Math.min(this.maxMaxParallelChunks, this.maxParallelChunks + 1);
-      console.info(`[BlobStreaming] Increasing parallelism to ${newValue} (strong network detected)`);
+      console.info(
+        `[BlobStreaming] Increasing parallelism to ${newValue} (strong network detected)`
+      );
     }
 
     this.maxParallelChunks = newValue;
@@ -277,10 +286,12 @@ export class BlobStreamingService {
     const history = this.performanceHistory;
     return {
       parallelChunks: history.reduce((sum, m) => sum + m.parallelChunks, 0) / history.length,
-      achievedBandwidthMbps: history.reduce((sum, m) => sum + m.achievedBandwidthMbps, 0) / history.length,
+      achievedBandwidthMbps:
+        history.reduce((sum, m) => sum + m.achievedBandwidthMbps, 0) / history.length,
       successRate: history.reduce((sum, m) => sum + m.successRate, 0) / history.length,
-      avgChunkDurationMs: history.reduce((sum, m) => sum + m.avgChunkDurationMs, 0) / history.length,
-      wasCongested: history.filter((m) => m.wasCongested).length > 0,
+      avgChunkDurationMs:
+        history.reduce((sum, m) => sum + m.avgChunkDurationMs, 0) / history.length,
+      wasCongested: history.filter(m => m.wasCongested).length > 0,
     };
   }
 
@@ -308,13 +319,13 @@ export class BlobStreamingService {
     progressCallback?: (progress: StreamingProgress) => void,
     abortSignal?: AbortSignal
   ): Observable<Blob> {
-    return new Observable((subscriber) => {
+    return new Observable(subscriber => {
       this.performChunkedDownload(blob, url, progressCallback, abortSignal)
-        .then((data) => {
+        .then(data => {
           subscriber.next(new Blob([data]));
           subscriber.complete();
         })
-        .catch((error) => subscriber.error(error));
+        .catch(error => subscriber.error(error));
     });
   }
 
@@ -329,7 +340,7 @@ export class BlobStreamingService {
   ): Promise<Uint8Array> {
     const totalSize = blob.sizeBytes;
     const chunkCount = Math.ceil(totalSize / this.chunkSizeBytes);
-    const chunks: Map<number, Uint8Array> = new Map();
+    const chunks = new Map<number, Uint8Array>();
     let downloadedBytes = 0;
     const startTime = performance.now();
 
@@ -351,44 +362,41 @@ export class BlobStreamingService {
       if (downloadPromises.length >= this.maxParallelChunks) {
         await Promise.race(downloadPromises);
         downloadPromises.splice(
-          downloadPromises.findIndex((p) => p === undefined),
+          downloadPromises.findIndex(p => p === undefined),
           1
         );
       }
 
-      const chunkPromise = this.downloadChunk(
-        url,
-        i,
-        this.chunkSizeBytes,
-        totalSize
-      ).then((chunk) => {
-        chunks.set(chunk.chunkIndex, chunk.data);
-        downloadedBytes += chunk.data.length;
+      const chunkPromise = this.downloadChunk(url, i, this.chunkSizeBytes, totalSize)
+        .then(chunk => {
+          chunks.set(chunk.chunkIndex, chunk.data);
+          downloadedBytes += chunk.data.length;
 
-        if (progressCallback) {
-          const elapsed = performance.now() - startTime;
-          const speedMbps = (downloadedBytes / 1024 / 1024) / (elapsed / 1000);
+          if (progressCallback) {
+            const elapsed = performance.now() - startTime;
+            const speedMbps = downloadedBytes / 1024 / 1024 / (elapsed / 1000);
 
-          progressCallback({
-            bytesReceived: downloadedBytes,
-            totalBytes: totalSize,
-            percentComplete: (downloadedBytes / totalSize) * 100,
-            averageSpeedMbps: speedMbps,
-            estimatedTimeRemainingSeconds:
-              (totalSize - downloadedBytes) / (speedMbps * 1024 * 1024),
-            chunkIndex: i,
-            totalChunks: chunkCount,
-            isBuffering: false,
-          });
-        }
+            progressCallback({
+              bytesReceived: downloadedBytes,
+              totalBytes: totalSize,
+              percentComplete: (downloadedBytes / totalSize) * 100,
+              averageSpeedMbps: speedMbps,
+              estimatedTimeRemainingSeconds:
+                (totalSize - downloadedBytes) / (speedMbps * 1024 * 1024),
+              chunkIndex: i,
+              totalChunks: chunkCount,
+              isBuffering: false,
+            });
+          }
 
-        abortSignal?.throwIfAborted();
-      }).catch((error) => {
-        // Capture chunk download errors instead of failing entire download
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        chunkErrors.set(i, errorMsg);
-        console.warn(`[BlobStreaming] Chunk ${i} download failed: ${errorMsg}`);
-      });
+          abortSignal?.throwIfAborted();
+        })
+        .catch(error => {
+          // Capture chunk download errors instead of failing entire download
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          chunkErrors.set(i, errorMsg);
+          console.warn(`[BlobStreaming] Chunk ${i} download failed: ${errorMsg}`);
+        });
 
       downloadPromises.push(chunkPromise);
     }
@@ -404,7 +412,7 @@ export class BlobStreamingService {
       const failedList = validation.failedChunkIndices.join(', ');
       throw new Error(
         `Chunk download validation failed. Missing: [${missingList}], Failed: [${failedList}]. ` +
-        `Got ${validation.successfulChunks}/${validation.totalChunks} chunks.`
+          `Got ${validation.successfulChunks}/${validation.totalChunks} chunks.`
       );
     }
 
@@ -439,7 +447,7 @@ export class BlobStreamingService {
     const startTime = performance.now();
 
     const headers = new HttpHeaders({
-      'Range': `bytes=${startByte}-${endByte}`,
+      Range: `bytes=${startByte}-${endByte}`,
     });
 
     return new Promise((resolve, reject) => {
@@ -459,7 +467,7 @@ export class BlobStreamingService {
               durationMs,
             });
           },
-          error: (err) => reject(err),
+          error: err => reject(err),
         });
     });
   }
@@ -527,9 +535,9 @@ export class BlobStreamingService {
    * - 4xx/5xx: Error state
    */
   private async checkRangeSupport(url: string): Promise<boolean> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const headers = new HttpHeaders({
-        'Range': 'bytes=0-1', // Request exactly 2 bytes
+        Range: 'bytes=0-1', // Request exactly 2 bytes
       });
 
       this.http
@@ -543,9 +551,7 @@ export class BlobStreamingService {
             // NEVER accept 200 as Range support - that means server ignored the Range header
             const contentRange = response.headers.get('Content-Range');
             const isRangeSupported: boolean =
-              response.status === 206 &&
-              !!contentRange &&
-              contentRange.includes('0-1');
+              response.status === 206 && !!contentRange && contentRange.includes('0-1');
 
             if (response.status === 200 && response.headers.has('Accept-Ranges')) {
               // Server explicitly advertises range support but test returned 200
@@ -569,7 +575,7 @@ export class BlobStreamingService {
     return new Promise((resolve, reject) => {
       this.http.get(url, { responseType: 'arraybuffer' }).subscribe({
         next: (data: ArrayBuffer) => resolve(new Uint8Array(data)),
-        error: (err) => reject(err),
+        error: err => reject(err),
       });
     });
   }
@@ -591,26 +597,26 @@ export class BlobStreamingService {
     if (validation.missingChunkIndices.length > 0) {
       parts.push(
         `Missing chunks: [${validation.missingChunkIndices.join(', ')}] ` +
-        `(${validation.missingChunkIndices.length}/${validation.totalChunks})`
+          `(${validation.missingChunkIndices.length}/${validation.totalChunks})`
       );
     }
 
     if (validation.failedChunkIndices.length > 0) {
       const errorDetails = validation.failedChunkIndices
         .slice(0, 3) // Show first 3 errors
-        .map((idx) => `chunk ${idx}: ${validation.chunkErrors.get(idx)}`)
+        .map(idx => `chunk ${idx}: ${validation.chunkErrors.get(idx)}`)
         .join('; ');
 
       parts.push(
         `Failed chunks: ${validation.failedChunkIndices.length} ` +
-        `(${errorDetails}${validation.failedChunkIndices.length > 3 ? '...' : ''})`
+          `(${errorDetails}${validation.failedChunkIndices.length > 3 ? '...' : ''})`
       );
     }
 
     if (validation.expectedSizeBytes !== validation.actualSizeBytes) {
       parts.push(
         `Size mismatch: expected ${validation.expectedSizeBytes} bytes, ` +
-        `got ${validation.actualSizeBytes} bytes`
+          `got ${validation.actualSizeBytes} bytes`
       );
     }
 
@@ -625,7 +631,10 @@ export class BlobStreamingService {
    * @param probeSizeBytes Size of probe data (default 1 MB)
    * @returns Bandwidth measurement result
    */
-  async probeBandwidth(url: string, probeSizeBytes: number = 1024 * 1024): Promise<BandwidthProbeResult> {
+  async probeBandwidth(
+    url: string,
+    probeSizeBytes: number = 1024 * 1024
+  ): Promise<BandwidthProbeResult> {
     // Check cache
     const cached = this.bandwidthCache.get(url);
     if (cached && performance.now() - cached.timestamp < 10 * 60 * 1000) {
@@ -639,7 +648,7 @@ export class BlobStreamingService {
       // Download probe data with timing
       const data = await new Promise<ArrayBuffer>((resolve, reject) => {
         this.http.get(url, { responseType: 'arraybuffer' }).subscribe({
-          next: (data) => {
+          next: data => {
             const latency = performance.now() - latencyStartTime;
             resolve(data);
           },
@@ -666,7 +675,9 @@ export class BlobStreamingService {
 
       return result;
     } catch (error) {
-      throw new Error(`Bandwidth probe failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Bandwidth probe failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -704,9 +715,7 @@ export class BlobStreamingService {
 
     for (const tier of qualityTiers) {
       // Check if blob has this variant
-      const hasVariant = blob.variants.some(
-        (v) => v.label === tier.variant
-      );
+      const hasVariant = blob.variants.some(v => v.label === tier.variant);
       if (!hasVariant) continue;
 
       // Only consider variants that fit within bandwidth (bitrate <= maxBitrate)
@@ -801,7 +810,7 @@ export class BlobStreamingService {
    * Helper: extract width from resolution string ("1080p" -> 1920).
    */
   private extractResolutionWidth(resolution: string): number {
-    const resolutionMap: { [key: string]: number } = {
+    const resolutionMap: Record<string, number> = {
       '480p': 854,
       '720p': 1280,
       '1080p': 1920,
@@ -816,7 +825,7 @@ export class BlobStreamingService {
    * Helper: extract height from resolution string ("1080p" -> 1080).
    */
   private extractResolutionHeight(resolution: string): number {
-    const heightMap: { [key: string]: number } = {
+    const heightMap: Record<string, number> = {
       '480p': 480,
       '720p': 720,
       '1080p': 1080,

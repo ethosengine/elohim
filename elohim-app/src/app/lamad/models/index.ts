@@ -31,7 +31,7 @@ export type {
   ContentGraphMetadata,
   ContentGraphMetadata as GraphMetadata,
   ContentReach,
-  ContentFlag
+  ContentFlag,
 } from './content-node.model';
 export { ContentRelationshipType } from './content-node.model';
 
@@ -110,7 +110,7 @@ export type {
   KnowledgeMapIndexEntry,
   KnowledgeMapIndex,
   KnowledgeMapUpdate,
-  MapMergeRequest
+  MapMergeRequest,
 } from './knowledge-map.model';
 // Export RelationshipType with alias to avoid collision
 export type { RelationshipType as PersonRelationshipType } from './knowledge-map.model';
@@ -150,11 +150,7 @@ export * from './path-negotiation.model';
 
 // Human Node models (humans in the graph - stays in lamad for graph integration)
 // Export selectively to avoid collisions
-export type {
-  HumanNode,
-  HumanReach,
-  HumanRelationship
-} from './human-node.model';
+export type { HumanNode, HumanReach, HumanRelationship } from './human-node.model';
 export type { RelationshipType as HumanRelationshipType } from './human-node.model';
 export {
   RELATIONSHIP_LAYER_MAP,
@@ -163,7 +159,7 @@ export {
   getDefaultIntimacy,
   isFamilyRelationship,
   isWorkplaceRelationship,
-  isHighTrustRelationship
+  isHighTrustRelationship,
 } from './human-node.model';
 
 // ============================================================================

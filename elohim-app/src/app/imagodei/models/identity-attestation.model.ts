@@ -22,95 +22,95 @@
 
 /** Humanity attestation types for continuous identity verification */
 export const ATTESTATION_TYPES = [
-  'behavioral',   // Passive monitoring shows consistent behavior
-  'interaction',  // Direct interaction with known human
-  'video_call',   // Video verification with trusted party
-  'in_person',    // Physical presence verification
+  'behavioral', // Passive monitoring shows consistent behavior
+  'interaction', // Direct interaction with known human
+  'video_call', // Video verification with trusted party
+  'in_person', // Physical presence verification
   'elohim_check', // AI knowledge verification
 ] as const;
-export type AttestationType = typeof ATTESTATION_TYPES[number];
+export type AttestationType = (typeof ATTESTATION_TYPES)[number];
 
 /** Anomaly types detected by behavioral monitoring */
 export const ANOMALY_TYPES = [
-  'posting_pattern',    // Sudden change in posting frequency/style
-  'content_style',      // AI-detected writing style deviation
+  'posting_pattern', // Sudden change in posting frequency/style
+  'content_style', // AI-detected writing style deviation
   'relationship_change', // Rapid/mass relationship modifications
-  'geo_shift',          // Geographic location anomaly
-  'session_anomaly',    // Unusual login patterns
-  'capability_abuse',   // Excessive use of privileged operations
+  'geo_shift', // Geographic location anomaly
+  'session_anomaly', // Unusual login patterns
+  'capability_abuse', // Excessive use of privileged operations
 ] as const;
-export type AnomalyType = typeof ANOMALY_TYPES[number];
+export type AnomalyType = (typeof ANOMALY_TYPES)[number];
 
 /** Anomaly severity levels */
 export const ANOMALY_SEVERITIES = [
-  'low',      // Notable but not concerning
-  'medium',   // Warrants monitoring
-  'high',     // Should trigger alerts
+  'low', // Notable but not concerning
+  'medium', // Warrants monitoring
+  'high', // Should trigger alerts
   'critical', // Should trigger auto-freeze
 ] as const;
-export type AnomalySeverity = typeof ANOMALY_SEVERITIES[number];
+export type AnomalySeverity = (typeof ANOMALY_SEVERITIES)[number];
 
 /** Identity challenge types (community override) */
 export const CHALLENGE_TYPES = [
-  'hijack_report',   // Account appears compromised
-  'impersonation',   // Someone claiming to be this person
-  'spam',            // Posting spam/malicious content
+  'hijack_report', // Account appears compromised
+  'impersonation', // Someone claiming to be this person
+  'spam', // Posting spam/malicious content
   'anomaly_confirm', // Confirming detected anomaly
 ] as const;
-export type ChallengeType = typeof CHALLENGE_TYPES[number];
+export type ChallengeType = (typeof CHALLENGE_TYPES)[number];
 
 /** Challenge status values */
 export const CHALLENGE_STATUSES = [
-  'pending',   // Challenge open, accumulating support
-  'upheld',    // Challenge succeeded, action taken
+  'pending', // Challenge open, accumulating support
+  'upheld', // Challenge succeeded, action taken
   'dismissed', // Challenge rejected
-  'expired',   // Challenge timed out
+  'expired', // Challenge timed out
 ] as const;
-export type ChallengeStatus = typeof CHALLENGE_STATUSES[number];
+export type ChallengeStatus = (typeof CHALLENGE_STATUSES)[number];
 
 /** Key revocation reasons */
 export const REVOCATION_REASONS = [
-  'compromised',       // Key known to be compromised
-  'stolen',            // Device/key stolen
-  'challenge_upheld',  // Community challenge succeeded
-  'voluntary',         // User-initiated revocation
+  'compromised', // Key known to be compromised
+  'stolen', // Device/key stolen
+  'challenge_upheld', // Community challenge succeeded
+  'voluntary', // User-initiated revocation
 ] as const;
-export type RevocationReason = typeof REVOCATION_REASONS[number];
+export type RevocationReason = (typeof REVOCATION_REASONS)[number];
 
 /** Identity freeze types */
 export const FREEZE_TYPES = [
-  'auto_anomaly',       // Triggered by anomaly detection
+  'auto_anomaly', // Triggered by anomaly detection
   'community_challenge', // Triggered by community reports
-  'steward_emergency',  // Triggered by M-of-N steward consensus
+  'steward_emergency', // Triggered by M-of-N steward consensus
 ] as const;
-export type FreezeType = typeof FREEZE_TYPES[number];
+export type FreezeType = (typeof FREEZE_TYPES)[number];
 
 /** Capabilities that can be frozen */
 export const FREEZABLE_CAPABILITIES = [
-  'post',               // Create new content
-  'transfer',           // Transfer assets/points
+  'post', // Create new content
+  'transfer', // Transfer assets/points
   'modify_relationships', // Change relationship graph
-  'vote',               // Participate in governance votes
-  'attest',             // Issue attestations to others
+  'vote', // Participate in governance votes
+  'attest', // Issue attestations to others
 ] as const;
-export type FreezableCapability = typeof FREEZABLE_CAPABILITIES[number];
+export type FreezableCapability = (typeof FREEZABLE_CAPABILITIES)[number];
 
 /** Verification requirements to unfreeze */
 export const UNFREEZE_REQUIREMENTS = [
-  'elohim_check',      // AI knowledge verification
-  'social_recovery',   // M-of-N steward approval
+  'elohim_check', // AI knowledge verification
+  'social_recovery', // M-of-N steward approval
   'steward_interview', // Direct interview by steward
-  'time_decay',        // Auto-unfreeze after timeout (low severity only)
+  'time_decay', // Auto-unfreeze after timeout (low severity only)
 ] as const;
-export type UnfreezeRequirement = typeof UNFREEZE_REQUIREMENTS[number];
+export type UnfreezeRequirement = (typeof UNFREEZE_REQUIREMENTS)[number];
 
 /** Signing policy levels for distributed key custody */
 export const SIGNING_POLICIES = [
-  'normal',   // Standard M-of-N threshold
+  'normal', // Standard M-of-N threshold
   'elevated', // Higher threshold for sensitive ops
   'emergency', // Recovery mode (relaxed threshold)
 ] as const;
-export type SigningPolicy = typeof SIGNING_POLICIES[number];
+export type SigningPolicy = (typeof SIGNING_POLICIES)[number];
 
 // =============================================================================
 // Entry Types
@@ -125,22 +125,22 @@ export type SigningPolicy = typeof SIGNING_POLICIES[number];
  */
 export interface HumanityWitness {
   id: string;
-  humanId: string;        // Human being attested
+  humanId: string; // Human being attested
   witnessAgentId: string; // Agent providing attestation
 
   // Attestation details
   attestationType: AttestationType;
-  confidence: number;               // 0.0 - 1.0 confidence in identity
-  behavioralHash?: string;          // Hash of behavioral baseline for comparison
+  confidence: number; // 0.0 - 1.0 confidence in identity
+  behavioralHash?: string; // Hash of behavioral baseline for comparison
 
   // Evidence
-  evidenceJson?: string;            // Supporting evidence
-  verificationMethod?: string;      // How identity was verified
+  evidenceJson?: string; // Supporting evidence
+  verificationMethod?: string; // How identity was verified
 
   // Lifecycle
   createdAt: string;
-  expiresAt: string;                // Attestations decay - must be renewed
-  revokedAt?: string;               // Explicitly revoked if witness changes mind
+  expiresAt: string; // Attestations decay - must be renewed
+  revokedAt?: string; // Explicitly revoked if witness changes mind
 }
 
 /**
@@ -155,22 +155,22 @@ export interface KeyStewardship {
   humanId: string;
 
   // Shard holders
-  keyShardHolders: string[];  // Agent IDs holding key shards
-  thresholdM: number;         // M required to sign
-  totalShardsN: number;       // Total shards distributed
+  keyShardHolders: string[]; // Agent IDs holding key shards
+  thresholdM: number; // M required to sign
+  totalShardsN: number; // Total shards distributed
 
   // Policy
   signingPolicy: SigningPolicy;
   elevatedThreshold?: number; // Higher M for sensitive ops
 
   // Key metadata
-  keyGenerationId: string;       // Which key generation this stewardship covers
-  shardCommitmentHash: string;   // Commitment to verify shards
+  keyGenerationId: string; // Which key generation this stewardship covers
+  shardCommitmentHash: string; // Commitment to verify shards
 
   // Lifecycle
   createdAt: string;
   updatedAt: string;
-  rotatedAt?: string;            // Last key rotation
+  rotatedAt?: string; // Last key rotation
 }
 
 /**
@@ -188,15 +188,15 @@ export interface IdentityAnomaly {
   // Anomaly details
   anomalyType: AnomalyType;
   severity: AnomalySeverity;
-  deviationScore: number;       // 0.0 - 1.0 (1.0 = extreme deviation)
+  deviationScore: number; // 0.0 - 1.0 (1.0 = extreme deviation)
 
   // Evidence
-  evidenceJson: string;         // { baseline: {...}, current: {...}, diff: {...} }
-  detectionMethod: string;      // AI model, rule-based, etc.
+  evidenceJson: string; // { baseline: {...}, current: {...}, diff: {...} }
+  detectionMethod: string; // AI model, rule-based, etc.
 
   // Actions
   autoFreezeTriggered: boolean;
-  freezeId?: string;            // Link to IdentityFreeze if triggered
+  freezeId?: string; // Link to IdentityFreeze if triggered
 
   // Resolution
   acknowledgedAt?: string;
@@ -219,25 +219,25 @@ export interface IdentityAnomaly {
  */
 export interface IdentityChallenge {
   id: string;
-  humanId: string;              // Human being challenged
+  humanId: string; // Human being challenged
 
   // Challenge details
   challengeType: ChallengeType;
-  initiatorId: string;          // Who started the challenge
-  initiatorWeight: number;      // Weight of initial challenger
+  initiatorId: string; // Who started the challenge
+  initiatorWeight: number; // Weight of initial challenger
 
   // Evidence
-  evidenceJson: string;         // { description: "", screenshots: [], etc. }
+  evidenceJson: string; // { description: "", screenshots: [], etc. }
   supportingAnomalyId?: string; // Link to IdentityAnomaly if related
 
   // Support accumulation
-  weightedSupport: number;      // Sum of all supporter weights
-  supporterCount: number;       // Number of unique supporters
-  supportersJson: string;       // [{ agentId, weight, votedAt }]
+  weightedSupport: number; // Sum of all supporter weights
+  supporterCount: number; // Number of unique supporters
+  supportersJson: string; // [{ agentId, weight, votedAt }]
 
   // Thresholds
-  freezeThreshold: number;      // Weight needed to trigger freeze (default 10.0)
-  revokeThreshold: number;      // Weight needed to trigger revocation (default 25.0)
+  freezeThreshold: number; // Weight needed to trigger freeze (default 10.0)
+  revokeThreshold: number; // Weight needed to trigger revocation (default 25.0)
 
   // Status
   status: ChallengeStatus;
@@ -246,7 +246,7 @@ export interface IdentityChallenge {
 
   // Timestamps
   createdAt: string;
-  expiresAt: string;            // Challenges expire after timeout
+  expiresAt: string; // Challenges expire after timeout
 }
 
 /**
@@ -277,21 +277,21 @@ export interface KeyRevocation {
   humanId: string;
 
   // Revoked key
-  revokedKey: string;           // The agent_pub_key being revoked
+  revokedKey: string; // The agent_pub_key being revoked
   reason: RevocationReason;
 
   // Trigger
-  initiatedBy: string;          // challenge_id, steward consensus, or voluntary
-  triggerType: string;          // challenge, steward_vote, voluntary
+  initiatedBy: string; // challenge_id, steward consensus, or voluntary
+  triggerType: string; // challenge, steward_vote, voluntary
 
   // Steward votes
-  requiredVotes: number;        // M required for revocation
+  requiredVotes: number; // M required for revocation
   currentVotes: number;
-  votesJson: string;            // RevocationVote[]
+  votesJson: string; // RevocationVote[]
 
   // Status
   thresholdReached: boolean;
-  effectiveAt?: string;         // When revocation became active
+  effectiveAt?: string; // When revocation became active
 
   // Timestamps
   createdAt: string;
@@ -306,7 +306,7 @@ export interface RevocationVote {
   revocationId: string;
   stewardId: string;
   approved: boolean;
-  attestation: string;          // Why they're voting this way
+  attestation: string; // Why they're voting this way
   votedAt: string;
 }
 
@@ -327,8 +327,8 @@ export interface IdentityFreeze {
   severity: AnomalySeverity;
 
   // Trigger
-  triggeredBy: string;          // ID of anomaly/challenge/steward action
-  triggerType: string;          // anomaly, challenge, steward
+  triggeredBy: string; // ID of anomaly/challenge/steward action
+  triggerType: string; // anomaly, challenge, steward
 
   // Verification required
   requiresVerification: UnfreezeRequirement;
@@ -343,7 +343,7 @@ export interface IdentityFreeze {
 
   // Timestamps
   frozenAt: string;
-  expiresAt?: string;           // Auto-lift for low severity
+  expiresAt?: string; // Auto-lift for low severity
 }
 
 // =============================================================================
@@ -358,12 +358,18 @@ export interface IdentityFreeze {
  */
 export function calculateTrustWeight(intimacyLevel: string): number {
   switch (intimacyLevel) {
-    case 'intimate': return 3.0;    // Family/very close
-    case 'trusted': return 2.0;     // Close friends
-    case 'familiar': return 1.0;    // Acquaintances
-    case 'acquainted': return 0.5;  // Casual connections
-    case 'public': return 0.1;      // Public followers
-    default: return 0.0;
+    case 'intimate':
+      return 3.0; // Family/very close
+    case 'trusted':
+      return 2.0; // Close friends
+    case 'familiar':
+      return 1.0; // Acquaintances
+    case 'acquainted':
+      return 0.5; // Casual connections
+    case 'public':
+      return 0.1; // Public followers
+    default:
+      return 0.0;
   }
 }
 
@@ -417,13 +423,20 @@ export const CAPABILITY_DISPLAY = {
  */
 export function getAnomalyTypeLabel(type: AnomalyType): string {
   switch (type) {
-    case 'posting_pattern': return 'Posting Pattern Change';
-    case 'content_style': return 'Content Style Deviation';
-    case 'relationship_change': return 'Relationship Graph Change';
-    case 'geo_shift': return 'Geographic Anomaly';
-    case 'session_anomaly': return 'Session Pattern Anomaly';
-    case 'capability_abuse': return 'Capability Overuse';
-    default: return type;
+    case 'posting_pattern':
+      return 'Posting Pattern Change';
+    case 'content_style':
+      return 'Content Style Deviation';
+    case 'relationship_change':
+      return 'Relationship Graph Change';
+    case 'geo_shift':
+      return 'Geographic Anomaly';
+    case 'session_anomaly':
+      return 'Session Pattern Anomaly';
+    case 'capability_abuse':
+      return 'Capability Overuse';
+    default:
+      return type;
   }
 }
 
@@ -432,10 +445,15 @@ export function getAnomalyTypeLabel(type: AnomalyType): string {
  */
 export function getChallengeTypeLabel(type: ChallengeType): string {
   switch (type) {
-    case 'hijack_report': return 'Account Hijacking';
-    case 'impersonation': return 'Impersonation';
-    case 'spam': return 'Spam/Malicious Content';
-    case 'anomaly_confirm': return 'Confirmed Anomaly';
-    default: return type;
+    case 'hijack_report':
+      return 'Account Hijacking';
+    case 'impersonation':
+      return 'Impersonation';
+    case 'spam':
+      return 'Spam/Malicious Content';
+    case 'anomaly_confirm':
+      return 'Confirmed Anomaly';
+    default:
+      return type;
   }
 }

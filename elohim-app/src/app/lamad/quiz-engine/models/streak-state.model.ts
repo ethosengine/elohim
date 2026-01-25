@@ -106,7 +106,7 @@ export const DEFAULT_STREAK_CONFIG: StreakConfig = {
   targetStreak: 3,
   maxQuestions: 10,
   resetOnWrong: true,
-  historyLength: 10
+  historyLength: 10,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -172,7 +172,7 @@ export function createStreakState(
     recentAnswers: [],
     bestStreak: 0,
     achieved: false,
-    startedAt: new Date().toISOString()
+    startedAt: new Date().toISOString(),
   };
 }
 
@@ -209,7 +209,7 @@ export function recordAnswer(
     questionId,
     correct,
     streakAfter: newStreak,
-    answeredAt: new Date().toISOString()
+    answeredAt: new Date().toISOString(),
   };
 
   // Update history (keep last N)
@@ -223,7 +223,7 @@ export function recordAnswer(
     recentAnswers: newHistory,
     bestStreak: newBestStreak,
     achieved: achieved || state.achieved, // Once achieved, stays achieved
-    achievedAt: achieved && !state.achieved ? new Date().toISOString() : state.achievedAt
+    achievedAt: achieved && !state.achieved ? new Date().toISOString() : state.achievedAt,
   };
 }
 
@@ -254,9 +254,8 @@ export function isStreakComplete(state: StreakState): boolean {
 export function getStreakProgress(state: StreakState): StreakProgress {
   const percentage = Math.min(100, Math.round((state.currentStreak / state.targetStreak) * 100));
 
-  const questionsRemaining = state.maxQuestions > 0
-    ? Math.max(0, state.maxQuestions - state.totalAttempted)
-    : null;
+  const questionsRemaining =
+    state.maxQuestions > 0 ? Math.max(0, state.maxQuestions - state.totalAttempted) : null;
 
   // Build indicators for UI
   const indicators: StreakIndicator[] = [];
@@ -281,7 +280,7 @@ export function getStreakProgress(state: StreakState): StreakProgress {
     percentage,
     achieved: state.achieved,
     questionsRemaining,
-    indicators
+    indicators,
   };
 }
 
@@ -297,7 +296,7 @@ export function resetStreak(state: StreakState): StreakState {
     recentAnswers: [],
     achieved: false,
     achievedAt: undefined,
-    startedAt: new Date().toISOString()
+    startedAt: new Date().toISOString(),
   };
 }
 

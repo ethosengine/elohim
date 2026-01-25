@@ -1,6 +1,11 @@
 import { Injectable, Optional, OnDestroy } from '@angular/core';
-import { BehaviorSubject, Observable, Subject } from 'rxjs';
+
 import { takeUntil } from 'rxjs/operators';
+
+import { BehaviorSubject, Observable, Subject } from 'rxjs';
+
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { ContentNode } from '@app/lamad/models/content-node.model';
 import {
   HumanAffinity,
   AffinityStats,
@@ -8,8 +13,6 @@ import {
   CategoryAffinityStats,
   TypeAffinityStats,
 } from '@app/qahal/models/human-affinity.model';
-import { ContentNode } from '@app/lamad/models/content-node.model';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
 /**
  * Service for tracking human affinity (relationship strength) to content nodes.
@@ -31,24 +34,17 @@ export class AffinityTrackingService implements OnDestroy {
   private readonly AUTO_INCREMENT_DELTA = 0.2; // Bump on first view
   private readonly AUTO_INCREMENT_THRESHOLD = 0.01; // Only auto-increment if below this
 
-  private readonly affinitySubject = new BehaviorSubject<HumanAffinity>(
-    this.loadFromStorage()
-  );
+  private readonly affinitySubject = new BehaviorSubject<HumanAffinity>(this.loadFromStorage());
   private readonly changeSubject = new BehaviorSubject<AffinityChangeEvent | null>(null);
 
-  public readonly affinity$: Observable<HumanAffinity> =
-    this.affinitySubject.asObservable();
+  public readonly affinity$: Observable<HumanAffinity> = this.affinitySubject.asObservable();
   public readonly changes$: Observable<AffinityChangeEvent | null> =
     this.changeSubject.asObservable();
 
-  constructor(
-    @Optional() private readonly sessionHumanService: SessionHumanService | null
-  ) {
+  constructor(@Optional() private readonly sessionHumanService: SessionHumanService | null) {
     // Re-load if session changes
     if (this.sessionHumanService) {
-      this.sessionHumanService.session$.pipe(
-        takeUntil(this.destroy$)
-      ).subscribe(session => {
+      this.sessionHumanService.session$.pipe(takeUntil(this.destroy$)).subscribe(session => {
         if (session) {
           const loaded = this.loadFromStorage();
           this.affinitySubject.next(loaded);
@@ -179,7 +175,7 @@ export class AffinityTrackingService implements OnDestroy {
     const categoryMap = new Map<string, number[]>();
     const typeMap = new Map<string, number[]>();
 
-    nodes.forEach((node) => {
+    nodes.forEach(node => {
       const nodeAffinity = affinity[node.id] || 0.0;
 
       // Track engagement
@@ -217,9 +213,8 @@ export class AffinityTrackingService implements OnDestroy {
     // Calculate category stats
     const byCategory = new Map<string, CategoryAffinityStats>();
     categoryMap.forEach((affinities, category) => {
-      const engaged = affinities.filter((a) => a > 0).length;
-      const avg =
-        affinities.reduce((sum, a) => sum + a, 0) / affinities.length;
+      const engaged = affinities.filter(a => a > 0).length;
+      const avg = affinities.reduce((sum, a) => sum + a, 0) / affinities.length;
       byCategory.set(category, {
         category,
         nodeCount: affinities.length,
@@ -231,9 +226,8 @@ export class AffinityTrackingService implements OnDestroy {
     // Calculate type stats
     const byType = new Map<string, TypeAffinityStats>();
     typeMap.forEach((affinities, type) => {
-      const engaged = affinities.filter((a) => a > 0).length;
-      const avg =
-        affinities.reduce((sum, a) => sum + a, 0) / affinities.length;
+      const engaged = affinities.filter(a => a > 0).length;
+      const avg = affinities.reduce((sum, a) => sum + a, 0) / affinities.length;
       byType.set(type, {
         type,
         nodeCount: affinities.length,

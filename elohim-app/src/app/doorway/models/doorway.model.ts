@@ -13,7 +13,13 @@
 /**
  * Health status of a node
  */
-export type NodeStatus = 'discovered' | 'registering' | 'online' | 'degraded' | 'offline' | 'failed';
+export type NodeStatus =
+  | 'discovered'
+  | 'registering'
+  | 'online'
+  | 'degraded'
+  | 'offline'
+  | 'failed';
 
 /**
  * Steward tier levels
@@ -245,8 +251,23 @@ export interface ClusterSnapshot {
  */
 export type DashboardMessage =
   | { type: 'initial_state'; timestamp: string; nodes: NodeSnapshot[]; cluster: ClusterSnapshot }
-  | { type: 'node_update'; timestamp: string; nodeId: string; status: string; combinedScore: number; changes: string[] }
-  | { type: 'cluster_update'; timestamp: string; onlineNodes: number; totalNodes: number; healthRatio: number; avgTrustScore: number; avgImpactScore: number }
+  | {
+      type: 'node_update';
+      timestamp: string;
+      nodeId: string;
+      status: string;
+      combinedScore: number;
+      changes: string[];
+    }
+  | {
+      type: 'cluster_update';
+      timestamp: string;
+      onlineNodes: number;
+      totalNodes: number;
+      healthRatio: number;
+      avgTrustScore: number;
+      avgImpactScore: number;
+    }
   | { type: 'heartbeat'; timestamp: string; intervalSecs: number }
   | { type: 'pong'; timestamp: string }
   | { type: 'error'; message: string };
@@ -267,7 +288,16 @@ export type ClientMessage =
  * Get display name for reach level
  */
 export function reachLevelName(level: number): string {
-  const names = ['Private', 'Invited', 'Local', 'Neighborhood', 'Municipal', 'Bioregional', 'Regional', 'Commons'];
+  const names = [
+    'Private',
+    'Invited',
+    'Local',
+    'Neighborhood',
+    'Municipal',
+    'Bioregional',
+    'Regional',
+    'Commons',
+  ];
   return names[level] ?? `Level ${level}`;
 }
 
@@ -276,13 +306,20 @@ export function reachLevelName(level: number): string {
  */
 export function statusColor(status: NodeStatus): string {
   switch (status) {
-    case 'online': return 'text-green-600';
-    case 'degraded': return 'text-yellow-600';
-    case 'offline': return 'text-gray-500';
-    case 'failed': return 'text-red-600';
-    case 'discovered': return 'text-blue-400';
-    case 'registering': return 'text-blue-600';
-    default: return 'text-gray-400';
+    case 'online':
+      return 'text-green-600';
+    case 'degraded':
+      return 'text-yellow-600';
+    case 'offline':
+      return 'text-gray-500';
+    case 'failed':
+      return 'text-red-600';
+    case 'discovered':
+      return 'text-blue-400';
+    case 'registering':
+      return 'text-blue-600';
+    default:
+      return 'text-gray-400';
   }
 }
 
@@ -291,10 +328,15 @@ export function statusColor(status: NodeStatus): string {
  */
 export function tierColor(tier: StewardTier | null): string {
   switch (tier) {
-    case 'pioneer': return 'text-purple-600';
-    case 'steward': return 'text-indigo-600';
-    case 'guardian': return 'text-blue-600';
-    case 'caretaker': return 'text-green-600';
-    default: return 'text-gray-500';
+    case 'pioneer':
+      return 'text-purple-600';
+    case 'steward':
+      return 'text-indigo-600';
+    case 'guardian':
+      return 'text-blue-600';
+    case 'caretaker':
+      return 'text-green-600';
+    default:
+      return 'text-gray-500';
   }
 }

@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+
 import { PathIndexEntry } from '../models/learning-path.model';
 
 /**
@@ -9,7 +10,6 @@ import { PathIndexEntry } from '../models/learning-path.model';
  */
 @Injectable({ providedIn: 'root' })
 export class PathFilterService {
-
   /**
    * Get featured paths for homepage display.
    * Returns a limited number of paths, prioritizing:
@@ -17,7 +17,7 @@ export class PathFilterService {
    * 2. Paths with certain featured tags
    * 3. Most recently updated (by order in index)
    */
-  getFeaturedPaths(paths: PathIndexEntry[], limit: number = 6): PathIndexEntry[] {
+  getFeaturedPaths(paths: PathIndexEntry[], limit = 6): PathIndexEntry[] {
     if (paths.length <= limit) {
       return paths;
     }
@@ -25,7 +25,7 @@ export class PathFilterService {
     // Priority scoring for featured selection
     const scored = paths.map(path => ({
       path,
-      score: this.calculateFeaturedScore(path)
+      score: this.calculateFeaturedScore(path),
     }));
 
     // Sort by score descending, then take top N
@@ -41,9 +41,7 @@ export class PathFilterService {
       return paths;
     }
     const tagSet = new Set(tags.map(t => t.toLowerCase()));
-    return paths.filter(path =>
-      path.tags?.some(t => tagSet.has(t.toLowerCase()))
-    );
+    return paths.filter(path => path.tags?.some(t => tagSet.has(t.toLowerCase())));
   }
 
   /**
@@ -51,7 +49,7 @@ export class PathFilterService {
    */
   filterByDifficulty(
     paths: PathIndexEntry[],
-    levels: Array<'beginner' | 'intermediate' | 'advanced'>
+    levels: ('beginner' | 'intermediate' | 'advanced')[]
   ): PathIndexEntry[] {
     if (!levels.length) {
       return paths;
@@ -75,10 +73,11 @@ export class PathFilterService {
       return paths;
     }
     const lowerQuery = query.toLowerCase();
-    return paths.filter(path =>
-      path.title.toLowerCase().includes(lowerQuery) ||
-      path.description.toLowerCase().includes(lowerQuery) ||
-      path.tags?.some(t => t.toLowerCase().includes(lowerQuery))
+    return paths.filter(
+      path =>
+        path.title.toLowerCase().includes(lowerQuery) ||
+        path.description.toLowerCase().includes(lowerQuery) ||
+        path.tags?.some(t => t.toLowerCase().includes(lowerQuery))
     );
   }
 
@@ -99,7 +98,13 @@ export class PathFilterService {
     }
 
     // Paths with featured-related tags get a boost
-    const featuredTags = ['featured', 'introduction', 'getting-started', 'overview', 'beginner-friendly'];
+    const featuredTags = [
+      'featured',
+      'introduction',
+      'getting-started',
+      'overview',
+      'beginner-friendly',
+    ];
     const pathTagsLower = path.tags?.map(t => t.toLowerCase()) ?? [];
     for (const tag of featuredTags) {
       if (pathTagsLower.includes(tag)) {

@@ -27,7 +27,7 @@ export { PerseusRendererComponent } from './perseus-renderer.component';
 export {
   registerPerseusElement,
   isPerseusElementRegistered,
-  getPerseusElement
+  getPerseusElement,
 } from './perseus-element-loader';
 export type { PerseusQuestionElement } from './perseus-element-loader';
 

@@ -29,11 +29,13 @@ describe('HealthCheckService', () => {
     ]);
     mockIndexedDbCache.init.and.returnValue(Promise.resolve(true));
     mockIndexedDbCache.isAvailable.and.returnValue(true);
-    mockIndexedDbCache.getStats.and.returnValue(Promise.resolve({
-      contentCount: 10,
-      pathCount: 5,
-      isAvailable: true,
-    }));
+    mockIndexedDbCache.getStats.and.returnValue(
+      Promise.resolve({
+        contentCount: 10,
+        pathCount: 5,
+        isAvailable: true,
+      })
+    );
 
     const mockChildLogger = {
       debug: jasmine.createSpy('debug'),
@@ -46,7 +48,9 @@ describe('HealthCheckService', () => {
       }),
     };
     mockLogger = jasmine.createSpyObj('LoggerService', ['createChild']);
-    mockLogger.createChild.and.returnValue(mockChildLogger as unknown as ReturnType<LoggerService['createChild']>);
+    mockLogger.createChild.and.returnValue(
+      mockChildLogger as unknown as ReturnType<LoggerService['createChild']>
+    );
 
     TestBed.configureTestingModule({
       providers: [
@@ -181,8 +185,9 @@ describe('HealthCheckService', () => {
       const beforeCheck = new Date().toISOString();
       await service.refresh();
       const status = service.status();
-      expect(new Date(status.lastChecked).getTime())
-        .toBeGreaterThanOrEqual(new Date(beforeCheck).getTime());
+      expect(new Date(status.lastChecked).getTime()).toBeGreaterThanOrEqual(
+        new Date(beforeCheck).getTime()
+      );
     });
   });
 

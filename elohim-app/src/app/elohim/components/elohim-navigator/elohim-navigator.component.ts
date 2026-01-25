@@ -1,19 +1,23 @@
-import { Component, OnInit, OnDestroy, Input, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink, Router, NavigationEnd } from '@angular/router';
+import { Component, OnInit, OnDestroy, Input, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Subject } from 'rxjs';
+import { RouterLink, Router, NavigationEnd } from '@angular/router';
+
 import { filter, takeUntil } from 'rxjs/operators';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
-import { SessionHuman, HolochainUpgradePrompt } from '@app/imagodei/models/session-human.model';
-import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { EdgeNodeDisplayInfo } from '@app/elohim/models/holochain-connection.model';
-import { SovereigntyBadgeComponent } from '@app/lamad/components/sovereignty-badge/sovereignty-badge.component';
-import { IdentityService } from '@app/imagodei/services/identity.service';
-import { AuthService } from '@app/imagodei/services/auth.service';
+
+import { Subject } from 'rxjs';
+
 import { RunningContextService } from '@app/doorway/services/running-context.service';
+import { EdgeNodeDisplayInfo } from '@app/elohim/models/holochain-connection.model';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { ConnectionIndicatorComponent } from '@app/imagodei/components/connection-indicator/connection-indicator.component';
+import { SessionHuman, HolochainUpgradePrompt } from '@app/imagodei/models/session-human.model';
+import { AuthService } from '@app/imagodei/services/auth.service';
+import { IdentityService } from '@app/imagodei/services/identity.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SovereigntyBadgeComponent } from '@app/lamad/components/sovereignty-badge/sovereignty-badge.component';
+
+import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
 
 /**
  * Context app identifiers for the Elohim Protocol
@@ -44,9 +48,16 @@ export interface ContextAppConfig {
 @Component({
   selector: 'app-elohim-navigator',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, ThemeToggleComponent, SovereigntyBadgeComponent, ConnectionIndicatorComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    FormsModule,
+    ThemeToggleComponent,
+    SovereigntyBadgeComponent,
+    ConnectionIndicatorComponent,
+  ],
   templateUrl: './elohim-navigator.component.html',
-  styleUrls: ['./elohim-navigator.component.css']
+  styleUrls: ['./elohim-navigator.component.css'],
 })
 export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   /** Current context app */
@@ -81,7 +92,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       icon: '📚',
       route: '/lamad',
       tagline: 'Learning & Content',
-      available: true
+      available: true,
     },
     {
       id: 'community',
@@ -89,7 +100,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       icon: '👥',
       route: '/community',
       tagline: 'Community & Governance',
-      available: true
+      available: true,
     },
     {
       id: 'shefa',
@@ -97,8 +108,8 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       icon: '✨',
       route: '/shefa',
       tagline: 'Economics of Flourishing',
-      available: true
-    }
+      available: true,
+    },
   ];
 
   /** Doorway context app (only for always-on nodes with web hosting) */
@@ -108,7 +119,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
     icon: '🌐',
     route: '/doorway',
     tagline: 'Web Hosting Configuration',
-    available: true
+    available: true,
   };
 
   /** Running context service - determines if operator mode is available */
@@ -183,12 +194,14 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
     });
 
     // Close trays on navigation
-    this.router.events.pipe(
-      filter(event => event instanceof NavigationEnd),
-      takeUntil(this.destroy$)
-    ).subscribe(() => {
-      this.closeAllTrays();
-    });
+    this.router.events
+      .pipe(
+        filter(event => event instanceof NavigationEnd),
+        takeUntil(this.destroy$)
+      )
+      .subscribe(() => {
+        this.closeAllTrays();
+      });
 
     // Close trays on click outside
     document.addEventListener('click', this.handleOutsideClick.bind(this));
@@ -300,7 +313,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   onSearch(): void {
     if (this.searchQuery.trim()) {
       this.router.navigate([`/${this.context}/search`], {
-        queryParams: { q: this.searchQuery }
+        queryParams: { q: this.searchQuery },
       });
     }
   }
@@ -393,7 +406,10 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   private handleOutsideClick(event: Event): void {
     const target = event.target as HTMLElement;
-    if (!target.closest('.profile-bubble-container') && !target.closest('.context-switcher-container')) {
+    if (
+      !target.closest('.profile-bubble-container') &&
+      !target.closest('.context-switcher-container')
+    ) {
       this.closeAllTrays();
     }
   }

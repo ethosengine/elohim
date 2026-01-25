@@ -1,3 +1,4 @@
+import { CommonModule, DOCUMENT } from '@angular/common';
 import {
   Component,
   OnInit,
@@ -8,36 +9,50 @@ import {
   inject,
   AfterViewChecked,
   HostListener,
-  Inject
+  Inject,
 } from '@angular/core';
-import { CommonModule, DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { Subject, Subscription, forkJoin, of } from 'rxjs';
+
 import { takeUntil, catchError } from 'rxjs/operators';
+
+import { Subject, Subscription, forkJoin, of } from 'rxjs';
+
+import { TrustBadge } from '@app/elohim/models/trust-badge.model';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { AgentService } from '@app/elohim/services/agent.service';
-import { ContentService } from '../../services/content.service';
 import {
   DataLoaderService,
   ChallengeRecord,
   DiscussionRecord,
-  GovernanceStateRecord
+  GovernanceStateRecord,
 } from '@app/elohim/services/data-loader.service';
-import { GovernanceService } from '@app/elohim/services/governance.service';
 import {
   GovernanceSignalService,
   AggregatedSignals,
 } from '@app/elohim/services/governance-signal.service';
+import { GovernanceService } from '@app/elohim/services/governance.service';
+import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
+import {
+  EmotionalReactionType,
+  FeedbackProfile,
+  DEFAULT_FEEDBACK_PROFILES,
+  createProfileFromTemplate,
+} from '@app/lamad/models/feedback-profile.model';
+import {
+  GraduatedFeedbackComponent,
+  FeedbackContext,
+} from '@app/qahal/components/graduated-feedback/graduated-feedback.component';
+import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
+
 import { SeoService } from '../../../services/seo.service';
 import { ContentNode } from '../../models/content-node.model';
+import { ContentService } from '../../services/content.service';
+
 import {
   RendererRegistryService,
   ContentRenderer,
-  RendererCompletionEvent
+  RendererCompletionEvent,
 } from '../../renderers/renderer-registry.service';
-
-import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
-import { TrustBadge } from '@app/elohim/models/trust-badge.model';
 
 // Content I/O for download functionality
 import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';
@@ -46,20 +61,12 @@ import { ContentEditorService } from '../../content-io/services/content-editor.s
 // Exploration components
 import { PathContextService } from '../../services/path-context.service';
 import { PathContext } from '../../models/exploration-context.model';
+import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 
 // Governance feedback components
-import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
-import { GraduatedFeedbackComponent, FeedbackContext } from '@app/qahal/components/graduated-feedback/graduated-feedback.component';
-import {
-  EmotionalReactionType,
-  FeedbackProfile,
-  DEFAULT_FEEDBACK_PROFILES,
-  createProfileFromTemplate,
-} from '@app/lamad/models/feedback-profile.model';
 
 // Focused view toggle for immersive content
-import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 
 @Component({
   selector: 'app-content-viewer',
@@ -104,7 +111,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   showFeedbackSection = true;
 
   // "Appears in paths" back-links (Wikipedia-style)
-  containingPaths: Array<{ pathId: string; pathTitle: string; stepIndex: number }> = [];
+  containingPaths: { pathId: string; pathTitle: string; stepIndex: number }[] = [];
   loadingPaths = false;
 
   // Edit capability
@@ -152,7 +159,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
   ngOnInit(): void {
     // Handle direct content access: /lamad/resource/:resourceId
-    this.route.params.pipe(takeUntil(this.destroy$)).subscribe((params) => {
+    this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
       const resourceId = params['resourceId'];
       if (resourceId) {
         this.nodeId = resourceId;
@@ -161,21 +168,18 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     });
 
     // Listen for affinity changes
-    this.affinityService.changes$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe((change) => {
-        if (change && change.nodeId === this.nodeId) {
-          this.affinity = change.newValue;
-        }
-      });
+    this.affinityService.changes$.pipe(takeUntil(this.destroy$)).subscribe(change => {
+      if (change && change.nodeId === this.nodeId) {
+        this.affinity = change.newValue;
+      }
+    });
 
     // Subscribe to path context for return navigation
-    this.pathContextService.context$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe((context) => {
-        this.pathContext = context;
-        this.hasReturnPath = context !== null && context.detourStack !== undefined && context.detourStack.length > 0;
-      });
+    this.pathContextService.context$.pipe(takeUntil(this.destroy$)).subscribe(context => {
+      this.pathContext = context;
+      this.hasReturnPath =
+        context !== null && context.detourStack !== undefined && context.detourStack.length > 0;
+    });
   }
 
   ngOnDestroy(): void {
@@ -240,8 +244,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     // Subscribe to completion events if the renderer supports them
     const instance = this.rendererRef.instance as any;
     if (instance.complete) {
-      this.rendererSubscription = instance.complete.subscribe(
-        (event: RendererCompletionEvent) => this.onRendererComplete(event)
+      this.rendererSubscription = instance.complete.subscribe((event: RendererCompletionEvent) =>
+        this.onRendererComplete(event)
       );
     }
   }
@@ -257,27 +261,27 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     // Map completion result to affinity delta
     // Passing increases affinity more than failing
     const affinityDelta = event.passed
-      ? 0.3 + (event.score / 100) * 0.2  // 0.3 to 0.5 for passing
-      : 0.1;                              // Small bump for attempting
+      ? 0.3 + (event.score / 100) * 0.2 // 0.3 to 0.5 for passing
+      : 0.1; // Small bump for attempting
 
     this.affinityService.incrementAffinity(this.nodeId, affinityDelta);
 
     // Emit governance signal for content effectiveness tracking
-    this.signalService.recordInteractiveCompletion({
-      contentId: this.nodeId,
-      interactionType: event.type,
-      passed: event.passed,
-      score: event.score,
-      details: event.details,
-    }).subscribe();
+    this.signalService
+      .recordInteractiveCompletion({
+        contentId: this.nodeId,
+        interactionType: event.type,
+        passed: event.passed,
+        score: event.score,
+        details: event.details,
+      })
+      .subscribe();
 
     // Check if this triggers an attestation suggestion
     const attempts = (event.details?.['attempts'] as number) ?? 1;
-    this.signalService.checkAttestationTrigger(
-      this.nodeId,
-      event.score / 100,
-      attempts
-    ).subscribe();
+    this.signalService
+      .checkAttestationTrigger(this.nodeId, event.score / 100, attempts)
+      .subscribe();
   }
 
   /**
@@ -287,68 +291,71 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     this.isLoading = true;
     this.error = null;
 
-    this.dataLoader.getContent(nodeId).pipe(takeUntil(this.destroy$)).subscribe({
-      next: (contentNode) => {
-        if (!contentNode) {
-          this.error = 'Content not found';
+    this.dataLoader
+      .getContent(nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: contentNode => {
+          if (!contentNode) {
+            this.error = 'Content not found';
+            this.isLoading = false;
+            return;
+          }
+
+          // Set ContentNode
+          this.node = contentNode;
+
+          // Check if content is editable
+          this.canEditContent = this.editorService.canEdit(contentNode);
+
+          // Update SEO metadata for this content
+          this.seoService.updateForContent({
+            id: contentNode.id,
+            title: contentNode.title,
+            summary: contentNode.description,
+            contentType: contentNode.contentType,
+            thumbnailUrl: contentNode.metadata?.['thumbnailUrl'],
+            authors: contentNode.metadata?.['authors'],
+            createdAt: contentNode.createdAt,
+            updatedAt: contentNode.updatedAt,
+          });
+
+          // Get current affinity
+          this.affinity = this.affinityService.getAffinity(nodeId);
+
+          // Auto-track view (increment if first time)
+          this.affinityService.trackView(nodeId);
+
+          // Mark content as "seen" for mastery tracking
+          this.agentService.markContentSeen(nodeId).pipe(takeUntil(this.destroy$)).subscribe();
+
+          // Load related nodes
+          this.loadRelatedNodes(contentNode.relatedNodeIds);
+
+          // Load containing paths (Wikipedia-style "appears in" back-links)
+          this.loadContainingPaths(nodeId);
+
+          // Load trust badge data for Attestations tab
+          this.loadTrustBadge(nodeId);
+
+          // Load governance data for Governance tab
+          this.loadGovernanceData(nodeId);
+
+          // Load feedback profile and aggregated signals
+          this.loadFeedbackProfile(contentNode);
+          this.loadAggregatedSignals(nodeId);
+
           this.isLoading = false;
-          return;
-        }
 
-        // Set ContentNode
-        this.node = contentNode;
-
-        // Check if content is editable
-        this.canEditContent = this.editorService.canEdit(contentNode);
-
-        // Update SEO metadata for this content
-        this.seoService.updateForContent({
-          id: contentNode.id,
-          title: contentNode.title,
-          summary: contentNode.description,
-          contentType: contentNode.contentType,
-          thumbnailUrl: contentNode.metadata?.['thumbnailUrl'],
-          authors: contentNode.metadata?.['authors'],
-          createdAt: contentNode.createdAt,
-          updatedAt: contentNode.updatedAt
-        });
-
-        // Get current affinity
-        this.affinity = this.affinityService.getAffinity(nodeId);
-
-        // Auto-track view (increment if first time)
-        this.affinityService.trackView(nodeId);
-
-        // Mark content as "seen" for mastery tracking
-        this.agentService.markContentSeen(nodeId).pipe(takeUntil(this.destroy$)).subscribe();
-
-        // Load related nodes
-        this.loadRelatedNodes(contentNode.relatedNodeIds);
-
-        // Load containing paths (Wikipedia-style "appears in" back-links)
-        this.loadContainingPaths(nodeId);
-
-        // Load trust badge data for Attestations tab
-        this.loadTrustBadge(nodeId);
-
-        // Load governance data for Governance tab
-        this.loadGovernanceData(nodeId);
-
-        // Load feedback profile and aggregated signals
-        this.loadFeedbackProfile(contentNode);
-        this.loadAggregatedSignals(nodeId);
-
-        this.isLoading = false;
-
-        // Schedule renderer loading for next change detection cycle
-        // The AfterViewChecked hook will load it once the ViewChild is available
-        this.pendingRendererLoad = true;
-      },
-      error: () => {
-        this.error = 'Failed to load content';
-        this.isLoading = false;
-      },
-    });
+          // Schedule renderer loading for next change detection cycle
+          // The AfterViewChecked hook will load it once the ViewChild is available
+          this.pendingRendererLoad = true;
+        },
+        error: () => {
+          this.error = 'Failed to load content';
+          this.isLoading = false;
+        },
+      });
   }
 
   /**
@@ -358,16 +365,17 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     this.loadingPaths = true;
     this.containingPaths = [];
 
-    this.contentService.getContainingPathsSummary(nodeId)
+    this.contentService
+      .getContainingPathsSummary(nodeId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (paths) => {
+        next: paths => {
           this.containingPaths = paths;
           this.loadingPaths = false;
         },
         error: () => {
           this.loadingPaths = false;
-        }
+        },
       });
   }
 
@@ -378,16 +386,17 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     this.isLoadingTrust = true;
     this.trustBadge = null;
 
-    this.trustBadgeService.getBadge(nodeId)
+    this.trustBadgeService
+      .getBadge(nodeId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (badge) => {
+        next: badge => {
           this.trustBadge = badge;
           this.isLoadingTrust = false;
         },
         error: () => {
           this.isLoadingTrust = false;
-        }
+        },
       });
   }
 
@@ -401,40 +410,43 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     this.discussions = [];
 
     // Load governance state
-    this.governanceService.getGovernanceState('content', nodeId)
+    this.governanceService
+      .getGovernanceState('content', nodeId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (state) => {
+        next: state => {
           this.governanceState = state;
         },
         error: () => {
           // Governance state is optional - content may not have explicit state
-        }
+        },
       });
 
     // Load challenges for this content
-    this.governanceService.getChallengesForEntity('content', nodeId)
+    this.governanceService
+      .getChallengesForEntity('content', nodeId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (challenges) => {
+        next: challenges => {
           this.challenges = challenges;
           this.isLoadingGovernance = false;
         },
         error: () => {
           this.isLoadingGovernance = false;
-        }
+        },
       });
 
     // Load discussions for this content
-    this.governanceService.getDiscussionsForEntity('content', nodeId)
+    this.governanceService
+      .getDiscussionsForEntity('content', nodeId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (discussions) => {
+        next: discussions => {
           this.discussions = discussions;
         },
         error: () => {
           // Discussions are optional
-        }
+        },
       });
   }
 
@@ -463,7 +475,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       this.feedbackContext = this.determineFeedbackContext(node);
 
       // Check if feedback should be shown (view-only profile hides feedback)
-      this.showFeedbackSection = this.feedbackProfile.permittedMechanisms.length > 0 &&
+      this.showFeedbackSection =
+        this.feedbackProfile.permittedMechanisms.length > 0 &&
         !this.feedbackProfile.permittedMechanisms.includes('view-only');
     } else {
       // Default to learning content profile
@@ -479,19 +492,19 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
    */
   mapContentTypeToProfileType(contentType: string): string {
     const mapping: Record<string, string> = {
-      'epic': 'learning-content',
-      'feature': 'learning-content',
-      'scenario': 'learning-content',
-      'tutorial': 'learning-content',
-      'guide': 'learning-content',
-      'concept': 'learning-content',
-      'lesson': 'learning-content',
-      'research': 'research-content',
-      'paper': 'research-content',
-      'testimony': 'personal-testimony',
-      'story': 'personal-testimony',
-      'announcement': 'community-announcement',
-      'proposal': 'governance-proposal',
+      epic: 'learning-content',
+      feature: 'learning-content',
+      scenario: 'learning-content',
+      tutorial: 'learning-content',
+      guide: 'learning-content',
+      concept: 'learning-content',
+      lesson: 'learning-content',
+      research: 'research-content',
+      paper: 'research-content',
+      testimony: 'personal-testimony',
+      story: 'personal-testimony',
+      announcement: 'community-announcement',
+      proposal: 'governance-proposal',
     };
     return mapping[contentType.toLowerCase()] || 'learning-content';
   }
@@ -519,16 +532,17 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
    * Load aggregated governance signals for content.
    */
   private loadAggregatedSignals(nodeId: string): void {
-    this.signalService.getContentSignals(nodeId)
+    this.signalService
+      .getContentSignals(nodeId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (signals) => {
+        next: signals => {
           this.aggregatedSignals = signals;
         },
         error: () => {
           // Signals are optional
           this.aggregatedSignals = null;
-        }
+        },
       });
   }
 
@@ -542,17 +556,17 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   getGovernanceStatusLabel(): string {
     const status = this.governanceState?.status || 'unreviewed';
     const labels: Record<string, string> = {
-      'unreviewed': 'Unreviewed',
+      unreviewed: 'Unreviewed',
       'auto-approved': 'Auto-Approved',
       'community-reviewed': 'Community Reviewed',
       'elohim-reviewed': 'Elohim Reviewed',
-      'challenged': 'Under Challenge',
-      'restricted': 'Restricted',
-      'suspended': 'Suspended',
-      'removed': 'Removed',
-      'appealing': 'Under Appeal',
-      'restored': 'Restored',
-      'constitutional': 'Constitutional'
+      challenged: 'Under Challenge',
+      restricted: 'Restricted',
+      suspended: 'Suspended',
+      removed: 'Removed',
+      appealing: 'Under Appeal',
+      restored: 'Restored',
+      constitutional: 'Constitutional',
     };
     return labels[status] || status;
   }
@@ -563,17 +577,17 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   getGovernanceStatusIcon(): string {
     const status = this.governanceState?.status || 'unreviewed';
     const icons: Record<string, string> = {
-      'unreviewed': '❓',
+      unreviewed: '❓',
       'auto-approved': '🤖',
       'community-reviewed': '👥',
       'elohim-reviewed': '✓',
-      'challenged': '⚠️',
-      'restricted': '🔒',
-      'suspended': '⏸️',
-      'removed': '🚫',
-      'appealing': '⚖️',
-      'restored': '↩️',
-      'constitutional': '📜'
+      challenged: '⚠️',
+      restricted: '🔒',
+      suspended: '⏸️',
+      removed: '🚫',
+      appealing: '⚖️',
+      restored: '↩️',
+      constitutional: '📜',
     };
     return icons[status] || '❓';
   }
@@ -615,7 +629,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
-        day: 'numeric'
+        day: 'numeric',
       });
     } catch {
       return 'Invalid date';
@@ -656,18 +670,20 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     }
 
     // Load related nodes in parallel (limit to 5)
-    const loadObservables = relatedIds.slice(0, 5).map(id =>
-      this.dataLoader.getContent(id).pipe(catchError(() => of(null)))
-    );
+    const loadObservables = relatedIds
+      .slice(0, 5)
+      .map(id => this.dataLoader.getContent(id).pipe(catchError(() => of(null))));
 
-    forkJoin(loadObservables).pipe(takeUntil(this.destroy$)).subscribe({
-      next: (nodes) => {
-        this.relatedNodes = nodes.filter((n): n is ContentNode => n !== null);
-      },
-      error: () => {
-        this.relatedNodes = [];
-      }
-    });
+    forkJoin(loadObservables)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: nodes => {
+          this.relatedNodes = nodes.filter((n): n is ContentNode => n !== null);
+        },
+        error: () => {
+          this.relatedNodes = [];
+        },
+      });
   }
 
   /**
@@ -812,7 +828,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
         fromContentId: this.nodeId,
         toContentId: nodeId,
         detourType: 'related',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
@@ -832,7 +848,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
         fromContentId: this.nodeId,
         toContentId: this.nodeId,
         detourType: 'graph-explore',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
@@ -840,11 +856,13 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     this.router.navigate(['/lamad/explore'], {
       queryParams: {
         focus: this.nodeId,
-        ...(this.pathContext ? {
-          fromPath: this.pathContext.pathId,
-          returnStep: this.pathContext.stepIndex
-        } : {})
-      }
+        ...(this.pathContext
+          ? {
+              fromPath: this.pathContext.pathId,
+              returnStep: this.pathContext.stepIndex,
+            }
+          : {}),
+      },
     });
   }
 

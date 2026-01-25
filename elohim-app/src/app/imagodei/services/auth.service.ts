@@ -23,6 +23,7 @@
  */
 
 import { Injectable, signal, computed, inject } from '@angular/core';
+
 import {
   type AuthState,
   type AuthProvider,
@@ -38,6 +39,7 @@ import {
   parseExpiryDate,
   isTokenExpiringSoon,
 } from '../models/auth.model';
+
 import { DoorwayRegistryService } from './doorway-registry.service';
 
 // =============================================================================
@@ -393,7 +395,10 @@ export class AuthService {
   /**
    * Handle successful authentication.
    */
-  private handleAuthSuccess(result: AuthResult & { success: true }, provider: AuthProviderType): void {
+  private handleAuthSuccess(
+    result: AuthResult & { success: true },
+    provider: AuthProviderType
+  ): void {
     const expiresAt = parseExpiryDate(result.expiresAt);
 
     // Update state

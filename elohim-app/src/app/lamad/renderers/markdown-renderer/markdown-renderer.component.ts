@@ -1,11 +1,26 @@
-import { Component, Input, OnChanges, SimpleChanges, Output, EventEmitter, AfterViewInit, ElementRef, ViewChild, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import {
+  Component,
+  Input,
+  OnChanges,
+  SimpleChanges,
+  Output,
+  EventEmitter,
+  AfterViewInit,
+  ElementRef,
+  ViewChild,
+  OnDestroy,
+  inject,
+} from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+
+import hljs from 'highlight.js';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
-import hljs from 'highlight.js';
-import { ContentNode } from '../../models/content-node.model';
+
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
+
+import { ContentNode } from '../../models/content-node.model';
 
 /**
  * Table of Contents entry extracted from markdown headings.
@@ -28,22 +43,16 @@ export interface TocEntry {
         class="toc-toggle"
         (click)="toggleToc()"
         [class.toc-open]="tocVisible"
-        title="Toggle Table of Contents">
+        title="Toggle Table of Contents"
+      >
         <span class="toc-icon">&#9776;</span>
       </button>
 
       <!-- TOC Backdrop - click to dismiss -->
-      <div
-        *ngIf="tocVisible"
-        class="toc-backdrop"
-        (click)="toggleToc()">
-      </div>
+      <div *ngIf="tocVisible" class="toc-backdrop" (click)="toggleToc()"></div>
 
       <!-- Table of Contents Sidebar -->
-      <nav
-        *ngIf="tocEntries.length > 0"
-        class="toc-sidebar"
-        [class.toc-visible]="tocVisible">
+      <nav *ngIf="tocEntries.length > 0" class="toc-sidebar" [class.toc-visible]="tocVisible">
         <div class="toc-header">
           <span>Contents</span>
           <button class="toc-close" (click)="toggleToc()">&times;</button>
@@ -52,7 +61,8 @@ export interface TocEntry {
           <li
             *ngFor="let entry of tocEntries"
             [class]="'toc-level-' + entry.level"
-            [class.toc-active]="activeHeadingId === entry.id">
+            [class.toc-active]="activeHeadingId === entry.id"
+          >
             <a [href]="'#' + entry.id" (click)="scrollToHeading($event, entry.id)">
               {{ entry.text }}
             </a>
@@ -64,21 +74,18 @@ export interface TocEntry {
       <article
         #contentEl
         class="markdown-content"
-        [class.has-toc]="tocEntries.length > 0 && !embedded">
+        [class.has-toc]="tocEntries.length > 0 && !embedded"
+      >
         <div [innerHTML]="renderedContent"></div>
       </article>
 
       <!-- Back to Top Button -->
-      <button
-        *ngIf="showBackToTop"
-        class="back-to-top"
-        (click)="scrollToTop()"
-        title="Back to top">
+      <button *ngIf="showBackToTop" class="back-to-top" (click)="scrollToTop()" title="Back to top">
         &uarr;
       </button>
     </div>
   `,
-  styleUrls: ['./markdown-renderer.component.css']
+  styleUrls: ['./markdown-renderer.component.css'],
 })
 export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDestroy {
   @Input() node!: ContentNode;
@@ -107,14 +114,14 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
         highlight(code, lang) {
           const language = hljs.getLanguage(lang) ? lang : 'plaintext';
           return hljs.highlight(code, { language }).value;
-        }
+        },
       })
     );
 
     // Configure marked options
     this.marked.setOptions({
       gfm: true,
-      breaks: false
+      breaks: false,
     });
 
     // Configure custom renderer to transform blob URLs in images
@@ -126,8 +133,8 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
           const resolvedHref = self.resolveBlobUrl(token.href);
           const title = token.title ? ` title="${token.title}"` : '';
           return `<img src="${resolvedHref}" alt="${token.text}"${title}>`;
-        }
-      }
+        },
+      },
     });
   }
 
@@ -246,7 +253,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       const text = content.replace(/<[^>]+>/g, '').trim();
 
       // Generate unique ID
-      let id = this.generateId(text);
+      const id = this.generateId(text);
       let uniqueId = id;
       let counter = 1;
       while (usedIds.has(uniqueId)) {
@@ -259,7 +266,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       toc.push({
         id: uniqueId,
         text,
-        level: parseInt(level, 10)
+        level: parseInt(level, 10),
       });
 
       // Return heading with ID and anchor link

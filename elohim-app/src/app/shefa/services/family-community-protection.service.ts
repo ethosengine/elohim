@@ -33,8 +33,12 @@
  */
 
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, combineLatest, of, interval, from } from 'rxjs';
+
 import { map, switchMap, catchError, shareReplay, startWith } from 'rxjs/operators';
+
+import { BehaviorSubject, Observable, combineLatest, of, interval, from } from 'rxjs';
+
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 import {
   FamilyCommunityProtectionStatus,
@@ -42,8 +46,6 @@ import {
   RegionalPresence,
   TrustRelationship,
 } from '../models/shefa-dashboard.model';
-
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 /**
  * Raw custodian commitment data from Holochain
@@ -111,7 +113,7 @@ export class FamilyCommunityProtectionService {
    */
   initializeProtectionMonitoring(
     operatorId: string,
-    refreshInterval: number = 60000 // Default: 1 minute
+    refreshInterval = 60000 // Default: 1 minute
   ): Observable<FamilyCommunityProtectionStatus> {
     return interval(refreshInterval).pipe(
       startWith(0),
@@ -145,7 +147,7 @@ export class FamilyCommunityProtectionService {
         payload: { steward_id: operatorId },
       })
     ).pipe(
-      switchMap((result) => {
+      switchMap(result => {
         const commitments = result.success ? result.data || [] : [];
         if (commitments.length === 0) {
           return of(this.getEmptyProtectionStatus());
@@ -172,7 +174,10 @@ export class FamilyCommunityProtectionService {
       }),
       map((data: any[]) => this.buildProtectionStatus(operatorId, data)),
       catchError(error => {
-        console.error('[FamilyCommunityProtectionService] Failed to load protection status:', error);
+        console.error(
+          '[FamilyCommunityProtectionService] Failed to load protection status:',
+          error
+        );
         return of(this.getEmptyProtectionStatus());
       })
     );
@@ -183,7 +188,7 @@ export class FamilyCommunityProtectionService {
    */
   private buildProtectionStatus(
     operatorId: string,
-    commitmentHealthPairs: Array<{ commitment: RawCustodianCommitment; status: AgentStatus | null }>
+    commitmentHealthPairs: { commitment: RawCustodianCommitment; status: AgentStatus | null }[]
   ): FamilyCommunityProtectionStatus {
     // Convert to CustodianNode objects
     const custodians: CustodianNode[] = commitmentHealthPairs.map(pair => ({
@@ -268,8 +273,12 @@ export class FamilyCommunityProtectionService {
    * Calculate redundancy metrics from commitments
    */
   private calculateRedundancyMetrics(
-    commitmentHealthPairs: Array<{ commitment: RawCustodianCommitment; status: AgentStatus | null }>
-  ): { strategy: 'full_replica' | 'threshold_split' | 'erasure_coded'; redundancyFactor: number; recoveryThreshold: number } {
+    commitmentHealthPairs: { commitment: RawCustodianCommitment; status: AgentStatus | null }[]
+  ): {
+    strategy: 'full_replica' | 'threshold_split' | 'erasure_coded';
+    redundancyFactor: number;
+    recoveryThreshold: number;
+  } {
     if (commitmentHealthPairs.length === 0) {
       return {
         strategy: 'full_replica',
@@ -291,11 +300,13 @@ export class FamilyCommunityProtectionService {
 
     let strategy: 'full_replica' | 'threshold_split' | 'erasure_coded' = 'full_replica';
     if (strategyCount.erasure_coded > strategyCount.full_replica) strategy = 'erasure_coded';
-    else if (strategyCount.threshold_split > strategyCount.full_replica) strategy = 'threshold_split';
+    else if (strategyCount.threshold_split > strategyCount.full_replica)
+      strategy = 'threshold_split';
 
     // Calculate average redundancy factor
     const avgRedundancy =
-      commitmentHealthPairs.reduce((sum, pair) => sum + pair.commitment.redundancyLevel, 0) / commitmentHealthPairs.length;
+      commitmentHealthPairs.reduce((sum, pair) => sum + pair.commitment.redundancyLevel, 0) /
+      commitmentHealthPairs.length;
 
     // Calculate recovery threshold
     let recoveryThreshold: number;
@@ -304,10 +315,12 @@ export class FamilyCommunityProtectionService {
       recoveryThreshold = 1;
     } else if (strategy === 'threshold_split') {
       // Threshold: need m-of-n shards
-      const avgShardThreshold = commitmentHealthPairs.reduce(
-        (sum, pair) => sum + (pair.commitment.shardThreshold || Math.ceil(pair.commitment.shardCount / 2)),
-        0
-      ) / commitmentHealthPairs.length;
+      const avgShardThreshold =
+        commitmentHealthPairs.reduce(
+          (sum, pair) =>
+            sum + (pair.commitment.shardThreshold || Math.ceil(pair.commitment.shardCount / 2)),
+          0
+        ) / commitmentHealthPairs.length;
       recoveryThreshold = Math.ceil(avgShardThreshold);
     } else {
       // Erasure coded: ~k of n (lower than threshold)
@@ -472,7 +485,9 @@ export class FamilyCommunityProtectionService {
   /**
    * Get custodians by type (family, friends, community, etc.)
    */
-  getCustodiansByType(type: 'family' | 'friend' | 'community' | 'professional' | 'institution'): CustodianNode[] {
+  getCustodiansByType(
+    type: 'family' | 'friend' | 'community' | 'professional' | 'institution'
+  ): CustodianNode[] {
     const status = this.protectionStatus$.value;
     return status ? status.custodians.filter(c => c.type === type) : [];
   }
@@ -484,7 +499,9 @@ export class FamilyCommunityProtectionService {
     const status = this.protectionStatus$.value;
     if (!status) return [];
 
-    return status.geographicDistribution.regions.filter(region => region.riskFactors.length > 0 || region.custodianCount === 1);
+    return status.geographicDistribution.regions.filter(
+      region => region.riskFactors.length > 0 || region.custodianCount === 1
+    );
   }
 
   /**

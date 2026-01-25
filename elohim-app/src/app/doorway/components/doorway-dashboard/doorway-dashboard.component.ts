@@ -1,6 +1,6 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
-import { DoorwayAdminService } from '../../services/doorway-admin.service';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+
 import {
   NodesResponse,
   NodeDetails,
@@ -13,6 +13,7 @@ import {
   tierColor,
   reachLevelName,
 } from '../../models/doorway.model';
+import { DoorwayAdminService } from '../../services/doorway-admin.service';
 
 type SortField = 'nodeId' | 'status' | 'combinedScore' | 'trustScore' | 'stewardTier';
 type SortDirection = 'asc' | 'desc';
@@ -87,9 +88,7 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
     });
   });
 
-  readonly healthyCount = computed(() =>
-    this.nodes().filter(n => n.status === 'online').length
-  );
+  readonly healthyCount = computed(() => this.nodes().filter(n => n.status === 'online').length);
 
   readonly totalCapacity = computed(() => {
     const c = this.cluster();
@@ -140,7 +139,7 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
 
   setSort(field: SortField): void {
     if (this.sortField() === field) {
-      this.sortDirection.update(d => d === 'asc' ? 'desc' : 'asc');
+      this.sortDirection.update(d => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       this.sortField.set(field);
       this.sortDirection.set('desc');

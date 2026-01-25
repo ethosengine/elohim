@@ -14,15 +14,18 @@
  * - question.widgets.expression: for math expressions
  */
 
-import type { PerseusItem, PerseusWidget } from '../../content-io/plugins/sophia/sophia-moment.model';
+import type {
+  PerseusItem,
+  PerseusWidget,
+} from '../../content-io/plugins/sophia/sophia-moment.model';
 
 // Radio widget options type for quiz migration
 interface RadioWidgetOptions {
-  choices: Array<{
+  choices: {
     content: string;
     correct?: boolean;
     isNoneOfTheAbove?: boolean;
-  }>;
+  }[];
   hasNoneOfTheAbove?: boolean;
   multipleSelect?: boolean;
   deselectEnabled?: boolean;
@@ -127,20 +130,18 @@ function migrateMultipleChoice(
   sourceNode: LegacyContentNode
 ): PerseusItem {
   const options = question.options || [];
-  const correctIndex = typeof question.correctAnswer === 'number'
-    ? question.correctAnswer
-    : 0;
+  const correctIndex = typeof question.correctAnswer === 'number' ? question.correctAnswer : 0;
 
   const radioOptions: RadioWidgetOptions = {
     choices: options.map((opt, idx) => ({
       content: opt,
-      correct: idx === correctIndex
+      correct: idx === correctIndex,
     })),
     randomize: true,
     multipleSelect: false,
     displayCount: null,
     hasNoneOfTheAbove: false,
-    deselectEnabled: false
+    deselectEnabled: false,
   };
 
   const widgetId = 'radio 1';
@@ -155,32 +156,36 @@ function migrateMultipleChoice(
           type: 'radio',
           options: radioOptions,
           graded: true,
-          version: { major: 0, minor: 0 }
-        }
-      }
+          version: { major: 0, minor: 0 },
+        },
+      },
     },
     answerArea: {
       type: 'multiple',
       options: {
         content: '',
         images: {},
-        widgets: {}
+        widgets: {},
       },
-      calculator: false
+      calculator: false,
     },
-    hints: question.explanation ? [{
-      content: question.explanation,
-      images: {},
-      widgets: {}
-    }] : [],
+    hints: question.explanation
+      ? [
+          {
+            content: question.explanation,
+            images: {},
+            widgets: {},
+          },
+        ]
+      : [],
     metadata: {
       sourceContentId: sourceNode.id,
       assessesContentId: sourceNode.relatedNodeIds?.[0],
       bloomsLevel: 'remember' as MasteryLevel,
-      difficulty: sourceNode.metadata?.difficulty as string ?? 'medium',
+      difficulty: (sourceNode.metadata?.difficulty as string) ?? 'medium',
       tags: sourceNode.tags,
-      createdAt: new Date().toISOString()
-    }
+      createdAt: new Date().toISOString(),
+    },
   };
 }
 
@@ -197,13 +202,13 @@ function migrateTrueFalse(
   const radioOptions: RadioWidgetOptions = {
     choices: [
       { content: 'True', correct: correctAnswer },
-      { content: 'False', correct: !correctAnswer }
+      { content: 'False', correct: !correctAnswer },
     ],
     randomize: false,
     multipleSelect: false,
     displayCount: null,
     hasNoneOfTheAbove: false,
-    deselectEnabled: false
+    deselectEnabled: false,
   };
 
   const widgetId = 'radio 1';
@@ -218,32 +223,36 @@ function migrateTrueFalse(
           type: 'radio',
           options: radioOptions,
           graded: true,
-          version: { major: 0, minor: 0 }
-        }
-      }
+          version: { major: 0, minor: 0 },
+        },
+      },
     },
     answerArea: {
       type: 'multiple',
       options: {
         content: '',
         images: {},
-        widgets: {}
+        widgets: {},
       },
-      calculator: false
+      calculator: false,
     },
-    hints: question.explanation ? [{
-      content: question.explanation,
-      images: {},
-      widgets: {}
-    }] : [],
+    hints: question.explanation
+      ? [
+          {
+            content: question.explanation,
+            images: {},
+            widgets: {},
+          },
+        ]
+      : [],
     metadata: {
       sourceContentId: sourceNode.id,
       assessesContentId: sourceNode.relatedNodeIds?.[0],
       bloomsLevel: 'remember' as MasteryLevel,
       difficulty: 'easy',
       tags: sourceNode.tags,
-      createdAt: new Date().toISOString()
-    }
+      createdAt: new Date().toISOString(),
+    },
   };
 }
 
@@ -255,9 +264,7 @@ function migrateShortAnswer(
   questionText: string,
   sourceNode: LegacyContentNode
 ): PerseusItem {
-  const expectedAnswer = typeof question.correctAnswer === 'string'
-    ? question.correctAnswer
-    : '';
+  const expectedAnswer = typeof question.correctAnswer === 'string' ? question.correctAnswer : '';
 
   const widgetId = 'input-number 1';
 
@@ -277,27 +284,31 @@ function migrateShortAnswer(
             size: 'normal',
             inexact: true,
             maxError: 0.1,
-            answerType: 'number'
+            answerType: 'number',
           },
           graded: false, // Short answer typically needs manual review
-          version: { major: 0, minor: 0 }
-        }
-      }
+          version: { major: 0, minor: 0 },
+        },
+      },
     },
     answerArea: {
       type: 'multiple',
       options: {
         content: '',
         images: {},
-        widgets: {}
+        widgets: {},
       },
-      calculator: false
+      calculator: false,
     },
-    hints: question.explanation ? [{
-      content: question.explanation,
-      images: {},
-      widgets: {}
-    }] : [],
+    hints: question.explanation
+      ? [
+          {
+            content: question.explanation,
+            images: {},
+            widgets: {},
+          },
+        ]
+      : [],
     metadata: {
       sourceContentId: sourceNode.id,
       assessesContentId: sourceNode.relatedNodeIds?.[0],
@@ -306,8 +317,8 @@ function migrateShortAnswer(
       tags: sourceNode.tags,
       rubric: question.rubric,
       expectedAnswer,
-      createdAt: new Date().toISOString()
-    }
+      createdAt: new Date().toISOString(),
+    },
   };
 }
 
@@ -324,16 +335,16 @@ function createFallbackItem(
     question: {
       content: `**Question:** ${questionText}\n\n*This question type (${question.type}) requires manual conversion.*`,
       images: {},
-      widgets: {}
+      widgets: {},
     },
     answerArea: {
       type: 'multiple',
       options: {
         content: '',
         images: {},
-        widgets: {}
+        widgets: {},
       },
-      calculator: false
+      calculator: false,
     },
     hints: [],
     metadata: {
@@ -343,8 +354,8 @@ function createFallbackItem(
       difficulty: 'medium',
       tags: sourceNode.tags,
       migrationWarning: `Unsupported question type: ${question.type}`,
-      createdAt: new Date().toISOString()
-    }
+      createdAt: new Date().toISOString(),
+    },
   };
 }
 
@@ -383,7 +394,7 @@ export function migrateQuizzes(nodes: LegacyContentNode[]): QuizMigrationResult[
       sourceTitle: node.title,
       questionsConverted: perseusItems.length,
       warnings,
-      perseusItems
+      perseusItems,
     };
   });
 }
@@ -415,6 +426,6 @@ export function createQuestionPool(
     title: poolTitle,
     questions: allQuestions,
     sourceQuizIds: sourceIds,
-    totalQuestions: allQuestions.length
+    totalQuestions: allQuestions.length,
   };
 }

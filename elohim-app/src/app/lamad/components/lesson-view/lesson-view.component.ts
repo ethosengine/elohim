@@ -1,3 +1,4 @@
+import { CommonModule } from '@angular/common';
 import {
   Component,
   Input,
@@ -10,10 +11,10 @@ import {
   ViewContainerRef,
   ComponentRef,
   ChangeDetectionStrategy,
-  ChangeDetectorRef
+  ChangeDetectorRef,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+
 import { Subject, Subscription } from 'rxjs';
 
 import { ContentNode } from '../../models/content-node.model';
@@ -22,10 +23,10 @@ import {
   RendererRegistryService,
   ContentRenderer,
   InteractiveRenderer,
-  RendererCompletionEvent
+  RendererCompletionEvent,
 } from '../../renderers/renderer-registry.service';
-import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
+import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
 // TODO: Quiz engine requires Perseus/React dependencies - enable when ready
 // import { InlineQuizComponent, InlineQuizCompletionEvent } from '../../quiz-engine';
 
@@ -76,8 +77,8 @@ interface InlineQuizCompletionEvent {
       class="lesson-view"
       [class.has-path-context]="pathContext"
       [class.standalone]="explorationMode === 'standalone'"
-      [class.panel-open]="explorationPanelOpen">
-
+      [class.panel-open]="explorationPanelOpen"
+    >
       <!-- Main content area -->
       <div class="lesson-main">
         <!-- Content header -->
@@ -134,7 +135,8 @@ interface InlineQuizCompletionEvent {
         class="panel-toggle"
         (click)="toggleExplorationPanel()"
         [attr.aria-expanded]="explorationPanelOpen"
-        aria-controls="exploration-panel">
+        aria-controls="exploration-panel"
+      >
         <span class="toggle-icon">{{ explorationPanelOpen ? '→' : '←' }}</span>
         <span class="toggle-label">{{ explorationPanelOpen ? 'Hide' : 'Explore' }}</span>
       </button>
@@ -143,14 +145,15 @@ interface InlineQuizCompletionEvent {
       <aside
         id="exploration-panel"
         class="exploration-panel"
-        [class.collapsed]="!explorationPanelOpen">
-
+        [class.collapsed]="!explorationPanelOpen"
+      >
         <div class="panel-header">
           <h2 class="panel-title">Explore</h2>
           <button
             class="panel-close"
             (click)="toggleExplorationPanel()"
-            aria-label="Close exploration panel">
+            aria-label="Close exploration panel"
+          >
             ×
           </button>
         </div>
@@ -164,8 +167,8 @@ interface InlineQuizCompletionEvent {
               [depth]="1"
               [height]="180"
               (nodeSelected)="onGraphNodeClick($event)"
-              (exploreRequested)="onExploreInGraphClick()">
-            </app-mini-graph>
+              (exploreRequested)="onExploreInGraphClick()"
+            ></app-mini-graph>
           </section>
 
           <!-- Related Concepts -->
@@ -176,15 +179,13 @@ interface InlineQuizCompletionEvent {
               [showHierarchy]="true"
               [compact]="true"
               [limit]="4"
-              (navigate)="onRelatedConceptClick($event)">
-            </app-related-concepts-panel>
+              (navigate)="onRelatedConceptClick($event)"
+            ></app-related-concepts-panel>
           </section>
 
           <!-- Explore in Full Graph button -->
           <div class="panel-actions">
-            <button
-              class="btn-explore-graph"
-              (click)="onExploreInGraphClick()">
+            <button class="btn-explore-graph" (click)="onExploreInGraphClick()">
               <span class="btn-icon">🔭</span>
               Explore in Full Graph
             </button>
@@ -194,314 +195,314 @@ interface InlineQuizCompletionEvent {
 
       <!-- Backdrop for mobile -->
       @if (explorationPanelOpen) {
-        <div
-          class="panel-backdrop"
-          (click)="toggleExplorationPanel()"
-          aria-hidden="true">
-        </div>
+        <div class="panel-backdrop" (click)="toggleExplorationPanel()" aria-hidden="true"></div>
       }
     </div>
   `,
-  styles: [`
-    .lesson-view {
-      display: flex;
-      width: 100%;
-      height: 100%;
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* Main content area */
-    .lesson-main {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      padding: 1.5rem;
-    }
-
-    .lesson-header {
-      margin-bottom: 1.5rem;
-    }
-
-    .header-meta {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .content-type-badge {
-      display: inline-block;
-      padding: 0.25rem 0.625rem;
-      font-size: 0.6875rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      background: var(--primary-surface, #e8f0fe);
-      color: var(--primary-text, #174ea6);
-      border-radius: var(--radius-sm, 4px);
-    }
-
-    .content-tags {
-      display: flex;
-      gap: 0.375rem;
-    }
-
-    .tag {
-      padding: 0.125rem 0.5rem;
-      font-size: 0.6875rem;
-      background: var(--surface-tertiary, #e8eaed);
-      color: var(--text-secondary, #5f6368);
-      border-radius: var(--radius-sm, 4px);
-    }
-
-    .lesson-title {
-      margin: 0 0 0.5rem;
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--text-primary, #202124);
-      line-height: 1.3;
-    }
-
-    .lesson-description {
-      margin: 0;
-      font-size: 1rem;
-      color: var(--text-secondary, #5f6368);
-      line-height: 1.5;
-    }
-
-    .lesson-content {
-      flex: 1;
-      min-height: 0;
-    }
-
-    .content-fallback {
-      line-height: 1.6;
-    }
-
-    .markdown-content {
-      font-size: 1rem;
-    }
-
-    .raw-content {
-      font-family: monospace;
-      font-size: 0.875rem;
-      background: var(--surface-secondary, #f8f9fa);
-      padding: 1rem;
-      border-radius: var(--radius-md, 8px);
-      overflow-x: auto;
-      white-space: pre-wrap;
-    }
-
-    /* Panel toggle button */
-    .panel-toggle {
-      position: fixed;
-      right: 0;
-      top: 50%;
-      transform: translateY(-50%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.25rem;
-      padding: 0.75rem 0.5rem;
-      background: var(--primary, #4285f4);
-      color: white;
-      border: none;
-      border-radius: var(--radius-md, 8px) 0 0 var(--radius-md, 8px);
-      cursor: pointer;
-      z-index: 20;
-      transition: all 0.2s ease;
-    }
-
-    .panel-toggle:hover {
-      padding-right: 0.75rem;
-    }
-
-    .toggle-icon {
-      font-size: 1rem;
-    }
-
-    .toggle-label {
-      writing-mode: vertical-rl;
-      text-orientation: mixed;
-      font-size: 0.75rem;
-      font-weight: 500;
-    }
-
-    .lesson-view.panel-open .panel-toggle {
-      right: 320px;
-    }
-
-    /* Exploration panel */
-    .exploration-panel {
-      position: fixed;
-      right: 0;
-      top: 0;
-      bottom: 0;
-      width: 320px;
-      background: var(--surface-elevated, #fff);
-      border-left: 1px solid var(--border-color, #e9ecef);
-      display: flex;
-      flex-direction: column;
-      transform: translateX(100%);
-      transition: transform 0.3s ease;
-      z-index: 30;
-      overflow: hidden;
-    }
-
-    .exploration-panel:not(.collapsed) {
-      transform: translateX(0);
-    }
-
-    .panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1rem;
-      border-bottom: 1px solid var(--border-color, #e9ecef);
-    }
-
-    .panel-title {
-      margin: 0;
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text-primary, #202124);
-    }
-
-    .panel-close {
-      width: 2rem;
-      height: 2rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: none;
-      border: none;
-      font-size: 1.5rem;
-      color: var(--text-secondary, #5f6368);
-      cursor: pointer;
-      border-radius: var(--radius-sm, 4px);
-    }
-
-    .panel-close:hover {
-      background: var(--surface-hover, #f1f3f4);
-    }
-
-    .panel-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-    }
-
-    .panel-section {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .section-title {
-      margin: 0;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-tertiary, #80868b);
-    }
-
-    .panel-actions {
-      margin-top: auto;
-      padding-top: 1rem;
-      border-top: 1px solid var(--border-color, #e9ecef);
-    }
-
-    .btn-explore-graph {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      padding: 0.75rem 1rem;
-      background: var(--surface-secondary, #f8f9fa);
-      border: 1px solid var(--border-color, #e9ecef);
-      border-radius: var(--radius-md, 8px);
-      color: var(--text-primary, #202124);
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .btn-explore-graph:hover {
-      background: var(--primary, #4285f4);
-      border-color: var(--primary, #4285f4);
-      color: white;
-    }
-
-    .btn-icon {
-      font-size: 1.125rem;
-    }
-
-    /* Backdrop */
-    .panel-backdrop {
-      display: none;
-    }
-
-    /* Desktop layout (panel always visible) */
-    @media (min-width: 1024px) {
-      .panel-toggle {
-        display: none;
-      }
-
-      .exploration-panel {
-        position: relative;
-        transform: none;
-        width: 320px;
-        flex-shrink: 0;
-      }
-
-      .exploration-panel.collapsed {
-        display: none;
-      }
-
-      .lesson-view:not(.standalone) .lesson-main {
-        padding-right: 0;
-      }
-    }
-
-    /* Mobile layout */
-    @media (max-width: 1023px) {
-      .exploration-panel {
+  styles: [
+    `
+      .lesson-view {
+        display: flex;
         width: 100%;
-        max-width: 360px;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
       }
 
-      .panel-backdrop {
-        display: block;
+      /* Main content area */
+      .lesson-main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        padding: 1.5rem;
+      }
+
+      .lesson-header {
+        margin-bottom: 1.5rem;
+      }
+
+      .header-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .content-type-badge {
+        display: inline-block;
+        padding: 0.25rem 0.625rem;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        background: var(--primary-surface, #e8f0fe);
+        color: var(--primary-text, #174ea6);
+        border-radius: var(--radius-sm, 4px);
+      }
+
+      .content-tags {
+        display: flex;
+        gap: 0.375rem;
+      }
+
+      .tag {
+        padding: 0.125rem 0.5rem;
+        font-size: 0.6875rem;
+        background: var(--surface-tertiary, #e8eaed);
+        color: var(--text-secondary, #5f6368);
+        border-radius: var(--radius-sm, 4px);
+      }
+
+      .lesson-title {
+        margin: 0 0 0.5rem;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--text-primary, #202124);
+        line-height: 1.3;
+      }
+
+      .lesson-description {
+        margin: 0;
+        font-size: 1rem;
+        color: var(--text-secondary, #5f6368);
+        line-height: 1.5;
+      }
+
+      .lesson-content {
+        flex: 1;
+        min-height: 0;
+      }
+
+      .content-fallback {
+        line-height: 1.6;
+      }
+
+      .markdown-content {
+        font-size: 1rem;
+      }
+
+      .raw-content {
+        font-family: monospace;
+        font-size: 0.875rem;
+        background: var(--surface-secondary, #f8f9fa);
+        padding: 1rem;
+        border-radius: var(--radius-md, 8px);
+        overflow-x: auto;
+        white-space: pre-wrap;
+      }
+
+      /* Panel toggle button */
+      .panel-toggle {
         position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.4);
-        z-index: 25;
-        opacity: 0;
-        animation: fadeIn 0.2s ease forwards;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.75rem 0.5rem;
+        background: var(--primary, #4285f4);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md, 8px) 0 0 var(--radius-md, 8px);
+        cursor: pointer;
+        z-index: 20;
+        transition: all 0.2s ease;
       }
 
-      @keyframes fadeIn {
-        to { opacity: 1; }
+      .panel-toggle:hover {
+        padding-right: 0.75rem;
       }
-    }
 
-    /* Standalone mode (no sidebar) */
-    .lesson-view.standalone .exploration-panel {
-      display: none;
-    }
+      .toggle-icon {
+        font-size: 1rem;
+      }
 
-    .lesson-view.standalone .panel-toggle {
-      display: none;
-    }
-  `]
+      .toggle-label {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+
+      .lesson-view.panel-open .panel-toggle {
+        right: 320px;
+      }
+
+      /* Exploration panel */
+      .exploration-panel {
+        position: fixed;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 320px;
+        background: var(--surface-elevated, #fff);
+        border-left: 1px solid var(--border-color, #e9ecef);
+        display: flex;
+        flex-direction: column;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        z-index: 30;
+        overflow: hidden;
+      }
+
+      .exploration-panel:not(.collapsed) {
+        transform: translateX(0);
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color, #e9ecef);
+      }
+
+      .panel-title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary, #202124);
+      }
+
+      .panel-close {
+        width: 2rem;
+        height: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: var(--text-secondary, #5f6368);
+        cursor: pointer;
+        border-radius: var(--radius-sm, 4px);
+      }
+
+      .panel-close:hover {
+        background: var(--surface-hover, #f1f3f4);
+      }
+
+      .panel-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .panel-section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .section-title {
+        margin: 0;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-tertiary, #80868b);
+      }
+
+      .panel-actions {
+        margin-top: auto;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-color, #e9ecef);
+      }
+
+      .btn-explore-graph {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: var(--surface-secondary, #f8f9fa);
+        border: 1px solid var(--border-color, #e9ecef);
+        border-radius: var(--radius-md, 8px);
+        color: var(--text-primary, #202124);
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .btn-explore-graph:hover {
+        background: var(--primary, #4285f4);
+        border-color: var(--primary, #4285f4);
+        color: white;
+      }
+
+      .btn-icon {
+        font-size: 1.125rem;
+      }
+
+      /* Backdrop */
+      .panel-backdrop {
+        display: none;
+      }
+
+      /* Desktop layout (panel always visible) */
+      @media (min-width: 1024px) {
+        .panel-toggle {
+          display: none;
+        }
+
+        .exploration-panel {
+          position: relative;
+          transform: none;
+          width: 320px;
+          flex-shrink: 0;
+        }
+
+        .exploration-panel.collapsed {
+          display: none;
+        }
+
+        .lesson-view:not(.standalone) .lesson-main {
+          padding-right: 0;
+        }
+      }
+
+      /* Mobile layout */
+      @media (max-width: 1023px) {
+        .exploration-panel {
+          width: 100%;
+          max-width: 360px;
+        }
+
+        .panel-backdrop {
+          display: block;
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.4);
+          z-index: 25;
+          opacity: 0;
+          animation: fadeIn 0.2s ease forwards;
+        }
+
+        @keyframes fadeIn {
+          to {
+            opacity: 1;
+          }
+        }
+      }
+
+      /* Standalone mode (no sidebar) */
+      .lesson-view.standalone .exploration-panel {
+        display: none;
+      }
+
+      .lesson-view.standalone .panel-toggle {
+        display: none;
+      }
+    `,
+  ],
 })
 export class LessonViewComponent implements OnChanges, OnDestroy {
   /** The content node to display */
@@ -620,19 +621,19 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
    */
   getContentTypeLabel(): string {
     const labels: Record<string, string> = {
-      'epic': 'Epic',
-      'feature': 'Feature',
-      'scenario': 'Scenario',
-      'concept': 'Concept',
-      'simulation': 'Simulation',
-      'video': 'Video',
-      'assessment': 'Assessment',
+      epic: 'Epic',
+      feature: 'Feature',
+      scenario: 'Scenario',
+      concept: 'Concept',
+      simulation: 'Simulation',
+      video: 'Video',
+      assessment: 'Assessment',
       'discovery-assessment': 'Self-Discovery', // Enneagram, learning style, etc.
-      'organization': 'Organization',
+      organization: 'Organization',
       'book-chapter': 'Chapter',
-      'tool': 'Tool',
-      'role': 'Role',
-      'path': 'Path'
+      tool: 'Tool',
+      role: 'Role',
+      path: 'Path',
     };
     return labels[this.content.contentType] || this.content.contentType;
   }

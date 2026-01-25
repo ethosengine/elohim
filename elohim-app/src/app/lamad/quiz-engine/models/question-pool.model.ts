@@ -22,7 +22,11 @@
  * ```
  */
 
-import type { PerseusItem, BloomsLevel, QuestionDifficulty } from '../../content-io/plugins/sophia/sophia-moment.model';
+import type {
+  PerseusItem,
+  BloomsLevel,
+  QuestionDifficulty,
+} from '../../content-io/plugins/sophia/sophia-moment.model';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Question Pool
@@ -257,20 +261,20 @@ export function createEmptyPool(contentId: string): QuestionPool {
         remember: 2,
         understand: 2,
         apply: 1,
-        analyze: 0
+        analyze: 0,
       },
       difficultyDistribution: {
         easy: 2,
         medium: 2,
-        hard: 1
+        hard: 1,
       },
       isComplete: false,
       tags: [],
-      sourceDocs: []
+      sourceDocs: [],
     },
     createdAt: now,
     updatedAt: now,
-    version: 1
+    version: 1,
   };
 }
 

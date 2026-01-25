@@ -13,15 +13,17 @@
  */
 
 import { Injectable } from '@angular/core';
-import { Observable, forkJoin, of } from 'rxjs';
+
 import { map, switchMap } from 'rxjs/operators';
 
+import { Observable, forkJoin, of } from 'rxjs';
+
+import { ContentMasteryView } from '@app/elohim/adapters/storage-types.adapter';
 import {
   StorageApiService,
   CreateMasteryInput,
   MasteryQuery,
 } from '@app/elohim/services/storage-api.service';
-import { ContentMasteryView } from '@app/elohim/adapters/storage-types.adapter';
 
 /**
  * Mastery level constants (Bloom's Taxonomy)
@@ -36,7 +38,7 @@ export const MasteryLevels = {
   MASTERED: 'mastered',
 } as const;
 
-export type MasteryLevelType = typeof MasteryLevels[keyof typeof MasteryLevels];
+export type MasteryLevelType = (typeof MasteryLevels)[keyof typeof MasteryLevels];
 
 /**
  * Mastery level ordering for comparison
@@ -71,13 +73,10 @@ export class MasteryService {
   /**
    * Get mastery for a specific content item.
    */
-  getMasteryForContent(
-    humanId: string,
-    contentId: string
-  ): Observable<ContentMasteryView | null> {
-    return this.storageApi.getMasteryRecords({ humanId, contentId }).pipe(
-      map(records => records.length > 0 ? records[0] : null)
-    );
+  getMasteryForContent(humanId: string, contentId: string): Observable<ContentMasteryView | null> {
+    return this.storageApi
+      .getMasteryRecords({ humanId, contentId })
+      .pipe(map(records => (records.length > 0 ? records[0] : null)));
   }
 
   /**
@@ -110,10 +109,7 @@ export class MasteryService {
   /**
    * Get mastery records at or above a minimum level.
    */
-  getMasteryAtLevel(
-    humanId: string,
-    minLevel: MasteryLevelType
-  ): Observable<ContentMasteryView[]> {
+  getMasteryAtLevel(humanId: string, minLevel: MasteryLevelType): Observable<ContentMasteryView[]> {
     return this.storageApi.getMasteryRecords({ humanId, minLevel });
   }
 

@@ -16,10 +16,19 @@
  */
 
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, from, of } from 'rxjs';
+
 import { map, tap, catchError } from 'rxjs/operators';
 
+import { BehaviorSubject, Observable, from, of } from 'rxjs';
+
 import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
+
+import {
+  parsePointsByTrigger,
+  getPointAmount,
+  formatPoints,
+  getTriggerLabel,
+} from '../models/learning-points.model';
 
 import type {
   LearnerPointBalance,
@@ -27,13 +36,6 @@ import type {
   EarnLamadPointsInput,
   EarnLamadPointsResult,
   LamadPointTrigger,
-} from '../models/learning-points.model';
-
-import {
-  parsePointsByTrigger,
-  getPointAmount,
-  formatPoints,
-  getTriggerLabel,
 } from '../models/learning-points.model';
 
 @Injectable({
@@ -58,9 +60,7 @@ export class PointsService {
   readonly loading$ = this.loadingSubject.asObservable();
 
   /** Total points as observable */
-  readonly totalPoints$ = this.balance$.pipe(
-    map(balance => balance?.total_points ?? 0)
-  );
+  readonly totalPoints$ = this.balance$.pipe(map(balance => balance?.total_points ?? 0));
 
   constructor(private readonly backend: LearnerBackendService) {}
 
@@ -85,17 +85,19 @@ export class PointsService {
   refreshBalance(): void {
     this.loadingSubject.next(true);
 
-    from(this.backend.getMyLamadPointBalance()).pipe(
-      tap(output => {
-        this.balanceSubject.next(output?.balance ?? null);
-        this.loadingSubject.next(false);
-      }),
-      catchError(err => {
-        console.warn('[Points] Failed to get balance:', err);
-        this.loadingSubject.next(false);
-        return of(null);
-      })
-    ).subscribe();
+    from(this.backend.getMyLamadPointBalance())
+      .pipe(
+        tap(output => {
+          this.balanceSubject.next(output?.balance ?? null);
+          this.loadingSubject.next(false);
+        }),
+        catchError(err => {
+          console.warn('[Points] Failed to get balance:', err);
+          this.loadingSubject.next(false);
+          return of(null);
+        })
+      )
+      .subscribe();
   }
 
   /**
@@ -198,9 +200,7 @@ export class PointsService {
    * Get point history as observable.
    */
   getHistory$(limit?: number): Observable<LamadPointEvent[]> {
-    return this.history$.pipe(
-      map(history => limit ? history.slice(0, limit) : history)
-    );
+    return this.history$.pipe(map(history => (limit ? history.slice(0, limit) : history)));
   }
 
   /**

@@ -24,12 +24,12 @@ describe('BlobFallbackService', () => {
   });
 
   describe('fetchWithFallback', () => {
-    it('should fetch from primary URL if available', (done) => {
+    it('should fetch from primary URL if available', done => {
       const primaryUrl = 'https://primary.example.com/blob.mp4';
       const secondaryUrl = 'https://secondary.example.com/blob.mp4';
       const testBlob = new Blob(['test data']);
 
-      service.fetchWithFallback([primaryUrl, secondaryUrl]).subscribe((result) => {
+      service.fetchWithFallback([primaryUrl, secondaryUrl]).subscribe(result => {
         expect(result.blob.size).toBe(testBlob.size);
         expect(result.urlIndex).toBe(0);
         expect(result.successUrl).toBe(primaryUrl);
@@ -42,12 +42,12 @@ describe('BlobFallbackService', () => {
       req.flush(testBlob);
     });
 
-    it('should fallback to secondary URL on primary failure', (done) => {
+    it('should fallback to secondary URL on primary failure', done => {
       const primaryUrl = 'https://primary.example.com/blob.mp4';
       const secondaryUrl = 'https://secondary.example.com/blob.mp4';
       const testBlob = new Blob(['fallback data']);
 
-      service.fetchWithFallback([primaryUrl, secondaryUrl], 30000, 0).subscribe((result) => {
+      service.fetchWithFallback([primaryUrl, secondaryUrl], 30000, 0).subscribe(result => {
         expect(result.urlIndex).toBe(1);
         expect(result.successUrl).toBe(secondaryUrl);
         done();
@@ -62,7 +62,7 @@ describe('BlobFallbackService', () => {
       secondaryReq.flush(testBlob);
     });
 
-    it('should cascade through multiple fallback URLs', (done) => {
+    it('should cascade through multiple fallback URLs', done => {
       const urls = [
         'https://cdn1.example.com/blob.mp4',
         'https://cdn2.example.com/blob.mp4',
@@ -70,7 +70,7 @@ describe('BlobFallbackService', () => {
       ];
       const testBlob = new Blob(['final data']);
 
-      service.fetchWithFallback(urls, 30000, 0).subscribe((result) => {
+      service.fetchWithFallback(urls, 30000, 0).subscribe(result => {
         expect(result.urlIndex).toBe(2);
         expect(result.successUrl).toBe(urls[2]);
         done();
@@ -89,15 +89,12 @@ describe('BlobFallbackService', () => {
       req3.flush(testBlob);
     });
 
-    it('should error if all URLs fail', (done) => {
-      const urls = [
-        'https://cdn1.example.com/blob.mp4',
-        'https://cdn2.example.com/blob.mp4',
-      ];
+    it('should error if all URLs fail', done => {
+      const urls = ['https://cdn1.example.com/blob.mp4', 'https://cdn2.example.com/blob.mp4'];
 
       service.fetchWithFallback(urls, 30000, 0).subscribe(
         () => fail('should have errored'),
-        (error) => {
+        error => {
           expect(error.message).toContain('All fallback URLs exhausted');
           done();
         }
@@ -110,21 +107,21 @@ describe('BlobFallbackService', () => {
       req2.error(new ErrorEvent('Error 2'));
     });
 
-    it('should error if no URLs provided', (done) => {
+    it('should error if no URLs provided', done => {
       service.fetchWithFallback([]).subscribe(
         () => fail('should have errored'),
-        (error) => {
+        error => {
           expect(error.message).toContain('No fallback URLs provided');
           done();
         }
       );
     });
 
-    it('should retry individual URLs on failure', (done) => {
+    it('should retry individual URLs on failure', done => {
       const url = 'https://example.com/blob.mp4';
       const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url], 30000, 2).subscribe((result) => {
+      service.fetchWithFallback([url], 30000, 2).subscribe(result => {
         expect(result.retryCount).toBeGreaterThan(0);
         done();
       });
@@ -140,11 +137,11 @@ describe('BlobFallbackService', () => {
       }, 150); // 100ms initial backoff + buffer
     });
 
-    it('should track request duration', (done) => {
+    it('should track request duration', done => {
       const url = 'https://example.com/blob.mp4';
       const testBlob = new Blob(['data']);
 
-      service.fetchWithFallback([url]).subscribe((result) => {
+      service.fetchWithFallback([url]).subscribe(result => {
         expect(result.durationMs).toBeGreaterThan(0);
         done();
       });
@@ -155,7 +152,7 @@ describe('BlobFallbackService', () => {
   });
 
   describe('URL Health Tracking', () => {
-    it('should record successful fetch', (done) => {
+    it('should record successful fetch', done => {
       const url = 'https://example.com/blob.mp4';
       const testBlob = new Blob(['data']);
 
@@ -171,7 +168,7 @@ describe('BlobFallbackService', () => {
       req.flush(testBlob);
     });
 
-    it('should record failed fetch', (done) => {
+    it('should record failed fetch', done => {
       const url = 'https://example.com/blob.mp4';
       const fallbackUrl = 'https://fallback.example.com/blob.mp4';
       const testBlob = new Blob(['data']);
@@ -191,7 +188,7 @@ describe('BlobFallbackService', () => {
       req2.flush(testBlob);
     });
 
-    it('should track error messages', (done) => {
+    it('should track error messages', done => {
       const url = 'https://example.com/blob.mp4';
       const fallbackUrl = 'https://fallback.example.com/blob.mp4';
       const testBlob = new Blob(['data']);
@@ -241,10 +238,7 @@ describe('BlobFallbackService', () => {
 
   describe('testFallbackUrls', () => {
     it('should test all URLs and report health', async () => {
-      const urls = [
-        'https://cdn1.example.com/blob.mp4',
-        'https://cdn2.example.com/blob.mp4',
-      ];
+      const urls = ['https://cdn1.example.com/blob.mp4', 'https://cdn2.example.com/blob.mp4'];
 
       const testPromise = service.testFallbackUrls(urls);
 
@@ -283,10 +277,10 @@ describe('BlobFallbackService', () => {
   });
 
   describe('URL Validation', () => {
-    it('should validate single URL successfully', (done) => {
+    it('should validate single URL successfully', done => {
       const url = 'https://example.com/blob.mp4';
 
-      service.validateUrl(url).then((result) => {
+      service.validateUrl(url).then(result => {
         expect(result.url).toBe(url);
         expect(typeof result.isValid).toBe('boolean');
         expect(result.statusCode).toBeDefined();
@@ -299,10 +293,10 @@ describe('BlobFallbackService', () => {
       req.flush(null, { status: 200, statusText: 'OK' });
     });
 
-    it('should detect URL validation failures', (done) => {
+    it('should detect URL validation failures', done => {
       const url = 'https://invalid.example.com/blob.mp4';
 
-      service.validateUrl(url).then((result) => {
+      service.validateUrl(url).then(result => {
         expect(result.url).toBe(url);
         expect(result.isValid).toBe(false);
         expect(result.statusCode).toBe(-1);
@@ -315,10 +309,10 @@ describe('BlobFallbackService', () => {
       req.error(new ErrorEvent('error'));
     });
 
-    it('should extract capabilities from validation headers', (done) => {
+    it('should extract capabilities from validation headers', done => {
       const url = 'https://example.com/blob.mp4';
 
-      service.validateUrl(url).then((result) => {
+      service.validateUrl(url).then(result => {
         expect(result.supportsRangeRequests).toBe(true);
         expect(result.contentLength).toBe(1024);
         done();
@@ -345,37 +339,37 @@ describe('BlobFallbackService', () => {
       expect(service['detectUrlType'](standardUrl)).toBe('standard');
     });
 
-    it('should validate multiple URLs in parallel', (done) => {
+    it('should validate multiple URLs in parallel', done => {
       const urls = ['https://example.com/blob1.mp4', 'https://example.com/blob2.mp4'];
 
-      service.validateUrls(urls).then((results) => {
+      service.validateUrls(urls).then(results => {
         expect(results.length).toBe(2);
         expect(results[0].url).toBe(urls[0]);
         expect(results[1].url).toBe(urls[1]);
         done();
       });
 
-      const reqs = httpMock.match((req) => urls.includes(req.url));
+      const reqs = httpMock.match(req => urls.includes(req.url));
       expect(reqs.length).toBe(2);
-      reqs.forEach((req) => {
+      reqs.forEach(req => {
         req.flush(null, { status: 200, statusText: 'OK' });
       });
     });
 
-    it('should filter to valid and healthy URLs only', (done) => {
+    it('should filter to valid and healthy URLs only', done => {
       const urls = ['https://example.com/blob1.mp4', 'https://example.com/blob2.mp4'];
 
       // Mark second URL as healthy in history
       service['recordUrlSuccess'](urls[1]);
 
-      service.getValidAndHealthyUrls(urls).then((validUrls) => {
+      service.getValidAndHealthyUrls(urls).then(validUrls => {
         // Results should include URLs that passed validation and are healthy
         expect(Array.isArray(validUrls)).toBe(true);
         done();
       });
 
-      const reqs = httpMock.match((req) => urls.includes(req.url));
-      reqs.forEach((req) => {
+      const reqs = httpMock.match(req => urls.includes(req.url));
+      reqs.forEach(req => {
         req.flush(null, { status: 200, statusText: 'OK' });
       });
     });

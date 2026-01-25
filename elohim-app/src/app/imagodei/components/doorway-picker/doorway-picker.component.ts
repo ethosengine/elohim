@@ -13,11 +13,10 @@
  * - Selection persistence
  */
 
-import { Component, OnInit, inject, signal, computed, output, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal, computed, output, input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DoorwayRegistryService } from '../../services/doorway-registry.service';
-import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
+
 import {
   type DoorwayInfo,
   type DoorwayRegion,
@@ -26,6 +25,8 @@ import {
   getStatusDisplay,
   getFeatureDisplay,
 } from '../../models/doorway.model';
+import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
 
 /** Mode for the doorway picker */
 export type DoorwayPickerMode = 'register' | 'login';
@@ -112,10 +113,11 @@ export class DoorwayPickerComponent implements OnInit {
     // Filter by search query
     const query = this.searchQuery().toLowerCase().trim();
     if (query) {
-      result = result.filter(d =>
-        d.name.toLowerCase().includes(query) ||
-        d.description.toLowerCase().includes(query) ||
-        d.operator.toLowerCase().includes(query)
+      result = result.filter(
+        d =>
+          d.name.toLowerCase().includes(query) ||
+          d.description.toLowerCase().includes(query) ||
+          d.operator.toLowerCase().includes(query)
       );
     }
 

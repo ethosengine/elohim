@@ -108,7 +108,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Time Status Card */
@@ -233,21 +235,21 @@
   border-radius: var(--radius-md, 0.5rem);
 }
 
-.restriction-card[data-type="category"] {
+.restriction-card[data-type='category'] {
   border-left: 3px solid var(--error, #ef4444);
 }
 
-.restriction-card[data-type="feature"],
-.restriction-card[data-type="route"] {
+.restriction-card[data-type='feature'],
+.restriction-card[data-type='route'] {
   border-left: 3px solid var(--warning, #f59e0b);
 }
 
-.restriction-card[data-type="time"] {
+.restriction-card[data-type='time'] {
   border-left: 3px solid var(--info, #3b82f6);
 }
 
-.restriction-card[data-type="age_rating"],
-.restriction-card[data-type="reach"] {
+.restriction-card[data-type='age_rating'],
+.restriction-card[data-type='reach'] {
   border-left: 3px solid var(--purple, #8b5cf6);
 }
 

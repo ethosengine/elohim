@@ -33,15 +33,15 @@
  * Types of attestations across different domains
  */
 export type AttestationType =
-  | 'educational'      // Academic achievements (math mastery, grade levels, etc.)
-  | 'skill'            // Technical or professional skills (ham radio, coding, etc.)
-  | 'relational'       // Trust and relationship depth (intimate partner, friend, etc.)
-  | 'civic'            // Community engagement and organizing capacity
-  | 'professional'     // Work credentials and expertise
-  | 'emotional'        // Emotional maturity and capacity (trauma support, etc.)
-  | 'time-based'       // Sustained engagement over time (consistency, dedication)
-  | 'social-proof'     // Community endorsements
-  | 'discovery';       // Self-discovery assessments (Enneagram, MBTI, CliftonStrengths, etc.)
+  | 'educational' // Academic achievements (math mastery, grade levels, etc.)
+  | 'skill' // Technical or professional skills (ham radio, coding, etc.)
+  | 'relational' // Trust and relationship depth (intimate partner, friend, etc.)
+  | 'civic' // Community engagement and organizing capacity
+  | 'professional' // Work credentials and expertise
+  | 'emotional' // Emotional maturity and capacity (trauma support, etc.)
+  | 'time-based' // Sustained engagement over time (consistency, dedication)
+  | 'social-proof' // Community endorsements
+  | 'discovery'; // Self-discovery assessments (Enneagram, MBTI, CliftonStrengths, etc.)
 
 /**
  * An earned attestation/achievement/badge
@@ -62,15 +62,13 @@ export interface Attestation {
   expiresAt?: string;
 
   /** Who/what issued this attestation */
-  issuedBy?: string;  // 'system', 'community', or specific steward ID
+  issuedBy?: string; // 'system', 'community', or specific steward ID
 
   /** Can this attestation be revoked? */
   revocable: boolean;
 
   /** Metadata for domain-specific extensions */
-  metadata?: {
-    [key: string]: any;
-  };
+  metadata?: Record<string, any>;
 }
 
 /**
@@ -81,8 +79,8 @@ export interface AttestationJourney {
   nodesVisited: string[];
 
   /** Starting and ending affinity levels */
-  startingAffinity: { [nodeId: string]: number };
-  endingAffinity: { [nodeId: string]: number };
+  startingAffinity: Record<string, number>;
+  endingAffinity: Record<string, number>;
 
   /** Practice exercises completed */
   exercisesCompleted?: string[];
@@ -94,7 +92,7 @@ export interface AttestationJourney {
   endorsements?: Endorsement[];
 
   /** Time invested in the journey */
-  timeInvested?: number;  // milliseconds
+  timeInvested?: number; // milliseconds
 
   /** Duration of the journey (ISO 8601 strings) */
   startDate: string;
@@ -109,7 +107,7 @@ export interface Endorsement {
   endorserName?: string;
   endorsedAt: string;
   reason?: string;
-  weight?: number;  // Some endorsers may have more weight based on their own attestations
+  weight?: number; // Some endorsers may have more weight based on their own attestations
 }
 
 /**
@@ -117,7 +115,7 @@ export interface Endorsement {
  */
 export interface AttestationRequirement {
   /** Minimum affinity level with specific content nodes */
-  requiredAffinity?: { [nodeId: string]: number };
+  requiredAffinity?: Record<string, number>;
 
   /** Other attestations that must already be earned (prerequisites) */
   prerequisiteAttestations?: string[];
@@ -132,10 +130,10 @@ export interface AttestationRequirement {
   minimumEndorsements?: number;
 
   /** Minimum time investment required */
-  minimumTimeInvested?: number;  // milliseconds
+  minimumTimeInvested?: number; // milliseconds
 
   /** Minimum sustained engagement period */
-  minimumDuration?: number;  // milliseconds
+  minimumDuration?: number; // milliseconds
 }
 
 /**
@@ -156,16 +154,16 @@ export interface AttestationAccessRequirement {
   requiredAllAttestations?: string[];
 
   /** Minimum affinity with prerequisite content */
-  prerequisiteAffinity?: { [nodeId: string]: number };
+  prerequisiteAffinity?: Record<string, number>;
 
   /** Community endorsements as alternative access */
   alternativeEndorsements?: {
     count: number;
-    fromAttestationHolders?: string[];  // Must be from people with these attestations
+    fromAttestationHolders?: string[]; // Must be from people with these attestations
   };
 
   /** Who manages this access requirement (steward) */
-  steward: string;  // Node ID or special identifier
+  steward: string; // Node ID or special identifier
 
   /** Can this requirement be revoked? */
   revocable: boolean;
@@ -193,7 +191,7 @@ export interface AttestationProgress {
   attestationId: string;
   requirement: AttestationRequirement;
   currentProgress: {
-    affinityProgress: { [nodeId: string]: number };
+    affinityProgress: Record<string, number>;
     exercisesCompleted: number;
     applicationsCompleted: number;
     endorsementsReceived: number;

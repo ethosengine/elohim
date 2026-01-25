@@ -19,8 +19,11 @@
  */
 
 import { Injectable } from '@angular/core';
-import { Observable, from, of } from 'rxjs';
+
 import { map, catchError, switchMap } from 'rxjs/operators';
+
+import { Observable, from, of } from 'rxjs';
+
 import { DoorwayClientService } from '../../elohim/services/doorway-client.service';
 
 /**
@@ -50,7 +53,10 @@ export interface BlobVerificationResult {
  * WASM module interface (from elohim-wasm crate)
  */
 interface ElohimWasmModule {
-  verify_blob(data: Uint8Array, expectedHash: string): {
+  verify_blob(
+    data: Uint8Array,
+    expectedHash: string
+  ): {
     is_valid: boolean;
     computed_hash: string;
     expected_hash: string;
@@ -100,11 +106,11 @@ export class BlobVerificationService {
     const startTime = performance.now();
 
     return from(this.verifyWithFallbackChain(blob, expectedHash)).pipe(
-      map((result) => ({
+      map(result => ({
         ...result,
         durationMs: performance.now() - startTime,
       })),
-      catchError((error) => {
+      catchError(error => {
         const durationMs = performance.now() - startTime;
         return of({
           isValid: false,
@@ -113,7 +119,7 @@ export class BlobVerificationService {
           error: `Verification failed: ${error.message}`,
           durationMs,
         });
-      }),
+      })
     );
   }
 
@@ -135,7 +141,7 @@ export class BlobVerificationService {
    */
   private async verifyWithFallbackChain(
     blob: Blob,
-    expectedHash: string,
+    expectedHash: string
   ): Promise<Omit<BlobVerificationResult, 'durationMs'>> {
     const buffer = await blob.arrayBuffer();
     const data = new Uint8Array(buffer);
@@ -178,7 +184,7 @@ export class BlobVerificationService {
       if (typeof crypto !== 'undefined' && crypto.subtle) {
         const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const computedHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+        const computedHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         const isValid = computedHash.toLowerCase() === expectedHash.toLowerCase();
         return {
           isValid,
@@ -248,7 +254,7 @@ export class BlobVerificationService {
   async streamComputeHash(
     blob: Blob,
     chunkSize: number = 1024 * 1024,
-    onProgress?: (processed: number, total: number) => void,
+    onProgress?: (processed: number, total: number) => void
   ): Promise<string> {
     // Try WASM streaming hasher first
     if (await this.ensureWasmLoaded()) {
@@ -301,7 +307,7 @@ export class BlobVerificationService {
     if (typeof crypto !== 'undefined' && crypto.subtle) {
       const hashBuffer = await crypto.subtle.digest('SHA-256', combined);
       return Array.from(new Uint8Array(hashBuffer))
-        .map((b) => b.toString(16).padStart(2, '0'))
+        .map(b => b.toString(16).padStart(2, '0'))
         .join('');
     }
 
@@ -314,11 +320,11 @@ export class BlobVerificationService {
    * @param blobsWithHashes Array of [Blob, expectedHash] pairs
    * @returns Observable with array of verification results
    */
-  verifyMultiple(blobsWithHashes: Array<[Blob, string]>): Observable<BlobVerificationResult[]> {
+  verifyMultiple(blobsWithHashes: [Blob, string][]): Observable<BlobVerificationResult[]> {
     const verifications = blobsWithHashes.map(([blob, hash]) => this.verifyBlob(blob, hash));
 
     return from(
-      Promise.all(verifications.map((v) => v.toPromise() as Promise<BlobVerificationResult>)),
+      Promise.all(verifications.map(v => v.toPromise() as Promise<BlobVerificationResult>))
     );
   }
 
@@ -456,9 +462,7 @@ export class BlobVerificationService {
     }
 
     // Produce final hash
-    return [h0, h1, h2, h3, h4, h5, h6, h7]
-      .map((v) => v.toString(16).padStart(8, '0'))
-      .join('');
+    return [h0, h1, h2, h3, h4, h5, h6, h7].map(v => v.toString(16).padStart(8, '0')).join('');
   }
 
   /**

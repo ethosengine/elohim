@@ -1,4 +1,9 @@
-import { generateId, generateMapId, generateExtensionId, generateNegotiationId } from './id-generator';
+import {
+  generateId,
+  generateMapId,
+  generateExtensionId,
+  generateNegotiationId,
+} from './id-generator';
 
 describe('id-generator utils', () => {
   describe('generateId', () => {

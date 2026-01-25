@@ -2,11 +2,7 @@
   <!-- View Mode Toggle -->
   <nav class="view-mode-bar">
     <div class="view-tabs">
-      <button
-        class="view-tab"
-        [class.active]="viewMode === 'paths'"
-        (click)="setViewMode('paths')"
-      >
+      <button class="view-tab" [class.active]="viewMode === 'paths'" (click)="setViewMode('paths')">
         <span class="tab-icon">📚</span>
         Learning Paths
       </button>
@@ -39,7 +35,6 @@
 
   <!-- Main Content -->
   @if (!isLoading && !error) {
-    
     <!-- Active Journey (Priority) -->
     @if (activeFocus) {
       <section class="featured-section">
@@ -79,7 +74,10 @@
           <p class="featured-description">{{ featuredPath.description }}</p>
 
           <div class="featured-meta">
-            <span class="meta-item difficulty" [class]="getDifficultyClass(featuredPath.difficulty)">
+            <span
+              class="meta-item difficulty"
+              [class]="getDifficultyClass(featuredPath.difficulty)"
+            >
               {{ formatDifficulty(featuredPath.difficulty) }}
             </span>
             @if (featuredPath.estimatedDuration) {
@@ -124,7 +122,11 @@
             <button class="path-card" (click)="goToPath(path.id)" type="button">
               @if (path.thumbnailUrl) {
                 <div class="path-thumbnail">
-                  <img [src]="path.thumbnailUrl" [alt]="path.thumbnailAlt || path.title" loading="lazy">
+                  <img
+                    [src]="path.thumbnailUrl"
+                    [alt]="path.thumbnailAlt || path.title"
+                    loading="lazy"
+                  />
                 </div>
               }
               <div class="path-content">
@@ -162,7 +164,9 @@
     <!-- Footer -->
     <footer class="home-footer">
       <p>
-        Lamad is part of the <strong>Elohim Protocol</strong> - digital infrastructure for human flourishing.
+        Lamad is part of the
+        <strong>Elohim Protocol</strong>
+        - digital infrastructure for human flourishing.
       </p>
     </footer>
   }

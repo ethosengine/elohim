@@ -223,13 +223,10 @@ describe('LoggerService', () => {
     });
 
     it('should time async operations', async () => {
-      const result = await service.time(
-        'async-op',
-        async () => {
-          await new Promise(resolve => setTimeout(resolve, 5));
-          return 'done';
-        }
-      );
+      const result = await service.time('async-op', async () => {
+        await new Promise(resolve => setTimeout(resolve, 5));
+        return 'done';
+      });
 
       expect(result).toBe('done');
       const logs = service.getRecentLogs();
@@ -238,12 +235,9 @@ describe('LoggerService', () => {
 
     it('should log failed async operations', async () => {
       try {
-        await service.time(
-          'failing-op',
-          async () => {
-            throw new Error('Operation failed');
-          }
-        );
+        await service.time('failing-op', async () => {
+          throw new Error('Operation failed');
+        });
       } catch {
         // Expected
       }

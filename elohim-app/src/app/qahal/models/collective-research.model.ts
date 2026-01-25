@@ -27,7 +27,11 @@
  * - Experience Sampling: Csikszentmihalyi & Larson
  */
 
-import type { ResearchFramework, ResearchCategory, PersonalResearchConsent } from '@app/lamad/quiz-engine/models/research-assessment.model';
+import type {
+  ResearchFramework,
+  ResearchCategory,
+  PersonalResearchConsent,
+} from '@app/lamad/quiz-engine/models/research-assessment.model';
 
 // =============================================================================
 // Unit of Analysis
@@ -37,11 +41,11 @@ import type { ResearchFramework, ResearchCategory, PersonalResearchConsent } fro
  * The unit of analysis for collective research.
  */
 export type CollectiveUnit =
-  | 'dyad'                // Pair of people (couples, mentor-mentee, etc.)
-  | 'small-group'         // 3-12 people (teams, families, cohorts)
-  | 'large-group'         // 13-100 people (classrooms, organizations)
-  | 'network'             // Social network/community
-  | 'population';         // Aggregate across many individuals/groups
+  | 'dyad' // Pair of people (couples, mentor-mentee, etc.)
+  | 'small-group' // 3-12 people (teams, families, cohorts)
+  | 'large-group' // 13-100 people (classrooms, organizations)
+  | 'network' // Social network/community
+  | 'population'; // Aggregate across many individuals/groups
 
 // =============================================================================
 // Dyadic Research
@@ -52,25 +56,25 @@ export type CollectiveUnit =
  * Determines distinguishability for APIM analysis.
  */
 export type DyadType =
-  | 'romantic-partner'    // Couples (distinguishable by role or indistinguishable)
-  | 'parent-child'        // Parent-child dyads (distinguishable)
-  | 'mentor-mentee'       // Mentorship relationships (distinguishable)
-  | 'sibling'             // Sibling pairs (distinguishable by birth order or indistinguishable)
-  | 'coworker'            // Workplace pairs
-  | 'friend'              // Friendship dyads (typically indistinguishable)
+  | 'romantic-partner' // Couples (distinguishable by role or indistinguishable)
+  | 'parent-child' // Parent-child dyads (distinguishable)
+  | 'mentor-mentee' // Mentorship relationships (distinguishable)
+  | 'sibling' // Sibling pairs (distinguishable by birth order or indistinguishable)
+  | 'coworker' // Workplace pairs
+  | 'friend' // Friendship dyads (typically indistinguishable)
   | 'caregiver-recipient' // Care relationships (distinguishable)
-  | 'teacher-student'     // Educational dyads (distinguishable)
-  | 'accountability'      // Accountability partners
-  | 'matched-control';    // Experimentally matched pairs
+  | 'teacher-student' // Educational dyads (distinguishable)
+  | 'accountability' // Accountability partners
+  | 'matched-control'; // Experimentally matched pairs
 
 /**
  * Whether dyad members can be distinguished by a non-arbitrary variable.
  * Affects statistical analysis methods (Pearson vs intraclass correlation).
  */
 export type Distinguishability =
-  | 'distinguishable'     // Members have distinct roles (e.g., parent vs child)
-  | 'indistinguishable'   // Members cannot be naturally distinguished
-  | 'mixed';              // Some aspects distinguishable, others not
+  | 'distinguishable' // Members have distinct roles (e.g., parent vs child)
+  | 'indistinguishable' // Members cannot be naturally distinguished
+  | 'mixed'; // Some aspects distinguishable, others not
 
 /**
  * A dyad (paired participants) in the research system.
@@ -207,10 +211,10 @@ export interface DyadicQuestion {
  * Analysis model for dyadic data.
  */
 export type DyadicAnalysisModel =
-  | 'apim'              // Actor-Partner Interdependence Model
-  | 'common-fate'       // Both members affected by shared factors
-  | 'mutual-influence'  // Bidirectional influence
-  | 'actor-only';       // No partner effects expected
+  | 'apim' // Actor-Partner Interdependence Model
+  | 'common-fate' // Both members affected by shared factors
+  | 'mutual-influence' // Bidirectional influence
+  | 'actor-only'; // No partner effects expected
 
 /**
  * Result from a dyadic assessment.
@@ -1028,7 +1032,14 @@ export interface ResearchStudy {
   dataRetention: DataRetentionPolicy;
 
   /** Status */
-  status: 'draft' | 'under-review' | 'approved' | 'recruiting' | 'active' | 'completed' | 'archived';
+  status:
+    | 'draft'
+    | 'under-review'
+    | 'approved'
+    | 'recruiting'
+    | 'active'
+    | 'completed'
+    | 'archived';
 
   /** Timestamps */
   createdAt: string;

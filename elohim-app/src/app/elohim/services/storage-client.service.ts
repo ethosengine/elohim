@@ -12,14 +12,16 @@
  * In Eclipse Che, doorway is accessed via the hc-dev endpoint URL.
  */
 
-import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+
 import { Observable, catchError, map, of, throwError, timeout } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
-import type { IConnectionStrategy, ConnectionConfig } from '@elohim/service/connection';
+
 import type { ListResponse, BulkCreateResult } from '../models/storage-response.model';
+import type { IConnectionStrategy, ConnectionConfig } from '@elohim/service/connection';
 
 /** Content node from storage (matches backend ContentWithTags) */
 export interface StorageContentNode {
@@ -36,9 +38,9 @@ export interface StorageContentNode {
   createdAt: string;
   updatedAt: string;
   // Additional fields from backend
-  reach?: string;              // visibility scope (commons, private, etc.)
-  validationStatus?: string;  // draft, approved, etc.
-  createdBy?: string;         // agent who created the content
+  reach?: string; // visibility scope (commons, private, etc.)
+  validationStatus?: string; // draft, approved, etc.
+  createdBy?: string; // agent who created the content
   contentSizeBytes?: number; // size of blob content
 }
 
@@ -68,13 +70,13 @@ export interface ContentFilter {
 
 /** Relationship between content nodes - camelCase for API */
 export interface StorageRelationship {
-  id?: string;               // Optional for creates
+  id?: string; // Optional for creates
   sourceId: string;
   targetId: string;
   relationshipType: string; // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
-  confidence?: number;       // 0.0-1.0
+  confidence?: number; // 0.0-1.0
   inferenceSource?: string; // explicit, path, tag, semantic
-  metadata?: Record<string, unknown>;  // Parsed JSON object
+  metadata?: Record<string, unknown>; // Parsed JSON object
   createdAt?: string;
   updatedAt?: string;
 }
@@ -119,7 +121,7 @@ export class StorageClientService {
     const url = this.getBlobUrl(blobHash);
     return this.http.get(url, { responseType: 'arraybuffer' }).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError((error) => this.handleError('fetchBlob', error))
+      catchError(error => this.handleError('fetchBlob', error))
     );
   }
 
@@ -130,7 +132,7 @@ export class StorageClientService {
     const url = this.getBlobUrl(blobHash);
     return this.http.head(url, { observe: 'response' }).pipe(
       timeout(5000),
-      map((response) => response.status === 200),
+      map(response => response.status === 200),
       catchError(() => of(false))
     );
   }
@@ -149,7 +151,7 @@ export class StorageClientService {
 
     return this.http.get<StorageContentNode>(endpoint).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError((error) => {
+      catchError(error => {
         if (error.status === 404) return of(null);
         return this.handleError('getContent', error);
       })
@@ -177,7 +179,7 @@ export class StorageClientService {
 
     return this.http.get<ListResponse<StorageContentNode>>(url).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError((error) => this.handleError('queryContent', error))
+      catchError(error => this.handleError('queryContent', error))
     );
   }
 
@@ -195,7 +197,7 @@ export class StorageClientService {
 
     return this.http.get<StoragePath>(endpoint).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError((error) => {
+      catchError(error => {
         if (error.status === 404) return of(null);
         return this.handleError('getPath', error);
       })
@@ -214,7 +216,7 @@ export class StorageClientService {
 
     return this.http.get<ListResponse<StoragePath>>(endpoint).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError((error) => this.handleError('getAllPaths', error))
+      catchError(error => this.handleError('getAllPaths', error))
     );
   }
 
@@ -298,7 +300,7 @@ export class StorageClientService {
 
     return this.http.post<BulkCreateResult>(endpoint, items).pipe(
       timeout(120000), // 2 min for bulk ops
-      catchError((error) => this.handleError('bulkCreateContent', error))
+      catchError(error => this.handleError('bulkCreateContent', error))
     );
   }
 
@@ -314,7 +316,7 @@ export class StorageClientService {
 
     return this.http.post<BulkCreateResult>(endpoint, items).pipe(
       timeout(120000),
-      catchError((error) => this.handleError('bulkCreatePaths', error))
+      catchError(error => this.handleError('bulkCreatePaths', error))
     );
   }
 
@@ -330,7 +332,7 @@ export class StorageClientService {
 
     return this.http.post<BulkCreateResult>(endpoint, items).pipe(
       timeout(120000),
-      catchError((error) => this.handleError('bulkCreateRelationships', error))
+      catchError(error => this.handleError('bulkCreateRelationships', error))
     );
   }
 }

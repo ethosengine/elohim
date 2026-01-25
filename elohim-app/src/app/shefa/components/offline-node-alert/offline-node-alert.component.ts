@@ -12,18 +12,25 @@
  * </app-offline-node-alert>
  */
 
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
+
 import { Subject, takeUntil } from 'rxjs';
 
-import { AlertBannerComponent, AlertData, AlertAction, AlertSeverity } from '@app/shared/components/alert-banner/alert-banner.component';
-import { ShefaComputeService } from '../../services/shefa-compute.service';
+import {
+  AlertBannerComponent,
+  AlertData,
+  AlertAction,
+  AlertSeverity,
+} from '@app/shared/components/alert-banner/alert-banner.component';
+
 import {
   OfflineNodeAlert,
   NodeTopologyState,
   ComputeNeedsAssessment,
 } from '../../models/shefa-dashboard.model';
+import { ShefaComputeService } from '../../services/shefa-compute.service';
 
 @Component({
   selector: 'app-offline-node-alert',
@@ -37,37 +44,41 @@ import {
       [maxVisible]="maxAlerts"
       [expandable]="true"
       (dismissed)="onAlertDismissed($event)"
-      (actionClicked)="onActionClicked($event)">
-    </app-alert-banner>
+      (actionClicked)="onActionClicked($event)"
+    ></app-alert-banner>
 
     <div class="loading-indicator" *ngIf="isLoading">
       <span class="spinner"></span>
       Checking node status...
     </div>
   `,
-  styles: [`
-    .loading-indicator {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      font-size: 0.85rem;
-      color: #6b7280;
-    }
+  styles: [
+    `
+      .loading-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        color: #6b7280;
+      }
 
-    .spinner {
-      width: 1rem;
-      height: 1rem;
-      border: 2px solid #e5e7eb;
-      border-top-color: #3b82f6;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+      .spinner {
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid #e5e7eb;
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  `],
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    `,
+  ],
 })
 export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
   /** Operator ID to load alerts for */
@@ -123,13 +134,13 @@ export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
       .getNodeTopology(this.operatorId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (topology) => {
+        next: topology => {
           this.topology = topology;
           this.rawAlerts = topology.alerts;
           this.updateAlertData();
           this.isLoading = false;
         },
-        error: (err) => {
+        error: err => {
           console.error('[OfflineNodeAlert] Failed to load topology:', err);
           this.isLoading = false;
         },
@@ -140,11 +151,11 @@ export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
       .getComputeNeedsAssessment(this.operatorId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (needs) => {
+        next: needs => {
           this.computeNeeds = needs;
           this.updateAlertData();
         },
-        error: (err) => {
+        error: err => {
           console.error('[OfflineNodeAlert] Failed to load compute needs:', err);
         },
       });
@@ -194,9 +205,12 @@ export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
   private mapSeverity(alert: OfflineNodeAlert): AlertSeverity {
     if (alert.isPrimaryNode) return 'critical';
     switch (alert.severity) {
-      case 'critical': return 'critical';
-      case 'warning': return 'warning';
-      default: return 'info';
+      case 'critical':
+        return 'critical';
+      case 'warning':
+        return 'warning';
+      default:
+        return 'info';
     }
   }
 

@@ -1,20 +1,24 @@
-import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { Subject } from 'rxjs';
+
 import { takeUntil } from 'rxjs/operators';
+
 import * as d3 from 'd3';
+import { Subject } from 'rxjs';
+
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { HierarchicalGraphService } from '../../services/hierarchical-graph.service';
+
 import {
   ClusterNode,
   ClusterEdge,
   ClusterGraphData,
   ClusterConnection,
   CLUSTER_LEVEL_CONFIG,
-  calculateClusterRadius
+  calculateClusterRadius,
 } from '../../models/cluster-graph.model';
+import { HierarchicalGraphService } from '../../services/hierarchical-graph.service';
 
 /**
  * View mode for the graph explorer.
@@ -38,7 +42,7 @@ type ViewMode = 'path-hierarchy' | 'overview';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './graph-explorer.component.html',
-  styleUrls: ['./graph-explorer.component.css']
+  styleUrls: ['./graph-explorer.component.css'],
 })
 export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('graphContainer', { static: true }) graphContainer!: ElementRef<HTMLDivElement>;
@@ -89,7 +93,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       if (params['fromPath']) {
         this.returnContext = {
           pathId: params['fromPath'],
-          stepIndex: parseInt(params['returnStep'] || '0', 10)
+          stepIndex: parseInt(params['returnStep'] || '0', 10),
         };
       }
 
@@ -128,7 +132,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
         '/lamad/path',
         this.returnContext.pathId,
         'step',
-        this.returnContext.stepIndex
+        this.returnContext.stepIndex,
       ]);
     } else {
       this.router.navigate(['/lamad']);
@@ -164,16 +168,18 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
     d3.select(container).selectAll('*').remove();
 
     // Create SVG
-    this.svg = d3.select(container)
+    this.svg = d3
+      .select(container)
       .append('svg')
       .attr('width', '100%')
       .attr('height', '100%')
       .attr('viewBox', `${-this.width / 2} ${-this.height / 2} ${this.width} ${this.height}`);
 
     // Add zoom behavior
-    this.zoom = d3.zoom<SVGSVGElement, unknown>()
+    this.zoom = d3
+      .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.3, 3])
-      .on('zoom', (event) => {
+      .on('zoom', event => {
         this.svg.select('g.graph-content').attr('transform', event.transform);
       });
 
@@ -198,25 +204,23 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
     const defs = this.svg.append('defs');
 
     // Radial gradient for cluster backgrounds
-    const gradient = defs.append('radialGradient')
+    const gradient = defs
+      .append('radialGradient')
       .attr('id', 'cluster-gradient')
       .attr('cx', '50%')
       .attr('cy', '50%')
       .attr('r', '50%');
 
-    gradient.append('stop')
-      .attr('offset', '0%')
-      .attr('stop-color', 'rgba(99, 102, 241, 0.3)');
+    gradient.append('stop').attr('offset', '0%').attr('stop-color', 'rgba(99, 102, 241, 0.3)');
 
-    gradient.append('stop')
-      .attr('offset', '100%')
-      .attr('stop-color', 'rgba(99, 102, 241, 0.1)');
+    gradient.append('stop').attr('offset', '100%').attr('stop-color', 'rgba(99, 102, 241, 0.1)');
 
     // Arrow marker for progression edges
-    defs.append('marker')
+    defs
+      .append('marker')
       .attr('id', 'arrow-next')
       .attr('viewBox', '0 -5 10 10')
-      .attr('refX', 25)  // Offset from end of line to account for node radius
+      .attr('refX', 25) // Offset from end of line to account for node radius
       .attr('refY', 0)
       .attr('markerWidth', 8)
       .attr('markerHeight', 8)
@@ -235,10 +239,11 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
     this.error = null;
     this.currentPathId = pathId;
 
-    this.hierarchicalGraph.initializeFromPath(pathId)
+    this.hierarchicalGraph
+      .initializeFromPath(pathId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (graph) => {
+        next: graph => {
           this.graphData = graph;
           this.updateVisibleNodes();
           this.breadcrumbs = [{ id: graph.root.id, title: graph.root.title, level: 0 }];
@@ -248,11 +253,11 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
             this.renderClusterGraph();
           }
         },
-        error: (err) => {
+        error: err => {
           console.error('[GraphExplorer] Failed to load path hierarchy:', err);
           this.error = 'Failed to load learning path graph';
           this.isLoading = false;
-        }
+        },
       });
   }
 
@@ -265,10 +270,11 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
     this.error = null;
 
     // Use the same learning path but show chapters as flat nodes
-    this.dataLoader.getPathHierarchy(this.currentPathId)
+    this.dataLoader
+      .getPathHierarchy(this.currentPathId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (path) => {
+        next: path => {
           if (!path || !path.chapters || path.chapters.length === 0) {
             this.error = 'No content available for overview';
             this.isLoading = false;
@@ -294,7 +300,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
               isCluster: true,
               clusterType: 'chapter' as const,
               clusterLevel: 1,
-              parentClusterId: null,  // No parent in flat view
+              parentClusterId: null, // No parent in flat view
               childClusterIds: [],
               conceptIds: [],
               isExpanded: false,
@@ -304,7 +310,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
               externalConnectionCount: 0,
               state: 'unseen' as const,
               affinityScore: 0,
-              order: chapter.order ?? index
+              order: chapter.order ?? index,
             };
           });
 
@@ -320,7 +326,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
         error: () => {
           this.error = 'Failed to load graph overview';
           this.isLoading = false;
-        }
+        },
       });
   }
 
@@ -360,7 +366,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       state,
       affinityScore,
       x: node.position?.x ?? 0,
-      y: node.position?.y ?? 0
+      y: node.position?.y ?? 0,
     };
   }
 
@@ -382,10 +388,11 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
 
     this.loadingClusters.add(clusterId);
 
-    this.hierarchicalGraph.expandCluster(clusterId)
+    this.hierarchicalGraph
+      .expandCluster(clusterId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (result) => {
+        next: result => {
           this.loadingClusters.delete(clusterId);
 
           // Update visible nodes
@@ -400,10 +407,10 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
           // Re-render
           this.renderClusterGraph();
         },
-        error: (err) => {
+        error: err => {
           console.error('[GraphExplorer] Failed to expand cluster:', err);
           this.loadingClusters.delete(clusterId);
-        }
+        },
       });
   }
 
@@ -428,7 +435,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       crumbs.unshift({
         id: current.id,
         title: current.title,
-        level: current.clusterLevel
+        level: current.clusterLevel,
       });
       current = current.parentClusterId
         ? this.graphData?.clusters.get(current.parentClusterId)
@@ -451,18 +458,28 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
     const edges = this.visibleEdges;
 
     // Create simulation with cluster-aware forces
-    this.simulation = d3.forceSimulation<ClusterNode>(nodes)
-      .force('link', d3.forceLink<ClusterNode, ClusterEdge>(edges as any)
-        .id((d: ClusterNode) => d.id)
-        .distance(d => this.getLinkDistance(d)))
-      .force('charge', d3.forceManyBody()
-        .strength(d => this.getChargeStrength(d as ClusterNode)))
+    this.simulation = d3
+      .forceSimulation<ClusterNode>(nodes)
+      .force(
+        'link',
+        d3
+          .forceLink<ClusterNode, ClusterEdge>(edges as any)
+          .id((d: ClusterNode) => d.id)
+          .distance(d => this.getLinkDistance(d))
+      )
+      .force(
+        'charge',
+        d3.forceManyBody().strength(d => this.getChargeStrength(d as ClusterNode))
+      )
       .force('center', d3.forceCenter(0, 0))
-      .force('collision', d3.forceCollide<ClusterNode>()
-        .radius(d => this.getCollisionRadius(d)));
+      .force(
+        'collision',
+        d3.forceCollide<ClusterNode>().radius(d => this.getCollisionRadius(d))
+      );
 
     // Draw edges first (under nodes)
-    const link = g.append('g')
+    const link = g
+      .append('g')
       .attr('class', 'links')
       .selectAll('line')
       .data(edges)
@@ -470,34 +487,43 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .append('line')
       .attr('class', d => `link link-${d.type.toLowerCase()}`)
       .attr('stroke', d => this.getEdgeColor(d))
-      .attr('stroke-opacity', d => d.type === 'NEXT' ? 0.8 : (d.isAggregated ? 0.3 : 0.6))
-      .attr('stroke-width', d => d.type === 'NEXT' ? 3 : (d.isAggregated ? Math.min(d.connectionCount || 1, 8) : 2))
-      .attr('stroke-dasharray', d => d.isAggregated ? '5,5' : 'none')
-      .attr('marker-end', d => d.type === 'NEXT' ? 'url(#arrow-next)' : null);
+      .attr('stroke-opacity', d => (d.type === 'NEXT' ? 0.8 : d.isAggregated ? 0.3 : 0.6))
+      .attr('stroke-width', d =>
+        d.type === 'NEXT' ? 3 : d.isAggregated ? Math.min(d.connectionCount || 1, 8) : 2
+      )
+      .attr('stroke-dasharray', d => (d.isAggregated ? '5,5' : 'none'))
+      .attr('marker-end', d => (d.type === 'NEXT' ? 'url(#arrow-next)' : null));
 
     // Draw nodes
-    const node = g.append('g')
+    const node = g
+      .append('g')
       .attr('class', 'nodes')
       .selectAll('g.node')
       .data(nodes)
       .enter()
       .append('g')
-      .attr('class', d => `node node-${d.contentType} node-state-${d.state} ${d.isCluster ? 'cluster' : 'concept'}`)
+      .attr(
+        'class',
+        d =>
+          `node node-${d.contentType} node-state-${d.state} ${d.isCluster ? 'cluster' : 'concept'}`
+      )
       .style('cursor', 'pointer')
       .call(this.drag());
 
     // Cluster circles (with fill)
-    node.filter(d => d.isCluster)
+    node
+      .filter(d => d.isCluster)
       .append('circle')
       .attr('r', d => this.getNodeRadius(d))
       .attr('fill', d => this.getClusterFill(d))
       .attr('stroke', d => this.getClusterStroke(d))
       .attr('stroke-width', 2)
-      .attr('stroke-dasharray', d => d.isExpanded ? '5,3' : 'none')
-      .attr('opacity', d => d.isExpanded ? 0.5 : 0.8);
+      .attr('stroke-dasharray', d => (d.isExpanded ? '5,3' : 'none'))
+      .attr('opacity', d => (d.isExpanded ? 0.5 : 0.8));
 
     // Concept circles (solid fill)
-    node.filter(d => !d.isCluster)
+    node
+      .filter(d => !d.isCluster)
       .append('circle')
       .attr('r', d => this.getNodeRadius(d))
       .attr('fill', d => this.getNodeColor(d))
@@ -505,7 +531,8 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .attr('stroke-width', 3);
 
     // Progress arc for clusters
-    node.filter(d => d.isCluster && d.totalConceptCount > 0)
+    node
+      .filter(d => d.isCluster && d.totalConceptCount > 0)
       .append('path')
       .attr('class', 'progress-arc')
       .attr('d', d => this.createProgressArc(d))
@@ -515,7 +542,8 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .attr('opacity', 0.8);
 
     // Child count badge for clusters
-    node.filter(d => d.isCluster && d.totalConceptCount > 0 && !d.isExpanded)
+    node
+      .filter(d => d.isCluster && d.totalConceptCount > 0 && !d.isExpanded)
       .append('circle')
       .attr('r', 14)
       .attr('cx', d => this.getNodeRadius(d) - 8)
@@ -524,7 +552,8 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .attr('stroke', '#fff')
       .attr('stroke-width', 2);
 
-    node.filter(d => d.isCluster && d.totalConceptCount > 0 && !d.isExpanded)
+    node
+      .filter(d => d.isCluster && d.totalConceptCount > 0 && !d.isExpanded)
       .append('text')
       .attr('x', d => this.getNodeRadius(d) - 8)
       .attr('y', d => -this.getNodeRadius(d) + 13)
@@ -535,7 +564,8 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .text(d => d.totalConceptCount);
 
     // Expand/collapse indicator for clusters
-    node.filter(d => d.isCluster && d.childClusterIds.length > 0)
+    node
+      .filter(d => d.isCluster && d.childClusterIds.length > 0)
       .append('text')
       .attr('class', 'expand-indicator')
       .attr('x', 0)
@@ -544,19 +574,21 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .attr('fill', '#e0e6ed')
       .attr('font-size', '18px')
       .attr('font-weight', 'bold')
-      .text(d => this.hierarchicalGraph.isExpanded(d.id) ? '−' : '+');
+      .text(d => (this.hierarchicalGraph.isExpanded(d.id) ? '−' : '+'));
 
     // Node labels
-    node.append('text')
+    node
+      .append('text')
       .attr('dy', d => this.getNodeRadius(d) + 18)
       .attr('text-anchor', 'middle')
       .attr('fill', '#e0e6ed')
-      .attr('font-size', d => d.isCluster ? '13px' : '11px')
-      .attr('font-weight', d => d.isCluster ? '600' : '500')
+      .attr('font-size', d => (d.isCluster ? '13px' : '11px'))
+      .attr('font-weight', d => (d.isCluster ? '600' : '500'))
       .text(d => this.truncateTitle(d.title, d.isCluster ? 25 : 18));
 
     // Cluster type label (above title)
-    node.filter(d => d.isCluster)
+    node
+      .filter(d => d.isCluster)
       .append('text')
       .attr('dy', d => -this.getNodeRadius(d) - 8)
       .attr('text-anchor', 'middle')
@@ -657,12 +689,18 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   private getNodeColor(node: ClusterNode): string {
     switch (node.state) {
-      case 'proficient': return '#fbbf24';
-      case 'in-progress': return '#facc15';
-      case 'recommended': return '#22c55e';
-      case 'review': return '#f97316';
-      case 'locked': return '#475569';
-      default: return '#64748b';
+      case 'proficient':
+        return '#fbbf24';
+      case 'in-progress':
+        return '#facc15';
+      case 'recommended':
+        return '#22c55e';
+      case 'review':
+        return '#f97316';
+      case 'locked':
+        return '#475569';
+      default:
+        return '#64748b';
     }
   }
 
@@ -671,12 +709,18 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   private getNodeStroke(node: ClusterNode): string {
     switch (node.state) {
-      case 'proficient': return '#3b82f6';
-      case 'in-progress': return '#3b82f6';
-      case 'recommended': return '#22c55e';
-      case 'review': return '#f97316';
-      case 'locked': return '#64748b';
-      default: return '#94a3b8';
+      case 'proficient':
+        return '#3b82f6';
+      case 'in-progress':
+        return '#3b82f6';
+      case 'recommended':
+        return '#22c55e';
+      case 'review':
+        return '#f97316';
+      case 'locked':
+        return '#64748b';
+      default:
+        return '#94a3b8';
     }
   }
 
@@ -685,11 +729,16 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   private getEdgeColor(edge: ClusterEdge): string {
     switch (edge.type) {
-      case 'NEXT': return '#6366f1';  // Indigo for progression
-      case 'CONTAINS': return '#22c55e';
-      case 'PREREQ': return '#3b82f6';
-      case 'RELATED': return '#8b5cf6';
-      default: return edge.isAggregated ? '#6366f1' : '#475569';
+      case 'NEXT':
+        return '#6366f1'; // Indigo for progression
+      case 'CONTAINS':
+        return '#22c55e';
+      case 'PREREQ':
+        return '#3b82f6';
+      case 'RELATED':
+        return '#8b5cf6';
+      default:
+        return edge.isAggregated ? '#6366f1' : '#475569';
     }
   }
 
@@ -704,7 +753,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
 
     const radius = this.getNodeRadius(node) + 6;
     const startAngle = -Math.PI / 2;
-    const endAngle = startAngle + (progress * 2 * Math.PI);
+    const endAngle = startAngle + progress * 2 * Math.PI;
 
     const x1 = Math.cos(startAngle) * radius;
     const y1 = Math.sin(startAngle) * radius;
@@ -786,21 +835,40 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    * Create drag behavior.
    */
   private drag(): d3.DragBehavior<SVGGElement, ClusterNode, ClusterNode | d3.SubjectPosition> {
-    return d3.drag<SVGGElement, ClusterNode>()
-      .on('start', (event: d3.D3DragEvent<SVGGElement, ClusterNode, ClusterNode | d3.SubjectPosition>, d: ClusterNode) => {
-        if (!event.active) this.simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
-      })
-      .on('drag', (event: d3.D3DragEvent<SVGGElement, ClusterNode, ClusterNode | d3.SubjectPosition>, d: ClusterNode) => {
-        d.fx = event.x;
-        d.fy = event.y;
-      })
-      .on('end', (event: d3.D3DragEvent<SVGGElement, ClusterNode, ClusterNode | d3.SubjectPosition>, d: ClusterNode) => {
-        if (!event.active) this.simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
-      });
+    return d3
+      .drag<SVGGElement, ClusterNode>()
+      .on(
+        'start',
+        (
+          event: d3.D3DragEvent<SVGGElement, ClusterNode, ClusterNode | d3.SubjectPosition>,
+          d: ClusterNode
+        ) => {
+          if (!event.active) this.simulation.alphaTarget(0.3).restart();
+          d.fx = d.x;
+          d.fy = d.y;
+        }
+      )
+      .on(
+        'drag',
+        (
+          event: d3.D3DragEvent<SVGGElement, ClusterNode, ClusterNode | d3.SubjectPosition>,
+          d: ClusterNode
+        ) => {
+          d.fx = event.x;
+          d.fy = event.y;
+        }
+      )
+      .on(
+        'end',
+        (
+          event: d3.D3DragEvent<SVGGElement, ClusterNode, ClusterNode | d3.SubjectPosition>,
+          d: ClusterNode
+        ) => {
+          if (!event.active) this.simulation.alphaTarget(0);
+          d.fx = null;
+          d.fy = null;
+        }
+      );
   }
 
   /**
@@ -808,9 +876,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   resetZoom(): void {
     if (this.svg && this.zoom) {
-      this.svg.transition()
-        .duration(500)
-        .call(this.zoom.transform, d3.zoomIdentity);
+      this.svg.transition().duration(500).call(this.zoom.transform, d3.zoomIdentity);
     }
   }
 
@@ -819,12 +885,12 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   getStateLabel(state: string): string {
     const labels: Record<string, string> = {
-      'unseen': 'Not Started',
+      unseen: 'Not Started',
       'in-progress': 'In Progress',
-      'proficient': 'Completed',
-      'recommended': 'Recommended',
-      'review': 'Needs Review',
-      'locked': 'Locked'
+      proficient: 'Completed',
+      recommended: 'Recommended',
+      review: 'Needs Review',
+      locked: 'Locked',
     };
     return labels[state] ?? state;
   }
@@ -835,10 +901,10 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
   getClusterTypeLabel(clusterType: string | null): string {
     if (!clusterType) return 'Concept';
     const labels: Record<string, string> = {
-      'path': 'Learning Path',
-      'chapter': 'Chapter',
-      'module': 'Module',
-      'section': 'Section'
+      path: 'Learning Path',
+      chapter: 'Chapter',
+      module: 'Module',
+      section: 'Section',
     };
     return labels[clusterType] ?? clusterType;
   }
@@ -847,9 +913,11 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    * Check if a cluster can be expanded.
    */
   canExpand(node: ClusterNode): boolean {
-    return node.isCluster &&
-           (node.childClusterIds.length > 0 || node.conceptIds.length > 0) &&
-           !this.hierarchicalGraph.isExpanded(node.id);
+    return (
+      node.isCluster &&
+      (node.childClusterIds.length > 0 || node.conceptIds.length > 0) &&
+      !this.hierarchicalGraph.isExpanded(node.id)
+    );
   }
 
   /**

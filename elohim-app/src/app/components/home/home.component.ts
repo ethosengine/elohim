@@ -1,17 +1,18 @@
 import { Component, OnInit, OnDestroy, ElementRef, Renderer2 } from '@angular/core';
-import { HeroComponent } from '../hero/hero.component';
+
+import { AnalyticsService } from '../../services/analytics.service';
+import { ConfigService } from '../../services/config.service';
+import { DomInteractionService } from '../../services/dom-interaction.service';
+import { CallToActionComponent } from '../call-to-action/call-to-action.component';
 import { CrisisComponent } from '../crisis/crisis.component';
-import { VisionComponent } from '../vision/vision.component';
-import { ElohimHostComponent } from '../elohim-host/elohim-host.component';
+import { DebugBarComponent } from '../debug-bar/debug-bar.component';
 import { DesignPrinciplesComponent } from '../design-principles/design-principles.component';
+import { ElohimHostComponent } from '../elohim-host/elohim-host.component';
+import { FooterComponent } from '../footer/footer.component';
+import { HeroComponent } from '../hero/hero.component';
 import { LearningSuccessComponent } from '../learning-success/learning-success.component';
 import { PathForwardComponent } from '../path-forward/path-forward.component';
-import { CallToActionComponent } from '../call-to-action/call-to-action.component';
-import { FooterComponent } from '../footer/footer.component';
-import { DebugBarComponent } from '../debug-bar/debug-bar.component';
-import { ConfigService } from '../../services/config.service';
-import { AnalyticsService } from '../../services/analytics.service';
-import { DomInteractionService } from '../../services/dom-interaction.service';
+import { VisionComponent } from '../vision/vision.component';
 
 @Component({
   selector: 'app-home',
@@ -26,10 +27,10 @@ import { DomInteractionService } from '../../services/dom-interaction.service';
     LearningSuccessComponent,
     PathForwardComponent,
     CallToActionComponent,
-    FooterComponent
+    FooterComponent,
   ],
   templateUrl: './home.component.html',
-  styleUrl: './home.component.css'
+  styleUrl: './home.component.css',
 })
 export class HomeComponent implements OnInit, OnDestroy {
   private scrollListener?: () => void;
@@ -108,10 +109,10 @@ export class HomeComponent implements OnInit, OnDestroy {
   private setupIntersectionObserver() {
     const observerOptions = {
       threshold: 0.1,
-      rootMargin: '0px 0px -50px 0px'
+      rootMargin: '0px 0px -50px 0px',
     };
 
-    this.intersectionObserver = new IntersectionObserver((entries) => {
+    this.intersectionObserver = new IntersectionObserver(entries => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           this.renderer.addClass(entry.target, 'visible');

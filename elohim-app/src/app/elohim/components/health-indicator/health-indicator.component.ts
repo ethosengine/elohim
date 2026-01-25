@@ -5,8 +5,9 @@
  * Uses the HealthCheckService to show real-time system status.
  */
 
-import { Component, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, computed } from '@angular/core';
+
 import { HealthCheckService, HealthState, HealthCheck } from '../../services/health-check.service';
 
 @Component({
@@ -59,10 +60,14 @@ export class HealthIndicatorComponent {
    */
   getStatusIcon(status: HealthState): string {
     switch (status) {
-      case 'healthy': return '✓';
-      case 'degraded': return '!';
-      case 'unhealthy': return '✕';
-      default: return '?';
+      case 'healthy':
+        return '✓';
+      case 'degraded':
+        return '!';
+      case 'unhealthy':
+        return '✕';
+      default:
+        return '?';
     }
   }
 

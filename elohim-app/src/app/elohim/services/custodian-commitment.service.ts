@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+
 import { HolochainClientService } from './holochain-client.service';
 
 /**
@@ -64,7 +65,7 @@ export interface CustodianCommitment {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class CustodianCommitmentService {
   private readonly holochain = inject(HolochainClientService);
@@ -77,7 +78,7 @@ export class CustodianCommitmentService {
       const result = await this.holochain.callZome({
         zomeName: 'replication',
         fnName: 'get_custodian_commitments_for_content',
-        payload: { content_id: contentId }
+        payload: { content_id: contentId },
       });
 
       if (!result.success) {
@@ -100,7 +101,7 @@ export class CustodianCommitmentService {
       const result = await this.holochain.callZome({
         zomeName: 'replication',
         fnName: 'get_custodian_all_commitments',
-        payload: { custodian_id: custodianId }
+        payload: { custodian_id: custodianId },
       });
 
       if (!result.success) {
@@ -124,7 +125,7 @@ export class CustodianCommitmentService {
     replicationStrategy: 'full_replica' | 'threshold' | 'erasure_coded',
     storageAllocated: number,
     bandwidthAllocated: number,
-    expirationDays: number = 30
+    expirationDays = 30
   ): Promise<{ success: boolean; commitmentId?: string; error?: string }> {
     try {
       const expiresAt = Date.now() + expirationDays * 24 * 60 * 60 * 1000;
@@ -138,8 +139,8 @@ export class CustodianCommitmentService {
           replication_strategy: replicationStrategy,
           storage_allocated: storageAllocated,
           bandwidth_allocated: bandwidthAllocated,
-          expires_at: expiresAt
-        }
+          expires_at: expiresAt,
+        },
       });
 
       if (!result.success) {
@@ -159,7 +160,7 @@ export class CustodianCommitmentService {
    */
   async renewCommitment(
     commitmentId: string,
-    extensionDays: number = 30
+    extensionDays = 30
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const result = await this.holochain.callZome({
@@ -167,8 +168,8 @@ export class CustodianCommitmentService {
         fnName: 'renew_custodian_commitment',
         payload: {
           commitment_id: commitmentId,
-          extension_days: extensionDays
-        }
+          extension_days: extensionDays,
+        },
       });
 
       if (!result.success) {
@@ -191,7 +192,7 @@ export class CustodianCommitmentService {
       const result = await this.holochain.callZome({
         zomeName: 'replication',
         fnName: 'revoke_custodian_commitment',
-        payload: { commitment_id: commitmentId }
+        payload: { commitment_id: commitmentId },
       });
 
       if (!result.success) {
@@ -211,7 +212,7 @@ export class CustodianCommitmentService {
    */
   async getExpiringCommitments(
     custodianId: string,
-    withinDays: number = 7
+    withinDays = 7
   ): Promise<CustodianCommitment[]> {
     try {
       const commitments = await this.getCommitmentsByCustomian(custodianId);
@@ -245,9 +246,7 @@ export class CustodianCommitmentService {
   async getTotalCommittedStorage(custodianId: string): Promise<number> {
     try {
       const commitments = await this.getCommitmentsByCustomian(custodianId);
-      return commitments
-        .filter(c => c.isActive)
-        .reduce((sum, c) => sum + c.storageAllocated, 0);
+      return commitments.filter(c => c.isActive).reduce((sum, c) => sum + c.storageAllocated, 0);
     } catch (err) {
       console.error('[CustodianCommitment] Error calculating committed storage:', err);
       return 0;

@@ -19,8 +19,11 @@
  */
 
 import { Injectable, signal, computed, inject } from '@angular/core';
+
 import { Observable, of, BehaviorSubject, map, catchError, tap, switchMap } from 'rxjs';
+
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
+
 import {
   StewardshipAllocation,
   StewardshipAllocationView,
@@ -56,11 +59,11 @@ export interface StewardPortfolio {
 export interface RecognitionDistribution {
   contentId: string;
   totalAmount: number;
-  distributions: Array<{
+  distributions: {
     stewardPresenceId: string;
     amount: number;
     ratio: number;
-  }>;
+  }[];
 }
 
 @Injectable({
@@ -135,14 +138,16 @@ export class StewardshipAllocationService {
    * Check if content has any stewardship allocations.
    */
   hasAllocations(contentId: string): Observable<boolean> {
-    return this.storageApi.getStewardshipAllocations({
-      contentId,
-      activeOnly: true,
-      limit: 1
-    }).pipe(
-      map(allocations => allocations.length > 0),
-      catchError(() => of(false))
-    );
+    return this.storageApi
+      .getStewardshipAllocations({
+        contentId,
+        activeOnly: true,
+        limit: 1,
+      })
+      .pipe(
+        map(allocations => allocations.length > 0),
+        catchError(() => of(false))
+      );
   }
 
   // ============================================================================
@@ -210,7 +215,10 @@ export class StewardshipAllocationService {
   /**
    * Update an existing allocation.
    */
-  updateAllocation(allocationId: string, input: UpdateAllocationInput): Observable<StewardshipAllocation> {
+  updateAllocation(
+    allocationId: string,
+    input: UpdateAllocationInput
+  ): Observable<StewardshipAllocation> {
     return this.storageApi.updateStewardshipAllocation(allocationId, input);
   }
 
@@ -227,7 +235,9 @@ export class StewardshipAllocationService {
   bulkCreateAllocations(inputs: CreateAllocationInput[]): Observable<BulkAllocationResult> {
     return this.storageApi.bulkCreateAllocations(inputs).pipe(
       tap(result => {
-        console.log(`[StewardshipAllocationService] Bulk created ${result.created}, failed ${result.failed}`);
+        console.log(
+          `[StewardshipAllocationService] Bulk created ${result.created}, failed ${result.failed}`
+        );
         if (result.errors.length > 0) {
           console.warn('[StewardshipAllocationService] Bulk errors:', result.errors);
         }
@@ -245,18 +255,24 @@ export class StewardshipAllocationService {
    * Used when a steward believes their allocation ratio is incorrect
    * or they're being subject to a "hostile takeover".
    */
-  fileDispute(allocationId: string, disputedBy: string, reason: string): Observable<StewardshipAllocation> {
+  fileDispute(
+    allocationId: string,
+    disputedBy: string,
+    reason: string
+  ): Observable<StewardshipAllocation> {
     const disputeId = `dispute-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    return this.storageApi.fileAllocationDispute(allocationId, {
-      disputeId,
-      disputedBy,
-      reason,
-    }).pipe(
-      tap(allocation => {
-        console.log('[StewardshipAllocationService] Filed dispute:', disputeId);
+    return this.storageApi
+      .fileAllocationDispute(allocationId, {
+        disputeId,
+        disputedBy,
+        reason,
       })
-    );
+      .pipe(
+        tap(allocation => {
+          console.log('[StewardshipAllocationService] Filed dispute:', disputeId);
+        })
+      );
   }
 
   /**
@@ -269,14 +285,16 @@ export class StewardshipAllocationService {
     ratifierId: string,
     newState: GovernanceState
   ): Observable<StewardshipAllocation> {
-    return this.storageApi.resolveAllocationDispute(allocationId, {
-      ratifierId,
-      newState,
-    }).pipe(
-      tap(allocation => {
-        console.log('[StewardshipAllocationService] Resolved dispute, new state:', newState);
+    return this.storageApi
+      .resolveAllocationDispute(allocationId, {
+        ratifierId,
+        newState,
       })
-    );
+      .pipe(
+        tap(allocation => {
+          console.log('[StewardshipAllocationService] Resolved dispute, new state:', newState);
+        })
+      );
   }
 
   /**
@@ -362,9 +380,8 @@ export class StewardshipAllocationService {
 
     return allocations.map(a => ({
       ...a,
-      allocationRatio: a.governanceState === 'active'
-        ? a.allocationRatio / totalRatio
-        : a.allocationRatio,
+      allocationRatio:
+        a.governanceState === 'active' ? a.allocationRatio / totalRatio : a.allocationRatio,
     }));
   }
 

@@ -10,7 +10,11 @@
 }
 
 .iframe-container.loading {
-  background: linear-gradient(135deg, var(--surface-ground, #f8f9fa), var(--surface-section, #e9ecef));
+  background: linear-gradient(
+    135deg,
+    var(--surface-ground, #f8f9fa),
+    var(--surface-section, #e9ecef)
+  );
 }
 
 .iframe-content {
@@ -55,7 +59,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error-message {
@@ -69,7 +75,9 @@
   padding: 0.5rem 1rem;
   border: 1px solid currentColor;
   border-radius: 4px;
-  transition: background-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
 .fallback-link:hover {

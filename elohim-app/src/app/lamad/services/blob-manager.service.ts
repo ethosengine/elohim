@@ -15,18 +15,18 @@
  */
 
 import { Injectable, Injector, inject } from '@angular/core';
-import { Observable, from, of, throwError } from 'rxjs';
+
 import { map, catchError, tap, switchMap } from 'rxjs/operators';
+
+import { Observable, from, of, throwError } from 'rxjs';
+
+import { StorageClientService } from '../../elohim/services/storage-client.service';
 import { ContentBlob } from '../models/content-node.model';
+
+import { BlobFallbackService, BlobFetchResult, UrlHealth } from './blob-fallback.service';
 import { BlobVerificationService, BlobVerificationResult } from './blob-verification.service';
-import {
-  BlobFallbackService,
-  BlobFetchResult,
-  UrlHealth,
-} from './blob-fallback.service';
 
 // Import StorageClientService for strategy-aware blob URLs
-import { StorageClientService } from '../../elohim/services/storage-client.service';
 
 /**
  * Full result of blob download and verification
@@ -137,7 +137,7 @@ export class BlobManagerService {
   constructor(
     private verificationService: BlobVerificationService,
     private fallbackService: BlobFallbackService,
-    private injector: Injector,
+    private injector: Injector
   ) {}
 
   // =========================================================================
@@ -211,7 +211,7 @@ export class BlobManagerService {
    */
   downloadBlob(
     blobMetadata: ContentBlob,
-    progressCallback?: (progress: BlobDownloadProgress) => void,
+    progressCallback?: (progress: BlobDownloadProgress) => void
   ): Observable<BlobDownloadResult> {
     const startTime = performance.now();
     const cacheKey = blobMetadata.hash;
@@ -265,17 +265,17 @@ export class BlobManagerService {
       switchMap((fetchResult: BlobFetchResult) =>
         // Verify blob integrity
         this.verificationService.verifyBlob(fetchResult.blob, blobMetadata.hash).pipe(
-          map((verificationResult) => ({
+          map(verificationResult => ({
             fetchResult,
             verificationResult,
-          })),
-        ),
+          }))
+        )
       ),
       switchMap(({ fetchResult, verificationResult }) => {
         // Cache if verification successful and cache not full
         if (verificationResult.isValid) {
           return from(this.cacheBlob(cacheKey, fetchResult.blob, blobMetadata.sizeBytes)).pipe(
-            map(() => ({ fetchResult, verificationResult })),
+            map(() => ({ fetchResult, verificationResult }))
           );
         }
         return of({ fetchResult, verificationResult });
@@ -285,7 +285,7 @@ export class BlobManagerService {
 
         if (!verificationResult.isValid) {
           throw new Error(
-            `Blob verification failed. Expected: ${verificationResult.expectedHash}, Got: ${verificationResult.computedHash}`,
+            `Blob verification failed. Expected: ${verificationResult.expectedHash}, Got: ${verificationResult.computedHash}`
           );
         }
 
@@ -298,13 +298,13 @@ export class BlobManagerService {
           wasCached: false,
         };
       }),
-      catchError((error) => {
+      catchError(error => {
         return throwError(() => ({
           error: error.message,
           blob: blobMetadata,
           phase: 'download',
         }));
-      }),
+      })
     );
   }
 
@@ -317,13 +317,11 @@ export class BlobManagerService {
    */
   downloadBlobs(
     blobMetadatas: ContentBlob[],
-    progressCallback?: (progress: BlobDownloadProgress) => void,
+    progressCallback?: (progress: BlobDownloadProgress) => void
   ): Observable<BlobDownloadResult[]> {
-    const downloads = blobMetadatas.map((metadata) =>
-      this.downloadBlob(metadata, progressCallback),
-    );
+    const downloads = blobMetadatas.map(metadata => this.downloadBlob(metadata, progressCallback));
 
-    return from(Promise.all(downloads.map((d) => d.toPromise() as Promise<BlobDownloadResult>)));
+    return from(Promise.all(downloads.map(d => d.toPromise() as Promise<BlobDownloadResult>)));
   }
 
   /**
@@ -356,7 +354,7 @@ export class BlobManagerService {
   async removeFromCache(hash: string): Promise<void> {
     // Serialize with cache lock to prevent race conditions
     this.cacheLock = this.cacheLock.then(() => {
-      return new Promise<void>((resolve) => {
+      return new Promise<void>(resolve => {
         const blob = this.blobCache.get(hash);
         if (blob) {
           this.cacheSize -= blob.size;
@@ -378,7 +376,7 @@ export class BlobManagerService {
   async clearCache(): Promise<void> {
     // Serialize with cache lock to prevent race conditions
     this.cacheLock = this.cacheLock.then(() => {
-      return new Promise<void>((resolve) => {
+      return new Promise<void>(resolve => {
         this.blobCache.clear();
         this.cacheSize = 0;
         resolve();
@@ -428,7 +426,7 @@ export class BlobManagerService {
    */
   isAccessible(blobMetadata: ContentBlob): boolean {
     const health = this.getUrlHealth(blobMetadata);
-    return health.some((h) => h.isHealthy);
+    return health.some(h => h.isHealthy);
   }
 
   /**
@@ -492,11 +490,11 @@ export class BlobManagerService {
   private async cacheBlob(hash: string, blob: Blob, size: number): Promise<void> {
     // Serialize cache operations to prevent race conditions
     this.cacheLock = this.cacheLock.then(() => {
-      return new Promise<void>((resolve) => {
+      return new Promise<void>(resolve => {
         // Don't cache if blob is too large for cache
         if (size > this.maxCacheSizeBytes) {
           console.warn(
-            `Blob too large to cache (${size} > ${this.maxCacheSizeBytes}). Keeping in memory temporarily.`,
+            `Blob too large to cache (${size} > ${this.maxCacheSizeBytes}). Keeping in memory temporarily.`
           );
           resolve();
           return;
@@ -545,18 +543,18 @@ export class BlobManagerService {
    */
   getBlobsForContent(contentId: string): Observable<ContentBlob[]> {
     return from(this.callGetBlobsForContent(contentId)).pipe(
-      map((output) => {
+      map(output => {
         if (!output || !output.blobs || output.blobs.length === 0) {
           return [];
         }
 
         // Transform Holochain BlobMetadataOutput to ContentBlob
-        return output.blobs.map((blob) => this.transformBlobMetadata(blob));
+        return output.blobs.map(blob => this.transformBlobMetadata(blob));
       }),
-      catchError((error) => {
+      catchError(error => {
         console.error('[BlobManager] Failed to retrieve blobs for content:', error);
         return of([]);
-      }),
+      })
     );
   }
 
@@ -572,10 +570,10 @@ export class BlobManagerService {
    */
   getBlobMetadata(contentId: string, blobHash: string): Observable<ContentBlob | null> {
     return this.getBlobsForContent(contentId).pipe(
-      map((blobs) => {
-        const found = blobs.find((b) => b.hash === blobHash);
+      map(blobs => {
+        const found = blobs.find(b => b.hash === blobHash);
         return found || null;
-      }),
+      })
     );
   }
 
@@ -587,9 +585,7 @@ export class BlobManagerService {
    * @returns Observable with boolean indicating existence
    */
   blobExists(contentId: string, blobHash: string): Observable<boolean> {
-    return this.getBlobMetadata(contentId, blobHash).pipe(
-      map((metadata) => metadata !== null),
-    );
+    return this.getBlobMetadata(contentId, blobHash).pipe(map(metadata => metadata !== null));
   }
 
   /**
@@ -599,15 +595,15 @@ export class BlobManagerService {
    * @returns Observable with map of content ID -> blobs array
    */
   getBlobsForMultipleContent(contentIds: string[]): Observable<Map<string, ContentBlob[]>> {
-    const requests = contentIds.map((id) =>
+    const requests = contentIds.map(id =>
       this.getBlobsForContent(id).pipe(
-        map((blobs) => ({ contentId: id, blobs })),
-        catchError(() => of({ contentId: id, blobs: [] })),
-      ),
+        map(blobs => ({ contentId: id, blobs })),
+        catchError(() => of({ contentId: id, blobs: [] }))
+      )
     );
 
-    return from(Promise.all(requests.map((r) => r.toPromise()))).pipe(
-      map((results) => {
+    return from(Promise.all(requests.map(r => r.toPromise()))).pipe(
+      map(results => {
         const map = new Map<string, ContentBlob[]>();
         for (const result of results) {
           if (result) {
@@ -615,7 +611,7 @@ export class BlobManagerService {
           }
         }
         return map;
-      }),
+      })
     );
   }
 
@@ -630,7 +626,8 @@ export class BlobManagerService {
   private async callGetBlobsForContent(contentId: string): Promise<BlobsForContentOutput | null> {
     try {
       // Lazily inject HolochainClientService to avoid circular dependency
-      const HolochainClientService = (await import('@app/elohim/services/holochain-client.service')).HolochainClientService;
+      const HolochainClientService = (await import('@app/elohim/services/holochain-client.service'))
+        .HolochainClientService;
       const holochainClient = this.injector.get(HolochainClientService);
 
       const result = await holochainClient.callZome<BlobsForContentOutput>({

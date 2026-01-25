@@ -7,6 +7,9 @@
  * @see https://github.com/holochain/holochain-client-js
  */
 
+import { environment } from '../../../environments/environment';
+
+import type { HolochainEnvironmentConfig } from '../../../environments/environment.types';
 import type {
   AdminWebsocket,
   AppWebsocket,
@@ -15,8 +18,6 @@ import type {
   AppInfo,
   InstalledAppId,
 } from '@holochain/client';
-import { environment } from '../../../environments/environment';
-import type { HolochainEnvironmentConfig } from '../../../environments/environment.types';
 
 // Cast to include optional properties from the type definition
 const holochainConfig = environment.holochain as HolochainEnvironmentConfig | undefined;
@@ -25,12 +26,12 @@ const holochainConfig = environment.holochain as HolochainEnvironmentConfig | un
  * Connection state machine
  */
 export type HolochainConnectionState =
-  | 'disconnected'    // Not connected to conductor
-  | 'connecting'      // WebSocket connection in progress
-  | 'authenticating'  // Generating keys / getting token
-  | 'connected'       // Ready for zome calls
-  | 'reconnecting'    // Auto-reconnecting after connection loss
-  | 'error';          // Connection failed
+  | 'disconnected' // Not connected to conductor
+  | 'connecting' // WebSocket connection in progress
+  | 'authenticating' // Generating keys / getting token
+  | 'connected' // Ready for zome calls
+  | 'reconnecting' // Auto-reconnecting after connection loss
+  | 'error'; // Connection failed
 
 /**
  * Configuration for connecting to Holochain conductor
@@ -405,18 +406,14 @@ export const VALID_RELATIONSHIP_TYPES = [
 ] as const;
 
 /** Valid difficulty levels for learning paths */
-export const VALID_DIFFICULTY_LEVELS = [
-  'beginner',
-  'intermediate',
-  'advanced',
-] as const;
+export const VALID_DIFFICULTY_LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
 
 // Type aliases from constants
-export type ValidContentType = typeof VALID_CONTENT_TYPES[number];
-export type ValidContentFormat = typeof VALID_CONTENT_FORMATS[number];
-export type ValidReachLevel = typeof VALID_REACH_LEVELS[number];
-export type ValidRelationshipType = typeof VALID_RELATIONSHIP_TYPES[number];
-export type ValidDifficultyLevel = typeof VALID_DIFFICULTY_LEVELS[number];
+export type ValidContentType = (typeof VALID_CONTENT_TYPES)[number];
+export type ValidContentFormat = (typeof VALID_CONTENT_FORMATS)[number];
+export type ValidReachLevel = (typeof VALID_REACH_LEVELS)[number];
+export type ValidRelationshipType = (typeof VALID_RELATIONSHIP_TYPES)[number];
+export type ValidDifficultyLevel = (typeof VALID_DIFFICULTY_LEVELS)[number];
 
 /**
  * Default configuration from environment

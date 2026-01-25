@@ -1,16 +1,24 @@
 import { Injectable, Type } from '@angular/core';
+
+import { MarkdownParser } from '../../../parsers/markdown-parser';
+import { MarkdownRendererComponent } from '../../../renderers/markdown-renderer/markdown-renderer.component';
 import {
   ContentFormatPlugin,
   ContentRenderer,
   ContentEditorComponent,
   EditorConfig,
-  DEFAULT_EDITOR_CONFIG
+  DEFAULT_EDITOR_CONFIG,
 } from '../../interfaces/content-format-plugin.interface';
-import { ContentIOImportResult, ContentIOExportInput } from '../../interfaces/content-io-plugin.interface';
+import {
+  ContentIOImportResult,
+  ContentIOExportInput,
+} from '../../interfaces/content-io-plugin.interface';
 import { FormatMetadata } from '../../interfaces/format-metadata.interface';
-import { ValidationResult, ValidationError, ValidationWarning } from '../../interfaces/validation-result.interface';
-import { MarkdownParser } from '../../../parsers/markdown-parser';
-import { MarkdownRendererComponent } from '../../../renderers/markdown-renderer/markdown-renderer.component';
+import {
+  ValidationResult,
+  ValidationError,
+  ValidationWarning,
+} from '../../interfaces/validation-result.interface';
 
 /**
  * MarkdownFormatPlugin - Unified plugin for Markdown content.
@@ -26,7 +34,7 @@ import { MarkdownRendererComponent } from '../../../renderers/markdown-renderer/
  * RendererRegistryService registration.
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class MarkdownFormatPlugin implements ContentFormatPlugin {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -68,7 +76,7 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
       tags: parsed.tags,
       metadata: parsed.metadata,
       relatedNodeIds: parsed.relatedNodeIds,
-      frontmatter: this.extractFrontmatter(content)
+      frontmatter: this.extractFrontmatter(content),
     };
   }
 
@@ -140,7 +148,7 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
           title: imported.title,
           description: imported.description,
           contentType: imported.contentType,
-          tags: imported.tags
+          tags: imported.tags,
         };
       } catch {
         // Preview generation failed, but that's okay
@@ -151,7 +159,7 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
     const stats = {
       wordCount: this.countWords(content),
       lineCount: content.split('\n').length,
-      sectionCount: (content.match(/^#{1,6}\s+/gm) ?? []).length
+      sectionCount: (content.match(/^#{1,6}\s+/gm) ?? []).length,
     };
 
     return {
@@ -159,7 +167,7 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
       errors,
       warnings,
       parsedPreview,
-      stats
+      stats,
     };
   }
 
@@ -195,18 +203,30 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
         position: 'top',
         actions: [
           { id: 'bold', label: 'Bold', icon: 'format_bold', shortcut: 'Ctrl+B', type: 'button' },
-          { id: 'italic', label: 'Italic', icon: 'format_italic', shortcut: 'Ctrl+I', type: 'button' },
-          { id: 'heading', label: 'Heading', icon: 'title', type: 'dropdown', children: [
-            { id: 'h1', label: 'Heading 1', icon: 'looks_one', type: 'button' },
-            { id: 'h2', label: 'Heading 2', icon: 'looks_two', type: 'button' },
-            { id: 'h3', label: 'Heading 3', icon: 'looks_3', type: 'button' },
-          ]},
+          {
+            id: 'italic',
+            label: 'Italic',
+            icon: 'format_italic',
+            shortcut: 'Ctrl+I',
+            type: 'button',
+          },
+          {
+            id: 'heading',
+            label: 'Heading',
+            icon: 'title',
+            type: 'dropdown',
+            children: [
+              { id: 'h1', label: 'Heading 1', icon: 'looks_one', type: 'button' },
+              { id: 'h2', label: 'Heading 2', icon: 'looks_two', type: 'button' },
+              { id: 'h3', label: 'Heading 3', icon: 'looks_3', type: 'button' },
+            ],
+          },
           { id: 'link', label: 'Link', icon: 'link', shortcut: 'Ctrl+K', type: 'button' },
           { id: 'code', label: 'Code', icon: 'code', shortcut: 'Ctrl+`', type: 'button' },
           { id: 'save', label: 'Save', icon: 'save', shortcut: 'Ctrl+S', type: 'button' },
           { id: 'cancel', label: 'Cancel', icon: 'close', shortcut: 'Escape', type: 'button' },
-        ]
-      }
+        ],
+      },
     };
   }
 
@@ -259,7 +279,7 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
       icon: 'description',
       category: 'document',
       supportsRoundTrip: true,
-      priority: 10
+      priority: 10,
     };
   }
 
@@ -311,7 +331,10 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
     const endIndex = lines.findIndex((line, i) => i > 0 && line.trim() === '---');
     if (endIndex === -1) return content;
 
-    return lines.slice(endIndex + 1).join('\n').trimStart();
+    return lines
+      .slice(endIndex + 1)
+      .join('\n')
+      .trimStart();
   }
 
   private generateFrontmatter(node: ContentIOExportInput): string | null {
@@ -369,7 +392,10 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
     return null;
   }
 
-  private validateFrontmatter(content: string): { errors: ValidationError[]; warnings: ValidationWarning[] } {
+  private validateFrontmatter(content: string): {
+    errors: ValidationError[];
+    warnings: ValidationWarning[];
+  } {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
 
@@ -377,7 +403,7 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
       warnings.push({
         code: 'NO_FRONTMATTER',
         message: 'No YAML frontmatter found. Consider adding metadata.',
-        suggestion: 'Add a --- delimited frontmatter block at the start of the file'
+        suggestion: 'Add a --- delimited frontmatter block at the start of the file',
       });
       return { errors, warnings };
     }
@@ -389,7 +415,7 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
       errors.push({
         code: 'UNCLOSED_FRONTMATTER',
         message: 'Frontmatter block is not closed. Missing closing ---',
-        line: 1
+        line: 1,
       });
       return { errors, warnings };
     }
@@ -401,7 +427,7 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
         warnings.push({
           code: 'NO_TITLE',
           message: 'No title in frontmatter. Title will be extracted from first heading.',
-          suggestion: 'Add a title field to frontmatter'
+          suggestion: 'Add a title field to frontmatter',
         });
       }
     }
@@ -419,13 +445,13 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
       warnings.push({
         code: 'NO_H1',
         message: 'No H1 heading found. Document should have a main title.',
-        suggestion: 'Add a # Title at the start of content'
+        suggestion: 'Add a # Title at the start of content',
       });
     } else if (h1Count > 1) {
       warnings.push({
         code: 'MULTIPLE_H1',
         message: 'Multiple H1 headings found. Document should have a single main title.',
-        suggestion: 'Use H2 (##) for subsections'
+        suggestion: 'Use H2 (##) for subsections',
       });
     }
 
@@ -442,7 +468,7 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
       warnings.push({
         code: 'EMPTY_REFERENCE',
         message: `Found ${matches.length} empty reference(s): ${matches.join(', ')}`,
-        suggestion: 'Fill in the reference identifier'
+        suggestion: 'Fill in the reference identifier',
       });
     }
 

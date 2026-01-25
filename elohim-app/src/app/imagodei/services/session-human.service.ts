@@ -1,5 +1,13 @@
 import { Injectable } from '@angular/core';
+
 import { BehaviorSubject, Observable } from 'rxjs';
+
+import {
+  ContentAccessMetadata,
+  AccessCheckResult,
+  AccessLevel,
+  AccessAction,
+} from '../../lamad/models/content-access.model';
 import {
   SessionHuman,
   SessionStats,
@@ -14,12 +22,6 @@ import {
   HostingCostStatus,
 } from '../models/session-human.model';
 // Content access models from lamad pillar
-import {
-  ContentAccessMetadata,
-  AccessCheckResult,
-  AccessLevel,
-  AccessAction,
-} from '../../lamad/models/content-access.model';
 
 /**
  * SessionHumanService - Manages temporary session identity for MVP.
@@ -44,13 +46,14 @@ import {
 @Injectable({ providedIn: 'root' })
 export class SessionHumanService {
   private readonly STORAGE_KEY = 'lamad-session';
-  private readonly ACTIVITY_LIMIT = 1000;  // Max activities to store
+  private readonly ACTIVITY_LIMIT = 1000; // Max activities to store
 
   private readonly sessionSubject = new BehaviorSubject<SessionHuman | null>(null);
   private readonly upgradePromptsSubject = new BehaviorSubject<HolochainUpgradePrompt[]>([]);
 
   public readonly session$: Observable<SessionHuman | null> = this.sessionSubject.asObservable();
-  public readonly upgradePrompts$: Observable<HolochainUpgradePrompt[]> = this.upgradePromptsSubject.asObservable();
+  public readonly upgradePrompts$: Observable<HolochainUpgradePrompt[]> =
+    this.upgradePromptsSubject.asObservable();
 
   constructor() {
     this.initializeSession();
@@ -219,9 +222,7 @@ export class SessionHumanService {
     const session = this.sessionSubject.value;
     if (session) {
       // Filter empty strings and trim each interest
-      session.interests = interests
-        .map(i => i.trim())
-        .filter(i => i.length > 0);
+      session.interests = interests.map(i => i.trim()).filter(i => i.length > 0);
 
       if (session.interests.length === 0) {
         session.interests = undefined;
@@ -239,9 +240,7 @@ export class SessionHumanService {
    */
   getStorageKeyPrefix(): string {
     const session = this.sessionSubject.value;
-    return session
-      ? `lamad-session-${session.sessionId}`
-      : 'lamad-session-anonymous';
+    return session ? `lamad-session-${session.sessionId}` : 'lamad-session-anonymous';
   }
 
   /**
@@ -568,7 +567,8 @@ export class SessionHumanService {
           id,
           trigger,
           title: 'Save Your Progress',
-          message: 'You\'re building a personal knowledge map! Install the Elohim app to save it permanently.',
+          message:
+            "You're building a personal knowledge map! Install the Elohim app to save it permanently.",
           benefits: [
             'Your progress syncs across devices',
             'Join a network of learners',
@@ -581,8 +581,9 @@ export class SessionHumanService {
         return {
           id,
           trigger,
-          title: 'You\'ve Started a Journey',
-          message: 'Your learning path is stored in your browser. Install Elohim to make it permanent.',
+          title: "You've Started a Journey",
+          message:
+            'Your learning path is stored in your browser. Install Elohim to make it permanent.',
           benefits: [
             'Resume from any device',
             'Get updates to your paths',
@@ -611,11 +612,7 @@ export class SessionHumanService {
           trigger,
           title: 'Your Notes Are Valuable',
           message: 'Personal notes enrich your learning. Install Elohim to keep them safe.',
-          benefits: [
-            'Notes stored securely',
-            'Searchable across all content',
-            'Export anytime',
-          ],
+          benefits: ['Notes stored securely', 'Searchable across all content', 'Export anytime'],
           dismissed: false,
         };
 
@@ -625,11 +622,7 @@ export class SessionHumanService {
           trigger,
           title: 'Welcome Back!',
           message: 'Good to see you again. Install Elohim to never worry about losing progress.',
-          benefits: [
-            'Automatic progress backup',
-            'Sync between devices',
-            'Join the community',
-          ],
+          benefits: ['Automatic progress backup', 'Sync between devices', 'Join the community'],
           dismissed: false,
         };
 
@@ -638,12 +631,9 @@ export class SessionHumanService {
           id,
           trigger,
           title: 'Storage Running Low',
-          message: 'Your browser storage is filling up. Install Elohim to safely store your progress.',
-          benefits: [
-            'Unlimited progress storage',
-            'Automatic backups',
-            'Secure and private',
-          ],
+          message:
+            'Your browser storage is filling up. Install Elohim to safely store your progress.',
+          benefits: ['Unlimited progress storage', 'Automatic backups', 'Secure and private'],
           dismissed: false,
         };
 
@@ -1058,7 +1048,7 @@ export class SessionHumanService {
       type: 'install-holochain',
       label: 'Join Network',
       description,
-      installUrl: '/install',  // Future: actual Holochain install page
+      installUrl: '/install', // Future: actual Holochain install page
     };
   }
 

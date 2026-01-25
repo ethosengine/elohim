@@ -1,3 +1,4 @@
+import { CommonModule } from '@angular/common';
 import {
   Component,
   OnInit,
@@ -5,22 +6,24 @@ import {
   ViewChild,
   ViewContainerRef,
   Type,
-  ComponentRef
+  ComponentRef,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { Subject, of } from 'rxjs';
+
 import { takeUntil, switchMap, catchError } from 'rxjs/operators';
 
-import { ContentNode } from '../../models/content-node.model';
+import { Subject, of } from 'rxjs';
+
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { ContentFormatRegistryService } from '../../content-io/services/content-format-registry.service';
-import { ContentEditorService, SaveResult } from '../../content-io/services/content-editor.service';
+
+import { DefaultCodeEditorComponent } from '../../content-io/components/default-code-editor';
 import {
   ContentEditorComponent,
-  ContentSaveEvent
+  ContentSaveEvent,
 } from '../../content-io/interfaces/content-format-plugin.interface';
-import { DefaultCodeEditorComponent } from '../../content-io/components/default-code-editor';
+import { ContentEditorService, SaveResult } from '../../content-io/services/content-editor.service';
+import { ContentFormatRegistryService } from '../../content-io/services/content-format-registry.service';
+import { ContentNode } from '../../models/content-node.model';
 
 /**
  * ContentEditorPageComponent - Standalone page for editing content.
@@ -42,7 +45,7 @@ import { DefaultCodeEditorComponent } from '../../content-io/components/default-
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './content-editor-page.component.html',
-  styleUrls: ['./content-editor-page.component.css']
+  styleUrls: ['./content-editor-page.component.css'],
 })
 export class ContentEditorPageComponent implements OnInit, OnDestroy {
   /** The content node being edited */
@@ -84,30 +87,32 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.route.params.pipe(
-      takeUntil(this.destroy$),
-      switchMap(params => {
-        this.resourceId = params['resourceId'];
-        this.isLoading = true;
-        this.error = '';
-        return this.dataLoader.getContent(this.resourceId).pipe(
-          catchError(err => {
-            this.error = err.message ?? 'Failed to load content';
-            return of(null);
-          })
-        );
-      })
-    ).subscribe(node => {
-      this.node = node;
-      this.isLoading = false;
+    this.route.params
+      .pipe(
+        takeUntil(this.destroy$),
+        switchMap(params => {
+          this.resourceId = params['resourceId'];
+          this.isLoading = true;
+          this.error = '';
+          return this.dataLoader.getContent(this.resourceId).pipe(
+            catchError(err => {
+              this.error = err.message ?? 'Failed to load content';
+              return of(null);
+            })
+          );
+        })
+      )
+      .subscribe(node => {
+        this.node = node;
+        this.isLoading = false;
 
-      if (node) {
-        this.canEdit = this.editorService.canEdit(node);
-        if (this.canEdit) {
-          this.loadEditor();
+        if (node) {
+          this.canEdit = this.editorService.canEdit(node);
+          if (this.canEdit) {
+            this.loadEditor();
+          }
         }
-      }
-    });
+      });
   }
 
   ngOnDestroy(): void {
@@ -200,10 +205,7 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
 
     try {
       // Create a draft and save it
-      const draft = this.editorService.createNewDraft(
-        event.content.contentFormat,
-        event.content
-      );
+      const draft = this.editorService.createNewDraft(event.content.contentFormat, event.content);
 
       this.editorService.saveContent(draft.id).subscribe({
         next: (result: SaveResult) => {
@@ -225,7 +227,7 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
         error: (err: Error) => {
           this.isSaving = false;
           this.saveError = err.message ?? 'Failed to save';
-        }
+        },
       });
     } catch (err) {
       this.isSaving = false;

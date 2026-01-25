@@ -1,3 +1,4 @@
+import { CommonModule } from '@angular/common';
 import {
   Component,
   Input,
@@ -8,14 +9,14 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   signal,
-  computed
+  computed,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { Subject, takeUntil } from 'rxjs';
 
-import { PathAdaptationService, GateStatus } from '../../services/path-adaptation.service';
-import { AttemptCooldownService } from '../../services/attempt-cooldown.service';
 import { CooldownStatus } from '../../models/attempt-record.model';
+import { AttemptCooldownService } from '../../services/attempt-cooldown.service';
+import { PathAdaptationService, GateStatus } from '../../services/path-adaptation.service';
 
 /**
  * Event emitted when mastery quiz is requested.
@@ -68,8 +69,8 @@ export interface MasteryQuizRequestEvent {
       [class.unlocked]="!isLocked()"
       [class.in-cooldown]="inCooldown()"
       role="dialog"
-      aria-labelledby="gate-title">
-
+      aria-labelledby="gate-title"
+    >
       <!-- Gate header -->
       <header class="gate-header">
         <div class="gate-icon" [class.unlocked]="!isLocked()">
@@ -95,9 +96,7 @@ export interface MasteryQuizRequestEvent {
       <div class="gate-body">
         @if (isLocked()) {
           <!-- Locked state -->
-          <p class="gate-message">
-            Complete a mastery check to continue to the next section.
-          </p>
+          <p class="gate-message">Complete a mastery check to continue to the next section.</p>
 
           <!-- Progress/attempts info -->
           <div class="gate-stats">
@@ -109,9 +108,7 @@ export interface MasteryQuizRequestEvent {
             }
             <div class="stat">
               <span class="stat-label">Attempts Today</span>
-              <span class="stat-value">
-                {{ attemptsUsed() }} / {{ maxAttempts() }}
-              </span>
+              <span class="stat-value">{{ attemptsUsed() }} / {{ maxAttempts() }}</span>
             </div>
           </div>
 
@@ -128,10 +125,7 @@ export interface MasteryQuizRequestEvent {
 
           <!-- Quiz button -->
           <div class="gate-actions">
-            <button
-              class="btn-start-quiz"
-              [disabled]="!canAttempt()"
-              (click)="onStartQuiz()">
+            <button class="btn-start-quiz" [disabled]="!canAttempt()" (click)="onStartQuiz()">
               @if (inCooldown()) {
                 Cooldown Active
               } @else if (attemptsRemaining() === 0) {
@@ -145,11 +139,11 @@ export interface MasteryQuizRequestEvent {
 
             @if (attemptsRemaining() > 0 && !inCooldown()) {
               <p class="attempts-hint">
-                {{ attemptsRemaining() }} attempt{{ attemptsRemaining() === 1 ? '' : 's' }} remaining today
+                {{ attemptsRemaining() }} attempt{{ attemptsRemaining() === 1 ? '' : 's' }}
+                remaining today
               </p>
             }
           </div>
-
         } @else {
           <!-- Unlocked state -->
           <div class="unlocked-message">
@@ -161,9 +155,7 @@ export interface MasteryQuizRequestEvent {
           </div>
 
           <div class="gate-actions">
-            <button class="btn-continue" (click)="onContinue()">
-              Continue to Next Section
-            </button>
+            <button class="btn-continue" (click)="onContinue()">Continue to Next Section</button>
           </div>
         }
       </div>
@@ -178,251 +170,253 @@ export interface MasteryQuizRequestEvent {
       }
     </div>
   `,
-  styles: [`
-    .mastery-gate {
-      max-width: 480px;
-      margin: 2rem auto;
-      background: var(--surface-elevated, #fff);
-      border-radius: var(--radius-lg, 12px);
-      border: 2px solid var(--warning, #fbbc04);
-      overflow: hidden;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
-    }
+  styles: [
+    `
+      .mastery-gate {
+        max-width: 480px;
+        margin: 2rem auto;
+        background: var(--surface-elevated, #fff);
+        border-radius: var(--radius-lg, 12px);
+        border: 2px solid var(--warning, #fbbc04);
+        overflow: hidden;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+      }
 
-    .mastery-gate.unlocked {
-      border-color: var(--success, #34a853);
-    }
+      .mastery-gate.unlocked {
+        border-color: var(--success, #34a853);
+      }
 
-    .mastery-gate.in-cooldown {
-      border-color: var(--border-color, #e9ecef);
-    }
+      .mastery-gate.in-cooldown {
+        border-color: var(--border-color, #e9ecef);
+      }
 
-    /* Header */
-    .gate-header {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      padding: 1.25rem 1.5rem;
-      background: linear-gradient(
-        to bottom,
-        var(--warning-surface, #fef7e0) 0%,
-        var(--surface-elevated, #fff) 100%
-      );
-    }
+      /* Header */
+      .gate-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.25rem 1.5rem;
+        background: linear-gradient(
+          to bottom,
+          var(--warning-surface, #fef7e0) 0%,
+          var(--surface-elevated, #fff) 100%
+        );
+      }
 
-    .mastery-gate.unlocked .gate-header {
-      background: linear-gradient(
-        to bottom,
-        var(--success-surface, #e6f4ea) 0%,
-        var(--surface-elevated, #fff) 100%
-      );
-    }
+      .mastery-gate.unlocked .gate-header {
+        background: linear-gradient(
+          to bottom,
+          var(--success-surface, #e6f4ea) 0%,
+          var(--surface-elevated, #fff) 100%
+        );
+      }
 
-    .gate-icon {
-      width: 3rem;
-      height: 3rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-      background: var(--warning, #fbbc04);
-      border-radius: 50%;
-    }
+      .gate-icon {
+        width: 3rem;
+        height: 3rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        background: var(--warning, #fbbc04);
+        border-radius: 50%;
+      }
 
-    .gate-icon.unlocked {
-      background: var(--success, #34a853);
-    }
+      .gate-icon.unlocked {
+        background: var(--success, #34a853);
+      }
 
-    .gate-title-area {
-      flex: 1;
-    }
+      .gate-title-area {
+        flex: 1;
+      }
 
-    .gate-title {
-      margin: 0;
-      font-size: 1.125rem;
-      font-weight: 600;
-      color: var(--text-primary, #202124);
-    }
+      .gate-title {
+        margin: 0;
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-primary, #202124);
+      }
 
-    .gate-subtitle {
-      margin: 0.25rem 0 0;
-      font-size: 0.875rem;
-      color: var(--text-secondary, #5f6368);
-    }
+      .gate-subtitle {
+        margin: 0.25rem 0 0;
+        font-size: 0.875rem;
+        color: var(--text-secondary, #5f6368);
+      }
 
-    /* Body */
-    .gate-body {
-      padding: 1.5rem;
-    }
+      /* Body */
+      .gate-body {
+        padding: 1.5rem;
+      }
 
-    .gate-message {
-      margin: 0 0 1.25rem;
-      font-size: 1rem;
-      color: var(--text-primary, #202124);
-      text-align: center;
-    }
+      .gate-message {
+        margin: 0 0 1.25rem;
+        font-size: 1rem;
+        color: var(--text-primary, #202124);
+        text-align: center;
+      }
 
-    /* Stats */
-    .gate-stats {
-      display: flex;
-      justify-content: center;
-      gap: 2rem;
-      margin-bottom: 1.5rem;
-    }
+      /* Stats */
+      .gate-stats {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-bottom: 1.5rem;
+      }
 
-    .stat {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.25rem;
-    }
+      .stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+      }
 
-    .stat-label {
-      font-size: 0.75rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      color: var(--text-tertiary, #80868b);
-    }
+      .stat-label {
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--text-tertiary, #80868b);
+      }
 
-    .stat-value {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text-primary, #202124);
-    }
+      .stat-value {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-primary, #202124);
+      }
 
-    /* Cooldown */
-    .cooldown-notice {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.75rem;
-      padding: 1rem;
-      margin-bottom: 1.5rem;
-      background: var(--surface-secondary, #f8f9fa);
-      border-radius: var(--radius-md, 8px);
-    }
+      /* Cooldown */
+      .cooldown-notice {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        background: var(--surface-secondary, #f8f9fa);
+        border-radius: var(--radius-md, 8px);
+      }
 
-    .cooldown-icon {
-      font-size: 1.5rem;
-    }
+      .cooldown-icon {
+        font-size: 1.5rem;
+      }
 
-    .cooldown-text {
-      display: flex;
-      flex-direction: column;
-      gap: 0.125rem;
-    }
+      .cooldown-text {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+      }
 
-    .cooldown-label {
-      font-size: 0.75rem;
-      color: var(--text-secondary, #5f6368);
-    }
+      .cooldown-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary, #5f6368);
+      }
 
-    .cooldown-time {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text-primary, #202124);
-      font-variant-numeric: tabular-nums;
-    }
+      .cooldown-time {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-primary, #202124);
+        font-variant-numeric: tabular-nums;
+      }
 
-    /* Actions */
-    .gate-actions {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.75rem;
-    }
+      /* Actions */
+      .gate-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+      }
 
-    .btn-start-quiz,
-    .btn-continue {
-      width: 100%;
-      padding: 0.875rem 1.5rem;
-      font-size: 1rem;
-      font-weight: 600;
-      border-radius: var(--radius-md, 8px);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
+      .btn-start-quiz,
+      .btn-continue {
+        width: 100%;
+        padding: 0.875rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border-radius: var(--radius-md, 8px);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
 
-    .btn-start-quiz {
-      background: var(--primary, #4285f4);
-      color: white;
-      border: none;
-    }
+      .btn-start-quiz {
+        background: var(--primary, #4285f4);
+        color: white;
+        border: none;
+      }
 
-    .btn-start-quiz:hover:not(:disabled) {
-      background: var(--primary-dark, #1a73e8);
-      transform: translateY(-1px);
-    }
+      .btn-start-quiz:hover:not(:disabled) {
+        background: var(--primary-dark, #1a73e8);
+        transform: translateY(-1px);
+      }
 
-    .btn-start-quiz:disabled {
-      background: var(--surface-tertiary, #e8eaed);
-      color: var(--text-disabled, #9aa0a6);
-      cursor: not-allowed;
-    }
+      .btn-start-quiz:disabled {
+        background: var(--surface-tertiary, #e8eaed);
+        color: var(--text-disabled, #9aa0a6);
+        cursor: not-allowed;
+      }
 
-    .btn-continue {
-      background: var(--success, #34a853);
-      color: white;
-      border: none;
-    }
+      .btn-continue {
+        background: var(--success, #34a853);
+        color: white;
+        border: none;
+      }
 
-    .btn-continue:hover {
-      background: var(--success-dark, #1e8e3e);
-      transform: translateY(-1px);
-    }
+      .btn-continue:hover {
+        background: var(--success-dark, #1e8e3e);
+        transform: translateY(-1px);
+      }
 
-    .attempts-hint {
-      margin: 0;
-      font-size: 0.8125rem;
-      color: var(--text-tertiary, #80868b);
-    }
+      .attempts-hint {
+        margin: 0;
+        font-size: 0.8125rem;
+        color: var(--text-tertiary, #80868b);
+      }
 
-    /* Unlocked state */
-    .unlocked-message {
-      text-align: center;
-      margin-bottom: 1.5rem;
-    }
+      /* Unlocked state */
+      .unlocked-message {
+        text-align: center;
+        margin-bottom: 1.5rem;
+      }
 
-    .success-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 3rem;
-      height: 3rem;
-      margin-bottom: 0.75rem;
-      font-size: 1.5rem;
-      background: var(--success, #34a853);
-      color: white;
-      border-radius: 50%;
-    }
+      .success-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 3rem;
+        height: 3rem;
+        margin-bottom: 0.75rem;
+        font-size: 1.5rem;
+        background: var(--success, #34a853);
+        color: white;
+        border-radius: 50%;
+      }
 
-    .unlocked-message p {
-      margin: 0;
-      font-size: 1rem;
-      color: var(--text-primary, #202124);
-    }
+      .unlocked-message p {
+        margin: 0;
+        font-size: 1rem;
+        color: var(--text-primary, #202124);
+      }
 
-    .final-score {
-      margin-top: 0.5rem !important;
-      font-weight: 600;
-      color: var(--success-text, #137333) !important;
-    }
+      .final-score {
+        margin-top: 0.5rem !important;
+        font-weight: 600;
+        color: var(--success-text, #137333) !important;
+      }
 
-    /* Footer */
-    .gate-footer {
-      padding: 1rem 1.5rem;
-      background: var(--surface-secondary, #f8f9fa);
-      border-top: 1px solid var(--border-color, #e9ecef);
-    }
+      /* Footer */
+      .gate-footer {
+        padding: 1rem 1.5rem;
+        background: var(--surface-secondary, #f8f9fa);
+        border-top: 1px solid var(--border-color, #e9ecef);
+      }
 
-    .gate-tip {
-      margin: 0;
-      font-size: 0.8125rem;
-      color: var(--text-secondary, #5f6368);
-      text-align: center;
-    }
-  `]
+      .gate-tip {
+        margin: 0;
+        font-size: 0.8125rem;
+        color: var(--text-secondary, #5f6368);
+        text-align: center;
+      }
+    `,
+  ],
 })
 export class MasteryGateComponent implements OnInit, OnDestroy {
   /** Path ID */
@@ -499,7 +493,7 @@ export class MasteryGateComponent implements OnInit, OnDestroy {
     this.startQuiz.emit({
       sectionId: this.sectionId,
       sectionTitle: this.sectionTitle,
-      contentIds: this.contentIds
+      contentIds: this.contentIds,
     });
   }
 
@@ -515,7 +509,8 @@ export class MasteryGateComponent implements OnInit, OnDestroy {
    */
   private loadGateStatus(): void {
     // Subscribe to gate status
-    this.adaptationService.getGateStatus$(this.pathId, this.sectionId, this.humanId)
+    this.adaptationService
+      .getGateStatus$(this.pathId, this.sectionId, this.humanId)
       .pipe(takeUntil(this.destroy$))
       .subscribe(status => {
         this.gateStatus.set(status);
@@ -523,7 +518,8 @@ export class MasteryGateComponent implements OnInit, OnDestroy {
       });
 
     // Subscribe to cooldown status for timer
-    this.cooldownService.getCooldownStatus$(this.sectionId, this.humanId)
+    this.cooldownService
+      .getCooldownStatus$(this.sectionId, this.humanId)
       .pipe(takeUntil(this.destroy$))
       .subscribe(status => {
         this.cooldownStatus.set(status);

@@ -36,14 +36,13 @@
         Consensus Statements
         <span class="section-badge">{{ consensusStatements.length }}</span>
       </h4>
-      <p class="section-description">
-        These statements have broad agreement across groups.
-      </p>
+      <p class="section-description">These statements have broad agreement across groups.</p>
       <div class="statement-list">
         <div
           *ngFor="let statement of consensusStatements"
           class="statement-item consensus"
-          (click)="selectStatement(statement)">
+          (click)="selectStatement(statement)"
+        >
           <span class="statement-text">{{ statement.text }}</span>
           <span class="statement-indicator">✓ High Agreement</span>
         </div>
@@ -64,7 +63,8 @@
         <div
           *ngFor="let statement of divisiveStatements"
           class="statement-item divisive"
-          (click)="selectStatement(statement)">
+          (click)="selectStatement(statement)"
+        >
           <span class="statement-text">{{ statement.text }}</span>
           <span class="statement-indicator">↔ Mixed Views</span>
         </div>
@@ -101,7 +101,8 @@
         <span>Group:</span>
         <span
           class="cluster-badge"
-          [style.background-color]="clusters.find(c => c.id === currentUserPosition!.cluster)?.color">
+          [style.background-color]="clusters.find(c => c.id === currentUserPosition!.cluster)?.color"
+        >
           {{ clusters.find(c => c.id === currentUserPosition!.cluster)?.name }}
         </span>
       </div>
@@ -118,16 +119,18 @@
       <summary>How to read this map</summary>
       <div class="explanation-content">
         <p>
-          Each dot represents a participant's opinion pattern. Dots close together
-          share similar views; dots far apart have different perspectives.
+          Each dot represents a participant's opinion pattern. Dots close together share similar
+          views; dots far apart have different perspectives.
         </p>
         <p>
-          Colored regions show natural "opinion groups" that emerged from the data.
-          This isn't about sides—it's about understanding the landscape of perspectives.
+          Colored regions show natural "opinion groups" that emerged from the data. This isn't about
+          sides—it's about understanding the landscape of perspectives.
         </p>
         <p>
-          <strong>Consensus statements</strong> are agreed upon across groups.
-          <strong>Divisive statements</strong> reveal where perspectives differ most.
+          <strong>Consensus statements</strong>
+          are agreed upon across groups.
+          <strong>Divisive statements</strong>
+          reveal where perspectives differ most.
         </p>
       </div>
     </details>

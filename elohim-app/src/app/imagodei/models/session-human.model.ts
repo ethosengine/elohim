@@ -134,19 +134,19 @@ export interface SessionHuman {
  * Session state machine.
  */
 export type SessionState =
-  | 'active'     // Normal session operation
-  | 'upgrading'  // In process of migrating to Holochain
-  | 'linked'     // Session exists alongside Holochain identity
-  | 'migrated';  // Session has been fully migrated
+  | 'active' // Normal session operation
+  | 'upgrading' // In process of migrating to Holochain
+  | 'linked' // Session exists alongside Holochain identity
+  | 'migrated'; // Session has been fully migrated
 
 /**
  * Access levels for session humans.
  * Expanded to support hybrid scenarios.
  */
 export type SessionAccessLevel =
-  | 'visitor'    // Pure session, open content only
-  | 'pending'    // Upgrade in progress
-  | 'linked';    // Has linked Holochain identity
+  | 'visitor' // Pure session, open content only
+  | 'pending' // Upgrade in progress
+  | 'linked'; // Has linked Holochain identity
 
 /**
  * Tracks upgrade intent for users who start but don't complete upgrade.
@@ -222,11 +222,11 @@ export interface HostingCostStatus {
  * Who covers hosting costs for a hosted human.
  */
 export type HostingCoverageSource =
-  | 'commons'    // Elohim commons fund covers costs
-  | 'steward'    // A steward sponsors this human
-  | 'sponsor'    // External sponsor (org, grant)
-  | 'self'       // Human pays own costs
-  | 'migrated';  // No costs - data on user's device
+  | 'commons' // Elohim commons fund covers costs
+  | 'steward' // A steward sponsors this human
+  | 'sponsor' // External sponsor (org, grant)
+  | 'self' // Human pays own costs
+  | 'migrated'; // No costs - data on user's device
 
 /**
  * Hosting cost tier for transparent pricing.
@@ -282,7 +282,7 @@ export const HOSTING_TIERS: HostingTier[] = [
 export interface SessionStats {
   // Content engagement
   nodesViewed: number;
-  nodesWithAffinity: number;  // Nodes where human set affinity > 0
+  nodesWithAffinity: number; // Nodes where human set affinity > 0
 
   // Path engagement
   pathsStarted: number;
@@ -290,7 +290,7 @@ export interface SessionStats {
   stepsCompleted: number;
 
   // Time tracking
-  totalSessionTime: number;  // Milliseconds
+  totalSessionTime: number; // Milliseconds
   averageSessionLength: number;
   sessionCount: number;
 }
@@ -363,10 +363,10 @@ export interface HolochainUpgradePrompt {
  * UpgradeTrigger - Events that trigger upgrade prompts.
  */
 export type UpgradeTrigger =
-  | 'first-affinity'      // Human marks first content as resonant
-  | 'path-started'        // Human begins their first path
-  | 'path-completed'      // Human completes a learning path
-  | 'notes-saved'         // Human saves personal notes
-  | 'return-visit'        // Human returns after session expires
-  | 'progress-at-risk'    // localStorage nearing quota
-  | 'network-feature';    // Human tries a network-only feature
+  | 'first-affinity' // Human marks first content as resonant
+  | 'path-started' // Human begins their first path
+  | 'path-completed' // Human completes a learning path
+  | 'notes-saved' // Human saves personal notes
+  | 'return-visit' // Human returns after session expires
+  | 'progress-at-risk' // localStorage nearing quota
+  | 'network-feature'; // Human tries a network-only feature

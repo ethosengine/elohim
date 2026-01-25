@@ -1,5 +1,6 @@
-import { Component, OnInit, OnDestroy, inject, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, inject, computed, signal } from '@angular/core';
+
 import { HolochainClientService } from '../../services/holochain-client.service';
 import { HolochainContentService } from '../../services/holochain-content.service';
 import { OfflineOperationQueueService } from '../../services/offline-operation-queue.service';
@@ -27,7 +28,7 @@ import { OfflineOperationQueueService } from '../../services/offline-operation-q
   standalone: true,
   imports: [CommonModule],
   templateUrl: './holochain-availability-ui.component.html',
-  styleUrl: './holochain-availability-ui.component.css'
+  styleUrl: './holochain-availability-ui.component.css',
 })
 export class HolochainAvailabilityUiComponent implements OnInit, OnDestroy {
   private readonly holochainClient = inject(HolochainClientService);
@@ -48,18 +49,19 @@ export class HolochainAvailabilityUiComponent implements OnInit, OnDestroy {
   // Computed display states
   readonly isConnecting = computed(() => this.connectionState() === 'connecting');
   readonly isError = computed(() => this.connectionState() === 'error');
-  readonly isOffline = computed(() =>
-    this.connectionState() === 'disconnected' || this.connectionState() === 'error'
+  readonly isOffline = computed(
+    () => this.connectionState() === 'disconnected' || this.connectionState() === 'error'
   );
 
   // UI visibility
   readonly shouldShow = computed(() => {
     const state = this.connectionState();
-    return !this.isDismissed() && (
-      state === 'connecting' ||
-      state === 'error' ||
-      state === 'disconnected' ||
-      this.hasQueuedOperations()
+    return (
+      !this.isDismissed() &&
+      (state === 'connecting' ||
+        state === 'error' ||
+        state === 'disconnected' ||
+        this.hasQueuedOperations())
     );
   });
 
@@ -101,8 +103,10 @@ export class HolochainAvailabilityUiComponent implements OnInit, OnDestroy {
       return 'Some features may be temporarily unavailable while connecting.';
     }
 
-    return 'Working in offline mode. Some features are unavailable. ' +
-           'Write operations will be queued and synced when connection is restored.';
+    return (
+      'Working in offline mode. Some features are unavailable. ' +
+      'Write operations will be queued and synced when connection is restored.'
+    );
   });
 
   // CSS class bindings
@@ -182,7 +186,7 @@ export class HolochainAvailabilityUiComponent implements OnInit, OnDestroy {
       'Creating new content',
       'Submitting mastery progress',
       'Recording appreciation',
-      'Accessing real-time data'
+      'Accessing real-time data',
     ];
 
     if (this.hasQueuedOperations()) {
@@ -200,7 +204,7 @@ export class HolochainAvailabilityUiComponent implements OnInit, OnDestroy {
       'Reading cached content',
       'Browsing learning paths',
       'Viewing cached blobs',
-      'Offline caching'
+      'Offline caching',
     ];
   }
 }

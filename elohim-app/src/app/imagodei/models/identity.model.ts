@@ -38,12 +38,12 @@ import type { SovereigntyStage } from './sovereignty.model';
  * @deprecated 'self-sovereign' - Use 'steward' instead. Will be removed in v2.0.
  */
 export type IdentityMode =
-  | 'anonymous'      // Pure browser, no session created
-  | 'session'        // localStorage visitor with session
-  | 'hosted'         // Holochain with custodial keys on edge node
-  | 'steward'        // Holochain with keys on user's device (preferred)
+  | 'anonymous' // Pure browser, no session created
+  | 'session' // localStorage visitor with session
+  | 'hosted' // Holochain with custodial keys on edge node
+  | 'steward' // Holochain with keys on user's device (preferred)
   | 'self-sovereign' // @deprecated - use 'steward' instead
-  | 'migrating';     // In transition between stages
+  | 'migrating'; // In transition between stages
 
 /**
  * Check if the identity mode represents a steward (local keys).
@@ -74,11 +74,11 @@ export function isNetworkMode(mode: IdentityMode): boolean {
  * Where the user's cryptographic keys are stored.
  */
 export type KeyLocation =
-  | 'none'           // No keys (visitor/anonymous)
-  | 'browser'        // Browser storage (IndexedDB) - least secure
-  | 'custodial'      // Edge node server holds keys
-  | 'device'         // Local Holochain conductor
-  | 'hardware';      // Hardware security module (Ledger, YubiKey)
+  | 'none' // No keys (visitor/anonymous)
+  | 'browser' // Browser storage (IndexedDB) - least secure
+  | 'custodial' // Edge node server holds keys
+  | 'device' // Local Holochain conductor
+  | 'hardware'; // Hardware security module (Ledger, YubiKey)
 
 /**
  * Key backup status - important for recovery planning.
@@ -99,17 +99,17 @@ export interface KeyBackupStatus {
  * Matches Holochain Human.profile_reach values.
  */
 export const ProfileReachLevels = {
-  PRIVATE: 'private',      // Only you
-  SELF: 'self',            // You and your agents
-  INTIMATE: 'intimate',    // Close trust circle
-  TRUSTED: 'trusted',      // Trusted connections
-  FAMILIAR: 'familiar',    // Known community members
-  COMMUNITY: 'community',  // Elohim community
-  PUBLIC: 'public',        // Anyone on the network
-  COMMONS: 'commons',      // Published to public commons
+  PRIVATE: 'private', // Only you
+  SELF: 'self', // You and your agents
+  INTIMATE: 'intimate', // Close trust circle
+  TRUSTED: 'trusted', // Trusted connections
+  FAMILIAR: 'familiar', // Known community members
+  COMMUNITY: 'community', // Elohim community
+  PUBLIC: 'public', // Anyone on the network
+  COMMONS: 'commons', // Published to public commons
 } as const;
 
-export type ProfileReach = typeof ProfileReachLevels[keyof typeof ProfileReachLevels];
+export type ProfileReach = (typeof ProfileReachLevels)[keyof typeof ProfileReachLevels];
 
 // =============================================================================
 // Human Profile
@@ -424,7 +424,12 @@ export interface MigrationResult {
  */
 export interface TransitionRequirement {
   /** Type of requirement */
-  type: 'app-install' | 'key-backup' | 'node-setup' | 'network-connection' | 'identity-verification';
+  type:
+    | 'app-install'
+    | 'key-backup'
+    | 'node-setup'
+    | 'network-connection'
+    | 'identity-verification';
   /** Human-readable label */
   label: string;
   /** Description of what's needed */

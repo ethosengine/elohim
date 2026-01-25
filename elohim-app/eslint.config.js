@@ -5,6 +5,9 @@ const angular = require("@angular-eslint/eslint-plugin");
 const angularTemplate = require("@angular-eslint/eslint-plugin-template");
 const angularTemplateParser = require("@angular-eslint/template-parser");
 const importPlugin = require("eslint-plugin-import");
+const prettierPlugin = require("eslint-plugin-prettier");
+const prettierConfig = require("eslint-config-prettier");
+const sonarjs = require("eslint-plugin-sonarjs");
 
 module.exports = tseslint.config(
   {
@@ -14,7 +17,9 @@ module.exports = tseslint.config(
       "node_modules/**",
       "**/*.spec.ts",
       "coverage/**",
-      ".angular/**"
+      ".angular/**",
+      "src/assets/**/*.js",  // Vendor bundles (perseus-plugin, etc.)
+      "src/assets/**/*.umd.js"
     ]
   },
   {
@@ -27,7 +32,9 @@ module.exports = tseslint.config(
     ],
     plugins: {
       "@angular-eslint": angular,
-      "import": importPlugin
+      "import": importPlugin,
+      "prettier": prettierPlugin,
+      "sonarjs": sonarjs
     },
     languageOptions: {
       parserOptions: {
@@ -75,17 +82,58 @@ module.exports = tseslint.config(
         ]
       }],
 
+      // Import organization - auto-fixable with --fix
+      "import/order": ["warn", {
+        groups: [
+          "builtin",      // Node.js built-ins
+          "external",     // npm packages
+          "internal",     // @app/* aliases
+          "parent",       // ../
+          "sibling",      // ./
+          "index",        // ./index
+          "type"          // type imports
+        ],
+        pathGroups: [
+          { pattern: "@angular/**", group: "external", position: "before" },
+          { pattern: "rxjs/**", group: "external", position: "before" },
+          { pattern: "@app/**", group: "internal", position: "before" },
+          { pattern: "@elohim/**", group: "internal", position: "after" }
+        ],
+        pathGroupsExcludedImportTypes: ["type"],
+        "newlines-between": "always",
+        alphabetize: { order: "asc", caseInsensitive: true }
+      }],
+      "import/no-duplicates": "error",
+      "import/no-useless-path-segments": "warn",
+
       // General best practices
       "no-console": ["warn", { allow: ["warn", "error"] }],
       "prefer-const": "error",
-      "no-var": "error"
+      "no-var": "error",
+
+      // SonarJS rules - mirrors SonarQube analysis for local catching
+      "sonarjs/cognitive-complexity": ["warn", 15],
+      "sonarjs/no-duplicate-string": ["warn", { threshold: 3 }],
+      "sonarjs/no-identical-functions": "warn",
+      "sonarjs/no-collapsible-if": "warn",
+      "sonarjs/no-redundant-jump": "warn",
+      "sonarjs/no-nested-template-literals": "warn",
+      "sonarjs/prefer-immediate-return": "warn",
+      "sonarjs/prefer-single-boolean-return": "warn",
+
+      // Prettier - auto-fix formatting (disabled in CI for performance)
+      "prettier/prettier": [process.env.CI === "true" ? "off" : "error"],
+
+      // Disable rules that conflict with Prettier
+      ...prettierConfig.rules
     }
   },
   {
     // HTML templates
     files: ["**/*.html"],
     plugins: {
-      "@angular-eslint/template": angularTemplate
+      "@angular-eslint/template": angularTemplate,
+      "prettier": prettierPlugin
     },
     languageOptions: {
       parser: angularTemplateParser
@@ -93,7 +141,10 @@ module.exports = tseslint.config(
     rules: {
       "@angular-eslint/template/banana-in-box": "error",
       "@angular-eslint/template/no-negated-async": "error",
-      "@angular-eslint/template/eqeqeq": "error"
+      "@angular-eslint/template/eqeqeq": "error",
+
+      // Prettier for HTML templates (disabled in CI)
+      "prettier/prettier": [process.env.CI === "true" ? "off" : "error"]
     }
   }
 );

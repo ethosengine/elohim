@@ -159,7 +159,7 @@ $type-colors: (
     transition: flex 0.3s ease;
 
     @each $type, $color in $type-colors {
-      &[data-type="#{$type}"] {
+      &[data-type='#{$type}'] {
         background: $color;
       }
     }

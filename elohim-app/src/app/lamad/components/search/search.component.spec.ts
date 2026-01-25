@@ -18,15 +18,15 @@ describe('SearchComponent', () => {
       title: 'Result 1',
       description: 'First result',
       contentType: 'epic',
-      tags: ['tag1', 'tag2']
+      tags: ['tag1', 'tag2'],
     },
     {
       id: 'result-2',
       title: 'Result 2',
       description: 'Second result',
       contentType: 'feature',
-      tags: ['tag3']
-    }
+      tags: ['tag3'],
+    },
   ] as SearchResult[];
 
   beforeEach(async () => {
@@ -41,11 +41,11 @@ describe('SearchComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            queryParams: queryParamsSubject.asObservable()
-          }
+            queryParams: queryParamsSubject.asObservable(),
+          },
         },
-        { provide: SearchService, useValue: searchSpyObj }
-      ]
+        { provide: SearchService, useValue: searchSpyObj },
+      ],
     }).compileComponents();
 
     searchServiceSpy = TestBed.inject(SearchService) as jasmine.SpyObj<SearchService>;
@@ -131,7 +131,9 @@ describe('SearchComponent', () => {
 
     it('should set isLoading during search', fakeAsync(() => {
       // Use delayed observable to test isLoading state
-      searchServiceSpy.search.and.returnValue(of({ results: mockSearchResults } as any).pipe(delay(100)));
+      searchServiceSpy.search.and.returnValue(
+        of({ results: mockSearchResults } as any).pipe(delay(100))
+      );
 
       component.query = 'test';
       component.performSearch();
@@ -149,7 +151,7 @@ describe('SearchComponent', () => {
         title: 'Test',
         description: 'Desc',
         contentType: 'epic',
-        tags: []
+        tags: [],
       } as unknown as SearchResult;
 
       const route = component.getNodeRoute(result);

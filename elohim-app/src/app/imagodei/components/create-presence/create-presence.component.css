@@ -103,15 +103,17 @@
   font-size: 0.95rem;
 }
 
-.form-group input[type="text"],
-.form-group input[type="email"],
+.form-group input[type='text'],
+.form-group input[type='email'],
 .form-group textarea,
 .form-group select {
   padding: 0.75rem 1rem;
   border: 1px solid var(--border-color, #e0e0e0);
   border-radius: 8px;
   font-size: 1rem;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
   background: var(--surface-card, white);
 }
 
@@ -310,7 +312,9 @@
   border-radius: 8px;
   border: none;
   cursor: pointer;
-  transition: background 0.2s, opacity 0.2s;
+  transition:
+    background 0.2s,
+    opacity 0.2s;
 }
 
 .btn:disabled {
@@ -366,7 +370,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Form Actions */

@@ -212,7 +212,7 @@ export function recognitionToScoreResult(recognition: Recognition): PerseusScore
     correct: recognition.mastery?.demonstrated ?? false,
     message: recognition.mastery?.message,
     empty: Object.keys(recognition.userInput).length === 0,
-    guess: false
+    guess: false,
   };
 }
 
@@ -228,7 +228,7 @@ export function perseusItemToMoment(item: Record<string, unknown>): Moment {
       purpose: 'mastery',
       content: item['question'] as PerseusRenderer,
       hints: item['hints'] as Hint[] | undefined,
-      metadata: item['metadata'] as MomentMetadata | undefined
+      metadata: item['metadata'] as MomentMetadata | undefined,
     };
   }
 

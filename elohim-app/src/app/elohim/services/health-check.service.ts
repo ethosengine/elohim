@@ -26,6 +26,7 @@
  */
 
 import { Injectable, signal, computed, inject, OnDestroy } from '@angular/core';
+
 import { HolochainClientService } from './holochain-client.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';

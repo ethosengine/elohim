@@ -52,34 +52,34 @@ describe('CustodianBlobDistributionService', () => {
   });
 
   describe('Custodian Selection', () => {
-    it('should select suitable custodians for blob', (done) => {
+    it('should select suitable custodians for blob', done => {
       const blob = createMockBlob();
       const criteria = createCriteria();
 
-      service.selectCustodiansForBlob(blob, 'content_123', criteria).subscribe((custodians) => {
+      service.selectCustodiansForBlob(blob, 'content_123', criteria).subscribe(custodians => {
         expect(Array.isArray(custodians)).toBe(true);
         done();
       });
     });
 
-    it('should respect maxCustodians limit', (done) => {
+    it('should respect maxCustodians limit', done => {
       const blob = createMockBlob();
       const criteria = createCriteria();
       criteria.maxCustodians = 2;
 
-      service.selectCustodiansForBlob(blob, 'content_123', criteria).subscribe((custodians) => {
+      service.selectCustodiansForBlob(blob, 'content_123', criteria).subscribe(custodians => {
         expect(custodians.length).toBeLessThanOrEqual(2);
         done();
       });
     });
 
-    it('should consider bandwidth requirements', (done) => {
+    it('should consider bandwidth requirements', done => {
       const blob = createMockBlob();
       blob.bitrateMbps = 50;
       const criteria = createCriteria();
       criteria.minBandwidthMbps = 100;
 
-      service.selectCustodiansForBlob(blob, 'content_123', criteria).subscribe((custodians) => {
+      service.selectCustodiansForBlob(blob, 'content_123', criteria).subscribe(custodians => {
         // In production, would only return custodians with sufficient bandwidth
         expect(Array.isArray(custodians)).toBe(true);
         done();
@@ -88,11 +88,11 @@ describe('CustodianBlobDistributionService', () => {
   });
 
   describe('Commitment Lifecycle', () => {
-    it('should create blob commitment', (done) => {
+    it('should create blob commitment', done => {
       const blob = createMockBlob();
       const custodianId = 'custodian_1';
 
-      service.createBlobCommitment('content_123', blob, custodianId).subscribe((commitment) => {
+      service.createBlobCommitment('content_123', blob, custodianId).subscribe(commitment => {
         expect(commitment.contentId).toBe('content_123');
         expect(commitment.blobHash).toBe(blob.hash);
         expect(commitment.custodianId).toBe(custodianId);
@@ -102,32 +102,32 @@ describe('CustodianBlobDistributionService', () => {
       });
     });
 
-    it('should set commitment expiration', (done) => {
+    it('should set commitment expiration', done => {
       const blob = createMockBlob();
       const now = Date.now();
 
-      service.createBlobCommitment('content_123', blob, 'custodian_1', 30).subscribe((commitment) => {
+      service.createBlobCommitment('content_123', blob, 'custodian_1', 30).subscribe(commitment => {
         const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
         expect(commitment.expiresAt - now).toBeCloseTo(thirtyDaysMs, -3); // Allow 3 second variance
         done();
       });
     });
 
-    it('should generate fallback URL for commitment', (done) => {
+    it('should generate fallback URL for commitment', done => {
       const blob = createMockBlob();
 
-      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe((commitment) => {
+      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(commitment => {
         expect(commitment.fallbackUrl).toContain('custodian_1');
         expect(commitment.fallbackUrl).toContain(blob.hash);
         done();
       });
     });
 
-    it('should update replication progress', (done) => {
+    it('should update replication progress', done => {
       const blob = createMockBlob();
 
-      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe((commitment) => {
-        service.updateReplicationProgress(commitment, 75, 15).subscribe((updated) => {
+      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(commitment => {
+        service.updateReplicationProgress(commitment, 75, 15).subscribe(updated => {
           expect(updated.replicationProgress).toBe(75);
           expect(updated.bandwidth).toBe(15);
           expect(updated.commitmentStatus).toBe('pending'); // Not 100% yet
@@ -136,11 +136,11 @@ describe('CustodianBlobDistributionService', () => {
       });
     });
 
-    it('should mark commitment active when replication complete', (done) => {
+    it('should mark commitment active when replication complete', done => {
       const blob = createMockBlob();
 
-      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe((commitment) => {
-        service.updateReplicationProgress(commitment, 100, 20).subscribe((updated) => {
+      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(commitment => {
+        service.updateReplicationProgress(commitment, 100, 20).subscribe(updated => {
           expect(updated.commitmentStatus).toBe('active');
           expect(updated.replicationProgress).toBe(100);
           done();
@@ -148,16 +148,16 @@ describe('CustodianBlobDistributionService', () => {
       });
     });
 
-    it('should revoke commitment', (done) => {
+    it('should revoke commitment', done => {
       const blob = createMockBlob();
 
       service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(() => {
-        service.revokeCommitment('content_123', blob.hash, 'custodian_1').subscribe((revoked) => {
+        service.revokeCommitment('content_123', blob.hash, 'custodian_1').subscribe(revoked => {
           expect(revoked).toBe(true);
 
           // Commitment should be expired
           const commitments = service.getCommitmentsForBlob('content_123', blob.hash);
-          const revoked_commitment = commitments.find((c) => c.custodianId === 'custodian_1');
+          const revoked_commitment = commitments.find(c => c.custodianId === 'custodian_1');
           expect(revoked_commitment?.commitmentStatus).toBe('expired');
           done();
         });
@@ -166,12 +166,12 @@ describe('CustodianBlobDistributionService', () => {
   });
 
   describe('Replication Status', () => {
-    it('should report blob replication status', (done) => {
+    it('should report blob replication status', done => {
       const blob = createMockBlob();
 
       service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(() => {
         service.createBlobCommitment('content_123', blob, 'custodian_2').subscribe(() => {
-          service.getBlobReplicationStatus('content_123', blob.hash).subscribe((status) => {
+          service.getBlobReplicationStatus('content_123', blob.hash).subscribe(status => {
             expect(status.blobHash).toBe(blob.hash);
             expect(status.custodianCount).toBe(2);
             done();
@@ -180,11 +180,11 @@ describe('CustodianBlobDistributionService', () => {
       });
     });
 
-    it('should calculate health status based on active replicas', (done) => {
+    it('should calculate health status based on active replicas', done => {
       const blob = createMockBlob();
 
       service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(() => {
-        service.getBlobReplicationStatus('content_123', blob.hash).subscribe((status) => {
+        service.getBlobReplicationStatus('content_123', blob.hash).subscribe(status => {
           // With 0 active replicas (commitments pending), should be critical
           expect(status.healthStatus).toBe('critical');
           done();
@@ -192,7 +192,7 @@ describe('CustodianBlobDistributionService', () => {
       });
     });
 
-    it('should return degraded health when some replicas fail', (done) => {
+    it('should return degraded health when some replicas fail', done => {
       const blob = createMockBlob();
 
       // Create 3 commitments
@@ -203,7 +203,7 @@ describe('CustodianBlobDistributionService', () => {
             let commitments = service.getCommitmentsForBlob('content_123', blob.hash);
             commitments[0].commitmentStatus = 'active';
 
-            service.getBlobReplicationStatus('content_123', blob.hash).subscribe((status) => {
+            service.getBlobReplicationStatus('content_123', blob.hash).subscribe(status => {
               // 1 active out of 3 = less than 50% = degraded
               expect(status.healthStatus).toBe('degraded');
               done();
@@ -215,16 +215,19 @@ describe('CustodianBlobDistributionService', () => {
   });
 
   describe('Commitment Queries', () => {
-    it('should retrieve commitments for blob', (done) => {
+    it('should retrieve commitments for blob', done => {
       const blob = createMockBlob();
 
       service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(() => {
         service.createBlobCommitment('content_123', blob, 'custodian_2').subscribe(() => {
-          const commitments = service.getCommitmentsForBlob('content_123', blob.hash) as CustodianBlobCommitment[];
+          const commitments = service.getCommitmentsForBlob(
+            'content_123',
+            blob.hash
+          ) as CustodianBlobCommitment[];
 
           expect(commitments.length).toBe(2);
-          expect(commitments.map((c) => c.custodianId)).toContain('custodian_1');
-          expect(commitments.map((c) => c.custodianId)).toContain('custodian_2');
+          expect(commitments.map(c => c.custodianId)).toContain('custodian_1');
+          expect(commitments.map(c => c.custodianId)).toContain('custodian_2');
           done();
         });
       });
@@ -235,7 +238,7 @@ describe('CustodianBlobDistributionService', () => {
       expect(commitments).toEqual([]);
     });
 
-    it('should get custodian fallback URLs from active commitments', (done) => {
+    it('should get custodian fallback URLs from active commitments', done => {
       const blob = createMockBlob();
 
       service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(() => {
@@ -253,23 +256,23 @@ describe('CustodianBlobDistributionService', () => {
   });
 
   describe('Additional Custodian Selection', () => {
-    it('should recommend additional custodians if under-replicated', (done) => {
+    it('should recommend additional custodians if under-replicated', done => {
       const blob = createMockBlob();
       const criteria = createCriteria();
 
-      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe((commitment1) => {
+      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(commitment1 => {
         const commitments = [commitment1];
 
         service
           .selectAdditionalCustodians(blob, 'content_123', commitments, 3, criteria)
-          .subscribe((additional) => {
+          .subscribe(additional => {
             expect(Array.isArray(additional)).toBe(true);
             done();
           });
       });
     });
 
-    it('should not recommend custodians if already sufficiently replicated', (done) => {
+    it('should not recommend custodians if already sufficiently replicated', done => {
       const blob = createMockBlob();
       const criteria = createCriteria();
 
@@ -281,24 +284,24 @@ describe('CustodianBlobDistributionService', () => {
 
       service
         .selectAdditionalCustodians(blob, 'content_123', commitments, 3, criteria)
-        .subscribe((additional) => {
+        .subscribe(additional => {
           expect(additional.length).toBe(0);
           done();
         });
     });
 
-    it('should not re-select custodians already replicating blob', (done) => {
+    it('should not re-select custodians already replicating blob', done => {
       const blob = createMockBlob();
       const criteria = createCriteria();
 
-      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe((commitment) => {
+      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(commitment => {
         const commitments = [commitment];
 
         service
           .selectAdditionalCustodians(blob, 'content_123', commitments, 2, criteria)
-          .subscribe((additional) => {
+          .subscribe(additional => {
             // Additional custodians should not include custodian_1
-            const additionalIds = additional.map((c) => c.custodianId);
+            const additionalIds = additional.map(c => c.custodianId);
             expect(additionalIds).not.toContain('custodian_1');
             done();
           });
@@ -307,11 +310,11 @@ describe('CustodianBlobDistributionService', () => {
   });
 
   describe('Replication Progress', () => {
-    it('should calculate average replication progress', (done) => {
+    it('should calculate average replication progress', done => {
       const blob = createMockBlob();
 
-      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe((c1) => {
-        service.createBlobCommitment('content_123', blob, 'custodian_2').subscribe((c2) => {
+      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(c1 => {
+        service.createBlobCommitment('content_123', blob, 'custodian_2').subscribe(c2 => {
           service.updateReplicationProgress(c1, 50, 10).subscribe(() => {
             service.updateReplicationProgress(c2, 100, 20).subscribe(() => {
               const avgProgress = service.getAverageReplicationProgress('content_123', blob.hash);
@@ -323,7 +326,7 @@ describe('CustodianBlobDistributionService', () => {
       });
     });
 
-    it('should count active replicas', (done) => {
+    it('should count active replicas', done => {
       const blob = createMockBlob();
 
       service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(() => {
@@ -344,11 +347,11 @@ describe('CustodianBlobDistributionService', () => {
   });
 
   describe('Best Custodian Selection', () => {
-    it('should return best custodian URL for serving', (done) => {
+    it('should return best custodian URL for serving', done => {
       const blob = createMockBlob();
 
-      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe((c1) => {
-        service.createBlobCommitment('content_123', blob, 'custodian_2').subscribe((c2) => {
+      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(c1 => {
+        service.createBlobCommitment('content_123', blob, 'custodian_2').subscribe(c2 => {
           // Mark both as active with different bandwidth
           let commitments = service.getCommitmentsForBlob('content_123', blob.hash);
           commitments[0].commitmentStatus = 'active';
@@ -373,8 +376,8 @@ describe('CustodianBlobDistributionService', () => {
   });
 
   describe('Custodian Health', () => {
-    it('should probe custodian health', (done) => {
-      service.probeCustodianHealth('custodian_1').subscribe((health) => {
+    it('should probe custodian health', done => {
+      service.probeCustodianHealth('custodian_1').subscribe(health => {
         expect(health.online).toBeDefined();
         expect(health.acceptingBlobs).toBeDefined();
         expect(health.bandwidth).toBeGreaterThanOrEqual(0);
@@ -383,8 +386,8 @@ describe('CustodianBlobDistributionService', () => {
       });
     });
 
-    it('should get custodian capability info', (done) => {
-      service.getCustodianCapability('custodian_1').subscribe((capability) => {
+    it('should get custodian capability info', done => {
+      service.getCustodianCapability('custodian_1').subscribe(capability => {
         // Will be null in stub implementation, but should not error
         done();
       });
@@ -392,21 +395,21 @@ describe('CustodianBlobDistributionService', () => {
   });
 
   describe('Resilience and Fallbacks', () => {
-    it('should handle missing blob gracefully', (done) => {
-      service.getBlobReplicationStatus('content_999', 'nonexistent').subscribe((status) => {
+    it('should handle missing blob gracefully', done => {
+      service.getBlobReplicationStatus('content_999', 'nonexistent').subscribe(status => {
         expect(status.custodianCount).toBe(0);
         expect(status.activeReplicas).toBe(0);
         done();
       });
     });
 
-    it('should generate consistent fallback URLs', (done) => {
+    it('should generate consistent fallback URLs', done => {
       const blob = createMockBlob();
 
-      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe((c1) => {
+      service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(c1 => {
         const url1 = c1.fallbackUrl;
 
-        service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe((c2) => {
+        service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(c2 => {
           const url2 = c2.fallbackUrl;
 
           // URLs for same blob and custodian should be similar

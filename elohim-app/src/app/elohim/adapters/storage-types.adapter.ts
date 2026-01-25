@@ -88,7 +88,9 @@ export function withFullyConsentedFlag(view: HumanRelationshipViewBase): HumanRe
  * Add derived `establishingContentIds` field to ContributorPresenceView.
  * Extracts the typed array from the already-parsed JSON value.
  */
-export function withEstablishingContentIds(view: ContributorPresenceViewBase): ContributorPresenceView {
+export function withEstablishingContentIds(
+  view: ContributorPresenceViewBase
+): ContributorPresenceView {
   const establishingContentIds = Array.isArray(view.establishingContentIds)
     ? (view.establishingContentIds as string[])
     : [];
@@ -105,14 +107,17 @@ export function withEstablishingContentIds(view: ContributorPresenceViewBase): C
 /**
  * Add derived fields to an array of HumanRelationshipViews.
  */
-export function withFullyConsentedFlags(views: HumanRelationshipViewBase[]): HumanRelationshipView[] {
+export function withFullyConsentedFlags(
+  views: HumanRelationshipViewBase[]
+): HumanRelationshipView[] {
   return views.map(withFullyConsentedFlag);
 }
 
 /**
  * Add derived fields to an array of ContributorPresenceViews.
  */
-export function withEstablishingContentIdsArray(views: ContributorPresenceViewBase[]): ContributorPresenceView[] {
+export function withEstablishingContentIdsArray(
+  views: ContributorPresenceViewBase[]
+): ContributorPresenceView[] {
   return views.map(withEstablishingContentIds);
 }
-

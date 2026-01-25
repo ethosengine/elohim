@@ -120,7 +120,7 @@ export const DEFAULT_COOLDOWN_CONFIG: CooldownConfig = {
   masteryAttemptsPerDay: 2,
   cooldownHours: 4,
   dailyResetHour: 0, // Midnight
-  minTimeBetweenAttempts: 5
+  minTimeBetweenAttempts: 5,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -154,10 +154,10 @@ export interface AttemptCheckResult {
  * Reasons an attempt may be denied.
  */
 export type AttemptDenialReason =
-  | 'max_attempts_reached'  // Used all attempts for the day
-  | 'in_cooldown'          // Cooldown period active
-  | 'too_soon'             // Too soon after last attempt
-  | 'already_mastered';    // Already passed mastery quiz
+  | 'max_attempts_reached' // Used all attempts for the day
+  | 'in_cooldown' // Cooldown period active
+  | 'too_soon' // Too soon after last attempt
+  | 'already_mastered'; // Already passed mastery quiz
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cooldown Status
@@ -217,7 +217,7 @@ export function createAttemptRecord(
     bestScore: 0,
     mastered: false,
     masteredAt: null,
-    attemptHistory: []
+    attemptHistory: [],
   };
 }
 
@@ -255,7 +255,7 @@ export function checkCanAttempt(
       reason: 'already_mastered',
       remainingAttempts: 0,
       resetsAt: record.resetsAt,
-      message: 'You have already mastered this content.'
+      message: 'You have already mastered this content.',
     };
   }
 
@@ -275,7 +275,7 @@ export function checkCanAttempt(
       reason: 'max_attempts_reached',
       remainingAttempts: 0,
       resetsAt: record.resetsAt,
-      message: `You've used all ${record.maxAttemptsPerDay} attempts for today. Try again tomorrow.`
+      message: `You've used all ${record.maxAttemptsPerDay} attempts for today. Try again tomorrow.`,
     };
   }
 
@@ -292,7 +292,7 @@ export function checkCanAttempt(
         cooldownEndsAt: record.cooldownEndsAt,
         remainingAttempts: record.maxAttemptsPerDay - attemptsToday,
         resetsAt: record.resetsAt,
-        message: `Please wait ${remainingFormatted} before your next attempt.`
+        message: `Please wait ${remainingFormatted} before your next attempt.`,
       };
     }
   }
@@ -311,7 +311,7 @@ export function checkCanAttempt(
         cooldownEndsAt: new Date(now.getTime() + waitTime).toISOString(),
         remainingAttempts: record.maxAttemptsPerDay - attemptsToday,
         resetsAt: record.resetsAt,
-        message: `Please wait ${formatDuration(waitTime)} before your next attempt.`
+        message: `Please wait ${formatDuration(waitTime)} before your next attempt.`,
       };
     }
   }
@@ -321,7 +321,7 @@ export function checkCanAttempt(
     allowed: true,
     remainingAttempts: record.maxAttemptsPerDay - attemptsToday,
     resetsAt: record.resetsAt,
-    message: `You have ${record.maxAttemptsPerDay - attemptsToday} attempt(s) remaining today.`
+    message: `You have ${record.maxAttemptsPerDay - attemptsToday} attempt(s) remaining today.`,
   };
 }
 
@@ -354,16 +354,15 @@ export function recordAttempt(
     passed: result.passed,
     durationMs: result.timing.totalDurationMs,
     correctCount: result.correctCount,
-    totalQuestions: result.totalQuestions
+    totalQuestions: result.totalQuestions,
   };
 
   // Calculate cooldown end
   const cooldownEndsAt = new Date(now.getTime() + fullConfig.cooldownHours * 60 * 60 * 1000);
 
   // Calculate new reset time if needed
-  const newResetsAt = now >= resetTime
-    ? calculateResetTime(fullConfig.dailyResetHour)
-    : record.resetsAt;
+  const newResetsAt =
+    now >= resetTime ? calculateResetTime(fullConfig.dailyResetHour) : record.resetsAt;
 
   return {
     ...record,
@@ -374,7 +373,7 @@ export function recordAttempt(
     mastered: record.mastered || result.passed,
     masteredAt: result.passed && !record.mastered ? now.toISOString() : record.masteredAt,
     resetsAt: newResetsAt,
-    attemptHistory: [...record.attemptHistory, historyEntry].slice(-50) // Keep last 50
+    attemptHistory: [...record.attemptHistory, historyEntry].slice(-50), // Keep last 50
   };
 }
 
@@ -422,7 +421,7 @@ export function getCooldownStatus(
     attemptsUsed: attemptsToday,
     attemptsRemaining: Math.max(0, record.maxAttemptsPerDay - attemptsToday),
     resetsAt,
-    timeUntilResetMs
+    timeUntilResetMs,
   };
 }
 

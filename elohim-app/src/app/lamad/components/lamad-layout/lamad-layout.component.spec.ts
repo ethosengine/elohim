@@ -12,7 +12,7 @@ describe('LamadLayoutComponent', () => {
     get: jasmine.createSpy('get').and.returnValue(Promise.resolve(null)),
     query: jasmine.createSpy('query').and.returnValue(Promise.resolve([])),
     supportsOffline: jasmine.createSpy('supportsOffline').and.returnValue(false),
-    backpressure: jasmine.createSpy('backpressure').and.returnValue(Promise.resolve(0))
+    backpressure: jasmine.createSpy('backpressure').and.returnValue(Promise.resolve(0)),
   };
 
   beforeEach(async () => {
@@ -21,8 +21,8 @@ describe('LamadLayoutComponent', () => {
       providers: [
         provideRouter([]),
         provideHttpClient(),
-        { provide: ELOHIM_CLIENT, useValue: mockElohimClient }
-      ]
+        { provide: ELOHIM_CLIENT, useValue: mockElohimClient },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(LamadLayoutComponent);

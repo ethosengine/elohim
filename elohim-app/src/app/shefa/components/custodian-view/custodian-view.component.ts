@@ -11,15 +11,16 @@
  * family-community protection network.
  */
 
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
+
 import { Subject, takeUntil } from 'rxjs';
 
-import { ShefaComputeService } from '../../services/shefa-compute.service';
 import {
   BidirectionalCustodianView,
   CustodianRelationship,
 } from '../../models/shefa-dashboard.model';
+import { ShefaComputeService } from '../../services/shefa-compute.service';
 
 @Component({
   selector: 'app-custodian-view',
@@ -71,11 +72,11 @@ export class CustodianViewComponent implements OnInit, OnDestroy {
       .getBidirectionalCustodianView(this.operatorId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (view) => {
+        next: view => {
           this.view = view;
           this.isLoading = false;
         },
-        error: (err) => {
+        error: err => {
           console.error('[CustodianView] Failed to load:', err);
           this.error = 'Failed to load custodian relationships';
           this.isLoading = false;

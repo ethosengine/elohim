@@ -18,11 +18,7 @@
  */
 
 import { ReachLevel } from './protocol-core.model';
-import {
-  ATTESTATION_BADGE_CONFIG,
-  REACH_BADGE_CONFIG,
-  WARNING_CONFIG
-} from './trust-badge-config';
+import { ATTESTATION_BADGE_CONFIG, REACH_BADGE_CONFIG, WARNING_CONFIG } from './trust-badge-config';
 
 // ContentAttestationType is lamad-specific - we define a minimal type here
 // for cross-pillar trust display. Full type lives in @app/lamad.
@@ -124,35 +120,35 @@ export interface BadgeDisplay {
  * BadgeType - Categories of trust badges.
  */
 export type BadgeType =
-  | 'reach'           // Reach level badge (private → commons)
-  | 'review'          // Review status (peer-reviewed, steward-approved)
-  | 'safety'          // Safety/moderation status
-  | 'canonical'       // Official/curriculum content
-  | 'community'       // Community endorsement
-  | 'author'          // Author verification
-  | 'license'         // Licensing status
-  | 'accessibility';  // Accessibility certification
+  | 'reach' // Reach level badge (private → commons)
+  | 'review' // Review status (peer-reviewed, steward-approved)
+  | 'safety' // Safety/moderation status
+  | 'canonical' // Official/curriculum content
+  | 'community' // Community endorsement
+  | 'author' // Author verification
+  | 'license' // Licensing status
+  | 'accessibility'; // Accessibility certification
 
 /**
  * BadgeColor - Color themes for badges.
  */
 export type BadgeColor =
-  | 'gold'      // Highest trust (governance-ratified, commons)
-  | 'blue'      // Strong trust (peer-reviewed, federated)
-  | 'green'     // Good trust (steward-approved, community)
-  | 'gray'      // Neutral (author-verified, local)
-  | 'orange'    // Warning/attention needed
-  | 'red';      // Critical warning
+  | 'gold' // Highest trust (governance-ratified, commons)
+  | 'blue' // Strong trust (peer-reviewed, federated)
+  | 'green' // Good trust (steward-approved, community)
+  | 'gray' // Neutral (author-verified, local)
+  | 'orange' // Warning/attention needed
+  | 'red'; // Critical warning
 
 /**
  * TrustLevel - Overall trust categorization for theming.
  */
 export type TrustLevel =
-  | 'verified'    // Highest trust - governance ratified, commons reach
-  | 'trusted'     // Strong trust - peer reviewed, steward approved
-  | 'emerging'    // Building trust - community endorsed, author verified
-  | 'unverified'  // No attestations yet
-  | 'flagged';    // Has active warnings
+  | 'verified' // Highest trust - governance ratified, commons reach
+  | 'trusted' // Strong trust - peer reviewed, steward approved
+  | 'emerging' // Building trust - community endorsed, author verified
+  | 'unverified' // No attestations yet
+  | 'flagged'; // Has active warnings
 
 /**
  * BadgeWarning - Warning/flag display data.
@@ -289,10 +285,10 @@ export function badgeToIndicator(badge: BadgeDisplay, priority: number): TrustIn
     source: {
       type: 'attestation',
       id: badge.attestationType ?? badge.type,
-      name: badge.grantedBy
+      name: badge.grantedBy,
     },
     timestamp: badge.grantedAt ?? new Date().toISOString(),
-    sourceType: badge.attestationType ?? 'author-verified'
+    sourceType: badge.attestationType ?? 'author-verified',
   };
 }
 
@@ -303,10 +299,10 @@ export function warningToIndicator(warning: BadgeWarning): TrustIndicator {
   // Warnings have high priority (show first in negative situations)
   const priorityMap: Record<BadgeWarning['type'], number> = {
     'partial-revocation': 95,
-    'disputed': 90,
+    disputed: 90,
     'appeal-pending': 80,
     'under-review': 70,
-    'outdated': 60
+    outdated: 60,
   };
 
   return {
@@ -320,10 +316,10 @@ export function warningToIndicator(warning: BadgeWarning): TrustIndicator {
     verified: true, // Flags are always "verified" as active
     source: {
       type: 'flag',
-      id: warning.type
+      id: warning.type,
     },
     timestamp: warning.flaggedAt,
-    sourceType: warning.type
+    sourceType: warning.type,
   };
 }
 
@@ -340,7 +336,7 @@ export const ATTESTATION_PRIORITY: Record<ContentAttestationType, number> = {
   'community-endorsed': 55,
   'accessibility-checked': 45,
   'license-cleared': 40,
-  'author-verified': 30
+  'author-verified': 30,
 };
 
 /**
@@ -392,18 +388,21 @@ export function calculateTrustLevel(
     return 'flagged';
   }
 
-  if (attestationTypes.includes('governance-ratified') ||
-      attestationTypes.includes('curriculum-canonical')) {
+  if (
+    attestationTypes.includes('governance-ratified') ||
+    attestationTypes.includes('curriculum-canonical')
+  ) {
     return 'verified';
   }
 
-  if (attestationTypes.includes('peer-reviewed') ||
-      attestationTypes.includes('steward-approved')) {
+  if (attestationTypes.includes('peer-reviewed') || attestationTypes.includes('steward-approved')) {
     return 'trusted';
   }
 
-  if (attestationTypes.includes('author-verified') ||
-      attestationTypes.includes('community-endorsed')) {
+  if (
+    attestationTypes.includes('author-verified') ||
+    attestationTypes.includes('community-endorsed')
+  ) {
     return 'emerging';
   }
 
@@ -519,6 +518,6 @@ export function toCompactBadge(badge: TrustBadge): CompactTrustBadge {
     tooltip: badge.summary,
     ariaLabel: badge.ariaLabel,
     trustLevel: badge.trustLevel,
-    showWarning: badge.hasWarnings
+    showWarning: badge.hasWarnings,
   };
 }

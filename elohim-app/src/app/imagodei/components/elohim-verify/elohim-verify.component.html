@@ -14,9 +14,8 @@
       <div class="intro-icon">psychology</div>
       <h2>Elohim Knowledge Check</h2>
       <p class="intro-description">
-        Verify your identity by answering questions about your profile.
-        These questions are based on your actual usage - paths you've completed,
-        relationships, quiz scores, and preferences.
+        Verify your identity by answering questions about your profile. These questions are based on
+        your actual usage - paths you've completed, relationships, quiz scores, and preferences.
       </p>
       <div class="intro-info">
         <div class="info-item">
@@ -32,11 +31,7 @@
           <span>Contributes up to 60% confidence</span>
         </div>
       </div>
-      <button
-        class="primary-button"
-        (click)="startVerification()"
-        [disabled]="isLoading()"
-      >
+      <button class="primary-button" (click)="startVerification()" [disabled]="isLoading()">
         @if (isLoading()) {
           <span class="spinner"></span>
           <span>Starting...</span>
@@ -125,18 +120,9 @@
           Previous
         </button>
         @if (currentQuestionIndex() < questions().length - 1) {
-          <button
-            class="nav-button primary"
-            (click)="nextQuestion()"
-          >
-            Next
-          </button>
+          <button class="nav-button primary" (click)="nextQuestion()">Next</button>
         } @else {
-          <button
-            class="nav-button submit"
-            (click)="submitAnswers()"
-            [disabled]="!canSubmit()"
-          >
+          <button class="nav-button submit" (click)="submitAnswers()" [disabled]="!canSubmit()">
             Submit Answers
           </button>
         }
@@ -175,11 +161,11 @@
 
       <div class="result-stats">
         <div class="stat">
-          <div class="stat-value">{{ res.accuracyPercent | number:'1.0-0' }}%</div>
+          <div class="stat-value">{{ res.accuracyPercent | number: '1.0-0' }}%</div>
           <div class="stat-label">Accuracy</div>
         </div>
         <div class="stat">
-          <div class="stat-value">{{ res.confidenceScore | number:'1.0-0' }}</div>
+          <div class="stat-value">{{ res.confidenceScore | number: '1.0-0' }}</div>
           <div class="stat-label">Confidence Points</div>
         </div>
       </div>
@@ -208,9 +194,7 @@
 
       <div class="result-actions">
         @if (!res.passed) {
-          <button class="secondary-button" (click)="retry()">
-            Try Again
-          </button>
+          <button class="secondary-button" (click)="retry()">Try Again</button>
         }
       </div>
     </div>

@@ -1,10 +1,15 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
+
 import { tap, switchMap } from 'rxjs/operators';
 
-import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
-import { HumanConsentService } from '@app/elohim/services/human-consent.service';
+import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
+
+import { hasMinimumIntimacy } from '@app/elohim/models/human-consent.model';
+import { PathNegotiationContent } from '@app/elohim/models/source-chain.model';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
+import { HumanConsentService } from '@app/elohim/services/human-consent.service';
+import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
+
 import {
   PathNegotiation,
   NegotiationStatus,
@@ -18,8 +23,6 @@ import {
   isNegotiationActive,
   isNegotiationResolved,
 } from '../models';
-import { PathNegotiationContent } from '@app/elohim/models/source-chain.model';
-import { hasMinimumIntimacy } from '@app/elohim/models/human-consent.model';
 
 /**
  * PathNegotiationService - Placeholder for Elohim-to-Elohim path negotiation.
@@ -79,7 +82,10 @@ export class PathNegotiationService {
 
       const existing = negotiationMap.get(content.negotiationId);
       if (!existing) {
-        negotiationMap.set(content.negotiationId, this.contentToNegotiation(content, entry.timestamp));
+        negotiationMap.set(
+          content.negotiationId,
+          this.contentToNegotiation(content, entry.timestamp)
+        );
       }
     }
 
@@ -112,7 +118,9 @@ export class PathNegotiationService {
         }
 
         if (!hasMinimumIntimacy(consent.intimacyLevel, 'intimate')) {
-          return throwError(() => new Error('Intimate-level consent required for love map negotiation'));
+          return throwError(
+            () => new Error('Intimate-level consent required for love map negotiation')
+          );
         }
 
         if (consent.consentState !== 'accepted') {
@@ -122,7 +130,9 @@ export class PathNegotiationService {
         // Check for existing active negotiation
         const existingActive = this.findActiveNegotiationWith(request.participantId);
         if (existingActive) {
-          return throwError(() => new Error('An active negotiation already exists with this human'));
+          return throwError(
+            () => new Error('An active negotiation already exists with this human')
+          );
         }
 
         // Create negotiation
@@ -135,9 +145,7 @@ export class PathNegotiationService {
           request.message
         );
 
-        return of(negotiation).pipe(
-          tap(n => this.saveNegotiation(n))
-        );
+        return of(negotiation).pipe(tap(n => this.saveNegotiation(n)));
       })
     );
   }
@@ -146,7 +154,10 @@ export class PathNegotiationService {
    * Accept a negotiation proposal.
    * Triggers affinity analysis.
    */
-  acceptNegotiation(negotiationId: string, response?: NegotiationResponse): Observable<PathNegotiation> {
+  acceptNegotiation(
+    negotiationId: string,
+    response?: NegotiationResponse
+  ): Observable<PathNegotiation> {
     const negotiation = this.findNegotiationById(negotiationId);
     if (!negotiation) {
       return throwError(() => new Error('Negotiation not found'));
@@ -213,9 +224,7 @@ export class PathNegotiationService {
       content: reason ?? 'Declined negotiation',
     });
 
-    return of(undefined).pipe(
-      tap(() => this.saveNegotiation(updatedNegotiation))
-    );
+    return of(undefined).pipe(tap(() => this.saveNegotiation(updatedNegotiation)));
   }
 
   // =========================================================================
@@ -286,9 +295,7 @@ export class PathNegotiationService {
           },
         });
 
-        return of(withMessage).pipe(
-          tap(n => this.saveNegotiation(n))
-        );
+        return of(withMessage).pipe(tap(n => this.saveNegotiation(n)));
       })
     );
   }
@@ -326,9 +333,7 @@ export class PathNegotiationService {
       updatedAt: new Date().toISOString(),
     };
 
-    return of(proposedPath).pipe(
-      tap(() => this.saveNegotiation(updatedNegotiation))
-    );
+    return of(proposedPath).pipe(tap(() => this.saveNegotiation(updatedNegotiation)));
   }
 
   /**
@@ -433,25 +438,25 @@ export class PathNegotiationService {
         updatedAt: new Date().toISOString(),
       };
 
-      return of(this.addMessage(updatedNegotiation, {
-        authorId: currentAgentId,
-        timestamp: new Date().toISOString(),
-        type: 'accept',
-        content: 'Path accepted and generated',
-        metadata: { pathId },
-      })).pipe(
-        tap(n => this.saveNegotiation(n))
-      );
+      return of(
+        this.addMessage(updatedNegotiation, {
+          authorId: currentAgentId,
+          timestamp: new Date().toISOString(),
+          type: 'accept',
+          content: 'Path accepted and generated',
+          metadata: { pathId },
+        })
+      ).pipe(tap(n => this.saveNegotiation(n)));
     } else {
       // Request changes
-      return of(this.addMessage(negotiation, {
-        authorId: currentAgentId,
-        timestamp: new Date().toISOString(),
-        type: 'counter',
-        content: acceptance.feedback ?? 'Requested changes to path',
-      })).pipe(
-        tap(n => this.saveNegotiation(n))
-      );
+      return of(
+        this.addMessage(negotiation, {
+          authorId: currentAgentId,
+          timestamp: new Date().toISOString(),
+          type: 'counter',
+          content: acceptance.feedback ?? 'Requested changes to path',
+        })
+      ).pipe(tap(n => this.saveNegotiation(n)));
     }
   }
 
@@ -519,9 +524,7 @@ export class PathNegotiationService {
       content,
     });
 
-    return of(updatedNegotiation).pipe(
-      tap(n => this.saveNegotiation(n))
-    );
+    return of(updatedNegotiation).pipe(tap(n => this.saveNegotiation(n)));
   }
 
   // =========================================================================
@@ -541,12 +544,14 @@ export class PathNegotiationService {
 
   private findActiveNegotiationWith(humanId: string): PathNegotiation | null {
     const currentAgentId = this.getCurrentAgentId();
-    return this.negotiationsSubject.value.find(
-      n =>
-        isNegotiationActive(n.status) &&
-        ((n.initiatorId === currentAgentId && n.participantId === humanId) ||
-          (n.initiatorId === humanId && n.participantId === currentAgentId))
-    ) ?? null;
+    return (
+      this.negotiationsSubject.value.find(
+        n =>
+          isNegotiationActive(n.status) &&
+          ((n.initiatorId === currentAgentId && n.participantId === humanId) ||
+            (n.initiatorId === humanId && n.participantId === currentAgentId))
+      ) ?? null
+    );
   }
 
   private createNegotiationRecord(
@@ -602,10 +607,7 @@ export class PathNegotiationService {
     };
   }
 
-  private addMessage(
-    negotiation: PathNegotiation,
-    message: NegotiationMessage
-  ): PathNegotiation {
+  private addMessage(negotiation: PathNegotiation, message: NegotiationMessage): PathNegotiation {
     return {
       ...negotiation,
       negotiationLog: [...negotiation.negotiationLog, message],

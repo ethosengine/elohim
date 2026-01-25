@@ -1,6 +1,7 @@
-import { Component, Input, Output, EventEmitter, OnChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, Output, EventEmitter, OnChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+
 import { ContentNode } from '../../models/content-node.model';
 import { InteractiveRenderer, RendererCompletionEvent } from '../renderer-registry.service';
 
@@ -8,14 +9,14 @@ interface QuizQuestion {
   id: string;
   type: 'multiple-choice' | 'true-false' | 'short-answer' | 'connection';
   question: string;
-  options?: string[];         // For multiple-choice
+  options?: string[]; // For multiple-choice
   correctAnswer?: number | string | boolean;
-  rubric?: string;            // For manually graded
-  explanation?: string;       // Shown after answer
+  rubric?: string; // For manually graded
+  explanation?: string; // Shown after answer
 }
 
 interface QuizContent {
-  passingScore: number;       // 0-100
+  passingScore: number; // 0-100
   allowRetake: boolean;
   showCorrectAnswers: boolean;
   questions: QuizQuestion[];
@@ -26,7 +27,7 @@ interface QuizContent {
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './quiz-renderer.component.html',
-  styleUrls: ['./quiz-renderer.component.css']
+  styleUrls: ['./quiz-renderer.component.css'],
 })
 export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
   @Input() node!: ContentNode;
@@ -38,7 +39,7 @@ export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
   @Output() quizComplete = new EventEmitter<{ passed: boolean; score: number }>();
 
   quiz: QuizContent | null = null;
-  answers: Map<string, any> = new Map();
+  answers = new Map<string, any>();
   submitted = false;
   score = 0;
   passed = false;
@@ -109,8 +110,8 @@ export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
       details: {
         correct,
         total: gradeable,
-        passingScore: this.quiz.passingScore
-      }
+        passingScore: this.quiz.passingScore,
+      },
     });
 
     // Also emit legacy event for backwards compatibility

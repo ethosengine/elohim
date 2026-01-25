@@ -19,7 +19,10 @@
  * ```
  */
 
-import type { PerseusItem, PerseusScoreResult } from '../../content-io/plugins/sophia/sophia-moment.model';
+import type {
+  PerseusItem,
+  PerseusScoreResult,
+} from '../../content-io/plugins/sophia/sophia-moment.model';
 import type { MasteryLevel } from '../../models/content-mastery.model';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,22 +33,22 @@ import type { MasteryLevel } from '../../models/content-mastery.model';
  * Types of quiz sessions supported.
  */
 export type QuizSessionType =
-  | 'practice'        // Practice quiz - unlimited, from hierarchy
-  | 'mastery'         // Mastery quiz - limited attempts, gates progression
-  | 'inline'          // Post-content attestation (3-in-a-row)
+  | 'practice' // Practice quiz - unlimited, from hierarchy
+  | 'mastery' // Mastery quiz - limited attempts, gates progression
+  | 'inline' // Post-content attestation (3-in-a-row)
   | 'pre-assessment'; // Skip-ahead assessment at path start
 
 /**
  * States in the quiz session lifecycle.
  */
 export type QuizSessionState =
-  | 'not_started'   // Session created but not begun
-  | 'in_progress'   // User is actively answering questions
-  | 'paused'        // Session paused (can resume)
-  | 'completed'     // All questions answered
-  | 'abandoned'     // User left without completing
-  | 'passed'        // Completed with passing score
-  | 'failed';       // Completed but did not pass
+  | 'not_started' // Session created but not begun
+  | 'in_progress' // User is actively answering questions
+  | 'paused' // Session paused (can resume)
+  | 'completed' // All questions answered
+  | 'abandoned' // User left without completing
+  | 'passed' // Completed with passing score
+  | 'failed'; // Completed but did not pass
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Quiz Session
@@ -428,7 +431,7 @@ export const VALID_TRANSITIONS: Record<QuizSessionState, QuizSessionState[]> = {
   completed: ['passed', 'failed'], // Terminal, but can resolve to pass/fail
   abandoned: [], // Terminal
   passed: [], // Terminal
-  failed: [] // Terminal
+  failed: [], // Terminal
 };
 
 /**
@@ -463,7 +466,7 @@ export const DEFAULT_CONFIGS: Record<QuizSessionType, QuizSessionConfig> = {
     timeLimitPerQuestion: 0,
     totalTimeLimit: 0,
     allowSkip: true,
-    allowBackNavigation: true
+    allowBackNavigation: true,
   },
   mastery: {
     passingScore: 0.8,
@@ -475,7 +478,7 @@ export const DEFAULT_CONFIGS: Record<QuizSessionType, QuizSessionConfig> = {
     timeLimitPerQuestion: 120000, // 2 minutes
     totalTimeLimit: 0,
     allowSkip: false,
-    allowBackNavigation: false
+    allowBackNavigation: false,
   },
   inline: {
     passingScore: 0.7,
@@ -487,7 +490,7 @@ export const DEFAULT_CONFIGS: Record<QuizSessionType, QuizSessionConfig> = {
     timeLimitPerQuestion: 0,
     totalTimeLimit: 0,
     allowSkip: false,
-    allowBackNavigation: false
+    allowBackNavigation: false,
   },
   'pre-assessment': {
     passingScore: 0.7,
@@ -499,8 +502,8 @@ export const DEFAULT_CONFIGS: Record<QuizSessionType, QuizSessionConfig> = {
     timeLimitPerQuestion: 60000, // 1 minute
     totalTimeLimit: 1800000, // 30 minutes
     allowSkip: true,
-    allowBackNavigation: false
-  }
+    allowBackNavigation: false,
+  },
 };
 
 /**
@@ -524,13 +527,13 @@ export function createQuizSession(
     answered: false,
     timeSpentMs: 0,
     hintUsed: false,
-    attempts: 0
+    attempts: 0,
   }));
 
   // Randomize if configured
   if (config.randomizeQuestions) {
     shuffleArray(sessionQuestions);
-    sessionQuestions.forEach((q, i) => q.index = i);
+    sessionQuestions.forEach((q, i) => (q.index = i));
   }
 
   const session: QuizSession = {
@@ -544,9 +547,9 @@ export function createQuizSession(
     timing: {
       createdAt: now,
       totalTimeMs: 0,
-      timeLimitMs: config.totalTimeLimit || undefined
+      timeLimitMs: config.totalTimeLimit || undefined,
     },
-    config
+    config,
   };
 
   // Add path context if provided
@@ -561,7 +564,7 @@ export function createQuizSession(
       targetStreak: 3,
       maxStreak: 0,
       recentAnswers: [],
-      targetAchieved: false
+      targetAchieved: false,
     };
   }
 
@@ -569,7 +572,7 @@ export function createQuizSession(
     session.attemptInfo = {
       attemptNumber: 1,
       maxAttempts: 2,
-      previousScores: []
+      previousScores: [],
     };
   }
 
@@ -605,14 +608,17 @@ export function calculateQuizResult(session: QuizSession): QuizResult {
   const passed = score >= session.config.passingScore;
 
   // Calculate per-content scores
-  const contentScoreMap = new Map<string, { correct: number; total: number; scores: number[]; blooms: Set<string> }>();
+  const contentScoreMap = new Map<
+    string,
+    { correct: number; total: number; scores: number[]; blooms: Set<string> }
+  >();
 
   for (const response of responses) {
     const existing = contentScoreMap.get(response.contentId) ?? {
       correct: 0,
       total: 0,
       scores: [],
-      blooms: new Set<string>()
+      blooms: new Set<string>(),
     };
     existing.total++;
     existing.scores.push(response.score);
@@ -627,13 +633,15 @@ export function calculateQuizResult(session: QuizSession): QuizResult {
     contentScoreMap.set(response.contentId, existing);
   }
 
-  const contentScores: ContentScore[] = Array.from(contentScoreMap.entries()).map(([contentId, data]) => ({
-    contentId,
-    questionsAnswered: data.total,
-    correctAnswers: data.correct,
-    averageScore: data.scores.reduce((a, b) => a + b, 0) / data.scores.length,
-    bloomsLevelsTested: Array.from(data.blooms)
-  }));
+  const contentScores: ContentScore[] = Array.from(contentScoreMap.entries()).map(
+    ([contentId, data]) => ({
+      contentId,
+      questionsAnswered: data.total,
+      correctAnswers: data.correct,
+      averageScore: data.scores.reduce((a, b) => a + b, 0) / data.scores.length,
+      bloomsLevelsTested: Array.from(data.blooms),
+    })
+  );
 
   // Calculate timing
   const times = responses.map(r => r.timeSpentMs);
@@ -641,7 +649,7 @@ export function calculateQuizResult(session: QuizSession): QuizResult {
     totalDurationMs: session.timing.totalTimeMs,
     averageTimePerQuestion: times.length > 0 ? times.reduce((a, b) => a + b, 0) / times.length : 0,
     fastestAnswerMs: times.length > 0 ? Math.min(...times) : 0,
-    slowestAnswerMs: times.length > 0 ? Math.max(...times) : 0
+    slowestAnswerMs: times.length > 0 ? Math.max(...times) : 0,
   };
 
   const result: QuizResult = {
@@ -658,7 +666,7 @@ export function calculateQuizResult(session: QuizSession): QuizResult {
     attestationsGranted: [], // Populated by attestation service
     pathContext: session.pathContext,
     timing,
-    completedAt: new Date().toISOString()
+    completedAt: new Date().toISOString(),
   };
 
   // Add streak result for inline quizzes
@@ -667,7 +675,7 @@ export function calculateQuizResult(session: QuizSession): QuizResult {
       achieved: session.streakInfo.targetAchieved,
       finalStreak: session.streakInfo.currentStreak,
       targetStreak: session.streakInfo.targetStreak,
-      maxStreak: session.streakInfo.maxStreak
+      maxStreak: session.streakInfo.maxStreak,
     };
   }
 

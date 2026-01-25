@@ -17,8 +17,8 @@
  * </app-alert-banner>
  */
 
-import { Component, Input, Output, EventEmitter, TemplateRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, Output, EventEmitter, TemplateRef, OnInit } from '@angular/core';
 
 /**
  * Alert severity levels
@@ -67,7 +67,7 @@ export interface AlertData {
   templateUrl: './alert-banner.component.html',
   styleUrls: ['./alert-banner.component.scss'],
 })
-export class AlertBannerComponent {
+export class AlertBannerComponent implements OnInit {
   /**
    * Single alert to display
    */
@@ -135,7 +135,7 @@ export class AlertBannerComponent {
 
   // Internal state
   isExpanded = false;
-  dismissedAlerts: Set<string> = new Set();
+  dismissedAlerts = new Set<string>();
 
   ngOnInit(): void {
     this.isExpanded = this.expanded;

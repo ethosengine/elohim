@@ -1,4 +1,5 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
+
 import { PerformanceMetricsService } from './performance-metrics.service';
 import { ShefaService } from './shefa.service';
 
@@ -30,7 +31,7 @@ export interface MetricsReportingStats {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class CustodianMetricsReporterService {
   private readonly metrics = inject(PerformanceMetricsService);

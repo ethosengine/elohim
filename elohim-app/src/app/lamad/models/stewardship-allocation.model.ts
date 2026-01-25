@@ -64,11 +64,7 @@ export const CONTRIBUTION_TYPE_DESCRIPTIONS: Record<ContributionType, string> = 
 /**
  * GovernanceState - Lifecycle state of a stewardship allocation.
  */
-export type GovernanceState =
-  | 'active'
-  | 'disputed'
-  | 'pending_review'
-  | 'superseded';
+export type GovernanceState = 'active' | 'disputed' | 'pending_review' | 'superseded';
 
 export const GOVERNANCE_STATE_DESCRIPTIONS: Record<GovernanceState, string> = {
   active: 'Currently active allocation',
@@ -96,7 +92,7 @@ export interface StewardshipAllocation {
   stewardPresenceId: string;
 
   // Allocation details
-  allocationRatio: number;        // 0.0-1.0, all for content sum to 1.0
+  allocationRatio: number; // 0.0-1.0, all for content sum to 1.0
   allocationMethod: AllocationMethod;
   contributionType: ContributionType;
   contributionEvidenceJson: string | null;
@@ -151,7 +147,7 @@ export interface StewardshipAllocationView extends StewardshipAllocation {
 export interface ContentStewardship {
   contentId: string;
   allocations: StewardshipAllocationWithPresence[];
-  totalAllocation: number;        // Should sum to 1.0
+  totalAllocation: number; // Should sum to 1.0
   hasDisputes: boolean;
   primarySteward: StewardshipAllocation | null;
 }
@@ -184,9 +180,9 @@ export interface ContributorPresenceRef {
 export interface CreateAllocationInput {
   contentId: string;
   stewardPresenceId: string;
-  allocationRatio?: number;         // default: 1.0
-  allocationMethod?: AllocationMethod;  // default: 'manual'
-  contributionType?: ContributionType;  // default: 'inherited'
+  allocationRatio?: number; // default: 1.0
+  allocationMethod?: AllocationMethod; // default: 'manual'
+  contributionType?: ContributionType; // default: 'inherited'
   contributionEvidenceJson?: string;
   note?: string;
   metadataJson?: string;
@@ -262,7 +258,9 @@ export interface BulkAllocationResult {
  * Transform API response (camelCase View) to TypeScript domain model.
  * API now returns camelCase with parsed JSON objects.
  */
-export function fromWireStewardshipAllocation(view: Record<string, unknown>): StewardshipAllocation {
+export function fromWireStewardshipAllocation(
+  view: Record<string, unknown>
+): StewardshipAllocation {
   // API returns parsed JSON objects; stringify for domain model compatibility
   const contributionEvidence = view['contributionEvidence'];
   const metadata = view['metadata'];
@@ -299,9 +297,11 @@ export function fromWireStewardshipAllocation(view: Record<string, unknown>): St
  * Transform ContentStewardship from API response (camelCase View).
  */
 export function fromWireContentStewardship(view: Record<string, unknown>): ContentStewardship {
-  const allocations = (view['allocations'] as Array<Record<string, unknown>> ?? []).map(a => ({
+  const allocations = ((view['allocations'] as Record<string, unknown>[]) ?? []).map(a => ({
     allocation: fromWireStewardshipAllocation(a['allocation'] as Record<string, unknown>),
-    steward: a['steward'] ? fromWireContributorPresenceRef(a['steward'] as Record<string, unknown>) : null,
+    steward: a['steward']
+      ? fromWireContributorPresenceRef(a['steward'] as Record<string, unknown>)
+      : null,
   }));
 
   return {

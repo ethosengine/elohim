@@ -1,13 +1,14 @@
 import { Injectable, Type } from '@angular/core';
+
+import { ContentNode } from '../../models/content-node.model';
 import {
   ContentFormatPlugin,
   ContentRenderer,
   ContentEditorComponent,
   EditorConfig,
-  DEFAULT_EDITOR_CONFIG
+  DEFAULT_EDITOR_CONFIG,
 } from '../interfaces/content-format-plugin.interface';
 import { FormatMetadata } from '../interfaces/format-metadata.interface';
-import { ContentNode } from '../../models/content-node.model';
 
 /**
  * ContentFormatRegistryService - Unified registry for content format plugins.
@@ -33,7 +34,7 @@ import { ContentNode } from '../../models/content-node.model';
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ContentFormatRegistryService {
   private readonly plugins = new Map<string, ContentFormatPlugin>();
@@ -99,7 +100,9 @@ export class ContentFormatRegistryService {
    */
   registerAlias(alias: string, canonicalFormatId: string): void {
     if (!this.plugins.has(canonicalFormatId)) {
-      console.warn(`Cannot register alias '${alias}' → '${canonicalFormatId}': target plugin not found`);
+      console.warn(
+        `Cannot register alias '${alias}' → '${canonicalFormatId}': target plugin not found`
+      );
       return;
     }
     this.formatAliases.set(alias, canonicalFormatId);
@@ -130,14 +133,20 @@ export class ContentFormatRegistryService {
     for (const ext of plugin.fileExtensions) {
       const normalizedExt = this.normalizeExtension(ext);
       const existing = this.extensionMap.get(normalizedExt) ?? [];
-      this.extensionMap.set(normalizedExt, existing.filter(id => id !== formatId));
+      this.extensionMap.set(
+        normalizedExt,
+        existing.filter(id => id !== formatId)
+      );
     }
 
     // Remove from MIME type map
     for (const mime of plugin.mimeTypes) {
       const normalizedMime = mime.toLowerCase();
       const existing = this.mimeTypeMap.get(normalizedMime) ?? [];
-      this.mimeTypeMap.set(normalizedMime, existing.filter(id => id !== formatId));
+      this.mimeTypeMap.set(
+        normalizedMime,
+        existing.filter(id => id !== formatId)
+      );
     }
 
     this.plugins.delete(formatId);
@@ -419,7 +428,7 @@ export class ContentFormatRegistryService {
       editableFormats: plugins.filter(p => p.canEdit).length,
       importableFormats: plugins.filter(p => p.canImport).length,
       exportableFormats: plugins.filter(p => p.canExport).length,
-      hasDefaultEditor: this.defaultEditorComponent !== null
+      hasDefaultEditor: this.defaultEditorComponent !== null,
     };
   }
 

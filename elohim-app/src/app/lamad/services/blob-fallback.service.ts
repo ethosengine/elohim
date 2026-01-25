@@ -10,10 +10,12 @@
  * Also tracks URL health for future requests.
  */
 
-import { Injectable } from '@angular/core';
-import { Observable, throwError } from 'rxjs';
-import { retry, timeout, catchError, tap, map } from 'rxjs/operators';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+
+import { retry, timeout, catchError, tap, map } from 'rxjs/operators';
+
+import { Observable, throwError } from 'rxjs';
 
 /**
  * Result of blob fetch attempt
@@ -96,8 +98,8 @@ export class BlobFallbackService {
    */
   fetchWithFallback(
     fallbackUrls: string[],
-    timeoutMs: number = 30000,
-    maxRetries: number = 2,
+    timeoutMs = 30000,
+    maxRetries = 2
   ): Observable<BlobFetchResult> {
     if (!fallbackUrls || fallbackUrls.length === 0) {
       return throwError(() => new Error('No fallback URLs provided'));
@@ -127,14 +129,11 @@ export class BlobFallbackService {
     currentIndex: number,
     timeoutMs: number,
     maxRetries: number,
-    context: { startTime: number; retryCount: number },
+    context: { startTime: number; retryCount: number }
   ): Observable<BlobFetchResult> {
     if (currentIndex >= urls.length) {
       return throwError(
-        () =>
-          new Error(
-            `All fallback URLs exhausted. Tried ${urls.length} URLs, all failed.`,
-          ),
+        () => new Error(`All fallback URLs exhausted. Tried ${urls.length} URLs, all failed.`)
       );
     }
 
@@ -150,13 +149,9 @@ export class BlobFallbackService {
           count: maxRetries,
           delay: (error, retryCount) => {
             context.retryCount++;
-            console.warn(
-              `Retry ${retryCount} for ${url}: ${error.message}`,
-            );
+            console.warn(`Retry ${retryCount} for ${url}: ${error.message}`);
             // Exponential backoff: 100ms, 200ms, 400ms
-            return new Promise((resolve) =>
-              setTimeout(resolve, 100 * Math.pow(2, retryCount - 1)),
-            );
+            return new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, retryCount - 1)));
           },
         }),
         tap((blob: Blob) => {
@@ -164,31 +159,24 @@ export class BlobFallbackService {
           this.recordUrlSuccess(url);
           console.log(`Successfully fetched from ${url}`);
         }),
-        map((blob: Blob): BlobFetchResult => ({
-          blob,
-          urlIndex: currentIndex,
-          successUrl: url,
-          durationMs: performance.now() - context.startTime,
-          retryCount: context.retryCount,
-        })),
+        map(
+          (blob: Blob): BlobFetchResult => ({
+            blob,
+            urlIndex: currentIndex,
+            successUrl: url,
+            durationMs: performance.now() - context.startTime,
+            retryCount: context.retryCount,
+          })
+        ),
         catchError((error: any) => {
           // Record failure
           this.recordUrlFailure(url, error.message);
 
-          console.warn(
-            `URL failed: ${url}. Trying next fallback...`,
-            error,
-          );
+          console.warn(`URL failed: ${url}. Trying next fallback...`, error);
 
           // Try next URL in cascade
-          return this.fetchUrlCascade(
-            urls,
-            currentIndex + 1,
-            timeoutMs,
-            maxRetries,
-            context,
-          );
-        }),
+          return this.fetchUrlCascade(urls, currentIndex + 1, timeoutMs, maxRetries, context);
+        })
       );
   }
 
@@ -200,26 +188,18 @@ export class BlobFallbackService {
    * @param maxRetries Max retries
    * @returns Observable with Blob
    */
-  private fetchUrl(
-    url: string,
-    timeoutMs: number,
-    maxRetries: number,
-  ): Observable<Blob> {
-    return this.http
-      .get(url, { responseType: 'blob' })
-      .pipe(
-        timeout(timeoutMs),
-        retry({
-          count: maxRetries,
-          delay: (error, retryCount) => {
-            const delay = 100 * Math.pow(2, retryCount - 1);
-            console.warn(
-              `Retry ${retryCount}/${maxRetries} for ${url} in ${delay}ms`,
-            );
-            return new Promise((resolve) => setTimeout(resolve, delay));
-          },
-        }),
-      );
+  private fetchUrl(url: string, timeoutMs: number, maxRetries: number): Observable<Blob> {
+    return this.http.get(url, { responseType: 'blob' }).pipe(
+      timeout(timeoutMs),
+      retry({
+        count: maxRetries,
+        delay: (error, retryCount) => {
+          const delay = 100 * Math.pow(2, retryCount - 1);
+          console.warn(`Retry ${retryCount}/${maxRetries} for ${url} in ${delay}ms`);
+          return new Promise(resolve => setTimeout(resolve, delay));
+        },
+      })
+    );
   }
 
   /**
@@ -246,7 +226,7 @@ export class BlobFallbackService {
    * @returns Array of UrlHealth statuses
    */
   getUrlsHealth(urls: string[]): UrlHealth[] {
-    return urls.map((url) => this.getUrlHealth(url));
+    return urls.map(url => this.getUrlHealth(url));
   }
 
   /**
@@ -329,7 +309,7 @@ export class BlobFallbackService {
    * @returns Promise resolving to health report
    */
   async testFallbackUrls(fallbackUrls: string[]): Promise<UrlHealth[]> {
-    const tests = fallbackUrls.map((url) =>
+    const tests = fallbackUrls.map(url =>
       this.http
         .head(url, {
           responseType: 'blob',
@@ -340,11 +320,11 @@ export class BlobFallbackService {
             this.recordUrlSuccess(url);
             return this.getUrlHealth(url);
           },
-          (error) => {
+          error => {
             this.recordUrlFailure(url, error.message);
             return this.getUrlHealth(url);
-          },
-        ),
+          }
+        )
     );
 
     return Promise.all(tests);
@@ -363,7 +343,7 @@ export class BlobFallbackService {
    * @param timeoutMs Validation timeout (default 5 seconds)
    * @returns Promise with validation result
    */
-  async validateUrl(url: string, timeoutMs: number = 5000): Promise<UrlValidationResult> {
+  async validateUrl(url: string, timeoutMs = 5000): Promise<UrlValidationResult> {
     const startTime = performance.now();
 
     try {
@@ -410,8 +390,8 @@ export class BlobFallbackService {
    * @param timeoutMs Validation timeout per URL
    * @returns Promise with array of validation results
    */
-  async validateUrls(urls: string[], timeoutMs: number = 5000): Promise<UrlValidationResult[]> {
-    const validations = urls.map((url) => this.validateUrl(url, timeoutMs));
+  async validateUrls(urls: string[], timeoutMs = 5000): Promise<UrlValidationResult[]> {
+    const validations = urls.map(url => this.validateUrl(url, timeoutMs));
     return Promise.all(validations);
   }
 
@@ -430,16 +410,16 @@ export class BlobFallbackService {
   async getValidAndHealthyUrls(urls: string[]): Promise<string[]> {
     const validations = await this.validateUrls(urls);
 
-    const validUrlsWithHealth = validations
-      .filter((v) => v.isValid && v.responseTimeMs < 5000)
-      .map((v) => ({
+    return validations
+      .filter(v => v.isValid && v.responseTimeMs < 5000)
+      .map(v => ({
         url: v.url,
         health: this.getUrlHealth(v.url),
       }))
-      .filter((item) => item.health.isHealthy || item.health.successCount + item.health.failureCount === 0) // Healthy or untested
-      .map((item) => item.url);
-
-    return validUrlsWithHealth;
+      .filter(
+        item => item.health.isHealthy || item.health.successCount + item.health.failureCount === 0
+      ) // Healthy or untested
+      .map(item => item.url);
   }
 
   /**

@@ -25,5 +25,5 @@ export type {
   SkipAheadResult,
   SkippableSection,
   PathAdaptationState,
-  PathAdaptationConfig
+  PathAdaptationConfig,
 } from './path-adaptation.service';

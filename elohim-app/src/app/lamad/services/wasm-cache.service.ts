@@ -21,24 +21,10 @@
  */
 
 import { Injectable, OnDestroy } from '@angular/core';
+
 import { BehaviorSubject, Observable } from 'rxjs';
 
 // Import from framework-agnostic cache module
-import type {
-  IReachAwareCache,
-  IBlobCache,
-  IChunkCache,
-  ICacheStats,
-  CacheEntryMetadata,
-  PriorityParams,
-  CacheConfig,
-} from '@elohim/service/cache/types';
-
-import {
-  ReachLevel,
-  MasteryLevel,
-} from '@elohim/service/cache/types';
-
 import {
   createReachAwareCache,
   createBlobCache,
@@ -50,6 +36,17 @@ import {
   TsBlobCache,
   TsChunkCache,
 } from '@elohim/service/cache/reach-aware-cache';
+import { ReachLevel, MasteryLevel } from '@elohim/service/cache/types';
+
+import type {
+  IReachAwareCache,
+  IBlobCache,
+  IChunkCache,
+  ICacheStats,
+  CacheEntryMetadata,
+  PriorityParams,
+  CacheConfig,
+} from '@elohim/service/cache/types';
 
 // Re-export constants for convenience
 export { ReachLevel, MasteryLevel };
@@ -135,7 +132,7 @@ export class WasmCacheService implements OnDestroy {
       // Default configuration
       const defaultConfig: CacheConfig = {
         maxSizePerReach: BigInt(128 * 1024 * 1024), // 128MB per reach level (1GB total)
-        maxSizeBytes: BigInt(1024 * 1024 * 1024),   // 1GB for blob cache
+        maxSizeBytes: BigInt(1024 * 1024 * 1024), // 1GB for blob cache
         ttlMillis: BigInt(7 * 24 * 60 * 60 * 1000), // 7 days for chunk cache
         preferWasm: true,
         ...config,
@@ -218,14 +215,16 @@ export class WasmCacheService implements OnDestroy {
   ): number {
     this.ensureReady();
 
-    const calculatedPriority = priority ?? calculatePriority({
-      reachLevel,
-      proximityScore: 0,
-      bandwidthClass: 2,
-      stewardTier: 1,
-      affinityMatch: 0.5,
-      agePenalty: 0,
-    });
+    const calculatedPriority =
+      priority ??
+      calculatePriority({
+        reachLevel,
+        proximityScore: 0,
+        bandwidthClass: 2,
+        stewardTier: 1,
+        affinityMatch: 0.5,
+        agePenalty: 0,
+      });
 
     return this.reachCache!.put(
       hash,
@@ -301,14 +300,16 @@ export class WasmCacheService implements OnDestroy {
     priority?: number
   ): number {
     this.ensureReady();
-    const p = priority ?? calculatePriority({
-      reachLevel,
-      proximityScore: 0,
-      bandwidthClass: 2,
-      stewardTier: 1,
-      affinityMatch: 0.5,
-      agePenalty: 0,
-    });
+    const p =
+      priority ??
+      calculatePriority({
+        reachLevel,
+        proximityScore: 0,
+        bandwidthClass: 2,
+        stewardTier: 1,
+        affinityMatch: 0.5,
+        agePenalty: 0,
+      });
     return this.blobCache!.put(hash, BigInt(sizeBytes), reachLevel, domain, epic, p);
   }
 
@@ -393,14 +394,14 @@ export class WasmCacheService implements OnDestroy {
    * Get comprehensive statistics.
    */
   getAllStats(): {
-    reach: { [level: number]: ICacheStats };
+    reach: Record<number, ICacheStats>;
     blob: ICacheStats;
     chunk: ICacheStats;
     implementation: 'wasm' | 'typescript';
   } {
     this.ensureReady();
 
-    const reachStats: { [level: number]: ICacheStats } = {};
+    const reachStats: Record<number, ICacheStats> = {};
     for (let i = 0; i <= 7; i++) {
       reachStats[i] = this.reachCache!.statsForReach(i);
     }
@@ -428,9 +429,7 @@ export class WasmCacheService implements OnDestroy {
 
   private ensureReady(): void {
     if (!this.isReady) {
-      throw new Error(
-        '[WasmCacheService] Service not initialized. Call initialize() first.'
-      );
+      throw new Error('[WasmCacheService] Service not initialized. Call initialize() first.');
     }
   }
 

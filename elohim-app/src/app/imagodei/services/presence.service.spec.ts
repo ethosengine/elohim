@@ -91,9 +91,11 @@ describe('PresenceService', () => {
     it('should throw when not connected', async () => {
       mockHolochainClient.isConnected.and.returnValue(false);
 
-      await expectAsync(service.createPresence({
-        displayName: 'New Contributor',
-      })).toBeRejectedWithError('Not connected to network');
+      await expectAsync(
+        service.createPresence({
+          displayName: 'New Contributor',
+        })
+      ).toBeRejectedWithError('Not connected to network');
     });
 
     it('should create presence when connected', async () => {
@@ -162,8 +164,9 @@ describe('PresenceService', () => {
         error: 'Network error',
       });
 
-      await expectAsync(service.createPresence({ displayName: 'Test' }))
-        .toBeRejectedWithError('Network error');
+      await expectAsync(service.createPresence({ displayName: 'Test' })).toBeRejectedWithError(
+        'Network error'
+      );
 
       expect(service.error()).toBe('Network error');
     });
@@ -173,16 +176,18 @@ describe('PresenceService', () => {
     it('should throw when not connected', async () => {
       mockHolochainClient.isConnected.and.returnValue(false);
 
-      await expectAsync(service.beginStewardship('presence-123'))
-        .toBeRejectedWithError('Not connected to network');
+      await expectAsync(service.beginStewardship('presence-123')).toBeRejectedWithError(
+        'Not connected to network'
+      );
     });
 
     it('should throw when not authenticated', async () => {
       mockHolochainClient.isConnected.and.returnValue(true);
       (mockIdentityService.agentPubKey as jasmine.Spy).and.returnValue(null);
 
-      await expectAsync(service.beginStewardship('presence-123'))
-        .toBeRejectedWithError('Must be authenticated to begin stewardship');
+      await expectAsync(service.beginStewardship('presence-123')).toBeRejectedWithError(
+        'Must be authenticated to begin stewardship'
+      );
     });
 
     it('should begin stewardship when authenticated', async () => {
@@ -242,7 +247,10 @@ describe('PresenceService', () => {
         success: true,
         data: [
           { action_hash: new Uint8Array([1]), presence: mockPresenceEntry },
-          { action_hash: new Uint8Array([2]), presence: { ...mockPresenceEntry, id: 'presence-456' } },
+          {
+            action_hash: new Uint8Array([2]),
+            presence: { ...mockPresenceEntry, id: 'presence-456' },
+          },
         ],
       });
 
@@ -257,11 +265,13 @@ describe('PresenceService', () => {
     it('should throw when not connected', async () => {
       mockHolochainClient.isConnected.and.returnValue(false);
 
-      await expectAsync(service.initiateClaim({
-        presenceId: 'presence-123',
-        claimEvidence: { proof: 'test' },
-        verificationMethod: 'email',
-      })).toBeRejectedWithError('Not connected to network');
+      await expectAsync(
+        service.initiateClaim({
+          presenceId: 'presence-123',
+          claimEvidence: { proof: 'test' },
+          verificationMethod: 'email',
+        })
+      ).toBeRejectedWithError('Not connected to network');
     });
 
     it('should initiate claim', async () => {
@@ -372,9 +382,7 @@ describe('PresenceService', () => {
       mockHolochainClient.isConnected.and.returnValue(true);
       mockHolochainClient.callZome.and.resolveTo({
         success: true,
-        data: [
-          { action_hash: new Uint8Array([1]), presence: mockPresenceEntry },
-        ],
+        data: [{ action_hash: new Uint8Array([1]), presence: mockPresenceEntry }],
       });
 
       const result = await service.getPresencesByState('unclaimed');

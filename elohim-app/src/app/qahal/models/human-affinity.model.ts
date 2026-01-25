@@ -17,7 +17,7 @@ export interface HumanAffinity {
   humanId: string;
 
   /** Map of node IDs to affinity values (0.0 to 1.0) */
-  affinity: { [nodeId: string]: number };
+  affinity: Record<string, number>;
 
   /** Last updated timestamp (ISO 8601 string) */
   lastUpdated: string;

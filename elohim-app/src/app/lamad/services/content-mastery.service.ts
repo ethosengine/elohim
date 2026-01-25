@@ -1,10 +1,16 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, map, from, of } from 'rxjs';
+
 import { catchError, tap } from 'rxjs/operators';
+
+import { BehaviorSubject, Observable, map, from, of } from 'rxjs';
+
+import { isAboveGate, compareMasteryLevels } from '@app/elohim/models/agent.model';
+import { MasteryRecordContent, SourceChainEntry } from '@app/elohim/models/source-chain.model';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
-import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+
 import {
   ContentMastery,
   EngagementType,
@@ -20,8 +26,6 @@ import {
   PathMasteryOverview,
   transformMasteryFromWire,
 } from '../models';
-import { isAboveGate, compareMasteryLevels } from '@app/elohim/models/agent.model';
-import { MasteryRecordContent, SourceChainEntry } from '@app/elohim/models/source-chain.model';
 
 /** Result of migration from local to backend */
 export interface MigrationResult {
@@ -54,7 +58,8 @@ export class ContentMasteryService {
   private readonly masteryCache = new Map<string, ContentMastery>();
   private readonly masterySubject = new BehaviorSubject<Map<string, ContentMastery>>(new Map());
 
-  public readonly mastery$: Observable<Map<string, ContentMastery>> = this.masterySubject.asObservable();
+  public readonly mastery$: Observable<Map<string, ContentMastery>> =
+    this.masterySubject.asObservable();
 
   constructor(
     private readonly sourceChain: LocalSourceChainService,
@@ -145,10 +150,10 @@ export class ContentMasteryService {
       humanId: entry.authorAgent,
       level: content.level as MasteryLevel,
       levelAchievedAt: content.levelAchievedAt,
-      levelHistory: [],  // Would need to query all entries for full history
+      levelHistory: [], // Would need to query all entries for full history
       lastEngagementAt: content.lastEngagementAt,
       lastEngagementType: content.lastEngagementType as EngagementType,
-      contentVersionAtMastery: '',  // Not tracked in MVP
+      contentVersionAtMastery: '', // Not tracked in MVP
       freshness: content.freshness,
       needsRefresh: false,
       assessmentEvidence: [],
@@ -164,9 +169,7 @@ export class ContentMasteryService {
    * Get mastery for a specific content node.
    */
   getMastery(contentId: string): Observable<ContentMastery | null> {
-    return this.mastery$.pipe(
-      map(cache => cache.get(contentId) ?? null)
-    );
+    return this.mastery$.pipe(map(cache => cache.get(contentId) ?? null));
   }
 
   /**
@@ -180,9 +183,7 @@ export class ContentMasteryService {
    * Get mastery level for content.
    */
   getMasteryLevel(contentId: string): Observable<MasteryLevel> {
-    return this.mastery$.pipe(
-      map(cache => cache.get(contentId)?.level ?? 'not_started')
-    );
+    return this.mastery$.pipe(map(cache => cache.get(contentId)?.level ?? 'not_started'));
   }
 
   /**
@@ -196,27 +197,21 @@ export class ContentMasteryService {
    * Get all mastery records.
    */
   getAllMastery(): Observable<ContentMastery[]> {
-    return this.mastery$.pipe(
-      map(cache => Array.from(cache.values()))
-    );
+    return this.mastery$.pipe(map(cache => Array.from(cache.values())));
   }
 
   /**
    * Get mastery statistics.
    */
   getMasteryStats(): Observable<MasteryStats> {
-    return this.mastery$.pipe(
-      map(cache => this.computeStats(cache))
-    );
+    return this.mastery$.pipe(map(cache => this.computeStats(cache)));
   }
 
   /**
    * Get content needing refresh.
    */
   getContentNeedingRefresh(): Observable<ContentMastery[]> {
-    return this.mastery$.pipe(
-      map(cache => Array.from(cache.values()).filter(m => m.needsRefresh))
-    );
+    return this.mastery$.pipe(map(cache => Array.from(cache.values()).filter(m => m.needsRefresh)));
   }
 
   // =========================================================================
@@ -251,7 +246,8 @@ export class ContentMasteryService {
     let newLevel = current;
 
     // Determine level based on assessment type and passing score
-    if (score >= 0.7) {  // 70% passing threshold
+    if (score >= 0.7) {
+      // 70% passing threshold
       switch (assessmentType) {
         case 'recall':
           newLevel = this.maxLevel(current, 'remember');
@@ -293,12 +289,15 @@ export class ContentMasteryService {
       contentId,
       level,
       levelAchievedAt: now,
-      freshness: 1.0,  // Fresh when just achieved
+      freshness: 1.0, // Fresh when just achieved
       lastEngagementAt: now,
       lastEngagementType: engagementType,
     };
 
-    const entry = this.sourceChain.createEntry<MasteryRecordContent>('mastery-record', masteryContent);
+    const entry = this.sourceChain.createEntry<MasteryRecordContent>(
+      'mastery-record',
+      masteryContent
+    );
 
     // Update cache
     const mastery: ContentMastery = {
@@ -307,12 +306,15 @@ export class ContentMasteryService {
       level,
       levelAchievedAt: now,
       levelHistory: current
-        ? [...(current.levelHistory || []), {
-            fromLevel: current.level,
-            toLevel: level,
-            timestamp: now,
-            trigger: engagementType === 'quiz' ? 'assessment' : 'engagement',
-          } as LevelProgressionEvent]
+        ? [
+            ...(current.levelHistory || []),
+            {
+              fromLevel: current.level,
+              toLevel: level,
+              timestamp: now,
+              trigger: engagementType === 'quiz' ? 'assessment' : 'engagement',
+            } as LevelProgressionEvent,
+          ]
         : [],
       lastEngagementAt: now,
       lastEngagementType: engagementType,
@@ -507,9 +509,8 @@ export class ContentMasteryService {
       }
     }
 
-    stats.freshPercentage = stats.totalMasteredNodes > 0
-      ? (totalFreshness / stats.totalMasteredNodes) * 100
-      : 100;
+    stats.freshPercentage =
+      stats.totalMasteredNodes > 0 ? (totalFreshness / stats.totalMasteredNodes) * 100 : 100;
 
     return stats;
   }
@@ -652,7 +653,9 @@ export class ContentMasteryService {
     }
 
     result.success = result.failed === 0;
-    console.log(`[ContentMastery] Migration complete: ${result.migrated} migrated, ${result.failed} failed`);
+    console.log(
+      `[ContentMastery] Migration complete: ${result.migrated} migrated, ${result.failed} failed`
+    );
 
     return result;
   }

@@ -109,7 +109,7 @@ export type RelationshipType =
 export const PREREQUISITE_RELATIONSHIP_TYPES: RelationshipType[] = [
   'PREREQUISITE',
   'FOUNDATION',
-  'DEPENDS_ON'
+  'DEPENDS_ON',
 ];
 
 export const EXTENSION_RELATIONSHIP_TYPES: RelationshipType[] = ['EXTENDS'];

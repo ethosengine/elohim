@@ -359,12 +359,7 @@ export interface RegionalPresence {
 export interface TrustRelationship {
   from: string; // My agent ID
   to: string; // Custodian agent ID
-  type:
-    | 'family-member'
-    | 'friend'
-    | 'community-peer'
-    | 'professional'
-    | 'institution';
+  type: 'family-member' | 'friend' | 'community-peer' | 'professional' | 'institution';
   trustScore: number; // 0-100
   depth: number; // Hops in trust graph (1 = direct)
   strength: 'weak' | 'moderate' | 'strong';
@@ -908,11 +903,11 @@ export interface NodeRecommendation {
  */
 export function getNodeTypeDisplay(type: OwnedNode['nodeType']): { label: string; icon: string } {
   const displays: Record<OwnedNode['nodeType'], { label: string; icon: string }> = {
-    'holoport': { label: 'HoloPort', icon: 'dns' },
+    holoport: { label: 'HoloPort', icon: 'dns' },
     'holoport-plus': { label: 'HoloPort+', icon: 'hub' },
     'holoport-nano': { label: 'HoloPort Nano', icon: 'memory' },
     'self-hosted': { label: 'Self-Hosted', icon: 'home' },
-    'cloud': { label: 'Cloud', icon: 'cloud' },
+    cloud: { label: 'Cloud', icon: 'cloud' },
   };
   return displays[type] ?? { label: type, icon: 'computer' };
 }
@@ -920,14 +915,18 @@ export function getNodeTypeDisplay(type: OwnedNode['nodeType']): { label: string
 /**
  * Get display info for node status.
  */
-export function getNodeStatusDisplay(status: NodeClusterStatus): { label: string; color: string; icon: string } {
+export function getNodeStatusDisplay(status: NodeClusterStatus): {
+  label: string;
+  color: string;
+  icon: string;
+} {
   const displays: Record<NodeClusterStatus, { label: string; color: string; icon: string }> = {
-    'online': { label: 'Online', color: '#22c55e', icon: 'check_circle' },
-    'offline': { label: 'Offline', color: '#ef4444', icon: 'error' },
-    'degraded': { label: 'Degraded', color: '#f59e0b', icon: 'warning' },
-    'maintenance': { label: 'Maintenance', color: '#6b7280', icon: 'build' },
-    'provisioning': { label: 'Provisioning', color: '#3b82f6', icon: 'sync' },
-    'unknown': { label: 'Unknown', color: '#6b7280', icon: 'help' },
+    online: { label: 'Online', color: '#22c55e', icon: 'check_circle' },
+    offline: { label: 'Offline', color: '#ef4444', icon: 'error' },
+    degraded: { label: 'Degraded', color: '#f59e0b', icon: 'warning' },
+    maintenance: { label: 'Maintenance', color: '#6b7280', icon: 'build' },
+    provisioning: { label: 'Provisioning', color: '#3b82f6', icon: 'sync' },
+    unknown: { label: 'Unknown', color: '#6b7280', icon: 'help' },
   };
   return displays[status] ?? displays['unknown'];
 }
@@ -935,13 +934,17 @@ export function getNodeStatusDisplay(status: NodeClusterStatus): { label: string
 /**
  * Get display info for gap severity.
  */
-export function getGapSeverityDisplay(severity: ComputeGap['severity'] | 'low' | 'critical'): { label: string; color: string; icon: string } {
+export function getGapSeverityDisplay(severity: ComputeGap['severity'] | 'low' | 'critical'): {
+  label: string;
+  color: string;
+  icon: string;
+} {
   const displays: Record<string, { label: string; color: string; icon: string }> = {
-    'none': { label: 'None', color: '#22c55e', icon: 'check_circle' },
-    'low': { label: 'Low', color: '#22c55e', icon: 'info' },
-    'minor': { label: 'Minor', color: '#22c55e', icon: 'info' },
-    'moderate': { label: 'Moderate', color: '#f59e0b', icon: 'warning' },
-    'critical': { label: 'Critical', color: '#ef4444', icon: 'dangerous' },
+    none: { label: 'None', color: '#22c55e', icon: 'check_circle' },
+    low: { label: 'Low', color: '#22c55e', icon: 'info' },
+    minor: { label: 'Minor', color: '#22c55e', icon: 'info' },
+    moderate: { label: 'Moderate', color: '#f59e0b', icon: 'warning' },
+    critical: { label: 'Critical', color: '#ef4444', icon: 'dangerous' },
   };
   return displays[severity] ?? displays['moderate'];
 }
@@ -953,19 +956,19 @@ export function calculateHealthScore(nodes: OwnedNode[]): number {
   if (nodes.length === 0) return 0;
 
   const statusScores: Record<NodeClusterStatus, number> = {
-    'online': 100,
-    'provisioning': 80,
-    'maintenance': 70,
-    'degraded': 50,
-    'offline': 0,
-    'unknown': 25,
+    online: 100,
+    provisioning: 80,
+    maintenance: 70,
+    degraded: 50,
+    offline: 0,
+    unknown: 25,
   };
 
   const totalScore = nodes.reduce((sum, node) => {
     const baseScore = statusScores[node.status];
     // Primary node has more weight
     const weight = node.isPrimary ? 2 : 1;
-    return sum + (baseScore * weight);
+    return sum + baseScore * weight;
   }, 0);
 
   const totalWeight = nodes.reduce((sum, node) => sum + (node.isPrimary ? 2 : 1), 0);

@@ -11,8 +11,11 @@
  */
 
 import { Injectable } from '@angular/core';
-import { Observable, of, throwError } from 'rxjs';
+
 import { map, catchError } from 'rxjs/operators';
+
+import { Observable, of, throwError } from 'rxjs';
+
 import { ContentBlob } from '../models/content-node.model';
 
 /**
@@ -110,13 +113,13 @@ export class CustodianBlobDistributionService {
 
     // Score custodians by suitability
     const scored = custodians
-      .map((c) => ({
+      .map(c => ({
         custodian: c,
         score: this.scoreCustodian(c, blob, criteria),
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, criteria.maxCustodians || 3)
-      .map((s) => s.custodian);
+      .map(s => s.custodian);
 
     return of(scored);
   }
@@ -135,7 +138,7 @@ export class CustodianBlobDistributionService {
     contentId: string,
     blob: ContentBlob,
     custodianId: string,
-    expirationDays: number = 30
+    expirationDays = 30
   ): Observable<CustodianBlobCommitment> {
     const now = Date.now();
     const expiresAt = now + expirationDays * 24 * 60 * 60 * 1000;
@@ -180,9 +183,7 @@ export class CustodianBlobDistributionService {
     // Find the commitment in storage and update it
     const key = `${commitment.contentId}_${commitment.blobHash}`;
     const commitments = this.blobCommitments.get(key) || [];
-    const index = commitments.findIndex(
-      (c) => c.custodianId === commitment.custodianId
-    );
+    const index = commitments.findIndex(c => c.custodianId === commitment.custodianId);
 
     if (index >= 0) {
       commitments[index].replicationProgress = Math.min(progress, 100);
@@ -221,7 +222,7 @@ export class CustodianBlobDistributionService {
     const key = `${contentId}_${blobHash}`;
     const commitments = this.blobCommitments.get(key) || [];
 
-    const activeReplicas = commitments.filter((c) => c.commitmentStatus === 'active').length;
+    const activeReplicas = commitments.filter(c => c.commitmentStatus === 'active').length;
     const avgProgress =
       commitments.length > 0
         ? commitments.reduce((sum, c) => sum + c.replicationProgress, 0) / commitments.length
@@ -275,7 +276,7 @@ export class CustodianBlobDistributionService {
     const key = `${contentId}_${blobHash}`;
     const commitments = this.blobCommitments.get(key) || [];
 
-    const index = commitments.findIndex((c) => c.custodianId === custodianId);
+    const index = commitments.findIndex(c => c.custodianId === custodianId);
     if (index >= 0) {
       commitments[index].commitmentStatus = 'expired';
       return of(true);
@@ -296,9 +297,9 @@ export class CustodianBlobDistributionService {
     const commitments = this.getCommitmentsForBlob(contentId, blobHash);
 
     return commitments
-      .filter((c) => c.commitmentStatus === 'active')
-      .map((c) => c.fallbackUrl)
-      .filter((url) => url && url.length > 0);
+      .filter(c => c.commitmentStatus === 'active')
+      .map(c => c.fallbackUrl)
+      .filter(url => url && url.length > 0);
   }
 
   /**
@@ -328,18 +329,18 @@ export class CustodianBlobDistributionService {
     const candidates = this.getAvailableCustodians(criteria);
 
     // Filter out custodians already replicating this blob
-    const alreadySelected = new Set(currentCommitments.map((c) => c.custodianId));
-    const availableCandidates = candidates.filter((c) => !alreadySelected.has(c.custodianId));
+    const alreadySelected = new Set(currentCommitments.map(c => c.custodianId));
+    const availableCandidates = candidates.filter(c => !alreadySelected.has(c.custodianId));
 
     // Score and select top candidates
     const selected = availableCandidates
-      .map((c) => ({
+      .map(c => ({
         custodian: c,
         score: this.scoreCustodian(c, blob, criteria),
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, needed)
-      .map((s) => s.custodian);
+      .map(s => s.custodian);
 
     return of(selected);
   }
@@ -410,7 +411,7 @@ export class CustodianBlobDistributionService {
    */
   getActiveReplicaCount(contentId: string, blobHash: string): number {
     const commitments = this.getCommitmentsForBlob(contentId, blobHash);
-    return commitments.filter((c) => c.commitmentStatus === 'active').length;
+    return commitments.filter(c => c.commitmentStatus === 'active').length;
   }
 
   /**
@@ -423,7 +424,7 @@ export class CustodianBlobDistributionService {
    */
   getBestCustodianUrl(contentId: string, blobHash: string): string | null {
     const commitments = this.getCommitmentsForBlob(contentId, blobHash).filter(
-      (c) => c.commitmentStatus === 'active'
+      c => c.commitmentStatus === 'active'
     );
 
     if (commitments.length === 0) {
@@ -475,7 +476,11 @@ export class CustodianBlobDistributionService {
     score += canStore ? 10 : 0; // 10% weight
 
     // Regional preference (if specified)
-    if (criteria.preferredRegions && custodian.region && criteria.preferredRegions.includes(custodian.region)) {
+    if (
+      criteria.preferredRegions &&
+      custodian.region &&
+      criteria.preferredRegions.includes(custodian.region)
+    ) {
       score += 5; // Bonus points
     }
 
@@ -495,9 +500,12 @@ export class CustodianBlobDistributionService {
    */
   private startHealthMonitoring(): void {
     // Run health checks every 5 minutes
-    setInterval(() => {
-      this.performHealthCheck();
-    }, 5 * 60 * 1000);
+    setInterval(
+      () => {
+        this.performHealthCheck();
+      },
+      5 * 60 * 1000
+    );
   }
 
   /**

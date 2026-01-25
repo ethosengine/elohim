@@ -36,8 +36,19 @@
  */
 
 import { Injectable, OnDestroy, inject } from '@angular/core';
-import { BehaviorSubject, Subject, interval } from 'rxjs';
+
 import { takeUntil } from 'rxjs/operators';
+
+import { BehaviorSubject, Subject, interval } from 'rxjs';
+
+import {
+  WritePriority,
+  WriteOpType,
+  createWriteBuffer,
+  isWasmBufferAvailable,
+  TsWriteBuffer,
+} from '@elohim/service/cache/write-buffer';
+
 import { LoggerService } from './logger.service';
 
 // Import from framework-agnostic write buffer
@@ -48,14 +59,6 @@ import type {
   BatchResult,
   WriteBufferStats,
   WriteBufferConfig,
-} from '@elohim/service/cache/write-buffer';
-
-import {
-  WritePriority,
-  WriteOpType,
-  createWriteBuffer,
-  isWasmBufferAvailable,
-  TsWriteBuffer,
 } from '@elohim/service/cache/write-buffer';
 
 // Re-export types and enums for convenience
@@ -241,7 +244,10 @@ export class WriteBufferService implements OnDestroy {
         implementation: this.implementation,
       };
     } catch (error) {
-      this.logger.error('Initialization failed', error instanceof Error ? error : new Error(String(error)));
+      this.logger.error(
+        'Initialization failed',
+        error instanceof Error ? error : new Error(String(error))
+      );
 
       // Fallback to TypeScript implementation
       try {
@@ -411,7 +417,6 @@ export class WriteBufferService implements OnDestroy {
 
       // BatchCallbackResult - may have partial success
       return this.handleBatchCallbackResult(batch, result);
-
     } catch (error) {
       // Exception thrown - all operations failed
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -434,10 +439,7 @@ export class WriteBufferService implements OnDestroy {
   /**
    * Process BatchCallbackResult to handle partial success.
    */
-  private handleBatchCallbackResult(
-    batch: WriteBatch,
-    result: BatchCallbackResult
-  ): FlushResult {
+  private handleBatchCallbackResult(batch: WriteBatch, result: BatchCallbackResult): FlushResult {
     const operationCount = batch.operations.length;
 
     if (result.success && !result.operationResults) {
@@ -608,7 +610,12 @@ export class WriteBufferService implements OnDestroy {
   async flushAllWithDetails(
     callback: FlushCallback,
     onProgress?: (committed: number, remaining: number, failed?: number) => void
-  ): Promise<{ totalCommitted: number; totalFailed: number; batchCount: number; failedOperationIds: string[] }> {
+  ): Promise<{
+    totalCommitted: number;
+    totalFailed: number;
+    batchCount: number;
+    failedOperationIds: string[];
+  }> {
     this.ensureReady();
 
     let totalCommitted = 0;
@@ -666,7 +673,7 @@ export class WriteBufferService implements OnDestroy {
    * @param callback - Function to send batch to conductor
    * @param intervalMs - Check interval in milliseconds (default: 100)
    */
-  startAutoFlush(callback: FlushCallback, intervalMs: number = 100): void {
+  startAutoFlush(callback: FlushCallback, intervalMs = 100): void {
     this.ensureReady();
 
     this.stopAutoFlush();
@@ -850,9 +857,7 @@ export class WriteBufferService implements OnDestroy {
 
   private ensureReady(): void {
     if (!this.isReady) {
-      throw new Error(
-        '[WriteBufferService] Service not initialized. Call initialize() first.'
-      );
+      throw new Error('[WriteBufferService] Service not initialized. Call initialize() first.');
     }
   }
 

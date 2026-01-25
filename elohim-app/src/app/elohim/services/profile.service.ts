@@ -1,15 +1,12 @@
 import { Injectable, Optional } from '@angular/core';
-import { Observable, of, forkJoin, combineLatest } from 'rxjs';
+
 import { map, switchMap, catchError } from 'rxjs/operators';
 
-// Services
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import { AgentService } from '@app/elohim/services/agent.service';
-import { PathService } from '@app/lamad/services/path.service';
-import { AffinityTrackingService } from './affinity-tracking.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { Observable, of, forkJoin, combineLatest } from 'rxjs';
 
-// Models
+// Services
+import { AgentService } from '@app/elohim/services/agent.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import {
   HumanProfile,
   JourneyStats,
@@ -25,6 +22,13 @@ import {
   ProfileSummaryCompact,
 } from '@app/imagodei/models/profile.model';
 import { SessionPathProgress, SessionActivity } from '@app/imagodei/models/session-human.model';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { PathService } from '@app/lamad/services/path.service';
+
+import { AffinityTrackingService } from './affinity-tracking.service';
+
+// Models
+
 import type { LearningPath } from '@app/lamad/models/learning-path.model';
 
 /**
@@ -116,8 +120,7 @@ export class ProfileService {
     if (session) {
       // Session-based: derive from session stats
       const affinityData = this.affinityService['affinitySubject'].value;
-      const meaningfulCount = Object.values(affinityData.affinity)
-        .filter(v => v > 0.5).length;
+      const meaningfulCount = Object.values(affinityData.affinity).filter(v => v > 0.5).length;
 
       return of({
         territoryExplored: session.stats.nodesViewed,
@@ -134,7 +137,7 @@ export class ProfileService {
     return this.agentService.getAgentProgress().pipe(
       map(progressRecords => {
         let stepsCompleted = 0;
-        let journeysCompleted = 0;
+        const journeysCompleted = 0;
         const journeysStarted = progressRecords.length;
 
         progressRecords.forEach(progress => {
@@ -148,7 +151,8 @@ export class ProfileService {
         });
 
         return {
-          territoryExplored: Object.keys(this.affinityService['affinitySubject'].value.affinity).length,
+          territoryExplored: Object.keys(this.affinityService['affinitySubject'].value.affinity)
+            .length,
           journeysStarted,
           journeysCompleted,
           stepsCompleted,
@@ -180,16 +184,20 @@ export class ProfileService {
       .filter(p => !p.completedAt) // Only incomplete paths
       .map(progress =>
         this.pathService.getPath(progress.pathId).pipe(
-          map((path): CurrentFocus => ({
-            pathId: progress.pathId,
-            pathTitle: path.title,
-            currentStepIndex: progress.currentStepIndex,
-            totalSteps: path.steps.length,
-            progressPercent: Math.round((progress.completedStepIndices.length / path.steps.length) * 100),
-            lastActiveAt: progress.lastActivityAt,
-            nextStepTitle: path.steps[progress.currentStepIndex]?.stepTitle,
-            nextStepNarrative: path.steps[progress.currentStepIndex]?.stepNarrative,
-          })),
+          map(
+            (path): CurrentFocus => ({
+              pathId: progress.pathId,
+              pathTitle: path.title,
+              currentStepIndex: progress.currentStepIndex,
+              totalSteps: path.steps.length,
+              progressPercent: Math.round(
+                (progress.completedStepIndices.length / path.steps.length) * 100
+              ),
+              lastActiveAt: progress.lastActivityAt,
+              nextStepTitle: path.steps[progress.currentStepIndex]?.stepTitle,
+              nextStepNarrative: path.steps[progress.currentStepIndex]?.stepNarrative,
+            })
+          ),
           catchError(() => of(null as CurrentFocus | null))
         )
       );
@@ -236,9 +244,7 @@ export class ProfileService {
    * Format attestation ID into human-readable name.
    */
   private formatAttestationName(id: string): string {
-    return id
-      .replace(/-/g, ' ')
-      .replace(/\b\w/g, l => l.toUpperCase());
+    return id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   }
 
   // =========================================================================
@@ -249,7 +255,7 @@ export class ProfileService {
    * Get chronological timeline of significant learning events.
    * These are transformation points, not just activity logs.
    */
-  getTimeline(limit: number = 50): Observable<TimelineEvent[]> {
+  getTimeline(limit = 50): Observable<TimelineEvent[]> {
     const activities = this.sessionHumanService?.getActivityHistory() ?? [];
 
     // Transform activities into timeline events
@@ -340,7 +346,7 @@ export class ProfileService {
    * Get content with highest engagement (affinity).
    * High affinity indicates resonance and meaning-making.
    */
-  getTopEngagedContent(limit: number = 10): Observable<ContentEngagement[]> {
+  getTopEngagedContent(limit = 10): Observable<ContentEngagement[]> {
     const affinityData = this.affinityService['affinitySubject'].value.affinity;
 
     // Sort by affinity descending
@@ -356,24 +362,24 @@ export class ProfileService {
     // Load content metadata for top engaged nodes
     const contentRequests = sorted.map(([nodeId, affinity]) =>
       this.dataLoader.getContent(nodeId).pipe(
-        map((content): ContentEngagement => ({
-          nodeId,
-          title: content.title,
-          contentType: content.contentType,
-          affinity,
-          viewCount: 1, // Would need view tracking
-          lastViewedAt: new Date().toISOString(), // Would need activity lookup
-          hasNotes: false, // Would need notes lookup
-          containingPaths: [] as string[], // Would need reverse lookup
-        })),
+        map(
+          (content): ContentEngagement => ({
+            nodeId,
+            title: content.title,
+            contentType: content.contentType,
+            affinity,
+            viewCount: 1, // Would need view tracking
+            lastViewedAt: new Date().toISOString(), // Would need activity lookup
+            hasNotes: false, // Would need notes lookup
+            containingPaths: [] as string[], // Would need reverse lookup
+          })
+        ),
         catchError(() => of(null as ContentEngagement | null))
       )
     );
 
     return forkJoin(contentRequests).pipe(
-      map(results =>
-        results.filter((r): r is ContentEngagement => r !== null)
-      )
+      map(results => results.filter((r): r is ContentEngagement => r !== null))
     );
   }
 
@@ -452,9 +458,10 @@ export class ProfileService {
           );
 
           const dayLabel = daysSince === 1 ? 'day' : 'days';
-          const reason = daysSince === 0
-            ? 'Pick up where you left off'
-            : `Return to your journey after ${daysSince} ${dayLabel}`;
+          const reason =
+            daysSince === 0
+              ? 'Pick up where you left off'
+              : `Return to your journey after ${daysSince} ${dayLabel}`;
 
           return {
             type: 'continue_path' as const,
@@ -492,13 +499,9 @@ export class ProfileService {
         pathProgress.forEach(p => progressMap.set(p.pathId, p));
 
         // Categorize paths
-        const inProgressIds = pathProgress
-          .filter(p => !p.completedAt)
-          .map(p => p.pathId);
+        const inProgressIds = pathProgress.filter(p => !p.completedAt).map(p => p.pathId);
 
-        const completedIds = pathProgress
-          .filter(p => p.completedAt)
-          .map(p => p.pathId);
+        const completedIds = pathProgress.filter(p => p.completedAt).map(p => p.pathId);
 
         // Load full path data for each category
         const inProgressRequests = inProgressIds.map(id =>
@@ -510,9 +513,7 @@ export class ProfileService {
         );
 
         // Suggested: paths not yet started (limit to 5)
-        const suggestedEntries = index.paths
-          .filter(p => !progressMap.has(p.id))
-          .slice(0, 5);
+        const suggestedEntries = index.paths.filter(p => !progressMap.has(p.id)).slice(0, 5);
 
         const suggestedRequests = suggestedEntries.map(entry =>
           this.pathService.getPath(entry.id).pipe(

@@ -1,10 +1,11 @@
 import { Injectable, Renderer2, RendererFactory2 } from '@angular/core';
+
 import { BehaviorSubject, Observable } from 'rxjs';
 
 export type Theme = 'light' | 'dark' | 'device';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ThemeService {
   private readonly renderer: Renderer2;

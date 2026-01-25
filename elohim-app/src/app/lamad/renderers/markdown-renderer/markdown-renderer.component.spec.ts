@@ -10,7 +10,7 @@ describe('MarkdownRendererComponent', () => {
 
   // Mock StorageClientService
   const mockStorageClientService = {
-    getBlobUrl: (hash: string) => `https://test-doorway.example.com/api/blob/${hash}`
+    getBlobUrl: (hash: string) => `https://test-doorway.example.com/api/blob/${hash}`,
   };
 
   const createContentNode = (content: string): ContentNode => ({
@@ -22,15 +22,13 @@ describe('MarkdownRendererComponent', () => {
     content,
     tags: ['markdown'],
     relatedNodeIds: [],
-    metadata: {}
+    metadata: {},
   });
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [MarkdownRendererComponent],
-      providers: [
-        { provide: StorageClientService, useValue: mockStorageClientService }
-      ]
+      providers: [{ provide: StorageClientService, useValue: mockStorageClientService }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(MarkdownRendererComponent);
@@ -52,7 +50,7 @@ describe('MarkdownRendererComponent', () => {
     it('should render basic markdown', fakeAsync(() => {
       component.node = createContentNode('# Hello World\n\nThis is a test.');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -66,7 +64,7 @@ describe('MarkdownRendererComponent', () => {
 
       component.node = createContentNode(markdown);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -78,7 +76,7 @@ describe('MarkdownRendererComponent', () => {
 
       component.node = createContentNode(markdown);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -91,7 +89,7 @@ describe('MarkdownRendererComponent', () => {
       (node as any).content = { invalid: 'object' };
       component.node = node;
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -107,7 +105,7 @@ describe('MarkdownRendererComponent', () => {
 
       component.node = createContentNode(markdown);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -125,7 +123,7 @@ describe('MarkdownRendererComponent', () => {
 
       component.node = createContentNode('# Test');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -139,7 +137,7 @@ describe('MarkdownRendererComponent', () => {
 
       component.node = createContentNode(markdown);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -164,7 +162,7 @@ describe('MarkdownRendererComponent', () => {
       const markdown = '# Test Heading';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -180,7 +178,10 @@ describe('MarkdownRendererComponent', () => {
       component.scrollToHeading(event, component.tocEntries[0].id);
 
       expect(event.preventDefault).toHaveBeenCalled();
-      expect(mockElement.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+      expect(mockElement.scrollIntoView).toHaveBeenCalledWith({
+        behavior: 'smooth',
+        block: 'start',
+      });
       expect(component.activeHeadingId).toBe(component.tocEntries[0].id);
 
       document.body.removeChild(mockElement);
@@ -190,7 +191,7 @@ describe('MarkdownRendererComponent', () => {
       const markdown = '# Test';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -224,7 +225,7 @@ describe('MarkdownRendererComponent', () => {
       component.node = createContentNode('# Test');
       fixture.detectChanges();
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
       fixture.detectChanges();
@@ -238,7 +239,9 @@ describe('MarkdownRendererComponent', () => {
     it('should set up scroll listener after view init', () => {
       spyOn(window, 'addEventListener');
       component.ngAfterViewInit();
-      expect(window.addEventListener).toHaveBeenCalledWith('scroll', jasmine.any(Function), { passive: true });
+      expect(window.addEventListener).toHaveBeenCalledWith('scroll', jasmine.any(Function), {
+        passive: true,
+      });
     });
 
     it('should remove scroll listener on destroy', () => {
@@ -254,7 +257,7 @@ describe('MarkdownRendererComponent', () => {
       const markdown = '# UPPERCASE HEADING';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -265,7 +268,7 @@ describe('MarkdownRendererComponent', () => {
       const markdown = '# Test Heading Here';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -277,7 +280,7 @@ describe('MarkdownRendererComponent', () => {
       const markdown = '# Test! @Heading#';
       component.node = createContentNode(markdown);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -290,7 +293,7 @@ describe('MarkdownRendererComponent', () => {
       const longHeading = '# ' + 'A'.repeat(100);
       component.node = createContentNode(longHeading);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -305,7 +308,7 @@ describe('MarkdownRendererComponent', () => {
 
       component.node = createContentNode(markdown);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 
@@ -319,7 +322,7 @@ describe('MarkdownRendererComponent', () => {
 
       component.node = createContentNode(markdown);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       tick();
 

@@ -43,7 +43,7 @@ export const PoolSources = {
   SERENDIPITY: 'serendipity',
 } as const;
 
-export type PoolSource = typeof PoolSources[keyof typeof PoolSources];
+export type PoolSource = (typeof PoolSources)[keyof typeof PoolSources];
 
 // =============================================================================
 // Challenge State Types
@@ -59,7 +59,8 @@ export const MasteryChallengeStates = {
   ABANDONED: 'abandoned',
 } as const;
 
-export type MasteryChallengeState = typeof MasteryChallengeStates[keyof typeof MasteryChallengeStates];
+export type MasteryChallengeState =
+  (typeof MasteryChallengeStates)[keyof typeof MasteryChallengeStates];
 
 // =============================================================================
 // Practice Pool

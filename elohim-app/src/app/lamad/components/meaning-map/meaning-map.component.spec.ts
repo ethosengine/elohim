@@ -25,7 +25,7 @@ describe('MeaningMapComponent', () => {
       content: 'Content 1',
       tags: ['tag1'],
       relatedNodeIds: [],
-      metadata: { category: 'core' }
+      metadata: { category: 'core' },
     },
     {
       id: 'node-2',
@@ -36,7 +36,7 @@ describe('MeaningMapComponent', () => {
       content: 'Content 2',
       tags: ['tag2'],
       relatedNodeIds: [],
-      metadata: { category: 'core' }
+      metadata: { category: 'core' },
     },
     {
       id: 'node-3',
@@ -47,17 +47,21 @@ describe('MeaningMapComponent', () => {
       content: 'Content 3',
       tags: ['tag3'],
       relatedNodeIds: [],
-      metadata: { category: 'deployment' }
-    }
+      metadata: { category: 'deployment' },
+    },
   ];
 
   beforeEach(async () => {
     affinitySubject = new BehaviorSubject(new Map<string, number>());
 
     const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', ['getContentIndex']);
-    const affinitySpyObj = jasmine.createSpyObj('AffinityTrackingService', ['getAffinity', 'getStats'], {
-      affinity$: affinitySubject.asObservable()
-    });
+    const affinitySpyObj = jasmine.createSpyObj(
+      'AffinityTrackingService',
+      ['getAffinity', 'getStats'],
+      {
+        affinity$: affinitySubject.asObservable(),
+      }
+    );
     const routerSpyObj = jasmine.createSpyObj('Router', ['navigate']);
 
     await TestBed.configureTestingModule({
@@ -66,12 +70,14 @@ describe('MeaningMapComponent', () => {
         provideHttpClient(),
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
         { provide: AffinityTrackingService, useValue: affinitySpyObj },
-        { provide: Router, useValue: routerSpyObj }
-      ]
+        { provide: Router, useValue: routerSpyObj },
+      ],
     }).compileComponents();
 
     dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
-    affinityServiceSpy = TestBed.inject(AffinityTrackingService) as jasmine.SpyObj<AffinityTrackingService>;
+    affinityServiceSpy = TestBed.inject(
+      AffinityTrackingService
+    ) as jasmine.SpyObj<AffinityTrackingService>;
     routerSpy = TestBed.inject(Router) as jasmine.SpyObj<Router>;
 
     // Default spy returns
@@ -84,9 +90,12 @@ describe('MeaningMapComponent', () => {
       distribution: { unseen: 0, low: 1, medium: 1, high: 1 },
       byCategory: new Map([
         ['core', { category: 'core', nodeCount: 2, engagedCount: 1, averageAffinity: 0.6 }],
-        ['deployment', { category: 'deployment', nodeCount: 1, engagedCount: 1, averageAffinity: 0.4 }]
+        [
+          'deployment',
+          { category: 'deployment', nodeCount: 1, engagedCount: 1, averageAffinity: 0.4 },
+        ],
       ]),
-      byType: new Map()
+      byType: new Map(),
     });
 
     fixture = TestBed.createComponent(MeaningMapComponent);
@@ -252,8 +261,8 @@ describe('MeaningMapComponent', () => {
           content: 'Content',
           tags: [],
           relatedNodeIds: [],
-          metadata: {}
-        }
+          metadata: {},
+        },
       ];
 
       dataLoaderSpy.getContentIndex.and.returnValue(of({ nodes: nodesWithoutCategory }));
@@ -262,8 +271,13 @@ describe('MeaningMapComponent', () => {
         averageAffinity: 0,
         engagedNodes: 0,
         distribution: { unseen: 1, low: 0, medium: 0, high: 0 },
-        byCategory: new Map([['uncategorized', { category: 'uncategorized', nodeCount: 1, engagedCount: 0, averageAffinity: 0 }]]),
-        byType: new Map()
+        byCategory: new Map([
+          [
+            'uncategorized',
+            { category: 'uncategorized', nodeCount: 1, engagedCount: 0, averageAffinity: 0 },
+          ],
+        ]),
+        byType: new Map(),
       });
 
       fixture.detectChanges();

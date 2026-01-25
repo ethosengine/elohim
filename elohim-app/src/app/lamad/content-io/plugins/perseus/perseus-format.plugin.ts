@@ -1,21 +1,27 @@
 import { Injectable, Type } from '@angular/core';
+
 import {
   ContentFormatPlugin,
   ContentRenderer,
   ContentEditorComponent,
   EditorConfig,
   DEFAULT_EDITOR_CONFIG,
-  InteractiveRenderer
+  InteractiveRenderer,
 } from '../../interfaces/content-format-plugin.interface';
-import { ContentIOImportResult, ContentIOExportInput } from '../../interfaces/content-io-plugin.interface';
+import {
+  ContentIOImportResult,
+  ContentIOExportInput,
+} from '../../interfaces/content-io-plugin.interface';
 import { FormatMetadata } from '../../interfaces/format-metadata.interface';
-import { ValidationResult, ValidationError, ValidationWarning } from '../../interfaces/validation-result.interface';
+import {
+  ValidationResult,
+  ValidationError,
+  ValidationWarning,
+} from '../../interfaces/validation-result.interface';
+
 import { PerseusRendererComponent } from './perseus-renderer.component';
-import type {
-  PerseusItem,
-  PerseusItemMetadata,
-  PerseusWidgetType
-} from './perseus-item.model';
+
+import type { PerseusItem, PerseusItemMetadata, PerseusWidgetType } from './perseus-item.model';
 
 /**
  * PerseusFormatPlugin - Unified plugin for Perseus quiz content.
@@ -39,7 +45,7 @@ import type {
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class PerseusFormatPlugin implements ContentFormatPlugin {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -90,11 +96,13 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
           bloomsLevels: this.extractBloomsLevels(items),
           difficulty: this.aggregateDifficulty(items),
           estimatedTimeMinutes: this.calculateEstimatedTime(items),
-          sourceDoc: metadata?.sourceDoc
-        }
+          sourceDoc: metadata?.sourceDoc,
+        },
       };
     } catch (error) {
-      throw new Error(`Failed to parse Perseus JSON: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to parse Perseus JSON: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -112,15 +120,11 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
       ...item,
       metadata: {
         ...item.metadata,
-        updatedAt: new Date().toISOString()
-      }
+        updatedAt: new Date().toISOString(),
+      },
     }));
 
-    return JSON.stringify(
-      updatedItems.length === 1 ? updatedItems[0] : updatedItems,
-      null,
-      2
-    );
+    return JSON.stringify(updatedItems.length === 1 ? updatedItems[0] : updatedItems, null, 2);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -140,7 +144,7 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
       errors.push({
         code: 'INVALID_JSON',
         message: `Invalid JSON: ${error instanceof Error ? error.message : 'Parse error'}`,
-        line: 1
+        line: 1,
       });
       return { valid: false, errors, warnings };
     }
@@ -156,21 +160,21 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
       if (!item.id) {
         errors.push({
           code: 'MISSING_ID',
-          message: `${prefix}Missing required field: id`
+          message: `${prefix}Missing required field: id`,
         });
       }
 
       if (!item.question) {
         errors.push({
           code: 'MISSING_QUESTION',
-          message: `${prefix}Missing required field: question`
+          message: `${prefix}Missing required field: question`,
         });
       } else {
         // Validate question structure
         if (typeof item.question.content !== 'string') {
           errors.push({
             code: 'INVALID_CONTENT',
-            message: `${prefix}question.content must be a string`
+            message: `${prefix}question.content must be a string`,
           });
         }
 
@@ -178,7 +182,7 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
           warnings.push({
             code: 'NO_WIDGETS',
             message: `${prefix}No widgets defined. Question may be display-only.`,
-            suggestion: 'Add widgets for interactive elements'
+            suggestion: 'Add widgets for interactive elements',
           });
         } else {
           // Validate widgets
@@ -191,14 +195,14 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
         warnings.push({
           code: 'NO_METADATA',
           message: `${prefix}No metadata. Lamad integration features may not work.`,
-          suggestion: 'Add metadata with assessesContentId, bloomsLevel, etc.'
+          suggestion: 'Add metadata with assessesContentId, bloomsLevel, etc.',
         });
       } else {
         if (!item.metadata.assessesContentId) {
           warnings.push({
             code: 'NO_CONTENT_LINK',
             message: `${prefix}No assessesContentId. Question won't be linked to content.`,
-            suggestion: 'Set metadata.assessesContentId to the content node ID'
+            suggestion: 'Set metadata.assessesContentId to the content node ID',
           });
         }
       }
@@ -208,7 +212,7 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
         warnings.push({
           code: 'NO_VERSION',
           message: `${prefix}No version specified. Using default 1.0.`,
-          suggestion: 'Add version: { major: 1, minor: 0 }'
+          suggestion: 'Add version: { major: 1, minor: 0 }',
         });
       }
     }
@@ -217,16 +221,14 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
     const stats = {
       itemCount: items.length,
       widgetCount: this.countWidgets(items as PerseusItem[]),
-      hasHints: items.some((item: Partial<PerseusItem>) =>
-        item.hints && item.hints.length > 0
-      )
+      hasHints: items.some((item: Partial<PerseusItem>) => item.hints && item.hints.length > 0),
     };
 
     return {
       valid: errors.length === 0,
       errors,
       warnings,
-      stats
+      stats,
     };
   }
 
@@ -266,8 +268,8 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
           { id: 'validate', label: 'Validate', icon: 'check_circle', type: 'button' },
           { id: 'save', label: 'Save', icon: 'save', shortcut: 'Ctrl+S', type: 'button' },
           { id: 'cancel', label: 'Cancel', icon: 'close', shortcut: 'Escape', type: 'button' },
-        ]
-      }
+        ],
+      },
     };
   }
 
@@ -319,7 +321,7 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
       icon: 'quiz',
       category: 'data', // Perseus quizzes are structured data
       supportsRoundTrip: true,
-      priority: 20
+      priority: 20,
     };
   }
 
@@ -399,8 +401,7 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
     }
 
     // Return most common difficulty
-    return Object.entries(difficulties)
-      .sort((a, b) => b[1] - a[1])[0][0];
+    return Object.entries(difficulties).sort((a, b) => b[1] - a[1])[0][0];
   }
 
   private calculateEstimatedTime(items: PerseusItem[]): number {
@@ -420,13 +421,35 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
     prefix: string
   ): void {
     const validTypes: PerseusWidgetType[] = [
-      'radio', 'numeric-input', 'expression', 'input-number',
-      'interactive-graph', 'image', 'transformer', 'number-line',
-      'sorter', 'categorizer', 'matcher', 'orderer', 'graded-group',
-      'graded-group-set', 'iframe', 'definition', 'dropdown',
-      'explanation', 'passage', 'passage-ref', 'phet-simulation',
-      'plotter', 'table', 'grapher', 'measurer', 'matrix',
-      'cs-program', 'video', 'label-image'
+      'radio',
+      'numeric-input',
+      'expression',
+      'input-number',
+      'interactive-graph',
+      'image',
+      'transformer',
+      'number-line',
+      'sorter',
+      'categorizer',
+      'matcher',
+      'orderer',
+      'graded-group',
+      'graded-group-set',
+      'iframe',
+      'definition',
+      'dropdown',
+      'explanation',
+      'passage',
+      'passage-ref',
+      'phet-simulation',
+      'plotter',
+      'table',
+      'grapher',
+      'measurer',
+      'matrix',
+      'cs-program',
+      'video',
+      'label-image',
     ];
 
     for (const [key, widget] of Object.entries(widgets)) {
@@ -435,7 +458,7 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
       if (!w.type) {
         errors.push({
           code: 'WIDGET_NO_TYPE',
-          message: `${prefix}Widget "${key}" has no type`
+          message: `${prefix}Widget "${key}" has no type`,
         });
         continue;
       }
@@ -444,7 +467,7 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
         warnings.push({
           code: 'UNKNOWN_WIDGET_TYPE',
           message: `${prefix}Unknown widget type: ${w.type}`,
-          suggestion: `Valid types: ${validTypes.slice(0, 5).join(', ')}...`
+          suggestion: `Valid types: ${validTypes.slice(0, 5).join(', ')}...`,
         });
       }
 
@@ -452,7 +475,7 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
         warnings.push({
           code: 'WIDGET_NO_OPTIONS',
           message: `${prefix}Widget "${key}" has no options`,
-          suggestion: 'Add options appropriate for the widget type'
+          suggestion: 'Add options appropriate for the widget type',
         });
       }
     }

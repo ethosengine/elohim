@@ -1,7 +1,43 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, of, from, defer, forkJoin } from 'rxjs';
+
 import { catchError, map, shareReplay, tap, switchMap, timeout } from 'rxjs/operators';
-import { LoggerService } from './logger.service';
+
+import { Observable, of, from, defer, forkJoin } from 'rxjs';
+
+// Models from elohim (local)
+
+// Models from lamad pillar (will stay there - content-specific)
+// Using relative imports for now; will update to @app/lamad after full migration
+import { ContentAttestation } from '../../lamad/models/content-attestation.model';
+import {
+  ContentNode,
+  ContentGraph,
+  ContentRelationship,
+  ContentRelationshipType,
+} from '../../lamad/models/content-node.model';
+import {
+  KnowledgeMapIndex,
+  KnowledgeMap,
+  KnowledgeMapIndexEntry,
+  KnowledgeMapType,
+  KnowledgeNode,
+} from '../../lamad/models/knowledge-map.model';
+import { LearningPath, PathIndex } from '../../lamad/models/learning-path.model';
+import {
+  PathExtensionIndex,
+  PathExtension,
+  PathExtensionIndexEntry,
+  PathStepInsertion,
+  PathStepAnnotation,
+  PathStepReorder,
+  PathStepExclusion,
+  UpstreamProposal,
+  ExtensionStats,
+} from '../../lamad/models/path-extension.model';
+import { Agent, AgentProgress, AgentAttestation } from '../models/agent.model';
+
+import { ContentResolverService } from './content-resolver.service';
+import { ContentService } from './content.service';
 import {
   HolochainContentService,
   HolochainPathOverview,
@@ -12,36 +48,8 @@ import {
   HolochainContentAttestationEntry,
 } from './holochain-content.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
+import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
-import { ContentResolverService } from './content-resolver.service';
-import { ContentService } from './content.service';
-
-// Models from elohim (local)
-import { Agent, AgentProgress, AgentAttestation } from '../models/agent.model';
-
-// Models from lamad pillar (will stay there - content-specific)
-// Using relative imports for now; will update to @app/lamad after full migration
-import { LearningPath, PathIndex } from '../../lamad/models/learning-path.model';
-import { ContentNode, ContentGraph, ContentRelationship, ContentRelationshipType } from '../../lamad/models/content-node.model';
-import { ContentAttestation } from '../../lamad/models/content-attestation.model';
-import {
-  KnowledgeMapIndex,
-  KnowledgeMap,
-  KnowledgeMapIndexEntry,
-  KnowledgeMapType,
-  KnowledgeNode
-} from '../../lamad/models/knowledge-map.model';
-import {
-  PathExtensionIndex,
-  PathExtension,
-  PathExtensionIndexEntry,
-  PathStepInsertion,
-  PathStepAnnotation,
-  PathStepReorder,
-  PathStepExclusion,
-  UpstreamProposal,
-  ExtensionStats
-} from '../../lamad/models/path-extension.model';
 
 // Assessment types (inline until models are expanded)
 export interface AssessmentIndex {
@@ -124,13 +132,13 @@ export interface DiscussionRecord {
   entityId: string;
   category: string;
   title: string;
-  messages: Array<{
+  messages: {
     id: string;
     authorId: string;
     authorName: string;
     content: string;
     createdAt: string;
-  }>;
+  }[];
   status: string;
   messageCount: number;
 }
@@ -146,7 +154,7 @@ export interface GovernanceStateRecord {
     deciderType: string;
     decidedAt: string;
   };
-  labels: Array<{ labelType: string; severity: string; appliedBy: string }>;
+  labels: { labelType: string; severity: string; appliedBy: string }[];
   activeChallenges: string[];
   lastUpdated: string;
 }
@@ -247,7 +255,9 @@ export class DataLoaderService {
 
       this.logger.debug('ContentResolver initialized with sources');
     } catch (err) {
-      this.logger.warn('Cache initialization failed', { error: err instanceof Error ? err.message : String(err) });
+      this.logger.warn('Cache initialization failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -424,7 +434,9 @@ export class DataLoaderService {
       tap(contentMap => {
         // Store in IndexedDB cache for offline persistence (background, non-blocking)
         if (this.idbInitialized && contentMap.size > 0) {
-          const toCache = Array.from(contentMap.values()).filter(c => c.contentType !== 'placeholder');
+          const toCache = Array.from(contentMap.values()).filter(
+            c => c.contentType !== 'placeholder'
+          );
           if (toCache.length > 0) {
             this.idbCache.setContentBatch(toCache).catch(() => {});
           }
@@ -440,7 +452,10 @@ export class DataLoaderService {
         return contentMap;
       }),
       catchError(err => {
-        this.logger.warn('Batch load error', { count: resourceIds.length, error: err.message || err });
+        this.logger.warn('Batch load error', {
+          count: resourceIds.length,
+          error: err.message || err,
+        });
         // Return placeholders for all
         const contentMap = new Map<string, ContentNode>();
         for (const id of resourceIds) {
@@ -483,9 +498,7 @@ export class DataLoaderService {
     return this.getPath(pathId).pipe(
       tap(path => {
         // Prefetch first N step content in background
-        const stepResourceIds = path.steps
-          .slice(0, prefetchSteps)
-          .map(s => s.resourceId);
+        const stepResourceIds = path.steps.slice(0, prefetchSteps).map(s => s.resourceId);
         this.prefetchContent(stepResourceIds, prefetchSteps);
       })
     );
@@ -577,14 +590,19 @@ export class DataLoaderService {
           })),
           totalCount: nodes.length,
           byType: this.groupByType(nodes),
-          lastUpdated: new Date().toISOString()
+          lastUpdated: new Date().toISOString(),
         })),
         shareReplay(1),
         catchError(err => {
           this.logger.error('Failed to load content index', err);
           // Clear cache on error so next call retries
           this.contentIndexCache$ = null;
-          return of({ nodes: [], totalCount: 0, byType: {}, lastUpdated: new Date().toISOString() });
+          return of({
+            nodes: [],
+            totalCount: 0,
+            byType: {},
+            lastUpdated: new Date().toISOString(),
+          });
         })
       );
     }
@@ -672,9 +690,15 @@ export class DataLoaderService {
           return total + chapter.steps.length;
         }
         if (chapter.modules) {
-          return total + chapter.modules.reduce((modTotal, mod) =>
-            modTotal + mod.sections.reduce((secTotal, sec) =>
-              secTotal + (sec.conceptIds?.length ?? 0), 0), 0);
+          return (
+            total +
+            chapter.modules.reduce(
+              (modTotal, mod) =>
+                modTotal +
+                mod.sections.reduce((secTotal, sec) => secTotal + (sec.conceptIds?.length ?? 0), 0),
+              0
+            )
+          );
         }
         return total;
       }, 0);
@@ -700,8 +724,8 @@ export class DataLoaderService {
     }
 
     return defer(() => from(this.holochainContent.getAgentById(agentId))).pipe(
-      map(result => result ? this.transformHolochainAgent(result.agent) : null),
-      catchError((err) => {
+      map(result => (result ? this.transformHolochainAgent(result.agent) : null)),
+      catchError(err => {
         this.logger.warn('Failed to load agent', { agentId, error: err.message || err });
         return of(null);
       })
@@ -805,7 +829,7 @@ export class DataLoaderService {
       hasGraph: this.graphCache$ !== null,
       hasPathIndex: this.pathIndexCache$ !== null,
       hasContentIndex: this.contentIndexCache$ !== null,
-      indexedDBAvailable: this.idbInitialized
+      indexedDBAvailable: this.idbInitialized,
     };
   }
 
@@ -863,9 +887,11 @@ export class DataLoaderService {
     this.attestationCache$ ??= defer(() =>
       from(this.holochainContent.queryContentAttestations({ status: 'active' }))
     ).pipe(
-      map(results => results.map(r => this.transformHolochainContentAttestation(r.contentAttestation))),
+      map(results =>
+        results.map(r => this.transformHolochainContentAttestation(r.contentAttestation))
+      ),
       shareReplay(1),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load content attestations:', err);
         return of([]);
       })
@@ -884,12 +910,16 @@ export class DataLoaderService {
       return of([]);
     }
 
-    return defer(() => from(this.holochainContent.getAttestations({
-      agentId: agentId,
-      category: category,
-    }))).pipe(
+    return defer(() =>
+      from(
+        this.holochainContent.getAttestations({
+          agentId: agentId,
+          category: category,
+        })
+      )
+    ).pipe(
       map(results => results.map(r => this.transformHolochainAttestation(r.attestation))),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load agent attestations:', err);
         return of([]);
       })
@@ -922,8 +952,13 @@ export class DataLoaderService {
   /**
    * Transform Holochain content attestation entry to frontend ContentAttestation model.
    */
-  private transformHolochainContentAttestation(hcAtt: HolochainContentAttestationEntry): ContentAttestation {
-    const grantedBy = (hcAtt.grantedBy ?? { type: 'system', grantorId: 'unknown' }) as ContentAttestation['grantedBy'];
+  private transformHolochainContentAttestation(
+    hcAtt: HolochainContentAttestationEntry
+  ): ContentAttestation {
+    const grantedBy = (hcAtt.grantedBy ?? {
+      type: 'system',
+      grantorId: 'unknown',
+    }) as ContentAttestation['grantedBy'];
     const revocation = (hcAtt.revocation ?? undefined) as ContentAttestation['revocation'];
     const evidence = (hcAtt.evidence ?? undefined) as ContentAttestation['evidence'];
     const scope = (hcAtt.scope ?? undefined) as ContentAttestation['scope'];
@@ -959,15 +994,15 @@ export class DataLoaderService {
       return of([]);
     }
 
-    return defer(() =>
-      from(this.holochainContent.getAttestationsForContent(contentId))
-    ).pipe(
+    return defer(() => from(this.holochainContent.getAttestationsForContent(contentId))).pipe(
       map(results => {
-        const attestations = results.map(r => this.transformHolochainContentAttestation(r.contentAttestation));
+        const attestations = results.map(r =>
+          this.transformHolochainContentAttestation(r.contentAttestation)
+        );
         this.attestationsByContentCache.set(contentId, attestations);
         return attestations;
       }),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load attestations for content:', err);
         return of([]);
       })
@@ -993,9 +1028,9 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryAgents({}))).pipe(
       map(results => ({
-        agents: results.map(r => this.transformHolochainAgent(r.agent))
+        agents: results.map(r => this.transformHolochainAgent(r.agent)),
       })),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load agent index:', err);
         return of({ agents: [] });
       })
@@ -1036,9 +1071,9 @@ export class DataLoaderService {
       map(results => ({
         lastUpdated: new Date().toISOString(),
         totalCount: results.length,
-        maps: results.map(r => this.transformHolochainKnowledgeMapToIndex(r.knowledgeMap))
+        maps: results.map(r => this.transformHolochainKnowledgeMapToIndex(r.knowledgeMap)),
       })),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load knowledge map index:', err);
         return of({ maps: [], totalCount: 0, lastUpdated: new Date().toISOString() });
       })
@@ -1054,8 +1089,8 @@ export class DataLoaderService {
     }
 
     return defer(() => from(this.holochainContent.getKnowledgeMapById(mapId))).pipe(
-      map(result => result ? this.transformHolochainKnowledgeMap(result.knowledgeMap) : null),
-      catchError((err) => {
+      map(result => (result ? this.transformHolochainKnowledgeMap(result.knowledgeMap) : null)),
+      catchError(err => {
         console.warn(`[DataLoader] Failed to load knowledge map "${mapId}":`, err);
         return of(null);
       })
@@ -1090,7 +1125,7 @@ export class DataLoaderService {
       visibility: hcMap.visibility,
       overallAffinity: hcMap.overallAffinity,
       nodeCount: Array.isArray(nodes) ? nodes.length : 0,
-      updatedAt: hcMap.updatedAt
+      updatedAt: hcMap.updatedAt,
     };
   }
 
@@ -1121,7 +1156,9 @@ export class DataLoaderService {
     const nodes = (Array.isArray(hcMap.nodes) ? hcMap.nodes : []) as KnowledgeNode[];
     const pathIds = (Array.isArray(hcMap.pathIds) ? hcMap.pathIds : []) as string[];
     const sharedWith = (Array.isArray(hcMap.sharedWith) ? hcMap.sharedWith : []) as string[];
-    const metadata = (hcMap.metadata && typeof hcMap.metadata === 'object' ? hcMap.metadata : {}) as Record<string, unknown>;
+    const metadata = (
+      hcMap.metadata && typeof hcMap.metadata === 'object' ? hcMap.metadata : {}
+    ) as Record<string, unknown>;
 
     return {
       id: hcMap.id,
@@ -1129,7 +1166,7 @@ export class DataLoaderService {
       subject: {
         type: hcMap.subjectType as 'content-graph' | 'agent' | 'organization',
         subjectId: hcMap.subjectId,
-        subjectName: hcMap.subjectName
+        subjectName: hcMap.subjectName,
       },
       ownerId: hcMap.ownerId,
       title: hcMap.title,
@@ -1141,7 +1178,7 @@ export class DataLoaderService {
       overallAffinity: hcMap.overallAffinity,
       createdAt: hcMap.createdAt,
       updatedAt: hcMap.updatedAt,
-      metadata
+      metadata,
     };
   }
 
@@ -1161,9 +1198,9 @@ export class DataLoaderService {
       map(results => ({
         lastUpdated: new Date().toISOString(),
         totalCount: results.length,
-        extensions: results.map(r => this.transformHolochainPathExtensionToIndex(r.pathExtension))
+        extensions: results.map(r => this.transformHolochainPathExtensionToIndex(r.pathExtension)),
       })),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load path extension index:', err);
         return of({ extensions: [], totalCount: 0, lastUpdated: new Date().toISOString() });
       })
@@ -1179,8 +1216,8 @@ export class DataLoaderService {
     }
 
     return defer(() => from(this.holochainContent.getPathExtensionById(extensionId))).pipe(
-      map(result => result ? this.transformHolochainPathExtension(result.pathExtension) : null),
-      catchError((err) => {
+      map(result => (result ? this.transformHolochainPathExtension(result.pathExtension) : null)),
+      catchError(err => {
         console.warn(`[DataLoader] Failed to load path extension "${extensionId}":`, err);
         return of(null);
       })
@@ -1195,9 +1232,11 @@ export class DataLoaderService {
       return of([]);
     }
 
-    return defer(() => from(this.holochainContent.queryPathExtensions({ basePathId: pathId }))).pipe(
+    return defer(() =>
+      from(this.holochainContent.queryPathExtensions({ basePathId: pathId }))
+    ).pipe(
       map(results => results.map(r => this.transformHolochainPathExtension(r.pathExtension))),
-      catchError((err) => {
+      catchError(err => {
         console.warn(`[DataLoader] Failed to load extensions for path "${pathId}":`, err);
         return of([]);
       })
@@ -1236,7 +1275,7 @@ export class DataLoaderService {
       insertionCount,
       annotationCount,
       forkCount: 0, // Would need separate query
-      updatedAt: hcExt.updatedAt
+      updatedAt: hcExt.updatedAt,
     };
   }
 
@@ -1264,10 +1303,18 @@ export class DataLoaderService {
     updatedAt: string;
   }): PathExtension {
     const sharedWith = (Array.isArray(hcExt.sharedWith) ? hcExt.sharedWith : []) as string[];
-    const insertions = (Array.isArray(hcExt.insertions) ? hcExt.insertions : []) as PathStepInsertion[];
-    const annotations = (Array.isArray(hcExt.annotations) ? hcExt.annotations : []) as PathStepAnnotation[];
-    const reorderings = (Array.isArray(hcExt.reorderings) ? hcExt.reorderings : []) as PathStepReorder[];
-    const exclusions = (Array.isArray(hcExt.exclusions) ? hcExt.exclusions : []) as PathStepExclusion[];
+    const insertions = (
+      Array.isArray(hcExt.insertions) ? hcExt.insertions : []
+    ) as PathStepInsertion[];
+    const annotations = (
+      Array.isArray(hcExt.annotations) ? hcExt.annotations : []
+    ) as PathStepAnnotation[];
+    const reorderings = (
+      Array.isArray(hcExt.reorderings) ? hcExt.reorderings : []
+    ) as PathStepReorder[];
+    const exclusions = (
+      Array.isArray(hcExt.exclusions) ? hcExt.exclusions : []
+    ) as PathStepExclusion[];
     const forks = (Array.isArray(hcExt.forks) ? hcExt.forks : []) as string[];
     const upstreamProposal = (hcExt.upstreamProposal ?? undefined) as UpstreamProposal | undefined;
     const stats = (hcExt.stats ?? undefined) as ExtensionStats | undefined;
@@ -1290,7 +1337,7 @@ export class DataLoaderService {
       upstreamProposal,
       stats,
       createdAt: hcExt.createdAt,
-      updatedAt: hcExt.updatedAt
+      updatedAt: hcExt.updatedAt,
     };
   }
 
@@ -1317,7 +1364,7 @@ export class DataLoaderService {
         // Build graph from Holochain relationships
         this.graphCache$ = this.buildGraphFromHolochain().pipe(
           shareReplay(1),
-          catchError((err) => {
+          catchError(err => {
             console.warn('[DataLoader] Failed to load graph from Holochain:', err);
             return of(this.createEmptyGraph());
           })
@@ -1356,7 +1403,7 @@ export class DataLoaderService {
 
       const request = this.fetchRelationshipsForNode(contentId, direction).pipe(
         shareReplay(1),
-        catchError((err) => {
+        catchError(err => {
           console.warn(`[DataLoader] Failed to load relationships for "${contentId}":`, err);
           // Remove from cache on error
           this.relationshipByNodeCache.delete(cacheKey);
@@ -1383,18 +1430,23 @@ export class DataLoaderService {
 
     return defer(() =>
       from(this.holochainContent.getRelationships({ content_id: contentId, direction }))
-    ).pipe(
-      map(results => results.map(r => this.transformHolochainRelationship(r.relationship)))
-    );
+    ).pipe(map(results => results.map(r => this.transformHolochainRelationship(r.relationship))));
   }
 
   /**
    * Transform Holochain relationship entry to frontend ContentRelationship model.
    */
-  private transformHolochainRelationship(
-    hcRel: { id: string; sourceId: string; targetId: string; relationshipType: string; confidence: number; metadata: unknown }
-  ): ContentRelationship {
-    const metadata = (hcRel.metadata && typeof hcRel.metadata === 'object' ? hcRel.metadata : {}) as Record<string, unknown>;
+  private transformHolochainRelationship(hcRel: {
+    id: string;
+    sourceId: string;
+    targetId: string;
+    relationshipType: string;
+    confidence: number;
+    metadata: unknown;
+  }): ContentRelationship {
+    const metadata = (
+      hcRel.metadata && typeof hcRel.metadata === 'object' ? hcRel.metadata : {}
+    ) as Record<string, unknown>;
 
     // Store confidence in metadata since ContentRelationship doesn't have a confidence field
     if (hcRel.confidence !== undefined && hcRel.confidence !== null) {
@@ -1406,7 +1458,7 @@ export class DataLoaderService {
       sourceNodeId: hcRel.sourceId,
       targetNodeId: hcRel.targetId,
       relationshipType: hcRel.relationshipType as ContentRelationshipType,
-      metadata
+      metadata,
     };
   }
 
@@ -1458,11 +1510,29 @@ export class DataLoaderService {
     // Add root node if present
     if (hcGraph.root) {
       const rootNode = this.transformHolochainContentToNode(hcGraph.root);
-      this.addNodeToGraphIndexes(rootNode, nodes, nodesByType, nodesByTag, nodesByCategory, adjacency, reverseAdjacency);
+      this.addNodeToGraphIndexes(
+        rootNode,
+        nodes,
+        nodesByType,
+        nodesByTag,
+        nodesByCategory,
+        adjacency,
+        reverseAdjacency
+      );
     }
 
     // Process related nodes recursively
-    this.processHolochainGraphNodes(hcGraph.related, nodes, relationships, nodesByType, nodesByTag, nodesByCategory, adjacency, reverseAdjacency, hcGraph.root?.content.id);
+    this.processHolochainGraphNodes(
+      hcGraph.related,
+      nodes,
+      relationships,
+      nodesByType,
+      nodesByTag,
+      nodesByCategory,
+      adjacency,
+      reverseAdjacency,
+      hcGraph.root?.content.id
+    );
 
     return {
       nodes,
@@ -1476,17 +1546,34 @@ export class DataLoaderService {
         nodeCount: hcGraph.totalNodes,
         relationshipCount: relationships.size,
         lastUpdated: new Date().toISOString(),
-        version: '1.0.0'
-      }
+        version: '1.0.0',
+      },
     };
   }
 
   /**
    * Transform HolochainContentOutput to ContentNode.
    */
-  private transformHolochainContentToNode(output: { content: { id: string; contentType: string; title: string; description: string; content: string; contentFormat: string; tags: string[]; sourcePath: string | null; relatedNodeIds: string[]; metadata: unknown; createdAt: string; updatedAt: string } }): ContentNode {
+  private transformHolochainContentToNode(output: {
+    content: {
+      id: string;
+      contentType: string;
+      title: string;
+      description: string;
+      content: string;
+      contentFormat: string;
+      tags: string[];
+      sourcePath: string | null;
+      relatedNodeIds: string[];
+      metadata: unknown;
+      createdAt: string;
+      updatedAt: string;
+    };
+  }): ContentNode {
     const entry = output.content;
-    const metadata = (entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {}) as Record<string, unknown>;
+    const metadata = (
+      entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {}
+    ) as Record<string, unknown>;
 
     return {
       id: entry.id,
@@ -1520,7 +1607,15 @@ export class DataLoaderService {
   ): void {
     for (const graphNode of graphNodes) {
       const node = this.transformHolochainContentToNode(graphNode.content);
-      this.addNodeToGraphIndexes(node, nodes, nodesByType, nodesByTag, nodesByCategory, adjacency, reverseAdjacency);
+      this.addNodeToGraphIndexes(
+        node,
+        nodes,
+        nodesByType,
+        nodesByTag,
+        nodesByCategory,
+        adjacency,
+        reverseAdjacency
+      );
 
       // Add relationship from parent to this node
       if (parentId) {
@@ -1529,7 +1624,7 @@ export class DataLoaderService {
           id: relId,
           sourceNodeId: parentId,
           targetNodeId: node.id,
-          relationshipType: graphNode.relationshipType as ContentRelationshipType
+          relationshipType: graphNode.relationshipType as ContentRelationshipType,
         });
 
         // Update adjacency
@@ -1542,7 +1637,17 @@ export class DataLoaderService {
 
       // Process children recursively
       if (graphNode.children.length > 0) {
-        this.processHolochainGraphNodes(graphNode.children, nodes, relationships, nodesByType, nodesByTag, nodesByCategory, adjacency, reverseAdjacency, node.id);
+        this.processHolochainGraphNodes(
+          graphNode.children,
+          nodes,
+          relationships,
+          nodesByType,
+          nodesByTag,
+          nodesByCategory,
+          adjacency,
+          reverseAdjacency,
+          node.id
+        );
       }
     }
   }
@@ -1564,7 +1669,8 @@ export class DataLoaderService {
     for (const tag of node.tags || []) {
       this.addToSetMap(nodesByTag, tag, node.id);
     }
-    const category = (node.metadata as Record<string, unknown>)?.['category'] as string ?? 'uncategorized';
+    const category =
+      ((node.metadata as Record<string, unknown>)?.['category'] as string) ?? 'uncategorized';
     this.addToSetMap(nodesByCategory, category, node.id);
     if (!adjacency.has(node.id)) adjacency.set(node.id, new Set());
     if (!reverseAdjacency.has(node.id)) reverseAdjacency.set(node.id, new Set());
@@ -1593,8 +1699,8 @@ export class DataLoaderService {
         nodeCount: 0,
         relationshipCount: 0,
         lastUpdated: new Date().toISOString(),
-        version: '1.0.0'
-      }
+        version: '1.0.0',
+      },
     };
   }
 
@@ -1627,7 +1733,9 @@ export class DataLoaderService {
           lastUpdated: new Date().toISOString(),
         };
       }),
-      catchError(() => of({ assessments: [], totalCount: 0, lastUpdated: new Date().toISOString() }))
+      catchError(() =>
+        of({ assessments: [], totalCount: 0, lastUpdated: new Date().toISOString() })
+      )
     );
   }
 
@@ -1636,9 +1744,7 @@ export class DataLoaderService {
    * Assessments are also stored as content nodes, so this uses the content loader.
    */
   getAssessment(assessmentId: string): Observable<ContentNode | null> {
-    return this.getContent(assessmentId).pipe(
-      catchError(() => of(null))
-    );
+    return this.getContent(assessmentId).pipe(catchError(() => of(null)));
   }
 
   /**
@@ -1665,32 +1771,34 @@ export class DataLoaderService {
         challengeCount: 0,
         proposalCount: 0,
         precedentCount: 0,
-        discussionCount: 0
+        discussionCount: 0,
       });
     }
 
     // Query all governance types in parallel
-    return defer(() => Promise.all([
-      this.holochainContent.queryChallenges({}),
-      this.holochainContent.queryProposals({}),
-      this.holochainContent.queryPrecedents({}),
-      this.holochainContent.queryDiscussions({})
-    ])).pipe(
+    return defer(() =>
+      Promise.all([
+        this.holochainContent.queryChallenges({}),
+        this.holochainContent.queryProposals({}),
+        this.holochainContent.queryPrecedents({}),
+        this.holochainContent.queryDiscussions({}),
+      ])
+    ).pipe(
       map(([challenges, proposals, precedents, discussions]) => ({
         lastUpdated: new Date().toISOString(),
         challengeCount: challenges.length,
         proposalCount: proposals.length,
         precedentCount: precedents.length,
-        discussionCount: discussions.length
+        discussionCount: discussions.length,
       })),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load governance index:', err);
         return of({
           lastUpdated: new Date().toISOString(),
           challengeCount: 0,
           proposalCount: 0,
           precedentCount: 0,
-          discussionCount: 0
+          discussionCount: 0,
         });
       })
     );
@@ -1706,7 +1814,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryChallenges({}))).pipe(
       map(results => results.map(r => this.transformHolochainChallenge(r.challenge))),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load challenges:', err);
         return of([]);
       })
@@ -1721,12 +1829,16 @@ export class DataLoaderService {
       return of([]);
     }
 
-    return defer(() => from(this.holochainContent.queryChallenges({
-      entityType: entityType,
-      entityId: entityId
-    }))).pipe(
+    return defer(() =>
+      from(
+        this.holochainContent.queryChallenges({
+          entityType: entityType,
+          entityId: entityId,
+        })
+      )
+    ).pipe(
       map(results => results.map(r => this.transformHolochainChallenge(r.challenge))),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load challenges for entity:', err);
         return of([]);
       })
@@ -1761,7 +1873,7 @@ export class DataLoaderService {
       challenger: {
         agentId: hcChallenge.challengerId,
         displayName: hcChallenge.challengerName,
-        standing: hcChallenge.challengerStanding
+        standing: hcChallenge.challengerStanding,
       },
       grounds: hcChallenge.grounds,
       description: hcChallenge.description,
@@ -1769,7 +1881,7 @@ export class DataLoaderService {
       filedAt: hcChallenge.filedAt,
       slaDeadline: hcChallenge.slaDeadline ?? undefined,
       assignedElohim: hcChallenge.assignedElohim ?? undefined,
-      resolution
+      resolution,
     };
   }
 
@@ -1783,7 +1895,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryProposals({}))).pipe(
       map(results => results.map(r => this.transformHolochainProposal(r.proposal))),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load proposals:', err);
         return of([]);
       })
@@ -1800,7 +1912,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryProposals({ status }))).pipe(
       map(results => results.map(r => this.transformHolochainProposal(r.proposal))),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load proposals by status:', err);
         return of([]);
       })
@@ -1835,14 +1947,14 @@ export class DataLoaderService {
       description: hcProposal.description,
       proposer: {
         agentId: hcProposal.proposerId,
-        displayName: hcProposal.proposerName
+        displayName: hcProposal.proposerName,
       },
       status: hcProposal.status,
       phase: hcProposal.phase,
       createdAt: hcProposal.createdAt,
       votingConfig,
       currentVotes,
-      outcome
+      outcome,
     };
   }
 
@@ -1856,7 +1968,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryPrecedents({}))).pipe(
       map(results => results.map(r => this.transformHolochainPrecedent(r.precedent))),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load precedents:', err);
         return of([]);
       })
@@ -1873,7 +1985,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryPrecedents({ binding }))).pipe(
       map(results => results.map(r => this.transformHolochainPrecedent(r.precedent))),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load precedents by binding:', err);
         return of([]);
       })
@@ -1903,7 +2015,7 @@ export class DataLoaderService {
       binding: hcPrecedent.binding,
       scope,
       citations: hcPrecedent.citations,
-      status: hcPrecedent.status
+      status: hcPrecedent.status,
     };
   }
 
@@ -1917,7 +2029,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryDiscussions({}))).pipe(
       map(results => results.map(r => this.transformHolochainDiscussion(r.discussion))),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load discussions:', err);
         return of([]);
       })
@@ -1932,12 +2044,16 @@ export class DataLoaderService {
       return of([]);
     }
 
-    return defer(() => from(this.holochainContent.queryDiscussions({
-      entityType: entityType,
-      entityId: entityId
-    }))).pipe(
+    return defer(() =>
+      from(
+        this.holochainContent.queryDiscussions({
+          entityType: entityType,
+          entityId: entityId,
+        })
+      )
+    ).pipe(
       map(results => results.map(r => this.transformHolochainDiscussion(r.discussion))),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[DataLoader] Failed to load discussions for entity:', err);
         return of([]);
       })
@@ -1957,7 +2073,9 @@ export class DataLoaderService {
     status: string;
     messageCount: number;
   }): DiscussionRecord {
-    const messages = (Array.isArray(hcDiscussion.messages) ? hcDiscussion.messages : []) as DiscussionRecord['messages'];
+    const messages = (
+      Array.isArray(hcDiscussion.messages) ? hcDiscussion.messages : []
+    ) as DiscussionRecord['messages'];
 
     return {
       id: hcDiscussion.id,
@@ -1967,24 +2085,33 @@ export class DataLoaderService {
       title: hcDiscussion.title,
       messages,
       status: hcDiscussion.status,
-      messageCount: hcDiscussion.messageCount
+      messageCount: hcDiscussion.messageCount,
     };
   }
 
   /**
    * Load governance state for a specific entity from Holochain.
    */
-  getGovernanceState(entityType: string, entityId: string): Observable<GovernanceStateRecord | null> {
+  getGovernanceState(
+    entityType: string,
+    entityId: string
+  ): Observable<GovernanceStateRecord | null> {
     if (!this.holochainContent.isAvailable()) {
       return of(null);
     }
 
-    return defer(() => from(this.holochainContent.getGovernanceState({
-      entityType: entityType,
-      entityId: entityId
-    }))).pipe(
-      map(result => result ? this.transformHolochainGovernanceState(result.governanceState) : null),
-      catchError((err) => {
+    return defer(() =>
+      from(
+        this.holochainContent.getGovernanceState({
+          entityType: entityType,
+          entityId: entityId,
+        })
+      )
+    ).pipe(
+      map(result =>
+        result ? this.transformHolochainGovernanceState(result.governanceState) : null
+      ),
+      catchError(err => {
         console.warn('[DataLoader] Failed to load governance state:', err);
         return of(null);
       })
@@ -2008,10 +2135,14 @@ export class DataLoaderService {
       reasoning: '',
       deciderId: '',
       deciderType: '',
-      decidedAt: ''
+      decidedAt: '',
     }) as GovernanceStateRecord['statusBasis'];
-    const labels = (Array.isArray(hcState.labels) ? hcState.labels : []) as GovernanceStateRecord['labels'];
-    const activeChallenges = (Array.isArray(hcState.activeChallenges) ? hcState.activeChallenges : []) as string[];
+    const labels = (
+      Array.isArray(hcState.labels) ? hcState.labels : []
+    ) as GovernanceStateRecord['labels'];
+    const activeChallenges = (
+      Array.isArray(hcState.activeChallenges) ? hcState.activeChallenges : []
+    ) as string[];
 
     return {
       entityType: hcState.entityType,
@@ -2020,7 +2151,7 @@ export class DataLoaderService {
       statusBasis,
       labels,
       activeChallenges,
-      lastUpdated: hcState.lastUpdated
+      lastUpdated: hcState.lastUpdated,
     };
   }
 
@@ -2076,15 +2207,13 @@ export class DataLoaderService {
         clusterId: '',
         outgoingByCluster: new Map(),
         incomingByCluster: new Map(),
-        totalConnections: 0
+        totalConnections: 0,
       });
     }
 
     // Query relationships for all concepts in the cluster
     const relationshipQueries = conceptIds.map(id =>
-      this.getRelationshipsForNode(id, 'both').pipe(
-        catchError(() => of([]))
-      )
+      this.getRelationshipsForNode(id, 'both').pipe(catchError(() => of([])))
     );
 
     return forkJoin(relationshipQueries).pipe(
@@ -2103,16 +2232,16 @@ export class DataLoaderService {
 
             // Look up which cluster the other node belongs to
             const otherClusterId = clusterMapping.get(otherNodeId);
-            if (!otherClusterId) continue;  // Skip nodes not in our cluster mapping
+            if (!otherClusterId) continue; // Skip nodes not in our cluster mapping
 
             const targetMap = isOutgoing ? outgoingByCluster : incomingByCluster;
 
             if (!targetMap.has(otherClusterId)) {
               targetMap.set(otherClusterId, {
-                sourceClusterId: '',  // Will be set by caller
+                sourceClusterId: '', // Will be set by caller
                 targetClusterId: otherClusterId,
                 connectionCount: 0,
-                relationshipTypes: []
+                relationshipTypes: [],
               });
             }
 
@@ -2127,10 +2256,10 @@ export class DataLoaderService {
         }
 
         return {
-          clusterId: '',  // Caller sets this
+          clusterId: '', // Caller sets this
           outgoingByCluster,
           incomingByCluster,
-          totalConnections
+          totalConnections,
         };
       })
     );

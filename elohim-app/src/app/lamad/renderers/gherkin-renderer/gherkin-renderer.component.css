@@ -3,7 +3,10 @@
    ============================================================================= */
 
 .gherkin-container {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
   padding: 1rem;
   max-width: 900px;
   margin: 0 auto;
@@ -188,12 +191,24 @@
 }
 
 /* Keyword colors */
-.keyword-given { color: #2563eb; }  /* Blue */
-.keyword-when { color: #7c3aed; }   /* Purple */
-.keyword-then { color: #059669; }   /* Green */
-.keyword-and { color: #64748b; }    /* Gray */
-.keyword-but { color: #dc2626; }    /* Red */
-.keyword-\* { color: #64748b; }     /* Gray for * */
+.keyword-given {
+  color: #2563eb;
+} /* Blue */
+.keyword-when {
+  color: #7c3aed;
+} /* Purple */
+.keyword-then {
+  color: #059669;
+} /* Green */
+.keyword-and {
+  color: #64748b;
+} /* Gray */
+.keyword-but {
+  color: #dc2626;
+} /* Red */
+.keyword-\* {
+  color: #64748b;
+} /* Gray for * */
 
 .step-text {
   color: var(--lamad-text-primary, #374151);

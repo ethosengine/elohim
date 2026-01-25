@@ -1,12 +1,10 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
+
 import { tap } from 'rxjs/operators';
 
-// Services
-import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
-import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 
-// Models
+// Services
 import {
   HumanConsent,
   IntimacyLevel,
@@ -17,6 +15,11 @@ import {
   canElevate,
 } from '@app/elohim/models/human-consent.model';
 import { HumanConsentContent } from '@app/elohim/models/source-chain.model';
+import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+
+// Models
+
 import type { LearningPath, PathVisibility } from '@app/lamad/models/learning-path.model';
 
 /**
@@ -120,9 +123,7 @@ export class HumanConsentService {
       note
     );
 
-    return of(consent).pipe(
-      tap(c => this.saveConsent(c))
-    );
+    return of(consent).pipe(tap(c => this.saveConsent(c)));
   }
 
   /**
@@ -160,9 +161,7 @@ export class HumanConsentService {
       message
     );
 
-    return of(consent).pipe(
-      tap(c => this.saveConsent(c))
-    );
+    return of(consent).pipe(tap(c => this.saveConsent(c)));
   }
 
   /**
@@ -184,9 +183,7 @@ export class HumanConsentService {
     }
 
     const updatedConsent = this.updateConsentState(consent, 'accepted');
-    return of(updatedConsent).pipe(
-      tap(c => this.saveConsent(c))
-    );
+    return of(updatedConsent).pipe(tap(c => this.saveConsent(c)));
   }
 
   /**
@@ -210,9 +207,7 @@ export class HumanConsentService {
     const updatedConsent = this.updateConsentState(consent, 'declined');
     updatedConsent.responseMessage = reason;
 
-    return of(undefined).pipe(
-      tap(() => this.saveConsent(updatedConsent))
-    );
+    return of(undefined).pipe(tap(() => this.saveConsent(updatedConsent)));
   }
 
   /**
@@ -237,9 +232,7 @@ export class HumanConsentService {
     const updatedConsent = this.updateConsentState(consent, 'revoked');
     updatedConsent.responseMessage = reason;
 
-    return of(undefined).pipe(
-      tap(() => this.saveConsent(updatedConsent))
-    );
+    return of(undefined).pipe(tap(() => this.saveConsent(updatedConsent)));
   }
 
   /**
@@ -290,9 +283,7 @@ export class HumanConsentService {
       ],
     };
 
-    return of(updatedConsent).pipe(
-      tap(c => this.saveConsent(c))
-    );
+    return of(updatedConsent).pipe(tap(c => this.saveConsent(c)));
   }
 
   // =========================================================================
@@ -429,11 +420,13 @@ export class HumanConsentService {
 
   private findConsentWith(humanId: string): HumanConsent | null {
     const currentAgentId = this.getCurrentAgentId();
-    return this.consentsSubject.value.find(
-      c =>
-        (c.initiatorId === currentAgentId && c.participantId === humanId) ||
-        (c.initiatorId === humanId && c.participantId === currentAgentId)
-    ) ?? null;
+    return (
+      this.consentsSubject.value.find(
+        c =>
+          (c.initiatorId === currentAgentId && c.participantId === humanId) ||
+          (c.initiatorId === humanId && c.participantId === currentAgentId)
+      ) ?? null
+    );
   }
 
   private findConsentById(consentId: string): HumanConsent | null {
@@ -489,8 +482,7 @@ export class HumanConsentService {
           fromState: consent.consentState,
           toState: newState,
           timestamp: now,
-          initiatedBy:
-            consent.initiatorId === currentAgentId ? 'initiator' : 'participant',
+          initiatedBy: consent.initiatorId === currentAgentId ? 'initiator' : 'participant',
         },
       ],
     };

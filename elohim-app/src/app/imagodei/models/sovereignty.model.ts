@@ -178,8 +178,7 @@ export const SOVEREIGNTY_STAGES: Record<SovereigntyStage, SovereigntyStageInfo> 
     stage: 'app-user',
     label: 'App User',
     tagline: 'Keys on your device',
-    description:
-      'Your identity lives on your device. You control your keys. Syncs when connected.',
+    description: 'Your identity lives on your device. You control your keys. Syncs when connected.',
     icon: 'smartphone',
     benefits: [
       'You control your keys',
@@ -187,11 +186,7 @@ export const SOVEREIGNTY_STAGES: Record<SovereigntyStage, SovereigntyStageInfo> 
       'Works offline',
       'True data ownership',
     ],
-    limitations: [
-      'Must keep device secure',
-      'Syncs only when online',
-      'Requires app installation',
-    ],
+    limitations: ['Must keep device secure', 'Syncs only when online', 'Requires app installation'],
     order: 3,
   },
 
@@ -222,7 +217,7 @@ export const SOVEREIGNTY_STAGES: Record<SovereigntyStage, SovereigntyStageInfo> 
  */
 export function getNextStage(current: SovereigntyStage): SovereigntyStage | null {
   const order = SOVEREIGNTY_STAGES[current].order;
-  const next = Object.values(SOVEREIGNTY_STAGES).find((s) => s.order === order + 1);
+  const next = Object.values(SOVEREIGNTY_STAGES).find(s => s.order === order + 1);
   return next?.stage ?? null;
 }
 

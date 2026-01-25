@@ -15,6 +15,7 @@
  */
 
 import { Injectable } from '@angular/core';
+
 import { ContentNode } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
 
@@ -24,9 +25,9 @@ import { LearningPath } from '../../lamad/models/learning-path.model';
 
 interface CacheEntry<T> {
   data: T;
-  cachedAt: number;       // Unix timestamp
-  expiresAt: number;      // Unix timestamp
-  version: number;        // Schema version for invalidation
+  cachedAt: number; // Unix timestamp
+  expiresAt: number; // Unix timestamp
+  version: number; // Schema version for invalidation
 }
 
 interface CacheMetadata {
@@ -52,8 +53,8 @@ const STORES = {
 
 /** Cache TTL in milliseconds */
 const CACHE_TTL = {
-  CONTENT: 24 * 60 * 60 * 1000,  // 24 hours for content
-  PATHS: 12 * 60 * 60 * 1000,    // 12 hours for paths
+  CONTENT: 24 * 60 * 60 * 1000, // 24 hours for content
+  PATHS: 12 * 60 * 60 * 1000, // 12 hours for paths
 } as const;
 
 /** Current schema version - increment to invalidate all cached data */
@@ -67,7 +68,7 @@ const CLEANUP_INTERVAL = 100;
 // =============================================================================
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class IndexedDBCacheService {
   private db: IDBDatabase | null = null;
@@ -359,7 +360,7 @@ export class IndexedDBCacheService {
    * Open/create the IndexedDB database.
    */
   private async openDatabase(): Promise<boolean> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       if (!('indexedDB' in window)) {
         console.warn('[IndexedDBCache] IndexedDB not supported');
         resolve(false);
@@ -379,7 +380,7 @@ export class IndexedDBCacheService {
         resolve(true);
       };
 
-      request.onupgradeneeded = (event) => {
+      request.onupgradeneeded = event => {
         const db = (event.target as IDBOpenDBRequest).result;
 
         // Create content store
@@ -566,7 +567,7 @@ export class IndexedDBCacheService {
   private async cleanupStore(storeName: string): Promise<number> {
     if (!this.db) return 0;
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const tx = this.db!.transaction(storeName, 'readwrite');
       const store = tx.objectStore(storeName);
       const now = Date.now();
@@ -574,7 +575,7 @@ export class IndexedDBCacheService {
 
       const request = store.openCursor();
 
-      request.onsuccess = (event) => {
+      request.onsuccess = event => {
         const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
         if (cursor) {
           const entry = cursor.value as CacheEntry<unknown>;

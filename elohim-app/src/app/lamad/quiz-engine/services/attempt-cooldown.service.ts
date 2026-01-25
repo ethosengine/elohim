@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
+
 import { BehaviorSubject, Observable, interval, map, startWith } from 'rxjs';
+
 import {
   AttemptRecord,
   AttemptCheckResult,
@@ -13,8 +15,9 @@ import {
   getRemainingAttempts,
   serializeAttemptRecord,
   deserializeAttemptRecord,
-  getAttemptRecordKey
+  getAttemptRecordKey,
 } from '../models/attempt-record.model';
+
 import type { QuizResult } from '../models/quiz-session.model';
 
 /**
@@ -52,7 +55,7 @@ import type { QuizResult } from '../models/quiz-session.model';
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AttemptCooldownService {
   /** Active attempt records by key */
@@ -317,7 +320,7 @@ export class AttemptCooldownService {
     if (record) {
       const updated: AttemptRecord = {
         ...record,
-        cooldownEndsAt: null
+        cooldownEndsAt: null,
       };
       this.setRecord(contentId, humanId, updated);
     }
@@ -331,10 +334,7 @@ export class AttemptCooldownService {
    * Get cooldown status for multiple content nodes.
    * Useful for displaying in path navigator.
    */
-  getBulkCooldownStatus(
-    contentIds: string[],
-    humanId: string
-  ): Map<string, CooldownStatus> {
+  getBulkCooldownStatus(contentIds: string[], humanId: string): Map<string, CooldownStatus> {
     const results = new Map<string, CooldownStatus>();
 
     for (const contentId of contentIds) {
@@ -347,10 +347,7 @@ export class AttemptCooldownService {
   /**
    * Check which content nodes are mastered.
    */
-  getBulkMasteryStatus(
-    contentIds: string[],
-    humanId: string
-  ): Map<string, boolean> {
+  getBulkMasteryStatus(contentIds: string[], humanId: string): Map<string, boolean> {
     const results = new Map<string, boolean>();
 
     for (const contentId of contentIds) {

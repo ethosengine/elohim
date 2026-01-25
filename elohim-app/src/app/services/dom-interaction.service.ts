@@ -4,7 +4,7 @@ import { Injectable, ElementRef, Renderer2, RendererFactory2 } from '@angular/co
  * Service for common DOM interaction patterns
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class DomInteractionService {
   private readonly renderer: Renderer2;
@@ -24,7 +24,7 @@ export class DomInteractionService {
         this.renderer.listen(scrollIndicator, 'click', () => {
           window.scrollTo({
             top: window.innerHeight,
-            behavior: 'smooth'
+            behavior: 'smooth',
           });
         });
       }

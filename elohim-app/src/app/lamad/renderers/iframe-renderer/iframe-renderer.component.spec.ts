@@ -17,10 +17,13 @@ describe('IframeRendererComponent', () => {
     content: url,
     tags: ['iframe'],
     relatedNodeIds: [],
-    metadata
+    metadata,
   });
 
-  const createHtml5AppNode = (content: Html5AppContent, metadata: Record<string, unknown> = {}): ContentNode => ({
+  const createHtml5AppNode = (
+    content: Html5AppContent,
+    metadata: Record<string, unknown> = {}
+  ): ContentNode => ({
     id: 'test-html5-app',
     title: 'Test HTML5 App',
     description: 'Test HTML5 app content',
@@ -29,12 +32,12 @@ describe('IframeRendererComponent', () => {
     content,
     tags: ['html5-app', 'interactive'],
     relatedNodeIds: [],
-    metadata
+    metadata,
   });
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [IframeRendererComponent]
+      imports: [IframeRendererComponent],
     }).compileComponents();
 
     fixture = TestBed.createComponent(IframeRendererComponent);
@@ -49,7 +52,7 @@ describe('IframeRendererComponent', () => {
     it('should set safe URL from content', () => {
       component.node = createContentNode('https://example.com/embed');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.safeUrl).toBeTruthy();
@@ -58,7 +61,7 @@ describe('IframeRendererComponent', () => {
     it('should handle empty URL with error message', () => {
       component.node = createContentNode('');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       // Empty URL results in error, not a safeUrl
@@ -72,7 +75,7 @@ describe('IframeRendererComponent', () => {
       (node as any).content = { invalid: 'object' };
       component.node = node;
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       // Invalid content (not Html5AppContent or URL string) results in error
@@ -92,7 +95,9 @@ describe('IframeRendererComponent', () => {
 
       const iframe = fixture.nativeElement.querySelector('iframe');
       // Static sandbox policy for security (Angular doesn't allow dynamic sandbox)
-      expect(iframe.getAttribute('sandbox')).toBe('allow-scripts allow-same-origin allow-forms allow-popups');
+      expect(iframe.getAttribute('sandbox')).toBe(
+        'allow-scripts allow-same-origin allow-forms allow-popups'
+      );
     }));
   });
 
@@ -151,14 +156,14 @@ describe('IframeRendererComponent', () => {
     it('should reconfigure when node changes', () => {
       component.node = createContentNode('https://first.com');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       const firstUrl = component.safeUrl;
 
       component.node = createContentNode('https://second.com');
       component.ngOnChanges({
-        node: new SimpleChange(createContentNode('https://first.com'), component.node, false)
+        node: new SimpleChange(createContentNode('https://first.com'), component.node, false),
       });
 
       expect(component.safeUrl).not.toBe(firstUrl);
@@ -169,7 +174,7 @@ describe('IframeRendererComponent', () => {
     it('should handle YouTube embed URLs', () => {
       component.node = createContentNode('https://www.youtube.com/embed/dQw4w9WgXcQ');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.safeUrl).toBeTruthy();
@@ -180,7 +185,7 @@ describe('IframeRendererComponent', () => {
     it('should handle Vimeo embed URLs', () => {
       component.node = createContentNode('https://player.vimeo.com/video/123456789');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.safeUrl).toBeTruthy();
@@ -191,7 +196,7 @@ describe('IframeRendererComponent', () => {
     it('should bypass security for trusted URLs', () => {
       component.node = createContentNode('https://trusted-domain.com/embed');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       // The safeUrl should be a SafeResourceUrl type, not a plain string
@@ -204,10 +209,10 @@ describe('IframeRendererComponent', () => {
     it('should handle Html5AppContent structure', () => {
       component.node = createHtml5AppNode({
         appId: 'evolution-of-trust',
-        entryPoint: 'index.html'
+        entryPoint: 'index.html',
       });
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.safeUrl).toBeTruthy();
@@ -217,10 +222,10 @@ describe('IframeRendererComponent', () => {
       component.node = createHtml5AppNode({
         appId: 'evolution-of-trust',
         entryPoint: 'index.html',
-        fallbackUrl: 'https://ncase.me/trust/'
+        fallbackUrl: 'https://ncase.me/trust/',
       });
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.fallbackUrl).toBe('https://ncase.me/trust/');
@@ -237,7 +242,9 @@ describe('IframeRendererComponent', () => {
       tick();
 
       const iframe = fixture.nativeElement.querySelector('iframe');
-      expect(iframe.getAttribute('sandbox')).toBe('allow-scripts allow-same-origin allow-forms allow-popups');
+      expect(iframe.getAttribute('sandbox')).toBe(
+        'allow-scripts allow-same-origin allow-forms allow-popups'
+      );
     }));
   });
 
@@ -245,7 +252,7 @@ describe('IframeRendererComponent', () => {
     it('should start in loading state', () => {
       component.node = createContentNode('https://example.com');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.loading).toBeTrue();
@@ -254,7 +261,7 @@ describe('IframeRendererComponent', () => {
     it('should exit loading state on iframe load', () => {
       component.node = createContentNode('https://example.com');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       component.onIframeLoad();
@@ -265,14 +272,14 @@ describe('IframeRendererComponent', () => {
     it('should reset loading state when node changes', () => {
       component.node = createContentNode('https://first.com');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       component.onIframeLoad();
       expect(component.loading).toBeFalse();
 
       component.node = createContentNode('https://second.com');
       component.ngOnChanges({
-        node: new SimpleChange(createContentNode('https://first.com'), component.node, false)
+        node: new SimpleChange(createContentNode('https://first.com'), component.node, false),
       });
 
       expect(component.loading).toBeTrue();
@@ -283,7 +290,7 @@ describe('IframeRendererComponent', () => {
     it('should set error message on iframe error', () => {
       component.node = createContentNode('https://example.com');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       component.onIframeError();
@@ -295,14 +302,14 @@ describe('IframeRendererComponent', () => {
     it('should clear error message when node changes', () => {
       component.node = createContentNode('https://first.com');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       component.onIframeError();
       expect(component.errorMessage).toBeTruthy();
 
       component.node = createContentNode('https://second.com');
       component.ngOnChanges({
-        node: new SimpleChange(createContentNode('https://first.com'), component.node, false)
+        node: new SimpleChange(createContentNode('https://first.com'), component.node, false),
       });
 
       expect(component.errorMessage).toBeNull();

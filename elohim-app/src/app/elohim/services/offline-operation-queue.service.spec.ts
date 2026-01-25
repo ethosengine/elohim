@@ -157,7 +157,7 @@ describe('OfflineOperationQueueService', () => {
       mockHolochainClient.isConnected.and.returnValue(true);
 
       service.enqueue({
-        type: 'write',  // No zomeName/fnName
+        type: 'write', // No zomeName/fnName
       });
 
       const result = await service.syncAll();

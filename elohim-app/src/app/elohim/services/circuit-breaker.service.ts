@@ -25,6 +25,7 @@
  */
 
 import { Injectable, inject, signal, computed } from '@angular/core';
+
 import { LoggerService } from './logger.service';
 
 // =============================================================================
@@ -63,8 +64,8 @@ export interface CircuitBreakerResult<T> {
 /** Internal circuit state */
 interface CircuitInstance {
   state: CircuitState;
-  failures: number[];  // Timestamps of failures
-  successes: number;   // Consecutive successes in half-open state
+  failures: number[]; // Timestamps of failures
+  successes: number; // Consecutive successes in half-open state
   lastFailure: number | null;
   lastStateChange: number;
   config: CircuitBreakerConfig;
@@ -76,7 +77,7 @@ interface CircuitInstance {
 
 const DEFAULT_CONFIG: CircuitBreakerConfig = {
   failureThreshold: 5,
-  resetTimeoutMs: 30000,  // 30 seconds
+  resetTimeoutMs: 30000, // 30 seconds
   successThreshold: 3,
   failureWindowMs: 60000, // 1 minute
 };
@@ -209,9 +210,7 @@ export class CircuitBreakerService {
       state: circuit.state,
       recentFailures: circuit.failures.length,
       consecutiveSuccesses: circuit.successes,
-      timeSinceLastFailure: circuit.lastFailure
-        ? Date.now() - circuit.lastFailure
-        : null,
+      timeSinceLastFailure: circuit.lastFailure ? Date.now() - circuit.lastFailure : null,
       timeSinceStateChange: Date.now() - circuit.lastStateChange,
     };
   }
@@ -265,7 +264,7 @@ export class CircuitBreakerService {
     const now = Date.now();
     circuit.lastFailure = now;
     circuit.failures.push(now);
-    circuit.successes = 0;  // Reset success counter
+    circuit.successes = 0; // Reset success counter
 
     // Clean old failures outside the window
     this.cleanOldFailures(circuit);
@@ -300,11 +299,7 @@ export class CircuitBreakerService {
     }
   }
 
-  private transitionTo(
-    name: string,
-    circuit: CircuitInstance,
-    newState: CircuitState
-  ): void {
+  private transitionTo(name: string, circuit: CircuitInstance, newState: CircuitState): void {
     const oldState = circuit.state;
     circuit.state = newState;
     circuit.lastStateChange = Date.now();

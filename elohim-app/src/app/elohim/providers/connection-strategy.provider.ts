@@ -19,11 +19,8 @@
  * @packageDocumentation
  */
 
-import { InjectionToken, Provider, inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-
-import { environment } from '../../../environments/environment';
-import type { ConnectionMode } from '../../../environments/environment.types';
+import { InjectionToken, Provider, inject, PLATFORM_ID } from '@angular/core';
 
 import {
   type IConnectionStrategy,
@@ -32,6 +29,10 @@ import {
   DirectConnectionStrategy,
 } from '@elohim/service/connection';
 
+import { environment } from '../../../environments/environment';
+
+import type { ConnectionMode } from '../../../environments/environment.types';
+
 /**
  * Injection token for the connection strategy.
  *
@@ -39,23 +40,20 @@ import {
  * 1. Environment configuration (connectionMode)
  * 2. Runtime detection (Tauri, Node.js, browser)
  */
-export const CONNECTION_STRATEGY = new InjectionToken<IConnectionStrategy>(
-  'ConnectionStrategy',
-  {
-    providedIn: 'root',
-    factory: () => {
-      // Get connection mode from environment config
-      const mode: ConnectionMode = environment.holochain?.connectionMode ?? 'auto';
+export const CONNECTION_STRATEGY = new InjectionToken<IConnectionStrategy>('ConnectionStrategy', {
+  providedIn: 'root',
+  factory: () => {
+    // Get connection mode from environment config
+    const mode: ConnectionMode = environment.holochain?.connectionMode ?? 'auto';
 
-      // Create strategy based on mode
-      const strategy = createConnectionStrategy(mode);
+    // Create strategy based on mode
+    const strategy = createConnectionStrategy(mode);
 
-      console.log(`[CONNECTION_STRATEGY] Created ${strategy.name} strategy (mode: ${mode})`);
+    console.log(`[CONNECTION_STRATEGY] Created ${strategy.name} strategy (mode: ${mode})`);
 
-      return strategy;
-    },
-  }
-);
+    return strategy;
+  },
+});
 
 /**
  * Provider for explicit strategy injection (e.g., in tests).

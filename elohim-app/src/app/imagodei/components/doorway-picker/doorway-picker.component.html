@@ -6,11 +6,7 @@
 
     <!-- Quick Action: Auto-select best -->
     @if (recommendedDoorway() && !selectedId()) {
-      <button
-        type="button"
-        class="quick-connect-btn"
-        (click)="selectRecommended()"
-      >
+      <button type="button" class="quick-connect-btn" (click)="selectRecommended()">
         <span class="material-icons">bolt</span>
         Quick Connect to Best Gateway
       </button>
@@ -59,11 +55,7 @@
     <!-- Sort Options -->
     <div class="sort-filter">
       <label class="filter-label">Sort:</label>
-      <select
-        class="sort-select"
-        [ngModel]="sortBy()"
-        (ngModelChange)="sortBy.set($event)"
-      >
+      <select class="sort-select" [ngModel]="sortBy()" (ngModelChange)="sortBy.set($event)">
         <option value="recommended">Recommended</option>
         <option value="latency">Fastest</option>
         <option value="users">Most Popular</option>
@@ -107,9 +99,7 @@
   @if (showCustomInput()) {
     <div class="custom-doorway">
       <div class="custom-input-wrapper">
-        <label for="custom-url" class="custom-label">
-          Enter a doorway URL
-        </label>
+        <label for="custom-url" class="custom-label">Enter a doorway URL</label>
         <input
           id="custom-url"
           type="url"
@@ -162,8 +152,13 @@
           }
 
           <!-- Status Badge -->
-          <div class="status-badge" [style.backgroundColor]="getStatusDisplay(doorway.status).color">
-            <span class="material-icons status-icon">{{ getStatusDisplay(doorway.status).icon }}</span>
+          <div
+            class="status-badge"
+            [style.backgroundColor]="getStatusDisplay(doorway.status).color"
+          >
+            <span class="material-icons status-icon">
+              {{ getStatusDisplay(doorway.status).icon }}
+            </span>
           </div>
 
           <!-- Doorway Info -->
@@ -235,7 +230,11 @@
         <div class="empty-state">
           <span class="material-icons">dns</span>
           <p>No doorways match your search</p>
-          <button type="button" class="clear-filters" (click)="searchQuery.set(''); selectedRegion.set('all')">
+          <button
+            type="button"
+            class="clear-filters"
+            (click)="searchQuery.set(''); selectedRegion.set('all')"
+          >
             Clear filters
           </button>
         </div>
@@ -262,9 +261,7 @@
         <span class="material-icons">arrow_forward</span>
       </button>
     } @else {
-      <button type="button" class="cancel-btn" (click)="cancel()">
-        Cancel
-      </button>
+      <button type="button" class="cancel-btn" (click)="cancel()">Cancel</button>
       <p class="footer-hint">
         <span class="material-icons">info</span>
         You can change your doorway later in settings

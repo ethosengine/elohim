@@ -1,10 +1,13 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
+
 import { map, switchMap, tap } from 'rxjs/operators';
+
+import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
 
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
 import { generateMapId } from '@app/elohim/utils';
+
 import {
   KnowledgeMap,
   KnowledgeMapType,
@@ -16,7 +19,7 @@ import {
   PersonKnowledgeMap,
   CollectiveKnowledgeMap,
   SubjectConsent,
-  MasteryLevel
+  MasteryLevel,
 } from '../models/knowledge-map.model';
 
 /**
@@ -39,7 +42,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class KnowledgeMapService {
   // In-memory map storage (prototype - production uses Holochain)
-  private readonly maps: Map<string, KnowledgeMap> = new Map();
+  private readonly maps = new Map<string, KnowledgeMap>();
   private mapIndex: KnowledgeMapIndex | null = null;
 
   // Current agent's maps
@@ -80,7 +83,7 @@ export class KnowledgeMapService {
     const index: KnowledgeMapIndex = {
       lastUpdated: new Date().toISOString(),
       totalCount: entries.length,
-      maps: entries
+      maps: entries,
     };
 
     this.mapIndex = index;
@@ -101,9 +104,7 @@ export class KnowledgeMapService {
    * Get maps of a specific type.
    */
   getMapsByType(mapType: KnowledgeMapType): Observable<KnowledgeMapIndexEntry[]> {
-    return this.getMapIndex().pipe(
-      map(index => index.maps.filter(m => m.mapType === mapType))
-    );
+    return this.getMapIndex().pipe(map(index => index.maps.filter(m => m.mapType === mapType)));
   }
 
   /**
@@ -119,7 +120,7 @@ export class KnowledgeMapService {
     if (!this.canView(m)) {
       return throwError(() => ({
         code: 'UNAUTHORIZED',
-        message: 'You do not have permission to view this map'
+        message: 'You do not have permission to view this map',
       }));
     }
 
@@ -190,7 +191,7 @@ export class KnowledgeMapService {
       subject: {
         type: 'content-graph',
         subjectId: params.contentGraphId,
-        subjectName: params.title
+        subjectName: params.title,
       },
       ownerId: this.currentAgentId,
       title: params.title,
@@ -202,7 +203,7 @@ export class KnowledgeMapService {
       contentGraphId: params.contentGraphId,
       masteryLevels: new Map(),
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     this.maps.set(mapId, newMap);
@@ -232,7 +233,7 @@ export class KnowledgeMapService {
       subject: {
         type: 'agent',
         subjectId: params.subjectAgentId,
-        subjectName: params.subjectName
+        subjectName: params.subjectName,
       },
       ownerId: this.currentAgentId,
       title: params.title,
@@ -244,7 +245,7 @@ export class KnowledgeMapService {
       relationshipType: params.relationshipType,
       categories: [],
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     this.maps.set(mapId, newMap);
@@ -274,7 +275,7 @@ export class KnowledgeMapService {
       subject: {
         type: 'organization',
         subjectId: params.organizationId,
-        subjectName: params.organizationName
+        subjectName: params.organizationName,
       },
       ownerId: this.currentAgentId,
       title: params.title,
@@ -283,20 +284,22 @@ export class KnowledgeMapService {
       nodes: [],
       pathIds: [],
       overallAffinity: 0,
-      members: [{
-        agentId: this.currentAgentId,
-        role: 'steward',
-        joinedAt: now,
-        contributionCount: 0
-      }],
+      members: [
+        {
+          agentId: this.currentAgentId,
+          role: 'steward',
+          joinedAt: now,
+          contributionCount: 0,
+        },
+      ],
       governance: params.governance ?? {
         approvalModel: 'steward-only',
-        membershipControl: 'steward-only'
+        membershipControl: 'steward-only',
       },
       domains: [],
       collectiveAttestations: [],
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     this.maps.set(mapId, newMap);
@@ -325,7 +328,7 @@ export class KnowledgeMapService {
 
         const newNode: KnowledgeNode = {
           ...node,
-          id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 11)}` // NOSONAR - Non-cryptographic node ID generation
+          id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`, // NOSONAR - Non-cryptographic node ID generation
         };
 
         m.nodes.push(newNode);
@@ -341,7 +344,11 @@ export class KnowledgeMapService {
   /**
    * Update a knowledge node.
    */
-  updateNode(mapId: string, nodeId: string, updates: Partial<KnowledgeNode>): Observable<KnowledgeNode> {
+  updateNode(
+    mapId: string,
+    nodeId: string,
+    updates: Partial<KnowledgeNode>
+  ): Observable<KnowledgeNode> {
     return this.getMap(mapId).pipe(
       switchMap(m => {
         if (!m) {
@@ -450,7 +457,7 @@ export class KnowledgeMapService {
         if (m.subject.subjectId !== this.currentAgentId) {
           return throwError(() => ({
             code: 'UNAUTHORIZED',
-            message: 'Only the subject can grant consent'
+            message: 'Only the subject can grant consent',
           }));
         }
 
@@ -488,11 +495,11 @@ export class KnowledgeMapService {
             type: 'knowledge-map-synthesis',
             mapId,
             subjectType: m.mapType,
-            subjectId: m.subject.subjectId
+            subjectId: m.subject.subjectId,
           },
           requesterId: this.currentAgentId,
           priority: 'normal',
-          requestedAt: new Date().toISOString()
+          requestedAt: new Date().toISOString(),
         });
       }),
       map(response => {
@@ -529,7 +536,11 @@ export class KnowledgeMapService {
     if (m.mapType === 'person') {
       const pm = m as PersonKnowledgeMap;
       if (pm.visibility === 'mutual' && pm.subject.subjectId === this.currentAgentId) return true;
-      if (pm.subjectConsent?.transparencyLevel !== 'none' && pm.subject.subjectId === this.currentAgentId) return true;
+      if (
+        pm.subjectConsent?.transparencyLevel !== 'none' &&
+        pm.subject.subjectId === this.currentAgentId
+      )
+        return true;
     }
 
     // For collective maps, members can view
@@ -573,7 +584,7 @@ export class KnowledgeMapService {
       visibility: m.visibility,
       overallAffinity: m.overallAffinity,
       nodeCount: m.nodes.length,
-      updatedAt: m.updatedAt
+      updatedAt: m.updatedAt,
     };
   }
 
@@ -596,14 +607,14 @@ export class KnowledgeMapService {
    */
   private recalculateDomainAffinity(m: DomainKnowledgeMap): void {
     const masteryWeights: Record<MasteryLevel, number> = {
-      'not_started': 0,
-      'seen': 0.1,
-      'remember': 0.2,
-      'understand': 0.35,
-      'apply': 0.5,      // Attestation gate
-      'analyze': 0.7,
-      'evaluate': 0.85,
-      'create': 1.0
+      not_started: 0,
+      seen: 0.1,
+      remember: 0.2,
+      understand: 0.35,
+      apply: 0.5, // Attestation gate
+      analyze: 0.7,
+      evaluate: 0.85,
+      create: 1.0,
     };
 
     if (m.masteryLevels.size === 0) {
@@ -612,7 +623,7 @@ export class KnowledgeMapService {
     }
 
     let totalAffinity = 0;
-    m.masteryLevels.forEach((level) => {
+    m.masteryLevels.forEach(level => {
       totalAffinity += masteryWeights[level];
     });
 
@@ -648,15 +659,15 @@ export class KnowledgeMapService {
           content: 'Based on your learning patterns, consider exploring this related concept.',
           affinity: 0.5,
           tags: ['suggested', 'elohim-synthesis'],
-          relatedNodeIds: []
+          relatedNodeIds: [],
         },
         source: {
           type: 'inference',
           timestamp: new Date().toISOString(),
-          confidence: 0.75
+          confidence: 0.75,
         },
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     ];
   }
 
@@ -673,7 +684,7 @@ export class KnowledgeMapService {
       subject: {
         type: 'content-graph',
         subjectId: 'elohim-protocol-graph',
-        subjectName: 'The Elohim Protocol'
+        subjectName: 'The Elohim Protocol',
       },
       ownerId: 'demo-learner',
       title: 'My Elohim Protocol Journey',
@@ -687,17 +698,18 @@ export class KnowledgeMapService {
           content: 'Love as committed action, constitutional governance, decentralized identity',
           affinity: 0.8,
           relatedNodeIds: [],
-          tags: ['manifesto', 'principles']
+          tags: ['manifesto', 'principles'],
         },
         {
           id: 'node-elohim-agents',
           category: 'technical',
           title: 'Elohim Agent Architecture',
-          content: 'Autonomous AI agents bound to constitutional principles, operating at different layers',
+          content:
+            'Autonomous AI agents bound to constitutional principles, operating at different layers',
           affinity: 0.6,
           relatedNodeIds: ['node-manifesto-core'],
-          tags: ['elohim', 'agents', 'architecture']
-        }
+          tags: ['elohim', 'agents', 'architecture'],
+        },
       ],
       pathIds: ['elohim-protocol'],
       overallAffinity: 0.7,
@@ -705,10 +717,10 @@ export class KnowledgeMapService {
       masteryLevels: new Map([
         ['manifesto', 'apply'],
         ['governance-epic', 'understand'],
-        ['hardware-spec', 'not_started']
+        ['hardware-spec', 'not_started'],
       ]),
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     this.maps.set(domainMap.id, domainMap);
@@ -720,7 +732,7 @@ export class KnowledgeMapService {
       subject: {
         type: 'organization',
         subjectId: 'elohim-protocol-learners',
-        subjectName: 'Elohim Protocol Learners'
+        subjectName: 'Elohim Protocol Learners',
       },
       ownerId: 'steward-curriculum',
       title: 'Collective Learning Insights',
@@ -735,18 +747,18 @@ export class KnowledgeMapService {
           content: 'Frequently asked questions about implementing Elohim principles',
           affinity: 0.9,
           relatedNodeIds: [],
-          tags: ['faq', 'community', 'learning']
-        }
+          tags: ['faq', 'community', 'learning'],
+        },
       ],
       pathIds: [],
       overallAffinity: 0.85,
       members: [
         { agentId: 'steward-curriculum', role: 'steward', joinedAt: now, contributionCount: 15 },
-        { agentId: 'demo-learner', role: 'contributor', joinedAt: now, contributionCount: 2 }
+        { agentId: 'demo-learner', role: 'contributor', joinedAt: now, contributionCount: 2 },
       ],
       governance: {
         approvalModel: 'steward-only',
-        membershipControl: 'member-invite'
+        membershipControl: 'member-invite',
       },
       domains: [
         {
@@ -755,12 +767,12 @@ export class KnowledgeMapService {
           description: 'Collective understanding of governance principles',
           stewards: ['steward-governance'],
           nodes: [],
-          affinity: 0.8
-        }
+          affinity: 0.8,
+        },
       ],
       collectiveAttestations: [],
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     this.maps.set(collectiveMap.id, collectiveMap);

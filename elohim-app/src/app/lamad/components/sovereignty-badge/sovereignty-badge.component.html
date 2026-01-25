@@ -1,8 +1,14 @@
 <!-- Sovereignty Badge: At-a-Glance View -->
 <div class="sovereignty-section">
-  <div class="sovereignty-header" (click)="toggleExpand()" role="button" tabindex="0"
-       [attr.aria-expanded]="expanded()" (keydown.enter)="toggleExpand()" (keydown.space)="toggleExpand()">
-
+  <div
+    class="sovereignty-header"
+    (click)="toggleExpand()"
+    role="button"
+    tabindex="0"
+    [attr.aria-expanded]="expanded()"
+    (keydown.enter)="toggleExpand()"
+    (keydown.space)="toggleExpand()"
+  >
     <!-- Stage Icon -->
     <span class="material-icons stage-icon">{{ stageInfo().icon }}</span>
 
@@ -51,7 +57,11 @@
         <span class="detail-label">Agent Key</span>
         <span class="detail-value monospace">
           {{ truncateHash(edgeNodeInfo().agentPubKey) }}
-          <button class="copy-btn" (click)="copyToClipboard(edgeNodeInfo().agentPubKey!, $event)" title="Copy">
+          <button
+            class="copy-btn"
+            (click)="copyToClipboard(edgeNodeInfo().agentPubKey!, $event)"
+            title="Copy"
+          >
             <span class="material-icons">content_copy</span>
           </button>
         </span>
@@ -61,7 +71,11 @@
         <span class="detail-label">DNA Hash</span>
         <span class="detail-value monospace">
           {{ truncateHash(edgeNodeInfo().dnaHash) }}
-          <button class="copy-btn" (click)="copyToClipboard(edgeNodeInfo().dnaHash!, $event)" title="Copy">
+          <button
+            class="copy-btn"
+            (click)="copyToClipboard(edgeNodeInfo().dnaHash!, $event)"
+            title="Copy"
+          >
             <span class="material-icons">content_copy</span>
           </button>
         </span>
@@ -80,10 +94,12 @@
     </div>
 
     <!-- Reconnect Button -->
-    <button class="reconnect-btn"
-            *ngIf="connectionStatus().state === 'error' || connectionStatus().state === 'offline'"
-            (click)="onReconnect()"
-            [disabled]="connectionStatus().state === 'connecting'">
+    <button
+      class="reconnect-btn"
+      *ngIf="connectionStatus().state === 'error' || connectionStatus().state === 'offline'"
+      (click)="onReconnect()"
+      [disabled]="connectionStatus().state === 'connecting'"
+    >
       <span class="material-icons">refresh</span>
       Connect to Network
     </button>

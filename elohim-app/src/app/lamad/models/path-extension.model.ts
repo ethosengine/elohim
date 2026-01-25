@@ -137,19 +137,19 @@ export interface PathStepAnnotation {
 }
 
 export type AnnotationType =
-  | 'note'           // General notes
-  | 'question'       // Questions for later/mentor
-  | 'insight'        // Personal insights
-  | 'connection'     // Connections to other knowledge
-  | 'struggle'       // Where learner struggled
-  | 'breakthrough'   // Aha moments
-  | 'application'    // How to apply this
-  | 'disagreement';  // Respectful disagreement with content
+  | 'note' // General notes
+  | 'question' // Questions for later/mentor
+  | 'insight' // Personal insights
+  | 'connection' // Connections to other knowledge
+  | 'struggle' // Where learner struggled
+  | 'breakthrough' // Aha moments
+  | 'application' // How to apply this
+  | 'disagreement'; // Respectful disagreement with content
 
 export interface AdditionalResource {
   title: string;
   url?: string;
-  resourceId?: string;  // If it's a Lamad content node
+  resourceId?: string; // If it's a Lamad content node
   description?: string;
 }
 
@@ -188,11 +188,11 @@ export interface PathStepExclusion {
 }
 
 export type ExclusionReason =
-  | 'already-mastered'     // Learner already knows this
-  | 'not-relevant'         // Doesn't apply to learner's context
+  | 'already-mastered' // Learner already knows this
+  | 'not-relevant' // Doesn't apply to learner's context
   | 'prerequisite-missing' // Need something else first
-  | 'too-advanced'         // Saving for later
-  | 'accessibility'        // Content not accessible to learner
+  | 'too-advanced' // Saving for later
+  | 'accessibility' // Content not accessible to learner
   | 'other';
 
 /**
@@ -209,7 +209,7 @@ export interface UpstreamProposal {
   response?: string;
 
   /** Which parts were accepted (if partial) */
-  acceptedParts?: string[];  // IDs of insertions/annotations
+  acceptedParts?: string[]; // IDs of insertions/annotations
 }
 
 /**
@@ -263,17 +263,17 @@ export interface CollaborativePath {
 }
 
 export type CollaborationType =
-  | 'sequential'      // One author at a time, pass the baton
-  | 'parallel'        // Multiple authors work simultaneously
+  | 'sequential' // One author at a time, pass the baton
+  | 'parallel' // Multiple authors work simultaneously
   | 'review-required' // Changes need approval
-  | 'open';           // Anyone with access can edit
+  | 'open'; // Anyone with access can edit
 
 export type CollaboratorRole =
-  | 'owner'      // Full control, can delete
-  | 'editor'     // Can make changes directly
-  | 'suggester'  // Can propose changes
-  | 'reviewer'   // Can approve/reject proposals
-  | 'viewer';    // Read-only access
+  | 'owner' // Full control, can delete
+  | 'editor' // Can make changes directly
+  | 'suggester' // Can propose changes
+  | 'reviewer' // Can approve/reject proposals
+  | 'viewer'; // Read-only access
 
 export interface CollaborationSettings {
   /** Require approval for changes? */
@@ -348,7 +348,14 @@ export interface ProposalComment {
 
 export interface CollaborationActivity {
   id: string;
-  type: 'proposal-created' | 'proposal-approved' | 'proposal-rejected' | 'step-added' | 'step-edited' | 'member-joined' | 'member-left';
+  type:
+    | 'proposal-created'
+    | 'proposal-approved'
+    | 'proposal-rejected'
+    | 'step-added'
+    | 'step-edited'
+    | 'member-joined'
+    | 'member-left';
   actorId: string;
   details: Record<string, unknown>;
   timestamp: string;

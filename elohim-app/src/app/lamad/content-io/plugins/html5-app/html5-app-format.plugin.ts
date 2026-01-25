@@ -1,4 +1,9 @@
 import { Injectable, Type } from '@angular/core';
+
+import {
+  IframeRendererComponent,
+  Html5AppContent,
+} from '../../../renderers/iframe-renderer/iframe-renderer.component';
 import {
   ContentFormatPlugin,
   ContentRenderer,
@@ -6,10 +11,16 @@ import {
   EditorConfig,
   DEFAULT_EDITOR_CONFIG,
 } from '../../interfaces/content-format-plugin.interface';
-import { ContentIOImportResult, ContentIOExportInput } from '../../interfaces/content-io-plugin.interface';
+import {
+  ContentIOImportResult,
+  ContentIOExportInput,
+} from '../../interfaces/content-io-plugin.interface';
 import { FormatMetadata } from '../../interfaces/format-metadata.interface';
-import { ValidationResult, ValidationError, ValidationWarning } from '../../interfaces/validation-result.interface';
-import { IframeRendererComponent, Html5AppContent } from '../../../renderers/iframe-renderer/iframe-renderer.component';
+import {
+  ValidationResult,
+  ValidationError,
+  ValidationWarning,
+} from '../../interfaces/validation-result.interface';
 
 /**
  * Html5AppFormatPlugin - Plugin for HTML5 interactive applications.
@@ -37,7 +48,7 @@ import { IframeRendererComponent, Html5AppContent } from '../../../renderers/ifr
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class Html5AppFormatPlugin implements ContentFormatPlugin {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -96,7 +107,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
         sizeBytes: input.size,
         embedStrategy: 'iframe',
         requiredCapabilities: ['javascript'],
-      }
+      },
     };
   }
 
@@ -111,7 +122,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
       metadata: {
         embedStrategy: 'iframe',
         requiredCapabilities: ['javascript'],
-      }
+      },
     };
   }
 
@@ -124,11 +135,15 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
     // The actual zip blob is handled separately by the blob service
     const content = node.content as Html5AppContent;
 
-    return JSON.stringify({
-      appId: content.appId,
-      entryPoint: content.entryPoint,
-      fallbackUrl: content.fallbackUrl,
-    }, null, 2);
+    return JSON.stringify(
+      {
+        appId: content.appId,
+        entryPoint: content.entryPoint,
+        fallbackUrl: content.fallbackUrl,
+      },
+      null,
+      2
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -148,7 +163,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
         errors.push({
           code: 'INVALID_JSON',
           message: `Invalid JSON: ${e instanceof Error ? e.message : 'Parse error'}`,
-          line: 1
+          line: 1,
         });
         return { valid: false, errors, warnings };
       }
@@ -158,25 +173,25 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
       if (!content.appId || typeof content.appId !== 'string') {
         errors.push({
           code: 'MISSING_APP_ID',
-          message: 'Missing required field: appId (string)'
+          message: 'Missing required field: appId (string)',
         });
       } else if (!/^[a-z0-9-]+$/.test(content.appId)) {
         errors.push({
           code: 'INVALID_APP_ID',
-          message: 'appId must be lowercase alphanumeric with hyphens only'
+          message: 'appId must be lowercase alphanumeric with hyphens only',
         });
       }
 
       if (!content.entryPoint || typeof content.entryPoint !== 'string') {
         errors.push({
           code: 'MISSING_ENTRY_POINT',
-          message: 'Missing required field: entryPoint (string)'
+          message: 'Missing required field: entryPoint (string)',
         });
       } else if (!content.entryPoint.endsWith('.html')) {
         warnings.push({
           code: 'ENTRY_POINT_NOT_HTML',
           message: 'entryPoint should typically be an HTML file',
-          suggestion: 'Use index.html as the entry point'
+          suggestion: 'Use index.html as the entry point',
         });
       }
 
@@ -184,24 +199,24 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
         warnings.push({
           code: 'NO_FALLBACK',
           message: 'No fallbackUrl specified. App will fail if doorway is unavailable.',
-          suggestion: 'Add fallbackUrl pointing to the original source'
+          suggestion: 'Add fallbackUrl pointing to the original source',
         });
       }
-
     } else {
       // Validate zip file
       if (!input.name.endsWith('.zip')) {
         errors.push({
           code: 'NOT_ZIP',
-          message: 'File must be a .zip archive'
+          message: 'File must be a .zip archive',
         });
       }
 
-      if (input.size > 100 * 1024 * 1024) { // 100MB limit
+      if (input.size > 100 * 1024 * 1024) {
+        // 100MB limit
         warnings.push({
           code: 'LARGE_FILE',
           message: 'Zip file is larger than 100MB. Consider optimizing assets.',
-          suggestion: 'Compress images, remove unused files'
+          suggestion: 'Compress images, remove unused files',
         });
       }
     }
@@ -213,7 +228,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
       stats: {
         formatId: this.formatId,
         isFile: input instanceof File,
-      }
+      },
     };
   }
 
@@ -277,13 +292,14 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
     return {
       formatId: this.formatId,
       displayName: this.displayName,
-      description: 'Interactive HTML5 applications served from Doorway. Content is extracted from zip archives and cached for fast access.',
+      description:
+        'Interactive HTML5 applications served from Doorway. Content is extracted from zip archives and cached for fast access.',
       fileExtensions: this.fileExtensions,
       mimeTypes: this.mimeTypes,
       icon: 'web',
       category: 'media', // HTML5 apps are interactive media content
       supportsRoundTrip: false, // Zip content isn't editable
-      priority: 15
+      priority: 15,
     };
   }
 
@@ -299,8 +315,6 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
   }
 
   private humanize(slug: string): string {
-    return slug
-      .replace(/-/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase());
+    return slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
 }

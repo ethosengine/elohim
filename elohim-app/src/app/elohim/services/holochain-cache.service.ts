@@ -53,7 +53,7 @@ export interface CacheStats {
  * - L2 misses return null
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class HolochainCacheService {
   /** Maximum L1 cache size (10MB) */
@@ -76,14 +76,14 @@ export class HolochainCacheService {
     hits: 0,
     misses: 0,
     totalEntries: 0,
-    totalSizeBytes: 0
+    totalSizeBytes: 0,
   });
 
   /** Computed hit rate */
   readonly hitRate = computed(() => {
     const { hits, misses } = this.stats();
     const total = hits + misses;
-    return total > 0 ? (hits / total * 100) : 0;
+    return total > 0 ? (hits / total) * 100 : 0;
   });
 
   /** Database instance */
@@ -121,7 +121,7 @@ export class HolochainCacheService {
         resolve();
       };
 
-      request.onupgradeneeded = (event) => {
+      request.onupgradeneeded = event => {
         const db = (event.target as IDBOpenDBRequest).result;
 
         // Create cache entries store
@@ -176,7 +176,12 @@ export class HolochainCacheService {
   /**
    * Set value in cache (L1 + L2)
    */
-  async set<T = any>(key: string, value: T, ttlMs?: number, metadata?: Record<string, any>): Promise<void> {
+  async set<T = any>(
+    key: string,
+    value: T,
+    ttlMs?: number,
+    metadata?: Record<string, any>
+  ): Promise<void> {
     await this.initPromise;
 
     const entry: CacheEntry = {
@@ -184,7 +189,7 @@ export class HolochainCacheService {
       value,
       timestamp: Date.now(),
       ttlMs,
-      metadata
+      metadata,
     };
 
     // Set in L1
@@ -265,13 +270,15 @@ export class HolochainCacheService {
     return {
       totalEntries: entries.length,
       totalSizeBytes: this.getMemoryCacheSize(),
-      oldestEntry: entries.length > 0
-        ? Math.round((Date.now() - Math.min(...entries.map(e => e.timestamp))) / 1000)
-        : 0,
-      newestEntry: entries.length > 0
-        ? Math.round((Date.now() - Math.max(...entries.map(e => e.timestamp))) / 1000)
-        : 0,
-      hitRate: this.hitRate()
+      oldestEntry:
+        entries.length > 0
+          ? Math.round((Date.now() - Math.min(...entries.map(e => e.timestamp))) / 1000)
+          : 0,
+      newestEntry:
+        entries.length > 0
+          ? Math.round((Date.now() - Math.max(...entries.map(e => e.timestamp))) / 1000)
+          : 0,
+      hitRate: this.hitRate(),
     };
   }
 
@@ -280,7 +287,7 @@ export class HolochainCacheService {
    *
    * Useful for warming cache on app startup or before user accesses content.
    */
-  async preload<T = any>(items: Array<{ key: string; value: T; ttlMs?: number }>): Promise<void> {
+  async preload<T = any>(items: { key: string; value: T; ttlMs?: number }[]): Promise<void> {
     console.log(`[HolochainCache] Preloading ${items.length} items...`);
 
     for (const item of items) {
@@ -305,18 +312,14 @@ export class HolochainCacheService {
    * Get entries by tag (searches metadata)
    */
   getByTag(tag: string): CacheEntry[] {
-    return this.query(entry =>
-      entry.metadata?.tags?.includes(tag) ?? false
-    );
+    return this.query(entry => entry.metadata?.tags?.includes(tag) ?? false);
   }
 
   /**
    * Get entries by domain (from metadata)
    */
   getByDomain(domain: string): CacheEntry[] {
-    return this.query(entry =>
-      entry.metadata?.domain === domain
-    );
+    return this.query(entry => entry.metadata?.domain === domain);
   }
 
   /**
@@ -350,8 +353,9 @@ export class HolochainCacheService {
    * Evict least-recently-used entries from memory cache
    */
   private evictMemoryCache(): void {
-    const entries = Array.from(this.memoryCache.entries())
-      .sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const entries = Array.from(this.memoryCache.entries()).sort(
+      (a, b) => a[1].timestamp - b[1].timestamp
+    );
 
     // Remove oldest 10% of entries
     const toRemove = Math.ceil(entries.length * 0.1);
@@ -426,7 +430,7 @@ export class HolochainCacheService {
     this.stats.update(s => ({
       ...s,
       totalEntries: this.memoryCache.size,
-      totalSizeBytes: this.getMemoryCacheSize()
+      totalSizeBytes: this.getMemoryCacheSize(),
     }));
   }
 }

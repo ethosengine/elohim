@@ -14,8 +14,10 @@
  */
 
 import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
+
 import { map, catchError } from 'rxjs/operators';
+
+import { Observable, of } from 'rxjs';
 
 import {
   StagedTransaction,
@@ -44,8 +46,7 @@ export class AICategorizationService {
 
   // Learning: store user corrections for few-shot examples
   private corrections: CorrectionRecord[] = [];
-  private merchantPatterns: Map<string, { category: string; confidence: number }> =
-    new Map();
+  private merchantPatterns = new Map<string, { category: string; confidence: number }>();
 
   constructor(private elohimStub: ElohimStubService) {
     this.initializeDefaultPatterns();
@@ -57,24 +58,24 @@ export class AICategorizationService {
    */
   private initializeDefaultPatterns(): void {
     const defaultPatterns: Record<string, string> = {
-      'amazon': 'Shopping',
+      amazon: 'Shopping',
       'whole foods': 'Groceries',
-      'safeway': 'Groceries',
-      'target': 'Shopping',
-      'coffee': 'Dining',
-      'restaurant': 'Dining',
+      safeway: 'Groceries',
+      target: 'Shopping',
+      coffee: 'Dining',
+      restaurant: 'Dining',
       'gas station': 'Transportation',
-      'uber': 'Transportation',
-      'delta': 'Travel',
-      'airbnb': 'Travel',
-      'netflix': 'Entertainment',
-      'gym': 'Health & Fitness',
-      'walgreens': 'Health',
-      'pharmacy': 'Health',
-      'rent': 'Housing',
-      'electric': 'Utilities',
-      'water': 'Utilities',
-      'internet': 'Utilities',
+      uber: 'Transportation',
+      delta: 'Travel',
+      airbnb: 'Travel',
+      netflix: 'Entertainment',
+      gym: 'Health & Fitness',
+      walgreens: 'Health',
+      pharmacy: 'Health',
+      rent: 'Housing',
+      electric: 'Utilities',
+      water: 'Utilities',
+      internet: 'Utilities',
     };
 
     Object.entries(defaultPatterns).forEach(([merchant, category]) => {
@@ -171,10 +172,7 @@ export class AICategorizationService {
    * 2. Accuracy tracking per merchant/pattern
    * 3. Auto-creation of TransactionRules if pattern is strong
    */
-  learnFromCorrection(
-    staged: StagedTransaction,
-    correctedCategory: string
-  ): void {
+  learnFromCorrection(staged: StagedTransaction, correctedCategory: string): void {
     // Store correction record
     const correction: CorrectionRecord = {
       id: `corr-${Date.now()}`,
@@ -202,10 +200,7 @@ export class AICategorizationService {
     }
 
     // Check if we should auto-create a TransactionRule
-    const shouldCreateRule = this.checkShouldCreateRule(
-      staged,
-      correctedCategory
-    );
+    const shouldCreateRule = this.checkShouldCreateRule(staged, correctedCategory);
     if (shouldCreateRule) {
       console.log(
         `[AICategories] Would create TransactionRule for ${staged.merchantName} → ${correctedCategory}`
@@ -213,18 +208,13 @@ export class AICategorizationService {
       // TODO: Emit event or call TransactionRuleService.createRule()
     }
 
-    console.log(
-      `[AICategories] Learned correction: ${staged.merchantName} → ${correctedCategory}`
-    );
+    console.log(`[AICategories] Learned correction: ${staged.merchantName} → ${correctedCategory}`);
   }
 
   /**
    * Checks if a pattern is strong enough to auto-create a TransactionRule
    */
-  private checkShouldCreateRule(
-    staged: StagedTransaction,
-    correctedCategory: string
-  ): boolean {
+  private checkShouldCreateRule(staged: StagedTransaction, correctedCategory: string): boolean {
     if (!staged.merchantName) {
       return false;
     }
@@ -233,9 +223,7 @@ export class AICategorizationService {
 
     // Count corrections for this merchant → category
     const relatedCorrections = this.corrections.filter(
-      c =>
-        c.merchantName?.toLowerCase() === merchant &&
-        c.correctedCategory === correctedCategory
+      c => c.merchantName?.toLowerCase() === merchant && c.correctedCategory === correctedCategory
     );
 
     if (relatedCorrections.length < 5) {
@@ -244,15 +232,12 @@ export class AICategorizationService {
 
     // Check for contradictions
     const contradictions = this.corrections.filter(
-      c =>
-        c.merchantName?.toLowerCase() === merchant &&
-        c.correctedCategory !== correctedCategory
+      c => c.merchantName?.toLowerCase() === merchant && c.correctedCategory !== correctedCategory
     );
 
     if (contradictions.length > 0) {
       const confidence =
-        relatedCorrections.length /
-        (relatedCorrections.length + contradictions.length);
+        relatedCorrections.length / (relatedCorrections.length + contradictions.length);
       return confidence > 0.9;
     }
 
@@ -324,13 +309,10 @@ export class AICategorizationService {
    * Gets high-quality examples from user's correction history
    */
   private getHistoricalExamples(stewardId: string): CorrectionRecord[] {
-    const stewardCorrections = this.corrections.filter(
-      c => c.stewardId === stewardId
-    );
+    const stewardCorrections = this.corrections.filter(c => c.stewardId === stewardId);
 
     return stewardCorrections.sort(
-      (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
   }
 

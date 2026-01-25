@@ -20,9 +20,13 @@
  */
 
 import { Injectable, signal, computed } from '@angular/core';
-import { BehaviorSubject, Observable, of, from, defer } from 'rxjs';
+
 import { catchError, shareReplay, tap } from 'rxjs/operators';
+
+import { BehaviorSubject, Observable, of, from, defer } from 'rxjs';
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+
 import {
   StewardCredential,
   StewardTier,
@@ -228,11 +232,9 @@ export class StewardService {
       throw new Error('Steward service not available');
     }
 
-    return defer(() =>
-      from(this.doCreateCredential(input))
-    ).pipe(
+    return defer(() => from(this.doCreateCredential(input))).pipe(
       tap(() => this.refreshMyCredentials()),
-      catchError((err) => {
+      catchError(err => {
         console.error('[StewardService] Failed to create credential:', err);
         throw err;
       })
@@ -251,11 +253,9 @@ export class StewardService {
     }
 
     if (!this.credentialCache.has(credentialId)) {
-      const request = defer(() =>
-        from(this.fetchCredential(credentialId))
-      ).pipe(
+      const request = defer(() => from(this.fetchCredential(credentialId))).pipe(
         shareReplay(1),
-        catchError((err) => {
+        catchError(err => {
           console.warn(`[StewardService] Failed to fetch credential "${credentialId}":`, err);
           return of(null);
         })
@@ -277,11 +277,9 @@ export class StewardService {
       return of([]);
     }
 
-    return defer(() =>
-      from(this.fetchMyCredentials())
-    ).pipe(
+    return defer(() => from(this.fetchMyCredentials())).pipe(
       tap(credentials => this.myCredentialsSubject.next(credentials)),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[StewardService] Failed to fetch my credentials:', err);
         return of([]);
       })
@@ -299,10 +297,8 @@ export class StewardService {
       return of([]);
     }
 
-    return defer(() =>
-      from(this.fetchCredentialsForHuman(humanPresenceId))
-    ).pipe(
-      catchError((err) => {
+    return defer(() => from(this.fetchCredentialsForHuman(humanPresenceId))).pipe(
+      catchError(err => {
         console.warn(`[StewardService] Failed to fetch credentials for "${humanPresenceId}":`, err);
         return of([]);
       })
@@ -324,11 +320,9 @@ export class StewardService {
       throw new Error('Steward service not available');
     }
 
-    return defer(() =>
-      from(this.doCreateGate(input))
-    ).pipe(
+    return defer(() => from(this.doCreateGate(input))).pipe(
       tap(() => this.refreshMyGates()),
-      catchError((err) => {
+      catchError(err => {
         console.error('[StewardService] Failed to create gate:', err);
         throw err;
       })
@@ -346,10 +340,8 @@ export class StewardService {
       return of(null);
     }
 
-    return defer(() =>
-      from(this.fetchGate(gateId))
-    ).pipe(
-      catchError((err) => {
+    return defer(() => from(this.fetchGate(gateId))).pipe(
+      catchError(err => {
         console.warn(`[StewardService] Failed to fetch gate "${gateId}":`, err);
         return of(null);
       })
@@ -370,11 +362,9 @@ export class StewardService {
     }
 
     if (!this.gatesByResourceCache.has(resourceId)) {
-      const request = defer(() =>
-        from(this.fetchGatesForResource(resourceId))
-      ).pipe(
+      const request = defer(() => from(this.fetchGatesForResource(resourceId))).pipe(
         shareReplay(1),
-        catchError((err) => {
+        catchError(err => {
           console.warn(`[StewardService] Failed to fetch gates for "${resourceId}":`, err);
           return of([]);
         })
@@ -402,11 +392,9 @@ export class StewardService {
     }
 
     if (!this.accessCheckCache.has(gateId)) {
-      const request = defer(() =>
-        from(this.fetchAccessCheck(gateId))
-      ).pipe(
+      const request = defer(() => from(this.fetchAccessCheck(gateId))).pipe(
         shareReplay(1),
-        catchError((err) => {
+        catchError(err => {
           console.warn(`[StewardService] Failed to check access for "${gateId}":`, err);
           return of(null);
         })
@@ -429,15 +417,13 @@ export class StewardService {
       throw new Error('Steward service not available');
     }
 
-    return defer(() =>
-      from(this.doGrantAccess(input))
-    ).pipe(
+    return defer(() => from(this.doGrantAccess(input))).pipe(
       tap(() => {
         // Clear relevant caches
         this.accessCheckCache.delete(input.gateId);
         this.refreshMyAccessGrants();
       }),
-      catchError((err) => {
+      catchError(err => {
         console.error('[StewardService] Failed to grant access:', err);
         throw err;
       })
@@ -454,11 +440,9 @@ export class StewardService {
       return of([]);
     }
 
-    return defer(() =>
-      from(this.fetchMyAccessGrants())
-    ).pipe(
+    return defer(() => from(this.fetchMyAccessGrants())).pipe(
       tap(grants => this.myAccessGrantsSubject.next(grants)),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[StewardService] Failed to fetch my access grants:', err);
         return of([]);
       })
@@ -480,10 +464,8 @@ export class StewardService {
       return of(null);
     }
 
-    return defer(() =>
-      from(this.fetchRevenueSummary(stewardPresenceId))
-    ).pipe(
-      catchError((err) => {
+    return defer(() => from(this.fetchRevenueSummary(stewardPresenceId))).pipe(
+      catchError(err => {
         console.warn(`[StewardService] Failed to fetch revenue for "${stewardPresenceId}":`, err);
         return of(null);
       })
@@ -550,7 +532,9 @@ export class StewardService {
   // Private Methods - Zome Calls
   // ===========================================================================
 
-  private async doCreateCredential(input: CreateStewardCredentialInput): Promise<StewardCredential> {
+  private async doCreateCredential(
+    input: CreateStewardCredentialInput
+  ): Promise<StewardCredential> {
     const payload = {
       steward_presence_id: input.stewardPresenceId,
       tier: input.tier,
@@ -644,7 +628,9 @@ export class StewardService {
       contributor_share_percent: input.contributorSharePercent ?? null,
       scholarship_eligible: input.scholarshipEligible,
       max_scholarships_per_period: input.maxScholarshipsPerPeriod ?? null,
-      scholarship_criteria_json: input.scholarshipCriteria ? JSON.stringify(input.scholarshipCriteria) : null,
+      scholarship_criteria_json: input.scholarshipCriteria
+        ? JSON.stringify(input.scholarshipCriteria)
+        : null,
       note: input.note ?? null,
     };
 
@@ -741,7 +727,9 @@ export class StewardService {
     return result.data.map(o => this.transformAccessGrant(o));
   }
 
-  private async fetchRevenueSummary(stewardPresenceId: string): Promise<StewardRevenueSummary | null> {
+  private async fetchRevenueSummary(
+    stewardPresenceId: string
+  ): Promise<StewardRevenueSummary | null> {
     const result = await this.holochainClient.callZome<HolochainStewardRevenueSummary | null>({
       zomeName: 'content_store',
       fnName: 'get_steward_revenue_summary',
@@ -802,7 +790,10 @@ export class StewardService {
       gateTitle: hc.gateTitle,
       gateDescription: hc.gateDescription,
       gateImage: hc.gateImage,
-      requiredAttestations: this.safeParseJson<RequiredAttestation[]>(hc.requiredAttestationsJson, []),
+      requiredAttestations: this.safeParseJson<RequiredAttestation[]>(
+        hc.requiredAttestationsJson,
+        []
+      ),
       requiredMastery: this.safeParseJson<RequiredMastery[]>(hc.requiredMasteryJson, []),
       requiredVouches: this.safeParseJson<RequiredVouches | null>(hc.requiredVouchesJson, null),
       pricingModel: hc.pricingModel as PricingModel,
@@ -815,7 +806,10 @@ export class StewardService {
       contributorSharePercent: hc.contributorSharePercent,
       scholarshipEligible: hc.scholarshipEligible,
       maxScholarshipsPerPeriod: hc.maxScholarshipsPerPeriod,
-      scholarshipCriteria: this.safeParseJson<Record<string, unknown> | null>(hc.scholarshipCriteriaJson, null),
+      scholarshipCriteria: this.safeParseJson<Record<string, unknown> | null>(
+        hc.scholarshipCriteriaJson,
+        null
+      ),
       isActive: hc.isActive,
       deactivationReason: hc.deactivationReason,
       totalAccessGrants: hc.totalAccessGrants,

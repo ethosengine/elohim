@@ -1,7 +1,8 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ShefaService } from '../../services/shefa.service';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+
 import { CustodianSelectionService } from '../../services/custodian-selection.service';
+import { ShefaService } from '../../services/shefa.service';
 
 /**
  * Shefa Dashboard Component
@@ -20,7 +21,7 @@ import { CustodianSelectionService } from '../../services/custodian-selection.se
   standalone: true,
   imports: [CommonModule],
   templateUrl: './shefa-dashboard.component.html',
-  styleUrl: './shefa-dashboard.component.css'
+  styleUrl: './shefa-dashboard.component.css',
 })
 export class ShefaDashboardComponent implements OnInit, OnDestroy {
   private readonly shefa = inject(ShefaService);
@@ -44,8 +45,8 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   // Computed values
   readonly totalCustodians = computed(() => this.allMetrics().length);
 
-  readonly healthyCustodians = computed(() =>
-    this.allMetrics().filter(c => c.health.uptime_percent >= 95).length
+  readonly healthyCustodians = computed(
+    () => this.allMetrics().filter(c => c.health.uptime_percent >= 95).length
   );
 
   readonly networkUptime = computed(() => {
@@ -147,7 +148,7 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
       const [allMetrics, alerts, recommendations] = await Promise.all([
         this.shefa.getAllMetrics(),
         this.shefa.getAlerts(),
-        this.shefa.getRecommendations()
+        this.shefa.getRecommendations(),
       ]);
 
       this.allMetrics.set(allMetrics);
@@ -172,7 +173,7 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
     return `${size.toFixed(2)} ${units[unitIndex]}`;
   }
 
-  formatPercentage(value: number, decimals: number = 1): string {
+  formatPercentage(value: number, decimals = 1): string {
     return `${value.toFixed(decimals)}%`;
   }
 
@@ -195,7 +196,7 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
       1: 'Caretaker',
       2: 'Curator',
       3: 'Expert',
-      4: 'Pioneer'
+      4: 'Pioneer',
     };
     return labels[tier] || 'Unknown';
   }

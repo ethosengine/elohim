@@ -8,18 +8,15 @@
  * - Post-registration redirect to return URL
  */
 
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
-import { IdentityService } from '../../services/identity.service';
-import { SessionHumanService } from '../../services/session-human.service';
-import { SessionMigrationService } from '../../services/session-migration.service';
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { AuthService } from '../../services/auth.service';
-import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
-import { DoorwayRegistryService } from '../../services/doorway-registry.service';
-import { DoorwayPickerComponent } from '../doorway-picker/doorway-picker.component';
+
+import { type RegisterCredentials } from '../../models/auth.model';
+import { type DoorwayInfo } from '../../models/doorway.model';
 import {
   type RegisterHumanRequest,
   type ProfileReach,
@@ -27,8 +24,13 @@ import {
   getReachLabel,
   getReachDescription,
 } from '../../models/identity.model';
-import { type RegisterCredentials } from '../../models/auth.model';
-import { type DoorwayInfo } from '../../models/doorway.model';
+import { AuthService } from '../../services/auth.service';
+import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { IdentityService } from '../../services/identity.service';
+import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
+import { SessionHumanService } from '../../services/session-human.service';
+import { SessionMigrationService } from '../../services/session-migration.service';
+import { DoorwayPickerComponent } from '../doorway-picker/doorway-picker.component';
 
 /** Registration step type */
 type RegistrationStep = 'doorway' | 'credentials';
@@ -122,10 +124,22 @@ export class RegisterComponent implements OnInit {
 
   /** Profile reach options */
   readonly reachOptions: { value: ProfileReach; label: string; description: string }[] = [
-    { value: 'community', label: getReachLabel('community'), description: getReachDescription('community') },
+    {
+      value: 'community',
+      label: getReachLabel('community'),
+      description: getReachDescription('community'),
+    },
     { value: 'public', label: getReachLabel('public'), description: getReachDescription('public') },
-    { value: 'trusted', label: getReachLabel('trusted'), description: getReachDescription('trusted') },
-    { value: 'private', label: getReachLabel('private'), description: getReachDescription('private') },
+    {
+      value: 'trusted',
+      label: getReachLabel('trusted'),
+      description: getReachDescription('trusted'),
+    },
+    {
+      value: 'private',
+      label: getReachLabel('private'),
+      description: getReachDescription('private'),
+    },
   ];
 
   // ==========================================================================

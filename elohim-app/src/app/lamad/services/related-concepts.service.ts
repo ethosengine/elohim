@@ -1,13 +1,16 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, forkJoin } from 'rxjs';
+
 import { map, shareReplay, take, switchMap, catchError, tap } from 'rxjs/operators';
 
+import { Observable, of, forkJoin } from 'rxjs';
+
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+
 import {
   ContentNode,
   ContentGraph,
   ContentRelationship,
-  ContentRelationshipType
+  ContentRelationshipType,
 } from '../models/content-node.model';
 import {
   RelatedConceptsResult,
@@ -21,7 +24,7 @@ import {
   PREREQUISITE_RELATIONSHIP_TYPES,
   EXTENSION_RELATIONSHIP_TYPES,
   RELATED_RELATIONSHIP_TYPES,
-  HIERARCHY_RELATIONSHIP_TYPES
+  HIERARCHY_RELATIONSHIP_TYPES,
 } from '../models/exploration-context.model';
 
 /**
@@ -32,7 +35,7 @@ class LRUCache<K, V> {
   private cache = new Map<K, V>();
   private readonly maxSize: number;
 
-  constructor(maxSize: number = 100) {
+  constructor(maxSize = 100) {
     this.maxSize = maxSize;
   }
 
@@ -183,12 +186,14 @@ export class RelatedConceptsService {
         }
 
         // Batch load related nodes (only metadata, not content)
-        const nodeLoads = Array.from(nodeIds).slice(0, limit * 3).map(id =>
-          this.dataLoader.getContent(id).pipe(
-            catchError(() => of(null)),
-            map(node => node ? (includeContent ? node : this.stripContent(node)) : null)
-          )
-        );
+        const nodeLoads = Array.from(nodeIds)
+          .slice(0, limit * 3)
+          .map(id =>
+            this.dataLoader.getContent(id).pipe(
+              catchError(() => of(null)),
+              map(node => (node ? (includeContent ? node : this.stripContent(node)) : null))
+            )
+          );
 
         if (nodeLoads.length === 0) {
           return of({ relationships, nodes: new Map<string, ContentNode>() });
@@ -239,7 +244,7 @@ export class RelatedConceptsService {
         source: rel.sourceNodeId,
         target: rel.targetNodeId,
         type: relType,
-        metadata: rel.metadata
+        metadata: rel.metadata,
       });
 
       // Categorize based on relationship type and direction
@@ -247,7 +252,10 @@ export class RelatedConceptsService {
         // Outgoing: this node → target
         if (HIERARCHY_RELATIONSHIP_TYPES.includes(relType) && children.length < limit) {
           children.push(node);
-        } else if (PREREQUISITE_RELATIONSHIP_TYPES.includes(relType) && prerequisites.length < limit) {
+        } else if (
+          PREREQUISITE_RELATIONSHIP_TYPES.includes(relType) &&
+          prerequisites.length < limit
+        ) {
           prerequisites.push(node);
         } else if (EXTENSION_RELATIONSHIP_TYPES.includes(relType) && extensions.length < limit) {
           extensions.push(node);
@@ -297,7 +305,13 @@ export class RelatedConceptsService {
 
     return this.getGraph().pipe(
       map(graph => {
-        const result = this.buildNeighborhoodGraph(graph, contentId, depth, maxNodes, relationshipTypes);
+        const result = this.buildNeighborhoodGraph(
+          graph,
+          contentId,
+          depth,
+          maxNodes,
+          relationshipTypes
+        );
         this.neighborhoodCache.set(cacheKey, result);
         return result;
       })
@@ -405,7 +419,7 @@ export class RelatedConceptsService {
         source: contentId,
         target: targetId,
         type: relType,
-        metadata: rel.metadata
+        metadata: rel.metadata,
       });
 
       const node = graph.nodes.get(targetId);
@@ -440,7 +454,7 @@ export class RelatedConceptsService {
         source: sourceId,
         target: contentId,
         type: relType,
-        metadata: rel.metadata
+        metadata: rel.metadata,
       });
 
       const node = graph.nodes.get(sourceId);
@@ -452,7 +466,10 @@ export class RelatedConceptsService {
       if (HIERARCHY_RELATIONSHIP_TYPES.includes(relType) && parents.length < limit) {
         // CONTAINS incoming = this is a child, source is parent
         parents.push(nodeToAdd);
-      } else if (PREREQUISITE_RELATIONSHIP_TYPES.includes(relType) && prerequisites.length < limit) {
+      } else if (
+        PREREQUISITE_RELATIONSHIP_TYPES.includes(relType) &&
+        prerequisites.length < limit
+      ) {
         // DEPENDS_ON incoming = source depends on this, so source is a dependent
         // But we want prerequisites FOR this node, which are DEPENDS_ON outgoing
         // Skip here - handled below
@@ -484,7 +501,7 @@ export class RelatedConceptsService {
       related,
       children,
       parents,
-      allRelationships
+      allRelationships,
     };
   }
 
@@ -503,7 +520,7 @@ export class RelatedConceptsService {
       return {
         focus: { id: focusId, title: 'Unknown', contentType: 'unknown', isFocus: true, depth: 0 },
         neighbors: [],
-        edges: []
+        edges: [],
       };
     }
 
@@ -542,14 +559,14 @@ export class RelatedConceptsService {
               title: targetNode.title || targetId,
               contentType: targetNode.contentType,
               isFocus: false,
-              depth: d
+              depth: d,
             });
           }
 
           edges.push({
             source: nodeId,
             target: targetId,
-            relationshipType: relType
+            relationshipType: relType,
           });
         }
 
@@ -575,14 +592,14 @@ export class RelatedConceptsService {
               title: sourceNode.title || sourceId,
               contentType: sourceNode.contentType,
               isFocus: false,
-              depth: d
+              depth: d,
             });
           }
 
           edges.push({
             source: sourceId,
             target: nodeId,
-            relationshipType: relType
+            relationshipType: relType,
           });
         }
       }
@@ -596,10 +613,10 @@ export class RelatedConceptsService {
         title: focusNode.title || focusId,
         contentType: focusNode.contentType,
         isFocus: true,
-        depth: 0
+        depth: 0,
       },
       neighbors,
-      edges
+      edges,
     };
   }
 
@@ -614,16 +631,16 @@ export class RelatedConceptsService {
   ): ContentRelationship[] {
     const results: ContentRelationship[] = [];
 
-    const adjacentIds = direction === 'outgoing'
-      ? graph.adjacency.get(contentId)
-      : graph.reverseAdjacency.get(contentId);
+    const adjacentIds =
+      direction === 'outgoing'
+        ? graph.adjacency.get(contentId)
+        : graph.reverseAdjacency.get(contentId);
 
     if (!adjacentIds) return results;
 
     for (const adjacentId of adjacentIds) {
-      const [sourceId, targetId] = direction === 'outgoing'
-        ? [contentId, adjacentId]
-        : [adjacentId, contentId];
+      const [sourceId, targetId] =
+        direction === 'outgoing' ? [contentId, adjacentId] : [adjacentId, contentId];
 
       const rel = this.findRelationshipBetween(graph, sourceId, targetId);
       if (rel && rel.relationshipType === relationshipType) {
@@ -681,7 +698,7 @@ export class RelatedConceptsService {
   private stripContent(node: ContentNode): ContentNode {
     return {
       ...node,
-      content: ''
+      content: '',
     };
   }
 
@@ -698,11 +715,15 @@ export class RelatedConceptsService {
   /**
    * Get cache statistics for debugging/monitoring.
    */
-  getCacheStats(): { relationshipCacheSize: number; neighborhoodCacheSize: number; hasGraph: boolean } {
+  getCacheStats(): {
+    relationshipCacheSize: number;
+    neighborhoodCacheSize: number;
+    hasGraph: boolean;
+  } {
     return {
       relationshipCacheSize: this.relationshipCache.size,
       neighborhoodCacheSize: this.neighborhoodCache.size,
-      hasGraph: this.graph$ !== null
+      hasGraph: this.graph$ !== null,
     };
   }
 }

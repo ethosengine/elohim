@@ -24,30 +24,30 @@ import type { DiscoveryCategory, DiscoveryFramework } from './discovery-assessme
  * Extends personal discovery with research-oriented categories.
  */
 export type ResearchCategory =
-  | DiscoveryCategory          // Personal discovery categories
-  | 'moral-political'          // Moral foundations, political compass
-  | 'social-attitudes'         // Trust, civic engagement attitudes
-  | 'well-being'               // Life satisfaction, affect, flourishing
-  | 'cognitive-style'          // Thinking patterns, decision-making
-  | 'behavioral-tendencies';   // Habit patterns, self-regulation
+  | DiscoveryCategory // Personal discovery categories
+  | 'moral-political' // Moral foundations, political compass
+  | 'social-attitudes' // Trust, civic engagement attitudes
+  | 'well-being' // Life satisfaction, affect, flourishing
+  | 'cognitive-style' // Thinking patterns, decision-making
+  | 'behavioral-tendencies'; // Habit patterns, self-regulation
 
 /**
  * Well-known research assessment frameworks.
  * These are individual-administered instruments.
  */
 export type ResearchFramework =
-  | DiscoveryFramework         // Personal discovery frameworks
-  | 'moral-foundations-mfq2'   // Moral Foundations Questionnaire 2
-  | 'political-compass'        // Political/economic spectrum
-  | 'trust-scale'              // Generalized trust measures
-  | 'civic-engagement'         // Civic engagement scales
-  | 'wellbeing-wemwbs'         // Warwick-Edinburgh Mental Wellbeing
-  | 'flourishing-perma'        // Seligman's PERMA model
-  | 'attachment-ecr-r'         // Experiences in Close Relationships - Revised
-  | 'big-five-ocean'           // OCEAN personality (research version)
-  | 'need-for-cognition'       // Thinking enjoyment scale
-  | 'self-efficacy'            // Bandura's self-efficacy
-  | 'custom-research';         // Custom research instrument
+  | DiscoveryFramework // Personal discovery frameworks
+  | 'moral-foundations-mfq2' // Moral Foundations Questionnaire 2
+  | 'political-compass' // Political/economic spectrum
+  | 'trust-scale' // Generalized trust measures
+  | 'civic-engagement' // Civic engagement scales
+  | 'wellbeing-wemwbs' // Warwick-Edinburgh Mental Wellbeing
+  | 'flourishing-perma' // Seligman's PERMA model
+  | 'attachment-ecr-r' // Experiences in Close Relationships - Revised
+  | 'big-five-ocean' // OCEAN personality (research version)
+  | 'need-for-cognition' // Thinking enjoyment scale
+  | 'self-efficacy' // Bandura's self-efficacy
+  | 'custom-research'; // Custom research instrument
 
 // =============================================================================
 // Individual Research Consent
@@ -58,12 +58,12 @@ export type ResearchFramework =
  * Stored in ImagoDei as part of identity preferences.
  */
 export type PersonalResearchConsent =
-  | 'none'                    // No research participation
-  | 'aggregate-only'          // Only anonymized aggregates
-  | 'pseudonymous'            // Pseudonymized individual data
-  | 'identifiable'            // Identifiable with explicit per-study consent
-  | 'longitudinal'            // Allow re-contact for follow-up
-  | 'open-science';           // Contribute to open datasets
+  | 'none' // No research participation
+  | 'aggregate-only' // Only anonymized aggregates
+  | 'pseudonymous' // Pseudonymized individual data
+  | 'identifiable' // Identifiable with explicit per-study consent
+  | 'longitudinal' // Allow re-contact for follow-up
+  | 'open-science'; // Contribute to open datasets
 
 /**
  * Personal research participation preferences.
@@ -84,7 +84,7 @@ export interface ResearchPreferences {
 
   /** Preferred prompt times (if ESM allowed) */
   preferredPromptTimes?: {
-    start: string;  // HH:mm format
+    start: string; // HH:mm format
     end: string;
   };
 
@@ -280,7 +280,8 @@ export const RESEARCH_INSTRUMENTS: Partial<Record<ResearchFramework, ResearchIns
   'moral-foundations-mfq2': {
     framework: 'moral-foundations-mfq2',
     displayName: 'Moral Foundations Questionnaire 2',
-    description: 'Measures six moral foundations: Care, Equality, Proportionality, Loyalty, Authority, Purity',
+    description:
+      'Measures six moral foundations: Care, Equality, Proportionality, Loyalty, Authority, Purity',
     citation: 'Atari, M., Graham, J., & Haidt, J. (2023)',
     authors: ['Mohammad Atari', 'Jesse Graham', 'Jonathan Haidt'],
     year: 2023,
@@ -306,7 +307,8 @@ export const RESEARCH_INSTRUMENTS: Partial<Record<ResearchFramework, ResearchIns
   'flourishing-perma': {
     framework: 'flourishing-perma',
     displayName: 'PERMA Profiler',
-    description: 'Measures five pillars of wellbeing: Positive emotion, Engagement, Relationships, Meaning, Accomplishment',
+    description:
+      'Measures five pillars of wellbeing: Positive emotion, Engagement, Relationships, Meaning, Accomplishment',
     citation: 'Butler, J., & Kern, M.L. (2016)',
     authors: ['Judy Butler', 'Margaret L. Kern'],
     year: 2016,

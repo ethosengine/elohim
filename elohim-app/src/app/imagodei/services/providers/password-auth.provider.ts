@@ -12,9 +12,11 @@
  * 2. Use for login/register flows via AuthService
  */
 
-import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+
 import { firstValueFrom } from 'rxjs';
+
 import { environment } from '../../../../environments/environment';
 import {
   type AuthProvider,
@@ -102,9 +104,7 @@ export class PasswordAuthProvider implements AuthProvider {
     // Convert WebSocket URL to HTTP URL
     // wss://holochain-dev.elohim.host -> https://holochain-dev.elohim.host
     // ws://localhost:8080 -> http://localhost:8080
-    let httpUrl = adminUrl
-      .replace(/^wss:/, 'https:')
-      .replace(/^ws:/, 'http:');
+    let httpUrl = adminUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
 
     // Remove any path and trailing slash
     try {
@@ -241,12 +241,16 @@ export class PasswordAuthProvider implements AuthProvider {
 
     try {
       const response = await firstValueFrom(
-        this.http.post<AuthResponse>(url, {}, {
-          headers: {
-            ...this.getHeaders(),
-            Authorization: `Bearer ${token}`,
-          },
-        })
+        this.http.post<AuthResponse>(
+          url,
+          {},
+          {
+            headers: {
+              ...this.getHeaders(),
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        )
       );
 
       return {
@@ -274,7 +278,7 @@ export class PasswordAuthProvider implements AuthProvider {
     const url = `${this.getAuthBaseUrl()}/auth/me`;
 
     try {
-      const response = await firstValueFrom(
+      return await firstValueFrom(
         this.http.get<{ humanId: string; agentPubKey: string; identifier: string }>(url, {
           headers: {
             ...this.getHeaders(),
@@ -282,8 +286,6 @@ export class PasswordAuthProvider implements AuthProvider {
           },
         })
       );
-
-      return response;
     } catch {
       return null;
     }

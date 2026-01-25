@@ -13,7 +13,7 @@ export {
   registerSophiaElement,
   isSophiaElementRegistered,
   getSophiaElement,
-  type SophiaQuestionElement
+  type SophiaQuestionElement,
 } from './sophia-element-loader';
 
 // Components

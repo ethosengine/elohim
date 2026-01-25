@@ -15,8 +15,8 @@
  * 4. If passed, contributes to recovery threshold
  */
 
-import { Component, inject, OnInit, OnDestroy, signal, computed, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, OnInit, OnDestroy, signal, computed, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 /** Question from the doorway */

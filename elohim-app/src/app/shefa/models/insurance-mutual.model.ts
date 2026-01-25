@@ -170,13 +170,13 @@ export interface MemberRiskProfile {
    * Manual override reasons (if risk tier was overridden by governance).
    * For transparency and accountability.
    */
-  governanceOverrides?: Array<{
+  governanceOverrides?: {
     date: string;
     previousTier: 'low' | 'standard' | 'high' | 'uninsurable';
     newTier: 'low' | 'standard' | 'high' | 'uninsurable';
     reason: string;
-    authorizedBy: string;  // Agent ID of governance authority
-  }>;
+    authorizedBy: string; // Agent ID of governance authority
+  }[];
 
   /** Arbitrary metadata (for extensibility) */
   metadata?: Record<string, unknown>;
@@ -358,9 +358,17 @@ export interface CoveredRisk {
    * Risk classification.
    * Describes what type of loss is covered.
    */
-  riskType: 'emergency-health' | 'preventive-health' | 'dental' | 'mental-health' |
-            'property-damage' | 'liability' | 'disaster' |
-            'care-interruption' | 'income-protection' | 'other';
+  riskType:
+    | 'emergency-health'
+    | 'preventive-health'
+    | 'dental'
+    | 'mental-health'
+    | 'property-damage'
+    | 'liability'
+    | 'disaster'
+    | 'care-interruption'
+    | 'income-protection'
+    | 'other';
 
   /**
    * Is this risk covered?
@@ -491,9 +499,17 @@ export interface InsuranceClaim {
    * Type of loss.
    * Classification of what happened.
    */
-  lossType: 'emergency-health' | 'preventive-health' | 'dental' | 'mental-health' |
-            'property-damage' | 'liability' | 'disaster' |
-            'care-interruption' | 'income-protection' | 'other';
+  lossType:
+    | 'emergency-health'
+    | 'preventive-health'
+    | 'dental'
+    | 'mental-health'
+    | 'property-damage'
+    | 'liability'
+    | 'disaster'
+    | 'care-interruption'
+    | 'income-protection'
+    | 'other';
 
   /**
    * When the loss occurred.
@@ -559,8 +575,8 @@ export interface InsuranceClaim {
    * Example: police report number, medical records, contractor estimate
    */
   thirdPartyEvidence?: {
-    source: string;         // e.g., "police-report", "medical-records"
-    reference: string;      // e.g., report number, case number
+    source: string; // e.g., "police-report", "medical-records"
+    reference: string; // e.g., report number, case number
     verificationStatus: 'pending' | 'verified' | 'failed';
   }[];
 
@@ -614,7 +630,7 @@ export interface InsuranceClaim {
    */
   appeal?: {
     appealInitiatedAt: string;
-    appealedBy: string;           // Member or adjuster
+    appealedBy: string; // Member or adjuster
     appealReason: string;
     reviewingAdjusterId?: string; // Different adjuster reviewing appeal
     appealDecision?: 'upheld' | 'overturned' | 'modified';
@@ -686,17 +702,17 @@ export interface InsuranceClaim {
  * InsuranceClaimStatus - Lifecycle of a claim.
  */
 export type InsuranceClaimStatus =
-  | 'reported'              // Member reported loss
-  | 'documented'            // Evidence collected
-  | 'under-investigation'   // Adjuster gathering info
-  | 'pending-adjustment'    // Adjuster reviewing
-  | 'adjustment-made'       // Adjuster determination made
-  | 'approved'              // Approved for settlement
-  | 'appealed'              // Member/other party appealing
-  | 'dispute-resolved'      // Appeal resolved
-  | 'ready-for-settlement'  // Ready to pay
-  | 'settled'               // Paid
-  | 'denied';               // Claim denied
+  | 'reported' // Member reported loss
+  | 'documented' // Evidence collected
+  | 'under-investigation' // Adjuster gathering info
+  | 'pending-adjustment' // Adjuster reviewing
+  | 'adjustment-made' // Adjuster determination made
+  | 'approved' // Approved for settlement
+  | 'appealed' // Member/other party appealing
+  | 'dispute-resolved' // Appeal resolved
+  | 'ready-for-settlement' // Ready to pay
+  | 'settled' // Paid
+  | 'denied'; // Claim denied
 
 // ============================================================================
 // ADJUSTMENT REASONING
@@ -775,10 +791,10 @@ export interface AdjustmentReasoning {
    * Shows adjuster thought through ambiguity.
    * Example: ["Could argue deductible applies differently"] + reasoning why not adopted
    */
-  alternativesConsidered?: Array<{
+  alternativesConsidered?: {
     interpretation: string;
     whyNotAdopted: string;
-  }>;
+  }[];
 
   // ─────────────────────────────────────────────────────────────────
   // Generosity Principle

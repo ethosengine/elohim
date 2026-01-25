@@ -17,6 +17,7 @@
  */
 
 import { Injectable } from '@angular/core';
+
 import { HolochainClientService } from './holochain-client.service';
 
 // Mastery types
@@ -34,6 +35,12 @@ import type {
 
 // Practice pool and challenge types
 import type {
+  LearnerPointBalanceOutput,
+  LamadPointEventOutput,
+  EarnLamadPointsInput,
+  EarnLamadPointsResult,
+} from '@app/lamad/models/learning-points.model';
+import type {
   PracticePoolOutput,
   CreatePoolInput,
   PoolRecommendations,
@@ -45,12 +52,6 @@ import type {
 } from '@app/lamad/models/practice.model';
 
 // Learning points types
-import type {
-  LearnerPointBalanceOutput,
-  LamadPointEventOutput,
-  EarnLamadPointsInput,
-  EarnLamadPointsResult,
-} from '@app/lamad/models/learning-points.model';
 
 const ZOME_NAME = 'content_store';
 

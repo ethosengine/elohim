@@ -260,9 +260,7 @@ export function requiresMutualAttestation(level: IntimacyLevel): boolean {
  * Check if consent can be elevated (not at max level, is accepted).
  */
 export function canElevate(consent: HumanConsent): boolean {
-  return (
-    consent.consentState === 'accepted' && consent.intimacyLevel !== 'intimate'
-  );
+  return consent.consentState === 'accepted' && consent.intimacyLevel !== 'intimate';
 }
 
 // Re-export utility functions from protocol-core for convenience

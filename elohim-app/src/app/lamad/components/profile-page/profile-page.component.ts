@@ -1,19 +1,27 @@
-import { Component, OnInit, OnDestroy, inject, computed, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, inject, computed, signal, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute } from '@angular/router';
-import { Subject, Observable, of } from 'rxjs';
+
 import { takeUntil, catchError } from 'rxjs/operators';
+
+import { Subject, Observable, of } from 'rxjs';
+
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { ProfileService } from '@app/elohim/services/profile.service';
+import { isNetworkMode } from '@app/imagodei/models/identity.model';
+import { ResumePoint, PathsOverview, TimelineEvent } from '@app/imagodei/models/profile.model';
+import {
+  SessionHuman,
+  SessionActivity,
+  SessionPathProgress,
+} from '@app/imagodei/models/session-human.model';
+import { IdentityService } from '@app/imagodei/services/identity.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { SovereigntyService } from '@app/imagodei/services/sovereignty.service';
-import { IdentityService } from '@app/imagodei/services/identity.service';
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { ContentMasteryService } from '../../services/content-mastery.service';
-import { ProfileService } from '@app/elohim/services/profile.service';
+
 import { MasteryStats, MasteryLevel } from '../../models';
-import { SessionHuman, SessionActivity, SessionPathProgress } from '@app/imagodei/models/session-human.model';
-import { ResumePoint, PathsOverview, TimelineEvent } from '@app/imagodei/models/profile.model';
-import { isNetworkMode } from '@app/imagodei/models/identity.model';
+import { ContentMasteryService } from '../../services/content-mastery.service';
 
 /**
  * ProfilePageComponent - Session Human profile management.
@@ -37,7 +45,7 @@ import { isNetworkMode } from '@app/imagodei/models/identity.model';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './profile-page.component.html',
-  styleUrls: ['./profile-page.component.css']
+  styleUrls: ['./profile-page.component.css'],
 })
 export class ProfilePageComponent implements OnInit, OnDestroy {
   // Injected services for sovereignty/network tab
@@ -114,13 +122,20 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   readonly modeBadgeText = computed(() => {
     const mode = this.identityMode();
     switch (mode) {
-      case 'hosted': return 'Hosted Human';
-      case 'steward': return 'Steward';
-      case 'self-sovereign': return 'Steward'; // deprecated, mapped to steward
-      case 'session': return 'Session Visitor';
-      case 'anonymous': return 'Anonymous';
-      case 'migrating': return 'Migrating...';
-      default: return 'Visitor';
+      case 'hosted':
+        return 'Hosted Human';
+      case 'steward':
+        return 'Steward';
+      case 'self-sovereign':
+        return 'Steward'; // deprecated, mapped to steward
+      case 'session':
+        return 'Session Visitor';
+      case 'anonymous':
+        return 'Anonymous';
+      case 'migrating':
+        return 'Migrating...';
+      default:
+        return 'Visitor';
     }
   });
 
@@ -128,12 +143,18 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   readonly modeBadgeIcon = computed(() => {
     const mode = this.identityMode();
     switch (mode) {
-      case 'hosted': return 'cloud_done';
-      case 'steward': return 'verified_user';
-      case 'self-sovereign': return 'verified_user'; // deprecated, mapped to steward
-      case 'session': return 'local_activity';
-      case 'migrating': return 'sync';
-      default: return 'person';
+      case 'hosted':
+        return 'cloud_done';
+      case 'steward':
+        return 'verified_user';
+      case 'self-sovereign':
+        return 'verified_user'; // deprecated, mapped to steward
+      case 'session':
+        return 'local_activity';
+      case 'migrating':
+        return 'sync';
+      default:
+        return 'person';
     }
   });
 
@@ -154,7 +175,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   masteryByLevel: { level: MasteryLevel; count: number; label: string }[] = [];
 
   // Activity filter
-  activityFilter: 'all' | 'view' | 'affinity' | 'path-start' | 'path-complete' | 'step-complete' = 'all';
+  activityFilter: 'all' | 'view' | 'affinity' | 'path-start' | 'path-complete' | 'step-complete' =
+    'all';
   filteredActivities: SessionActivity[] = [];
 
   // Edit mode for settings
@@ -164,7 +186,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     avatarUrl: '',
     bio: '',
     locale: '',
-    interests: ''
+    interests: '',
   };
 
   // Loading states
@@ -181,7 +203,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     apply: 'Apply',
     analyze: 'Analyze',
     evaluate: 'Evaluate',
-    create: 'Create'
+    create: 'Create',
   };
 
   constructor(
@@ -214,12 +236,10 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     this.isLoading = true;
 
     // Subscribe to session changes
-    this.sessionHumanService.session$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(session => {
-        this.session = session;
-        this.initEditForm();
-      });
+    this.sessionHumanService.session$.pipe(takeUntil(this.destroy$)).subscribe(session => {
+      this.session = session;
+      this.initEditForm();
+    });
 
     // Load path progress
     this.pathProgressList = this.sessionHumanService.getAllPathProgress();
@@ -229,7 +249,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     this.applyActivityFilter();
 
     // Subscribe to mastery stats
-    this.contentMasteryService.getMasteryStats()
+    this.contentMasteryService
+      .getMasteryStats()
       .pipe(takeUntil(this.destroy$))
       .subscribe(stats => {
         this.masteryStats = stats;
@@ -238,7 +259,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
       });
 
     // Load resume point from ProfileService
-    this.profileService.getResumePoint()
+    this.profileService
+      .getResumePoint()
       .pipe(
         takeUntil(this.destroy$),
         catchError(() => of(null))
@@ -248,7 +270,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
       });
 
     // Load paths overview from ProfileService
-    this.profileService.getPathsOverview()
+    this.profileService
+      .getPathsOverview()
       .pipe(
         takeUntil(this.destroy$),
         catchError(() => of({ inProgress: [], completed: [], suggested: [] }))
@@ -258,7 +281,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
       });
 
     // Load timeline from ProfileService
-    this.profileService.getTimeline(50)
+    this.profileService
+      .getTimeline(50)
       .pipe(
         takeUntil(this.destroy$),
         catchError(() => of([]))
@@ -277,7 +301,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
         avatarUrl: '', // Holochain profile doesn't have avatarUrl in current schema
         bio: profile?.bio ?? '',
         locale: '', // Not in Holochain schema yet
-        interests: profile?.affinities?.join(', ') ?? ''
+        interests: profile?.affinities?.join(', ') ?? '',
       };
     } else if (this.session) {
       this.editForm = {
@@ -285,21 +309,27 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
         avatarUrl: this.session.avatarUrl ?? '',
         bio: this.session.bio ?? '',
         locale: this.session.locale ?? '',
-        interests: this.session.interests?.join(', ') ?? ''
+        interests: this.session.interests?.join(', ') ?? '',
       };
     }
   }
 
   private computeMasteryBreakdown(stats: MasteryStats): void {
     const levels: MasteryLevel[] = [
-      'seen', 'remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'
+      'seen',
+      'remember',
+      'understand',
+      'apply',
+      'analyze',
+      'evaluate',
+      'create',
     ];
 
     this.masteryByLevel = levels
       .map(level => ({
         level,
         count: stats.levelDistribution[level],
-        label: this.levelLabels[level]
+        label: this.levelLabels[level],
       }))
       .filter(item => item.count > 0);
   }
@@ -342,31 +372,49 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
 
   getActivityIcon(type: SessionActivity['type']): string {
     switch (type) {
-      case 'view': return 'visibility';
-      case 'affinity': return 'favorite';
-      case 'path-start': return 'play_arrow';
-      case 'path-complete': return 'check_circle';
-      case 'step-complete': return 'done';
-      case 'explore': return 'explore';
-      default: return 'lens';
+      case 'view':
+        return 'visibility';
+      case 'affinity':
+        return 'favorite';
+      case 'path-start':
+        return 'play_arrow';
+      case 'path-complete':
+        return 'check_circle';
+      case 'step-complete':
+        return 'done';
+      case 'explore':
+        return 'explore';
+      default:
+        return 'lens';
     }
   }
 
   getActivityLabel(type: SessionActivity['type']): string {
     switch (type) {
-      case 'view': return 'Viewed';
-      case 'affinity': return 'Marked Affinity';
-      case 'path-start': return 'Started Path';
-      case 'path-complete': return 'Completed Path';
-      case 'step-complete': return 'Completed Step';
-      case 'explore': return 'Explored';
-      default: return type;
+      case 'view':
+        return 'Viewed';
+      case 'affinity':
+        return 'Marked Affinity';
+      case 'path-start':
+        return 'Started Path';
+      case 'path-complete':
+        return 'Completed Path';
+      case 'step-complete':
+        return 'Completed Step';
+      case 'explore':
+        return 'Explored';
+      default:
+        return type;
     }
   }
 
   formatTimestamp(timestamp: string): string {
     const date = new Date(timestamp);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return (
+      date.toLocaleDateString() +
+      ' ' +
+      date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    );
   }
 
   // =========================================================================
@@ -454,23 +502,23 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
 
   getTimelineEventIcon(type: string): string {
     const icons: Record<string, string> = {
-      'journey_started': 'play_circle',
-      'journey_completed': 'emoji_events',
-      'step_completed': 'check_circle',
-      'capability_earned': 'workspace_premium',
-      'meaningful_encounter': 'favorite',
-      'note_created': 'edit_note',
-      'return_visit': 'replay',
-      'first_exploration': 'explore',
+      journey_started: 'play_circle',
+      journey_completed: 'emoji_events',
+      step_completed: 'check_circle',
+      capability_earned: 'workspace_premium',
+      meaningful_encounter: 'favorite',
+      note_created: 'edit_note',
+      return_visit: 'replay',
+      first_exploration: 'explore',
     };
     return icons[type] ?? 'lens';
   }
 
   getTimelineEventColor(significance: string): string {
     const colors: Record<string, string> = {
-      'milestone': '#667eea',
-      'progress': '#4caf50',
-      'activity': '#9e9e9e',
+      milestone: '#667eea',
+      progress: '#4caf50',
+      activity: '#9e9e9e',
     };
     return colors[significance] ?? '#9e9e9e';
   }
@@ -512,7 +560,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
       apply: '#ffb74d',
       analyze: '#ff8a65',
       evaluate: '#ba68c8',
-      create: '#4fc3f7'
+      create: '#4fc3f7',
     };
     return colors[level];
   }
@@ -546,8 +594,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
       'browser-storage': 'storage',
       'hosted-server': 'cloud',
       'local-holochain': 'smartphone',
-      'dht': 'lan',
-      'encrypted-backup': 'lock'
+      dht: 'lan',
+      'encrypted-backup': 'lock',
     };
     return icons[location] ?? 'folder';
   }

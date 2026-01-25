@@ -6,7 +6,7 @@ import {
   ContentRenderer,
   ContentEditorComponent,
   EditorConfig,
-  DEFAULT_EDITOR_CONFIG
+  DEFAULT_EDITOR_CONFIG,
 } from '../interfaces/content-format-plugin.interface';
 import { ContentNode } from '../../models/content-node.model';
 
@@ -35,9 +35,13 @@ describe('ContentFormatRegistryService', () => {
     canValidate: false,
     canRender: true,
     canEdit: false,
-    import: jasmine.createSpy('import').and.returnValue(Promise.resolve({ nodes: [], warnings: [] })),
+    import: jasmine
+      .createSpy('import')
+      .and.returnValue(Promise.resolve({ nodes: [], warnings: [] })),
     export: jasmine.createSpy('export').and.returnValue(Promise.resolve('exported')),
-    validate: jasmine.createSpy('validate').and.returnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
+    validate: jasmine
+      .createSpy('validate')
+      .and.returnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
     getFormatMetadata: () => ({
       formatId: overrides.formatId ?? 'test-format',
       displayName: overrides.displayName ?? 'Test Format',
@@ -49,18 +53,20 @@ describe('ContentFormatRegistryService', () => {
       canValidate: false,
       priority: 50,
       category: 'document',
-      supportsRoundTrip: true
+      supportsRoundTrip: true,
     }),
-    getRendererComponent: jasmine.createSpy('getRendererComponent').and.returnValue(MockRendererComponent),
+    getRendererComponent: jasmine
+      .createSpy('getRendererComponent')
+      .and.returnValue(MockRendererComponent),
     getRendererPriority: () => 0,
     getEditorComponent: jasmine.createSpy('getEditorComponent').and.returnValue(null),
     getEditorConfig: jasmine.createSpy('getEditorConfig').and.returnValue(DEFAULT_EDITOR_CONFIG),
-    ...overrides
+    ...overrides,
   });
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [ContentFormatRegistryService]
+      providers: [ContentFormatRegistryService],
     });
     service = TestBed.inject(ContentFormatRegistryService);
   });
@@ -81,7 +87,7 @@ describe('ContentFormatRegistryService', () => {
 
     it('should replace existing plugin with same formatId', () => {
       const plugin1 = createMockPlugin({
-        getRendererComponent: () => MockRendererComponent
+        getRendererComponent: () => MockRendererComponent,
       });
 
       class NewRendererComponent implements ContentRenderer {
@@ -89,7 +95,7 @@ describe('ContentFormatRegistryService', () => {
       }
 
       const plugin2 = createMockPlugin({
-        getRendererComponent: () => NewRendererComponent
+        getRendererComponent: () => NewRendererComponent,
       });
 
       service.register(plugin1);
@@ -118,7 +124,7 @@ describe('ContentFormatRegistryService', () => {
 
     it('should return null if plugin canRender is false', () => {
       const plugin = createMockPlugin({
-        canRender: false
+        canRender: false,
       });
       service.register(plugin);
 
@@ -147,7 +153,7 @@ describe('ContentFormatRegistryService', () => {
         contentFormat: 'markdown',
         tags: [],
         relatedNodeIds: [],
-        metadata: {}
+        metadata: {},
       } as ContentNode;
       const result = service.getRenderer(node);
 
@@ -159,7 +165,7 @@ describe('ContentFormatRegistryService', () => {
     it('should return editor component when plugin provides one', () => {
       const plugin = createMockPlugin({
         canEdit: true,
-        getEditorComponent: () => MockEditorComponent as any
+        getEditorComponent: () => MockEditorComponent as any,
       });
       service.register(plugin);
 
@@ -172,7 +178,7 @@ describe('ContentFormatRegistryService', () => {
       service.registerDefaultEditor(MockEditorComponent as any);
       const plugin = createMockPlugin({
         canEdit: false,
-        getEditorComponent: () => null
+        getEditorComponent: () => null,
       });
       service.register(plugin);
 
@@ -184,7 +190,7 @@ describe('ContentFormatRegistryService', () => {
     it('should return null when no editor available and no default registered', () => {
       const plugin = createMockPlugin({
         canEdit: false,
-        getEditorComponent: () => null
+        getEditorComponent: () => null,
       });
       service.register(plugin);
 
@@ -209,11 +215,11 @@ describe('ContentFormatRegistryService', () => {
         wordWrap: false,
         toolbar: {
           enabled: false,
-          actions: []
-        }
+          actions: [],
+        },
       };
       const plugin = createMockPlugin({
-        getEditorConfig: () => customConfig
+        getEditorConfig: () => customConfig,
       });
       service.register(plugin);
 
@@ -234,7 +240,7 @@ describe('ContentFormatRegistryService', () => {
       const mdPlugin = createMockPlugin({
         formatId: 'markdown',
         fileExtensions: ['.md', '.markdown'],
-        mimeTypes: ['text/markdown']
+        mimeTypes: ['text/markdown'],
       });
       service.register(mdPlugin);
 
@@ -248,7 +254,7 @@ describe('ContentFormatRegistryService', () => {
       const mdPlugin = createMockPlugin({
         formatId: 'markdown',
         fileExtensions: [],
-        mimeTypes: ['text/markdown']
+        mimeTypes: ['text/markdown'],
       });
       service.register(mdPlugin);
 
@@ -262,12 +268,12 @@ describe('ContentFormatRegistryService', () => {
       const plugin1 = createMockPlugin({
         formatId: 'format1',
         fileExtensions: ['.txt'],
-        detectFormat: () => 0.3
+        detectFormat: () => 0.3,
       });
       const plugin2 = createMockPlugin({
         formatId: 'format2',
         fileExtensions: ['.txt'],
-        detectFormat: () => 0.9
+        detectFormat: () => 0.9,
       });
       service.register(plugin1);
       service.register(plugin2);
@@ -405,7 +411,7 @@ describe('ContentFormatRegistryService', () => {
     it('should return true when plugin has custom editor', () => {
       const plugin = createMockPlugin({
         canEdit: true,
-        getEditorComponent: () => MockEditorComponent as any
+        getEditorComponent: () => MockEditorComponent as any,
       });
       service.register(plugin);
 
@@ -415,7 +421,7 @@ describe('ContentFormatRegistryService', () => {
     it('should return false when plugin uses default editor', () => {
       const plugin = createMockPlugin({
         canEdit: false,
-        getEditorComponent: () => null
+        getEditorComponent: () => null,
       });
       service.register(plugin);
 
@@ -430,14 +436,14 @@ describe('ContentFormatRegistryService', () => {
         canRender: true,
         canEdit: true,
         canImport: true,
-        canExport: true
+        canExport: true,
       });
       const plugin2 = createMockPlugin({
         formatId: 'format2',
         canRender: false,
         canEdit: false,
         canImport: true,
-        canExport: false
+        canExport: false,
       });
       service.register(plugin1);
       service.register(plugin2);

@@ -29,12 +29,16 @@
         <div class="balance-stats">
           <span class="stat">
             <span class="label">Helping</span>
-            <span class="value">{{ view.helpingCount }} people ({{ formatGB(view.helpingTotalGB) }})</span>
+            <span class="value">
+              {{ view.helpingCount }} people ({{ formatGB(view.helpingTotalGB) }})
+            </span>
           </span>
           <span class="divider">|</span>
           <span class="stat">
             <span class="label">Being helped by</span>
-            <span class="value">{{ view.beingHelpedByCount }} people ({{ formatGB(view.beingHelpedByTotalGB) }})</span>
+            <span class="value">
+              {{ view.beingHelpedByCount }} people ({{ formatGB(view.beingHelpedByTotalGB) }})
+            </span>
           </span>
         </div>
       </div>
@@ -133,10 +137,7 @@
 
             <!-- Content Type Breakdown -->
             <div class="content-types" *ngIf="rel.contentSummary.contentTypes.length > 0">
-              <div
-                class="type-tag"
-                *ngFor="let ct of rel.contentSummary.contentTypes.slice(0, 4)"
-              >
+              <div class="type-tag" *ngFor="let ct of rel.contentSummary.contentTypes.slice(0, 4)">
                 {{ ct.type }}: {{ ct.count }}
               </div>
               <span class="more-types" *ngIf="rel.contentSummary.contentTypes.length > 4">
@@ -168,12 +169,12 @@
           <span class="empty-icon" *ngIf="activeTab === 'helping'">💝</span>
           <span class="empty-icon" *ngIf="activeTab === 'beingHelped'">🙏</span>
           <p *ngIf="activeTab === 'helping'">
-            You're not helping anyone store their content yet.
-            Consider inviting family or friends to join your network.
+            You're not helping anyone store their content yet. Consider inviting family or friends
+            to join your network.
           </p>
           <p *ngIf="activeTab === 'beingHelped'">
-            No one is helping you store your content yet.
-            Connect with family or community members to increase your protection.
+            No one is helping you store your content yet. Connect with family or community members
+            to increase your protection.
           </p>
         </div>
       </div>

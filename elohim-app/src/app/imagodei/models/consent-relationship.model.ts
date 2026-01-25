@@ -33,8 +33,8 @@
  * - Radical Markets: Posner & Weyl (2018)
  */
 
-import type { Measure, ResourceClassification } from '@app/elohim/models/rea-bridge.model';
 import type { EconomicEvent, LamadEventType } from '@app/elohim/models/economic-event.model';
+import type { Measure, ResourceClassification } from '@app/elohim/models/rea-bridge.model';
 
 // =============================================================================
 // Consent Request (The Invitation)
@@ -159,14 +159,14 @@ export interface DataRequest {
  * Types of data that can be requested.
  */
 export type RequestedDataType =
-  | 'discovery-assessment'    // Your Enneagram, MBTI, etc.
-  | 'research-response'       // Your responses to research instruments
-  | 'learning-journey'        // Your path through content
-  | 'deliberation-positions'  // Your positions in deliberations
-  | 'network-position'        // Your place in social networks
-  | 'temporal-patterns'       // ESM/EMA data over time
-  | 'dyadic-data'             // Data from your paired relationships
-  | 'group-participation'     // Your role in group assessments
+  | 'discovery-assessment' // Your Enneagram, MBTI, etc.
+  | 'research-response' // Your responses to research instruments
+  | 'learning-journey' // Your path through content
+  | 'deliberation-positions' // Your positions in deliberations
+  | 'network-position' // Your place in social networks
+  | 'temporal-patterns' // ESM/EMA data over time
+  | 'dyadic-data' // Data from your paired relationships
+  | 'group-participation' // Your role in group assessments
   | 'aggregate-contribution'; // Just contribute to aggregate stats
 
 /**
@@ -174,7 +174,12 @@ export type RequestedDataType =
  */
 export interface ConsentPurpose {
   /** Purpose category */
-  category: 'academic-research' | 'community-insight' | 'personal-connection' | 'commercial' | 'governance';
+  category:
+    | 'academic-research'
+    | 'community-insight'
+    | 'personal-connection'
+    | 'commercial'
+    | 'governance';
 
   /** Description of purpose */
   description: string;
@@ -247,15 +252,15 @@ export interface ValueOffer {
  * Types of value that can be offered.
  */
 export type ValueOfferType =
-  | 'none'                    // Requesting altruistic contribution
-  | 'results-access'          // Access to research findings
-  | 'reciprocal-data'         // They share their data too
-  | 'community-benefit'       // Benefits the community you're part of
-  | 'tokens'                  // Protocol tokens
-  | 'monetary'                // Fiat compensation
-  | 'reputation'              // Reputation/attestation in return
-  | 'connection'              // Relationship with requester
-  | 'negotiable';             // Open to discussion
+  | 'none' // Requesting altruistic contribution
+  | 'results-access' // Access to research findings
+  | 'reciprocal-data' // They share their data too
+  | 'community-benefit' // Benefits the community you're part of
+  | 'tokens' // Protocol tokens
+  | 'monetary' // Fiat compensation
+  | 'reputation' // Reputation/attestation in return
+  | 'connection' // Relationship with requester
+  | 'negotiable'; // Open to discussion
 
 /**
  * How long they want access.
@@ -278,14 +283,14 @@ export interface AccessDuration {
  * Current status of a consent request.
  */
 export type ConsentRequestStatus =
-  | 'pending'           // Awaiting your response
-  | 'in-conversation'   // Active dialogue
-  | 'deferred'          // You asked to decide later
-  | 'granted'           // You said yes
-  | 'declined'          // You said no
-  | 'negotiating'       // Discussing terms
-  | 'expired'           // Request timed out
-  | 'withdrawn';        // Requester withdrew
+  | 'pending' // Awaiting your response
+  | 'in-conversation' // Active dialogue
+  | 'deferred' // You asked to decide later
+  | 'granted' // You said yes
+  | 'declined' // You said no
+  | 'negotiating' // Discussing terms
+  | 'expired' // Request timed out
+  | 'withdrawn'; // Requester withdrew
 
 // =============================================================================
 // Consent Response (Your Answer)
@@ -325,12 +330,12 @@ export interface ConsentResponse {
  * Your decision on a consent request.
  */
 export type ConsentDecision =
-  | 'grant'              // Yes, you can use my data
-  | 'grant-modified'     // Yes, but with different terms
-  | 'decline'            // No, not this time
-  | 'decline-permanent'  // No, don't ask again
-  | 'defer'              // Ask me again later
-  | 'counter-offer';     // I want different terms
+  | 'grant' // Yes, you can use my data
+  | 'grant-modified' // Yes, but with different terms
+  | 'decline' // No, not this time
+  | 'decline-permanent' // No, don't ask again
+  | 'defer' // Ask me again later
+  | 'counter-offer'; // I want different terms
 
 /**
  * Terms of a consent grant.
@@ -415,13 +420,13 @@ export interface ConsentGrant {
  * Status of a consent grant.
  */
 export type ConsentGrantStatus =
-  | 'active'             // Currently in effect
-  | 'paused'             // Temporarily suspended
-  | 'under-review'       // You're reviewing whether to continue
-  | 'expired'            // Time-limited grant ended
-  | 'withdrawn'          // You withdrew consent
-  | 'violated'           // Terms were violated
-  | 'completed';         // Study/purpose completed
+  | 'active' // Currently in effect
+  | 'paused' // Temporarily suspended
+  | 'under-review' // You're reviewing whether to continue
+  | 'expired' // Time-limited grant ended
+  | 'withdrawn' // You withdrew consent
+  | 'violated' // Terms were violated
+  | 'completed'; // Study/purpose completed
 
 /**
  * Log of how your data was used under a grant.
@@ -544,13 +549,13 @@ export interface ConsentAudit {
  * What triggered this audit.
  */
 export type AuditTrigger =
-  | 'scheduled'          // Regular periodic review
-  | 'usage-threshold'    // Your data was used X times
-  | 'new-publication'    // Something was published using your data
-  | 'grant-expiring'     // A grant is about to expire
-  | 'user-initiated'     // You requested a review
-  | 'policy-change'      // Requester changed their terms
-  | 'violation-detected';// Potential terms violation
+  | 'scheduled' // Regular periodic review
+  | 'usage-threshold' // Your data was used X times
+  | 'new-publication' // Something was published using your data
+  | 'grant-expiring' // A grant is about to expire
+  | 'user-initiated' // You requested a review
+  | 'policy-change' // Requester changed their terms
+  | 'violation-detected'; // Potential terms violation
 
 /**
  * Summary of a grant for audit review.
@@ -637,7 +642,12 @@ export interface ElohimConsentAssessment {
   assessedAt: string;
 
   /** Overall recommendation */
-  recommendation: 'likely-approve' | 'worth-considering' | 'needs-review' | 'likely-decline' | 'flag-concern';
+  recommendation:
+    | 'likely-approve'
+    | 'worth-considering'
+    | 'needs-review'
+    | 'likely-decline'
+    | 'flag-concern';
 
   /** Confidence in recommendation (0-1) */
   confidence: number;
@@ -667,7 +677,13 @@ export interface ElohimConsentAssessment {
  */
 export interface ConsentFactor {
   /** Factor type */
-  type: 'requester-reputation' | 'purpose-alignment' | 'value-fairness' | 'privacy-risk' | 'past-behavior' | 'community-benefit';
+  type:
+    | 'requester-reputation'
+    | 'purpose-alignment'
+    | 'value-fairness'
+    | 'privacy-risk'
+    | 'past-behavior'
+    | 'community-benefit';
 
   /** Weight of this factor */
   weight: number;
@@ -826,7 +842,10 @@ export interface ConsentRelationshipService {
   getRequest(requestId: string): Promise<ConsentRequest>;
 
   // ===== Responding to requests
-  respond(requestId: string, response: Omit<ConsentResponse, 'id' | 'respondedAt'>): Promise<ConsentResponse>;
+  respond(
+    requestId: string,
+    response: Omit<ConsentResponse, 'id' | 'respondedAt'>
+  ): Promise<ConsentResponse>;
   startConversation(requestId: string, message: string): Promise<ConsentConversation>;
   proposeTerms(requestId: string, terms: ConsentTerms): Promise<ConsentMessage>;
 

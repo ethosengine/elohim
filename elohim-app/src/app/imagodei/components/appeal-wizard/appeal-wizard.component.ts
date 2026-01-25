@@ -11,12 +11,11 @@
  * 4. Review and submit
  */
 
-import { Component, OnInit, inject, signal, computed, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 
-import { StewardshipService } from '../../services/stewardship.service';
 import {
   type StewardshipGrant,
   type StewardshipAppeal,
@@ -24,6 +23,7 @@ import {
   type FileAppealInput,
   getAuthorityBasisLabel,
 } from '../../models/stewardship.model';
+import { StewardshipService } from '../../services/stewardship.service';
 
 /** Appeal wizard step */
 type WizardStep = 'type' | 'grounds' | 'advocate' | 'review';
@@ -112,7 +112,11 @@ export class AppealWizardComponent implements OnInit {
 
     return [
       { id: 'type', label: 'Appeal Type', completed: type !== null },
-      { id: 'grounds', label: 'Grounds', completed: grounds.length > 0 || this.customGrounds().length > 0 },
+      {
+        id: 'grounds',
+        label: 'Grounds',
+        completed: grounds.length > 0 || this.customGrounds().length > 0,
+      },
       { id: 'advocate', label: 'Advocate', completed: true }, // Optional step
       { id: 'review', label: 'Review', completed: false },
     ];
@@ -173,7 +177,8 @@ export class AppealWizardComponent implements OnInit {
     {
       value: 'invalid_evidence',
       label: 'Invalid Evidence',
-      description: 'The evidence supporting this grant is invalid, outdated, or improperly obtained.',
+      description:
+        'The evidence supporting this grant is invalid, outdated, or improperly obtained.',
     },
     {
       value: 'capability_request',

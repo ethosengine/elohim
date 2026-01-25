@@ -1,6 +1,7 @@
-<div class="content-viewer-container focused-view-container"
-     [class.focused-view-active]="isFocusedView">
-
+<div
+  class="content-viewer-container focused-view-container"
+  [class.focused-view-active]="isFocusedView"
+>
   <!-- Loading state -->
   <div *ngIf="isLoading" class="loading-state">
     <div class="spinner"></div>
@@ -18,17 +19,10 @@
     <!-- Header -->
     <div class="content-header">
       <div class="header-nav">
-        <button
-          class="back-button"
-          (click)="backToHome()">
-          ← Back to Lamad
-        </button>
+        <button class="back-button" (click)="backToHome()">← Back to Lamad</button>
 
         <!-- Return to Path button (shown when viewing from a detour) -->
-        <button
-          *ngIf="hasReturnPath"
-          class="return-to-path-btn"
-          (click)="returnToPath()">
+        <button *ngIf="hasReturnPath" class="return-to-path-btn" (click)="returnToPath()">
           ← Return to {{ pathContext?.pathTitle }}
         </button>
       </div>
@@ -46,12 +40,8 @@
           <span *ngIf="getMetadataCategory()" class="meta-item">
             📁 {{ getMetadataCategory() }}
           </span>
-          <span *ngIf="getMetadataAuthors()" class="meta-item">
-            ✍️ {{ getMetadataAuthors() }}
-          </span>
-          <span *ngIf="getMetadataVersion()" class="meta-item">
-            🏷️ v{{ getMetadataVersion() }}
-          </span>
+          <span *ngIf="getMetadataAuthors()" class="meta-item">✍️ {{ getMetadataAuthors() }}</span>
+          <span *ngIf="getMetadataVersion()" class="meta-item">🏷️ v{{ getMetadataVersion() }}</span>
         </div>
 
         <div class="tags" *ngIf="node.tags.length > 0">
@@ -64,7 +54,8 @@
           <a
             *ngIf="canEditContent"
             [routerLink]="['/lamad/resource', node.id, 'edit']"
-            class="btn-edit">
+            class="btn-edit"
+          >
             ✏️ Edit
           </a>
         </div>
@@ -89,10 +80,18 @@
         </div>
 
         <div class="quick-actions">
-          <button class="btn-quick" (click)="setAffinity(0.5)" [ngClass]="{'active': affinity >= 0.4 && affinity <= 0.6}">
+          <button
+            class="btn-quick"
+            (click)="setAffinity(0.5)"
+            [ngClass]="{ active: affinity >= 0.4 && affinity <= 0.6 }"
+          >
             📚 Practicing
           </button>
-          <button class="btn-quick" (click)="setAffinity(1.0)" [ngClass]="{'active': affinity > 0.9}">
+          <button
+            class="btn-quick"
+            (click)="setAffinity(1.0)"
+            [ngClass]="{ active: affinity > 0.9 }"
+          >
             ✅ Mastered
           </button>
         </div>
@@ -101,37 +100,52 @@
           <div
             class="affinity-bar-fill"
             [style.width.%]="getAffinityPercentage()"
-            [ngClass]="'affinity-' + getAffinityLevel()">
-          </div>
+            [ngClass]="'affinity-' + getAffinityLevel()"
+          ></div>
         </div>
       </div>
     </div>
 
     <!-- Tabs Navigation -->
     <div class="viewer-tabs">
-      <button class="tab-btn" (click)="setActiveTab('content')" [class.active]="activeTab === 'content'">
+      <button
+        class="tab-btn"
+        (click)="setActiveTab('content')"
+        [class.active]="activeTab === 'content'"
+      >
         Content
       </button>
-      <button class="tab-btn" (click)="setActiveTab('trust')" [class.active]="activeTab === 'trust'">
+      <button
+        class="tab-btn"
+        (click)="setActiveTab('trust')"
+        [class.active]="activeTab === 'trust'"
+      >
         Attestations
       </button>
-      <button class="tab-btn" (click)="setActiveTab('governance')" [class.active]="activeTab === 'governance'">
+      <button
+        class="tab-btn"
+        (click)="setActiveTab('governance')"
+        [class.active]="activeTab === 'governance'"
+      >
         Governance
       </button>
-      <button class="tab-btn" (click)="setActiveTab('network')" [class.active]="activeTab === 'network'">
+      <button
+        class="tab-btn"
+        (click)="setActiveTab('network')"
+        [class.active]="activeTab === 'network'"
+      >
         Network
       </button>
     </div>
 
     <!-- Tab Content -->
     <div [ngSwitch]="activeTab" class="tab-content">
-
       <!-- Content Toolbar (fixed at top in focused view) -->
       <div class="content-toolbar">
         <app-focused-view-toggle
           [isActive]="isFocusedView"
-          (toggled)="onFocusedViewToggle($event)">
-        </app-focused-view-toggle>
+          (toggled)="onFocusedViewToggle($event)"
+        ></app-focused-view-toggle>
       </div>
 
       <!-- Content Tab -->
@@ -144,7 +158,8 @@
           <!-- Fallback: Plain text content (when no renderer registered) -->
           <div
             *ngIf="!hasRegisteredRenderer && node.contentFormat === 'plaintext'"
-            class="plaintext-content">
+            class="plaintext-content"
+          >
             <pre>{{ getStringContent(node.content) }}</pre>
           </div>
 
@@ -152,13 +167,18 @@
           <div
             *ngIf="!hasRegisteredRenderer && node.contentFormat === 'html'"
             class="html-content"
-            [innerHTML]="node.content">
-          </div>
+            [innerHTML]="node.content"
+          ></div>
 
           <!-- Fallback: Unknown format -->
           <div
-            *ngIf="!hasRegisteredRenderer && node.contentFormat !== 'plaintext' && node.contentFormat !== 'html'"
-            class="fallback-content">
+            *ngIf="
+              !hasRegisteredRenderer &&
+              node.contentFormat !== 'plaintext' &&
+              node.contentFormat !== 'html'
+            "
+            class="fallback-content"
+          >
             <p class="fallback-notice">Content format: {{ node.contentFormat }}</p>
             <pre>{{ getStringContent(node.content) }}</pre>
           </div>
@@ -175,8 +195,8 @@
               [allowedReactions]="allowedReactions"
               [constraints]="feedbackProfile?.emotionalReactionConstraints"
               [contentType]="mapContentTypeToProfileType(node.contentType)"
-              [showCounts]="true">
-            </app-reaction-bar>
+              [showCounts]="true"
+            ></app-reaction-bar>
           </div>
 
           <!-- Graduated Feedback (Medium Friction) -->
@@ -185,31 +205,42 @@
               [contentId]="node.id"
               [context]="feedbackContext"
               [requiresReasoning]="false"
-              [showAggregates]="true">
-            </app-graduated-feedback>
+              [showAggregates]="true"
+            ></app-graduated-feedback>
           </div>
 
           <!-- Signal Summary (when aggregates exist) -->
-          <div class="signal-summary" *ngIf="aggregatedSignals && aggregatedSignals.reactionCounts.total > 0">
+          <div
+            class="signal-summary"
+            *ngIf="aggregatedSignals && aggregatedSignals.reactionCounts.total > 0"
+          >
             <div class="signal-metric">
               <span class="metric-label">Community Sentiment</span>
-              <span class="metric-value" [ngClass]="{
-                'positive': aggregatedSignals.sentimentScore > 0.6,
-                'neutral': aggregatedSignals.sentimentScore >= 0.4 && aggregatedSignals.sentimentScore <= 0.6,
-                'negative': aggregatedSignals.sentimentScore < 0.4
-              }">
-                {{ (aggregatedSignals.sentimentScore * 100) | number:'1.0-0' }}%
+              <span
+                class="metric-value"
+                [ngClass]="{
+                  positive: aggregatedSignals.sentimentScore > 0.6,
+                  neutral:
+                    aggregatedSignals.sentimentScore >= 0.4 &&
+                    aggregatedSignals.sentimentScore <= 0.6,
+                  negative: aggregatedSignals.sentimentScore < 0.4,
+                }"
+              >
+                {{ aggregatedSignals.sentimentScore * 100 | number: '1.0-0' }}%
               </span>
             </div>
             <div class="signal-metric" *ngIf="aggregatedSignals.effectivenessScore > 0">
               <span class="metric-label">Effectiveness</span>
               <span class="metric-value">
-                {{ (aggregatedSignals.effectivenessScore * 100) | number:'1.0-0' }}%
+                {{ aggregatedSignals.effectivenessScore * 100 | number: '1.0-0' }}%
               </span>
             </div>
             <div class="signal-metric">
               <span class="metric-label">Consensus</span>
-              <span class="metric-value consensus-badge" [ngClass]="aggregatedSignals.consensusState.level">
+              <span
+                class="metric-value consensus-badge"
+                [ngClass]="aggregatedSignals.consensusState.level"
+              >
                 {{ aggregatedSignals.consensusState.level | titlecase }}
               </span>
             </div>
@@ -219,10 +250,13 @@
         <!-- Appears in Paths (Wikipedia-style back-links) -->
         <div *ngIf="containingPaths.length > 0 || loadingPaths" class="paths-section">
           <h2>📚 Appears in Learning Paths</h2>
-          <p class="paths-description">This content is part of the following curated learning journeys:</p>
+          <p class="paths-description">
+            This content is part of the following curated learning journeys:
+          </p>
 
           <div *ngIf="loadingPaths" class="paths-loading">
-            <span class="spinner-small"></span> Loading paths...
+            <span class="spinner-small"></span>
+            Loading paths...
           </div>
 
           <div *ngIf="!loadingPaths && containingPaths.length > 0" class="paths-list">
@@ -230,7 +264,8 @@
               *ngFor="let pathRef of containingPaths"
               class="path-card"
               (click)="navigateToPath(pathRef.pathId, pathRef.stepIndex)"
-              type="button">
+              type="button"
+            >
               <div class="path-header">
                 <span class="path-icon">🗺️</span>
                 <span class="path-title">{{ pathRef.pathTitle }}</span>
@@ -252,12 +287,11 @@
               class="related-card"
               (click)="viewRelatedContent(relatedNode)"
               (keydown.enter)="viewRelatedContent(relatedNode)"
-              type="button">
+              type="button"
+            >
               <div class="related-header">
                 <span class="related-type">{{ relatedNode.contentType }}</span>
-                <span class="related-affinity">
-                  {{ getRelatedNodeAffinity(relatedNode.id) }}%
-                </span>
+                <span class="related-affinity">{{ getRelatedNodeAffinity(relatedNode.id) }}%</span>
               </div>
               <h3 class="related-title">{{ relatedNode.title }}</h3>
               <p class="related-description">{{ relatedNode.description }}</p>
@@ -297,7 +331,8 @@
               </div>
             </div>
             <div class="trust-reach">
-              <strong>Reach Level:</strong> {{ trustBadge.reachLabel | titlecase }}
+              <strong>Reach Level:</strong>
+              {{ trustBadge.reachLabel | titlecase }}
             </div>
           </div>
 
@@ -319,7 +354,11 @@
           <div class="trust-badges-section" *ngIf="trustBadge.secondary.length > 0">
             <h3>Verified Attributes</h3>
             <div class="badges-grid">
-              <div *ngFor="let badge of trustBadge.secondary" class="badge-card" [class]="'badge-' + badge.color">
+              <div
+                *ngFor="let badge of trustBadge.secondary"
+                class="badge-card"
+                [class]="'badge-' + badge.color"
+              >
                 <div class="badge-icon">{{ badge.icon }}</div>
                 <div class="badge-info">
                   <h4>{{ badge.label }}</h4>
@@ -336,10 +375,12 @@
           <div class="trust-actions" *ngIf="trustBadge.actions?.length">
             <h3>Available Actions</h3>
             <div class="actions-list">
-              <button *ngFor="let action of trustBadge.actions" 
-                      class="btn-secondary"
-                      [disabled]="!action.available"
-                      (click)="handleAction(action)">
+              <button
+                *ngFor="let action of trustBadge.actions"
+                class="btn-secondary"
+                [disabled]="!action.available"
+                (click)="handleAction(action)"
+              >
                 <span class="action-icon">{{ action.icon }}</span>
                 {{ action.label }}
               </button>
@@ -347,7 +388,7 @@
           </div>
         </div>
       </section>
-      
+
       <!-- Governance Tab -->
       <section *ngSwitchCase="'governance'" class="governance-tab">
         <div *ngIf="isLoadingGovernance" class="loading-state">
@@ -357,7 +398,10 @@
 
         <div *ngIf="!isLoadingGovernance" class="governance-content">
           <!-- Status Card -->
-          <div class="governance-status-card" [class]="'status-' + (governanceState?.status || 'unreviewed')">
+          <div
+            class="governance-status-card"
+            [class]="'status-' + (governanceState?.status || 'unreviewed')"
+          >
             <div class="status-header">
               <span class="status-icon">{{ getGovernanceStatusIcon() }}</span>
               <h3>{{ getGovernanceStatusLabel() }}</h3>
@@ -371,9 +415,11 @@
               <h4>Active Labels</h4>
               <div class="labels-list">
                 <ng-container *ngIf="governanceState">
-                  <span *ngFor="let label of governanceState.labels"
-                        class="label-badge"
-                        [class]="'severity-' + label.severity">
+                  <span
+                    *ngFor="let label of governanceState.labels"
+                    class="label-badge"
+                    [class]="'severity-' + label.severity"
+                  >
                     {{ label.labelType }}
                   </span>
                 </ng-container>
@@ -391,9 +437,11 @@
             </div>
 
             <div *ngIf="challenges.length > 0" class="challenges-list">
-              <div *ngFor="let challenge of challenges"
-                   class="challenge-card"
-                   [class]="'status-' + challenge.status">
+              <div
+                *ngFor="let challenge of challenges"
+                class="challenge-card"
+                [class]="'status-' + challenge.status"
+              >
                 <div class="challenge-header">
                   <span class="challenge-grounds">{{ challenge.grounds }}</span>
                   <span class="challenge-status">{{ challenge.status }}</span>
@@ -450,8 +498,8 @@
             [maxNodes]="20"
             [height]="350"
             (nodeSelected)="onGraphNodeSelected($event)"
-            (exploreRequested)="exploreInGraph()">
-          </app-mini-graph>
+            (exploreRequested)="exploreInGraph()"
+          ></app-mini-graph>
         </div>
 
         <!-- Explore in Full Graph Button -->
@@ -462,7 +510,6 @@
           </button>
         </div>
       </section>
-
     </div>
   </div>
 </div>

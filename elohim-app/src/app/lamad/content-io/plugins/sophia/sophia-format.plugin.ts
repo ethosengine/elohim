@@ -7,19 +7,22 @@
  */
 
 import { Type } from '@angular/core';
+
 import {
   BaseContentFormatPlugin,
   ContentRenderer,
   DEFAULT_EDITOR_CONFIG,
-  type EditorConfig
+  type EditorConfig,
 } from '../../interfaces/content-format-plugin.interface';
+
+import { SophiaRendererComponent } from './sophia-renderer.component';
+
 import type {
   ContentIOImportResult,
-  ContentIOExportInput
+  ContentIOExportInput,
 } from '../../interfaces/content-io-plugin.interface';
-import type { ValidationResult } from '../../interfaces/validation-result.interface';
 import type { FormatMetadata } from '../../interfaces/format-metadata.interface';
-import { SophiaRendererComponent } from './sophia-renderer.component';
+import type { ValidationResult } from '../../interfaces/validation-result.interface';
 
 /**
  * Format plugin for Sophia psychometric assessments.
@@ -82,14 +85,21 @@ export class SophiaFormatPlugin extends BaseContentFormatPlugin {
 
       return {
         valid: isValid,
-        errors: isValid ? [] : [{ code: 'INVALID_STRUCTURE', message: 'Invalid Sophia assessment structure' }],
-        warnings: []
+        errors: isValid
+          ? []
+          : [{ code: 'INVALID_STRUCTURE', message: 'Invalid Sophia assessment structure' }],
+        warnings: [],
       };
     } catch (error) {
       return {
         valid: false,
-        errors: [{ code: 'PARSE_ERROR', message: `Parse error: ${error instanceof Error ? error.message : 'Unknown error'}` }],
-        warnings: []
+        errors: [
+          {
+            code: 'PARSE_ERROR',
+            message: `Parse error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        warnings: [],
       };
     }
   }
@@ -119,8 +129,8 @@ export class SophiaFormatPlugin extends BaseContentFormatPlugin {
       title,
       metadata: {
         format: 'sophia-quiz-json',
-        assessmentPurpose: purpose
-      }
+        assessmentPurpose: purpose,
+      },
     };
   }
 
@@ -143,7 +153,7 @@ export class SophiaFormatPlugin extends BaseContentFormatPlugin {
       icon: 'quiz',
       category: 'data', // Assessment content is structured data
       supportsRoundTrip: true,
-      priority: 10 // Higher priority for assessment content
+      priority: 10, // Higher priority for assessment content
     };
   }
 
@@ -151,7 +161,7 @@ export class SophiaFormatPlugin extends BaseContentFormatPlugin {
     return {
       ...DEFAULT_EDITOR_CONFIG,
       editorMode: 'code',
-      supportsLivePreview: true
+      supportsLivePreview: true,
     };
   }
 
@@ -196,15 +206,15 @@ export class SophiaFormatPlugin extends BaseContentFormatPlugin {
     // Valid Moment format (has purpose and content properties)
     if (obj['purpose'] && obj['content']) {
       const innerContent = obj['content'] as Record<string, unknown>;
-      return typeof innerContent['content'] === 'string' &&
-             typeof innerContent['widgets'] === 'object';
+      return (
+        typeof innerContent['content'] === 'string' && typeof innerContent['widgets'] === 'object'
+      );
     }
 
     // Valid Perseus-compatible format (has question property)
     if (obj['question']) {
       const question = obj['question'] as Record<string, unknown>;
-      return typeof question['content'] === 'string' &&
-             typeof question['widgets'] === 'object';
+      return typeof question['content'] === 'string' && typeof question['widgets'] === 'object';
     }
 
     // Array of moments or questions

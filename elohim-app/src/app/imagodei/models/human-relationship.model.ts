@@ -38,7 +38,8 @@ export const HumanRelationshipTypes = {
   OTHER: 'other',
 } as const;
 
-export type HumanRelationshipType = typeof HumanRelationshipTypes[keyof typeof HumanRelationshipTypes];
+export type HumanRelationshipType =
+  (typeof HumanRelationshipTypes)[keyof typeof HumanRelationshipTypes];
 
 // =============================================================================
 // Intimacy Levels
@@ -62,7 +63,7 @@ export const IntimacyLevels = {
   INTIMATE: 'intimate',
 } as const;
 
-export type IntimacyLevel = typeof IntimacyLevels[keyof typeof IntimacyLevels];
+export type IntimacyLevel = (typeof IntimacyLevels)[keyof typeof IntimacyLevels];
 
 /**
  * Intimacy level ordering for comparison.
@@ -285,7 +286,9 @@ export interface HumanRelationshipWire {
 /**
  * Transform wire format to HumanRelationshipView.
  */
-export function transformHumanRelationshipFromWire(wire: HumanRelationshipWire): HumanRelationshipView {
+export function transformHumanRelationshipFromWire(
+  wire: HumanRelationshipWire
+): HumanRelationshipView {
   let context: Record<string, unknown> | undefined;
   try {
     context = wire.contextJson ? JSON.parse(wire.contextJson) : undefined;
@@ -324,7 +327,7 @@ export function transformHumanRelationshipFromWire(wire: HumanRelationshipWire):
  */
 export function transformHumanRelationshipToWire(
   view: HumanRelationshipView,
-  appId: string = 'imagodei'
+  appId = 'imagodei'
 ): Omit<HumanRelationshipWire, 'createdAt' | 'updatedAt'> {
   return {
     id: view.id,

@@ -4,11 +4,7 @@
     <h1>My Capabilities</h1>
     <p class="subtitle">View your current access and restrictions</p>
 
-    <button
-      class="refresh-btn"
-      (click)="refresh()"
-      [disabled]="isLoading()"
-      title="Refresh">
+    <button class="refresh-btn" (click)="refresh()" [disabled]="isLoading()" title="Refresh">
       <span class="icon">&#8635;</span>
     </button>
   </header>
@@ -18,9 +14,7 @@
     <div class="error-banner" role="alert">
       <span class="error-icon">&#9888;</span>
       <span class="error-message">{{ error() }}</span>
-      <button class="dismiss-btn" (click)="clearError()" aria-label="Dismiss">
-        &times;
-      </button>
+      <button class="dismiss-btn" (click)="clearError()" aria-label="Dismiss">&times;</button>
     </div>
   }
 
@@ -66,7 +60,7 @@
         </div>
 
         <div class="current-time">
-          {{ currentTime() | date:'shortTime' }}
+          {{ currentTime() | date: 'shortTime' }}
         </div>
       </section>
     }
@@ -90,13 +84,27 @@
             <div class="restriction-card" [attr.data-type]="restriction.type">
               <div class="restriction-icon">
                 @switch (restriction.type) {
-                  @case ('category') { <span>🚫</span> }
-                  @case ('feature') { <span>🔒</span> }
-                  @case ('route') { <span>🚧</span> }
-                  @case ('time') { <span>⏰</span> }
-                  @case ('age_rating') { <span>🎲</span> }
-                  @case ('reach') { <span>🌐</span> }
-                  @default { <span>&#8226;</span> }
+                  @case ('category') {
+                    <span>🚫</span>
+                  }
+                  @case ('feature') {
+                    <span>🔒</span>
+                  }
+                  @case ('route') {
+                    <span>🚧</span>
+                  }
+                  @case ('time') {
+                    <span>⏰</span>
+                  }
+                  @case ('age_rating') {
+                    <span>🎲</span>
+                  }
+                  @case ('reach') {
+                    <span>🌐</span>
+                  }
+                  @default {
+                    <span>&#8226;</span>
+                  }
                 }
               </div>
 
@@ -106,10 +114,7 @@
               </div>
 
               @if (restriction.canAppeal) {
-                <button
-                  class="appeal-btn"
-                  (click)="fileAppeal(restriction)"
-                  title="Request change">
+                <button class="appeal-btn" (click)="fileAppeal(restriction)" title="Request change">
                   Appeal
                 </button>
               }
@@ -135,17 +140,15 @@
               {{ getAuthorityBasisLabel(primarySteward()!.authorityBasis) }}
             </p>
             <p class="steward-meta">
-              <span>Since {{ primarySteward()!.grantedAt | date:'mediumDate' }}</span>
+              <span>Since {{ primarySteward()!.grantedAt | date: 'mediumDate' }}</span>
               @if (primarySteward()!.expiresAt) {
-                <span>&bull; Expires {{ primarySteward()!.expiresAt | date:'mediumDate' }}</span>
+                <span>&bull; Expires {{ primarySteward()!.expiresAt | date: 'mediumDate' }}</span>
               }
             </p>
           </div>
 
           <div class="steward-actions">
-            <button class="contact-btn" (click)="contactSteward()">
-              Contact
-            </button>
+            <button class="contact-btn" (click)="contactSteward()">Contact</button>
           </div>
         </div>
       </section>
@@ -155,15 +158,35 @@
     <section class="rights-notice">
       <h3>Your Rights</h3>
       <p>
-        These capabilities can <strong>never</strong> be restricted:
+        These capabilities can
+        <strong>never</strong>
+        be restricted:
       </p>
       <ul class="rights-list">
-        <li><span class="icon">👁</span> View this dashboard</li>
-        <li><span class="icon">✏️</span> File appeals</li>
-        <li><span class="icon">💬</span> Contact your steward</li>
-        <li><span class="icon">🤖</span> Access Elohim chat</li>
-        <li><span class="icon">📞</span> Emergency contacts</li>
-        <li><span class="icon">🕐</span> See time remaining</li>
+        <li>
+          <span class="icon">👁</span>
+          View this dashboard
+        </li>
+        <li>
+          <span class="icon">✏️</span>
+          File appeals
+        </li>
+        <li>
+          <span class="icon">💬</span>
+          Contact your steward
+        </li>
+        <li>
+          <span class="icon">🤖</span>
+          Access Elohim chat
+        </li>
+        <li>
+          <span class="icon">📞</span>
+          Emergency contacts
+        </li>
+        <li>
+          <span class="icon">🕐</span>
+          See time remaining
+        </li>
       </ul>
     </section>
 

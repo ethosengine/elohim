@@ -1,13 +1,16 @@
+import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
-import { CommonModule } from '@angular/common';
+
 import { filter } from 'rxjs/operators';
+
+import { environment } from '../environments/environment';
+
 import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
 import { HolochainContentService } from './elohim/services/holochain-content.service';
-import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
-import { environment } from '../environments/environment';
+import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
 
 /** Connection retry configuration */
 interface RetryConfig {
@@ -21,7 +24,7 @@ interface RetryConfig {
   selector: 'app-root',
   imports: [RouterOutlet, ThemeToggleComponent, CommonModule],
   templateUrl: './app.component.html',
-  styleUrl: './app.component.css'
+  styleUrl: './app.component.css',
 })
 export class AppComponent implements OnInit, OnDestroy {
   title = 'elohim-app';
@@ -38,7 +41,7 @@ export class AppComponent implements OnInit, OnDestroy {
     maxAttempts: 5,
     baseDelayMs: 1000,
     maxDelayMs: 30000,
-    backoffMultiplier: 2
+    backoffMultiplier: 2,
   };
 
   /** Track retry state */
@@ -200,13 +203,14 @@ export class AppComponent implements OnInit, OnDestroy {
 
       if (this.connectionAttempt < maxAttempts) {
         // Calculate delay with exponential backoff + jitter
-        const exponentialDelay = baseDelayMs * Math.pow(backoffMultiplier, this.connectionAttempt - 1);
+        const exponentialDelay =
+          baseDelayMs * Math.pow(backoffMultiplier, this.connectionAttempt - 1);
         const jitter = Math.random() * 1000; // Add up to 1s of jitter
         const delay = Math.min(exponentialDelay + jitter, maxDelayMs);
 
         console.warn(
           `[Holochain] Connection failed (attempt ${this.connectionAttempt}/${maxAttempts}): ${errorMessage}. ` +
-          `Retrying in ${Math.round(delay / 1000)}s...`
+            `Retrying in ${Math.round(delay / 1000)}s...`
         );
 
         // Schedule retry
@@ -219,7 +223,7 @@ export class AppComponent implements OnInit, OnDestroy {
         // Max retries reached - log and continue without throwing
         console.error(
           `[Holochain] Connection failed after ${maxAttempts} attempts: ${errorMessage}. ` +
-          'App will continue without Holochain connectivity.'
+            'App will continue without Holochain connectivity.'
         );
         // Reset for potential future reconnection attempts
         this.connectionAttempt = 0;

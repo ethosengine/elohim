@@ -14,12 +14,12 @@
  * - Appeal filing access
  */
 
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { RouterModule } from '@angular/router';
+
 import { interval, Subscription } from 'rxjs';
 
-import { StewardshipService } from '../../services/stewardship.service';
 import {
   type ComputedPolicy,
   type StewardshipGrant,
@@ -28,6 +28,7 @@ import {
   getAuthorityBasisLabel,
   INALIENABLE_FEATURES,
 } from '../../models/stewardship.model';
+import { StewardshipService } from '../../services/stewardship.service';
 
 /** Restriction display item */
 interface RestrictionItem {

@@ -1,4 +1,5 @@
 import { Injectable, OnDestroy } from '@angular/core';
+
 import { BehaviorSubject, Observable, Subject, interval, takeUntil, filter, map } from 'rxjs';
 
 /**
@@ -22,7 +23,7 @@ import { BehaviorSubject, Observable, Subject, interval, takeUntil, filter, map 
  * - Escalation response: 4 hours
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class SlaMonitorService implements OnDestroy {
   private readonly destroy$ = new Subject<void>();
@@ -33,42 +34,57 @@ export class SlaMonitorService implements OnDestroy {
   private readonly slaBreaches$ = new Subject<SlaBreach>();
 
   // SLA configuration by entity type
-  private readonly slaConfig: Map<SlaEntityType, SlaConfiguration> = new Map([
-    ['challenge', {
-      acknowledgmentHours: 24,
-      resolutionDays: 7,
-      warningThresholdPercent: 75,
-      criticalThresholdPercent: 90,
-      escalationPath: ['assigned-elohim', 'governance-council', 'network-stewards']
-    }],
-    ['proposal', {
-      acknowledgmentHours: 4,
-      resolutionDays: 7, // Default voting period
-      warningThresholdPercent: 50,
-      criticalThresholdPercent: 75,
-      escalationPath: ['proposer', 'governance-council']
-    }],
-    ['mediation', {
-      acknowledgmentHours: 1,
-      resolutionDays: 1,
-      warningThresholdPercent: 50,
-      criticalThresholdPercent: 75,
-      escalationPath: ['mediator-pool', 'governance-council']
-    }],
-    ['reaction-review', {
-      acknowledgmentHours: 4,
-      resolutionDays: 2,
-      warningThresholdPercent: 75,
-      criticalThresholdPercent: 90,
-      escalationPath: ['content-steward', 'governance-council']
-    }],
-    ['feedback-aggregation', {
-      acknowledgmentHours: 24,
-      resolutionDays: 14,
-      warningThresholdPercent: 80,
-      criticalThresholdPercent: 95,
-      escalationPath: ['content-governance', 'governance-council']
-    }],
+  private readonly slaConfig = new Map<SlaEntityType, SlaConfiguration>([
+    [
+      'challenge',
+      {
+        acknowledgmentHours: 24,
+        resolutionDays: 7,
+        warningThresholdPercent: 75,
+        criticalThresholdPercent: 90,
+        escalationPath: ['assigned-elohim', 'governance-council', 'network-stewards'],
+      },
+    ],
+    [
+      'proposal',
+      {
+        acknowledgmentHours: 4,
+        resolutionDays: 7, // Default voting period
+        warningThresholdPercent: 50,
+        criticalThresholdPercent: 75,
+        escalationPath: ['proposer', 'governance-council'],
+      },
+    ],
+    [
+      'mediation',
+      {
+        acknowledgmentHours: 1,
+        resolutionDays: 1,
+        warningThresholdPercent: 50,
+        criticalThresholdPercent: 75,
+        escalationPath: ['mediator-pool', 'governance-council'],
+      },
+    ],
+    [
+      'reaction-review',
+      {
+        acknowledgmentHours: 4,
+        resolutionDays: 2,
+        warningThresholdPercent: 75,
+        criticalThresholdPercent: 90,
+        escalationPath: ['content-steward', 'governance-council'],
+      },
+    ],
+    [
+      'feedback-aggregation',
+      {
+        acknowledgmentHours: 24,
+        resolutionDays: 14,
+        warningThresholdPercent: 80,
+        criticalThresholdPercent: 95,
+        escalationPath: ['content-governance', 'governance-council'],
+      },
+    ],
   ]);
 
   // Metrics
@@ -218,14 +234,14 @@ export class SlaMonitorService implements OnDestroy {
     sla.metadata = {
       ...sla.metadata,
       escalationHistory: [
-        ...(sla.metadata['escalationHistory'] as EscalationRecord[] || []),
+        ...((sla.metadata['escalationHistory'] as EscalationRecord[]) || []),
         {
           level: sla.currentEscalationLevel,
           reason,
           timestamp: new Date().toISOString(),
           escalatedTo: sla.assignedTo,
-        }
-      ]
+        },
+      ],
     };
 
     this.metrics.escalationCount++;
@@ -258,9 +274,7 @@ export class SlaMonitorService implements OnDestroy {
    * Get SLAs by entity type.
    */
   getSlasByType(entityType: SlaEntityType): Observable<SlaItem[]> {
-    return this.activeSlas$.pipe(
-      map(slas => slas.filter(s => s.entityType === entityType))
-    );
+    return this.activeSlas$.pipe(map(slas => slas.filter(s => s.entityType === entityType)));
   }
 
   /**
@@ -268,7 +282,14 @@ export class SlaMonitorService implements OnDestroy {
    */
   getSlaForEntity(entityId: string): Observable<SlaItem | undefined> {
     return this.activeSlas$.pipe(
-      map(slas => slas.find(s => s.entityId === entityId && s.status !== 'resolved-on-time' && s.status !== 'resolved-late'))
+      map(slas =>
+        slas.find(
+          s =>
+            s.entityId === entityId &&
+            s.status !== 'resolved-on-time' &&
+            s.status !== 'resolved-late'
+        )
+      )
     );
   }
 
@@ -291,14 +312,16 @@ export class SlaMonitorService implements OnDestroy {
    */
   getAtRiskSlas(): Observable<SlaItem[]> {
     return this.activeSlas$.pipe(
-      map(slas => slas.filter(s => {
-        if (s.status === 'resolved-on-time' || s.status === 'resolved-late') return false;
-        const config = this.slaConfig.get(s.entityType);
-        if (!config) return false;
+      map(slas =>
+        slas.filter(s => {
+          if (s.status === 'resolved-on-time' || s.status === 'resolved-late') return false;
+          const config = this.slaConfig.get(s.entityType);
+          if (!config) return false;
 
-        const progress = this.calculateProgress(s);
-        return progress >= config.warningThresholdPercent;
-      }))
+          const progress = this.calculateProgress(s);
+          return progress >= config.warningThresholdPercent;
+        })
+      )
     );
   }
 
@@ -511,9 +534,8 @@ export class SlaMonitorService implements OnDestroy {
       if (data) {
         const items = JSON.parse(data) as SlaItem[];
         // Filter out old resolved items
-        const active = items.filter(s =>
-          s.status !== 'resolved-on-time' &&
-          s.status !== 'resolved-late'
+        const active = items.filter(
+          s => s.status !== 'resolved-on-time' && s.status !== 'resolved-late'
         );
         this.activeSlas$.next(active);
         this.metrics.currentActive = active.length;

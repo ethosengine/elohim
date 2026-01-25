@@ -13,7 +13,9 @@
  */
 
 import { Injectable, computed, inject } from '@angular/core';
+
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
+import { type KeyLocation, type IdentityMode } from '../models/identity.model';
 import {
   type SovereigntyState,
   type SovereigntyStage,
@@ -26,7 +28,6 @@ import {
   getHostedDataResidency,
   getAppUserDataResidency,
 } from '../models/sovereignty.model';
-import { type KeyLocation, type IdentityMode } from '../models/identity.model';
 
 @Injectable({
   providedIn: 'root',
@@ -64,12 +65,15 @@ export class SovereigntyService {
       dataResidency,
       keys,
       hasStoredCredentials: displayInfo.hasStoredCredentials,
-      networkStats: holochainState === 'connected' ? {
-        connectedSince: displayInfo.connectedAt ?? undefined,
-        totalPeers: 0, // TODO: Get from conductor when available
-        dataShared: 0,
-        dataReceived: 0,
-      } : undefined,
+      networkStats:
+        holochainState === 'connected'
+          ? {
+              connectedSince: displayInfo.connectedAt ?? undefined,
+              totalPeers: 0, // TODO: Get from conductor when available
+              dataShared: 0,
+              dataReceived: 0,
+            }
+          : undefined,
       migrationAvailable: nextStage !== null,
       migrationTarget: nextStage ?? undefined,
     };
@@ -104,10 +108,7 @@ export class SovereigntyService {
    * - app-user: Connected to local conductor on user's device (self-sovereign keys)
    * - node-operator: Local conductor that also hosts other humans
    */
-  private determineStage(
-    holochainState: string,
-    hasStoredCredentials: boolean
-  ): SovereigntyStage {
+  private determineStage(holochainState: string, hasStoredCredentials: boolean): SovereigntyStage {
     const displayInfo = this.holochainService.getDisplayInfo();
 
     if (holochainState === 'connected') {
@@ -142,12 +143,7 @@ export class SovereigntyService {
     if (!url) return false;
 
     // Local conductor indicators
-    const localPatterns = [
-      'localhost',
-      '127.0.0.1',
-      '[::1]',
-      '0.0.0.0',
-    ];
+    const localPatterns = ['localhost', '127.0.0.1', '[::1]', '0.0.0.0'];
 
     const urlLower = url.toLowerCase();
     return localPatterns.some(pattern => urlLower.includes(pattern));
@@ -179,10 +175,7 @@ export class SovereigntyService {
   /**
    * Map Holochain connection state to sovereignty connection status.
    */
-  private getConnectionStatus(
-    holochainState: string,
-    error: string | null
-  ): ConnectionStatus {
+  private getConnectionStatus(holochainState: string, error: string | null): ConnectionStatus {
     switch (holochainState) {
       case 'connected':
         return {
@@ -350,7 +343,7 @@ export class SovereigntyService {
    */
   getDataSummary(): string {
     const state = this.sovereigntyState();
-    const locations = new Set(state.dataResidency.map((d) => d.locationLabel));
+    const locations = new Set(state.dataResidency.map(d => d.locationLabel));
     return `${state.dataResidency.length} categories in ${Array.from(locations).join(', ')}`;
   }
 

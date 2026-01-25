@@ -22,10 +22,12 @@
  */
 
 import { Type, EventEmitter } from '@angular/core';
-import { ContentIOImportResult, ContentIOExportInput } from './content-io-plugin.interface';
-import { ValidationResult } from './validation-result.interface';
-import { FormatMetadata } from './format-metadata.interface';
+
 import { ContentNode } from '../../models/content-node.model';
+
+import { ContentIOImportResult, ContentIOExportInput } from './content-io-plugin.interface';
+import { FormatMetadata } from './format-metadata.interface';
+import { ValidationResult } from './validation-result.interface';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Plugin Interface
@@ -364,8 +366,8 @@ export const DEFAULT_EDITOR_CONFIG: EditorConfig = {
     actions: [
       { id: 'save', label: 'Save', icon: 'save', shortcut: 'Ctrl+S', type: 'button' },
       { id: 'cancel', label: 'Cancel', icon: 'close', shortcut: 'Escape', type: 'button' },
-    ]
-  }
+    ],
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

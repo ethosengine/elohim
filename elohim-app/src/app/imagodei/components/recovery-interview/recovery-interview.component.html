@@ -55,20 +55,26 @@
               </div>
 
               <div class="request-progress">
-                <span>{{ request.progress.affirmCount }} of {{ request.progress.requiredCount }} attestations</span>
+                <span>
+                  {{ request.progress.affirmCount }} of
+                  {{ request.progress.requiredCount }} attestations
+                </span>
                 <div class="progress-bar small">
-                  <div class="progress-fill" [style.width.%]="request.progress.progressPercent"></div>
+                  <div
+                    class="progress-fill"
+                    [style.width.%]="request.progress.progressPercent"
+                  ></div>
                 </div>
               </div>
 
               <div class="request-meta">
                 <span class="meta-item">
                   <span class="material-icons">schedule</span>
-                  Expires in {{ request.expiresIn | number:'1.0-0' }} hours
+                  Expires in {{ request.expiresIn | number: '1.0-0' }} hours
                 </span>
                 <span class="meta-item">
                   <span class="material-icons">event</span>
-                  {{ request.createdAt | date:'short' }}
+                  {{ request.createdAt | date: 'short' }}
                 </span>
               </div>
 
@@ -200,16 +206,11 @@
       <!-- Confidence Slider -->
       <div class="confidence-section">
         <label>
-          Confidence Level: <strong>{{ confidence }}%</strong>
+          Confidence Level:
+          <strong>{{ confidence }}%</strong>
           <span class="confidence-label">({{ getConfidenceLabel() }})</span>
         </label>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          [(ngModel)]="confidence"
-          class="confidence-slider"
-        />
+        <input type="range" min="0" max="100" [(ngModel)]="confidence" class="confidence-slider" />
       </div>
 
       <!-- Notes -->

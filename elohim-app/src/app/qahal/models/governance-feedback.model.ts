@@ -40,13 +40,13 @@
  * GovernableEntity - Types of things that need governance.
  */
 export type GovernableEntityType =
-  | 'content'              // ContentNode
-  | 'path'                 // LearningPath
-  | 'assessment'           // AssessmentInstrument
-  | 'contributor'          // ContributorPresence
-  | 'human'                // Agent (human identity)
-  | 'elohim'               // ElohimAgent (yes, even AI needs oversight)
-  | 'collective'           // CollectiveKnowledgeMap (organizations)
+  | 'content' // ContentNode
+  | 'path' // LearningPath
+  | 'assessment' // AssessmentInstrument
+  | 'contributor' // ContributorPresence
+  | 'human' // Agent (human identity)
+  | 'elohim' // ElohimAgent (yes, even AI needs oversight)
+  | 'collective' // CollectiveKnowledgeMap (organizations)
   | 'governance-decision'; // Decisions themselves can be challenged
 
 /**
@@ -105,17 +105,17 @@ export interface GovernanceState {
 }
 
 export type GovernanceStatus =
-  | 'unreviewed'           // New, not yet examined
-  | 'auto-approved'        // Passed automated checks
-  | 'community-reviewed'   // Reviewed by community members
-  | 'elohim-reviewed'      // Reviewed by Elohim agent
-  | 'challenged'           // Currently under challenge
-  | 'restricted'           // Limited due to concerns
-  | 'suspended'            // Temporarily removed from circulation
-  | 'removed'              // Permanently removed (with record)
-  | 'appealing'            // Removal under appeal
-  | 'restored'             // Previously removed, now restored
-  | 'constitutional';      // Core protocol content (highest trust)
+  | 'unreviewed' // New, not yet examined
+  | 'auto-approved' // Passed automated checks
+  | 'community-reviewed' // Reviewed by community members
+  | 'elohim-reviewed' // Reviewed by Elohim agent
+  | 'challenged' // Currently under challenge
+  | 'restricted' // Limited due to concerns
+  | 'suspended' // Temporarily removed from circulation
+  | 'removed' // Permanently removed (with record)
+  | 'appealing' // Removal under appeal
+  | 'restored' // Previously removed, now restored
+  | 'constitutional'; // Core protocol content (highest trust)
 
 export interface StatusBasis {
   /** How was this status determined? */
@@ -178,52 +178,52 @@ export interface GovernanceLabel {
 
 export type LabelType =
   // Content Quality
-  | 'unverified-claims'        // Contains claims not yet verified
-  | 'disputed-accuracy'        // Accuracy contested by credible sources
-  | 'outdated-information'     // Information may be stale
-  | 'missing-attribution'      // Sources not properly cited
-  | 'ai-generated'             // Created by AI (not inherently bad)
+  | 'unverified-claims' // Contains claims not yet verified
+  | 'disputed-accuracy' // Accuracy contested by credible sources
+  | 'outdated-information' // Information may be stale
+  | 'missing-attribution' // Sources not properly cited
+  | 'ai-generated' // Created by AI (not inherently bad)
   | 'ai-generated-undisclosed' // AI content presented as human
 
   // Safety Concerns
-  | 'content-warning'          // May be distressing (not removal-worthy)
-  | 'age-restricted'           // Not appropriate for minors
-  | 'trauma-sensitive'         // May trigger trauma responses
-  | 'crisis-resource-needed'   // Should link to crisis resources
+  | 'content-warning' // May be distressing (not removal-worthy)
+  | 'age-restricted' // Not appropriate for minors
+  | 'trauma-sensitive' // May trigger trauma responses
+  | 'crisis-resource-needed' // Should link to crisis resources
 
   // Policy Violations
-  | 'potential-harassment'     // May constitute harassment
+  | 'potential-harassment' // May constitute harassment
   | 'potential-misinformation' // May be false/misleading
-  | 'potential-manipulation'   // May be manipulative
-  | 'potential-spam'           // May be spam/promotional
-  | 'potential-impersonation'  // May be impersonating someone
-  | 'copyright-concern'        // May infringe copyright
-  | 'privacy-concern'          // May violate privacy
+  | 'potential-manipulation' // May be manipulative
+  | 'potential-spam' // May be spam/promotional
+  | 'potential-impersonation' // May be impersonating someone
+  | 'copyright-concern' // May infringe copyright
+  | 'privacy-concern' // May violate privacy
 
   // Positive Labels
-  | 'fact-checked'             // Verified by fact-checkers
-  | 'expert-reviewed'          // Reviewed by domain expert
-  | 'community-trusted'        // High community trust score
-  | 'source-verified'          // Sources have been verified
-  | 'contributor-verified'     // Contributor identity verified
+  | 'fact-checked' // Verified by fact-checkers
+  | 'expert-reviewed' // Reviewed by domain expert
+  | 'community-trusted' // High community trust score
+  | 'source-verified' // Sources have been verified
+  | 'contributor-verified' // Contributor identity verified
 
   // Meta Labels
-  | 'under-review'             // Currently being reviewed
-  | 'review-requested'         // Community requested review
-  | 'precedent-setting';       // May set governance precedent
+  | 'under-review' // Currently being reviewed
+  | 'review-requested' // Community requested review
+  | 'precedent-setting'; // May set governance precedent
 
 export type LabelSeverity =
-  | 'informational'    // FYI, no action needed
-  | 'advisory'         // Caution advised
-  | 'warning'          // Significant concern
-  | 'critical'         // Serious violation
-  | 'emergency';       // Immediate action required
+  | 'informational' // FYI, no action needed
+  | 'advisory' // Caution advised
+  | 'warning' // Significant concern
+  | 'critical' // Serious violation
+  | 'emergency'; // Immediate action required
 
 export interface LabelEvidence {
   type: 'automated-detection' | 'human-report' | 'elohim-analysis' | 'external-source';
   description: string;
   sourceId?: string;
-  confidence: number;  // 0.0 - 1.0
+  confidence: number; // 0.0 - 1.0
   timestamp: string;
 }
 
@@ -268,21 +268,21 @@ export interface ReviewRecord {
 }
 
 export type ReviewType =
-  | 'initial'          // First review of new content
-  | 'periodic'         // Scheduled re-review
-  | 'triggered'        // Triggered by report/flag
-  | 'appeal'           // Review as part of appeal
-  | 'precedent'        // Review for precedent-setting
-  | 'meta';            // Review of review quality
+  | 'initial' // First review of new content
+  | 'periodic' // Scheduled re-review
+  | 'triggered' // Triggered by report/flag
+  | 'appeal' // Review as part of appeal
+  | 'precedent' // Review for precedent-setting
+  | 'meta'; // Review of review quality
 
 export type ReviewOutcome =
-  | 'approved'         // No concerns found
-  | 'approved-with-labels'  // Approved but labels added
-  | 'needs-modification'    // Creator should modify
-  | 'escalate'              // Needs higher-level review
-  | 'restrict'              // Should be restricted
-  | 'remove'                // Should be removed
-  | 'no-action';            // Review complete, no change
+  | 'approved' // No concerns found
+  | 'approved-with-labels' // Approved but labels added
+  | 'needs-modification' // Creator should modify
+  | 'escalate' // Needs higher-level review
+  | 'restrict' // Should be restricted
+  | 'remove' // Should be removed
+  | 'no-action'; // Review complete, no change
 
 export interface ReviewRecommendation {
   action: 'add-label' | 'remove-label' | 'modify-content' | 'add-context' | 'escalate' | 'restore';
@@ -328,7 +328,7 @@ export interface Challenge {
 
   /** Timeline */
   filedAt: string;
-  responseDeadline: string;  // SLA - system MUST respond by this time
+  responseDeadline: string; // SLA - system MUST respond by this time
   respondedAt?: string;
 
   /** Assigned handler */
@@ -341,7 +341,12 @@ export interface Challenge {
 
 export interface ChallengeStanding {
   /** Basis for standing */
-  basis: 'content-owner' | 'affected-party' | 'community-member' | 'public-interest' | 'constitutional';
+  basis:
+    | 'content-owner'
+    | 'affected-party'
+    | 'community-member'
+    | 'public-interest'
+    | 'constitutional';
 
   /** Explanation of standing */
   explanation: string;
@@ -365,16 +370,16 @@ export interface ChallengeGrounds {
 }
 
 export type ChallengeGroundType =
-  | 'factual-error'           // The facts are wrong
-  | 'misapplication'          // Policy applied incorrectly
-  | 'context-ignored'         // Important context was missed
-  | 'bias'                    // Decision reflects bias
-  | 'inconsistency'           // Inconsistent with similar cases
-  | 'procedural-violation'    // Process wasn't followed
-  | 'proportionality'         // Response disproportionate to concern
-  | 'new-evidence'            // New evidence available
-  | 'changed-circumstances'   // Circumstances have changed
-  | 'constitutional';         // Violates protocol constitution
+  | 'factual-error' // The facts are wrong
+  | 'misapplication' // Policy applied incorrectly
+  | 'context-ignored' // Important context was missed
+  | 'bias' // Decision reflects bias
+  | 'inconsistency' // Inconsistent with similar cases
+  | 'procedural-violation' // Process wasn't followed
+  | 'proportionality' // Response disproportionate to concern
+  | 'new-evidence' // New evidence available
+  | 'changed-circumstances' // Circumstances have changed
+  | 'constitutional'; // Violates protocol constitution
 
 export interface ChallengeEvidence {
   type: 'document' | 'testimony' | 'precedent' | 'expert-opinion' | 'data';
@@ -385,13 +390,13 @@ export interface ChallengeEvidence {
 }
 
 export type ChallengeState =
-  | 'filed'                   // Just submitted
-  | 'acknowledged'            // System has acknowledged receipt
-  | 'under-review'            // Being actively reviewed
-  | 'additional-info-needed'  // Challenger needs to provide more
-  | 'escalated'               // Moved to higher level
-  | 'resolved'                // Decision made
-  | 'appealed';               // Being appealed to higher level
+  | 'filed' // Just submitted
+  | 'acknowledged' // System has acknowledged receipt
+  | 'under-review' // Being actively reviewed
+  | 'additional-info-needed' // Challenger needs to provide more
+  | 'escalated' // Moved to higher level
+  | 'resolved' // Decision made
+  | 'appealed'; // Being appealed to higher level
 
 export interface ChallengeResponse {
   /** Outcome */
@@ -409,7 +414,7 @@ export interface ChallengeResponse {
   responderLevel: ElohimLevel;
 
   /** Response time (for SLA tracking) */
-  responseTime: number;  // milliseconds from filing
+  responseTime: number; // milliseconds from filing
 
   /** Can be appealed? */
   appealable: boolean;
@@ -486,8 +491,8 @@ export interface AppealEscalation {
 
 export type AppealState =
   | 'filed'
-  | 'accepted'               // Appeal accepted for review
-  | 'rejected'               // Appeal not accepted (no standing/grounds)
+  | 'accepted' // Appeal accepted for review
+  | 'rejected' // Appeal not accepted (no standing/grounds)
   | 'under-review'
   | 'escalated'
   | 'resolved';
@@ -507,10 +512,10 @@ export interface AppealDecision {
 // ============================================================================
 
 export type ElohimLevel =
-  | 'individual'    // Personal Elohim (AI assistant level)
-  | 'family'        // Family Elohim (household/small group)
-  | 'community'     // Community Elohim (local community)
-  | 'network'       // Network Council (protocol-wide)
+  | 'individual' // Personal Elohim (AI assistant level)
+  | 'family' // Family Elohim (household/small group)
+  | 'community' // Community Elohim (local community)
+  | 'network' // Network Council (protocol-wide)
   | 'constitutional'; // Constitutional matters only
 
 export interface ElohimJurisdiction {
@@ -523,7 +528,12 @@ export interface ElohimJurisdiction {
   oversightLevel?: ElohimLevel;
 
   /** Jurisdiction basis */
-  basis: 'content-origin' | 'creator-affiliation' | 'subject-matter' | 'geographic' | 'constitutional';
+  basis:
+    | 'content-origin'
+    | 'creator-affiliation'
+    | 'subject-matter'
+    | 'geographic'
+    | 'constitutional';
 
   /** Can this be appealed to higher level? */
   appealPath: ElohimLevel[];
@@ -573,14 +583,14 @@ export interface Restriction {
 }
 
 export type RestrictionType =
-  | 'visibility-limited'      // Only visible to some
-  | 'interaction-limited'     // Can view but not interact
-  | 'distribution-limited'    // Cannot be shared/cited
-  | 'monetization-disabled'   // No recognition flows
-  | 'requires-warning'        // Must show warning before display
-  | 'requires-context'        // Must show context/fact-check
-  | 'age-gated'               // Age verification required
-  | 'geographic-limited';     // Limited to certain regions
+  | 'visibility-limited' // Only visible to some
+  | 'interaction-limited' // Can view but not interact
+  | 'distribution-limited' // Cannot be shared/cited
+  | 'monetization-disabled' // No recognition flows
+  | 'requires-warning' // Must show warning before display
+  | 'requires-context' // Must show context/fact-check
+  | 'age-gated' // Age verification required
+  | 'geographic-limited'; // Limited to certain regions
 
 // ============================================================================
 // Precedent (Constitutional Evolution)
@@ -634,7 +644,7 @@ export interface Precedent {
 }
 
 export type PrecedentBinding =
-  | 'persuasive'    // Informative but not binding
+  | 'persuasive' // Informative but not binding
   | 'binding-local' // Binding within community
   | 'binding-network' // Binding protocol-wide
   | 'constitutional'; // Part of constitution
@@ -731,13 +741,13 @@ export interface CreationRecord {
 }
 
 export type CreationContext =
-  | 'original'              // Created from scratch
-  | 'imported'              // Imported from external source
-  | 'forked'                // Forked from existing content
-  | 'synthesized'           // AI-synthesized
-  | 'collaborative'         // Created by multiple contributors
-  | 'converted'             // Converted from another format
-  | 'restored';             // Restored from deletion
+  | 'original' // Created from scratch
+  | 'imported' // Imported from external source
+  | 'forked' // Forked from existing content
+  | 'synthesized' // AI-synthesized
+  | 'collaborative' // Created by multiple contributors
+  | 'converted' // Converted from another format
+  | 'restored'; // Restored from deletion
 
 export interface DerivationRecord {
   sourceId: string;
@@ -771,7 +781,7 @@ export interface VersionRecord {
   diff?: ContentDiff;
 
   /** Size change */
-  sizeChange: number;  // bytes added/removed
+  sizeChange: number; // bytes added/removed
 
   /** Was this reviewed? */
   reviewStatus: 'pending' | 'approved' | 'reverted';
@@ -787,18 +797,18 @@ export interface VersionRecord {
 }
 
 export type VersionChangeType =
-  | 'initial'           // First version
-  | 'edit'              // Content edit
-  | 'correction'        // Factual correction
-  | 'clarification'     // Clarification without changing meaning
-  | 'expansion'         // Added content
-  | 'reduction'         // Removed content
-  | 'restructure'       // Reorganized without changing content
-  | 'metadata-update'   // Only metadata changed
-  | 'format-change'     // Format conversion
-  | 'revert'            // Reverted to previous version
-  | 'merge'             // Merged from another version/fork
-  | 'auto-update';      // Automated update (e.g., link fixing)
+  | 'initial' // First version
+  | 'edit' // Content edit
+  | 'correction' // Factual correction
+  | 'clarification' // Clarification without changing meaning
+  | 'expansion' // Added content
+  | 'reduction' // Removed content
+  | 'restructure' // Reorganized without changing content
+  | 'metadata-update' // Only metadata changed
+  | 'format-change' // Format conversion
+  | 'revert' // Reverted to previous version
+  | 'merge' // Merged from another version/fork
+  | 'auto-update'; // Automated update (e.g., link fixing)
 
 export interface ContentDiff {
   type: 'text' | 'structured' | 'binary';
@@ -808,7 +818,7 @@ export interface ContentDiff {
 }
 
 export interface DiffChange {
-  location: string;  // Path or line number
+  location: string; // Path or line number
   type: 'add' | 'remove' | 'modify';
   before?: string;
   after?: string;
@@ -835,7 +845,7 @@ export interface GovernanceEvent {
   details: Record<string, unknown>;
 
   /** Related entities */
-  relatedEntities?: Array<{ type: string; id: string }>;
+  relatedEntities?: { type: string; id: string }[];
 
   /** Visibility of this event */
   visibility: 'public' | 'participants-only' | 'elohim-only';
@@ -918,18 +928,18 @@ export interface DiscussionThread {
 }
 
 export type DiscussionCategory =
-  | 'accuracy'              // Is this accurate?
-  | 'neutrality'            // Is this neutral/biased?
-  | 'sources'               // Source quality/citation
-  | 'structure'             // Organization of content
-  | 'scope'                 // What should be included?
-  | 'style'                 // Writing style concerns
-  | 'attribution'           // Who should be credited?
-  | 'merge-proposal'        // Should this merge with other content?
-  | 'split-proposal'        // Should this be split?
-  | 'deletion-discussion'   // Should this be deleted?
-  | 'protection-request'    // Request for protection
-  | 'general';              // General discussion
+  | 'accuracy' // Is this accurate?
+  | 'neutrality' // Is this neutral/biased?
+  | 'sources' // Source quality/citation
+  | 'structure' // Organization of content
+  | 'scope' // What should be included?
+  | 'style' // Writing style concerns
+  | 'attribution' // Who should be credited?
+  | 'merge-proposal' // Should this merge with other content?
+  | 'split-proposal' // Should this be split?
+  | 'deletion-discussion' // Should this be deleted?
+  | 'protection-request' // Request for protection
+  | 'general'; // General discussion
 
 export interface DiscussionMessage {
   id: string;
@@ -942,7 +952,15 @@ export interface DiscussionMessage {
   replyTo?: string;
 
   /** Message type */
-  type: 'comment' | 'proposal' | 'support' | 'oppose' | 'neutral' | 'question' | 'answer' | 'summary';
+  type:
+    | 'comment'
+    | 'proposal'
+    | 'support'
+    | 'oppose'
+    | 'neutral'
+    | 'question'
+    | 'answer'
+    | 'summary';
 
   /** Has this been edited? */
   edited: boolean;
@@ -965,7 +983,7 @@ export interface MessageEdit {
 export interface MessageReaction {
   type: 'agree' | 'disagree' | 'helpful' | 'unhelpful' | 'question';
   count: number;
-  reactors: string[];  // For transparency
+  reactors: string[]; // For transparency
 }
 
 export interface ThreadResolution {
@@ -1028,11 +1046,11 @@ export interface ProtectionChange {
 }
 
 export type ProtectionLevel =
-  | 'none'                  // Anyone can edit
-  | 'semi'                  // Established contributors only
-  | 'extended'              // Extended-confirmed contributors
-  | 'full'                  // Elohim only
-  | 'cascade';              // Protection cascades to included content
+  | 'none' // Anyone can edit
+  | 'semi' // Established contributors only
+  | 'extended' // Extended-confirmed contributors
+  | 'full' // Elohim only
+  | 'cascade'; // Protection cascades to included content
 
 /**
  * EngagementSnapshot - Point-in-time engagement metrics.
@@ -1071,8 +1089,8 @@ export interface GovernanceHistoryStats {
   daysSinceLastReview: number;
 
   averageVersionsPerMonth: number;
-  controversyScore: number;  // Based on challenges/reverts
-  stabilityScore: number;    // Based on recent edit frequency
+  controversyScore: number; // Based on challenges/reverts
+  stabilityScore: number; // Based on recent edit frequency
 }
 
 /**
@@ -1083,7 +1101,7 @@ export interface ContentGovernanceSummary {
   entityTitle: string;
 
   currentStatus: GovernanceStatus;
-  activeLabels: Array<{ type: LabelType; severity: LabelSeverity }>;
+  activeLabels: { type: LabelType; severity: LabelSeverity }[];
 
   lastEdited: string;
   lastEditedBy: string;
@@ -1141,7 +1159,12 @@ export interface GovernanceVote {
 }
 
 export interface VoteSubject {
-  type: 'label-application' | 'removal-decision' | 'appeal-outcome' | 'precedent-adoption' | 'constitutional-amendment';
+  type:
+    | 'label-application'
+    | 'removal-decision'
+    | 'appeal-outcome'
+    | 'precedent-adoption'
+    | 'constitutional-amendment';
   entityId: string;
   question: string;
   options: VoteOption[];
@@ -1156,12 +1179,17 @@ export interface VoteOption {
 
 export interface VoteEligibility {
   /** Who can vote? */
-  basis: 'all-members' | 'affected-community' | 'domain-experts' | 'elohim-council' | 'stake-weighted';
+  basis:
+    | 'all-members'
+    | 'affected-community'
+    | 'domain-experts'
+    | 'elohim-council'
+    | 'stake-weighted';
 
   /** Minimum requirements */
   requirements?: {
     minTrustScore?: number;
-    minTenure?: string;  // ISO 8601 duration
+    minTenure?: string; // ISO 8601 duration
     requiredAttestations?: string[];
   };
 
@@ -1171,11 +1199,11 @@ export interface VoteEligibility {
 
 export type VotingMechanism =
   | 'simple-majority'
-  | 'supermajority'        // 2/3 or 3/4
+  | 'supermajority' // 2/3 or 3/4
   | 'ranked-choice'
-  | 'quadratic'            // Quadratic voting
-  | 'conviction'           // Conviction voting (time-weighted)
-  | 'consent';             // Consent-based (no strong objections)
+  | 'quadratic' // Quadratic voting
+  | 'conviction' // Conviction voting (time-weighted)
+  | 'consent'; // Consent-based (no strong objections)
 
 export interface QuorumRequirement {
   type: 'percentage' | 'absolute' | 'none';
@@ -1197,11 +1225,11 @@ export interface VoteResults {
   totalVoted: number;
   participationRate: number;
   quorumMet: boolean;
-  optionResults: Array<{
+  optionResults: {
     optionId: string;
     votes: number;
     percentage: number;
-  }>;
+  }[];
   outcome: string;
   certifiedBy: string;
   certifiedAt: string;
@@ -1225,7 +1253,7 @@ export interface GovernanceFeedbackMetrics {
 
   /** Response times */
   challengeResponseTime: {
-    median: number;      // milliseconds
+    median: number; // milliseconds
     p95: number;
     slaViolations: number;
   };
@@ -1236,7 +1264,7 @@ export interface GovernanceFeedbackMetrics {
     upheld: number;
     denied: number;
     partiallyUpheld: number;
-    upheldRate: number;  // High rate may indicate over-moderation
+    upheldRate: number; // High rate may indicate over-moderation
   };
 
   /** Appeal rates */
@@ -1244,13 +1272,13 @@ export interface GovernanceFeedbackMetrics {
     totalChallenges: number;
     appealed: number;
     appealRate: number;
-    reversalRate: number;  // High reversal rate indicates problems
+    reversalRate: number; // High reversal rate indicates problems
   };
 
   /** Consistency */
   consistencyMetrics: {
-    similarCasesSameOutcome: number;  // percentage
-    precedentFollowed: number;        // percentage
+    similarCasesSameOutcome: number; // percentage
+    precedentFollowed: number; // percentage
     inconsistenciesReported: number;
   };
 
@@ -1267,7 +1295,12 @@ export interface GovernanceFeedbackMetrics {
 }
 
 export interface GovernanceRedFlag {
-  type: 'sla-breach' | 'high-reversal-rate' | 'low-participation' | 'inconsistency-spike' | 'challenge-surge';
+  type:
+    | 'sla-breach'
+    | 'high-reversal-rate'
+    | 'low-participation'
+    | 'inconsistency-spike'
+    | 'challenge-surge';
   severity: 'warning' | 'critical';
   description: string;
   detectedAt: string;
@@ -1285,19 +1318,19 @@ export interface GovernanceRedFlag {
  */
 export interface GovernanceSLA {
   /** Acknowledgment of challenge */
-  challengeAcknowledgment: string;  // "PT1H" = 1 hour
+  challengeAcknowledgment: string; // "PT1H" = 1 hour
 
   /** Initial response to challenge */
-  challengeInitialResponse: string;  // "P3D" = 3 days
+  challengeInitialResponse: string; // "P3D" = 3 days
 
   /** Final resolution of challenge */
-  challengeFinalResolution: string;  // "P14D" = 14 days
+  challengeFinalResolution: string; // "P14D" = 14 days
 
   /** Appeal response */
-  appealResponse: string;  // "P7D" = 7 days
+  appealResponse: string; // "P7D" = 7 days
 
   /** Emergency (safety) response */
-  emergencyResponse: string;  // "PT4H" = 4 hours
+  emergencyResponse: string; // "PT4H" = 4 hours
 
   /** What happens on SLA breach */
   breachConsequences: SLABreachConsequence[];
@@ -1313,26 +1346,26 @@ export interface SLABreachConsequence {
  * Default SLA values (can be customized per community)
  */
 export const DEFAULT_GOVERNANCE_SLA: GovernanceSLA = {
-  challengeAcknowledgment: 'PT1H',      // 1 hour
-  challengeInitialResponse: 'P3D',       // 3 days
-  challengeFinalResolution: 'P14D',      // 14 days
-  appealResponse: 'P7D',                 // 7 days
-  emergencyResponse: 'PT4H',             // 4 hours
+  challengeAcknowledgment: 'PT1H', // 1 hour
+  challengeInitialResponse: 'P3D', // 3 days
+  challengeFinalResolution: 'P14D', // 14 days
+  appealResponse: 'P7D', // 7 days
+  emergencyResponse: 'PT4H', // 4 hours
   breachConsequences: [
     {
       slaType: 'challengeAcknowledgment',
       consequence: 'auto-escalate',
-      description: 'Auto-escalate to oversight Elohim'
+      description: 'Auto-escalate to oversight Elohim',
     },
     {
       slaType: 'challengeFinalResolution',
       consequence: 'default-favor-challenger',
-      description: 'If no response in 14 days, challenge is upheld by default'
+      description: 'If no response in 14 days, challenge is upheld by default',
     },
     {
       slaType: 'emergencyResponse',
       consequence: 'public-report',
-      description: 'Emergency SLA breach is publicly reported'
-    }
-  ]
+      description: 'Emergency SLA breach is publicly reported',
+    },
+  ],
 };

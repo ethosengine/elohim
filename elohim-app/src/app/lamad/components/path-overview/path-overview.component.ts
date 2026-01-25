@@ -1,13 +1,22 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { Subject, forkJoin } from 'rxjs';
+
 import { takeUntil } from 'rxjs/operators';
-import { PathService } from '../../services/path.service';
+
+import { Subject, forkJoin } from 'rxjs';
+
+import { AgentProgress, MasteryLevel, MasteryTier } from '@app/elohim/models/agent.model';
 import { AgentService } from '@app/elohim/services/agent.service';
+
 import { SeoService } from '../../../services/seo.service';
 import { LearningPath, PathStep, PathChapter, PathModule, PathSection } from '../../models';
-import { AgentProgress, MasteryLevel, MasteryTier } from '@app/elohim/models/agent.model';
+import { PathService } from '../../services/path.service';
+import {
+  getStepTypeIcon,
+  getIconForContent,
+  inferContentTypeFromId,
+} from '../../utils/content-icons';
 
 /**
  * Lightweight step display data - uses step metadata, NOT content.
@@ -111,26 +120,26 @@ interface ChapterDisplay {
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './path-overview.component.html',
-  styleUrls: ['./path-overview.component.css']
+  styleUrls: ['./path-overview.component.css'],
 })
 export class PathOverviewComponent implements OnInit, OnDestroy {
-  pathId: string = '';
+  pathId = '';
   path: LearningPath | null = null;
   progress: AgentProgress | null = null;
   accessibleSteps: number[] = [];
-  
+
   // Chapter Data
   chapters: ChapterDisplay[] = [];
   pathCompletion: any = null; // Territory-based completion metrics
-  
+
   // Concept Progress Data
-  conceptProgress: Array<{
+  conceptProgress: {
     conceptId: string;
     title: string;
     totalSteps: number;
     completedSteps: number;
     completionPercentage: number;
-  }> = [];
+  }[] = [];
 
   // Flat steps for paths without chapters
   flatSteps: StepDisplay[] = [];
@@ -173,116 +182,89 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       completion: this.pathService.getPathCompletionByContent(this.pathId),
       chapterSummaries: this.pathService.getChapterSummariesWithContent(this.pathId),
       stepsMetadata: this.pathService.getAllStepsMetadata(this.pathId), // Lightweight!
-      concepts: this.pathService.getConceptProgressForPath(this.pathId)
-    }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: ({ path, progress, accessible, completion, chapterSummaries, stepsMetadata, concepts }) => {
-        this.path = path;
-        this.progress = progress;
-        this.accessibleSteps = accessible;
-        this.pathCompletion = completion;
-        this.conceptProgress = concepts;
+      concepts: this.pathService.getConceptProgressForPath(this.pathId),
+    })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: ({
+          path,
+          progress,
+          accessible,
+          completion,
+          chapterSummaries,
+          stepsMetadata,
+          concepts,
+        }) => {
+          this.path = path;
+          this.progress = progress;
+          this.accessibleSteps = accessible;
+          this.pathCompletion = completion;
+          this.conceptProgress = concepts;
 
-        // Update SEO metadata for this path
-        this.seoService.updateForPath({
-          id: path.id,
-          title: path.title,
-          description: path.description,
-          thumbnailUrl: path.thumbnailUrl,
-          difficulty: path.difficulty,
-          estimatedDuration: path.estimatedDuration
-        });
-
-        // Map steps to display format using METADATA only (no content loading)
-        const displaySteps: StepDisplay[] = stepsMetadata.map((s) => ({
-          step: s.step,
-          stepIndex: s.stepIndex,
-          isCompleted: s.isCompleted,
-          isGlobalCompletion: s.completedInOtherPath,
-          icon: this.getStepTypeIcon(s.step.stepType || 'content'), // Use stepType, not content
-          isLocked: !accessible.includes(s.stepIndex),
-          masteryLevel: s.masteryLevel,
-          masteryTier: s.masteryTier
-        }));
-
-        if (chapterSummaries.length > 0) {
-          // Map chapter summaries to display format with modules
-          this.chapters = chapterSummaries.map(summary => {
-            // Handle both 4-level (modules) and 2-level (steps) formats
-            const moduleDisplays = this.buildModuleDisplaysFromChapter(summary.chapter);
-            const totalConcepts = moduleDisplays.reduce((sum, m) => sum + m.totalConcepts, 0);
-            const completedConcepts = moduleDisplays.reduce((sum, m) => sum + m.completedConcepts, 0);
-            const completionPercentage = totalConcepts > 0
-              ? Math.round((completedConcepts / totalConcepts) * 100)
-              : 0;
-
-            const display: ChapterDisplay = {
-              chapter: summary.chapter,
-              metrics: {
-                totalUniqueContent: summary.totalUniqueContent,
-                completedUniqueContent: summary.completedUniqueContent,
-                contentCompletionPercentage: summary.contentCompletionPercentage,
-                sharedContentCompleted: summary.sharedContentCompleted,
-                completedSteps: summary.completedSteps,
-                totalSteps: summary.totalSteps
-              },
-              modules: moduleDisplays,
-              totalConcepts,
-              completedConcepts,
-              completionPercentage,
-              isExpanded: true // Default expanded
-            };
-            return display;
+          // Update SEO metadata for this path
+          this.seoService.updateForPath({
+            id: path.id,
+            title: path.title,
+            description: path.description,
+            thumbnailUrl: path.thumbnailUrl,
+            difficulty: path.difficulty,
+            estimatedDuration: path.estimatedDuration,
           });
-        } else {
-          this.flatSteps = displaySteps;
-        }
 
-        this.isLoading = false;
-      },
-      error: err => {
-        this.error = err.message ?? 'Failed to load path';
-        this.isLoading = false;
-      }
-    });
-  }
+          // Map steps to display format using METADATA only (no content loading)
+          const displaySteps: StepDisplay[] = stepsMetadata.map(s => ({
+            step: s.step,
+            stepIndex: s.stepIndex,
+            isCompleted: s.isCompleted,
+            isGlobalCompletion: s.completedInOtherPath,
+            icon: getStepTypeIcon(s.step.stepType || 'content'), // Use stepType from utility
+            isLocked: !accessible.includes(s.stepIndex),
+            masteryLevel: s.masteryLevel,
+            masteryTier: s.masteryTier,
+          }));
 
-  /**
-   * Get icon for step type (uses step metadata, not content).
-   * This is efficient - no content loading required.
-   */
-  getStepTypeIcon(stepType: string): string {
-    const icons: Record<string, string> = {
-      'content': '📄',
-      'read': '📖',
-      'assessment': '📝',
-      'quiz': '📝',
-      'checkpoint': '🏁',
-      'path': '🛤️',
-      'external': '🔗',
-      'video': '🎥',
-      'simulation': '🎮'
-    };
-    return icons[stepType] || '📄';
-  }
+          if (chapterSummaries.length > 0) {
+            // Map chapter summaries to display format with modules
+            this.chapters = chapterSummaries.map(summary => {
+              // Handle both 4-level (modules) and 2-level (steps) formats
+              const moduleDisplays = this.buildModuleDisplaysFromChapter(summary.chapter);
+              const totalConcepts = moduleDisplays.reduce((sum, m) => sum + m.totalConcepts, 0);
+              const completedConcepts = moduleDisplays.reduce(
+                (sum, m) => sum + m.completedConcepts,
+                0
+              );
+              const completionPercentage =
+                totalConcepts > 0 ? Math.round((completedConcepts / totalConcepts) * 100) : 0;
 
-  /**
-   * Get icon for content type (legacy - used when content is loaded)
-   */
-  getContentIcon(contentType: string): string {
-    const icons: Record<string, string> = {
-      'epic': '📖',
-      'feature': '⚡',
-      'scenario': '✓',
-      'concept': '💡',
-      'simulation': '🎮',
-      'video': '🎥',
-      'assessment': '📝',
-      'organization': '🏢',
-      'book-chapter': '📚',
-      'tool': '🛠️',
-      'placeholder': '⚠️'
-    };
-    return icons[contentType] || '📄';
+              const display: ChapterDisplay = {
+                chapter: summary.chapter,
+                metrics: {
+                  totalUniqueContent: summary.totalUniqueContent,
+                  completedUniqueContent: summary.completedUniqueContent,
+                  contentCompletionPercentage: summary.contentCompletionPercentage,
+                  sharedContentCompleted: summary.sharedContentCompleted,
+                  completedSteps: summary.completedSteps,
+                  totalSteps: summary.totalSteps,
+                },
+                modules: moduleDisplays,
+                totalConcepts,
+                completedConcepts,
+                completionPercentage,
+                isExpanded: true, // Default expanded
+              };
+              return display;
+            });
+          } else {
+            this.flatSteps = displaySteps;
+          }
+
+          this.isLoading = false;
+        },
+        error: err => {
+          this.error = err.message ?? 'Failed to load path';
+          this.isLoading = false;
+        },
+      });
   }
 
   /**
@@ -314,8 +296,9 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
     }
     if (!this.path || !this.progress) return false;
     const requiredSteps = this.path.steps.filter(s => !s.optional);
-    return requiredSteps.length > 0 && requiredSteps.every(step =>
-      this.progress!.completedStepIndices.includes(step.order)
+    return (
+      requiredSteps.length > 0 &&
+      requiredSteps.every(step => this.progress!.completedStepIndices.includes(step.order))
     );
   }
 
@@ -376,9 +359,9 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    */
   getDifficultyDisplay(): string {
     const displays: Record<string, string> = {
-      'beginner': 'Beginner',
-      'intermediate': 'Intermediate',
-      'advanced': 'Advanced'
+      beginner: 'Beginner',
+      intermediate: 'Intermediate',
+      advanced: 'Advanced',
     };
     return displays[this.path?.difficulty ?? ''] ?? this.path?.difficulty ?? '';
   }
@@ -396,11 +379,11 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    */
   getMasteryTierLabel(tier: MasteryTier): string {
     const labels: Record<MasteryTier, string> = {
-      'unseen': 'Not started',
-      'seen': 'Seen',
-      'practiced': 'Practiced',
-      'applied': 'Applied',
-      'mastered': 'Mastered'
+      unseen: 'Not started',
+      seen: 'Seen',
+      practiced: 'Practiced',
+      applied: 'Applied',
+      mastered: 'Mastered',
     };
     return labels[tier] ?? '';
   }
@@ -417,11 +400,11 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    */
   getMasteryTierIcon(tier: MasteryTier): string {
     const icons: Record<MasteryTier, string> = {
-      'unseen': '',
-      'seen': '👁',
-      'practiced': '✏️',
-      'applied': '🎯',
-      'mastered': '⭐'
+      unseen: '',
+      seen: '👁',
+      practiced: '✏️',
+      applied: '🎯',
+      mastered: '⭐',
     };
     return icons[tier] ?? '';
   }
@@ -530,7 +513,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       id: `${chapter.id}-section`,
       title: chapter.title,
       order: 0,
-      conceptIds
+      conceptIds,
     };
 
     // Create a synthetic module
@@ -538,33 +521,38 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       id: `${chapter.id}-module`,
       title: chapter.title,
       order: 0,
-      sections: [syntheticSection]
+      sections: [syntheticSection],
     };
 
     const sectionDisplay: SectionDisplay = {
       section: syntheticSection,
-      concepts: steps.map(step => ({
-        conceptId: step.resourceId,
-        title: step.stepTitle,
-        isCompleted: false, // TODO: Load from progress
-        isGlobalCompletion: false,
-        icon: this.getStepTypeIcon(step.stepType || 'content'),
-        estimatedMinutes: parseInt(step.estimatedTime?.split('-')[0] || '5', 10)
-      })),
+      concepts: steps.map(step => {
+        const inferredType = inferContentTypeFromId(step.resourceId);
+        return {
+          conceptId: step.resourceId,
+          title: step.stepTitle,
+          isCompleted: false, // TODO: Load from progress
+          isGlobalCompletion: false,
+          icon: getIconForContent(step.resourceId, inferredType),
+          contentType: inferredType,
+        };
+      }),
       totalConcepts: steps.length,
       completedConcepts: 0, // TODO: Load from progress
       completionPercentage: 0,
-      isExpanded: true
+      isExpanded: true,
     };
 
-    return [{
-      module: syntheticModule,
-      sections: [sectionDisplay],
-      totalConcepts: steps.length,
-      completedConcepts: 0,
-      completionPercentage: 0,
-      isExpanded: true
-    }];
+    return [
+      {
+        module: syntheticModule,
+        sections: [sectionDisplay],
+        totalConcepts: steps.length,
+        completedConcepts: 0,
+        completionPercentage: 0,
+        isExpanded: true,
+      },
+    ];
   }
 
   /**
@@ -575,9 +563,8 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       const sections = this.buildSectionDisplays(module.sections || []);
       const totalConcepts = sections.reduce((sum, s) => sum + s.totalConcepts, 0);
       const completedConcepts = sections.reduce((sum, s) => sum + s.completedConcepts, 0);
-      const completionPercentage = totalConcepts > 0
-        ? Math.round((completedConcepts / totalConcepts) * 100)
-        : 0;
+      const completionPercentage =
+        totalConcepts > 0 ? Math.round((completedConcepts / totalConcepts) * 100) : 0;
 
       return {
         module,
@@ -585,7 +572,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
         totalConcepts,
         completedConcepts,
         completionPercentage,
-        isExpanded: true // Default expanded for detailed view
+        isExpanded: true, // Default expanded for detailed view
       };
     });
   }
@@ -598,9 +585,8 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       const concepts = this.buildConceptDisplays(section.conceptIds);
       const totalConcepts = concepts.length;
       const completedConcepts = concepts.filter(c => c.isCompleted || c.isGlobalCompletion).length;
-      const completionPercentage = totalConcepts > 0
-        ? Math.round((completedConcepts / totalConcepts) * 100)
-        : 0;
+      const completionPercentage =
+        totalConcepts > 0 ? Math.round((completedConcepts / totalConcepts) * 100) : 0;
 
       return {
         section,
@@ -608,26 +594,27 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
         totalConcepts,
         completedConcepts,
         completionPercentage,
-        isExpanded: true // Default expanded for detailed view
+        isExpanded: true, // Default expanded for detailed view
       };
     });
   }
 
   /**
    * Build concept display objects from concept IDs.
-   * Uses conceptProgress data for completion status.
+   * Uses conceptProgress data for completion status, utility functions for icons.
    */
   private buildConceptDisplays(conceptIds: string[]): ConceptDisplay[] {
     return conceptIds.map(conceptId => {
       const conceptData = this.conceptProgress.find(c => c.conceptId === conceptId);
+      const inferredType = inferContentTypeFromId(conceptId);
 
       return {
         conceptId,
         title: conceptData?.title ?? this.formatConceptTitle(conceptId),
         isCompleted: this.isConceptCompleted(conceptId),
         isGlobalCompletion: this.isConceptGloballyComplete(conceptId),
-        icon: this.getConceptIcon(conceptId),
-        contentType: this.getConceptType(conceptId)
+        icon: getIconForContent(conceptId, inferredType),
+        contentType: inferredType,
       };
     });
   }
@@ -640,37 +627,6 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
     if (!conceptData) return false;
     // If completed but not in this path's progress, it's global
     return conceptData.completionPercentage === 100 && !this.isConceptCompleted(conceptId);
-  }
-
-  /**
-   * Get icon for a concept based on its type.
-   */
-  private getConceptIcon(conceptId: string): string {
-    // Could be enhanced to look up from conceptProgress or content type
-    const icons: Record<string, string> = {
-      'epic': '📖',
-      'feature': '⚡',
-      'scenario': '✓',
-      'concept': '💡',
-      'simulation': '🎮',
-      'video': '🎥',
-      'assessment': '📝'
-    };
-    const contentType = this.getConceptType(conceptId);
-    return icons[contentType] ?? '💡';
-  }
-
-  /**
-   * Get content type for a concept.
-   */
-  private getConceptType(conceptId: string): string {
-    // Look for common patterns in concept IDs
-    if (conceptId.includes('scenario')) return 'scenario';
-    if (conceptId.includes('feature')) return 'feature';
-    if (conceptId.includes('epic')) return 'epic';
-    if (conceptId.includes('assessment') || conceptId.includes('quiz')) return 'assessment';
-    if (conceptId.includes('video')) return 'video';
-    return 'concept';
   }
 
   /**

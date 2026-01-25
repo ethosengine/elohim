@@ -4,8 +4,8 @@
     <div class="card-header">
       <h1>Create Contributor Presence</h1>
       <p class="subtitle">
-        Attribute contributions to someone not yet in the network.
-        Recognition will accumulate until they claim their presence.
+        Attribute contributions to someone not yet in the network. Recognition will accumulate until
+        they claim their presence.
       </p>
     </div>
 
@@ -47,8 +47,12 @@
           <div class="identifiers-list">
             @for (identifier of identifiers(); track identifier.id) {
               <div class="identifier-tag">
-                <span class="material-icons identifier-icon">{{ getProviderIcon(identifier.provider) }}</span>
-                <span class="identifier-provider">{{ getProviderLabel(identifier.provider) }}:</span>
+                <span class="material-icons identifier-icon">
+                  {{ getProviderIcon(identifier.provider) }}
+                </span>
+                <span class="identifier-provider">
+                  {{ getProviderLabel(identifier.provider) }}:
+                </span>
                 <span class="identifier-value">{{ identifier.value }}</span>
                 <button
                   type="button"
@@ -148,11 +152,7 @@
           </div>
         }
 
-        <button
-          type="button"
-          class="btn btn-link"
-          (click)="toggleContentSearch()"
-        >
+        <button type="button" class="btn btn-link" (click)="toggleContentSearch()">
           {{ showContentSearch() ? 'Hide search' : 'Add content' }}
         </button>
       </div>
@@ -182,11 +182,7 @@
         >
           Cancel
         </button>
-        <button
-          type="submit"
-          class="btn btn-primary"
-          [disabled]="!isValid() || isSubmitting()"
-        >
+        <button type="submit" class="btn btn-primary" [disabled]="!isValid() || isSubmitting()">
           @if (isSubmitting()) {
             <span class="spinner"></span>
             Creating...
@@ -201,9 +197,17 @@
     <div class="info-section">
       <h3>What happens next?</h3>
       <ul>
-        <li>The presence is created in <strong>unclaimed</strong> state</li>
+        <li>
+          The presence is created in
+          <strong>unclaimed</strong>
+          state
+        </li>
         <li>You or others can steward it, caring for accumulated recognition</li>
-        <li>When the contributor joins, they can <strong>claim</strong> their presence</li>
+        <li>
+          When the contributor joins, they can
+          <strong>claim</strong>
+          their presence
+        </li>
         <li>All accumulated recognition transfers to them upon verification</li>
       </ul>
     </div>

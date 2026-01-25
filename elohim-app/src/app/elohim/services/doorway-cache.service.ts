@@ -12,10 +12,12 @@
  * Doorway is just a dumb cache that serves what's stored.
  */
 
-import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http';
-import { Observable, of } from 'rxjs';
+import { Injectable, inject } from '@angular/core';
+
 import { map, catchError, timeout } from 'rxjs/operators';
+
+import { Observable, of } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 
@@ -44,14 +46,11 @@ export class DoorwayCacheService {
 
   /** Base URL for cache API */
   private get baseUrl(): string {
-    const doorwayUrl = environment.holochain?.authUrl
-      || environment.holochain?.appUrl
-      || 'http://localhost:8080';
+    const doorwayUrl =
+      environment.holochain?.authUrl || environment.holochain?.appUrl || 'http://localhost:8080';
 
     // Convert WebSocket URL to HTTP
-    return doorwayUrl
-      .replace('wss://', 'https://')
-      .replace('ws://', 'http://');
+    return doorwayUrl.replace('wss://', 'https://').replace('ws://', 'http://');
   }
 
   /** API key for authenticated requests */
@@ -183,11 +182,7 @@ export class DoorwayCacheService {
   /**
    * Handle HTTP errors gracefully
    */
-  private handleError<T>(
-    error: HttpErrorResponse,
-    context: string,
-    fallback: T
-  ): Observable<T> {
+  private handleError<T>(error: HttpErrorResponse, context: string, fallback: T): Observable<T> {
     // Only log non-404 errors (404 is expected for missing content)
     if (error.status !== 404) {
       console.debug(`[DoorwayCache] ${context} failed:`, error.status, error.message);

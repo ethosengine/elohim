@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
+
 import { BehaviorSubject, Observable } from 'rxjs';
+
 import { PathContext, DetourInfo } from '../models/exploration-context.model';
 
 /**
@@ -102,7 +104,7 @@ export class PathContextService {
         ...this.contextStack[existingIndex],
         stepIndex: context.stepIndex,
         chapterTitle: context.chapterTitle,
-        returnRoute: context.returnRoute
+        returnRoute: context.returnRoute,
       };
     } else {
       // Push new path context
@@ -226,25 +228,25 @@ export class PathContextService {
     const breadcrumbs: BreadcrumbItem[] = [
       {
         label: 'Paths',
-        route: ['/lamad']
+        route: ['/lamad'],
       },
       {
         label: current.pathTitle,
-        route: ['/lamad/path', current.pathId]
-      }
+        route: ['/lamad/path', current.pathId],
+      },
     ];
 
     if (current.chapterTitle) {
       breadcrumbs.push({
         label: current.chapterTitle,
-        route: current.returnRoute
+        route: current.returnRoute,
       });
     }
 
     breadcrumbs.push({
       label: `Step ${current.stepIndex + 1}`,
       route: current.returnRoute,
-      isCurrent: !current.detourStack?.length
+      isCurrent: !current.detourStack?.length,
     });
 
     // Add detour breadcrumbs
@@ -255,7 +257,7 @@ export class PathContextService {
           label: `Exploring: ${detour.toContentId}`,
           route: ['/lamad/resource', detour.toContentId],
           isDetour: true,
-          isCurrent: i === current.detourStack.length - 1
+          isCurrent: i === current.detourStack.length - 1,
         });
       }
     }
@@ -276,7 +278,7 @@ export class PathContextService {
       totalSteps: current.totalSteps,
       chapterTitle: current.chapterTitle,
       detourCount: current.detourStack?.length ?? 0,
-      returnRoute: current.returnRoute
+      returnRoute: current.returnRoute,
     };
   }
 }

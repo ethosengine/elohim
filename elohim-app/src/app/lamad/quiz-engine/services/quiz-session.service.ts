@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
+
 import { BehaviorSubject, Observable, of, map, switchMap, tap } from 'rxjs';
-import { QuestionPoolService } from './question-pool.service';
-import type { PerseusItem, PerseusScoreResult } from '../../content-io/plugins/sophia/sophia-moment.model';
+
 import {
   QuizSession,
   QuizSessionType,
@@ -15,8 +15,15 @@ import {
   calculateQuizResult,
   isValidTransition,
   isTerminalState,
-  DEFAULT_CONFIGS
+  DEFAULT_CONFIGS,
 } from '../models/quiz-session.model';
+
+import { QuestionPoolService } from './question-pool.service';
+
+import type {
+  PerseusItem,
+  PerseusScoreResult,
+} from '../../content-io/plugins/sophia/sophia-moment.model';
 
 /**
  * QuizSessionService - Manages quiz session lifecycle.
@@ -42,7 +49,7 @@ import {
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class QuizSessionService {
   private readonly questionPool = inject(QuestionPoolService);
@@ -71,7 +78,7 @@ export class QuizSessionService {
     pathId: string,
     sectionId: string,
     humanId: string,
-    questionCount: number = 5
+    questionCount = 5
   ): Observable<QuizSession> {
     return this.questionPool.getHierarchicalPool(pathId, sectionId).pipe(
       switchMap(source => this.questionPool.loadHierarchicalPools(source)),
@@ -81,15 +88,10 @@ export class QuizSessionService {
         const pathContext: PathQuizContext = {
           pathId,
           sectionId,
-          sectionContentIds: source.eligibleContentIds
+          sectionContentIds: source.eligibleContentIds,
         };
 
-        const session = createQuizSession(
-          'practice',
-          humanId,
-          selection.questions,
-          pathContext
-        );
+        const session = createQuizSession('practice', humanId, selection.questions, pathContext);
 
         this.registerSession(session);
         return session;
@@ -108,7 +110,7 @@ export class QuizSessionService {
     sectionId: string,
     humanId: string,
     practicedContentIds: string[] = [],
-    questionCount: number = 5
+    questionCount = 5
   ): Observable<QuizSession> {
     return this.questionPool.getHierarchicalPool(pathId, sectionId).pipe(
       switchMap(source => this.questionPool.loadHierarchicalPools(source)),
@@ -122,15 +124,10 @@ export class QuizSessionService {
         const pathContext: PathQuizContext = {
           pathId,
           sectionId,
-          sectionContentIds: source.eligibleContentIds
+          sectionContentIds: source.eligibleContentIds,
         };
 
-        const session = createQuizSession(
-          'mastery',
-          humanId,
-          selection.questions,
-          pathContext
-        );
+        const session = createQuizSession('mastery', humanId, selection.questions, pathContext);
 
         this.registerSession(session);
         return session;
@@ -147,18 +144,15 @@ export class QuizSessionService {
   startInlineQuiz(
     contentId: string,
     humanId: string,
-    targetStreak: number = 3,
-    maxQuestions: number = 10
+    targetStreak = 3,
+    maxQuestions = 10
   ): Observable<QuizSession> {
     return this.questionPool.selectInlineQuestions(contentId, maxQuestions).pipe(
       map(selection => {
-        const session = createQuizSession(
-          'inline',
-          humanId,
-          selection.questions,
-          undefined,
-          { allowRetry: true, showImmediateFeedback: true }
-        );
+        const session = createQuizSession('inline', humanId, selection.questions, undefined, {
+          allowRetry: true,
+          showImmediateFeedback: true,
+        });
 
         // Configure streak tracking
         if (session.streakInfo) {
@@ -177,11 +171,7 @@ export class QuizSessionService {
    * Pre-assessments test knowledge before starting a path,
    * allowing learners to skip content they already know.
    */
-  startPreAssessment(
-    pathId: string,
-    humanId: string,
-    questionCount: number = 10
-  ): Observable<QuizSession> {
+  startPreAssessment(pathId: string, humanId: string, questionCount = 10): Observable<QuizSession> {
     // Get all content from the path
     return this.questionPool.getHierarchicalPool(pathId, pathId).pipe(
       switchMap(source => this.questionPool.loadHierarchicalPools(source)),
@@ -189,13 +179,13 @@ export class QuizSessionService {
         const selection = this.questionPool.selectQuestions(source.combinedPool, {
           count: questionCount,
           randomize: true,
-          ensureVariety: true
+          ensureVariety: true,
         });
 
         const pathContext: PathQuizContext = {
           pathId,
           sectionId: pathId,
-          sectionContentIds: source.eligibleContentIds
+          sectionContentIds: source.eligibleContentIds,
         };
 
         const session = createQuizSession(
@@ -293,11 +283,10 @@ export class QuizSessionService {
       state: newState,
       timing: {
         ...session.timing,
-        startedAt: newState === 'in_progress' && !session.timing.startedAt
-          ? now
-          : session.timing.startedAt,
-        endedAt: isTerminalState(newState) ? now : session.timing.endedAt
-      }
+        startedAt:
+          newState === 'in_progress' && !session.timing.startedAt ? now : session.timing.startedAt,
+        endedAt: isTerminalState(newState) ? now : session.timing.endedAt,
+      },
     };
 
     this.updateSession(updated);
@@ -339,9 +328,10 @@ export class QuizSessionService {
     const now = new Date().toISOString();
 
     // Calculate time spent on this question
-    const startTime = session.responses.length > 0
-      ? new Date(session.responses[session.responses.length - 1].answeredAt).getTime()
-      : new Date(session.timing.startedAt ?? session.timing.createdAt).getTime();
+    const startTime =
+      session.responses.length > 0
+        ? new Date(session.responses[session.responses.length - 1].answeredAt).getTime()
+        : new Date(session.timing.startedAt ?? session.timing.createdAt).getTime();
     const timeSpentMs = Date.now() - startTime;
 
     // Create response record
@@ -356,7 +346,7 @@ export class QuizSessionService {
       timeSpentMs,
       attemptNumber: question.attempts + 1,
       hintViewed: question.hintUsed,
-      perseusResult: scoreResult
+      perseusResult: scoreResult,
     };
 
     // Update question state
@@ -367,7 +357,7 @@ export class QuizSessionService {
       correct: scoreResult.correct,
       score: scoreResult.score,
       timeSpentMs: question.timeSpentMs + timeSpentMs,
-      attempts: question.attempts + 1
+      attempts: question.attempts + 1,
     };
 
     // Update streak for inline quizzes
@@ -380,13 +370,13 @@ export class QuizSessionService {
           currentStreak: newStreak,
           maxStreak: Math.max(session.streakInfo.maxStreak, newStreak),
           recentAnswers: [...session.streakInfo.recentAnswers, true],
-          targetAchieved: newStreak >= session.streakInfo.targetStreak
+          targetAchieved: newStreak >= session.streakInfo.targetStreak,
         };
       } else {
         updatedStreakInfo = {
           ...session.streakInfo,
           currentStreak: 0,
-          recentAnswers: [...session.streakInfo.recentAnswers, false]
+          recentAnswers: [...session.streakInfo.recentAnswers, false],
         };
       }
     }
@@ -399,8 +389,8 @@ export class QuizSessionService {
       streakInfo: updatedStreakInfo,
       timing: {
         ...session.timing,
-        totalTimeMs: session.timing.totalTimeMs + timeSpentMs
-      }
+        totalTimeMs: session.timing.totalTimeMs + timeSpentMs,
+      },
     };
 
     this.updateSession(updated);
@@ -426,7 +416,7 @@ export class QuizSessionService {
 
     const updated: QuizSession = {
       ...session,
-      currentIndex: session.currentIndex + 1
+      currentIndex: session.currentIndex + 1,
     };
 
     this.updateSession(updated);
@@ -448,7 +438,7 @@ export class QuizSessionService {
 
     const updated: QuizSession = {
       ...session,
-      currentIndex: session.currentIndex - 1
+      currentIndex: session.currentIndex - 1,
     };
 
     this.updateSession(updated);
@@ -488,12 +478,12 @@ export class QuizSessionService {
     const updatedQuestions = [...session.questions];
     updatedQuestions[session.currentIndex] = {
       ...currentQuestion,
-      hintUsed: true
+      hintUsed: true,
     };
 
     this.updateSession({
       ...session,
-      questions: updatedQuestions
+      questions: updatedQuestions,
     });
 
     return true;
@@ -537,8 +527,8 @@ export class QuizSessionService {
         ...session,
         timing: {
           ...session.timing,
-          timeExceeded: true
-        }
+          timeExceeded: true,
+        },
       };
       this.updateSession(updated);
     }
@@ -569,7 +559,7 @@ export class QuizSessionService {
     return {
       current: session.currentIndex + 1,
       total: session.questions.length,
-      percentage: Math.round(((session.currentIndex + 1) / session.questions.length) * 100)
+      percentage: Math.round(((session.currentIndex + 1) / session.questions.length) * 100),
     };
   }
 

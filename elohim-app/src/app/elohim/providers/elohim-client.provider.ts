@@ -7,7 +7,13 @@
  */
 
 import { InjectionToken, Provider } from '@angular/core';
-import { ElohimClient, ElohimClientConfig, detectClientMode, ReachLevel } from '@elohim/service/client';
+
+import {
+  ElohimClient,
+  ElohimClientConfig,
+  detectClientMode,
+  ReachLevel,
+} from '@elohim/service/client';
 
 /**
  * Local injection token for ElohimClient

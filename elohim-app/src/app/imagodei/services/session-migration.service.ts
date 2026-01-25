@@ -14,9 +14,8 @@
  */
 
 import { Injectable, inject, signal, computed } from '@angular/core';
+
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
-import { SessionHumanService } from './session-human.service';
-import { IdentityService } from './identity.service';
 import { ContentMasteryService } from '../../lamad/services/content-mastery.service';
 import {
   type MigrationState,
@@ -25,6 +24,9 @@ import {
   type RegisterHumanRequest,
   INITIAL_MIGRATION_STATE,
 } from '../models/identity.model';
+
+import { IdentityService } from './identity.service';
+import { SessionHumanService } from './session-human.service';
 
 // =============================================================================
 // Migration Service
@@ -61,10 +63,11 @@ export class SessionMigrationService {
   });
 
   /** Whether migration can be started */
-  readonly canMigrate = computed(() =>
-    this.sessionHumanService.hasSession() &&
-    this.holochainClient.isConnected() &&
-    this.identityService.mode() === 'session'
+  readonly canMigrate = computed(
+    () =>
+      this.sessionHumanService.hasSession() &&
+      this.holochainClient.isConnected() &&
+      this.identityService.mode() === 'session'
   );
 
   // ==========================================================================
@@ -92,7 +95,11 @@ export class SessionMigrationService {
 
     try {
       // Step 1: Prepare migration data
-      this.updateState({ status: 'preparing', currentStep: 'Packaging session data...', progress: 10 });
+      this.updateState({
+        status: 'preparing',
+        currentStep: 'Packaging session data...',
+        progress: 10,
+      });
 
       const migrationPackage = this.sessionHumanService.prepareMigration();
       if (!migrationPackage) {
@@ -100,7 +107,11 @@ export class SessionMigrationService {
       }
 
       // Step 2: Register human in network
-      this.updateState({ status: 'registering', currentStep: 'Creating network identity...', progress: 30 });
+      this.updateState({
+        status: 'registering',
+        currentStep: 'Creating network identity...',
+        progress: 30,
+      });
 
       const registrationRequest: RegisterHumanRequest = {
         displayName: profileOverrides?.displayName ?? session.displayName,
@@ -114,7 +125,11 @@ export class SessionMigrationService {
       const profile = await this.identityService.registerHuman(registrationRequest);
 
       // Step 3: Transfer progress data
-      this.updateState({ status: 'transferring', currentStep: 'Transferring progress...', progress: 60 });
+      this.updateState({
+        status: 'transferring',
+        currentStep: 'Transferring progress...',
+        progress: 60,
+      });
 
       // Transfer path progress
       const pathProgress = migrationPackage.pathProgress ?? [];
@@ -199,7 +214,8 @@ export class SessionMigrationService {
         payload: {
           agent_id: agentId,
           path_id: progress.pathId,
-          completed_step_index: progress.currentStepIndex > 0 ? progress.currentStepIndex - 1 : undefined,
+          completed_step_index:
+            progress.currentStepIndex > 0 ? progress.currentStepIndex - 1 : undefined,
         },
         roleName: 'imagodei',
       });
@@ -217,7 +233,11 @@ export class SessionMigrationService {
     try {
       // This could call a zome function to store affinity data
       // For MVP, the affinity will be rebuilt as user interacts with content
-      console.log('[SessionMigration] Affinity data prepared for transfer:', Object.keys(affinity).length, 'entries');
+      console.log(
+        '[SessionMigration] Affinity data prepared for transfer:',
+        Object.keys(affinity).length,
+        'entries'
+      );
     } catch (err) {
       console.warn('[SessionMigration] Failed to transfer affinity:', err);
     }

@@ -8,12 +8,11 @@
  * - View stewardship details
  */
 
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { PresenceService } from '../../services/presence.service';
-import { IdentityService } from '../../services/identity.service';
+
 import {
   type ContributorPresenceView,
   type PresenceState,
@@ -21,6 +20,8 @@ import {
   PresenceStates,
   getPresenceStateLabel,
 } from '../../models/presence.model';
+import { IdentityService } from '../../services/identity.service';
+import { PresenceService } from '../../services/presence.service';
 
 type FilterState = 'all' | PresenceState;
 

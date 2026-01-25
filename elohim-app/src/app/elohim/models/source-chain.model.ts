@@ -89,32 +89,32 @@ export interface SourceChainEntry<T = unknown> {
  */
 export type LamadEntryType =
   // Identity entries
-  | 'human-profile'           // SessionHuman / HumanProfile data
-  | 'presence-claim'          // ContributorPresence claim record
-  | 'external-identifier'     // Link to external identity (Twitter, GitHub, etc.)
+  | 'human-profile' // SessionHuman / HumanProfile data
+  | 'presence-claim' // ContributorPresence claim record
+  | 'external-identifier' // Link to external identity (Twitter, GitHub, etc.)
 
   // Learning entries
-  | 'mastery-record'          // ContentMastery for a specific content node
-  | 'affinity-mark'           // Affinity value for a content node
-  | 'path-progress'           // Progress through a learning path
-  | 'step-completion'         // Completion of a specific step
-  | 'assessment-result'       // Quiz/assessment result
+  | 'mastery-record' // ContentMastery for a specific content node
+  | 'affinity-mark' // Affinity value for a content node
+  | 'path-progress' // Progress through a learning path
+  | 'step-completion' // Completion of a specific step
+  | 'assessment-result' // Quiz/assessment result
 
   // Recognition entries
-  | 'recognition-event'       // Recognition flowing to a presence
-  | 'endorsement'             // Endorsement of content or person
-  | 'attestation-grant'       // Attestation earned
+  | 'recognition-event' // Recognition flowing to a presence
+  | 'endorsement' // Endorsement of content or person
+  | 'attestation-grant' // Attestation earned
 
   // Governance entries
-  | 'governance-vote'         // Vote on a proposal
-  | 'challenge-filed'         // Challenge to content
-  | 'review-submitted'        // Review of content
+  | 'governance-vote' // Vote on a proposal
+  | 'challenge-filed' // Challenge to content
+  | 'review-submitted' // Review of content
 
   // Consent & Relationship entries
-  | 'human-consent'           // Consent relationship between two humans
-  | 'consent-state-change'    // Record of consent state transition
-  | 'path-negotiation'        // Love map negotiation session
-  | 'negotiation-message';    // Message in a negotiation
+  | 'human-consent' // Consent relationship between two humans
+  | 'consent-state-change' // Record of consent state transition
+  | 'path-negotiation' // Love map negotiation session
+  | 'negotiation-message'; // Message in a negotiation
 
 // =============================================================================
 // LINK TYPES
@@ -186,30 +186,30 @@ export interface EntryLink {
  */
 export type LamadLinkType =
   // Identity links
-  | 'profile-for-agent'       // Agent → their profile entry
-  | 'presence-for-content'    // Content → attributed presence(s)
-  | 'identity-claim'          // Presence → claim verification entry
+  | 'profile-for-agent' // Agent → their profile entry
+  | 'presence-for-content' // Content → attributed presence(s)
+  | 'identity-claim' // Presence → claim verification entry
 
   // Learning links
-  | 'mastery-for-content'     // Content → mastery record(s) by this agent
-  | 'affinity-for-content'    // Content → affinity mark by this agent
-  | 'progress-for-path'       // Path → progress record by this agent
-  | 'completion-for-step'     // Step → completion record
+  | 'mastery-for-content' // Content → mastery record(s) by this agent
+  | 'affinity-for-content' // Content → affinity mark by this agent
+  | 'progress-for-path' // Path → progress record by this agent
+  | 'completion-for-step' // Step → completion record
 
   // Recognition links
   | 'recognition-to-presence' // Recognition event → target presence
-  | 'recognition-from-agent'  // Recognition event → source agent
+  | 'recognition-from-agent' // Recognition event → source agent
   | 'endorsement-for-content' // Content → endorsement
 
   // Correction links
-  | 'correction-of'           // New entry → corrected entry
-  | 'supersedes'              // New entry → superseded entry
+  | 'correction-of' // New entry → corrected entry
+  | 'supersedes' // New entry → superseded entry
 
   // Consent & Relationship links
-  | 'consent-with-human'      // Human → consent relationship with another human
-  | 'consent-from-human'      // Human → consent relationship FROM another human
+  | 'consent-with-human' // Human → consent relationship with another human
+  | 'consent-from-human' // Human → consent relationship FROM another human
   | 'negotiation-for-consent' // Consent → negotiation session
-  | 'path-from-negotiation';  // Negotiation → generated path
+  | 'path-from-negotiation'; // Negotiation → generated path
 
 // =============================================================================
 // QUERY TYPES
@@ -311,7 +311,7 @@ export interface HumanProfileContent {
  */
 export interface MasteryRecordContent {
   contentId: string;
-  level: string;  // MasteryLevel (Bloom's Taxonomy: not_started → create)
+  level: string; // MasteryLevel (Bloom's Taxonomy: not_started → create)
   levelAchievedAt: string;
   freshness: number;
   lastEngagementAt: string;
@@ -323,7 +323,7 @@ export interface MasteryRecordContent {
  */
 export interface AffinityMarkContent {
   contentId: string;
-  value: number;  // 0.0 - 1.0
+  value: number; // 0.0 - 1.0
   previousValue?: number;
 }
 
@@ -442,7 +442,12 @@ export interface PathNegotiationContent {
   sharedAffinityNodes: string[];
 
   /** Bridging strategy */
-  bridgingStrategy?: 'shortest_path' | 'maximum_overlap' | 'complementary' | 'exploration' | 'custom';
+  bridgingStrategy?:
+    | 'shortest_path'
+    | 'maximum_overlap'
+    | 'complementary'
+    | 'exploration'
+    | 'custom';
 
   /** Generated path ID */
   generatedPathId?: string;

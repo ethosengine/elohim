@@ -11,11 +11,18 @@
  */
 
 import { Injectable } from '@angular/core';
-import { Observable, forkJoin } from 'rxjs';
+
 import { map, filter } from 'rxjs/operators';
 
-import { StorageApiService, CreatePresenceInput, CreateMasteryInput, CreateEventInput } from '@app/elohim/services/storage-api.service';
+import { Observable, forkJoin } from 'rxjs';
+
 import { HumanRelationshipView } from '@app/elohim/adapters/storage-types.adapter';
+import {
+  StorageApiService,
+  CreatePresenceInput,
+  CreateMasteryInput,
+  CreateEventInput,
+} from '@app/elohim/services/storage-api.service';
 import {
   HumanRelationshipQuery,
   CreateHumanRelationshipInput,
@@ -154,16 +161,8 @@ export class HumanRelationshipService {
    * @param enabled Whether to enable custody
    * @param autoCustody Whether to enable auto-custody (auto-verify recovery requests)
    */
-  updateCustody(
-    relationshipId: string,
-    enabled: boolean,
-    autoCustody: boolean = false
-  ): Observable<void> {
-    return this.storageApi.updateHumanRelationshipCustody(
-      relationshipId,
-      enabled,
-      autoCustody
-    );
+  updateCustody(relationshipId: string, enabled: boolean, autoCustody = false): Observable<void> {
+    return this.storageApi.updateHumanRelationshipCustody(relationshipId, enabled, autoCustody);
   }
 
   // ===========================================================================
@@ -174,12 +173,12 @@ export class HumanRelationshipService {
    * Check if a relationship exists between two people.
    */
   relationshipExists(personAId: string, personBId: string): Observable<boolean> {
-    return this.storageApi.getHumanRelationships({
-      partyAId: personAId,
-      partyBId: personBId,
-    }).pipe(
-      map(relationships => relationships.length > 0)
-    );
+    return this.storageApi
+      .getHumanRelationships({
+        partyAId: personAId,
+        partyBId: personBId,
+      })
+      .pipe(map(relationships => relationships.length > 0));
   }
 
   /**

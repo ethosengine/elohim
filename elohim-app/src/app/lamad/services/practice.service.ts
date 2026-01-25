@@ -17,8 +17,10 @@
  */
 
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, from, of } from 'rxjs';
+
 import { map, tap, catchError, switchMap } from 'rxjs/operators';
+
+import { BehaviorSubject, Observable, from, of } from 'rxjs';
 
 import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
 
@@ -145,15 +147,17 @@ export class PracticeService {
    * Refresh pool recommendations.
    */
   refreshRecommendations(): void {
-    from(this.backend.getPoolRecommendations()).pipe(
-      tap(recommendations => {
-        this.recommendationsSubject.next(recommendations);
-      }),
-      catchError(err => {
-        console.warn('[Practice] Failed to get recommendations:', err);
-        return of(null);
-      })
-    ).subscribe();
+    from(this.backend.getPoolRecommendations())
+      .pipe(
+        tap(recommendations => {
+          this.recommendationsSubject.next(recommendations);
+        }),
+        catchError(err => {
+          console.warn('[Practice] Failed to get recommendations:', err);
+          return of(null);
+        })
+      )
+      .subscribe();
   }
 
   /**
@@ -175,24 +179,24 @@ export class PracticeService {
    * Check if user can take a challenge.
    */
   checkCooldown(): void {
-    from(this.backend.checkChallengeCooldown()).pipe(
-      tap(cooldown => {
-        this.cooldownSubject.next(cooldown);
-      }),
-      catchError(err => {
-        console.warn('[Practice] Failed to check cooldown:', err);
-        return of(null);
-      })
-    ).subscribe();
+    from(this.backend.checkChallengeCooldown())
+      .pipe(
+        tap(cooldown => {
+          this.cooldownSubject.next(cooldown);
+        }),
+        catchError(err => {
+          console.warn('[Practice] Failed to check cooldown:', err);
+          return of(null);
+        })
+      )
+      .subscribe();
   }
 
   /**
    * Observable for whether user can take a challenge.
    */
   canTakeChallenge$(): Observable<boolean> {
-    return this.cooldown$.pipe(
-      map(cooldown => cooldown?.can_take_challenge ?? false)
-    );
+    return this.cooldown$.pipe(map(cooldown => cooldown?.can_take_challenge ?? false));
   }
 
   /**
@@ -254,11 +258,13 @@ export class PracticeService {
     responses: MasteryChallengeResponse[],
     actualTimeSeconds: number
   ): Observable<ChallengeResult | null> {
-    return from(this.backend.submitMasteryChallenge({
-      challenge_id: challengeId,
-      responses,
-      actual_time_seconds: actualTimeSeconds,
-    })).pipe(
+    return from(
+      this.backend.submitMasteryChallenge({
+        challenge_id: challengeId,
+        responses,
+        actual_time_seconds: actualTimeSeconds,
+      })
+    ).pipe(
       tap(result => {
         if (result) {
           // Clear current challenge

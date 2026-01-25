@@ -18,10 +18,15 @@
         [style.left.%]="position.index * 100"
         [attr.aria-label]="position.label"
         (click)="selectPosition(position)"
-        type="button">
+        type="button"
+      >
         <span class="marker-dot"></span>
         <span class="marker-label">{{ position.label }}</span>
-        <span class="requires-reasoning" *ngIf="position.requiresReasoning" title="Reasoning required">
+        <span
+          class="requires-reasoning"
+          *ngIf="position.requiresReasoning"
+          title="Reasoning required"
+        >
           *
         </span>
       </button>
@@ -30,7 +35,9 @@
     <!-- Slider for continuous selection (alternative UI) -->
     <div class="scale-labels">
       <span class="label-start">{{ currentScale.positions[0].label }}</span>
-      <span class="label-end">{{ currentScale.positions[currentScale.positions.length - 1].label }}</span>
+      <span class="label-end">
+        {{ currentScale.positions[currentScale.positions.length - 1].label }}
+      </span>
     </div>
   </div>
 
@@ -55,7 +62,8 @@
         max="10"
         [(ngModel)]="intensity"
         class="slider"
-        [style.--intensity-percent]="(intensity - 1) / 9 * 100 + '%'" />
+        [style.--intensity-percent]="((intensity - 1) / 9) * 100 + '%'"
+      />
       <span class="intensity-high">Very Strongly</span>
     </div>
   </div>
@@ -66,7 +74,8 @@
       *ngIf="!reasoningRequired && !showReasoningField"
       class="add-reasoning-btn"
       (click)="toggleReasoning()"
-      type="button">
+      type="button"
+    >
       + Add reasoning (optional)
     </button>
 
@@ -80,8 +89,8 @@
         rows="3"
         placeholder="Share your perspective..."
         class="reasoning-textarea"
-        [class.error]="reasoningRequired && !reasoning.trim()">
-      </textarea>
+        [class.error]="reasoningRequired && !reasoning.trim()"
+      ></textarea>
       <p class="reasoning-hint" *ngIf="context === 'proposal' && selectedPosition === 0">
         Blocking a proposal is a serious action. Please explain the constitutional or principled
         basis for your objection so it can be properly considered.
@@ -95,7 +104,8 @@
       class="submit-btn"
       [disabled]="!canSubmit || isSubmitting"
       (click)="submit()"
-      type="button">
+      type="button"
+    >
       <span *ngIf="!isSubmitting">Submit Feedback</span>
       <span *ngIf="isSubmitting">Submitting...</span>
     </button>
@@ -111,9 +121,7 @@
       </span>
       <span class="response-intensity">({{ getIntensityLabel() }})</span>
     </div>
-    <button class="change-btn" (click)="reset()" type="button">
-      Change response
-    </button>
+    <button class="change-btn" (click)="reset()" type="button">Change response</button>
   </div>
 
   <!-- Aggregate Distribution -->
@@ -125,14 +133,15 @@
         class="distribution-segment"
         [style.width.%]="getDistributionWidth(position)"
         [style.background-color]="position.color"
-        [title]="position.label + ': ' + (stats.distribution[position.label] || 0)">
-      </div>
+        [title]="position.label + ': ' + (stats.distribution[position.label] || 0)"
+      ></div>
     </div>
     <div class="distribution-legend">
       <div
         *ngFor="let position of currentScale.positions"
         class="legend-item"
-        [class.has-responses]="(stats.distribution[position.label] || 0) > 0">
+        [class.has-responses]="(stats.distribution[position.label] || 0) > 0"
+      >
         <span class="legend-dot" [style.background-color]="position.color"></span>
         <span class="legend-label">{{ position.label }}</span>
         <span class="legend-count">({{ stats.distribution[position.label] || 0 }})</span>

@@ -195,7 +195,9 @@
   font-size: 1rem;
   font-family: inherit;
   background: var(--surface-ground, #f8f9fa);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .form-group input:focus,
@@ -286,7 +288,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Progress Section */

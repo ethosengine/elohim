@@ -1,13 +1,12 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
+
 import { map, switchMap, catchError, take } from 'rxjs/operators';
 
+import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
+
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
-import {
-  ContentNode,
-  ContentGraph,
-  ContentRelationship
-} from '../models/content-node.model';
+
+import { ContentNode, ContentGraph, ContentRelationship } from '../models/content-node.model';
 import {
   GraphExplorationQuery,
   PathfindingQuery,
@@ -23,7 +22,7 @@ import {
   AttestationCheck,
   ExplorationError,
   ExplorationErrorCode,
-  ExplorationEvent
+  ExplorationEvent,
 } from '../models/exploration.model';
 
 /**
@@ -64,7 +63,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class ExplorationService {
   // Rate limit tracking per agent
-  private readonly rateLimits: Map<string, AgentRateLimitState> = new Map();
+  private readonly rateLimits = new Map<string, AgentRateLimitState>();
 
   // Event log for analytics/audit
   private eventLog: ExplorationEvent[] = [];
@@ -77,9 +76,7 @@ export class ExplorationService {
   private readonly rateLimitStatusSubject = new BehaviorSubject<RateLimitStatus | null>(null);
   public readonly rateLimitStatus$ = this.rateLimitStatusSubject.asObservable();
 
-  constructor(
-    private readonly dataLoader: DataLoaderService
-  ) {}
+  constructor(private readonly dataLoader: DataLoaderService) {}
 
   // =========================================================================
   // Core Exploration Methods
@@ -110,7 +107,7 @@ export class ExplorationService {
         const rateLimitCheck = this.checkRateLimit(this.currentAgentId, 'exploration');
         if (!rateLimitCheck.allowed) {
           return this.createError('RATE_LIMIT_EXCEEDED', {
-            rateLimitStatus: this.getRateLimitStatusSync(this.currentAgentId)
+            rateLimitStatus: this.getRateLimitStatusSync(this.currentAgentId),
           });
         }
 
@@ -143,8 +140,8 @@ export class ExplorationService {
               result: {
                 nodesReturned: result.metadata.nodesReturned,
                 computeTimeMs: result.metadata.computeTimeMs,
-                creditsConsumed: result.metadata.resourceCredits
-              }
+                creditsConsumed: result.metadata.resourceCredits,
+              },
             });
 
             return of(result);
@@ -157,7 +154,7 @@ export class ExplorationService {
           timestamp: new Date().toISOString(),
           agentId: this.currentAgentId,
           query,
-          error: err
+          error: err,
         });
         return throwError(() => err);
       })
@@ -177,9 +174,12 @@ export class ExplorationService {
     // Pathfinding requires path-creator attestation
     return this.checkAttestations(this.currentAgentId, 3).pipe(
       switchMap(attestationCheck => {
-        if (attestationCheck.tier !== 'path-creator' && attestationCheck.tier !== 'advanced-researcher') {
+        if (
+          attestationCheck.tier !== 'path-creator' &&
+          attestationCheck.tier !== 'advanced-researcher'
+        ) {
           return this.createError('PATHFINDING_UNAUTHORIZED', {
-            requiredAttestation: 'path-creator'
+            requiredAttestation: 'path-creator',
           });
         }
 
@@ -190,7 +190,7 @@ export class ExplorationService {
         const rateLimitCheck = this.checkRateLimit(this.currentAgentId, 'pathfinding');
         if (!rateLimitCheck.allowed) {
           return this.createError('RATE_LIMIT_EXCEEDED', {
-            rateLimitStatus: this.getRateLimitStatusSync(this.currentAgentId)
+            rateLimitStatus: this.getRateLimitStatusSync(this.currentAgentId),
           });
         }
 
@@ -210,14 +210,15 @@ export class ExplorationService {
             }
 
             // Execute pathfinding
-            const pathResult = query.algorithm === 'shortest'
-              ? this.dijkstraPath(graph, query, startTime)
-              : this.semanticPath(graph, query, startTime);
+            const pathResult =
+              query.algorithm === 'shortest'
+                ? this.dijkstraPath(graph, query, startTime)
+                : this.semanticPath(graph, query, startTime);
 
             if (!pathResult) {
               return this.createError('NO_PATH_EXISTS', {
                 from: query.from,
-                to: query.to
+                to: query.to,
               });
             }
 
@@ -238,7 +239,10 @@ export class ExplorationService {
    * @param params - Parameters for the operation
    * @returns Observable<QueryCost> - Estimated cost
    */
-  estimateCost(operation: string, params: Partial<GraphExplorationQuery | PathfindingQuery>): Observable<QueryCost> {
+  estimateCost(
+    operation: string,
+    params: Partial<GraphExplorationQuery | PathfindingQuery>
+  ): Observable<QueryCost> {
     const agentStatus = this.getRateLimitStatusSync(this.currentAgentId);
 
     return this.dataLoader.getGraph().pipe(
@@ -251,7 +255,7 @@ export class ExplorationService {
             resourceCredits: 0,
             rateLimitImpact: 'Graph not loaded',
             canExecute: false,
-            blockedReason: 'query-too-expensive' as const
+            blockedReason: 'query-too-expensive' as const,
           };
         }
 
@@ -266,8 +270,7 @@ export class ExplorationService {
 
           // Check attestation requirement
           const requiredAttestation = DEPTH_ATTESTATION_REQUIREMENTS[depth];
-          const canAfford = depth <= agentStatus.maxDepth &&
-                           agentStatus.explorationRemaining > 0;
+          const canAfford = depth <= agentStatus.maxDepth && agentStatus.explorationRemaining > 0;
 
           return {
             estimatedNodes: Math.min(estimatedNodes, graph.nodes.size),
@@ -278,13 +281,13 @@ export class ExplorationService {
             canExecute: canAfford,
             blockedReason: !canAfford
               ? this.getBlockedReason(depth, agentStatus.maxDepth)
-              : undefined
+              : undefined,
           };
         }
 
         if (operation === 'findPath') {
-          const canAfford = agentStatus.tier === 'path-creator' &&
-                           agentStatus.pathfindingRemaining > 0;
+          const canAfford =
+            agentStatus.tier === 'path-creator' && agentStatus.pathfindingRemaining > 0;
 
           return {
             estimatedNodes: graph.nodes.size, // Worst case: traverse all nodes
@@ -293,7 +296,7 @@ export class ExplorationService {
             attestationRequired: 'path-creator',
             rateLimitImpact: `${agentStatus.pathfindingRemaining} of ${agentStatus.pathfindingLimit} pathfinding queries remaining`,
             canExecute: canAfford,
-            blockedReason: !canAfford ? 'insufficient-attestation' as const : undefined
+            blockedReason: !canAfford ? ('insufficient-attestation' as const) : undefined,
           };
         }
 
@@ -303,7 +306,7 @@ export class ExplorationService {
           resourceCredits: 0,
           rateLimitImpact: 'Unknown operation',
           canExecute: false,
-          blockedReason: 'invalid-query' as const
+          blockedReason: 'invalid-query' as const,
         };
       })
     );
@@ -318,7 +321,9 @@ export class ExplorationService {
    */
   getRateLimitStatus(agentId?: string): Observable<RateLimitStatus> {
     return this.checkAttestations(agentId ?? this.currentAgentId, 0).pipe(
-      map(attestation => this.getRateLimitStatusSync(agentId ?? this.currentAgentId, attestation.tier))
+      map(attestation =>
+        this.getRateLimitStatusSync(agentId ?? this.currentAgentId, attestation.tier)
+      )
     );
   }
 
@@ -340,7 +345,7 @@ export class ExplorationService {
       pathfindingRemaining: config.pathfindingPerHour - state.pathfindingCount,
       pathfindingLimit: config.pathfindingPerHour,
       resetsAt: resetsAt.toISOString(),
-      resetsInMs: Math.max(0, resetsAt.getTime() - now)
+      resetsInMs: Math.max(0, resetsAt.getTime() - now),
     };
   }
 
@@ -372,7 +377,7 @@ export class ExplorationService {
       edges: [],
       visited: new Set([query.focus]),
       nodesTraversed: 1,
-      edgesExamined: 0
+      edgesExamined: 0,
     };
 
     let currentFrontier = [query.focus];
@@ -400,8 +405,8 @@ export class ExplorationService {
         resourceCredits: this.calculateCredits(query.depth, ctx.visited.size),
         nodesTraversed: ctx.nodesTraversed,
         edgesExamined: ctx.edgesExamined,
-        queriedAt: new Date().toISOString()
-      }
+        queriedAt: new Date().toISOString(),
+      },
     };
   }
 
@@ -451,7 +456,7 @@ export class ExplorationService {
       ctx.edges.push({
         source: sourceId,
         target: targetId,
-        relationshipType: relationship.relationshipType
+        relationshipType: relationship.relationshipType,
       });
     }
 
@@ -464,11 +469,13 @@ export class ExplorationService {
     const node = ctx.graph.nodes.get(targetId);
     if (node) {
       // Apply content type filter
-      if (!this.passesContentTypeFilter(
-        node,
-        ctx.query.contentTypeFilter,
-        ctx.query.excludeContentTypes
-      )) {
+      if (
+        !this.passesContentTypeFilter(
+          node,
+          ctx.query.contentTypeFilter,
+          ctx.query.excludeContentTypes
+        )
+      ) {
         // Node is filtered out, but we still add it to frontier for traversal
         // This allows traversing THROUGH filtered nodes to reach others
         nextFrontier.push(targetId);
@@ -513,7 +520,11 @@ export class ExplorationService {
   /**
    * Find relationship between two nodes.
    */
-  private findRelationship(graph: ContentGraph, sourceId: string, targetId: string): ContentRelationship | null {
+  private findRelationship(
+    graph: ContentGraph,
+    sourceId: string,
+    targetId: string
+  ): ContentRelationship | null {
     for (const [, rel] of graph.relationships) {
       if (rel.sourceNodeId === sourceId && rel.targetNodeId === targetId) {
         return rel;
@@ -528,7 +539,7 @@ export class ExplorationService {
   private stripContent(node: ContentNode): ContentNode {
     return {
       ...node,
-      content: '[content stripped for performance]'
+      content: '[content stripped for performance]',
     };
   }
 
@@ -562,7 +573,7 @@ export class ExplorationService {
       previous: new Map(),
       unvisited: new Set(graph.nodes.keys()),
       nodesTraversed: 0,
-      edgesExamined: 0
+      edgesExamined: 0,
     };
   }
 
@@ -588,7 +599,9 @@ export class ExplorationService {
   }
 
   /** Find the unvisited node with minimum distance */
-  private findMinDistanceNode(ctx: PathfindingContext): { nodeId: string; distance: number } | null {
+  private findMinDistanceNode(
+    ctx: PathfindingContext
+  ): { nodeId: string; distance: number } | null {
     let minDist = Infinity;
     let minNode: string | null = null;
 
@@ -600,7 +613,7 @@ export class ExplorationService {
       }
     }
 
-    return (minNode && minDist < Infinity) ? { nodeId: minNode, distance: minDist } : null;
+    return minNode && minDist < Infinity ? { nodeId: minNode, distance: minDist } : null;
   }
 
   /** Update distances to neighbors */
@@ -653,8 +666,8 @@ export class ExplorationService {
         resourceCredits: 10,
         nodesTraversed: ctx.nodesTraversed,
         edgesExamined: ctx.edgesExamined,
-        queriedAt: new Date().toISOString()
-      }
+        queriedAt: new Date().toISOString(),
+      },
     };
     if (semanticScore !== undefined) {
       result.semanticScore = semanticScore;
@@ -681,7 +694,7 @@ export class ExplorationService {
       edges.push({
         source: path[i],
         target: path[i + 1],
-        relationshipType: rel?.relationshipType ?? 'unknown'
+        relationshipType: rel?.relationshipType ?? 'unknown',
       });
     }
     return edges;
@@ -696,18 +709,18 @@ export class ExplorationService {
     startTime: number
   ): PathResult | null {
     const relationshipWeights: Record<string, number> = {
-      'BELONGS_TO': 1,
-      'RELATES_TO': 2,
-      'DEPENDS_ON': 1.5,
-      'IMPLEMENTS': 1,
-      'EXTENDS': 1.5
+      BELONGS_TO: 1,
+      RELATES_TO: 2,
+      DEPENDS_ON: 1.5,
+      IMPLEMENTS: 1,
+      EXTENDS: 1.5,
     };
 
     const ctx = this.initPathfindingContext(graph, query);
 
     // Run Dijkstra with semantic weights
-    this.runDijkstra(ctx, (rel) => {
-      const baseWeight = rel ? (relationshipWeights[rel.relationshipType] || 2) : 2;
+    this.runDijkstra(ctx, rel => {
+      const baseWeight = rel ? relationshipWeights[rel.relationshipType] || 2 : 2;
       const relType = rel?.relationshipType;
       const preferred = relType ? query.preferredRelationships?.includes(relType) : false;
       return preferred ? baseWeight * 0.5 : baseWeight;
@@ -739,7 +752,7 @@ export class ExplorationService {
             maxAllowedDepth: 0,
             tier: 'unauthenticated' as RateLimitTier,
             requiredAttestation: 'authentication',
-            reason: 'Agent not found - authentication required'
+            reason: 'Agent not found - authentication required',
           };
         }
 
@@ -749,7 +762,10 @@ export class ExplorationService {
         let tier: RateLimitTier = 'authenticated';
         let maxDepth = 1;
 
-        if (attestations.includes('path-creator') || attestations.includes('curriculum-architect')) {
+        if (
+          attestations.includes('path-creator') ||
+          attestations.includes('curriculum-architect')
+        ) {
           tier = 'path-creator';
           maxDepth = 3;
         } else if (attestations.includes('advanced-researcher')) {
@@ -770,7 +786,9 @@ export class ExplorationService {
           maxAllowedDepth: maxDepth,
           tier,
           requiredAttestation: requiredAttestation ?? undefined,
-          reason: allowed ? undefined : `Depth ${requestedDepth} requires ${requiredAttestation} attestation`
+          reason: allowed
+            ? undefined
+            : `Depth ${requestedDepth} requires ${requiredAttestation} attestation`,
         };
       }),
       catchError(() => {
@@ -780,7 +798,7 @@ export class ExplorationService {
           maxAllowedDepth: 0,
           tier: 'unauthenticated' as RateLimitTier,
           requiredAttestation: 'authentication',
-          reason: 'Could not verify agent attestations'
+          reason: 'Could not verify agent attestations',
         });
       })
     );
@@ -800,7 +818,7 @@ export class ExplorationService {
         tier: 'authenticated',
         windowStart: now,
         explorationCount: 0,
-        pathfindingCount: 0
+        pathfindingCount: 0,
       };
       this.rateLimits.set(agentId, state);
     }
@@ -816,7 +834,10 @@ export class ExplorationService {
     return state;
   }
 
-  private checkRateLimit(agentId: string, type: 'exploration' | 'pathfinding'): { allowed: boolean } {
+  private checkRateLimit(
+    agentId: string,
+    type: 'exploration' | 'pathfinding'
+  ): { allowed: boolean } {
     const state = this.getOrCreateRateLimitState(agentId);
     const config = RATE_LIMIT_CONFIGS[state.tier];
 
@@ -861,7 +882,10 @@ export class ExplorationService {
     return Math.ceil(Math.pow(depth + 1, 2) * Math.log2(nodeCount + 1));
   }
 
-  private getBlockedReason(depth: number, maxDepth: number): 'insufficient-attestation' | 'rate-limit-exceeded' {
+  private getBlockedReason(
+    depth: number,
+    maxDepth: number
+  ): 'insufficient-attestation' | 'rate-limit-exceeded' {
     return depth > maxDepth ? 'insufficient-attestation' : 'rate-limit-exceeded';
   }
 
@@ -879,21 +903,25 @@ export class ExplorationService {
     return throwError(() => this.buildError(code, undefined, details));
   }
 
-  private buildError(code: ExplorationErrorCode, message?: string, details?: any): ExplorationError {
+  private buildError(
+    code: ExplorationErrorCode,
+    message?: string,
+    details?: any
+  ): ExplorationError {
     const messages: Record<ExplorationErrorCode, string> = {
-      'RESOURCE_NOT_FOUND': 'The requested resource was not found',
-      'DEPTH_UNAUTHORIZED': 'You do not have permission to explore at this depth',
-      'RATE_LIMIT_EXCEEDED': 'Query rate limit exceeded. Please wait before trying again.',
-      'PATHFINDING_UNAUTHORIZED': 'Pathfinding requires path-creator attestation',
-      'NO_PATH_EXISTS': 'No path exists between the specified resources',
-      'QUERY_TOO_EXPENSIVE': 'The query would exceed computational limits',
-      'INVALID_QUERY': 'Invalid query parameters'
+      RESOURCE_NOT_FOUND: 'The requested resource was not found',
+      DEPTH_UNAUTHORIZED: 'You do not have permission to explore at this depth',
+      RATE_LIMIT_EXCEEDED: 'Query rate limit exceeded. Please wait before trying again.',
+      PATHFINDING_UNAUTHORIZED: 'Pathfinding requires path-creator attestation',
+      NO_PATH_EXISTS: 'No path exists between the specified resources',
+      QUERY_TOO_EXPENSIVE: 'The query would exceed computational limits',
+      INVALID_QUERY: 'Invalid query parameters',
     };
 
     return {
       code,
       message: message ?? messages[code],
-      details
+      details,
     };
   }
 
@@ -921,9 +949,7 @@ export class ExplorationService {
    * Get events for a specific agent.
    */
   getAgentEvents(agentId: string, limit = 20): ExplorationEvent[] {
-    return this.eventLog
-      .filter(e => e.agentId === agentId)
-      .slice(-limit);
+    return this.eventLog.filter(e => e.agentId === agentId).slice(-limit);
   }
 
   // =========================================================================
@@ -943,7 +969,7 @@ export class ExplorationService {
       focus: view.focus,
       neighbors,
       edges: view.edges,
-      metadata: view.metadata
+      metadata: view.metadata,
     };
   }
 
@@ -960,7 +986,7 @@ export class ExplorationService {
       focus: serialized.focus,
       neighbors,
       edges: serialized.edges,
-      metadata: serialized.metadata
+      metadata: serialized.metadata,
     };
   }
 }

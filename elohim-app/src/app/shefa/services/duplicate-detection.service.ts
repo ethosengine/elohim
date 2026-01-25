@@ -11,6 +11,7 @@
  */
 
 import { Injectable } from '@angular/core';
+
 import {
   DuplicateResult,
   FuzzyMatch,
@@ -33,9 +34,7 @@ interface TransactionCandidate {
 /**
  * Hash-based transaction lookup index
  */
-interface HashIndex {
-  [hash: string]: string[]; // hash -> list of transaction IDs
-}
+type HashIndex = Record<string, string[]>;
 
 @Injectable({
   providedIn: 'root',
@@ -45,7 +44,7 @@ export class DuplicateDetectionService {
   private hashIndex: HashIndex = {};
 
   // Set of known plaidTransactionIds
-  private plaidIdSet: Set<string> = new Set();
+  private plaidIdSet = new Set<string>();
 
   constructor() {}
 
@@ -74,8 +73,7 @@ export class DuplicateDetectionService {
         isDuplicate: true,
         confidence: 95,
         matchId: hashMatch,
-        reason:
-          'Hash collision: same account, amount, date, and description - likely duplicate',
+        reason: 'Hash collision: same account, amount, date, and description - likely duplicate',
       };
     }
 
@@ -103,9 +101,7 @@ export class DuplicateDetectionService {
    *
    * Returns only new, non-duplicate transactions.
    */
-  async filterDuplicates(
-    transactions: PlaidTransaction[]
-  ): Promise<PlaidTransaction[]> {
+  async filterDuplicates(transactions: PlaidTransaction[]): Promise<PlaidTransaction[]> {
     const uniqueTransactions: PlaidTransaction[] = [];
     const seenHashes = new Set<string>();
 
@@ -134,9 +130,7 @@ export class DuplicateDetectionService {
     }
     this.hashIndex[hash].push(staged.id);
 
-    console.log(
-      `[DuplicateDetection] Registered transaction ${staged.plaidTransactionId}`
-    );
+    console.log(`[DuplicateDetection] Registered transaction ${staged.plaidTransactionId}`);
   }
 
   /**
@@ -224,29 +218,18 @@ export class DuplicateDetectionService {
    *
    * All criteria must be met for a match.
    */
-  private async fuzzySearch(
-    txn: PlaidTransaction
-  ): Promise<FuzzyMatch | null> {
+  private async fuzzySearch(txn: PlaidTransaction): Promise<FuzzyMatch | null> {
     // Build list of candidate transactions (same account, similar amount)
-    const candidates = this.getCandidates(
-      txn.account_id,
-      txn.amount,
-      txn.date
-    );
+    const candidates = this.getCandidates(txn.account_id, txn.amount, txn.date);
 
     for (const candidate of candidates) {
       const amountMatch = Math.abs(candidate.amount - txn.amount) <= 0.01;
       const dateMatch = this.dateDiffDays(candidate.timestamp, txn.date) <= 2;
-      const descMatch = this.levenshteinDistance(
-        candidate.description.toLowerCase(),
-        txn.name.toLowerCase()
-      ) <= 3;
+      const descMatch =
+        this.levenshteinDistance(candidate.description.toLowerCase(), txn.name.toLowerCase()) <= 3;
 
       if (amountMatch && dateMatch && descMatch) {
-        const confidence = this.calculateFuzzyConfidence(
-          candidate,
-          txn
-        );
+        const confidence = this.calculateFuzzyConfidence(candidate, txn);
 
         return {
           id: candidate.id,
@@ -288,10 +271,7 @@ export class DuplicateDetectionService {
    * - Date difference (closer = higher)
    * - Description similarity (more similar = higher)
    */
-  private calculateFuzzyConfidence(
-    candidate: TransactionCandidate,
-    txn: PlaidTransaction
-  ): number {
+  private calculateFuzzyConfidence(candidate: TransactionCandidate, txn: PlaidTransaction): number {
     let score = 75; // Base score for passing all criteria
 
     // Amount similarity (±$1.00 = full points)
@@ -386,8 +366,7 @@ export class DuplicateDetectionService {
     const date1 = new Date(dateStr1);
     const date2 = new Date(dateStr2);
     const diffTime = Math.abs(date2.getTime() - date1.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
 
   // ============================================================================

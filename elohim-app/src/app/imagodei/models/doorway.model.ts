@@ -44,12 +44,12 @@ export type DoorwayRegion =
 
 /** Features a doorway may support */
 export type DoorwayFeature =
-  | 'premium-content'      // Supports gated/premium content
-  | 'high-availability'    // Multi-region redundancy
-  | 'media-hosting'        // Rich media storage
-  | 'recovery-service'     // Social recovery support
-  | 'analytics'            // Usage analytics
-  | 'custom-domain';       // Custom domain support
+  | 'premium-content' // Supports gated/premium content
+  | 'high-availability' // Multi-region redundancy
+  | 'media-hosting' // Rich media storage
+  | 'recovery-service' // Social recovery support
+  | 'analytics' // Usage analytics
+  | 'custom-domain'; // Custom domain support
 
 /**
  * Information about an Elohim doorway.
@@ -134,7 +134,7 @@ export interface DoorwayRegistration {
  */
 export interface DoorwayVouch {
   doorwayId: string;
-  voucherId: string;     // Agent who vouched
+  voucherId: string; // Agent who vouched
   timestamp: string;
   comment?: string;
 }
@@ -145,8 +145,8 @@ export interface DoorwayVouch {
 export interface DoorwayStatusUpdate {
   doorwayId: string;
   status: DoorwayStatus;
-  message?: string;       // Optional status message
-  expectedResolution?: string;  // ISO date for degraded/offline
+  message?: string; // Optional status message
+  expectedResolution?: string; // ISO date for degraded/offline
 }
 
 // =============================================================================
@@ -160,7 +160,7 @@ export interface DoorwayHealthCheckResult {
   url: string;
   status: DoorwayStatus;
   latencyMs: number | null;
-  version?: string;       // Doorway software version
+  version?: string; // Doorway software version
   checkedAt: string;
   error?: string;
 }
@@ -183,7 +183,8 @@ export const BOOTSTRAP_DOORWAYS: DoorwayInfo[] = [
     id: 'doorway-dev-elohim-host',
     name: 'Dev Gateway',
     url: 'https://doorway-dev.elohim.host',
-    description: 'Development doorway operated by Matthew Dowell @ Ethos Engine. For alpha/dev testing.',
+    description:
+      'Development doorway operated by Matthew Dowell @ Ethos Engine. For alpha/dev testing.',
     region: 'north-america',
     operator: 'Matthew Dowell',
     features: ['premium-content', 'high-availability', 'recovery-service', 'media-hosting'],
@@ -231,7 +232,7 @@ export interface ValidateDoorwayResponse {
 export interface DoorwayHealthResponse {
   status: DoorwayStatus;
   version: string;
-  uptime: number;          // Seconds
+  uptime: number; // Seconds
   userCount?: number;
   registrationOpen: boolean;
 }
@@ -247,11 +248,11 @@ export function getRegionDisplayName(region: DoorwayRegion): string {
   const names: Record<DoorwayRegion, string> = {
     'north-america': 'North America',
     'south-america': 'South America',
-    'europe': 'Europe',
+    europe: 'Europe',
     'asia-pacific': 'Asia Pacific',
-    'africa': 'Africa',
+    africa: 'Africa',
     'middle-east': 'Middle East',
-    'global': 'Global',
+    global: 'Global',
   };
   return names[region] ?? region;
 }
@@ -259,12 +260,16 @@ export function getRegionDisplayName(region: DoorwayRegion): string {
 /**
  * Get status display info.
  */
-export function getStatusDisplay(status: DoorwayStatus): { label: string; color: string; icon: string } {
+export function getStatusDisplay(status: DoorwayStatus): {
+  label: string;
+  color: string;
+  icon: string;
+} {
   const displays: Record<DoorwayStatus, { label: string; color: string; icon: string }> = {
-    'online': { label: 'Online', color: '#22c55e', icon: 'check_circle' },
-    'degraded': { label: 'Degraded', color: '#f59e0b', icon: 'warning' },
-    'offline': { label: 'Offline', color: '#ef4444', icon: 'error' },
-    'unknown': { label: 'Unknown', color: '#6b7280', icon: 'help' },
+    online: { label: 'Online', color: '#22c55e', icon: 'check_circle' },
+    degraded: { label: 'Degraded', color: '#f59e0b', icon: 'warning' },
+    offline: { label: 'Offline', color: '#ef4444', icon: 'error' },
+    unknown: { label: 'Unknown', color: '#6b7280', icon: 'help' },
   };
   return displays[status] ?? displays['unknown'];
 }
@@ -278,7 +283,7 @@ export function getFeatureDisplay(feature: DoorwayFeature): { label: string; ico
     'high-availability': { label: 'High Availability', icon: 'verified' },
     'media-hosting': { label: 'Media Hosting', icon: 'cloud' },
     'recovery-service': { label: 'Recovery Support', icon: 'restore' },
-    'analytics': { label: 'Analytics', icon: 'analytics' },
+    analytics: { label: 'Analytics', icon: 'analytics' },
     'custom-domain': { label: 'Custom Domain', icon: 'language' },
   };
   return displays[feature] ?? { label: feature, icon: 'extension' };
@@ -292,10 +297,10 @@ export function sortDoorwaysByRelevance(doorways: DoorwayInfo[]): DoorwayInfo[] 
   return [...doorways].sort((a, b) => {
     // Online first
     const statusOrder: Record<DoorwayStatus, number> = {
-      'online': 0,
-      'degraded': 1,
-      'offline': 2,
-      'unknown': 3,
+      online: 0,
+      degraded: 1,
+      offline: 2,
+      unknown: 3,
     };
     const statusDiff = statusOrder[a.status] - statusOrder[b.status];
     if (statusDiff !== 0) return statusDiff;

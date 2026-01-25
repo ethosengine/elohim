@@ -48,7 +48,11 @@
   padding: 0.875rem 1.5rem;
   font-size: 1rem;
   font-weight: 600;
-  background: linear-gradient(135deg, var(--lamad-accent-primary, #6366f1), var(--lamad-accent-secondary, #8b5cf6));
+  background: linear-gradient(
+    135deg,
+    var(--lamad-accent-primary, #6366f1),
+    var(--lamad-accent-secondary, #8b5cf6)
+  );
   border: none;
   border-radius: 9999px;
   color: white;
@@ -102,7 +106,9 @@
   border: 1px solid var(--lamad-border-subtle, #334155);
   border-radius: 0.5rem;
   color: var(--lamad-text-primary, #f1f5f9);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .search-input:focus {
@@ -243,7 +249,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error-state .material-icons,
@@ -316,7 +324,9 @@
   border: 1px solid var(--lamad-border-subtle, #334155);
   border-radius: 0.5rem;
   color: var(--lamad-text-primary, #f1f5f9);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .custom-input:focus {
@@ -337,7 +347,9 @@
   border-radius: 0.5rem;
   color: white;
   cursor: pointer;
-  transition: background-color 0.2s, opacity 0.2s;
+  transition:
+    background-color 0.2s,
+    opacity 0.2s;
 }
 
 .validate-btn:hover:not(:disabled) {
@@ -520,10 +532,18 @@
   font-size: 1rem;
 }
 
-.latency-fast { color: #22c55e; }
-.latency-medium { color: #f59e0b; }
-.latency-slow { color: #ef4444; }
-.latency-unknown { color: var(--lamad-text-muted, #64748b); }
+.latency-fast {
+  color: #22c55e;
+}
+.latency-medium {
+  color: #f59e0b;
+}
+.latency-slow {
+  color: #ef4444;
+}
+.latency-unknown {
+  color: var(--lamad-text-muted, #64748b);
+}
 
 /* Latency Indicator (visual bar) */
 .latency-indicator {
@@ -712,7 +732,11 @@
   padding: 0.875rem 1.5rem;
   font-size: 1rem;
   font-weight: 600;
-  background: linear-gradient(135deg, var(--lamad-accent-primary, #6366f1), var(--lamad-accent-secondary, #8b5cf6));
+  background: linear-gradient(
+    135deg,
+    var(--lamad-accent-primary, #6366f1),
+    var(--lamad-accent-secondary, #8b5cf6)
+  );
   border: none;
   border-radius: 0.5rem;
   color: white;

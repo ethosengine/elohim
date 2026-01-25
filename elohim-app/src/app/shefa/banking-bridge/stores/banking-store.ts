@@ -58,7 +58,14 @@ export interface ImportBatchLocal {
   newTransactions: number;
   duplicateTransactions: number;
   errorTransactions: number;
-  status: 'fetching' | 'categorizing' | 'staged' | 'reviewing' | 'approved' | 'completed' | 'rejected';
+  status:
+    | 'fetching'
+    | 'categorizing'
+    | 'staged'
+    | 'reviewing'
+    | 'approved'
+    | 'completed'
+    | 'rejected';
   stagedTransactionIds: string[];
   aiCategorizationEnabled: boolean;
   aiCategorizationCompletedAt?: string;
@@ -84,12 +91,12 @@ export interface StagedTransactionLocal {
   category: string;
   categoryConfidence: number;
   categorySource: 'ai' | 'plaid' | 'manual' | 'rule';
-  suggestedCategories?: Array<{
+  suggestedCategories?: {
     category: string;
     confidence: number;
     reasoning?: string;
     source: 'ai' | 'pattern' | 'keyword' | 'historical';
-  }>;
+  }[];
   budgetId?: string;
   budgetCategoryId?: string;
   isDuplicate: boolean;
@@ -175,7 +182,7 @@ export class BankingStore {
         resolve();
       };
 
-      request.onupgradeneeded = (event) => {
+      request.onupgradeneeded = event => {
         const db = (event.target as IDBOpenDBRequest).result;
         this.createStores(db);
       };
@@ -228,7 +235,10 @@ export class BankingStore {
   // GENERIC CRUD OPERATIONS
   // ==========================================================================
 
-  private async getStore(storeName: string, mode: IDBTransactionMode = 'readonly'): Promise<IDBObjectStore> {
+  private async getStore(
+    storeName: string,
+    mode: IDBTransactionMode = 'readonly'
+  ): Promise<IDBObjectStore> {
     await this.init();
     if (!this.db) throw new Error('Database not initialized');
     const tx = this.db.transaction(storeName, mode);
@@ -325,7 +335,9 @@ export class BankingStore {
     return this.wrapRequest(index.getAll(batchId));
   }
 
-  async getStagedByStatus(status: StagedTransactionLocal['reviewStatus']): Promise<StagedTransactionLocal[]> {
+  async getStagedByStatus(
+    status: StagedTransactionLocal['reviewStatus']
+  ): Promise<StagedTransactionLocal[]> {
     const store = await this.getStore(STORES.STAGED);
     const index = store.index('reviewStatus');
     return this.wrapRequest(index.getAll(status));
@@ -421,9 +433,9 @@ export class BankingStore {
     }
   }
 
-  async clearCompletedBatches(olderThanDays: number = 30): Promise<number> {
+  async clearCompletedBatches(olderThanDays = 30): Promise<number> {
     const batches = await this.getBatchesByStatus('completed');
-    const cutoff = Date.now() - (olderThanDays * 24 * 60 * 60 * 1000);
+    const cutoff = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
     let deleted = 0;
 
     for (const batch of batches) {

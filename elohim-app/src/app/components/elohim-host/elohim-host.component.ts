@@ -4,8 +4,6 @@ import { Component } from '@angular/core';
   selector: 'app-elohim-host',
   imports: [],
   templateUrl: './elohim-host.component.html',
-  styleUrl: './elohim-host.component.css'
+  styleUrl: './elohim-host.component.css',
 })
-export class ElohimHostComponent {
-
-}
+export class ElohimHostComponent {}

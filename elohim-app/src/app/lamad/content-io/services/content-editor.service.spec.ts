@@ -2,7 +2,10 @@ import { TestBed } from '@angular/core/testing';
 import { ContentEditorService, ContentDraft, SaveResult } from './content-editor.service';
 import { ContentFormatRegistryService } from './content-format-registry.service';
 import { ContentNode } from '../../models/content-node.model';
-import { ContentFormatPlugin, DEFAULT_EDITOR_CONFIG } from '../interfaces/content-format-plugin.interface';
+import {
+  ContentFormatPlugin,
+  DEFAULT_EDITOR_CONFIG,
+} from '../interfaces/content-format-plugin.interface';
 
 describe('ContentEditorService', () => {
   let service: ContentEditorService;
@@ -20,14 +23,14 @@ describe('ContentEditorService', () => {
     metadata: {},
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    ...overrides
+    ...overrides,
   });
 
   beforeEach(() => {
     mockRegistry = jasmine.createSpyObj('ContentFormatRegistryService', [
       'getPlugin',
       'getEditorComponent',
-      'getEditorConfig'
+      'getEditorConfig',
     ]);
     mockRegistry.getPlugin.and.returnValue(undefined);
     mockRegistry.getEditorComponent.and.returnValue(null);
@@ -36,8 +39,8 @@ describe('ContentEditorService', () => {
     TestBed.configureTestingModule({
       providers: [
         ContentEditorService,
-        { provide: ContentFormatRegistryService, useValue: mockRegistry }
-      ]
+        { provide: ContentFormatRegistryService, useValue: mockRegistry },
+      ],
     });
     service = TestBed.inject(ContentEditorService);
   });
@@ -138,7 +141,7 @@ describe('ContentEditorService', () => {
       const draft = service.createNewDraft('gherkin', {
         title: 'My Feature',
         content: 'Feature: Test',
-        description: 'A test feature'
+        description: 'A test feature',
       });
 
       expect(draft.content.title).toBe('My Feature');
@@ -200,7 +203,7 @@ describe('ContentEditorService', () => {
         title: 'New Title',
         description: 'New Description',
         content: 'New Content',
-        tags: ['new', 'tags']
+        tags: ['new', 'tags'],
       });
 
       expect(draft.content.title).toBe('New Title');
@@ -282,9 +285,9 @@ describe('ContentEditorService', () => {
     it('should use plugin validation when available', async () => {
       const mockPlugin: Partial<ContentFormatPlugin> = {
         canValidate: true,
-        validate: jasmine.createSpy('validate').and.returnValue(
-          Promise.resolve({ valid: true, errors: [], warnings: [] })
-        )
+        validate: jasmine
+          .createSpy('validate')
+          .and.returnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
       };
       mockRegistry.getPlugin.and.returnValue(mockPlugin as ContentFormatPlugin);
 
@@ -296,7 +299,7 @@ describe('ContentEditorService', () => {
 
     it('should return valid when plugin cannot validate', async () => {
       const mockPlugin: Partial<ContentFormatPlugin> = {
-        canValidate: false
+        canValidate: false,
       };
       mockRegistry.getPlugin.and.returnValue(mockPlugin as ContentFormatPlugin);
 
@@ -308,7 +311,7 @@ describe('ContentEditorService', () => {
   });
 
   describe('saveContent', () => {
-    it('should mark draft as saved', (done) => {
+    it('should mark draft as saved', done => {
       const node = createMockNode();
       const draft = service.createDraft(node);
       service.updateDraft(draft.id, { title: 'Changed' });
@@ -319,21 +322,21 @@ describe('ContentEditorService', () => {
           expect(draft.isDirty).toBeFalse();
           done();
         },
-        error: done.fail
+        error: done.fail,
       });
     });
 
-    it('should return error for unknown draft', (done) => {
+    it('should return error for unknown draft', done => {
       service.saveContent('nonexistent').subscribe({
         next: () => done.fail('Should have thrown'),
-        error: (err) => {
+        error: err => {
           expect(err.message).toContain('Draft not found');
           done();
-        }
+        },
       });
     });
 
-    it('should return node ID in save result', (done) => {
+    it('should return node ID in save result', done => {
       const node = createMockNode();
       const draft = service.createDraft(node);
 
@@ -342,7 +345,7 @@ describe('ContentEditorService', () => {
           expect(result.nodeId).toBe(node.id);
           done();
         },
-        error: done.fail
+        error: done.fail,
       });
     });
   });
@@ -358,7 +361,7 @@ describe('ContentEditorService', () => {
         contentType: 'concept',
         description: '',
         tags: [],
-        metadata: {}
+        metadata: {},
       });
 
       expect(result).toBe('# Content');
@@ -366,7 +369,7 @@ describe('ContentEditorService', () => {
 
     it('should use plugin export when available', async () => {
       const mockPlugin: Partial<ContentFormatPlugin> = {
-        export: jasmine.createSpy('export').and.returnValue(Promise.resolve('exported'))
+        export: jasmine.createSpy('export').and.returnValue(Promise.resolve('exported')),
       };
       mockRegistry.getPlugin.and.returnValue(mockPlugin as ContentFormatPlugin);
 
@@ -377,7 +380,7 @@ describe('ContentEditorService', () => {
         contentType: 'concept',
         description: '',
         tags: [],
-        metadata: {}
+        metadata: {},
       });
 
       expect(result).toBe('exported');
@@ -395,7 +398,7 @@ describe('ContentEditorService', () => {
         contentType: 'concept',
         description: '',
         tags: [],
-        metadata: {}
+        metadata: {},
       });
 
       expect(result).toBe(JSON.stringify(contentObj, null, 2));

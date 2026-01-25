@@ -155,12 +155,13 @@ describe('BlobCacheTiersService', () => {
       expect(service.getBlob('hash2')).toBeNull(); // Should be evicted
     });
 
-    it('should remove expired blobs on access', (done) => {
+    it('should remove expired blobs on access', done => {
       const blob = new Blob(['test']);
       service.setBlob('hash1', blob);
 
       // Manually set expiration time to past
-      (service['blobCache'] as any).cache.get('hash1')!.createdAt = Date.now() - 25 * 60 * 60 * 1000;
+      (service['blobCache'] as any).cache.get('hash1')!.createdAt =
+        Date.now() - 25 * 60 * 60 * 1000;
 
       const retrieved = service.getBlob('hash1');
       expect(retrieved).toBeNull();
@@ -202,7 +203,8 @@ describe('BlobCacheTiersService', () => {
       service.setChunk('hash2', chunk2);
 
       // Manually expire hash1
-      (service['chunkCache'] as any).cache.get('hash1')!.createdAt = Date.now() - 8 * 24 * 60 * 60 * 1000;
+      (service['chunkCache'] as any).cache.get('hash1')!.createdAt =
+        Date.now() - 8 * 24 * 60 * 60 * 1000;
 
       // Add new chunk - should trigger cleanup that removes expired hash1
       const chunk3 = new Uint8Array(100);

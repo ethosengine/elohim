@@ -8,12 +8,14 @@
  * - Red: Offline (cached mode)
  */
 
-import { Component, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IdentityService } from '../../services/identity.service';
+import { Component, computed, inject } from '@angular/core';
+
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+
 import { type IdentityMode } from '../../models/identity.model';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { IdentityService } from '../../services/identity.service';
 
 /** Extended connection status including transient states */
 export type ConnectionMode = IdentityMode | 'connecting' | 'offline';
@@ -57,7 +59,10 @@ export class ConnectionIndicatorComponent {
     }
 
     // Steward mode (local node connected) - handles both 'steward' and deprecated 'self-sovereign'
-    if ((identityMode === 'steward' || identityMode === 'self-sovereign') && holochainState === 'connected') {
+    if (
+      (identityMode === 'steward' || identityMode === 'self-sovereign') &&
+      holochainState === 'connected'
+    ) {
       return {
         mode: 'steward',
         label: 'Steward',

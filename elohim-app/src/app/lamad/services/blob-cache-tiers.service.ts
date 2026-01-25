@@ -14,7 +14,9 @@
  */
 
 import { Injectable, Injector } from '@angular/core';
+
 import { ContentBlob } from '../models/content-node.model';
+
 import { WasmCacheService, ReachLevel } from './wasm-cache.service';
 
 // ============================================================================
@@ -158,10 +160,7 @@ class LRUCache<T> {
   private evictUntilFits(requiredBytes: number): number {
     let evicted = 0;
 
-    while (
-      this.currentSize + requiredBytes > this.maxSizeBytes &&
-      this.cache.size > 0
-    ) {
+    while (this.currentSize + requiredBytes > this.maxSizeBytes && this.cache.size > 0) {
       // Map.keys().next() returns first (LRU) item in O(1)
       const lruHash = this.cache.keys().next().value;
       if (lruHash) {
@@ -222,9 +221,7 @@ class LRUCache<T> {
       totalSizeBytes: this.currentSize,
       maxSizeBytes: this.maxSizeBytes,
       percentFull:
-        this.maxSizeBytes === Infinity
-          ? 0
-          : (this.currentSize / this.maxSizeBytes) * 100,
+        this.maxSizeBytes === Infinity ? 0 : (this.currentSize / this.maxSizeBytes) * 100,
       evictionCount: this.stats.evictions,
       hitCount: this.stats.hits,
       missCount: this.stats.misses,
@@ -263,8 +260,7 @@ export class BlobCacheTiersService {
   );
 
   private lastIntegrityCheck: CacheIntegrityCheckResult | null = null;
-  private integrityCheckIntervalId: ReturnType<typeof setInterval> | null =
-    null;
+  private integrityCheckIntervalId: ReturnType<typeof setInterval> | null = null;
   private cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
 
   // NEW: WASM-backed reach-aware cache for high-performance operations
@@ -290,9 +286,7 @@ export class BlobCacheTiersService {
         preferWasm: true,
       });
       this.wasmCacheInitialized = true;
-      console.log(
-        `[BlobCacheTiersService] WASM cache initialized (${result.implementation})`
-      );
+      console.log(`[BlobCacheTiersService] WASM cache initialized (${result.implementation})`);
     } catch (error) {
       console.warn('[BlobCacheTiersService] WASM cache init failed, using fallback:', error);
     }
@@ -496,10 +490,13 @@ export class BlobCacheTiersService {
 
   private startCleanupTimer(): void {
     // Run every 5 minutes
-    this.cleanupIntervalId = setInterval(() => {
-      this.blobCache.cleanupExpired();
-      this.chunkCache.cleanupExpired();
-    }, 5 * 60 * 1000);
+    this.cleanupIntervalId = setInterval(
+      () => {
+        this.blobCache.cleanupExpired();
+        this.chunkCache.cleanupExpired();
+      },
+      5 * 60 * 1000
+    );
   }
 
   // ==========================================================================
@@ -515,9 +512,7 @@ export class BlobCacheTiersService {
     if (!blob) return false;
 
     try {
-      const { BlobVerificationService } = await import(
-        './blob-verification.service'
-      );
+      const { BlobVerificationService } = await import('./blob-verification.service');
       const verificationService = this.injector.get(BlobVerificationService);
       const result = await verificationService.verifyBlob(blob, hash).toPromise();
       return result?.isValid ?? false;
@@ -532,17 +527,13 @@ export class BlobCacheTiersService {
     let itemsChecked = 0;
 
     try {
-      const { BlobVerificationService } = await import(
-        './blob-verification.service'
-      );
+      const { BlobVerificationService } = await import('./blob-verification.service');
       const verificationService = this.injector.get(BlobVerificationService);
 
       for (const [hash, item] of this.blobCache.entries()) {
         itemsChecked++;
         try {
-          const result = await verificationService
-            .verifyBlob(item.data, hash)
-            .toPromise();
+          const result = await verificationService.verifyBlob(item.data, hash).toPromise();
           if (!result?.isValid) {
             corruptedItems.push(hash);
           }
@@ -581,14 +572,20 @@ export class BlobCacheTiersService {
 
   startIntegrityVerification(): void {
     // Every hour
-    this.integrityCheckIntervalId = setInterval(() => {
-      this.verifyAllBlobIntegrity().catch(() => {});
-    }, 60 * 60 * 1000);
+    this.integrityCheckIntervalId = setInterval(
+      () => {
+        this.verifyAllBlobIntegrity().catch(() => {});
+      },
+      60 * 60 * 1000
+    );
 
     // Initial check after 5 minutes
-    setTimeout(() => {
-      this.verifyAllBlobIntegrity().catch(() => {});
-    }, 5 * 60 * 1000);
+    setTimeout(
+      () => {
+        this.verifyAllBlobIntegrity().catch(() => {});
+      },
+      5 * 60 * 1000
+    );
   }
 
   stopIntegrityVerification(): void {
@@ -616,8 +613,8 @@ export class BlobCacheTiersService {
     hash: string,
     metadata: ContentBlob,
     reachLevel: number = ReachLevel.COMMONS,
-    domain: string = '',
-    epic: string = ''
+    domain = '',
+    epic = ''
   ): CacheOperationResult {
     // Always store in legacy metadata cache for backwards compatibility
     const legacyResult = this.setMetadata(hash, metadata);

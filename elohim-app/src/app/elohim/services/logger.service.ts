@@ -234,7 +234,11 @@ export class LoggerService {
       timer.end({ ...context, success: true });
       return result;
     } catch (err) {
-      timer.end({ ...context, success: false, error: err instanceof Error ? err.message : String(err) });
+      timer.end({
+        ...context,
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
       throw err;
     }
   }
@@ -313,11 +317,13 @@ export class LoggerService {
       // JSON output for log aggregation
       const jsonEntry = {
         ...entry,
-        error: entry.error ? {
-          name: entry.error.name,
-          message: entry.error.message,
-          stack: entry.error.stack,
-        } : undefined,
+        error: entry.error
+          ? {
+              name: entry.error.name,
+              message: entry.error.message,
+              stack: entry.error.stack,
+            }
+          : undefined,
       };
       console.log(JSON.stringify(jsonEntry));
       return;

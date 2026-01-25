@@ -23,8 +23,11 @@
  */
 
 import { Injectable, signal, computed } from '@angular/core';
-import { Observable, of, from, defer } from 'rxjs';
+
 import { catchError, shareReplay } from 'rxjs/operators';
+
+import { Observable, of, from, defer } from 'rxjs';
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 // =============================================================================
@@ -144,12 +147,13 @@ export class AppreciationService {
     }
 
     if (!this.appreciationsForCache.has(appreciatedId)) {
-      const request = defer(() =>
-        from(this.fetchAppreciationsFor(appreciatedId))
-      ).pipe(
+      const request = defer(() => from(this.fetchAppreciationsFor(appreciatedId))).pipe(
         shareReplay(1),
-        catchError((err) => {
-          console.warn(`[AppreciationService] Failed to fetch appreciations for "${appreciatedId}":`, err);
+        catchError(err => {
+          console.warn(
+            `[AppreciationService] Failed to fetch appreciations for "${appreciatedId}":`,
+            err
+          );
           return of([]);
         })
       );
@@ -174,12 +178,13 @@ export class AppreciationService {
     }
 
     if (!this.appreciationsByCache.has(appreciatorId)) {
-      const request = defer(() =>
-        from(this.fetchAppreciationsBy(appreciatorId))
-      ).pipe(
+      const request = defer(() => from(this.fetchAppreciationsBy(appreciatorId))).pipe(
         shareReplay(1),
-        catchError((err) => {
-          console.warn(`[AppreciationService] Failed to fetch appreciations by "${appreciatorId}":`, err);
+        catchError(err => {
+          console.warn(
+            `[AppreciationService] Failed to fetch appreciations by "${appreciatorId}":`,
+            err
+          );
           return of([]);
         })
       );
@@ -207,10 +212,8 @@ export class AppreciationService {
       throw new Error('Appreciation service not available');
     }
 
-    return defer(() =>
-      from(this.doAppreciate(input))
-    ).pipe(
-      catchError((err) => {
+    return defer(() => from(this.doAppreciate(input))).pipe(
+      catchError(err => {
         console.error('[AppreciationService] Failed to create appreciation:', err);
         throw err;
       })

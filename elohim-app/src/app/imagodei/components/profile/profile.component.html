@@ -107,7 +107,9 @@
                       <span class="discovery-framework">{{ getFrameworkName(result) }}</span>
                       <span class="discovery-result">{{ result.displayString }}</span>
                     </div>
-                    <span class="discovery-short" [title]="result.displayString">{{ result.shortDisplay }}</span>
+                    <span class="discovery-short" [title]="result.displayString">
+                      {{ result.shortDisplay }}
+                    </span>
                   </div>
                 }
               </div>
@@ -150,7 +152,10 @@
                 <span class="context-icon material-icons">memory</span>
                 <div class="context-info">
                   <strong>Compute & Nodes</strong>
-                  <span>Manage your stewarded compute resources, node topology, and infrastructure tokens</span>
+                  <span>
+                    Manage your stewarded compute resources, node topology, and infrastructure
+                    tokens
+                  </span>
                 </div>
                 <span class="material-icons">chevron_right</span>
               </a>

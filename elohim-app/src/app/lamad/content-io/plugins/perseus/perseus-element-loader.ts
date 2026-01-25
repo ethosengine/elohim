@@ -35,15 +35,16 @@ let cssLoaded = false;
 
 // Configuration for CSS URLs
 const getPerseusStylesUrl = (): string => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (window as any)['__PERSEUS_STYLES_URL__'] as string
-    || '/assets/perseus-plugin/perseus.css';
+  return (
+    ((window as any)['__PERSEUS_STYLES_URL__'] as string) || '/assets/perseus-plugin/perseus.css'
+  );
 };
 
 const getPerseusThemeOverridesUrl = (): string => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (window as any)['__PERSEUS_THEME_OVERRIDES_URL__'] as string
-    || '/assets/perseus-plugin/perseus-theme-overrides.css';
+  return (
+    ((window as any)['__PERSEUS_THEME_OVERRIDES_URL__'] as string) ||
+    '/assets/perseus-plugin/perseus-theme-overrides.css'
+  );
 };
 
 /**
@@ -173,7 +174,11 @@ export async function registerPerseusElement(): Promise<void> {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const g = globalThis as any;
       console.log('[Perseus] Pre-load check - globalThis.React:', typeof g.React, g.React?.version);
-      console.log('[Perseus] Pre-load check - globalThis.ReactDOM:', typeof g.ReactDOM, g.ReactDOM?.version);
+      console.log(
+        '[Perseus] Pre-load check - globalThis.ReactDOM:',
+        typeof g.ReactDOM,
+        g.ReactDOM?.version
+      );
 
       // Load the UMD bundle - it auto-registers the custom element synchronously
       await loadScript(pluginUrl);

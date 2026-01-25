@@ -55,10 +55,14 @@
           <div class="type-info">
             <span class="type-name">{{ largestContentType.displayLabel }}</span>
             <span class="type-details">
-              {{ largestContentType.itemCount | number }} items ({{ formatSize(largestContentType.sizeGB) }})
+              {{ largestContentType.itemCount | number }} items ({{
+                formatSize(largestContentType.sizeGB)
+              }})
             </span>
           </div>
-          <span class="type-percent">{{ largestContentType.percentOfTotal | number:'1.0-0' }}%</span>
+          <span class="type-percent">
+            {{ largestContentType.percentOfTotal | number: '1.0-0' }}%
+          </span>
         </div>
 
         <!-- Mini bar chart -->
@@ -116,10 +120,7 @@
 
           <div class="type-bar">
             <div class="bar-bg">
-              <div
-                class="bar-fill"
-                [style.width]="ct.percentOfTotal + '%'"
-              ></div>
+              <div class="bar-fill" [style.width]="ct.percentOfTotal + '%'"></div>
             </div>
             <span class="bar-value">{{ formatSize(ct.sizeGB) }}</span>
           </div>
@@ -128,9 +129,11 @@
             <span class="replication-label">Replication:</span>
             <span class="replication-stats">
               <span class="stat good">{{ ct.fullyReplicated }} OK</span>
-              <span class="stat bad" *ngIf="ct.underReplicated > 0">{{ ct.underReplicated }} under</span>
+              <span class="stat bad" *ngIf="ct.underReplicated > 0">
+                {{ ct.underReplicated }} under
+              </span>
             </span>
-            <span class="avg-replicas">(avg {{ ct.averageReplicas | number:'1.1-1' }})</span>
+            <span class="avg-replicas">(avg {{ ct.averageReplicas | number: '1.1-1' }})</span>
           </div>
         </div>
 
@@ -168,10 +171,16 @@
 
           <div class="reach-replication">
             <span class="replica-info">
-              {{ rl.currentReplicas | number:'1.1-1' }} / {{ rl.targetReplicas }} replicas
+              {{ rl.currentReplicas | number: '1.1-1' }} / {{ rl.targetReplicas }} replicas
             </span>
             <span class="replica-status" [ngClass]="getReplicationClass(rl.replicationStatus)">
-              {{ rl.replicationStatus === 'met' ? '✓' : rl.replicationStatus === 'under' ? '⚠️' : '⬆️' }}
+              {{
+                rl.replicationStatus === 'met'
+                  ? '✓'
+                  : rl.replicationStatus === 'under'
+                    ? '⚠️'
+                    : '⬆️'
+              }}
             </span>
           </div>
         </div>
@@ -210,7 +219,9 @@
               ></div>
               <div
                 class="bar-segment custodied"
-                [style.width]="getProgressWidth(node.contentBreakdown.custodiedContent, node.totalGB)"
+                [style.width]="
+                  getProgressWidth(node.contentBreakdown.custodiedContent, node.totalGB)
+                "
                 title="Custodied content"
               ></div>
               <div
@@ -236,9 +247,7 @@
             </span>
           </div>
 
-          <div class="node-available">
-            {{ formatSize(node.availableGB) }} available
-          </div>
+          <div class="node-available">{{ formatSize(node.availableGB) }} available</div>
         </div>
 
         <div class="empty-state" *ngIf="distribution.byNode.length === 0">

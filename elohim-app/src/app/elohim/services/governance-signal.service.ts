@@ -1,8 +1,10 @@
 import { Injectable, Optional, inject } from '@angular/core';
-import { BehaviorSubject, Observable, of, combineLatest } from 'rxjs';
+
 import { map, shareReplay, take, catchError } from 'rxjs/operators';
+
+import { BehaviorSubject, Observable, of, combineLatest } from 'rxjs';
+
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
-import { LoggerService } from './logger.service';
 import {
   EmotionalReaction,
   EmotionalReactionType,
@@ -10,6 +12,8 @@ import {
   MediationLog,
   REACTION_CATEGORIES,
 } from '@app/lamad/models/feedback-profile.model';
+
+import { LoggerService } from './logger.service';
 
 // =============================================================================
 // LRU Cache Implementation
@@ -121,16 +125,18 @@ export class GovernanceSignalService {
   private readonly STORAGE_PREFIX = 'elohim-governance-signal-';
 
   // Cached signal aggregates with LRU eviction
-  private contentSignalsCache = new LruCache<string, Observable<AggregatedSignals>>(MAX_CONTENT_CACHE_SIZE);
-  private pathSignalsCache = new LruCache<string, Observable<PathSignalAggregate>>(MAX_PATH_CACHE_SIZE);
+  private contentSignalsCache = new LruCache<string, Observable<AggregatedSignals>>(
+    MAX_CONTENT_CACHE_SIZE
+  );
+  private pathSignalsCache = new LruCache<string, Observable<PathSignalAggregate>>(
+    MAX_PATH_CACHE_SIZE
+  );
 
   // Signal change stream for UI reactivity
   private readonly signalChangeSubject = new BehaviorSubject<SignalChangeEvent | null>(null);
   public readonly signalChanges$ = this.signalChangeSubject.asObservable();
 
-  constructor(
-    @Optional() private readonly sessionHumanService: SessionHumanService | null
-  ) {}
+  constructor(@Optional() private readonly sessionHumanService: SessionHumanService | null) {}
 
   // ===========================================================================
   // Signal Collection - Low Friction (Reactions)
@@ -446,10 +452,7 @@ export class GovernanceSignalService {
           const sentimentScore = this.computeSentimentScore(reactionCounts);
 
           // Compute pedagogical effectiveness from learning signals
-          const effectivenessScore = this.computeEffectivenessScore(
-            learningSignals,
-            completions
-          );
+          const effectivenessScore = this.computeEffectivenessScore(learningSignals, completions);
 
           // Compute consensus state from feedback
           const consensusState = this.computeConsensusState(feedbackStats);
@@ -496,11 +499,19 @@ export class GovernanceSignalService {
           }
 
           // Helper to extract payload values
-          const getPayloadNumber = (s: LearningSignalRecord, key: string, defaultVal: number): number => {
+          const getPayloadNumber = (
+            s: LearningSignalRecord,
+            key: string,
+            defaultVal: number
+          ): number => {
             const val = s.payload?.[key];
             return typeof val === 'number' ? val : defaultVal;
           };
-          const getPayloadString = (s: LearningSignalRecord, key: string, defaultVal: string): string => {
+          const getPayloadString = (
+            s: LearningSignalRecord,
+            key: string,
+            defaultVal: string
+          ): string => {
             const val = s.payload?.[key];
             return typeof val === 'string' ? val : defaultVal;
           };
@@ -527,17 +538,24 @@ export class GovernanceSignalService {
           for (const [step, stepSignals] of byStep.entries()) {
             completionsByStep[step] = stepSignals.length;
             averageMasteryByStep[step] =
-              stepSignals.reduce((sum, s) => sum + this.masteryToNumber(getPayloadString(s, 'masteryLevel', 'none')), 0) /
-              stepSignals.length;
+              stepSignals.reduce(
+                (sum, s) => sum + this.masteryToNumber(getPayloadString(s, 'masteryLevel', 'none')),
+                0
+              ) / stepSignals.length;
             averageTimeByStep[step] =
-              stepSignals.reduce((sum, s) => sum + getPayloadNumber(s, 'timeSpentSeconds', 0), 0) / stepSignals.length;
-            scaffoldingScoreByStep[step] =
-              stepSignals.reduce((sum, s) => sum + getPayloadNumber(s, 'scaffoldingEffective', 0.5), 0) /
+              stepSignals.reduce((sum, s) => sum + getPayloadNumber(s, 'timeSpentSeconds', 0), 0) /
               stepSignals.length;
+            scaffoldingScoreByStep[step] =
+              stepSignals.reduce(
+                (sum, s) => sum + getPayloadNumber(s, 'scaffoldingEffective', 0.5),
+                0
+              ) / stepSignals.length;
           }
 
           // Overall effectiveness
-          const allMasteries = signals.map(s => this.masteryToNumber(getPayloadString(s, 'masteryLevel', 'none')));
+          const allMasteries = signals.map(s =>
+            this.masteryToNumber(getPayloadString(s, 'masteryLevel', 'none'))
+          );
           const overallEffectiveness =
             allMasteries.reduce((sum, m) => sum + m, 0) / allMasteries.length;
 
@@ -565,9 +583,7 @@ export class GovernanceSignalService {
    * Get community consensus state for content.
    */
   getCommunityConsensus(contentId: string): Observable<ConsensusState> {
-    return this.getContentSignals(contentId).pipe(
-      map(signals => signals.consensusState)
-    );
+    return this.getContentSignals(contentId).pipe(map(signals => signals.consensusState));
   }
 
   // ===========================================================================
@@ -598,9 +614,10 @@ export class GovernanceSignalService {
       this.loadFromStorage(`${this.STORAGE_PREFIX}attestation-suggestions`) ?? []
     );
 
-    const suggestions = this.loadFromStorage<AttestationSuggestion[]>(
-      `${this.STORAGE_PREFIX}attestation-suggestions`
-    ) ?? [];
+    const suggestions =
+      this.loadFromStorage<AttestationSuggestion[]>(
+        `${this.STORAGE_PREFIX}attestation-suggestions`
+      ) ?? [];
     suggestions.push(suggestion);
     this.saveToStorage(`${this.STORAGE_PREFIX}attestation-suggestions`, suggestions);
 
@@ -626,9 +643,7 @@ export class GovernanceSignalService {
       status: 'pending',
     };
 
-    const flags = this.loadFromStorage<ReviewFlag[]>(
-      `${this.STORAGE_PREFIX}review-flags`
-    ) ?? [];
+    const flags = this.loadFromStorage<ReviewFlag[]>(`${this.STORAGE_PREFIX}review-flags`) ?? [];
     flags.push(flag);
     this.saveToStorage(`${this.STORAGE_PREFIX}review-flags`, flags);
 
@@ -647,9 +662,10 @@ export class GovernanceSignalService {
    * Get pending attestation suggestions.
    */
   getPendingAttestations(): Observable<AttestationSuggestion[]> {
-    const suggestions = this.loadFromStorage<AttestationSuggestion[]>(
-      `${this.STORAGE_PREFIX}attestation-suggestions`
-    ) ?? [];
+    const suggestions =
+      this.loadFromStorage<AttestationSuggestion[]>(
+        `${this.STORAGE_PREFIX}attestation-suggestions`
+      ) ?? [];
     return of(suggestions.filter(s => s.status === 'pending'));
   }
 
@@ -657,9 +673,7 @@ export class GovernanceSignalService {
    * Get pending review flags.
    */
   getPendingReviewFlags(): Observable<ReviewFlag[]> {
-    const flags = this.loadFromStorage<ReviewFlag[]>(
-      `${this.STORAGE_PREFIX}review-flags`
-    ) ?? [];
+    const flags = this.loadFromStorage<ReviewFlag[]>(`${this.STORAGE_PREFIX}review-flags`) ?? [];
     return of(flags.filter(f => f.status === 'pending'));
   }
 
@@ -672,10 +686,7 @@ export class GovernanceSignalService {
    * Groups respondents by similarity in their feedback patterns.
    */
   computeOpinionClusters(contentId: string): Observable<OpinionCluster[]> {
-    return combineLatest([
-      this.getGraduatedFeedback(contentId),
-      this.getReactions(contentId),
-    ]).pipe(
+    return combineLatest([this.getGraduatedFeedback(contentId), this.getReactions(contentId)]).pipe(
       map(([feedback, reactions]) => {
         if (feedback.length === 0 && reactions.length === 0) {
           return [];
@@ -757,13 +768,18 @@ export class GovernanceSignalService {
         evidenceType: 'assessment-success',
         score: assessmentScore,
         attempts,
-      }).pipe(
-        take(1),
-        catchError(err => {
-          this.logger.error('Failed to suggest attestation', err instanceof Error ? err : new Error(String(err)));
-          return of(null);
-        })
-      ).subscribe();
+      })
+        .pipe(
+          take(1),
+          catchError(err => {
+            this.logger.error(
+              'Failed to suggest attestation',
+              err instanceof Error ? err : new Error(String(err))
+            );
+            return of(null);
+          })
+        )
+        .subscribe();
       return of(true);
     }
 
@@ -773,13 +789,18 @@ export class GovernanceSignalService {
         evidenceType: 'assessment-failure',
         attempts,
         avgScore: assessmentScore,
-      }).pipe(
-        take(1),
-        catchError(err => {
-          this.logger.error('Failed to flag for review', err instanceof Error ? err : new Error(String(err)));
-          return of(null);
-        })
-      ).subscribe();
+      })
+        .pipe(
+          take(1),
+          catchError(err => {
+            this.logger.error(
+              'Failed to flag for review',
+              err instanceof Error ? err : new Error(String(err))
+            );
+            return of(null);
+          })
+        )
+        .subscribe();
       return of(true);
     }
 
@@ -806,7 +827,10 @@ export class GovernanceSignalService {
       this.saveToStorage(key, existing);
       return true;
     } catch (err) {
-      this.logger.error(`Failed to save ${signalType}`, err instanceof Error ? err : new Error(String(err)));
+      this.logger.error(
+        `Failed to save ${signalType}`,
+        err instanceof Error ? err : new Error(String(err))
+      );
       return false;
     }
   }
@@ -875,8 +899,7 @@ export class GovernanceSignalService {
 
     // Weight completions
     if (completions.length > 0) {
-      const successRate =
-        completions.filter(c => c.passed).length / completions.length;
+      const successRate = completions.filter(c => c.passed).length / completions.length;
       score += successRate * 0.4;
       weight += 0.4;
     }
@@ -937,12 +960,12 @@ export class GovernanceSignalService {
 
   private masteryToNumber(mastery: string): number {
     const levels: Record<string, number> = {
-      'none': 0,
-      'exposure': 0.2,
-      'familiarity': 0.4,
-      'competence': 0.6,
-      'proficiency': 0.8,
-      'mastery': 1.0,
+      none: 0,
+      exposure: 0.2,
+      familiarity: 0.4,
+      competence: 0.6,
+      proficiency: 0.8,
+      mastery: 1.0,
     };
     return levels[mastery.toLowerCase()] ?? 0.5;
   }
@@ -979,7 +1002,7 @@ export class GovernanceSignalService {
     }
 
     // Simple clustering: group by average position
-    const respondentAverages: Array<{ id: string; avg: number }> = [];
+    const respondentAverages: { id: string; avg: number }[] = [];
 
     for (const [id, values] of vectors.entries()) {
       const avg = values.reduce((a, b) => a + b, 0) / values.length;
@@ -1075,7 +1098,12 @@ export interface FeedbackStats {
 
 export interface LearningSignalInput {
   contentId: string;
-  signalType: 'content_viewed' | 'progress_update' | 'quiz_attempt' | 'mastery_achieved' | 'interactive_completion';
+  signalType:
+    | 'content_viewed'
+    | 'progress_update'
+    | 'quiz_attempt'
+    | 'mastery_achieved'
+    | 'interactive_completion';
   payload: Record<string, unknown>;
 }
 
@@ -1164,7 +1192,13 @@ export interface ReviewFlag {
 }
 
 export interface SignalChangeEvent {
-  type: 'reaction' | 'graduated-feedback' | 'learning-signal' | 'completion' | 'review-flag' | 'mediation-proceed';
+  type:
+    | 'reaction'
+    | 'graduated-feedback'
+    | 'learning-signal'
+    | 'completion'
+    | 'review-flag'
+    | 'mediation-proceed';
   contentId: string;
   signalId: string;
   agentId: string;

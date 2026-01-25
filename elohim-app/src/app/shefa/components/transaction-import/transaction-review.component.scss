@@ -97,7 +97,7 @@
 
     .progress-bar {
       height: 4px;
-      background: #4CAF50;
+      background: #4caf50;
       border-radius: 2px;
       transition: width 0.3s ease;
       margin-bottom: 10px;
@@ -472,7 +472,7 @@
       }
 
       &.btn-approve {
-        background: #4CAF50;
+        background: #4caf50;
         color: white;
 
         &:hover:not(:disabled) {
@@ -587,7 +587,7 @@
 
     .btn {
       &.btn-success {
-        background: #4CAF50;
+        background: #4caf50;
         color: white;
 
         &:hover:not(:disabled) {
@@ -691,7 +691,7 @@
           font-size: 14px;
 
           .icon-approved {
-            color: #4CAF50;
+            color: #4caf50;
           }
 
           .icon-rejected {

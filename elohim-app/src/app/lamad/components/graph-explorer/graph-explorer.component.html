@@ -72,11 +72,7 @@
   }
 
   <!-- Graph container -->
-  <div
-    #graphContainer
-    class="graph-container"
-    [class.hidden]="isLoading || error"
-  ></div>
+  <div #graphContainer class="graph-container" [class.hidden]="isLoading || error"></div>
 
   <!-- Node tooltip / info panel -->
   @if (hoveredNode || selectedNode) {
@@ -84,14 +80,13 @@
     <div class="node-tooltip" [class.selected]="selectedNode" [class.cluster]="node?.isCluster">
       <div class="tooltip-header">
         @if (node?.isCluster) {
-          <span class="tooltip-type cluster-type">{{ getClusterTypeLabel(node?.clusterType ?? null) }}</span>
+          <span class="tooltip-type cluster-type">
+            {{ getClusterTypeLabel(node?.clusterType ?? null) }}
+          </span>
         } @else {
           <span class="tooltip-type">{{ node?.contentType }}</span>
         }
-        <span
-          class="tooltip-state"
-          [class]="'state-' + node?.state"
-        >
+        <span class="tooltip-state" [class]="'state-' + node?.state">
           {{ getStateLabel(node?.state || '') }}
         </span>
       </div>
@@ -116,7 +111,11 @@
                 <span class="stat-label">completed</span>
               </div>
               <div class="stat progress-stat">
-                <span class="stat-value">{{ ((node.completedConceptCount / node.totalConceptCount) * 100) | number:'1.0-0' }}%</span>
+                <span class="stat-value">
+                  {{
+                    (node.completedConceptCount / node.totalConceptCount) * 100 | number: '1.0-0'
+                  }}%
+                </span>
                 <span class="stat-label">progress</span>
               </div>
             }
@@ -132,7 +131,14 @@
           @if (node && node.childClusterIds.length > 0) {
             <p class="cluster-children">
               <span class="children-icon">&#9662;</span>
-              {{ node.childClusterIds.length }} {{ node.clusterType === 'chapter' ? 'modules' : node.clusterType === 'module' ? 'sections' : 'items' }}
+              {{ node.childClusterIds.length }}
+              {{
+                node.clusterType === 'chapter'
+                  ? 'modules'
+                  : node.clusterType === 'module'
+                    ? 'sections'
+                    : 'items'
+              }}
             </p>
           }
         </div>
@@ -160,7 +166,10 @@
                 Expand
               </button>
             } @else if (isExpanded(selectedNode)) {
-              <button class="btn btn-secondary btn-small" (click)="collapseCluster(selectedNode.id)">
+              <button
+                class="btn btn-secondary btn-small"
+                (click)="collapseCluster(selectedNode.id)"
+              >
                 <span class="collapse-icon">-</span>
                 Collapse
               </button>
@@ -237,15 +246,23 @@
   <div class="instructions">
     <p>
       @if (viewMode === 'path-hierarchy') {
-        <strong>Click</strong> to select &bull;
-        <strong>Double-click</strong> cluster to expand &bull;
-        <strong>Drag</strong> to reposition &bull;
-        <strong>Scroll</strong> to zoom
+        <strong>Click</strong>
+        to select &bull;
+        <strong>Double-click</strong>
+        cluster to expand &bull;
+        <strong>Drag</strong>
+        to reposition &bull;
+        <strong>Scroll</strong>
+        to zoom
       } @else {
-        <strong>Click</strong> a node to select &bull;
-        <strong>Double-click</strong> to navigate &bull;
-        <strong>Drag</strong> to reposition &bull;
-        <strong>Scroll</strong> to zoom
+        <strong>Click</strong>
+        a node to select &bull;
+        <strong>Double-click</strong>
+        to navigate &bull;
+        <strong>Drag</strong>
+        to reposition &bull;
+        <strong>Scroll</strong>
+        to zoom
       }
     </p>
   </div>

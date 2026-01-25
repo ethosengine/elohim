@@ -1,12 +1,13 @@
-import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit } from '@angular/core';
+
 import { ConfigService, AppConfig } from '../../services/config.service';
 
 @Component({
   selector: 'app-debug-bar',
   imports: [CommonModule],
   templateUrl: './debug-bar.component.html',
-  styleUrl: './debug-bar.component.css'
+  styleUrl: './debug-bar.component.css',
 })
 export class DebugBarComponent implements OnInit {
   config: AppConfig | null = null;
@@ -17,7 +18,7 @@ export class DebugBarComponent implements OnInit {
 
   ngOnInit() {
     this.configService.getConfig().subscribe({
-      next: (config) => {
+      next: config => {
         this.config = config;
         const nonProdEnvironments = ['staging', 'alpha'];
         this.showDebugBar = nonProdEnvironments.includes(this.config.environment);
@@ -25,7 +26,7 @@ export class DebugBarComponent implements OnInit {
       },
       error: () => {
         this.showDebugBar = false;
-      }
+      },
     });
   }
 }

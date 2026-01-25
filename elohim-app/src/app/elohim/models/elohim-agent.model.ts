@@ -39,7 +39,7 @@
  */
 export type ElohimLayer =
   | 'global'
-  | 'bioregional'    // NEW: Ecological boundary enforcers (constitutional limits)
+  | 'bioregional' // NEW: Ecological boundary enforcers (constitutional limits)
   | 'nation-state'
   | 'provincial'
   | 'municipal'
@@ -56,14 +56,14 @@ export type ElohimLayer =
  * Elohim can override nation-state on water availability limits.
  */
 export const ELOHIM_LAYER_HIERARCHY: Record<ElohimLayer, number> = {
-  'global': 7,
-  'bioregional': 6,    // Same level as nation-state but with ecological override
+  global: 7,
+  bioregional: 6, // Same level as nation-state but with ecological override
   'nation-state': 6,
-  'provincial': 5,
-  'municipal': 4,
-  'community': 3,
-  'family': 2,
-  'individual': 1
+  provincial: 5,
+  municipal: 4,
+  community: 3,
+  family: 2,
+  individual: 1,
 };
 
 // ============================================================================
@@ -78,51 +78,51 @@ export const ELOHIM_LAYER_HIERARCHY: Record<ElohimLayer, number> = {
  */
 export type ElohimCapability =
   // Content Operations
-  | 'content-safety-review'        // Review content for harmful patterns
-  | 'accuracy-verification'        // Verify factual accuracy
-  | 'attestation-recommendation'   // Recommend attestation decisions
-  | 'constitutional-verification'  // Verify constitutional alignment
+  | 'content-safety-review' // Review content for harmful patterns
+  | 'accuracy-verification' // Verify factual accuracy
+  | 'attestation-recommendation' // Recommend attestation decisions
+  | 'constitutional-verification' // Verify constitutional alignment
 
   // Knowledge Map Operations
-  | 'knowledge-map-synthesis'      // Build/update knowledge maps
-  | 'affinity-analysis'            // Analyze learner affinity patterns
-  | 'path-recommendation'          // Suggest learning paths
+  | 'knowledge-map-synthesis' // Build/update knowledge maps
+  | 'affinity-analysis' // Analyze learner affinity patterns
+  | 'path-recommendation' // Suggest learning paths
 
   // Care Operations
-  | 'spiral-detection'             // Detect individual/community spiraling
-  | 'care-connection'              // Connect to appropriate care resources
-  | 'graduated-intervention'       // Execute graduated response protocols
+  | 'spiral-detection' // Detect individual/community spiraling
+  | 'care-connection' // Connect to appropriate care resources
+  | 'graduated-intervention' // Execute graduated response protocols
 
   // Governance Operations
-  | 'cross-layer-validation'       // Validate decisions across layers
+  | 'cross-layer-validation' // Validate decisions across layers
   | 'existential-boundary-enforcement' // Enforce non-negotiable limits
-  | 'governance-ratification'      // Participate in governance decisions
+  | 'governance-ratification' // Participate in governance decisions
 
   // Path Operations
-  | 'path-analysis'                // Analyze learning path structure
+  | 'path-analysis' // Analyze learning path structure
   | 'learning-objective-validation' // Validate learning objectives
-  | 'prerequisite-verification'    // Verify prerequisite chains
-  | 'mastery-assessment-design'    // Design mastery assessments
+  | 'prerequisite-verification' // Verify prerequisite chains
+  | 'mastery-assessment-design' // Design mastery assessments
 
   // Family/Individual Operations
-  | 'family-value-alignment'       // Align with family-specific values
-  | 'personal-agent-support'       // Support individual agent needs
+  | 'family-value-alignment' // Align with family-specific values
+  | 'personal-agent-support' // Support individual agent needs
 
   // Feedback Profile Operations (Virality is a privilege)
   | 'feedback-profile-negotiation' // Negotiate content feedback profiles
   | 'feedback-profile-enforcement' // Enforce feedback mechanism restrictions
-  | 'feedback-profile-upgrade'     // Approve profile upgrades (more mechanisms)
-  | 'feedback-profile-downgrade'   // Execute profile downgrades (intellectual humility)
+  | 'feedback-profile-upgrade' // Approve profile upgrades (more mechanisms)
+  | 'feedback-profile-downgrade' // Execute profile downgrades (intellectual humility)
 
   // Place & Geographic Operations (Embodied awareness)
-  | 'place-attestation'           // Attest to place existence/boundaries
-  | 'place-naming-governance'     // Participate in naming deliberation
+  | 'place-attestation' // Attest to place existence/boundaries
+  | 'place-naming-governance' // Participate in naming deliberation
   | 'geographic-reach-assignment' // Assign geographic reach to content
-  | 'bioregional-enforcement'     // Enforce ecological limits (boundary enforcer)
-  | 'cultural-context-mediation'  // Mediate cultural place disputes
-  | 'place-relationship-mapping'  // Map place relationships
+  | 'bioregional-enforcement' // Enforce ecological limits (boundary enforcer)
+  | 'cultural-context-mediation' // Mediate cultural place disputes
+  | 'place-relationship-mapping' // Map place relationships
   | 'ecological-limit-assessment' // Assess ecological limits
-  | 'place-stewardship';          // General place stewardship
+  | 'place-stewardship'; // General place stewardship
 
 // ============================================================================
 // Elohim Agent Entity
@@ -188,7 +188,14 @@ export interface ElohimPlaceAwareness {
   bioregionalAuthorityId?: string;
 
   /** Geographic scope even without specific places */
-  geographicScope?: 'hyperlocal' | 'neighborhood' | 'municipal' | 'regional' | 'national' | 'continental' | 'global';
+  geographicScope?:
+    | 'hyperlocal'
+    | 'neighborhood'
+    | 'municipal'
+    | 'regional'
+    | 'national'
+    | 'continental'
+    | 'global';
 
   /** Languages this Elohim serves in these places */
   serviceLanguages?: string[];
@@ -357,11 +364,11 @@ export interface ConstitutionalReasoning {
   interpretation: string;
 
   /** Values that were weighed */
-  valuesWeighed: Array<{
+  valuesWeighed: {
     value: string;
     weight: number;
     direction: 'for' | 'against';
-  }>;
+  }[];
 
   /** Confidence in the decision (0.0 - 1.0) */
   confidence: number;
@@ -387,12 +394,12 @@ export interface ContentReviewResult {
   type: 'content-review';
   contentId: string;
   approved: boolean;
-  issues?: Array<{
+  issues?: {
     severity: 'info' | 'warning' | 'critical';
     category: string;
     description: string;
     suggestion?: string;
-  }>;
+  }[];
   trustScoreImpact?: number;
 }
 
@@ -412,7 +419,7 @@ export interface ElohimKnowledgeMapUpdate {
   nodesAdded?: number;
   nodesUpdated?: number;
   connectionsFound?: number;
-  affinityAdjustments?: Array<{ nodeId: string; delta: number }>;
+  affinityAdjustments?: { nodeId: string; delta: number }[];
 }
 
 export interface SpiralDetectionResult {
@@ -429,12 +436,12 @@ export interface PathAnalysisResult {
   type: 'path-analysis';
   pathId: string;
   analysisType: string;
-  findings: Array<{
+  findings: {
     aspect: string;
     status: 'good' | 'needs-attention' | 'critical';
     details: string;
     suggestions?: string[];
-  }>;
+  }[];
   overallAssessment: string;
 }
 

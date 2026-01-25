@@ -12,6 +12,7 @@
  * - Recognition-based completion events
  */
 
+import { CommonModule } from '@angular/common';
 import {
   Component,
   Input,
@@ -24,26 +25,29 @@ import {
   SimpleChanges,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
-  inject
+  inject,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+
 import { Subject, takeUntil } from 'rxjs';
+
+import { ContentNode } from '../../../models/content-node.model';
 import {
   ContentRenderer,
   InteractiveRenderer,
-  RendererCompletionEvent
+  RendererCompletionEvent,
 } from '../../interfaces/content-format-plugin.interface';
-import { ContentNode } from '../../../models/content-node.model';
-import { SophiaWrapperComponent } from './sophia-wrapper.component';
-import type { Moment, Recognition } from './sophia-moment.model';
+
 import {
   getPsycheAPI,
   type PsycheAPI,
   type AggregatedReflection,
   type ReflectionRecognition,
-  type UserInputMap
+  type UserInputMap,
 } from './sophia-element-loader';
+import { SophiaWrapperComponent } from './sophia-wrapper.component';
+
+import type { Moment, Recognition } from './sophia-moment.model';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mode Configuration
@@ -65,7 +69,7 @@ const DISCOVERY_CONFIG: ModeConfig = {
   nextButtonText: 'Continue',
   showFeedback: false,
   showCorrectness: false,
-  trackSubscales: true
+  trackSubscales: true,
 };
 
 const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
@@ -74,10 +78,10 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
     nextButtonText: 'Next Question',
     showFeedback: true,
     showCorrectness: true,
-    trackSubscales: false
+    trackSubscales: false,
   },
   discovery: DISCOVERY_CONFIG,
-  reflection: DISCOVERY_CONFIG
+  reflection: DISCOVERY_CONFIG,
 };
 
 @Component({
@@ -132,28 +136,23 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
             <div class="result-card">
               <div class="result-icon">✨</div>
               <h4 class="result-title">Assessment Complete</h4>
-              <p class="result-description">
-                Thank you for completing this reflection.
-              </p>
+              <p class="result-description">Thank you for completing this reflection.</p>
             </div>
 
             <!-- Coming Soon placeholder -->
             <div class="imagodei-preview">
               <p class="preview-text">
-                <strong>Coming Soon:</strong> Your responses will be saved to your
-                ImagoDei profile, helping you create meaning from your reflections.
+                <strong>Coming Soon:</strong>
+                Your responses will be saved to your ImagoDei profile, helping you create meaning
+                from your reflections.
               </p>
-              <a class="profile-link" routerLink="/identity/profile">
-                View your ImagoDei →
-              </a>
+              <a class="profile-link" routerLink="/identity/profile">View your ImagoDei →</a>
             </div>
           }
 
           <!-- Continue navigation -->
           <div class="results-actions">
-            <button class="btn btn-primary" (click)="completeAndContinue()">
-              Continue
-            </button>
+            <button class="btn btn-primary" (click)="completeAndContinue()">Continue</button>
           </div>
         </div>
       } @else {
@@ -161,9 +160,7 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
         <header class="quiz-header" *ngIf="showHeader">
           <h3 class="quiz-title">{{ title }}</h3>
           <div class="quiz-progress" *ngIf="totalMoments > 1">
-            <span class="progress-text">
-              {{ currentMomentIndex + 1 }} of {{ totalMoments }}
-            </span>
+            <span class="progress-text">{{ currentMomentIndex + 1 }} of {{ totalMoments }}</span>
             <div class="progress-bar">
               <div class="progress-fill" [style.width.%]="progressPercentage"></div>
             </div>
@@ -180,16 +177,20 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
             [reviewMode]="reviewMode"
             (recognized)="handleRecognition($event)"
             (answerChanged)="handleAnswerChange($event)"
-            (ready)="handleReady()">
-          </app-sophia-question>
+            (ready)="handleReady()"
+          ></app-sophia-question>
         </div>
 
         <!-- Feedback (mastery mode only) -->
-        <div class="feedback-container" *ngIf="showFeedback && modeConfig.showCorrectness && lastRecognition?.mastery">
+        <div
+          class="feedback-container"
+          *ngIf="showFeedback && modeConfig.showCorrectness && lastRecognition?.mastery"
+        >
           <div
             class="feedback"
             [class.correct]="lastRecognition?.mastery?.demonstrated"
-            [class.incorrect]="lastRecognition && !lastRecognition.mastery?.demonstrated">
+            [class.incorrect]="lastRecognition && !lastRecognition.mastery?.demonstrated"
+          >
             <span class="feedback-icon">
               {{ lastRecognition?.mastery?.demonstrated ? '✓' : '✗' }}
             </span>
@@ -209,13 +210,11 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
             <button
               class="btn btn-primary"
               [disabled]="!hasAnswer || isSubmitting"
-              (click)="submitAnswer()">
+              (click)="submitAnswer()"
+            >
               {{ submitButtonText }}
             </button>
-            <button
-              class="btn btn-secondary"
-              *ngIf="showNextButton"
-              (click)="nextMoment()">
+            <button class="btn btn-secondary" *ngIf="showNextButton" (click)="nextMoment()">
               {{ isLastMoment ? 'See Results' : 'Next Question' }}
             </button>
           </ng-container>
@@ -223,9 +222,7 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
           <!-- Discovery/Reflection mode: single-click flow with Back link -->
           <ng-container *ngIf="!modeConfig.showFeedback">
             <!-- Back link - subtle styling, shows when not on first question -->
-            <a class="nav-link back-link"
-               *ngIf="currentMomentIndex > 0"
-               (click)="previousMoment()">
+            <a class="nav-link back-link" *ngIf="currentMomentIndex > 0" (click)="previousMoment()">
               &larr; Back
             </a>
 
@@ -233,7 +230,8 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
             <button
               class="btn btn-primary"
               [disabled]="!hasAnswer || isSubmitting"
-              (click)="submitAnswer()">
+              (click)="submitAnswer()"
+            >
               {{ isLastMoment ? 'Finish' : 'Continue' }}
             </button>
           </ng-container>
@@ -241,344 +239,350 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
       }
     </div>
   `,
-  styles: [`
-    :host {
-      display: block;
-    }
+  styles: [
+    `
+      :host {
+        display: block;
+      }
 
-    .sophia-renderer {
-      padding: 1rem;
-    }
+      .sophia-renderer {
+        padding: 1rem;
+      }
 
-    .quiz-header {
-      margin-bottom: 1.5rem;
-    }
+      .quiz-header {
+        margin-bottom: 1.5rem;
+      }
 
-    .quiz-title {
-      margin: 0 0 0.5rem;
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text-primary, #1a1a1a);
-    }
+      .quiz-title {
+        margin: 0 0 0.5rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-primary, #1a1a1a);
+      }
 
-    .quiz-progress {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
+      .quiz-progress {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
 
-    .progress-text {
-      font-size: 0.875rem;
-      color: var(--text-secondary, #666);
-    }
+      .progress-text {
+        font-size: 0.875rem;
+        color: var(--text-secondary, #666);
+      }
 
-    .progress-bar {
-      flex: 1;
-      height: 6px;
-      background: var(--bg-tertiary, #e0e0e0);
-      border-radius: 3px;
-      overflow: hidden;
-    }
+      .progress-bar {
+        flex: 1;
+        height: 6px;
+        background: var(--bg-tertiary, #e0e0e0);
+        border-radius: 3px;
+        overflow: hidden;
+      }
 
-    .progress-fill {
-      height: 100%;
-      background: var(--primary-color, #1976d2);
-      border-radius: 3px;
-      transition: width 0.3s ease;
-    }
+      .progress-fill {
+        height: 100%;
+        background: var(--primary-color, #1976d2);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+      }
 
-    .moment-container {
-      margin-bottom: 1.5rem;
-    }
+      .moment-container {
+        margin-bottom: 1.5rem;
+      }
 
-    .feedback-container {
-      margin-bottom: 1rem;
-    }
+      .feedback-container {
+        margin-bottom: 1rem;
+      }
 
-    .feedback {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      font-size: 0.9375rem;
-    }
+      .feedback {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.9375rem;
+      }
 
-    .feedback.correct {
-      background: var(--success-bg, #e8f5e9);
-      color: var(--success-color, #2e7d32);
-    }
+      .feedback.correct {
+        background: var(--success-bg, #e8f5e9);
+        color: var(--success-color, #2e7d32);
+      }
 
-    .feedback.incorrect {
-      background: var(--error-bg, #ffebee);
-      color: var(--error-color, #c62828);
-    }
+      .feedback.incorrect {
+        background: var(--error-bg, #ffebee);
+        color: var(--error-color, #c62828);
+      }
 
-    .feedback-icon {
-      font-size: 1.25rem;
-      font-weight: bold;
-    }
+      .feedback-icon {
+        font-size: 1.25rem;
+        font-weight: bold;
+      }
 
-    .feedback-message {
-      margin-left: auto;
-      font-size: 0.875rem;
-      opacity: 0.8;
-    }
+      .feedback-message {
+        margin-left: auto;
+        font-size: 0.875rem;
+        opacity: 0.8;
+      }
 
-    .quiz-controls {
-      display: flex;
-      gap: 0.75rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--border-color, #e0e0e0);
-    }
+      .quiz-controls {
+        display: flex;
+        gap: 0.75rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-color, #e0e0e0);
+      }
 
-    .btn {
-      padding: 0.625rem 1.25rem;
-      border: none;
-      border-radius: 6px;
-      font-size: 0.9375rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background-color 0.2s, opacity 0.2s;
-    }
+      .btn {
+        padding: 0.625rem 1.25rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.9375rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition:
+          background-color 0.2s,
+          opacity 0.2s;
+      }
 
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
 
-    .btn-primary {
-      background: var(--primary-color, #1976d2);
-      color: white;
-    }
+      .btn-primary {
+        background: var(--primary-color, #1976d2);
+        color: white;
+      }
 
-    .btn-primary:hover:not(:disabled) {
-      background: var(--primary-dark, #1565c0);
-    }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--primary-dark, #1565c0);
+      }
 
-    .btn-secondary {
-      background: var(--bg-secondary, #f5f5f5);
-      color: var(--text-primary, #1a1a1a);
-    }
+      .btn-secondary {
+        background: var(--bg-secondary, #f5f5f5);
+        color: var(--text-primary, #1a1a1a);
+      }
 
-    .btn-secondary:hover:not(:disabled) {
-      background: var(--bg-tertiary, #e0e0e0);
-    }
+      .btn-secondary:hover:not(:disabled) {
+        background: var(--bg-tertiary, #e0e0e0);
+      }
 
-    .nav-link.back-link {
-      color: var(--text-secondary, #666);
-      cursor: pointer;
-      font-size: 0.9375rem;
-      text-decoration: none;
-      padding: 0.625rem 0;
-      margin-right: 0.5rem;
-      display: inline-flex;
-      align-items: center;
-    }
+      .nav-link.back-link {
+        color: var(--text-secondary, #666);
+        cursor: pointer;
+        font-size: 0.9375rem;
+        text-decoration: none;
+        padding: 0.625rem 0;
+        margin-right: 0.5rem;
+        display: inline-flex;
+        align-items: center;
+      }
 
-    .nav-link.back-link:hover {
-      color: var(--text-primary, #1a1a1a);
-      text-decoration: underline;
-    }
+      .nav-link.back-link:hover {
+        color: var(--text-primary, #1a1a1a);
+        text-decoration: underline;
+      }
 
-    /* Results Section - Theme-aware colors */
-    .results-section {
-      padding: 1.5rem;
-      text-align: center;
-    }
+      /* Results Section - Theme-aware colors */
+      .results-section {
+        padding: 1.5rem;
+        text-align: center;
+      }
 
-    .result-card {
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 12px;
-      padding: 2rem;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      color: #1a1a1a;
-    }
+      .result-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        color: #1a1a1a;
+      }
 
-    .result-icon {
-      font-size: 3rem;
-      margin-bottom: 1rem;
-    }
+      .result-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+      }
 
-    .result-title {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin: 0 0 0.5rem;
-      color: #1a1a1a;
-    }
+      .result-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0 0 0.5rem;
+        color: #1a1a1a;
+      }
 
-    .result-description {
-      font-size: 0.9375rem;
-      color: #555;
-      margin: 0;
-    }
+      .result-description {
+        font-size: 0.9375rem;
+        color: #555;
+        margin: 0;
+      }
 
-    .imagodei-preview {
-      background: rgba(245, 245, 245, 0.95);
-      border-radius: 8px;
-      padding: 1rem 1.25rem;
-      margin-bottom: 1.5rem;
-      text-align: left;
-      color: #333;
-    }
+      .imagodei-preview {
+        background: rgba(245, 245, 245, 0.95);
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.5rem;
+        text-align: left;
+        color: #333;
+      }
 
-    .preview-text {
-      margin: 0 0 0.5rem;
-      font-size: 0.875rem;
-      color: #555;
-      line-height: 1.5;
-    }
+      .preview-text {
+        margin: 0 0 0.5rem;
+        font-size: 0.875rem;
+        color: #555;
+        line-height: 1.5;
+      }
 
-    .profile-link {
-      color: #1976d2;
-      font-size: 0.875rem;
-      font-weight: 500;
-      text-decoration: none;
-    }
+      .profile-link {
+        color: #1976d2;
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-decoration: none;
+      }
 
-    .profile-link:hover {
-      text-decoration: underline;
-    }
+      .profile-link:hover {
+        text-decoration: underline;
+      }
 
-    .results-actions {
-      padding-top: 1rem;
-    }
+      .results-actions {
+        padding-top: 1rem;
+      }
 
-    /* Mastery Results */
-    .result-card.passed {
-      border: 2px solid #2e7d32;
-    }
+      /* Mastery Results */
+      .result-card.passed {
+        border: 2px solid #2e7d32;
+      }
 
-    .result-card.failed {
-      border: 2px solid #f57c00;
-    }
+      .result-card.failed {
+        border: 2px solid #f57c00;
+      }
 
-    .score-display {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-top: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid #e0e0e0;
-    }
+      .score-display {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e0e0e0;
+      }
 
-    .score-value {
-      font-size: 2.5rem;
-      font-weight: 700;
-      color: #1976d2;
-      line-height: 1;
-    }
+      .score-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1976d2;
+        line-height: 1;
+      }
 
-    .score-label {
-      font-size: 0.875rem;
-      color: #555;
-      margin-top: 0.25rem;
-    }
+      .score-label {
+        font-size: 0.875rem;
+        color: #555;
+        margin-top: 0.25rem;
+      }
 
-    .mastery-preview {
-      background: rgba(245, 245, 245, 0.95);
-      border-radius: 8px;
-      padding: 1rem;
-      margin-bottom: 1.5rem;
-      color: #333;
-    }
+      .mastery-preview {
+        background: rgba(245, 245, 245, 0.95);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        color: #333;
+      }
 
-    .preview-item {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.5rem 0;
-    }
+      .preview-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0;
+      }
 
-    .preview-item:not(:last-child) {
-      border-bottom: 1px solid #e0e0e0;
-    }
+      .preview-item:not(:last-child) {
+        border-bottom: 1px solid #e0e0e0;
+      }
 
-    .preview-icon {
-      font-size: 1.25rem;
-    }
+      .preview-icon {
+        font-size: 1.25rem;
+      }
 
-    .preview-content {
-      display: flex;
-      flex-direction: column;
-      gap: 0.125rem;
-    }
+      .preview-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+      }
 
-    .preview-content strong {
-      font-size: 0.875rem;
-      color: #1a1a1a;
-    }
+      .preview-content strong {
+        font-size: 0.875rem;
+        color: #1a1a1a;
+      }
 
-    .coming-soon {
-      font-size: 0.75rem;
-      color: #777;
-      font-style: italic;
-    }
+      .coming-soon {
+        font-size: 0.75rem;
+        color: #777;
+        font-style: italic;
+      }
 
-    /* Dark theme overrides */
-    :host-context(body[data-theme="dark"]) .result-card,
-    :host-context(body:not([data-theme])) .result-card {
-      background: rgba(30, 30, 35, 0.95);
-      color: #f0f0f0;
-    }
+      /* Dark theme overrides */
+      :host-context(body[data-theme='dark']) .result-card,
+      :host-context(body:not([data-theme])) .result-card {
+        background: rgba(30, 30, 35, 0.95);
+        color: #f0f0f0;
+      }
 
-    :host-context(body[data-theme="dark"]) .result-title,
-    :host-context(body:not([data-theme])) .result-title {
-      color: #f0f0f0;
-    }
+      :host-context(body[data-theme='dark']) .result-title,
+      :host-context(body:not([data-theme])) .result-title {
+        color: #f0f0f0;
+      }
 
-    :host-context(body[data-theme="dark"]) .result-description,
-    :host-context(body:not([data-theme])) .result-description {
-      color: #aaa;
-    }
+      :host-context(body[data-theme='dark']) .result-description,
+      :host-context(body:not([data-theme])) .result-description {
+        color: #aaa;
+      }
 
-    :host-context(body[data-theme="dark"]) .imagodei-preview,
-    :host-context(body[data-theme="dark"]) .mastery-preview,
-    :host-context(body:not([data-theme])) .imagodei-preview,
-    :host-context(body:not([data-theme])) .mastery-preview {
-      background: rgba(45, 45, 50, 0.95);
-      color: #ddd;
-    }
+      :host-context(body[data-theme='dark']) .imagodei-preview,
+      :host-context(body[data-theme='dark']) .mastery-preview,
+      :host-context(body:not([data-theme])) .imagodei-preview,
+      :host-context(body:not([data-theme])) .mastery-preview {
+        background: rgba(45, 45, 50, 0.95);
+        color: #ddd;
+      }
 
-    :host-context(body[data-theme="dark"]) .preview-text,
-    :host-context(body:not([data-theme])) .preview-text {
-      color: #aaa;
-    }
+      :host-context(body[data-theme='dark']) .preview-text,
+      :host-context(body:not([data-theme])) .preview-text {
+        color: #aaa;
+      }
 
-    :host-context(body[data-theme="dark"]) .preview-content strong,
-    :host-context(body:not([data-theme])) .preview-content strong {
-      color: #f0f0f0;
-    }
+      :host-context(body[data-theme='dark']) .preview-content strong,
+      :host-context(body:not([data-theme])) .preview-content strong {
+        color: #f0f0f0;
+      }
 
-    :host-context(body[data-theme="dark"]) .coming-soon,
-    :host-context(body:not([data-theme])) .coming-soon {
-      color: #888;
-    }
+      :host-context(body[data-theme='dark']) .coming-soon,
+      :host-context(body:not([data-theme])) .coming-soon {
+        color: #888;
+      }
 
-    :host-context(body[data-theme="dark"]) .score-label,
-    :host-context(body:not([data-theme])) .score-label {
-      color: #aaa;
-    }
+      :host-context(body[data-theme='dark']) .score-label,
+      :host-context(body:not([data-theme])) .score-label {
+        color: #aaa;
+      }
 
-    :host-context(body[data-theme="dark"]) .score-display,
-    :host-context(body:not([data-theme])) .score-display {
-      border-top-color: #444;
-    }
+      :host-context(body[data-theme='dark']) .score-display,
+      :host-context(body:not([data-theme])) .score-display {
+        border-top-color: #444;
+      }
 
-    :host-context(body[data-theme="dark"]) .preview-item:not(:last-child),
-    :host-context(body:not([data-theme])) .preview-item:not(:last-child) {
-      border-bottom-color: #444;
-    }
+      :host-context(body[data-theme='dark']) .preview-item:not(:last-child),
+      :host-context(body:not([data-theme])) .preview-item:not(:last-child) {
+        border-bottom-color: #444;
+      }
 
-    :host-context(body[data-theme="dark"]) .profile-link,
-    :host-context(body:not([data-theme])) .profile-link {
-      color: #64b5f6;
-    }
-  `],
-  changeDetection: ChangeDetectionStrategy.OnPush
+      :host-context(body[data-theme='dark']) .profile-link,
+      :host-context(body:not([data-theme])) .profile-link {
+        color: #64b5f6;
+      }
+    `,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SophiaRendererComponent implements ContentRenderer, InteractiveRenderer, OnInit, OnChanges, OnDestroy {
+export class SophiaRendererComponent
+  implements ContentRenderer, InteractiveRenderer, OnInit, OnChanges, OnDestroy
+{
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly destroy$ = new Subject<void>();
 
@@ -705,7 +709,7 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
       hasNodeChange: !!changes['node'],
       nodeId: this.node?.id,
       nodeContentFormat: this.node?.contentFormat,
-      hasContent: !!this.node?.content
+      hasContent: !!this.node?.content,
     });
     if (changes['node'] && this.node) {
       this.loadMoments();
@@ -772,7 +776,8 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
         this.recognitions.push(recognition);
       }
 
-      const isDiscoveryOrReflection = this.assessmentMode === 'discovery' || this.assessmentMode === 'reflection';
+      const isDiscoveryOrReflection =
+        this.assessmentMode === 'discovery' || this.assessmentMode === 'reflection';
 
       if (isDiscoveryOrReflection) {
         // Use Psyche API for aggregation
@@ -824,10 +829,11 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
       }
 
       this.currentMomentIndex--;
-      this.hasAnswer = true;  // Previous answer will be restored via initialUserInput
+      this.hasAnswer = true; // Previous answer will be restored via initialUserInput
       this.showFeedback = false;
       this.showNextButton = false;
-      this.lastRecognition = this.recognitions.find(r => r.momentId === this.currentMoment?.id) ?? null;
+      this.lastRecognition =
+        this.recognitions.find(r => r.momentId === this.currentMoment?.id) ?? null;
     }
     this.cdr.markForCheck();
   }
@@ -844,7 +850,7 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
       hasContent: !!this.node?.content,
       contentTypeOf: typeof this.node?.content,
       contentIsArray: Array.isArray(this.node?.content),
-      contentLength: Array.isArray(this.node?.content) ? this.node.content.length : 'N/A'
+      contentLength: Array.isArray(this.node?.content) ? this.node.content.length : 'N/A',
     });
 
     if (!this.node?.content) {
@@ -910,9 +916,10 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
 
     // Perseus item format (has 'question' property)
     if (obj['question']) {
-      const purpose = (obj['discoveryMode'] || obj['purpose'] === 'discovery' || obj['purpose'] === 'reflection')
-        ? 'reflection'
-        : 'mastery';
+      const purpose =
+        obj['discoveryMode'] || obj['purpose'] === 'discovery' || obj['purpose'] === 'reflection'
+          ? 'reflection'
+          : 'mastery';
 
       return {
         id: String(obj['id'] || `moment-${Math.random().toString(36).substr(2, 9)}`),
@@ -920,7 +927,7 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
         content: obj['question'] as Moment['content'],
         hints: obj['hints'] as Moment['hints'],
         subscaleContributions: obj['subscaleContributions'] as Moment['subscaleContributions'],
-        metadata: obj['metadata'] as Moment['metadata']
+        metadata: obj['metadata'] as Moment['metadata'],
       };
     }
 
@@ -928,7 +935,7 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
     return {
       id: `moment-${Math.random().toString(36).substr(2, 9)}`,
       purpose: 'mastery',
-      content: obj as unknown as Moment['content']
+      content: obj as unknown as Moment['content'],
     };
   }
 
@@ -943,9 +950,9 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
       purpose: 'reflection',
       userInput: recognition.userInput,
       reflection: recognition.reflection ?? {
-        subscaleContributions: recognition.resonance?.subscaleContributions ?? {}
+        subscaleContributions: recognition.resonance?.subscaleContributions ?? {},
       },
-      timestamp: recognition.timestamp ?? Date.now()
+      timestamp: recognition.timestamp ?? Date.now(),
     };
 
     this.reflectionRecognitions.push(reflectionRecognition);
@@ -957,10 +964,9 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
 
     // Use Psyche API for aggregation if available
     if (this.psycheAPI && this.reflectionRecognitions.length > 0) {
-      this.aggregatedReflection = this.psycheAPI.aggregateReflections(
-        this.reflectionRecognitions,
-        { normalization: 'sum' }
-      );
+      this.aggregatedReflection = this.psycheAPI.aggregateReflections(this.reflectionRecognitions, {
+        normalization: 'sum',
+      });
       console.log('[SophiaRenderer] Aggregated via Psyche API:', this.aggregatedReflection);
     } else {
       // Fallback: create minimal aggregation manually
@@ -975,8 +981,8 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
    * after sophia-plugin is loaded.
    */
   private aggregateFallback(recognition: Recognition): void {
-    const contributions = recognition.reflection?.subscaleContributions ||
-                          recognition.resonance?.subscaleContributions;
+    const contributions =
+      recognition.reflection?.subscaleContributions || recognition.resonance?.subscaleContributions;
 
     if (!contributions) return;
 
@@ -988,7 +994,7 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
         normalizedScores: {},
         momentCount: 0,
         momentIds: [],
-        aggregatedAt: 0
+        aggregatedAt: 0,
       };
     }
 
@@ -1003,8 +1009,8 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
     this.aggregatedReflection.momentCount++;
 
     // Normalize scores
-    const total = Object.values(this.aggregatedReflection.subscaleTotals)
-      .reduce((sum, v) => sum + v, 0) || 1;
+    const total =
+      Object.values(this.aggregatedReflection.subscaleTotals).reduce((sum, v) => sum + v, 0) || 1;
 
     for (const [subscale, value] of Object.entries(this.aggregatedReflection.subscaleTotals)) {
       this.aggregatedReflection.normalizedScores[subscale] = value / total;
@@ -1029,7 +1035,8 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
    * Emits completion event and triggers navigation to next step.
    */
   completeAndContinue(): void {
-    const isDiscoveryOrReflection = this.assessmentMode === 'discovery' || this.assessmentMode === 'reflection';
+    const isDiscoveryOrReflection =
+      this.assessmentMode === 'discovery' || this.assessmentMode === 'reflection';
     if (isDiscoveryOrReflection) {
       this.emitReflectionCompletion();
     } else {
@@ -1061,9 +1068,9 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
         moments: this.moments.map((m, i) => ({
           id: m.id,
           correct: this.recognitions[i]?.mastery?.demonstrated ?? false,
-          score: this.recognitions[i]?.mastery?.score ?? 0
-        }))
-      }
+          score: this.recognitions[i]?.mastery?.score ?? 0,
+        })),
+      },
     };
 
     this.complete.emit(event);
@@ -1082,8 +1089,8 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
           assessmentMode: this.assessmentMode,
           recognitions: this.recognitions,
           total: this.totalMoments,
-          correct: this.totalMoments
-        }
+          correct: this.totalMoments,
+        },
       };
       this.complete.emit(event);
       return;
@@ -1106,7 +1113,7 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
 
     console.log('[SophiaRenderer] Reflection complete:', {
       subscaleTotals: this.aggregatedReflection.subscaleTotals,
-      primarySubscale
+      primarySubscale,
     });
 
     const event: RendererCompletionEvent = {
@@ -1121,8 +1128,8 @@ export class SophiaRendererComponent implements ContentRenderer, InteractiveRend
         aggregatedReflection: { ...this.aggregatedReflection },
         recognitions: this.recognitions,
         total: this.totalMoments,
-        correct: this.totalMoments
-      }
+        correct: this.totalMoments,
+      },
     };
 
     this.complete.emit(event);

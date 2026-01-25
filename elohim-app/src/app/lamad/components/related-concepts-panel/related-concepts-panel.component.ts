@@ -1,11 +1,23 @@
-import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, ChangeDetectionStrategy, ChangeDetectorRef, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Subject } from 'rxjs';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  OnChanges,
+  SimpleChanges,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  OnDestroy,
+} from '@angular/core';
+
 import { takeUntil } from 'rxjs/operators';
 
-import { RelatedConceptsService } from '../../services/related-concepts.service';
+import { Subject } from 'rxjs';
+
 import { ContentNode } from '../../models/content-node.model';
 import { RelatedConceptsResult } from '../../models/exploration-context.model';
+import { RelatedConceptsService } from '../../services/related-concepts.service';
 import { ConceptCardComponent } from '../concept-card/concept-card.component';
 
 /**
@@ -62,8 +74,8 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
                   [concept]="concept"
                   relationshipType="PREREQUISITE"
                   [compact]="compact"
-                  (navigate)="onNavigate($event)">
-                </app-concept-card>
+                  (navigate)="onNavigate($event)"
+                ></app-concept-card>
               }
             </div>
           </section>
@@ -83,8 +95,8 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
                   [concept]="concept"
                   relationshipType="CONTAINS"
                   [compact]="compact"
-                  (navigate)="onNavigate($event)">
-                </app-concept-card>
+                  (navigate)="onNavigate($event)"
+                ></app-concept-card>
               }
             </div>
           </section>
@@ -104,8 +116,8 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
                   [concept]="concept"
                   relationshipType="RELATES_TO"
                   [compact]="compact"
-                  (navigate)="onNavigate($event)">
-                </app-concept-card>
+                  (navigate)="onNavigate($event)"
+                ></app-concept-card>
               }
             </div>
           </section>
@@ -125,8 +137,8 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
                   [concept]="concept"
                   relationshipType="EXTENDS"
                   [compact]="compact"
-                  (navigate)="onNavigate($event)">
-                </app-concept-card>
+                  (navigate)="onNavigate($event)"
+                ></app-concept-card>
               }
             </div>
           </section>
@@ -146,8 +158,8 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
                   [concept]="concept"
                   relationshipType="CONTAINS"
                   [compact]="compact"
-                  (navigate)="onNavigate($event)">
-                </app-concept-card>
+                  (navigate)="onNavigate($event)"
+                ></app-concept-card>
               }
             </div>
           </section>
@@ -155,96 +167,100 @@ import { ConceptCardComponent } from '../concept-card/concept-card.component';
       }
     </div>
   `,
-  styles: [`
-    .related-concepts-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
+  styles: [
+    `
+      .related-concepts-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
 
-    .loading-state,
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      padding: 2rem 1rem;
-      color: var(--text-secondary, #5f6368);
-      text-align: center;
-    }
+      .loading-state,
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 2rem 1rem;
+        color: var(--text-secondary, #5f6368);
+        text-align: center;
+      }
 
-    .loading-spinner {
-      width: 1.5rem;
-      height: 1.5rem;
-      border: 2px solid var(--border-color, #e9ecef);
-      border-top-color: var(--primary, #4285f4);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+      .loading-spinner {
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 2px solid var(--border-color, #e9ecef);
+        border-top-color: var(--primary, #4285f4);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
 
-    .empty-icon {
-      font-size: 2rem;
-      opacity: 0.5;
-    }
+      .empty-icon {
+        font-size: 2rem;
+        opacity: 0.5;
+      }
 
-    .relationship-section {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
+      .relationship-section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
 
-    .section-header {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin: 0;
-      padding: 0.25rem 0;
-      font-size: 0.8125rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      color: var(--text-secondary, #5f6368);
-      border-bottom: 1px solid var(--border-color, #e9ecef);
-    }
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0;
+        padding: 0.25rem 0;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--text-secondary, #5f6368);
+        border-bottom: 1px solid var(--border-color, #e9ecef);
+      }
 
-    .section-icon {
-      font-size: 1rem;
-    }
+      .section-icon {
+        font-size: 1rem;
+      }
 
-    .section-count {
-      font-weight: 400;
-      opacity: 0.7;
-    }
+      .section-count {
+        font-weight: 400;
+        opacity: 0.7;
+      }
 
-    .section-content {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
+      .section-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
 
-    /* Section-specific styling */
-    .prerequisites .section-header {
-      color: var(--warning-text, #b06000);
-    }
+      /* Section-specific styling */
+      .prerequisites .section-header {
+        color: var(--warning-text, #b06000);
+      }
 
-    .extensions .section-header {
-      color: var(--success-text, #137333);
-    }
+      .extensions .section-header {
+        color: var(--success-text, #137333);
+      }
 
-    .related .section-header {
-      color: var(--info-text, #174ea6);
-    }
+      .related .section-header {
+        color: var(--info-text, #174ea6);
+      }
 
-    .parents .section-header,
-    .children .section-header {
-      color: var(--text-secondary, #5f6368);
-    }
-  `]
+      .parents .section-header,
+      .children .section-header {
+        color: var(--text-secondary, #5f6368);
+      }
+    `,
+  ],
 })
 export class RelatedConceptsPanelComponent implements OnChanges, OnDestroy {
   /** The content ID to find related concepts for */
@@ -272,7 +288,7 @@ export class RelatedConceptsPanelComponent implements OnChanges, OnDestroy {
     related: [],
     children: [],
     parents: [],
-    allRelationships: []
+    allRelationships: [],
   };
 
   private readonly destroy$ = new Subject<void>();
@@ -324,16 +340,16 @@ export class RelatedConceptsPanelComponent implements OnChanges, OnDestroy {
       .getRelatedConcepts(this.contentId, { limit: this.limit })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (result) => {
+        next: result => {
           this.result = result;
           this.isLoading = false;
           this.cdr.markForCheck();
         },
-        error: (err) => {
+        error: err => {
           console.error('Failed to load related concepts:', err);
           this.isLoading = false;
           this.cdr.markForCheck();
-        }
+        },
       });
   }
 }

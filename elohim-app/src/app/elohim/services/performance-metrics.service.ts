@@ -16,9 +16,9 @@ import { Injectable, signal, computed } from '@angular/core';
 
 export interface ResponseTimeMetrics {
   count: number;
-  p50: number;  // 50th percentile (median)
-  p95: number;  // 95th percentile
-  p99: number;  // 99th percentile
+  p50: number; // 50th percentile (median)
+  p95: number; // 95th percentile
+  p99: number; // 99th percentile
   min: number;
   max: number;
   mean: number;
@@ -33,7 +33,7 @@ export interface LocalMetrics {
   startTime: number;
   lastCheckTime: number;
   uptimePercent: number;
-  downEvents: Array<{ startTime: number; endTime: number; reason: string }>;
+  downEvents: { startTime: number; endTime: number; reason: string }[];
 
   // Resource usage
   cpuUsagePercent: number;
@@ -111,7 +111,7 @@ class PercentileCalculator {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class PerformanceMetricsService {
   // Percentile calculators for response times
@@ -137,7 +137,7 @@ export class PerformanceMetricsService {
     replicationTasksRunning: 0,
     reconstructionTasksRunning: 0,
     avgReconstructionTimeMs: 0,
-    collectedAt: Date.now()
+    collectedAt: Date.now(),
   });
 
   // Expose as readonly signal
@@ -164,12 +164,7 @@ export class PerformanceMetricsService {
     const resourceScore = Math.max(0, 100 - Math.max(m.cpuUsagePercent, m.memoryUsagePercent));
     const replicationScore = m.replicationTasksRunning === 0 ? 100 : 50;
 
-    return (
-      uptimeScore * 0.4 +
-      errorScore * 0.3 +
-      resourceScore * 0.2 +
-      replicationScore * 0.1
-    );
+    return uptimeScore * 0.4 + errorScore * 0.3 + resourceScore * 0.2 + replicationScore * 0.1;
   });
 
   constructor() {
@@ -223,11 +218,7 @@ export class PerformanceMetricsService {
   /**
    * Update CPU/Memory/Disk usage
    */
-  updateResourceUsage(
-    cpuPercent: number,
-    memoryPercent: number,
-    diskPercent: number
-  ): void {
+  updateResourceUsage(cpuPercent: number, memoryPercent: number, diskPercent: number): void {
     const m = this.metrics();
     m.cpuUsagePercent = cpuPercent;
     m.memoryUsagePercent = memoryPercent;
@@ -245,7 +236,7 @@ export class PerformanceMetricsService {
     m.downEvents.push({
       startTime: now - durationMs,
       endTime: now,
-      reason
+      reason,
     });
 
     this.recalculateUptime();
@@ -286,14 +277,15 @@ export class PerformanceMetricsService {
         responseTimeP50Ms: m.queryResponseTimes.p50,
         responseTimeP95Ms: m.queryResponseTimes.p95,
         responseTimeP99Ms: m.queryResponseTimes.p99,
-        errorRate: this.errorRatePercent() / 100 // Convert to 0-1
+        errorRate: this.errorRatePercent() / 100, // Convert to 0-1
       },
 
       computation: {
         cpuUsagePercent: m.cpuUsagePercent,
         memoryUsagePercent: m.memoryUsagePercent,
-        zomeOpsPerSecond: (m.queriesProcessed + m.mutationsProcessed) / ((Date.now() - m.startTime) / 1000),
-        reconstructionWorkloadPercent: m.reconstructionTasksRunning > 0 ? 50 : 0
+        zomeOpsPerSecond:
+          (m.queriesProcessed + m.mutationsProcessed) / ((Date.now() - m.startTime) / 1000),
+        reconstructionWorkloadPercent: m.reconstructionTasksRunning > 0 ? 50 : 0,
       },
 
       operations: {
@@ -302,10 +294,10 @@ export class PerformanceMetricsService {
         validations: m.validationsProcessed,
         failed: m.failedOperations,
         query_avg_ms: m.queryResponseTimes.mean,
-        mutation_avg_ms: m.mutationResponseTimes.mean
+        mutation_avg_ms: m.mutationResponseTimes.mean,
       },
 
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -334,7 +326,7 @@ export class PerformanceMetricsService {
       replicationTasksRunning: 0,
       reconstructionTasksRunning: 0,
       avgReconstructionTimeMs: 0,
-      collectedAt: Date.now()
+      collectedAt: Date.now(),
     });
   }
 
@@ -351,7 +343,7 @@ export class PerformanceMetricsService {
       p99: this.queryPercentiles.getP99(),
       min: this.queryPercentiles.getMin(),
       max: this.queryPercentiles.getMax(),
-      mean: this.queryPercentiles.getMean()
+      mean: this.queryPercentiles.getMean(),
     };
 
     m.mutationResponseTimes = {
@@ -361,7 +353,7 @@ export class PerformanceMetricsService {
       p99: this.mutationPercentiles.getP99(),
       min: this.mutationPercentiles.getMin(),
       max: this.mutationPercentiles.getMax(),
-      mean: this.mutationPercentiles.getMean()
+      mean: this.mutationPercentiles.getMean(),
     };
 
     m.collectedAt = Date.now();
@@ -384,7 +376,10 @@ export class PerformanceMetricsService {
   private recalculateUptime(): void {
     const m = this.metrics();
     const totalTime = Date.now() - m.startTime;
-    const downTime = m.downEvents.reduce((sum, event) => sum + (event.endTime - event.startTime), 0);
+    const downTime = m.downEvents.reduce(
+      (sum, event) => sum + (event.endTime - event.startTime),
+      0
+    );
     const upTime = totalTime - downTime;
     m.uptimePercent = (upTime / totalTime) * 100;
   }

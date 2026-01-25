@@ -30,10 +30,13 @@
  * - GET /api/custodian/blob/{hash}/best - Best custodian URL
  */
 
-import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, throwError, of } from 'rxjs';
+import { Injectable } from '@angular/core';
+
 import { map, catchError, timeout, retry } from 'rxjs/operators';
+
+import { Observable, throwError, of } from 'rxjs';
+
 import { environment } from '../../../environments/environment';
 
 /**
@@ -176,7 +179,7 @@ export class DoorwayClientService {
       .pipe(
         timeout(this.defaultTimeoutMs),
         retry(this.maxRetries),
-        catchError((error) => this.handleError('getBlob', error)),
+        catchError(error => this.handleError('getBlob', error))
       );
   }
 
@@ -195,7 +198,7 @@ export class DoorwayClientService {
       .pipe(
         timeout(this.defaultTimeoutMs),
         retry(this.maxRetries),
-        catchError((error) => this.handleError('getChunk', error)),
+        catchError(error => this.handleError('getChunk', error))
       );
   }
 
@@ -267,7 +270,7 @@ export class DoorwayClientService {
       })
       .pipe(
         timeout(this.defaultTimeoutMs),
-        map((response) => ({
+        map(response => ({
           isValid: response.isValid,
           computedHash: response.computedHash,
           expectedHash: response.expectedHash,
@@ -275,7 +278,7 @@ export class DoorwayClientService {
           durationMs: response.durationMs,
           error: response.error,
         })),
-        catchError((error) => this.handleError('verifyBlob', error)),
+        catchError(error => this.handleError('verifyBlob', error))
       );
   }
 
@@ -286,7 +289,10 @@ export class DoorwayClientService {
    * @param expectedHash Expected SHA256 hash
    * @returns Observable with verification response
    */
-  verifyBlobData(data: Uint8Array | ArrayBuffer, expectedHash: string): Observable<VerifyBlobResponse> {
+  verifyBlobData(
+    data: Uint8Array | ArrayBuffer,
+    expectedHash: string
+  ): Observable<VerifyBlobResponse> {
     const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
     const base64 = this.arrayBufferToBase64(bytes);
 
@@ -308,11 +314,13 @@ export class DoorwayClientService {
    */
   getCustodiansForBlob(hash: string): Observable<CustodianInfo[]> {
     return this.http
-      .get<{ custodians: CustodianInfo[] }>(`${this.baseUrl}/api/custodian/blob/${encodeURIComponent(hash)}`)
+      .get<{
+        custodians: CustodianInfo[];
+      }>(`${this.baseUrl}/api/custodian/blob/${encodeURIComponent(hash)}`)
       .pipe(
         timeout(this.defaultTimeoutMs),
-        map((response) => response.custodians),
-        catchError((error) => this.handleError('getCustodiansForBlob', error)),
+        map(response => response.custodians),
+        catchError(error => this.handleError('getCustodiansForBlob', error))
       );
   }
 
@@ -332,10 +340,13 @@ export class DoorwayClientService {
     }
 
     return this.http
-      .get<BestCustodianResponse>(`${this.baseUrl}/api/custodian/blob/${encodeURIComponent(hash)}/best`, { params })
+      .get<BestCustodianResponse>(
+        `${this.baseUrl}/api/custodian/blob/${encodeURIComponent(hash)}/best`,
+        { params }
+      )
       .pipe(
         timeout(this.defaultTimeoutMs),
-        catchError((error) => this.handleError('getBestCustodianUrl', error)),
+        catchError(error => this.handleError('getBestCustodianUrl', error))
       );
   }
 
@@ -352,7 +363,7 @@ export class DoorwayClientService {
   fetchHlsManifest(contentId: string): Observable<string> {
     return this.http.get(this.getHlsManifestUrl(contentId), { responseType: 'text' }).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError((error) => this.handleError('fetchHlsManifest', error)),
+      catchError(error => this.handleError('fetchHlsManifest', error))
     );
   }
 
@@ -365,7 +376,7 @@ export class DoorwayClientService {
   fetchDashManifest(contentId: string): Observable<string> {
     return this.http.get(this.getDashManifestUrl(contentId), { responseType: 'text' }).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError((error) => this.handleError('fetchDashManifest', error)),
+      catchError(error => this.handleError('fetchDashManifest', error))
     );
   }
 
@@ -381,7 +392,7 @@ export class DoorwayClientService {
   checkHealth(): Observable<{ status: string }> {
     return this.http.get<{ status: string }>(`${this.baseUrl}/health`).pipe(
       timeout(5000),
-      catchError((error) => this.handleError('checkHealth', error)),
+      catchError(error => this.handleError('checkHealth', error))
     );
   }
 
@@ -393,7 +404,7 @@ export class DoorwayClientService {
   getStatus(): Observable<Record<string, unknown>> {
     return this.http.get<Record<string, unknown>>(`${this.baseUrl}/status`).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError((error) => this.handleError('getStatus', error)),
+      catchError(error => this.handleError('getStatus', error))
     );
   }
 

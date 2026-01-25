@@ -25,9 +25,15 @@
  */
 
 import { Injectable, inject, OnDestroy } from '@angular/core';
-import { BehaviorSubject, Subject, firstValueFrom } from 'rxjs';
+
 import { takeUntil } from 'rxjs/operators';
 
+import { BehaviorSubject, Subject, firstValueFrom } from 'rxjs';
+
+import { ContentNode } from '../../lamad/models/content-node.model';
+import { LearningPath } from '../../lamad/models/learning-path.model';
+
+import { StorageClientService } from './storage-client.service';
 import {
   WriteBufferService,
   WritePriority,
@@ -35,9 +41,6 @@ import {
   type WriteBatch,
   type WriteBufferStats,
 } from './write-buffer.service';
-import { StorageClientService } from './storage-client.service';
-import { ContentNode } from '../../lamad/models/content-node.model';
-import { LearningPath } from '../../lamad/models/learning-path.model';
 
 /** Seeding operation mode */
 export type SeedingMode = 'import' | 'recovery' | 'sync';
@@ -177,12 +180,7 @@ export class SeedingService implements OnDestroy {
         metadata: content.metadata || {},
       });
 
-      this.writeBuffer.queueWrite(
-        content.id,
-        WriteOpType.CreateEntry,
-        payload,
-        priority
-      );
+      this.writeBuffer.queueWrite(content.id, WriteOpType.CreateEntry, payload, priority);
     }
 
     progress.phase = 'flushing';
@@ -260,12 +258,7 @@ export class SeedingService implements OnDestroy {
         })),
       });
 
-      this.writeBuffer.queueWrite(
-        pathData.id,
-        WriteOpType.CreateEntry,
-        payload,
-        priority
-      );
+      this.writeBuffer.queueWrite(pathData.id, WriteOpType.CreateEntry, payload, priority);
     }
 
     progress.phase = 'flushing';
@@ -332,7 +325,7 @@ export class SeedingService implements OnDestroy {
     let successCount = 0;
     let failureCount = 0;
 
-    await this.writeBuffer.flushAll(async (batch) => {
+    await this.writeBuffer.flushAll(async batch => {
       try {
         // Call the appropriate zome function based on operation type
         await this.executeBatch(batch);
@@ -348,9 +341,7 @@ export class SeedingService implements OnDestroy {
       progress.processedItems += batch.operations.length;
       progress.successCount = successCount;
       progress.failureCount = failureCount;
-      progress.percentComplete = Math.round(
-        (progress.processedItems / progress.totalItems) * 100
-      );
+      progress.percentComplete = Math.round((progress.processedItems / progress.totalItems) * 100);
       this.progressSubject.next({ ...progress });
     });
 
@@ -364,13 +355,11 @@ export class SeedingService implements OnDestroy {
    */
   private async executeBatch(batch: WriteBatch): Promise<void> {
     // Group operations by type
-    const contentOps = batch.operations.filter(
-      (op) => op.opType === WriteOpType.CreateEntry
-    );
+    const contentOps = batch.operations.filter(op => op.opType === WriteOpType.CreateEntry);
 
     if (contentOps.length > 0) {
       // Parse payloads and transform to backend format
-      const entries = contentOps.map((op) => {
+      const entries = contentOps.map(op => {
         const parsed = JSON.parse(op.payload);
         // Transform to backend format: content → contentBody
         return {
@@ -387,16 +376,11 @@ export class SeedingService implements OnDestroy {
       });
 
       // Call bulk create via HTTP (through Doorway)
-      const result = await firstValueFrom(
-        this.storageClient.bulkCreateContent(entries)
-      );
+      const result = await firstValueFrom(this.storageClient.bulkCreateContent(entries));
 
       // Log result for debugging
       if (result.errors && result.errors.length > 0) {
-        console.warn(
-          `[SeedingService] ${result.errors.length} errors:`,
-          result.errors.slice(0, 3)
-        );
+        console.warn(`[SeedingService] ${result.errors.length} errors:`, result.errors.slice(0, 3));
       }
       console.log(
         `[SeedingService] Bulk create: ${result.inserted} inserted, ${result.skipped} skipped`

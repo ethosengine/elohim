@@ -17,9 +17,13 @@
  * 4. Selected doorway is used for all auth operations
  */
 
-import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Injectable, signal, computed, inject } from '@angular/core';
+
 import { catchError, map, of, timeout, firstValueFrom } from 'rxjs';
+
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+
 import {
   type DoorwayInfo,
   type DoorwayStatus,
@@ -31,7 +35,6 @@ import {
   BOOTSTRAP_DOORWAYS,
   sortDoorwaysByRelevance,
 } from '../models/doorway.model';
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 // =============================================================================
 // Constants
@@ -77,9 +80,9 @@ function createCheDoorway(): DoorwayInfo {
     name: 'Local Dev (Che)',
     url: getCheHcDevUrl(),
     description: 'Local development doorway via Eclipse Che hc-dev endpoint',
-    region: 'global',  // Use 'global' as catch-all for dev
+    region: 'global', // Use 'global' as catch-all for dev
     operator: 'Local Development',
-    features: [],  // No special features for local dev
+    features: [], // No special features for local dev
     status: 'online',
     registrationOpen: true,
     vouchCount: 0,
@@ -140,13 +143,14 @@ export class DoorwayRegistryService {
   /** Doorways with health info attached */
   readonly doorwaysWithHealth = computed(() => {
     const healthMap = this.healthMapSignal();
-    return this.doorways().map(d =>
-      healthMap.get(d.id) ?? {
-        ...d,
-        latencyMs: null,
-        lastHealthCheck: new Date().toISOString(),
-        isReachable: false,
-      }
+    return this.doorways().map(
+      d =>
+        healthMap.get(d.id) ?? {
+          ...d,
+          latencyMs: null,
+          lastHealthCheck: new Date().toISOString(),
+          isReachable: false,
+        }
     );
   });
 
@@ -203,7 +207,6 @@ export class DoorwayRegistryService {
       // Last resort: bootstrap list
       this.doorwaysSignal.set(BOOTSTRAP_DOORWAYS);
       return BOOTSTRAP_DOORWAYS;
-
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load doorways';
       this.errorSignal.set(message);
@@ -213,7 +216,6 @@ export class DoorwayRegistryService {
       const fallback = cached ?? BOOTSTRAP_DOORWAYS;
       this.doorwaysSignal.set(fallback);
       return fallback;
-
     } finally {
       this.loadingSignal.set(false);
     }
@@ -231,9 +233,7 @@ export class DoorwayRegistryService {
     // Check health in batches to avoid overwhelming
     for (let i = 0; i < doorways.length; i += MAX_CONCURRENT_HEALTH_CHECKS) {
       const batch = doorways.slice(i, i + MAX_CONCURRENT_HEALTH_CHECKS);
-      const results = await Promise.all(
-        batch.map(d => this.checkHealth(d))
-      );
+      const results = await Promise.all(batch.map(d => this.checkHealth(d)));
       results.forEach(r => healthMap.set(r.id, r));
     }
 
@@ -320,7 +320,6 @@ export class DoorwayRegistryService {
       };
 
       return { isValid: true, doorway };
-
     } catch (err) {
       return {
         isValid: false,
@@ -347,7 +346,7 @@ export class DoorwayRegistryService {
       const result = await this.holochainClient.callZome<DoorwayInfo[]>({
         zomeName: 'infrastructure',
         fnName: 'get_doorways_by_region',
-        payload: 'global',  // Use 'global' region to get all doorways
+        payload: 'global', // Use 'global' region to get all doorways
         roleName: 'infrastructure',
       });
 
@@ -488,7 +487,10 @@ export class DoorwayRegistryService {
     // In Eclipse Che, always use the local hc-dev endpoint
     if (isEclipseChe()) {
       const cheDoorway = createCheDoorway();
-      console.log('[DoorwayRegistry] Eclipse Che detected, using local hc-dev endpoint:', cheDoorway.url);
+      console.log(
+        '[DoorwayRegistry] Eclipse Che detected, using local hc-dev endpoint:',
+        cheDoorway.url
+      );
       this.selectedSignal.set({
         doorway: cheDoorway,
         selectedAt: new Date().toISOString(),

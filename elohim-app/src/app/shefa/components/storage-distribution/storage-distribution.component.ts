@@ -9,17 +9,18 @@
  * Helps users understand their digital footprint distribution.
  */
 
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
+
 import { Subject, takeUntil } from 'rxjs';
 
-import { ShefaComputeService } from '../../services/shefa-compute.service';
 import {
   StorageContentDistribution,
   ContentTypeStorage,
   ReachLevelStorage,
   NodeStorageBreakdown,
 } from '../../models/shefa-dashboard.model';
+import { ShefaComputeService } from '../../services/shefa-compute.service';
 
 @Component({
   selector: 'app-storage-distribution',
@@ -79,11 +80,11 @@ export class StorageDistributionComponent implements OnInit, OnDestroy {
       .getStorageContentDistribution(this.operatorId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (dist) => {
+        next: dist => {
           this.distribution = dist;
           this.isLoading = false;
         },
-        error: (err) => {
+        error: err => {
           console.error('[StorageDistribution] Failed to load:', err);
           this.error = 'Failed to load storage distribution';
           this.isLoading = false;

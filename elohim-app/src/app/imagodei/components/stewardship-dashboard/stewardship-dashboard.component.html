@@ -90,9 +90,15 @@
           </div>
 
           @for (item of allocations(); track item.allocation.id) {
-            <div class="allocation-row" [class.disputed]="item.allocation.governanceState === 'disputed'">
+            <div
+              class="allocation-row"
+              [class.disputed]="item.allocation.governanceState === 'disputed'"
+            >
               <div class="col-content">
-                <a [routerLink]="['/learn/content', item.allocation.contentId]" class="content-link">
+                <a
+                  [routerLink]="['/learn/content', item.allocation.contentId]"
+                  class="content-link"
+                >
                   {{ item.contentTitle }}
                 </a>
                 <span class="content-id">{{ item.allocation.contentId }}</span>
@@ -129,10 +135,7 @@
                   <span class="material-icons">visibility</span>
                 </a>
                 @if (item.allocation.governanceState === 'disputed') {
-                  <button
-                    class="btn-icon warning"
-                    title="View dispute"
-                  >
+                  <button class="btn-icon warning" title="View dispute">
                     <span class="material-icons">warning</span>
                   </button>
                 }
@@ -148,12 +151,22 @@
       <h3>About Stewardship</h3>
       <p>
         As a steward, you care for content and receive recognition for its value to the community.
-        Stewardship can be shared among multiple contributors based on their relationship to the content.
+        Stewardship can be shared among multiple contributors based on their relationship to the
+        content.
       </p>
       <ul>
-        <li><strong>Allocation Ratio</strong> - Your share of recognition for this content</li>
-        <li><strong>Recognition</strong> - Value accumulated from community engagement</li>
-        <li><strong>Disputes</strong> - Challenges to allocation that require Elohim governance</li>
+        <li>
+          <strong>Allocation Ratio</strong>
+          - Your share of recognition for this content
+        </li>
+        <li>
+          <strong>Recognition</strong>
+          - Value accumulated from community engagement
+        </li>
+        <li>
+          <strong>Disputes</strong>
+          - Challenges to allocation that require Elohim governance
+        </li>
       </ul>
     </div>
   }

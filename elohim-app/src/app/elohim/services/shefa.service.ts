@@ -1,7 +1,8 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
+
+import { CustodianCommitmentService } from './custodian-commitment.service';
 import { HolochainClientService } from './holochain-client.service';
 import { PerformanceMetricsService } from './performance-metrics.service';
-import { CustodianCommitmentService } from './custodian-commitment.service';
 
 /**
  * ShefaService
@@ -25,13 +26,13 @@ export interface CustodianMetrics {
 
   // Health metrics
   health: {
-    uptimePercent: number;        // 0-100
-    availability: boolean;         // Currently online
+    uptimePercent: number; // 0-100
+    availability: boolean; // Currently online
     responseTimeP50Ms: number;
     responseTimeP95Ms: number;
     responseTimeP99Ms: number;
-    errorRate: number;           // 0-1 (percentage)
-    slaCompliance: boolean;      // Meeting SLA targets
+    errorRate: number; // 0-1 (percentage)
+    slaCompliance: boolean; // Meeting SLA targets
   };
 
   // Storage metrics
@@ -70,17 +71,17 @@ export interface CustodianMetrics {
 
   // Reputation metrics
   reputation: {
-    reliabilityRating: number;     // 0-5 stars
-    speedRating: number;           // 0-5 stars
-    reputationScore: number;       // 0-100
-    specializationBonus: number;   // 0-0.1 (10%)
+    reliabilityRating: number; // 0-5 stars
+    speedRating: number; // 0-5 stars
+    reputationScore: number; // 0-100
+    specializationBonus: number; // 0-0.1 (10%)
     commitmentFulfillment: number; // 0-1 (percentage of commitments honored)
   };
 
   // Economic metrics
   economic: {
     stewardTier: 1 | 2 | 3 | 4;
-    pricePerGb: number;           // $/GB/month
+    pricePerGb: number; // $/GB/month
     monthlyEarnings: number;
     lifetimeEarnings: number;
     activeCommitments: number;
@@ -93,7 +94,7 @@ export interface CustodianMetrics {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ShefaService {
   private readonly holochain = inject(HolochainClientService);
@@ -115,8 +116,7 @@ export class ShefaService {
   readonly localMetrics = computed(() => {
     // This would be for a custodian node
     // Returns current node's metrics in Shefa format
-    const perfMetrics = this.performance.getMetrics();
-    return perfMetrics;
+    return this.performance.getMetrics();
   });
 
   constructor() {
@@ -143,7 +143,7 @@ export class ShefaService {
       const result = await this.holochain.callZome({
         zomeName: 'metrics',
         fnName: 'get_custodian_metrics',
-        payload: { custodian_id: custodianId }
+        payload: { custodian_id: custodianId },
       });
 
       if (!result.success) {
@@ -156,7 +156,7 @@ export class ShefaService {
       // Cache result
       this.metricsCache.set(custodianId, {
         data: metrics,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       return metrics;
@@ -182,7 +182,7 @@ export class ShefaService {
       const result = await this.holochain.callZome({
         zomeName: 'metrics',
         fnName: 'list_all_custodian_metrics',
-        payload: {}
+        payload: {},
       });
 
       if (!result.success) {
@@ -190,12 +190,12 @@ export class ShefaService {
         return [];
       }
 
-      const metrics = Array.isArray(result.data) ? result.data as CustodianMetrics[] : [];
+      const metrics = Array.isArray(result.data) ? (result.data as CustodianMetrics[]) : [];
 
       // Cache result
       this.allMetricsCache.set({
         data: metrics,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       return metrics;
@@ -216,8 +216,8 @@ export class ShefaService {
         zomeName: 'metrics',
         fnName: 'report_custodian_metrics',
         payload: {
-          metrics: metrics
-        }
+          metrics: metrics,
+        },
       });
 
       if (!result.success) {
@@ -239,7 +239,7 @@ export class ShefaService {
   /**
    * Get custodians ranked by health (uptime %)
    */
-  async getRankedByHealth(limit: number = 10): Promise<CustodianMetrics[]> {
+  async getRankedByHealth(limit = 10): Promise<CustodianMetrics[]> {
     const allMetrics = await this.getAllMetrics();
     return allMetrics
       .sort((a, b) => b.health.uptimePercent - a.health.uptimePercent)
@@ -249,7 +249,7 @@ export class ShefaService {
   /**
    * Get custodians ranked by speed (response time)
    */
-  async getRankedBySpeed(limit: number = 10): Promise<CustodianMetrics[]> {
+  async getRankedBySpeed(limit = 10): Promise<CustodianMetrics[]> {
     const allMetrics = await this.getAllMetrics();
     return allMetrics
       .sort((a, b) => a.health.responseTimeP95Ms - b.health.responseTimeP95Ms)
@@ -259,7 +259,7 @@ export class ShefaService {
   /**
    * Get custodians ranked by reputation
    */
-  async getRankedByReputation(limit: number = 10): Promise<CustodianMetrics[]> {
+  async getRankedByReputation(limit = 10): Promise<CustodianMetrics[]> {
     const allMetrics = await this.getAllMetrics();
     return allMetrics
       .sort((a, b) => b.reputation.reputationScore - a.reputation.reputationScore)
@@ -282,22 +282,22 @@ export class ShefaService {
    * @returns Array of alert objects for unhealthy or problematic custodians
    */
   async getAlerts(): Promise<
-    Array<{
+    {
       custodianId: string;
       severity: 'warning' | 'critical';
       category: string;
       message: string;
       suggestion?: string;
-    }>
+    }[]
   > {
     const allMetrics = await this.getAllMetrics();
-    const alerts: Array<{
+    const alerts: {
       custodianId: string;
       severity: 'warning' | 'critical';
       category: string;
       message: string;
       suggestion?: string;
-    }> = [];
+    }[] = [];
 
     for (const metrics of allMetrics) {
       // High memory usage
@@ -307,7 +307,7 @@ export class ShefaService {
           severity: 'warning',
           category: 'resource',
           message: `Memory usage high: ${metrics.computation.memoryUsagePercent.toFixed(1)}%`,
-          suggestion: 'Consider upgrading memory or reducing commitments'
+          suggestion: 'Consider upgrading memory or reducing commitments',
         });
       }
 
@@ -318,7 +318,7 @@ export class ShefaService {
           severity: 'warning',
           category: 'performance',
           message: `High latency: p95=${metrics.health.responseTimeP95Ms}ms`,
-          suggestion: 'Investigate network issues or reduce load'
+          suggestion: 'Investigate network issues or reduce load',
         });
       }
 
@@ -329,7 +329,7 @@ export class ShefaService {
           severity: 'critical',
           category: 'reliability',
           message: `Low uptime: ${metrics.health.uptimePercent.toFixed(1)}%`,
-          suggestion: 'Investigate outages and improve reliability'
+          suggestion: 'Investigate outages and improve reliability',
         });
       }
 
@@ -340,7 +340,7 @@ export class ShefaService {
           severity: 'critical',
           category: 'error',
           message: `High error rate: ${(metrics.health.errorRate * 100).toFixed(1)}%`,
-          suggestion: 'Check logs and debug failing operations'
+          suggestion: 'Check logs and debug failing operations',
         });
       }
 
@@ -351,7 +351,7 @@ export class ShefaService {
           severity: 'critical',
           category: 'storage',
           message: `Storage nearly full: ${metrics.storage.utilizationPercent.toFixed(1)}%`,
-          suggestion: 'Expand storage capacity or reduce commitments'
+          suggestion: 'Expand storage capacity or reduce commitments',
         });
       }
 
@@ -362,7 +362,7 @@ export class ShefaService {
           severity: 'critical',
           category: 'sla',
           message: 'Not meeting SLA targets',
-          suggestion: 'Take corrective action to restore SLA compliance'
+          suggestion: 'Take corrective action to restore SLA compliance',
         });
       }
     }
@@ -374,26 +374,27 @@ export class ShefaService {
    * Get recommendations for custodian operators
    */
   async getRecommendations(): Promise<
-    Array<{
+    {
       custodianId: string;
       category: string;
       opportunity: string;
       potential_revenue?: number;
-    }>
+    }[]
   > {
     const allMetrics = await this.getAllMetrics();
     const recommendations = [];
 
     for (const metrics of allMetrics) {
       // Available bandwidth opportunity
-      const avgUtilization = (metrics.bandwidth.currentUsageMbps / metrics.bandwidth.declaredMbps) * 100;
+      const avgUtilization =
+        (metrics.bandwidth.currentUsageMbps / metrics.bandwidth.declaredMbps) * 100;
       if (avgUtilization < 50) {
         const availableMbps = metrics.bandwidth.declaredMbps - metrics.bandwidth.currentUsageMbps;
         recommendations.push({
           custodianId: metrics.custodianId,
           category: 'capacity',
           opportunity: `${availableMbps.toFixed(0)}Mbps available bandwidth - accept more commitments`,
-          potential_revenue: (availableMbps / 100) * 500 // Rough estimate
+          potential_revenue: (availableMbps / 100) * 500, // Rough estimate
         });
       }
 
@@ -402,7 +403,7 @@ export class ShefaService {
         recommendations.push({
           custodianId: metrics.custodianId,
           category: 'capacity',
-          opportunity: `Significant CPU capacity available (${Math.round(100 - metrics.computation.cpuUsagePercent)}%) - take on computation work`
+          opportunity: `Significant CPU capacity available (${Math.round(100 - metrics.computation.cpuUsagePercent)}%) - take on computation work`,
         });
       }
 
@@ -411,7 +412,7 @@ export class ShefaService {
         recommendations.push({
           custodianId: metrics.custodianId,
           category: 'tier',
-          opportunity: `Eligible for tier promotion - would increase earnings and reputation`
+          opportunity: `Eligible for tier promotion - would increase earnings and reputation`,
         });
       }
 
@@ -420,7 +421,7 @@ export class ShefaService {
         recommendations.push({
           custodianId: metrics.custodianId,
           category: 'specialization',
-          opportunity: `Develop specialization in specific domains to earn bonus multiplier (+5-10%)`
+          opportunity: `Develop specialization in specific domains to earn bonus multiplier (+5-10%)`,
         });
       }
     }
@@ -444,10 +445,8 @@ export class ShefaService {
       // Only report if this is a custodian node (has commitments)
       // In production, would check if node has commitments
       // For now, skip reporting from app node
-
       // const custodianId = this.getUserId();
       // const hasCommitments = (await this.commitments.getActiveCommitmentCount(custodianId)) > 0;
-
       // if (hasCommitments) {
       //   const perfMetrics = this.performance.getMetrics();
       //   const metrics = this.transformToShefaMetrics(perfMetrics);

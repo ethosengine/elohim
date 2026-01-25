@@ -1,10 +1,12 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { EconomicService } from '../../services/economic.service';
-import { AppreciationService, AppreciationDisplay } from '../../services/appreciation.service';
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+
 import { EconomicEvent, REAAction } from '@app/elohim/models';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+
+import { AppreciationService, AppreciationDisplay } from '../../services/appreciation.service';
+import { EconomicService } from '../../services/economic.service';
 
 /**
  * ShefaHomeComponent - Economic Dashboard
@@ -29,7 +31,11 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
           <h1>Shefa Dashboard</h1>
           <p class="subtitle">Economics of Human Flourishing</p>
         </div>
-        <div class="connection-status" [class.connected]="isConnected()" [class.disconnected]="!isConnected()">
+        <div
+          class="connection-status"
+          [class.connected]="isConnected()"
+          [class.disconnected]="!isConnected()"
+        >
           <span class="status-dot"></span>
           {{ isConnected() ? 'Connected' : 'Disconnected' }}
         </div>
@@ -70,7 +76,7 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
         <div class="stat-card">
           <div class="stat-icon">✨</div>
           <div class="stat-content">
-            <div class="stat-value">{{ totalRecognition() | number:'1.0-0' }}</div>
+            <div class="stat-value">{{ totalRecognition() | number: '1.0-0' }}</div>
             <div class="stat-label">Recognition Points</div>
           </div>
         </div>
@@ -99,7 +105,8 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
                 </div>
                 <div class="event-meta">
                   <span class="event-quantity" *ngIf="event.resourceQuantity">
-                    {{ event.resourceQuantity.hasNumericalValue }} {{ event.resourceQuantity.hasUnit }}
+                    {{ event.resourceQuantity.hasNumericalValue }}
+                    {{ event.resourceQuantity.hasUnit }}
                   </span>
                   <span class="event-time">{{ formatTime(event.hasPointInTime) }}</span>
                 </div>
@@ -124,7 +131,10 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
           </div>
 
           <div class="events-list" *ngIf="appreciations().length > 0; else noAppreciations">
-            <div class="appreciation-item" *ngFor="let appreciation of appreciations().slice(0, 10)">
+            <div
+              class="appreciation-item"
+              *ngFor="let appreciation of appreciations().slice(0, 10)"
+            >
               <div class="appreciation-icon">💜</div>
               <div class="appreciation-details">
                 <div class="appreciation-flow">
@@ -157,15 +167,9 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
 
       <!-- Action Buttons -->
       <div class="dashboard-actions" *ngIf="!loading()">
-        <button class="action-btn primary" (click)="refreshData()">
-          🔄 Refresh Data
-        </button>
-        <button class="action-btn" (click)="testConnection()">
-          🔌 Test Connection
-        </button>
-        <a routerLink="/lamad" class="action-btn">
-          📚 Explore Lamad
-        </a>
+        <button class="action-btn primary" (click)="refreshData()">🔄 Refresh Data</button>
+        <button class="action-btn" (click)="testConnection()">🔌 Test Connection</button>
+        <a routerLink="/lamad" class="action-btn">📚 Explore Lamad</a>
       </div>
 
       <!-- Error State -->
@@ -176,363 +180,388 @@ import { EconomicEvent, REAAction } from '@app/elohim/models';
       </div>
     </div>
   `,
-  styles: [`
-    .shefa-dashboard {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 2rem;
-      position: relative;
-    }
-
-    /* Header */
-    .dashboard-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header-content h1 {
-      font-size: 2rem;
-      margin: 0;
-      color: var(--lamad-text-primary, #f8fafc);
-    }
-
-    .subtitle {
-      color: var(--lamad-text-muted, #64748b);
-      margin: 0.25rem 0 0 0;
-    }
-
-    .connection-status {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      border-radius: 20px;
-      font-size: 0.875rem;
-      font-weight: 500;
-    }
-
-    .connection-status.connected {
-      background: rgba(34, 197, 94, 0.1);
-      color: #22c55e;
-    }
-
-    .connection-status.disconnected {
-      background: rgba(239, 68, 68, 0.1);
-      color: #ef4444;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: currentColor;
-    }
-
-    /* Loading */
-    .loading-overlay {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 4rem;
-      color: var(--lamad-text-muted, #64748b);
-    }
-
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--lamad-border, rgba(99, 102, 241, 0.2));
-      border-top-color: var(--lamad-accent-primary, #6366f1);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 1rem;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* Stats Grid */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin-bottom: 2rem;
-    }
-
-    .stat-card {
-      background: var(--lamad-surface, rgba(30, 30, 46, 0.8));
-      border: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.1));
-      border-radius: 12px;
-      padding: 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      transition: transform 0.2s, border-color 0.2s;
-    }
-
-    .stat-card:hover {
-      transform: translateY(-2px);
-      border-color: var(--lamad-accent-primary, #6366f1);
-    }
-
-    .stat-icon {
-      font-size: 2rem;
-      width: 50px;
-      height: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--lamad-bg-primary, #0f0f1a);
-      border-radius: 10px;
-    }
-
-    .stat-value {
-      font-size: 1.75rem;
-      font-weight: 600;
-      color: var(--lamad-text-primary, #f8fafc);
-    }
-
-    .stat-label {
-      font-size: 0.875rem;
-      color: var(--lamad-text-muted, #64748b);
-    }
-
-    /* Dashboard Columns */
-    .dashboard-columns {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-
-    @media (max-width: 900px) {
-      .dashboard-columns {
-        grid-template-columns: 1fr;
+  styles: [
+    `
+      .shefa-dashboard {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+        position: relative;
       }
-    }
 
-    .dashboard-section {
-      background: var(--lamad-surface, rgba(30, 30, 46, 0.8));
-      border: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.1));
-      border-radius: 12px;
-      overflow: hidden;
-    }
+      /* Header */
+      .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
 
-    .section-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 1.5rem;
-      border-bottom: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.1));
-      background: var(--lamad-bg-primary, rgba(15, 15, 26, 0.5));
-    }
+      .header-content h1 {
+        font-size: 2rem;
+        margin: 0;
+        color: var(--lamad-text-primary, #f8fafc);
+      }
 
-    .section-header h2 {
-      margin: 0;
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--lamad-text-primary, #f8fafc);
-    }
+      .subtitle {
+        color: var(--lamad-text-muted, #64748b);
+        margin: 0.25rem 0 0 0;
+      }
 
-    .event-count {
-      font-size: 0.75rem;
-      color: var(--lamad-text-muted, #64748b);
-      background: var(--lamad-bg-primary, #0f0f1a);
-      padding: 0.25rem 0.75rem;
-      border-radius: 10px;
-    }
+      .connection-status {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 500;
+      }
 
-    /* Events List */
-    .events-list {
-      max-height: 400px;
-      overflow-y: auto;
-    }
+      .connection-status.connected {
+        background: rgba(34, 197, 94, 0.1);
+        color: #22c55e;
+      }
 
-    .event-item, .appreciation-item {
-      display: flex;
-      gap: 1rem;
-      padding: 1rem 1.5rem;
-      border-bottom: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.05));
-      transition: background 0.2s;
-    }
+      .connection-status.disconnected {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+      }
 
-    .event-item:hover, .appreciation-item:hover {
-      background: var(--lamad-bg-primary, rgba(15, 15, 26, 0.5));
-    }
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+      }
 
-    .event-item:last-child, .appreciation-item:last-child {
-      border-bottom: none;
-    }
+      /* Loading */
+      .loading-overlay {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 4rem;
+        color: var(--lamad-text-muted, #64748b);
+      }
 
-    .event-icon, .appreciation-icon {
-      width: 36px;
-      height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--lamad-bg-primary, #0f0f1a);
-      border-radius: 8px;
-      font-size: 1.25rem;
-      flex-shrink: 0;
-    }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--lamad-border, rgba(99, 102, 241, 0.2));
+        border-top-color: var(--lamad-accent-primary, #6366f1);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 1rem;
+      }
 
-    .event-icon.use { background: rgba(59, 130, 246, 0.2); }
-    .event-icon.produce { background: rgba(34, 197, 94, 0.2); }
-    .event-icon.transfer { background: rgba(168, 85, 247, 0.2); }
-    .event-icon.consume { background: rgba(239, 68, 68, 0.2); }
-    .event-icon.raise { background: rgba(251, 191, 36, 0.2); }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
 
-    .event-details, .appreciation-details {
-      flex: 1;
-      min-width: 0;
-    }
+      /* Stats Grid */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
 
-    .event-action {
-      font-weight: 600;
-      color: var(--lamad-text-primary, #f8fafc);
-      margin-bottom: 0.25rem;
-      text-transform: capitalize;
-    }
+      .stat-card {
+        background: var(--lamad-surface, rgba(30, 30, 46, 0.8));
+        border: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.1));
+        border-radius: 12px;
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition:
+          transform 0.2s,
+          border-color 0.2s;
+      }
 
-    .event-parties, .appreciation-flow {
-      font-size: 0.875rem;
-      color: var(--lamad-text-secondary, #e2e8f0);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
+      .stat-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--lamad-accent-primary, #6366f1);
+      }
 
-    .arrow {
-      color: var(--lamad-text-muted, #64748b);
-    }
+      .stat-icon {
+        font-size: 2rem;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--lamad-bg-primary, #0f0f1a);
+        border-radius: 10px;
+      }
 
-    .provider, .appreciator {
-      color: var(--lamad-accent-primary, #6366f1);
-    }
+      .stat-value {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: var(--lamad-text-primary, #f8fafc);
+      }
 
-    .receiver, .appreciated {
-      color: #22c55e;
-    }
+      .stat-label {
+        font-size: 0.875rem;
+        color: var(--lamad-text-muted, #64748b);
+      }
 
-    .event-meta, .appreciation-meta {
-      font-size: 0.75rem;
-      color: var(--lamad-text-muted, #64748b);
-      margin-top: 0.25rem;
-      display: flex;
-      gap: 1rem;
-    }
+      /* Dashboard Columns */
+      .dashboard-columns {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+      }
 
-    .appreciation-note {
-      font-size: 0.75rem;
-      color: var(--lamad-text-secondary, #e2e8f0);
-      font-style: italic;
-      margin-top: 0.25rem;
-      opacity: 0.8;
-    }
+      @media (max-width: 900px) {
+        .dashboard-columns {
+          grid-template-columns: 1fr;
+        }
+      }
 
-    /* Empty State */
-    .empty-state {
-      text-align: center;
-      padding: 3rem 1.5rem;
-      color: var(--lamad-text-muted, #64748b);
-    }
+      .dashboard-section {
+        background: var(--lamad-surface, rgba(30, 30, 46, 0.8));
+        border: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.1));
+        border-radius: 12px;
+        overflow: hidden;
+      }
 
-    .empty-icon {
-      font-size: 3rem;
-      margin-bottom: 1rem;
-      opacity: 0.5;
-    }
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.1));
+        background: var(--lamad-bg-primary, rgba(15, 15, 26, 0.5));
+      }
 
-    .empty-state p {
-      margin: 0;
-    }
+      .section-header h2 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--lamad-text-primary, #f8fafc);
+      }
 
-    .empty-hint {
-      font-size: 0.875rem;
-      margin-top: 0.5rem !important;
-      opacity: 0.7;
-    }
+      .event-count {
+        font-size: 0.75rem;
+        color: var(--lamad-text-muted, #64748b);
+        background: var(--lamad-bg-primary, #0f0f1a);
+        padding: 0.25rem 0.75rem;
+        border-radius: 10px;
+      }
 
-    /* Action Buttons */
-    .dashboard-actions {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
+      /* Events List */
+      .events-list {
+        max-height: 400px;
+        overflow-y: auto;
+      }
 
-    .action-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.75rem 1.5rem;
-      background: var(--lamad-surface, rgba(30, 30, 46, 0.8));
-      border: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.2));
-      color: var(--lamad-text-secondary, #e2e8f0);
-      text-decoration: none;
-      border-radius: 8px;
-      font-size: 0.875rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
+      .event-item,
+      .appreciation-item {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.05));
+        transition: background 0.2s;
+      }
 
-    .action-btn:hover {
-      background: var(--lamad-accent-primary, #6366f1);
-      border-color: var(--lamad-accent-primary, #6366f1);
-      color: white;
-    }
+      .event-item:hover,
+      .appreciation-item:hover {
+        background: var(--lamad-bg-primary, rgba(15, 15, 26, 0.5));
+      }
 
-    .action-btn.primary {
-      background: var(--lamad-accent-primary, #6366f1);
-      border-color: var(--lamad-accent-primary, #6366f1);
-      color: white;
-    }
+      .event-item:last-child,
+      .appreciation-item:last-child {
+        border-bottom: none;
+      }
 
-    .action-btn.primary:hover {
-      background: var(--lamad-accent-secondary, #4f46e5);
-    }
+      .event-icon,
+      .appreciation-icon {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--lamad-bg-primary, #0f0f1a);
+        border-radius: 8px;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+      }
 
-    /* Error Banner */
-    .error-banner {
-      position: fixed;
-      bottom: 2rem;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(239, 68, 68, 0.9);
-      color: white;
-      padding: 1rem 1.5rem;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      z-index: 1000;
-    }
+      .event-icon.use {
+        background: rgba(59, 130, 246, 0.2);
+      }
+      .event-icon.produce {
+        background: rgba(34, 197, 94, 0.2);
+      }
+      .event-icon.transfer {
+        background: rgba(168, 85, 247, 0.2);
+      }
+      .event-icon.consume {
+        background: rgba(239, 68, 68, 0.2);
+      }
+      .event-icon.raise {
+        background: rgba(251, 191, 36, 0.2);
+      }
 
-    .error-icon {
-      font-size: 1.25rem;
-    }
+      .event-details,
+      .appreciation-details {
+        flex: 1;
+        min-width: 0;
+      }
 
-    .dismiss-btn {
-      background: rgba(255, 255, 255, 0.2);
-      border: none;
-      color: white;
-      padding: 0.25rem 0.75rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.75rem;
-    }
+      .event-action {
+        font-weight: 600;
+        color: var(--lamad-text-primary, #f8fafc);
+        margin-bottom: 0.25rem;
+        text-transform: capitalize;
+      }
 
-    .dismiss-btn:hover {
-      background: rgba(255, 255, 255, 0.3);
-    }
-  `]
+      .event-parties,
+      .appreciation-flow {
+        font-size: 0.875rem;
+        color: var(--lamad-text-secondary, #e2e8f0);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .arrow {
+        color: var(--lamad-text-muted, #64748b);
+      }
+
+      .provider,
+      .appreciator {
+        color: var(--lamad-accent-primary, #6366f1);
+      }
+
+      .receiver,
+      .appreciated {
+        color: #22c55e;
+      }
+
+      .event-meta,
+      .appreciation-meta {
+        font-size: 0.75rem;
+        color: var(--lamad-text-muted, #64748b);
+        margin-top: 0.25rem;
+        display: flex;
+        gap: 1rem;
+      }
+
+      .appreciation-note {
+        font-size: 0.75rem;
+        color: var(--lamad-text-secondary, #e2e8f0);
+        font-style: italic;
+        margin-top: 0.25rem;
+        opacity: 0.8;
+      }
+
+      /* Empty State */
+      .empty-state {
+        text-align: center;
+        padding: 3rem 1.5rem;
+        color: var(--lamad-text-muted, #64748b);
+      }
+
+      .empty-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+      }
+
+      .empty-state p {
+        margin: 0;
+      }
+
+      .empty-hint {
+        font-size: 0.875rem;
+        margin-top: 0.5rem !important;
+        opacity: 0.7;
+      }
+
+      /* Action Buttons */
+      .dashboard-actions {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        background: var(--lamad-surface, rgba(30, 30, 46, 0.8));
+        border: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.2));
+        color: var(--lamad-text-secondary, #e2e8f0);
+        text-decoration: none;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .action-btn:hover {
+        background: var(--lamad-accent-primary, #6366f1);
+        border-color: var(--lamad-accent-primary, #6366f1);
+        color: white;
+      }
+
+      .action-btn.primary {
+        background: var(--lamad-accent-primary, #6366f1);
+        border-color: var(--lamad-accent-primary, #6366f1);
+        color: white;
+      }
+
+      .action-btn.primary:hover {
+        background: var(--lamad-accent-secondary, #4f46e5);
+      }
+
+      /* Error Banner */
+      .error-banner {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(239, 68, 68, 0.9);
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+      }
+
+      .error-icon {
+        font-size: 1.25rem;
+      }
+
+      .dismiss-btn {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.75rem;
+      }
+
+      .dismiss-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+    `,
+  ],
 })
 export class ShefaHomeComponent implements OnInit {
   // State signals
@@ -588,16 +617,16 @@ export class ShefaHomeComponent implements OnInit {
       if (this.economicService.isAvailable()) {
         // Try to load events for current agent (or a sample)
         this.economicService.getEventsForAgent('current', 'both').subscribe({
-          next: (events) => this.events.set(events),
-          error: (err) => console.warn('Could not load events:', err)
+          next: events => this.events.set(events),
+          error: err => console.warn('Could not load events:', err),
         });
       }
 
       if (this.appreciationService.isAvailable()) {
         // Try to load appreciations
         this.appreciationService.getAppreciationsFor('current').subscribe({
-          next: (appreciations) => this.appreciations.set(appreciations),
-          error: (err) => console.warn('Could not load appreciations:', err)
+          next: appreciations => this.appreciations.set(appreciations),
+          error: err => console.warn('Could not load appreciations:', err),
         });
       }
 

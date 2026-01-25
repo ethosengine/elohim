@@ -35,7 +35,7 @@ describe('GraphExplorerComponent', () => {
     completedConceptCount: 10,
     externalConnectionCount: 5,
     state: 'in-progress',
-    affinityScore: 0.2
+    affinityScore: 0.2,
   };
 
   const mockChapterCluster: ClusterNode = {
@@ -55,17 +55,17 @@ describe('GraphExplorerComponent', () => {
     completedConceptCount: 5,
     externalConnectionCount: 3,
     state: 'in-progress',
-    affinityScore: 0.2
+    affinityScore: 0.2,
   };
 
   const mockGraphData: ClusterGraphData = {
     root: mockPathRoot,
     clusters: new Map([
       ['elohim-protocol', mockPathRoot],
-      ['chapter-1', mockChapterCluster]
+      ['chapter-1', mockChapterCluster],
     ]),
     edges: [],
-    connections: []
+    connections: [],
   };
 
   beforeEach(async () => {
@@ -77,25 +77,29 @@ describe('GraphExplorerComponent', () => {
       'isExpanded',
       'getVisibleNodes',
       'getVisibleEdges',
-      'reset'
+      'reset',
     ]);
-    const dataLoaderSpy = jasmine.createSpyObj('DataLoaderService', ['getGraph', 'getPath', 'getPathHierarchy']);
+    const dataLoaderSpy = jasmine.createSpyObj('DataLoaderService', [
+      'getGraph',
+      'getPath',
+      'getPathHierarchy',
+    ]);
 
     await TestBed.configureTestingModule({
-      imports: [
-        GraphExplorerComponent,
-        HttpClientTestingModule,
-        RouterTestingModule
-      ],
+      imports: [GraphExplorerComponent, HttpClientTestingModule, RouterTestingModule],
       providers: [
         { provide: AffinityTrackingService, useValue: affinityServiceSpy },
         { provide: HierarchicalGraphService, useValue: hierarchicalGraphSpy },
-        { provide: DataLoaderService, useValue: dataLoaderSpy }
-      ]
+        { provide: DataLoaderService, useValue: dataLoaderSpy },
+      ],
     }).compileComponents();
 
-    affinityService = TestBed.inject(AffinityTrackingService) as jasmine.SpyObj<AffinityTrackingService>;
-    hierarchicalGraphService = TestBed.inject(HierarchicalGraphService) as jasmine.SpyObj<HierarchicalGraphService>;
+    affinityService = TestBed.inject(
+      AffinityTrackingService
+    ) as jasmine.SpyObj<AffinityTrackingService>;
+    hierarchicalGraphService = TestBed.inject(
+      HierarchicalGraphService
+    ) as jasmine.SpyObj<HierarchicalGraphService>;
     dataLoaderService = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
 
     affinityService.getAffinity.and.returnValue(0);
@@ -103,28 +107,32 @@ describe('GraphExplorerComponent', () => {
     hierarchicalGraphService.getVisibleNodes.and.returnValue([mockPathRoot, mockChapterCluster]);
     hierarchicalGraphService.getVisibleEdges.and.returnValue([]);
     hierarchicalGraphService.isExpanded.and.returnValue(false);
-    dataLoaderService.getGraph.and.returnValue(of({
-      nodes: new Map(),
-      relationships: new Map(),
-      nodesByType: new Map(),
-      nodesByTag: new Map(),
-      nodesByCategory: new Map(),
-      adjacency: new Map(),
-      reverseAdjacency: new Map(),
-      metadata: {
-        nodeCount: 0,
-        relationshipCount: 0,
-        lastUpdated: new Date().toISOString(),
-        version: '1.0.0'
-      }
-    } as any));
-    dataLoaderService.getPathHierarchy.and.returnValue(of({
-      id: 'elohim-protocol',
-      title: 'Elohim Protocol',
-      description: 'A learning path',
-      steps: [],
-      chapters: []
-    } as any));
+    dataLoaderService.getGraph.and.returnValue(
+      of({
+        nodes: new Map(),
+        relationships: new Map(),
+        nodesByType: new Map(),
+        nodesByTag: new Map(),
+        nodesByCategory: new Map(),
+        adjacency: new Map(),
+        reverseAdjacency: new Map(),
+        metadata: {
+          nodeCount: 0,
+          relationshipCount: 0,
+          lastUpdated: new Date().toISOString(),
+          version: '1.0.0',
+        },
+      } as any)
+    );
+    dataLoaderService.getPathHierarchy.and.returnValue(
+      of({
+        id: 'elohim-protocol',
+        title: 'Elohim Protocol',
+        description: 'A learning path',
+        steps: [],
+        chapters: [],
+      } as any)
+    );
 
     fixture = TestBed.createComponent(GraphExplorerComponent);
     component = fixture.componentInstance;
@@ -135,7 +143,7 @@ describe('GraphExplorerComponent', () => {
     Object.defineProperty(mockDiv, 'clientWidth', { value: 800, writable: false });
     Object.defineProperty(mockDiv, 'clientHeight', { value: 600, writable: false });
     component.graphContainer = {
-      nativeElement: mockDiv
+      nativeElement: mockDiv,
     } as ElementRef<HTMLDivElement>;
   });
 
@@ -168,12 +176,14 @@ describe('GraphExplorerComponent', () => {
   });
 
   it('should expand cluster on double-click', () => {
-    hierarchicalGraphService.expandCluster.and.returnValue(of({
-      clusterId: 'chapter-1',
-      children: [],
-      edges: [],
-      connections: []
-    }));
+    hierarchicalGraphService.expandCluster.and.returnValue(
+      of({
+        clusterId: 'chapter-1',
+        children: [],
+        edges: [],
+        connections: [],
+      })
+    );
 
     fixture.detectChanges();
 
@@ -199,12 +209,14 @@ describe('GraphExplorerComponent', () => {
   });
 
   it('should toggle cluster expansion on double-click', () => {
-    hierarchicalGraphService.expandCluster.and.returnValue(of({
-      clusterId: 'chapter-1',
-      children: [],
-      edges: [],
-      connections: []
-    }));
+    hierarchicalGraphService.expandCluster.and.returnValue(
+      of({
+        clusterId: 'chapter-1',
+        children: [],
+        edges: [],
+        connections: [],
+      })
+    );
 
     fixture.detectChanges();
 
@@ -240,7 +252,7 @@ describe('GraphExplorerComponent', () => {
       completedConceptCount: 0,
       externalConnectionCount: 0,
       state: 'unseen',
-      affinityScore: 0
+      affinityScore: 0,
     };
 
     component.handleNodeDoubleClick(conceptNode);
@@ -253,7 +265,7 @@ describe('GraphExplorerComponent', () => {
 
     const lockedNode: ClusterNode = {
       ...mockChapterCluster,
-      state: 'locked'
+      state: 'locked',
     };
 
     component.handleNodeDoubleClick(lockedNode);
@@ -271,7 +283,7 @@ describe('GraphExplorerComponent', () => {
     const emptyCluster: ClusterNode = {
       ...mockChapterCluster,
       childClusterIds: [],
-      conceptIds: []
+      conceptIds: [],
     };
     expect(component.canExpand(emptyCluster)).toBe(false);
   });

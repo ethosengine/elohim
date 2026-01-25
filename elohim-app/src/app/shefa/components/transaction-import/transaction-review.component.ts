@@ -21,18 +21,19 @@
 
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { Subject } from 'rxjs';
+
 import { takeUntil } from 'rxjs/operators';
+
+import { Subject } from 'rxjs';
 
 import {
   StagedTransaction,
   ImportBatch,
   CategorySuggestion,
 } from '../../models/transaction-import.model';
-
-import { TransactionImportService } from '../../services/transaction-import.service';
 import { AICategorizationService } from '../../services/ai-categorization.service';
 import { BudgetReconciliationService } from '../../services/budget-reconciliation.service';
+import { TransactionImportService } from '../../services/transaction-import.service';
 
 /**
  * Budget category for selection dropdown
@@ -59,7 +60,7 @@ interface UITransaction extends StagedTransaction {
 })
 export class TransactionReviewComponent implements OnInit, OnDestroy {
   // Route parameters
-  batchId: string = '';
+  batchId = '';
 
   // Data
   batch: ImportBatch | null = null;
@@ -71,7 +72,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
   currentTransaction: UITransaction | null = null;
 
   // Selection & filters
-  selectedIds: Set<string> = new Set();
+  selectedIds = new Set<string>();
   filterStatus: 'all' | 'pending' | 'needs-attention' = 'pending';
   filterConfidenceMin = 0; // 0-100
   searchText = '';
@@ -146,7 +147,9 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
         this.loadTransaction(0);
       }
 
-      console.log(`[TransactionReview] Loaded ${this.stagedTransactions.length} staged transactions`);
+      console.log(
+        `[TransactionReview] Loaded ${this.stagedTransactions.length} staged transactions`
+      );
     } catch (error) {
       console.error('[TransactionReview] Failed to load batch', error);
     } finally {
@@ -178,7 +181,9 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
       this.currentTransaction._varianceImpact = this.currentTransaction.amount.value;
     }
 
-    console.log(`[TransactionReview] Loaded transaction ${index}: ${this.currentTransaction.description}`);
+    console.log(
+      `[TransactionReview] Loaded transaction ${index}: ${this.currentTransaction.description}`
+    );
   }
 
   /**
@@ -453,9 +458,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const confirmed = confirm(
-      `Approve ${this.selectedIds.size} transactions?`
-    );
+    const confirmed = confirm(`Approve ${this.selectedIds.size} transactions?`);
     if (!confirmed) return;
 
     this.isSaving = true;
@@ -606,9 +609,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
    * Gets completion percentage
    */
   getCompletionPercent(): number {
-    const approved = this.stagedTransactions.filter(
-      t => t.reviewStatus === 'approved'
-    ).length;
+    const approved = this.stagedTransactions.filter(t => t.reviewStatus === 'approved').length;
     return this.stagedTransactions.length > 0
       ? Math.round((approved / this.stagedTransactions.length) * 100)
       : 0;
@@ -618,8 +619,6 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
    * Gets remaining transaction count
    */
   getRemainingCount(): number {
-    return this.stagedTransactions.filter(
-      t => t.reviewStatus === 'pending'
-    ).length;
+    return this.stagedTransactions.filter(t => t.reviewStatus === 'pending').length;
   }
 }

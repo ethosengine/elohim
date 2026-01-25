@@ -1,6 +1,21 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { GovernanceSignalService, OpinionCluster } from '@app/elohim/services/governance-signal.service';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  OnInit,
+  OnChanges,
+  SimpleChanges,
+  ElementRef,
+  ViewChild,
+  AfterViewInit,
+} from '@angular/core';
+
+import {
+  GovernanceSignalService,
+  OpinionCluster,
+} from '@app/elohim/services/governance-signal.service';
 
 /**
  * OpinionClusterComponent - Polis-style 2D Opinion Visualization
@@ -140,15 +155,17 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
       const xStatements = this.statements.slice(0, midpoint);
       const yStatements = this.statements.slice(midpoint);
 
-      const x = xStatements.reduce((sum, s, i) => {
-        const v = votes.get(s.id) ?? 0;
-        return sum + v * Math.cos((i / xStatements.length) * Math.PI);
-      }, 0) / Math.max(xStatements.length, 1);
+      const x =
+        xStatements.reduce((sum, s, i) => {
+          const v = votes.get(s.id) ?? 0;
+          return sum + v * Math.cos((i / xStatements.length) * Math.PI);
+        }, 0) / Math.max(xStatements.length, 1);
 
-      const y = yStatements.reduce((sum, s, i) => {
-        const v = votes.get(s.id) ?? 0;
-        return sum + v * Math.sin((i / yStatements.length) * Math.PI);
-      }, 0) / Math.max(yStatements.length, 1);
+      const y =
+        yStatements.reduce((sum, s, i) => {
+          const v = votes.get(s.id) ?? 0;
+          return sum + v * Math.sin((i / yStatements.length) * Math.PI);
+        }, 0) / Math.max(yStatements.length, 1);
 
       // Normalize to [-1, 1] range
       const normalizedX = Math.max(-1, Math.min(1, x));
@@ -225,8 +242,7 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
 
       for (const cluster of clusters) {
         const dist = Math.sqrt(
-          Math.pow(p.x - cluster.centroid.x, 2) +
-          Math.pow(p.y - cluster.centroid.y, 2)
+          Math.pow(p.x - cluster.centroid.x, 2) + Math.pow(p.y - cluster.centroid.y, 2)
         );
         if (dist < minDist) {
           minDist = dist;
@@ -275,17 +291,14 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
 
     // Top 20% lowest variance = consensus
     const consensusCount = Math.ceil(statementStats.length * 0.2);
-    this.consensusStatements = statementStats
-      .slice(0, consensusCount)
-      .map(s => s.statement);
+    this.consensusStatements = statementStats.slice(0, consensusCount).map(s => s.statement);
 
     // Top 20% highest variance = divisive
-    this.divisiveStatements = statementStats
-      .slice(-consensusCount)
-      .map(s => s.statement);
+    this.divisiveStatements = statementStats.slice(-consensusCount).map(s => s.statement);
 
     // Calculate overall consensus score (inverse of average variance)
-    const avgVariance = statementStats.reduce((sum, s) => sum + s.variance, 0) / statementStats.length;
+    const avgVariance =
+      statementStats.reduce((sum, s) => sum + s.variance, 0) / statementStats.length;
     this.consensusScore = Math.round((1 - Math.min(avgVariance, 1)) * 100);
   }
 
@@ -315,8 +328,8 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
 
     // Handle mouse events
     if (this.interactive) {
-      canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
-      canvas.addEventListener('click', (e) => this.onClick(e));
+      canvas.addEventListener('mousemove', e => this.onMouseMove(e));
+      canvas.addEventListener('click', e => this.onClick(e));
     }
   }
 
@@ -547,7 +560,12 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
   /**
    * Convert data coordinates to canvas coordinates.
    */
-  private toCanvasCoords(x: number, y: number, width: number, height: number): { x: number; y: number } {
+  private toCanvasCoords(
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): { x: number; y: number } {
     const usableWidth = width - this.padding * 2;
     const usableHeight = height - this.padding * 2;
 
@@ -560,7 +578,12 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
   /**
    * Convert canvas coordinates to data coordinates.
    */
-  private toDataCoords(canvasX: number, canvasY: number, width: number, height: number): { x: number; y: number } {
+  private toDataCoords(
+    canvasX: number,
+    canvasY: number,
+    width: number,
+    height: number
+  ): { x: number; y: number } {
     const usableWidth = width - this.padding * 2;
     const usableHeight = height - this.padding * 2;
 
@@ -612,7 +635,12 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
 
     // Check if clicked on a cluster
     for (const cluster of this.clusters) {
-      const pos = this.toCanvasCoords(cluster.centroid.x, cluster.centroid.y, canvas.width, canvas.height);
+      const pos = this.toCanvasCoords(
+        cluster.centroid.x,
+        cluster.centroid.y,
+        canvas.width,
+        canvas.height
+      );
       const radius = Math.sqrt(cluster.size) * 20 + 30;
       const dist = Math.sqrt(Math.pow(x - pos.x, 2) + Math.pow(y - pos.y, 2));
 

@@ -40,7 +40,7 @@ describe('PathNavigatorComponent', () => {
         stepNarrative: 'Narrative 1',
         learningObjectives: [],
         optional: false,
-        completionCriteria: []
+        completionCriteria: [],
       },
       {
         order: 1,
@@ -49,7 +49,7 @@ describe('PathNavigatorComponent', () => {
         stepNarrative: 'Narrative 2',
         learningObjectives: [],
         optional: false,
-        completionCriteria: []
+        completionCriteria: [],
       },
       {
         order: 2,
@@ -58,9 +58,9 @@ describe('PathNavigatorComponent', () => {
         stepNarrative: 'Narrative 3',
         learningObjectives: [],
         optional: false,
-        completionCriteria: []
-      }
-    ]
+        completionCriteria: [],
+      },
+    ],
   };
 
   const mockStepView: PathStepView = {
@@ -71,7 +71,7 @@ describe('PathNavigatorComponent', () => {
       stepNarrative: 'This is step 2',
       learningObjectives: [],
       optional: false,
-      completionCriteria: []
+      completionCriteria: [],
     },
     content: {
       id: 'node-2',
@@ -82,19 +82,35 @@ describe('PathNavigatorComponent', () => {
       content: '# Test Content\n\nThis is **markdown** content.',
       tags: [],
       relatedNodeIds: [],
-      metadata: {}
+      metadata: {},
     },
     hasNext: true,
     hasPrevious: true,
     nextStepIndex: 2,
-    previousStepIndex: 0
+    previousStepIndex: 0,
   };
 
   beforeEach(async () => {
-    const pathServiceSpy = jasmine.createSpyObj('PathService', ['getPath', 'getPathStep', 'getContentById']);
-    const agentServiceSpy = jasmine.createSpyObj('AgentService', ['completeStep', 'markContentSeen', 'getContentMastery']);
-    const pathContextServiceSpy = jasmine.createSpyObj('PathContextService', ['enterPath', 'exitPath', 'startDetour']);
-    const seoServiceSpy = jasmine.createSpyObj('SeoService', ['updateSeo', 'updateForPath', 'setTitle']);
+    const pathServiceSpy = jasmine.createSpyObj('PathService', [
+      'getPath',
+      'getPathStep',
+      'getContentById',
+    ]);
+    const agentServiceSpy = jasmine.createSpyObj('AgentService', [
+      'completeStep',
+      'markContentSeen',
+      'getContentMastery',
+    ]);
+    const pathContextServiceSpy = jasmine.createSpyObj('PathContextService', [
+      'enterPath',
+      'exitPath',
+      'startDetour',
+    ]);
+    const seoServiceSpy = jasmine.createSpyObj('SeoService', [
+      'updateSeo',
+      'updateForPath',
+      'setTitle',
+    ]);
 
     paramsSubject = new BehaviorSubject({ pathId: 'test-path', stepIndex: '1' });
 
@@ -110,9 +126,9 @@ describe('PathNavigatorComponent', () => {
         { provide: SeoService, useValue: seoServiceSpy },
         {
           provide: ActivatedRoute,
-          useValue: { params: paramsSubject.asObservable() }
-        }
-      ]
+          useValue: { params: paramsSubject.asObservable() },
+        },
+      ],
     }).compileComponents();
 
     pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
@@ -295,7 +311,7 @@ describe('PathNavigatorComponent', () => {
       section: { id: 's1', title: 'Section 1', order: 0, conceptIds: [] },
       sectionIndex: 0,
       concepts: [],
-      currentConceptIndex: 0
+      currentConceptIndex: 0,
     };
 
     expect(component.getCurrentChapterTitle()).toBe('Chapter 1');

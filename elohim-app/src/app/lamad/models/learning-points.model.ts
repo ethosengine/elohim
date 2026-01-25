@@ -86,7 +86,7 @@ export const LamadPointTriggers = {
   CONTRIBUTION: 'contribution',
 } as const;
 
-export type LamadPointTrigger = typeof LamadPointTriggers[keyof typeof LamadPointTriggers];
+export type LamadPointTrigger = (typeof LamadPointTriggers)[keyof typeof LamadPointTriggers];
 
 /**
  * Default point amounts per learning trigger.
@@ -126,7 +126,8 @@ export const LamadRecognitionFlowTypes = {
   DISCOVERY_SPARK: 'discovery_spark',
 } as const;
 
-export type LamadRecognitionFlowType = typeof LamadRecognitionFlowTypes[keyof typeof LamadRecognitionFlowTypes];
+export type LamadRecognitionFlowType =
+  (typeof LamadRecognitionFlowTypes)[keyof typeof LamadRecognitionFlowTypes];
 
 // =============================================================================
 // Learner Point Balance

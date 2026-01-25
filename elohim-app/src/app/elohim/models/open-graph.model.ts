@@ -226,20 +226,19 @@ export interface OpenGraphMetadata {
  */
 export type OpenGraphType =
   // Basic types
-  | 'website'           // Default for most content
-  | 'article'           // Blog posts, news articles, learning content
-  | 'book'              // Books, chapters
-  | 'profile'           // Person or organization profile
+  | 'website' // Default for most content
+  | 'article' // Blog posts, news articles, learning content
+  | 'book' // Books, chapters
+  | 'profile' // Person or organization profile
 
   // Media types
-  | 'video.movie'       // Feature film
-  | 'video.episode'     // TV episode
-  | 'video.tv_show'     // TV series
-  | 'video.other'       // Other video content
-
-  | 'music.song'        // Individual song
-  | 'music.album'       // Music album
-  | 'music.playlist'    // Playlist
+  | 'video.movie' // Feature film
+  | 'video.episode' // TV episode
+  | 'video.tv_show' // TV series
+  | 'video.other' // Other video content
+  | 'music.song' // Individual song
+  | 'music.album' // Music album
+  | 'music.playlist' // Playlist
   | 'music.radio_station'; // Radio station
 
 /**

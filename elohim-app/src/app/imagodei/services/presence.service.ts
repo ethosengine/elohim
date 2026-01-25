@@ -11,8 +11,8 @@
  */
 
 import { Injectable, inject, signal, computed } from '@angular/core';
+
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
-import { IdentityService } from './identity.service';
 import {
   type ContributorPresenceView,
   type PresenceState,
@@ -23,6 +23,8 @@ import {
   parseExternalIdentifiers,
   serializeExternalIdentifiers,
 } from '../models/presence.model';
+
+import { IdentityService } from './identity.service';
 
 // =============================================================================
 // Wire Format Types (internal - snake_case matches conductor response)
@@ -250,7 +252,10 @@ export class PresenceService {
   /**
    * Begin stewardship of an unclaimed presence.
    */
-  async beginStewardship(presenceId: string, commitmentNote?: string): Promise<ContributorPresenceView> {
+  async beginStewardship(
+    presenceId: string,
+    commitmentNote?: string
+  ): Promise<ContributorPresenceView> {
     if (!this.holochainClient.isConnected()) {
       throw new Error('Not connected to network');
     }

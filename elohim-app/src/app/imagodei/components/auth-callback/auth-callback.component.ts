@@ -12,11 +12,13 @@
  * 5. On error: Show error message with retry option
  */
 
-import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
+
 import { AuthService } from '../../services/auth.service';
+import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
+
 import type { AuthResult } from '../../models/auth.model';
 
 type CallbackStatus = 'processing' | 'success' | 'error';
@@ -68,125 +70,131 @@ type CallbackStatus = 'processing' | 'success' | 'error';
       }
     </div>
   `,
-  styles: [`
-    .callback-container {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #1a1a2e 0%, #0a0a15 100%);
-      padding: 1rem;
-    }
+  styles: [
+    `
+      .callback-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1a1a2e 0%, #0a0a15 100%);
+        padding: 1rem;
+      }
 
-    .callback-card {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 1rem;
-      padding: 3rem;
-      text-align: center;
-      max-width: 400px;
-      width: 100%;
-      backdrop-filter: blur(10px);
-    }
+      .callback-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 1rem;
+        padding: 3rem;
+        text-align: center;
+        max-width: 400px;
+        width: 100%;
+        backdrop-filter: blur(10px);
+      }
 
-    .callback-card h2 {
-      color: #fff;
-      margin: 1.5rem 0 0.5rem;
-      font-size: 1.5rem;
-      font-weight: 600;
-    }
+      .callback-card h2 {
+        color: #fff;
+        margin: 1.5rem 0 0.5rem;
+        font-size: 1.5rem;
+        font-weight: 600;
+      }
 
-    .callback-card p {
-      color: rgba(255, 255, 255, 0.7);
-      margin: 0;
-      font-size: 0.95rem;
-    }
+      .callback-card p {
+        color: rgba(255, 255, 255, 0.7);
+        margin: 0;
+        font-size: 0.95rem;
+      }
 
-    .spinner {
-      width: 48px;
-      height: 48px;
-      border: 3px solid rgba(255, 255, 255, 0.1);
-      border-top-color: #6366f1;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto;
-    }
+      .spinner {
+        width: 48px;
+        height: 48px;
+        border: 3px solid rgba(255, 255, 255, 0.1);
+        border-top-color: #6366f1;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+      }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
 
-    .check-icon, .error-icon {
-      width: 64px;
-      height: 64px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto;
-    }
+      .check-icon,
+      .error-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+      }
 
-    .check-icon {
-      background: rgba(34, 197, 94, 0.2);
-      color: #22c55e;
-    }
+      .check-icon {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+      }
 
-    .check-icon svg {
-      width: 32px;
-      height: 32px;
-    }
+      .check-icon svg {
+        width: 32px;
+        height: 32px;
+      }
 
-    .error-icon {
-      background: rgba(239, 68, 68, 0.2);
-      color: #ef4444;
-    }
+      .error-icon {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+      }
 
-    .error-icon svg {
-      width: 32px;
-      height: 32px;
-    }
+      .error-icon svg {
+        width: 32px;
+        height: 32px;
+      }
 
-    .error-message {
-      color: rgba(239, 68, 68, 0.9) !important;
-      margin-top: 0.5rem !important;
-    }
+      .error-message {
+        color: rgba(239, 68, 68, 0.9) !important;
+        margin-top: 0.5rem !important;
+      }
 
-    .actions {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      margin-top: 2rem;
-    }
+      .actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-top: 2rem;
+      }
 
-    .btn-primary, .btn-secondary {
-      padding: 0.75rem 1.5rem;
-      border-radius: 0.5rem;
-      font-size: 0.95rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-      border: none;
-    }
+      .btn-primary,
+      .btn-secondary {
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        font-size: 0.95rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+      }
 
-    .btn-primary {
-      background: #6366f1;
-      color: white;
-    }
+      .btn-primary {
+        background: #6366f1;
+        color: white;
+      }
 
-    .btn-primary:hover {
-      background: #4f46e5;
-    }
+      .btn-primary:hover {
+        background: #4f46e5;
+      }
 
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.1);
-      color: white;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
+      .btn-secondary {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
 
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.15);
-    }
-  `]
+      .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.15);
+      }
+    `,
+  ],
 })
 export class AuthCallbackComponent implements OnInit {
   private readonly router = inject(Router);
@@ -246,9 +254,7 @@ export class AuthCallbackComponent implements OnInit {
       }
     } catch (err) {
       this.status.set('error');
-      this.errorMessage.set(
-        err instanceof Error ? err.message : 'An unexpected error occurred'
-      );
+      this.errorMessage.set(err instanceof Error ? err.message : 'An unexpected error occurred');
     }
   }
 

@@ -1,8 +1,11 @@
 import { Injectable } from '@angular/core';
-import { Observable, forkJoin, of } from 'rxjs';
+
 import { map, switchMap, catchError } from 'rxjs/operators';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+
+import { Observable, forkJoin, of } from 'rxjs';
+
 import { AgentProgress } from '@app/elohim/models/agent.model';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 
 /**
  * ProgressMigrationService - Migrates existing progress data to support cross-path completion.
@@ -45,7 +48,7 @@ export class ProgressMigrationService {
         agentsMigrated: 0,
         pathsMigrated: 0,
         contentNodesMigrated: 0,
-        errors: ['No progress records found in localStorage']
+        errors: ['No progress records found in localStorage'],
       });
     }
 
@@ -77,7 +80,7 @@ export class ProgressMigrationService {
           agentsMigrated: agentGroups.size,
           pathsMigrated: totalPaths,
           contentNodesMigrated: totalContentNodes,
-          errors
+          errors,
         };
       })
     );
@@ -128,13 +131,10 @@ export class ProgressMigrationService {
         }
 
         // Create or update __global__ progress record
-        return this.createGlobalProgress(
-          agentId,
-          Array.from(completedContentIds)
-        ).pipe(
+        return this.createGlobalProgress(agentId, Array.from(completedContentIds)).pipe(
           map(() => ({
             contentNodesMigrated: completedContentIds.size,
-            pathsMigrated: pathProgressList.length
+            pathsMigrated: pathProgressList.length,
           }))
         );
       })
@@ -144,10 +144,7 @@ export class ProgressMigrationService {
   /**
    * Create or update the __global__ progress record with completed content IDs.
    */
-  private createGlobalProgress(
-    agentId: string,
-    contentIds: string[]
-  ): Observable<void> {
+  private createGlobalProgress(agentId: string, contentIds: string[]): Observable<void> {
     // Check if __global__ progress already exists
     const existingProgress = this.dataLoader.getLocalProgress(agentId, '__global__');
 
@@ -164,7 +161,7 @@ export class ProgressMigrationService {
       stepNotes: {},
       reflectionResponses: {},
       attestationsEarned: [],
-      completedContentIds: []
+      completedContentIds: [],
     };
 
     // Merge content IDs (avoid duplicates)
@@ -211,11 +208,11 @@ export class ProgressMigrationService {
    * Useful for debugging and verification before running the actual migration.
    */
   previewMigration(): Observable<{
-    agents: Array<{
+    agents: {
       agentId: string;
       pathCount: number;
       estimatedContentNodes: number;
-    }>;
+    }[];
     totalAgents: number;
     totalPaths: number;
     estimatedContentNodes: number;
@@ -243,7 +240,7 @@ export class ProgressMigrationService {
       return {
         agentId,
         pathCount: progressList.length,
-        estimatedContentNodes
+        estimatedContentNodes,
       };
     });
 
@@ -254,7 +251,7 @@ export class ProgressMigrationService {
       agents,
       totalAgents: agents.length,
       totalPaths,
-      estimatedContentNodes
+      estimatedContentNodes,
     });
   }
 
@@ -290,7 +287,7 @@ export class ProgressMigrationService {
       valid: missingGlobalProgress.length === 0,
       agentsWithProgress: agentsWithProgress.size,
       agentsWithGlobalProgress: agentsWithGlobalProgress.size,
-      missingGlobalProgress
+      missingGlobalProgress,
     });
   }
 }

@@ -24,9 +24,13 @@
  */
 
 import { Injectable, signal, computed } from '@angular/core';
-import { BehaviorSubject, Observable, of, from, defer } from 'rxjs';
+
 import { catchError, map, shareReplay, tap } from 'rxjs/operators';
+
+import { BehaviorSubject, Observable, of, from, defer } from 'rxjs';
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+
 import {
   LamadContributorDashboard,
   LamadContributorImpact,
@@ -168,12 +172,13 @@ export class ContributorService {
     }
 
     if (!this.dashboardCache.has(contributorId)) {
-      const request = defer(() =>
-        from(this.fetchDashboard(contributorId))
-      ).pipe(
+      const request = defer(() => from(this.fetchDashboard(contributorId))).pipe(
         shareReplay(1),
-        catchError((err) => {
-          console.warn(`[ContributorService] Failed to fetch dashboard for "${contributorId}":`, err);
+        catchError(err => {
+          console.warn(
+            `[ContributorService] Failed to fetch dashboard for "${contributorId}":`,
+            err
+          );
           return of(null);
         })
       );
@@ -196,11 +201,9 @@ export class ContributorService {
       return of(null);
     }
 
-    return defer(() =>
-      from(this.fetchMyDashboard())
-    ).pipe(
+    return defer(() => from(this.fetchMyDashboard())).pipe(
       tap(dashboard => this.dashboardSubject.next(dashboard)),
-      catchError((err) => {
+      catchError(err => {
         console.warn('[ContributorService] Failed to fetch my dashboard:', err);
         return of(null);
       })
@@ -222,10 +225,8 @@ export class ContributorService {
       return of(null);
     }
 
-    return defer(() =>
-      from(this.fetchImpact(contributorId))
-    ).pipe(
-      catchError((err) => {
+    return defer(() => from(this.fetchImpact(contributorId))).pipe(
+      catchError(err => {
         console.warn(`[ContributorService] Failed to fetch impact for "${contributorId}":`, err);
         return of(null);
       })
@@ -244,7 +245,7 @@ export class ContributorService {
     // This is derived from the dashboard
     return this.getDashboard(contributorId).pipe(
       map(dashboard => dashboard?.impactByContent ?? []),
-      catchError(() => of([])),
+      catchError(() => of([]))
     );
   }
 
@@ -266,12 +267,13 @@ export class ContributorService {
     }
 
     if (!this.recognitionCache.has(contributorId)) {
-      const request = defer(() =>
-        from(this.fetchRecognitionHistory(contributorId))
-      ).pipe(
+      const request = defer(() => from(this.fetchRecognitionHistory(contributorId))).pipe(
         shareReplay(1),
-        catchError((err) => {
-          console.warn(`[ContributorService] Failed to fetch recognition for "${contributorId}":`, err);
+        catchError(err => {
+          console.warn(
+            `[ContributorService] Failed to fetch recognition for "${contributorId}":`,
+            err
+          );
           return of([]);
         })
       );
@@ -371,7 +373,9 @@ export class ContributorService {
     return this.transformImpact(result.data);
   }
 
-  private async fetchRecognitionHistory(contributorId: string): Promise<LamadContributorRecognition[]> {
+  private async fetchRecognitionHistory(
+    contributorId: string
+  ): Promise<LamadContributorRecognition[]> {
     const result = await this.holochainClient.callZome<HolochainContributorRecognitionOutput[]>({
       zomeName: 'content_store',
       fnName: 'get_recognition_by_contributor',
@@ -438,7 +442,9 @@ export class ContributorService {
     };
   }
 
-  private transformRecognition(output: HolochainContributorRecognitionOutput): LamadContributorRecognition {
+  private transformRecognition(
+    output: HolochainContributorRecognitionOutput
+  ): LamadContributorRecognition {
     const hc = output.recognition;
     const metadata = this.safeParseJson<Record<string, unknown>>(hc.metadataJson, {});
 

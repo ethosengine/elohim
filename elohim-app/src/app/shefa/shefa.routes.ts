@@ -16,23 +16,20 @@ export const SHEFA_ROUTES: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('./components/shefa-layout/shefa-layout.component').then(
-        m => m.ShefaLayoutComponent
-      ),
+      import('./components/shefa-layout/shefa-layout.component').then(m => m.ShefaLayoutComponent),
     children: [
       {
         path: '',
         loadComponent: () =>
-          import('./components/shefa-home/shefa-home.component').then(
-            m => m.ShefaHomeComponent
-          ),
+          import('./components/shefa-home/shefa-home.component').then(m => m.ShefaHomeComponent),
         data: {
           title: 'Shefa - Economics of Human Flourishing',
           seo: {
             title: 'Shefa Economy',
-            description: 'Economic coordination layer implementing ValueFlows patterns for multi-dimensional value tracking.',
-          }
-        }
+            description:
+              'Economic coordination layer implementing ValueFlows patterns for multi-dimensional value tracking.',
+          },
+        },
       },
       {
         path: 'dashboard',
@@ -45,9 +42,9 @@ export const SHEFA_ROUTES: Routes = [
           seo: {
             title: 'Shefa Dashboard',
             description: 'Network health overview and custodian performance metrics for operators.',
-          }
-        }
-      }
-    ]
-  }
+          },
+        },
+      },
+    ],
+  },
 ];

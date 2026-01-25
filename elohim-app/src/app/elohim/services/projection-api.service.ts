@@ -8,15 +8,18 @@
  * Doorway is just a cache that serves stored content.
  */
 
-import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http';
-import { Observable, of } from 'rxjs';
+import { Injectable, inject } from '@angular/core';
+
 import { map, catchError, timeout, shareReplay } from 'rxjs/operators';
 
+import { Observable, of } from 'rxjs';
+
 import { environment } from '../../../environments/environment';
-import { StorageClientService } from './storage-client.service';
 import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
+
+import { StorageClientService } from './storage-client.service';
 
 /**
  * Content query filters for projection API
@@ -96,10 +99,9 @@ export class ProjectionAPIService {
 
   /** Base URL for cache API */
   private get baseUrl(): string {
-    const doorwayUrl = environment.holochain?.authUrl || environment.holochain?.appUrl || 'http://localhost:8080';
-    const httpUrl = doorwayUrl
-      .replace('wss://', 'https://')
-      .replace('ws://', 'http://');
+    const doorwayUrl =
+      environment.holochain?.authUrl || environment.holochain?.appUrl || 'http://localhost:8080';
+    const httpUrl = doorwayUrl.replace('wss://', 'https://').replace('ws://', 'http://');
     return `${httpUrl}/api/v1/cache`;
   }
 
@@ -170,14 +172,17 @@ export class ProjectionAPIService {
       map(data => (data || []).map(c => this.transformContent(c))),
       // Apply client-side filters
       map(contents => this.applyContentFilters(contents, filters)),
-      catchError(err => this.handleContentArrayError(err, 'queryContent')),
+      catchError(err => this.handleContentArrayError(err, 'queryContent'))
     );
   }
 
   /**
    * Apply client-side content filters
    */
-  private applyContentFilters(contents: ContentNode[], filters: ContentQueryFilters): ContentNode[] {
+  private applyContentFilters(
+    contents: ContentNode[],
+    filters: ContentQueryFilters
+  ): ContentNode[] {
     let result = contents;
 
     if (filters.id) {
@@ -188,18 +193,16 @@ export class ProjectionAPIService {
       result = result.filter(c => idSet.has(c.id));
     }
     if (filters.contentType) {
-      const types = Array.isArray(filters.contentType) ? filters.contentType : [filters.contentType];
+      const types = Array.isArray(filters.contentType)
+        ? filters.contentType
+        : [filters.contentType];
       result = result.filter(c => types.includes(c.contentType as ContentType));
     }
     if (filters.tags?.length) {
-      result = result.filter(c =>
-        filters.tags!.every(tag => c.tags?.includes(tag))
-      );
+      result = result.filter(c => filters.tags!.every(tag => c.tags?.includes(tag)));
     }
     if (filters.anyTags?.length) {
-      result = result.filter(c =>
-        filters.anyTags!.some(tag => c.tags?.includes(tag))
-      );
+      result = result.filter(c => filters.anyTags!.some(tag => c.tags?.includes(tag)));
     }
     if (filters.publicOnly) {
       result = result.filter(c => c.reach === 'commons');
@@ -291,7 +294,7 @@ export class ProjectionAPIService {
       map(data => (data || []).map(p => this.transformPath(p))),
       // Apply client-side filters
       map(paths => this.applyPathFilters(paths, filters)),
-      catchError(err => this.handlePathArrayError(err, 'queryPaths')),
+      catchError(err => this.handlePathArrayError(err, 'queryPaths'))
     );
   }
 
@@ -318,9 +321,7 @@ export class ProjectionAPIService {
       result = result.filter(p => p.visibility === 'public');
     }
     if (filters.tags?.length) {
-      result = result.filter(p =>
-        filters.tags!.some(tag => p.tags?.includes(tag))
-      );
+      result = result.filter(p => filters.tags!.some(tag => p.tags?.includes(tag)));
     }
 
     return result;
@@ -364,14 +365,15 @@ export class ProjectionAPIService {
 
     const params = new HttpParams().set('depth', depth.toString());
 
-    return this.http.get<ProjectionResponse<ContentNode[]>>(
-      `${this.baseUrl}/content/${encodeURIComponent(nodeId)}/related`,
-      { params }
-    ).pipe(
-      timeout(this.defaultTimeout),
-      map(response => (response.data || []).map(c => this.transformContent(c))),
-      catchError(err => this.handleContentArrayError(err, `getRelated(${nodeId})`)),
-    );
+    return this.http
+      .get<
+        ProjectionResponse<ContentNode[]>
+      >(`${this.baseUrl}/content/${encodeURIComponent(nodeId)}/related`, { params })
+      .pipe(
+        timeout(this.defaultTimeout),
+        map(response => (response.data || []).map(c => this.transformContent(c))),
+        catchError(err => this.handleContentArrayError(err, `getRelated(${nodeId})`))
+      );
   }
 
   // =========================================================================
@@ -388,7 +390,7 @@ export class ProjectionAPIService {
 
     return this.http.get<ProjectionStats>(`${this.baseUrl}/stats`).pipe(
       timeout(this.defaultTimeout),
-      catchError(err => this.handleStatsError(err, 'getStats')),
+      catchError(err => this.handleStatsError(err, 'getStats'))
     );
   }
 
@@ -431,9 +433,7 @@ export class ProjectionAPIService {
       params = params.set('anyTags', filters.anyTags.join(','));
     }
     if (filters.reach) {
-      const reaches = Array.isArray(filters.reach)
-        ? filters.reach.join(',')
-        : filters.reach;
+      const reaches = Array.isArray(filters.reach) ? filters.reach.join(',') : filters.reach;
       params = params.set('reach', reaches);
     }
     if (filters.publicOnly) {
@@ -574,32 +574,50 @@ export class ProjectionAPIService {
   /**
    * Handle HTTP errors - returns null for single items, empty array for collections
    */
-  private handleContentError(error: HttpErrorResponse, context: string): Observable<ContentNode | null> {
+  private handleContentError(
+    error: HttpErrorResponse,
+    context: string
+  ): Observable<ContentNode | null> {
     console.debug(`[ProjectionAPI] ${context} failed:`, error.status, error.message);
     return of(null);
   }
 
-  private handleContentArrayError(error: HttpErrorResponse, context: string): Observable<ContentNode[]> {
+  private handleContentArrayError(
+    error: HttpErrorResponse,
+    context: string
+  ): Observable<ContentNode[]> {
     console.debug(`[ProjectionAPI] ${context} failed:`, error.status, error.message);
     return of([]);
   }
 
-  private handlePathError(error: HttpErrorResponse, context: string): Observable<LearningPath | null> {
+  private handlePathError(
+    error: HttpErrorResponse,
+    context: string
+  ): Observable<LearningPath | null> {
     console.debug(`[ProjectionAPI] ${context} failed:`, error.status, error.message);
     return of(null);
   }
 
-  private handlePathOverviewError(error: HttpErrorResponse, context: string): Observable<Partial<LearningPath> | null> {
+  private handlePathOverviewError(
+    error: HttpErrorResponse,
+    context: string
+  ): Observable<Partial<LearningPath> | null> {
     console.debug(`[ProjectionAPI] ${context} failed:`, error.status, error.message);
     return of(null);
   }
 
-  private handlePathArrayError(error: HttpErrorResponse, context: string): Observable<LearningPath[]> {
+  private handlePathArrayError(
+    error: HttpErrorResponse,
+    context: string
+  ): Observable<LearningPath[]> {
     console.debug(`[ProjectionAPI] ${context} failed:`, error.status, error.message);
     return of([]);
   }
 
-  private handleStatsError(error: HttpErrorResponse, context: string): Observable<ProjectionStats | null> {
+  private handleStatsError(
+    error: HttpErrorResponse,
+    context: string
+  ): Observable<ProjectionStats | null> {
     console.debug(`[ProjectionAPI] ${context} failed:`, error.status, error.message);
     return of(null);
   }

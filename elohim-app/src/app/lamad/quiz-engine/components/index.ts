@@ -17,11 +17,11 @@ export type { MasteryQuizRequestEvent } from './mastery-gate/mastery-gate.compon
 export { PreAssessmentComponent } from './pre-assessment/pre-assessment.component';
 export type {
   PreAssessmentDecision,
-  SkipSelectionEvent
+  SkipSelectionEvent,
 } from './pre-assessment/pre-assessment.component';
 
 export { DiscoveryQuizComponent } from './discovery-quiz/discovery-quiz.component';
 export type {
   DiscoveryQuizCompletionEvent,
-  EPIC_SUBSCALES
+  EPIC_SUBSCALES,
 } from './discovery-quiz/discovery-quiz.component';

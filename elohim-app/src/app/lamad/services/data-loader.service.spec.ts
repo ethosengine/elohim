@@ -31,7 +31,7 @@ describe('DataLoaderService', () => {
     content: '# Test',
     tags: [],
     relatedNodeIds: [],
-    metadata: {}
+    metadata: {},
   };
 
   const mockProgress: AgentProgress = {
@@ -44,22 +44,26 @@ describe('DataLoaderService', () => {
     stepAffinity: {},
     stepNotes: {},
     reflectionResponses: {},
-    attestationsEarned: []
+    attestationsEarned: [],
   };
 
   beforeEach(() => {
-    mockHolochainContent = jasmine.createSpyObj('HolochainContentService', [
-      'getContent',
-      'getContentByType',
-      'getStats',
-      'clearCache',
-      'isAvailable',
-      'getPathIndex',
-      'getPathWithSteps'
-    ], {
-      // Signal property - callable function that returns availability
-      available: jasmine.createSpy('available').and.returnValue(true)
-    });
+    mockHolochainContent = jasmine.createSpyObj(
+      'HolochainContentService',
+      [
+        'getContent',
+        'getContentByType',
+        'getStats',
+        'clearCache',
+        'isAvailable',
+        'getPathIndex',
+        'getPathWithSteps',
+      ],
+      {
+        // Signal property - callable function that returns availability
+        available: jasmine.createSpy('available').and.returnValue(true),
+      }
+    );
 
     mockIndexedDBCache = jasmine.createSpyObj('IndexedDBCacheService', [
       'init',
@@ -70,36 +74,44 @@ describe('DataLoaderService', () => {
       'getContentBatch',
       'setContentBatch',
       'getStats',
-      'clearAll'
+      'clearAll',
     ]);
 
-    mockProjectionApi = jasmine.createSpyObj('ProjectionAPIService', [
-      'getContent',
-      'queryContent',
-      'batchGetContent',
-      'getPath',
-      'getPathOverview',
-      'queryPaths',
-      'getRelated',
-      'getStats',
-      'isHealthy'
-    ], {
-      enabled: false  // Disabled by default so tests use Holochain path
-    });
+    mockProjectionApi = jasmine.createSpyObj(
+      'ProjectionAPIService',
+      [
+        'getContent',
+        'queryContent',
+        'batchGetContent',
+        'getPath',
+        'getPathOverview',
+        'queryPaths',
+        'getRelated',
+        'getStats',
+        'isHealthy',
+      ],
+      {
+        enabled: false, // Disabled by default so tests use Holochain path
+      }
+    );
 
-    mockContentResolver = jasmine.createSpyObj('ContentResolverService', [
-      'initialize',
-      'resolveContent',
-      'resolvePath',
-      'batchResolveContent',
-      'cacheContent',
-      'cachePath',
-      'registerStandardSource',
-      'setSourceAvailable'
-    ], {
-      isReady: true,
-      state$: new BehaviorSubject('ready').asObservable()
-    });
+    mockContentResolver = jasmine.createSpyObj(
+      'ContentResolverService',
+      [
+        'initialize',
+        'resolveContent',
+        'resolvePath',
+        'batchResolveContent',
+        'cacheContent',
+        'cachePath',
+        'registerStandardSource',
+        'setSourceAvailable',
+      ],
+      {
+        isReady: true,
+        state$: new BehaviorSubject('ready').asObservable(),
+      }
+    );
 
     // Projection API mock returns (disabled by default)
     mockProjectionApi.getContent.and.returnValue(of(null));
@@ -115,7 +127,9 @@ describe('DataLoaderService', () => {
     // Default mock returns
     mockHolochainContent.getStats.and.returnValue(of({ totalCount: 0, byType: {} }));
     mockHolochainContent.isAvailable.and.returnValue(true);
-    (mockHolochainContent.getPathIndex as jasmine.Spy).and.returnValue(Promise.resolve({ paths: [], totalCount: 0, lastUpdated: '' }));
+    (mockHolochainContent.getPathIndex as jasmine.Spy).and.returnValue(
+      Promise.resolve({ paths: [], totalCount: 0, lastUpdated: '' })
+    );
     (mockHolochainContent.getPathWithSteps as jasmine.Spy).and.returnValue(Promise.resolve(null));
 
     // IndexedDB mock returns (disabled by default to use Holochain)
@@ -126,11 +140,15 @@ describe('DataLoaderService', () => {
     mockIndexedDBCache.setContent.and.returnValue(Promise.resolve());
     mockIndexedDBCache.getContentBatch.and.returnValue(Promise.resolve(new Map()));
     mockIndexedDBCache.setContentBatch.and.returnValue(Promise.resolve());
-    mockIndexedDBCache.getStats.and.returnValue(Promise.resolve({ contentCount: 0, pathCount: 0, isAvailable: false }));
+    mockIndexedDBCache.getStats.and.returnValue(
+      Promise.resolve({ contentCount: 0, pathCount: 0, isAvailable: false })
+    );
     mockIndexedDBCache.clearAll.and.returnValue(Promise.resolve());
 
     // ContentResolver mock returns
-    mockContentResolver.initialize.and.returnValue(Promise.resolve({ success: true, implementation: 'typescript' }));
+    mockContentResolver.initialize.and.returnValue(
+      Promise.resolve({ success: true, implementation: 'typescript' })
+    );
     mockContentResolver.resolveContent.and.returnValue(Promise.resolve(null));
     mockContentResolver.resolvePath.and.returnValue(Promise.resolve(null));
     mockContentResolver.batchResolveContent.and.returnValue(Promise.resolve(new Map()));
@@ -148,7 +166,7 @@ describe('DataLoaderService', () => {
       'searchContent',
       'getPath',
       'queryPaths',
-      'getAllPaths'
+      'getAllPaths',
     ]);
     mockContentService.getContent.and.returnValue(of(null));
     mockContentService.queryContent.and.returnValue(of([]));
@@ -163,7 +181,7 @@ describe('DataLoaderService', () => {
       get: jasmine.createSpy('get').and.returnValue(Promise.resolve(null)),
       query: jasmine.createSpy('query').and.returnValue(Promise.resolve([])),
       supportsOffline: jasmine.createSpy('supportsOffline').and.returnValue(false),
-      backpressure: jasmine.createSpy('backpressure').and.returnValue(Promise.resolve(0))
+      backpressure: jasmine.createSpy('backpressure').and.returnValue(Promise.resolve(0)),
     };
 
     TestBed.configureTestingModule({
@@ -175,8 +193,8 @@ describe('DataLoaderService', () => {
         { provide: ProjectionAPIService, useValue: mockProjectionApi },
         { provide: ContentResolverService, useValue: mockContentResolver },
         { provide: ContentService, useValue: mockContentService },
-        { provide: ELOHIM_CLIENT, useValue: mockElohimClient }
-      ]
+        { provide: ELOHIM_CLIENT, useValue: mockElohimClient },
+      ],
     });
 
     service = TestBed.inject(DataLoaderService);
@@ -192,7 +210,7 @@ describe('DataLoaderService', () => {
   });
 
   describe('getPath', () => {
-    it('should load path via ContentService', (done) => {
+    it('should load path via ContentService', done => {
       const mockPath: LearningPath = {
         id: 'test-path',
         version: '1.0.0',
@@ -208,7 +226,7 @@ describe('DataLoaderService', () => {
         tags: ['test'],
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
-        steps: []
+        steps: [],
       };
 
       // ContentService returns path directly
@@ -224,7 +242,7 @@ describe('DataLoaderService', () => {
   });
 
   describe('getContent', () => {
-    it('should load content via ContentService', (done) => {
+    it('should load content via ContentService', done => {
       // ContentService returns content directly
       mockContentService.getContent.and.returnValue(of(mockContent));
 
@@ -236,7 +254,7 @@ describe('DataLoaderService', () => {
       });
     });
 
-    it('should cache content in IndexedDB after loading', (done) => {
+    it('should cache content in IndexedDB after loading', done => {
       mockContentService.getContent.and.returnValue(of(mockContent));
 
       service.getContent('test-content').subscribe(content => {
@@ -247,7 +265,7 @@ describe('DataLoaderService', () => {
       });
     });
 
-    it('should return placeholder when content not found', (done) => {
+    it('should return placeholder when content not found', done => {
       // Resolver returns null when content not found
       mockContentResolver.resolveContent.and.returnValue(Promise.resolve(null));
 
@@ -260,13 +278,13 @@ describe('DataLoaderService', () => {
         },
         error: () => {
           fail('Should not throw error, should return placeholder');
-        }
+        },
       });
     });
   });
 
   describe('getPathIndex', () => {
-    it('should load path index from ContentService', (done) => {
+    it('should load path index from ContentService', done => {
       const mockPaths: LearningPath[] = [
         {
           id: 'test-path',
@@ -283,17 +301,19 @@ describe('DataLoaderService', () => {
           tags: [],
           createdAt: '2025-01-01T00:00:00.000Z',
           updatedAt: '2025-01-01T00:00:00.000Z',
-          steps: [{
-            order: 0,
-            stepType: 'content',
-            resourceId: 'step-1',
-            stepTitle: 'Step 1',
-            stepNarrative: '',
-            optional: false,
-            learningObjectives: [],
-            completionCriteria: []
-          }]
-        }
+          steps: [
+            {
+              order: 0,
+              stepType: 'content',
+              resourceId: 'step-1',
+              stepTitle: 'Step 1',
+              stepNarrative: '',
+              optional: false,
+              learningObjectives: [],
+              completionCriteria: [],
+            },
+          ],
+        },
       ];
 
       mockContentService.queryPaths.and.returnValue(of(mockPaths));
@@ -309,7 +329,7 @@ describe('DataLoaderService', () => {
   });
 
   describe('getContentIndex', () => {
-    it('should return content index from ContentService', (done) => {
+    it('should return content index from ContentService', done => {
       // Mock content nodes with different types (cast to any to avoid full interface)
       const mockNodes = [
         { id: '1', title: 'A', contentType: 'concept', tags: [] },
@@ -330,7 +350,7 @@ describe('DataLoaderService', () => {
   });
 
   describe('getAgentProgress', () => {
-    it('should load agent progress from localStorage', (done) => {
+    it('should load agent progress from localStorage', done => {
       const progressJson = JSON.stringify(mockProgress);
       spyOn(localStorage, 'getItem').and.returnValue(progressJson);
 
@@ -341,7 +361,7 @@ describe('DataLoaderService', () => {
       });
     });
 
-    it('should return null if progress not in localStorage', (done) => {
+    it('should return null if progress not in localStorage', done => {
       spyOn(localStorage, 'getItem').and.returnValue(null);
 
       service.getAgentProgress('test-agent', 'missing-path').subscribe(progress => {
@@ -352,7 +372,7 @@ describe('DataLoaderService', () => {
   });
 
   describe('saveAgentProgress', () => {
-    it('should save progress to localStorage', (done) => {
+    it('should save progress to localStorage', done => {
       spyOn(localStorage, 'setItem');
 
       service.saveAgentProgress(mockProgress).subscribe(() => {
@@ -364,7 +384,7 @@ describe('DataLoaderService', () => {
       });
     });
 
-    it('should handle localStorage errors gracefully', (done) => {
+    it('should handle localStorage errors gracefully', done => {
       spyOn(localStorage, 'setItem').and.throwError('QuotaExceededError');
 
       service.saveAgentProgress(mockProgress).subscribe(() => {

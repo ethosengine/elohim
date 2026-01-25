@@ -1,9 +1,11 @@
 import { Injectable, inject } from '@angular/core';
+
 import { BehaviorSubject, Observable, combineLatest, map, of } from 'rxjs';
 
 import { AttemptCooldownService } from './attempt-cooldown.service';
 import { QuestionPoolService } from './question-pool.service';
 import { StreakTrackerService } from './streak-tracker.service';
+
 import type { QuizResult } from '../models/quiz-session.model';
 
 /**
@@ -44,11 +46,11 @@ export interface GateStatus {
 }
 
 export type GateLockReason =
-  | 'not_attempted'      // Haven't taken the mastery quiz yet
-  | 'failed'             // Failed mastery quiz, can retry
-  | 'in_cooldown'        // Failed and waiting for cooldown
-  | 'max_attempts'       // Used all attempts for the day
-  | 'prerequisites';     // Previous sections not mastered
+  | 'not_attempted' // Haven't taken the mastery quiz yet
+  | 'failed' // Failed mastery quiz, can retry
+  | 'in_cooldown' // Failed and waiting for cooldown
+  | 'max_attempts' // Used all attempts for the day
+  | 'prerequisites'; // Previous sections not mastered
 
 /**
  * Recommendation for supplementary content.
@@ -72,11 +74,11 @@ export interface ContentRecommendation {
 }
 
 export type RecommendationReason =
-  | 'struggled_with_concept'  // Low scores on related questions
-  | 'prerequisite_gap'        // Missing prerequisite knowledge
-  | 'exploration_interest'    // User explored related content
-  | 'reinforcement'           // Good score but could use reinforcement
-  | 'advanced_option';        // High score, offer advanced content
+  | 'struggled_with_concept' // Low scores on related questions
+  | 'prerequisite_gap' // Missing prerequisite knowledge
+  | 'exploration_interest' // User explored related content
+  | 'reinforcement' // Good score but could use reinforcement
+  | 'advanced_option'; // High score, offer advanced content
 
 /**
  * Skip-ahead eligibility from pre-assessment.
@@ -176,7 +178,7 @@ const DEFAULT_CONFIG: PathAdaptationConfig = {
   enableRecommendations: true,
   maxRecommendations: 3,
   recommendationThreshold: 0.6,
-  requireInlineBeforeMastery: true
+  requireInlineBeforeMastery: true,
 };
 
 /**
@@ -209,7 +211,7 @@ const DEFAULT_CONFIG: PathAdaptationConfig = {
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class PathAdaptationService {
   private readonly cooldownService = inject(AttemptCooldownService);
@@ -254,11 +256,7 @@ export class PathAdaptationService {
    * Get gate status for a section.
    * Gates block progress until mastery quiz is passed.
    */
-  getGateStatus(
-    pathId: string,
-    sectionId: string,
-    humanId: string
-  ): GateStatus {
+  getGateStatus(pathId: string, sectionId: string, humanId: string): GateStatus {
     const state = this.getOrCreateState(pathId, humanId);
     const existingGate = state.gates.get(sectionId);
 
@@ -274,15 +272,13 @@ export class PathAdaptationService {
   /**
    * Get observable gate status for UI binding.
    */
-  getGateStatus$(
-    pathId: string,
-    sectionId: string,
-    humanId: string
-  ): Observable<GateStatus> {
+  getGateStatus$(pathId: string, sectionId: string, humanId: string): Observable<GateStatus> {
     return this.getState$(pathId, humanId).pipe(
       map(state => {
         const gate = state.gates.get(sectionId);
-        return gate ? this.refreshGateStatus(gate, humanId) : this.createGateStatus(sectionId, humanId);
+        return gate
+          ? this.refreshGateStatus(gate, humanId)
+          : this.createGateStatus(sectionId, humanId);
       })
     );
   }
@@ -290,11 +286,7 @@ export class PathAdaptationService {
   /**
    * Check if learner can proceed past a gate.
    */
-  canProceed(
-    pathId: string,
-    sectionId: string,
-    humanId: string
-  ): boolean {
+  canProceed(pathId: string, sectionId: string, humanId: string): boolean {
     const gate = this.getGateStatus(pathId, sectionId, humanId);
     return !gate.locked;
   }
@@ -320,7 +312,7 @@ export class PathAdaptationService {
       locked: !result.passed,
       reason: result.passed ? undefined : 'failed',
       bestScore: Math.max(gate.bestScore, result.score),
-      mastered: result.passed || gate.mastered
+      mastered: result.passed || gate.mastered,
     };
 
     // Refresh with cooldown info
@@ -353,7 +345,7 @@ export class PathAdaptationService {
       state.gates.set(sectionId, {
         ...gate,
         locked: false,
-        mastered: true
+        mastered: true,
       });
       state.completedSections.add(sectionId);
       this.saveState(pathId, humanId, state);
@@ -444,7 +436,7 @@ export class PathAdaptationService {
         title: section.title,
         masteryScore,
         conceptIds: section.conceptIds,
-        recommendSkip
+        recommendSkip,
       });
 
       // Find first section that shouldn't be skipped
@@ -458,7 +450,7 @@ export class PathAdaptationService {
       skippableSections,
       recommendedStartSection,
       preAssessmentScore: result.score,
-      conceptScores
+      conceptScores,
     };
 
     // Update state
@@ -478,7 +470,7 @@ export class PathAdaptationService {
           quizAvailable: true,
           remainingAttempts: 2,
           bestScore: section.masteryScore,
-          mastered: true
+          mastered: true,
         });
       }
     }
@@ -499,11 +491,7 @@ export class PathAdaptationService {
   /**
    * Apply skip-ahead selections.
    */
-  applySkipAhead(
-    pathId: string,
-    humanId: string,
-    sectionIdsToSkip: string[]
-  ): void {
+  applySkipAhead(pathId: string, humanId: string, sectionIdsToSkip: string[]): void {
     const state = this.getOrCreateState(pathId, humanId);
 
     for (const sectionId of sectionIdsToSkip) {
@@ -518,7 +506,7 @@ export class PathAdaptationService {
         quizAvailable: true,
         remainingAttempts: 2,
         bestScore: existingGate?.bestScore ?? 0,
-        mastered: true
+        mastered: true,
       });
     }
 
@@ -540,11 +528,7 @@ export class PathAdaptationService {
    * Check if all inline quizzes in a section are complete.
    * Required before mastery gate if configured.
    */
-  areSectionInlinesComplete(
-    pathId: string,
-    sectionId: string,
-    contentIds: string[]
-  ): boolean {
+  areSectionInlinesComplete(pathId: string, sectionId: string, contentIds: string[]): boolean {
     if (!this.config.requireInlineBeforeMastery) {
       return true;
     }
@@ -620,7 +604,7 @@ export class PathAdaptationService {
       recommendations: [],
       completedSections: new Set(),
       skippedSections: new Set(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     this.states.set(key, newState);
@@ -654,7 +638,7 @@ export class PathAdaptationService {
       cooldownEndsAt: cooldownStatus.cooldownEndsAt ?? undefined,
       remainingAttempts: cooldownStatus.attemptsRemaining,
       bestScore: this.cooldownService.getBestScore(sectionId, humanId),
-      mastered: this.cooldownService.isMastered(sectionId, humanId)
+      mastered: this.cooldownService.isMastered(sectionId, humanId),
     };
   }
 
@@ -678,16 +662,15 @@ export class PathAdaptationService {
       quizAvailable: !cooldownStatus.inCooldown && cooldownStatus.attemptsRemaining > 0,
       cooldownEndsAt: cooldownStatus.cooldownEndsAt ?? undefined,
       remainingAttempts: cooldownStatus.attemptsRemaining,
-      bestScore: Math.max(gate.bestScore, this.cooldownService.getBestScore(gate.sectionId, humanId)),
-      mastered: gate.mastered || this.cooldownService.isMastered(gate.sectionId, humanId)
+      bestScore: Math.max(
+        gate.bestScore,
+        this.cooldownService.getBestScore(gate.sectionId, humanId)
+      ),
+      mastered: gate.mastered || this.cooldownService.isMastered(gate.sectionId, humanId),
     };
   }
 
-  private generateRecommendations(
-    pathId: string,
-    humanId: string,
-    result: QuizResult
-  ): void {
+  private generateRecommendations(pathId: string, humanId: string, result: QuizResult): void {
     const state = this.getOrCreateState(pathId, humanId);
     const newRecs: ContentRecommendation[] = [];
 
@@ -703,8 +686,8 @@ export class PathAdaptationService {
           triggerContext: {
             quizType: result.type === 'mastery' ? 'mastery' : 'practice',
             conceptIds: [contentScore.contentId],
-            score: contentScore.averageScore
-          }
+            score: contentScore.averageScore,
+          },
         });
       }
     }
@@ -740,10 +723,12 @@ export class PathAdaptationService {
         gates: Array.from(state.gates.entries()),
         completedSections: Array.from(state.completedSections),
         skippedSections: Array.from(state.skippedSections),
-        skipAhead: state.skipAhead ? {
-          ...state.skipAhead,
-          conceptScores: Array.from(state.skipAhead.conceptScores.entries())
-        } : undefined
+        skipAhead: state.skipAhead
+          ? {
+              ...state.skipAhead,
+              conceptScores: Array.from(state.skipAhead.conceptScores.entries()),
+            }
+          : undefined,
       };
       localStorage.setItem(this.STORAGE_PREFIX + key, JSON.stringify(serializable));
     } catch (e) {
@@ -762,10 +747,12 @@ export class PathAdaptationService {
         gates: new Map(parsed.gates),
         completedSections: new Set(parsed.completedSections),
         skippedSections: new Set(parsed.skippedSections),
-        skipAhead: parsed.skipAhead ? {
-          ...parsed.skipAhead,
-          conceptScores: new Map(parsed.skipAhead.conceptScores)
-        } : undefined
+        skipAhead: parsed.skipAhead
+          ? {
+              ...parsed.skipAhead,
+              conceptScores: new Map(parsed.skipAhead.conceptScores),
+            }
+          : undefined,
       };
     } catch (e) {
       console.warn('Failed to load path adaptation state:', e);

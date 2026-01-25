@@ -11,7 +11,9 @@
  */
 
 import { Injectable, inject } from '@angular/core';
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+
 import { bankingStore, StagedTransactionLocal, ImportBatchLocal } from '../stores/banking-store';
 
 /**
@@ -24,7 +26,7 @@ export interface EconomicEventPayload {
   provider: string;
   receiver: string;
   resourceConformsTo: string;
-  resourceClassifiedAs: string[];  // Parsed JSON array
+  resourceClassifiedAs: string[]; // Parsed JSON array
   resourceQuantityValue: number;
   resourceQuantityUnit: string;
   effortQuantityValue?: number;
@@ -40,7 +42,7 @@ export interface EconomicEventPayload {
   triggeredBy?: string;
   atLocation?: string;
   lamadEventType?: string;
-  metadata: Record<string, unknown>;  // Parsed JSON object
+  metadata: Record<string, unknown>; // Parsed JSON object
   createdAt: string;
 }
 
@@ -61,10 +63,10 @@ export interface BatchCommitResult {
   totalAttempted: number;
   successCount: number;
   failureCount: number;
-  results: Array<{
+  results: {
     stagedId: string;
     result: CommitResult;
-  }>;
+  }[];
 }
 
 @Injectable({
@@ -89,11 +91,18 @@ export class EconomicEventBridgeService {
       }
 
       if (staged.reviewStatus !== 'approved') {
-        return { success: false, error: `Transaction ${stagedId} is not approved (status: ${staged.reviewStatus})` };
+        return {
+          success: false,
+          error: `Transaction ${stagedId} is not approved (status: ${staged.reviewStatus})`,
+        };
       }
 
       if (staged.economicEventId) {
-        return { success: true, economicEventId: staged.economicEventId, error: 'Already committed' };
+        return {
+          success: true,
+          economicEventId: staged.economicEventId,
+          error: 'Already committed',
+        };
       }
 
       // 2. Transform to EconomicEvent payload
@@ -118,7 +127,9 @@ export class EconomicEventBridgeService {
       staged.reviewStatus = 'approved'; // Stays approved, now with event link
       await bankingStore.saveStaged(staged);
 
-      console.log(`[EconomicEventBridge] Committed transaction ${stagedId} → event ${economicEventId}`);
+      console.log(
+        `[EconomicEventBridge] Committed transaction ${stagedId} → event ${economicEventId}`
+      );
 
       return {
         success: true,
@@ -196,15 +207,11 @@ export class EconomicEventBridgeService {
     // For debit: user is provider (spending), merchant is receiver
     // For credit: merchant is provider, user is receiver
     const isDebit = staged.type === 'debit' || staged.type === 'fee';
-    const provider = isDebit ? staged.stewardId : (staged.merchantName || 'external');
-    const receiver = isDebit ? (staged.merchantName || 'external') : staged.stewardId;
+    const provider = isDebit ? staged.stewardId : staged.merchantName || 'external';
+    const receiver = isDebit ? staged.merchantName || 'external' : staged.stewardId;
 
     // Resource classification from category
-    const resourceClassifications = [
-      staged.category,
-      staged.type,
-      'bank-import',
-    ];
+    const resourceClassifications = [staged.category, staged.type, 'bank-import'];
 
     // Build metadata preserving Plaid provenance
     const metadata = {

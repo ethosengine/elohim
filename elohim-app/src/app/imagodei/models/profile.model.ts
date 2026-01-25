@@ -12,11 +12,11 @@
  */
 
 // Models from lamad pillar
+import { MasteryLevel } from '../../elohim/models/agent.model';
+import { JsonLdMetadata } from '../../elohim/models/json-ld.model';
+import { OpenGraphMetadata } from '../../elohim/models/open-graph.model';
 import { ContentType } from '../../lamad/models/content-node.model';
 // Models from elohim pillar (canonical location for shared types)
-import { OpenGraphMetadata } from '../../elohim/models/open-graph.model';
-import { JsonLdMetadata } from '../../elohim/models/json-ld.model';
-import { MasteryLevel } from '../../elohim/models/agent.model';
 
 /**
  * Human Profile Summary
@@ -203,14 +203,14 @@ export interface TimelineEvent {
 }
 
 export type TimelineEventType =
-  | 'journey_started'      // Began a new learning path
-  | 'journey_completed'    // Finished a learning path
-  | 'step_completed'       // Completed a step
-  | 'capability_earned'    // Earned an attestation
+  | 'journey_started' // Began a new learning path
+  | 'journey_completed' // Finished a learning path
+  | 'step_completed' // Completed a step
+  | 'capability_earned' // Earned an attestation
   | 'meaningful_encounter' // Marked content with high affinity
-  | 'note_created'         // Added a personal reflection
-  | 'return_visit'         // Returned after absence (commitment)
-  | 'first_exploration';   // First content viewed (journey begins)
+  | 'note_created' // Added a personal reflection
+  | 'return_visit' // Returned after absence (commitment)
+  | 'first_exploration'; // First content viewed (journey begins)
 
 /**
  * Content Engagement

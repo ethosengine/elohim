@@ -1,13 +1,17 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, BehaviorSubject } from 'rxjs';
+
 import { map } from 'rxjs/operators';
+
+import { Observable, of, BehaviorSubject } from 'rxjs';
+
 import {
   DataLoaderService,
   AssessmentIndex,
-  AssessmentIndexEntry
+  AssessmentIndexEntry,
 } from '@app/elohim/services/data-loader.service';
-import { ContentNode } from '../models/content-node.model';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+
+import { ContentNode } from '../models/content-node.model';
 
 /**
  * Assessment result stored in localStorage (MVP) or source chain (Holochain).
@@ -146,7 +150,7 @@ export class AssessmentService {
       startedAt: new Date().toISOString(),
       currentQuestionIndex: 0,
       responses: {},
-      timeSpentMs: 0
+      timeSpentMs: 0,
     };
 
     this.activeSession$.next(session);
@@ -194,7 +198,7 @@ export class AssessmentService {
       questionId,
       questionType,
       value,
-      answeredAt: new Date().toISOString()
+      answeredAt: new Date().toISOString(),
     };
 
     session.currentQuestionIndex++;
@@ -253,7 +257,7 @@ export class AssessmentService {
           responses: session.responses,
           scores,
           interpretation,
-          attestationGranted: (assessment.metadata as any)?.attestationId
+          attestationGranted: (assessment.metadata as any)?.attestationId,
         };
 
         // Save result
@@ -286,10 +290,7 @@ export class AssessmentService {
     const sections = content.sections ?? [];
     const questions = content.questions ?? [];
 
-    const allQuestions = [
-      ...questions,
-      ...sections.flatMap((s: any) => s.questions ?? [])
-    ];
+    const allQuestions = [...questions, ...sections.flatMap((s: any) => s.questions ?? [])];
 
     for (const question of allQuestions) {
       const response = responses[question.id];
@@ -297,7 +298,7 @@ export class AssessmentService {
 
       const subscales = question.subscales ?? [];
       const value = typeof response.value === 'number' ? response.value : 0;
-      const actualValue = question.reverseScored ? (8 - value) : value; // Assume 7-point scale
+      const actualValue = question.reverseScored ? 8 - value : value; // Assume 7-point scale
 
       for (const subscale of subscales) {
         scores[subscale] = (scores[subscale] || 0) + actualValue;
@@ -310,20 +311,17 @@ export class AssessmentService {
   /**
    * Compute interpretation based on scores and assessment configuration.
    */
-  private computeInterpretation(
-    scores: Record<string, number>,
-    content: any
-  ): string | undefined {
+  private computeInterpretation(scores: Record<string, number>, content: any): string | undefined {
     const interpretation = content.interpretation;
     if (!interpretation) return undefined;
 
     if (interpretation.method === 'quadrant') {
       // E.g., attachment style
       const dimensions = interpretation.dimensions as string[];
-      const outcomes = interpretation.outcomes as Array<{
+      const outcomes = interpretation.outcomes as {
         name: string;
         [key: string]: string;
-      }>;
+      }[];
 
       if (dimensions.length === 2) {
         const [dim1, dim2] = dimensions;
@@ -336,9 +334,7 @@ export class AssessmentService {
         const level1 = score1 > threshold ? 'high' : 'low';
         const level2 = score2 > threshold ? 'high' : 'low';
 
-        const match = outcomes.find(o =>
-          o[dim1] === level1 && o[dim2] === level2
-        );
+        const match = outcomes.find(o => o[dim1] === level1 && o[dim2] === level2);
 
         return match?.name;
       }
@@ -377,9 +373,7 @@ export class AssessmentService {
    * Check if user has completed an assessment.
    */
   hasCompleted(assessmentId: string): Observable<boolean> {
-    return this.getResultForAssessment(assessmentId).pipe(
-      map(result => result !== null)
-    );
+    return this.getResultForAssessment(assessmentId).pipe(map(result => result !== null));
   }
 
   // =========================================================================
@@ -467,8 +461,8 @@ export class AssessmentService {
       }
     }
 
-    return results.sort((a, b) =>
-      new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
+    return results.sort(
+      (a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
     );
   }
 }
