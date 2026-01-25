@@ -11,10 +11,11 @@ The goal is a **"super Google Drive"** - a unified interface where humans can:
 
 1. **Steward their entire digital footprint** across all life contexts (files, photos, videos, books, learning, economics, identity, community)
 2. **See at a glance** the status of every piece of content:
+   - **Context**: Which app/life-area does it belong to?
+   - **Custody**: Who is stewarding it? On whose behalf?
    - **Safety**: Is it encrypted? Private? Public?
    - **Reach**: Who can see it? How far has it spread?
    - **Replication**: How safe is it? Where are the copies?
-   - **Context**: Which app/life-area does it belong to?
 3. **Trust the system** to protect, distribute, and preserve their content according to their preferences
 4. **Break free from silos** - no more fragmentation across Google/Apple/Amazon/Netflix/Spotify ecosystems
 
@@ -86,7 +87,7 @@ The vision is a **unified content management experience** like Google Drive or S
 
 ## Content Dimensions Model
 
-Every piece of content should expose **four** key dimension categories:
+Every piece of content should expose **five** key dimension categories:
 
 ### 4. Application Context Dimension
 
@@ -188,6 +189,192 @@ What app/context does this content belong to?
 - "Add to..." action to link content across contexts
 - Unified storage quota display across all contexts
 - Context-specific viewers/editors with shared dimension controls
+
+---
+
+### 5. Custodial Delegation Dimension
+
+Who is stewarding this content, and on whose behalf?
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 CUSTODIAL DELEGATION MODEL                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Not everyone can fully steward their own digital life.        │
+│  The system must support delegated care relationships:         │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                                                             ││
+│  │  WHO NEEDS CUSTODIAL SUPPORT?                               ││
+│  │  ════════════════════════════                               ││
+│  │                                                             ││
+│  │  👶 CHILDREN                                                ││
+│  │     Parents/guardians manage digital life until maturity    ││
+│  │     Gradual handoff of control as capability grows          ││
+│  │                                                             ││
+│  │  🧠 INTELLECTUALLY DISABLED / VULNERABLE ADULTS             ││
+│  │     Caregivers, social workers, family members              ││
+│  │     Court-appointed guardians, conservators                 ││
+│  │                                                             ││
+│  │  ⚖️ LEGALLY SUPERVISED                                      ││
+│  │     Probation/parole requirements                           ││
+│  │     Court-ordered monitoring                                ││
+│  │     Institutional oversight                                 ││
+│  │                                                             ││
+│  │  🔒 POLITICALLY SENSITIVE                                   ││
+│  │     Journalists protecting sources                          ││
+│  │     Dissidents in hostile regimes                           ││
+│  │     Whistleblowers needing trusted holders                  ││
+│  │     "Dead man's switch" scenarios                           ││
+│  │                                                             ││
+│  │  🏠 TRANSIENT / RESOURCE-LIMITED                            ││
+│  │     Immigrants without stable infrastructure                ││
+│  │     Homeless / housing-insecure individuals                 ││
+│  │     Economically disadvantaged (no personal devices)        ││
+│  │     Refugees needing identity continuity                    ││
+│  │                                                             ││
+│  │  👴 SENIOR CITIZENS                                         ││
+│  │     Family helping with technology                          ││
+│  │     Gradual transition as capability changes                ││
+│  │     Estate planning / inheritance preparation               ││
+│  │                                                             ││
+│  │  🏢 ORGANIZATIONAL                                          ││
+│  │     Employees (work content owned by org)                   ││
+│  │     Students (school-managed devices/content)               ││
+│  │     Members of institutions                                 ││
+│  │                                                             ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  DELEGATION MODEL:                                              │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                                                             ││
+│  │  AUTHORITY SOURCE                                           ││
+│  │  ════════════════                                           ││
+│  │                                                             ││
+│  │  EARNED      - Built through relationship over time         ││
+│  │               Trust score from interaction history          ││
+│  │               Demonstrated competence and care              ││
+│  │                                                             ││
+│  │  GIVEN       - Explicitly granted by the principal          ││
+│  │               Power of attorney equivalent                  ││
+│  │               Revocable at any time (if capable)            ││
+│  │                                                             ││
+│  │  ATTESTED    - Third-party verification                     ││
+│  │               Court orders, medical certifications          ││
+│  │               Institutional credentials                     ││
+│  │               Community vouching / web of trust             ││
+│  │                                                             ││
+│  │  INHERITED   - Succession from previous custodian           ││
+│  │               Estate transfer                               ││
+│  │               Organizational role handoff                   ││
+│  │                                                             ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  PERMISSION GRANULARITY (like Google Superadmin/MDM):          │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                                                             ││
+│  │  SCOPE           What content/contexts can they access?     ││
+│  │  ─────           - All contexts vs specific (photos only)   ││
+│  │                  - All content vs tagged subsets            ││
+│  │                  - Time-bounded access windows              ││
+│  │                                                             ││
+│  │  CAPABILITY      What actions can they take?                ││
+│  │  ──────────      - View only (monitoring)                   ││
+│  │                  - View + organize (curation)               ││
+│  │                  - View + organize + share (distribution)   ││
+│  │                  - Full control (backup, delete, settings)  ││
+│  │                                                             ││
+│  │  VISIBILITY      Can the principal see custodian actions?   ││
+│  │  ──────────      - Transparent (full audit trail visible)   ││
+│  │                  - Summarized (periodic reports)            ││
+│  │                  - Hidden (appropriate for some scenarios)  ││
+│  │                                                             ││
+│  │  OVERRIDE        Can principal override custodian?          ││
+│  │  ────────        - Always (custodian is helper only)        ││
+│  │                  - With witness (requires attestation)      ││
+│  │                  - Never (full guardianship)                ││
+│  │                                                             ││
+│  │  SUCCESSION      What happens when custodian unavailable?   ││
+│  │  ──────────      - Fallback custodian chain                 ││
+│  │                  - Revert to principal                      ││
+│  │                  - Community/institutional backup           ││
+│  │                                                             ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  TRUST TRANSITIONS:                                             │
+│                                                                 │
+│  Child → Adult:     Gradual capability handoff over years      │
+│  Senior → Family:   Gradual delegation as needs change         │
+│  Crisis → Recovery: Temporary delegation during hardship       │
+│  Death → Heir:      Estate transfer with preparation period    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Custodial Relationship Types**:
+
+| Relationship | Authority Source | Typical Scope | Override Model |
+|--------------|------------------|---------------|----------------|
+| Parent → Child | Legal + Given | Full | Never → Always (age-graduated) |
+| Guardian → Ward | Attested (court) | Full | With witness |
+| Caregiver → Elder | Given + Earned | Selective | Always |
+| Employer → Employee | Attested (contract) | Work context only | N/A (org owns) |
+| Trustee → Beneficiary | Attested (legal) | As defined | Per trust terms |
+| Support Network → Member | Earned + Given | Emergency only | Always |
+| Dead Man's Switch → Holder | Given | Release conditions | N/A (triggered) |
+
+**UI Considerations**:
+- "Manage on behalf of" mode in all apps
+- Clear visual indicator when acting as custodian
+- Audit log of custodial actions
+- Capability request/grant workflow
+- Transition planning tools (gradual handoff)
+- Emergency access protocols
+
+**Data Model**:
+```typescript
+interface CustodialRelationship {
+  id: string;
+  principalId: string;          // Whose content
+  custodianId: string;          // Who manages it
+
+  // Authority
+  authoritySource: 'earned' | 'given' | 'attested' | 'inherited';
+  attestations: Attestation[];  // Supporting evidence
+  grantedAt: string;
+  expiresAt?: string;           // Time-bounded access
+
+  // Scope
+  contextScope: string[];       // Which app contexts
+  contentScope: ContentFilter;  // Which content within contexts
+
+  // Capability
+  capabilities: CustodialCapability[];
+
+  // Visibility
+  auditVisibility: 'transparent' | 'summarized' | 'hidden';
+
+  // Override
+  principalCanOverride: boolean;
+  overrideRequiresWitness: boolean;
+
+  // Succession
+  fallbackCustodians: string[]; // Ordered list
+  successionTrigger: 'unavailable' | 'incapacitated' | 'death';
+}
+
+type CustodialCapability =
+  | 'view'
+  | 'organize'
+  | 'share'
+  | 'backup'
+  | 'delete'
+  | 'settings'
+  | 'delegate';  // Can assign sub-custodians
+```
 
 ---
 
