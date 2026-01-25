@@ -5,11 +5,11 @@
 
 ---
 
-## Vision: Digital Sovereignty Through Unified Storage
+## Vision: Digital Stewardship Through Unified Storage
 
 The goal is a **"super Google Drive"** - a unified interface where humans can:
 
-1. **Own their entire digital footprint** across all life contexts (files, photos, videos, books, learning, economics, identity, community)
+1. **Steward their entire digital footprint** across all life contexts (files, photos, videos, books, learning, economics, identity, community)
 2. **See at a glance** the status of every piece of content:
    - **Safety**: Is it encrypted? Private? Public?
    - **Reach**: Who can see it? How far has it spread?
