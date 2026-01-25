@@ -139,6 +139,8 @@ pub fn transform_path_step_v1_to_v2(v1: PathStepV1Export) -> PathStep {
         id: v1.id,
         path_id: v1.path_id,
         chapter_id: v1.chapter_id,
+        module_id: None,  // New field in V2 - not present in V1
+        section_id: None, // New field in V2 - not present in V1
         order_index: v1.order_index,
         step_type: v1.step_type,
         resource_id: v1.resource_id,
