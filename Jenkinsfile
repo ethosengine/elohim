@@ -86,21 +86,29 @@ def buildSophiaPlugin() {
             pnpm build
 
             echo "✅ Sophia packages built successfully"
-            ls -la packages/perseus/dist/ || true
-            ls -la packages/psyche-core/dist/ || true
+            ls -la packages/sophia/dist/ || true
+            ls -la packages/sophia-element/dist/ || true
         '''
     }
 
-    // Now build sophia-plugin which depends on sophia packages
-    echo 'Building sophia-plugin UMD bundle...'
-    dir('elohim-library/projects/sophia-plugin') {
-        sh '''
-            npm ci
-            npm run build
-            ls -la dist/
-            echo "✅ Sophia plugin built successfully"
-        '''
-    }
+    // Copy sophia-element UMD bundle and CSS to elohim-app assets
+    echo 'Copying sophia-element to elohim-app assets...'
+    sh '''
+        mkdir -p elohim-app/src/assets/sophia-plugin
+
+        # Copy UMD bundle from sophia-element
+        cp sophia/packages/sophia-element/dist/sophia-element.umd.js elohim-app/src/assets/sophia-plugin/
+
+        # Copy base CSS from main sophia package
+        cp sophia/packages/sophia/dist/index.css elohim-app/src/assets/sophia-plugin/
+
+        # Copy theme overrides from sophia-element
+        cp sophia/packages/sophia-element/dist/sophia-theme-overrides.css elohim-app/src/assets/sophia-plugin/
+        cp sophia/packages/sophia-element/dist/sophia.css elohim-app/src/assets/sophia-plugin/
+
+        echo "✅ Sophia plugin assets copied to elohim-app"
+        ls -la elohim-app/src/assets/sophia-plugin/
+    '''
 }
 
 def runE2ETests(String environment, String baseUrl, String gitCommitHash) {
