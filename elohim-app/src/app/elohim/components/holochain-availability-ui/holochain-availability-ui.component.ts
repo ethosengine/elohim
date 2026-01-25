@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject, computed, signal } from '@angular/core';
+import { Component, inject, computed, signal } from '@angular/core';
 
 import { HolochainClientService } from '../../services/holochain-client.service';
 import { HolochainContentService } from '../../services/holochain-content.service';
@@ -30,7 +30,7 @@ import { OfflineOperationQueueService } from '../../services/offline-operation-q
   templateUrl: './holochain-availability-ui.component.html',
   styleUrl: './holochain-availability-ui.component.css',
 })
-export class HolochainAvailabilityUiComponent implements OnInit, OnDestroy {
+export class HolochainAvailabilityUiComponent {
   private readonly holochainClient = inject(HolochainClientService);
   private readonly holochainContent = inject(HolochainContentService);
   private readonly operationQueue = inject(OfflineOperationQueueService);
@@ -124,14 +124,8 @@ export class HolochainAvailabilityUiComponent implements OnInit, OnDestroy {
     return '⊗';
   });
 
-  ngOnInit(): void {
-    // Auto-dismiss after successful connection
-    // (This would need a proper subscription in a real app - simplified here)
-  }
-
-  ngOnDestroy(): void {
-    // Cleanup if needed
-  }
+  // Note: ngOnInit/ngOnDestroy intentionally not implemented
+  // Auto-dismiss would need a proper subscription in a real app - simplified here
 
   /**
    * Dismiss the banner

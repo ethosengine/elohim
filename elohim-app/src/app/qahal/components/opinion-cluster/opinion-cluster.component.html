@@ -76,17 +76,9 @@
   <div class="cluster-details" *ngIf="selectedCluster">
     <div class="cluster-detail-header">
       <span class="cluster-dot" [style.background-color]="selectedCluster.color"></span>
-      <h4 class="cluster-name">{{ selectedCluster.name }}</h4>
-      <span class="cluster-size">{{ selectedCluster.size }} participants</span>
+      <h4 class="cluster-name">{{ selectedCluster.label }}</h4>
+      <span class="cluster-size">{{ selectedCluster.memberCount }} participants</span>
       <button class="close-btn" (click)="selectedCluster = null" aria-label="Close">×</button>
-    </div>
-    <div class="cluster-statements" *ngIf="selectedCluster.statements.length > 0">
-      <p class="detail-label">Top agreements in this group:</p>
-      <ul class="agreement-list">
-        <li *ngFor="let stmt of selectedCluster.statements.slice(0, 3)">
-          {{ stmt }}
-        </li>
-      </ul>
     </div>
   </div>
 
@@ -99,11 +91,8 @@
     <div class="position-details">
       <div class="position-cluster" *ngIf="currentUserPosition.cluster">
         <span>Group:</span>
-        <span
-          class="cluster-badge"
-          [style.background-color]="clusters.find(c => c.id === currentUserPosition!.cluster)?.color"
-        >
-          {{ clusters.find(c => c.id === currentUserPosition!.cluster)?.name }}
+        <span class="cluster-badge" [style.background-color]="getUserClusterColor()">
+          {{ getUserClusterLabel() }}
         </span>
       </div>
       <div class="position-votes">

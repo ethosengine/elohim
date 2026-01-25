@@ -485,7 +485,8 @@ export class HolochainClientService {
    * - 'imagodei' - Identity & Relationships DNA
    */
   async callZome<T>(input: ZomeCallInput): Promise<ZomeCallResult<T>> {
-    let { appWs, cellIds, state } = this.connectionSignal();
+    const { state } = this.connectionSignal();
+    let { appWs, cellIds } = this.connectionSignal();
 
     // Generate correlation ID for this request (for tracing)
     const correlationId = `zome-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -606,7 +607,8 @@ export class HolochainClientService {
    * Endpoint: POST /api/v1/zome/{dna_hash}/{zome_name}/{fn_name}
    */
   async callZomeRest<T>(input: ZomeCallInput): Promise<ZomeCallResult<T>> {
-    let { cellIds, state } = this.connectionSignal();
+    const { state } = this.connectionSignal();
+    let { cellIds } = this.connectionSignal();
     const startTime = Date.now();
 
     // Default to 'lamad' role if not specified

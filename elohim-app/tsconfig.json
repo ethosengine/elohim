@@ -18,6 +18,8 @@
       "@app/shefa/*": ["src/app/shefa/*"],
       "@app/doorway": ["src/app/doorway/index.ts"],
       "@app/doorway/*": ["src/app/doorway/*"],
+      "@app/testing": ["src/app/testing/mocks/index.ts"],
+      "@app/testing/*": ["src/app/testing/*"],
       "@elohim/service": ["../elohim-library/projects/elohim-service/src/index.ts"],
       "@elohim/service/*": ["../elohim-library/projects/elohim-service/src/*"],
       "@elohim/storage-client": ["node_modules/@elohim/storage-client/dist/index"],

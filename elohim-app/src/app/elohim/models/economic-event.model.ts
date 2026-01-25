@@ -193,14 +193,23 @@ export interface EventSignature {
 export type LamadEventType =
   // Attention Events
   | 'content-view' // Human viewed content (use + attention)
+  | 'content-complete' // Human completed content (produce + achievement)
   | 'path-step-complete' // Human completed a step (use + attention)
   | 'session-start' // Human began a session (use + attention)
   | 'session-end' // Human ended a session (use + attention)
+
+  // Assessment Events
+  | 'assessment-start' // Human started assessment (use + attention)
+  | 'assessment-complete' // Human completed assessment (produce + achievement)
+  | 'practice-attempt' // Human attempted practice (use + attention)
+  | 'quiz-submit' // Human submitted quiz (produce + achievement)
 
   // Recognition Events
   | 'affinity-mark' // Human marked affinity (appreciate + recognition)
   | 'endorsement' // Formal endorsement (appreciate + endorsement)
   | 'citation' // Content cited another (cite + recognition)
+  | 'recognition-given' // Recognition given to contributor (appreciate + recognition)
+  | 'recognition-received' // Recognition received (appreciate + recognition)
 
   // Achievement Events
   | 'path-complete' // Human completed a path (produce + credential)
@@ -269,14 +278,31 @@ export const LAMAD_EVENT_MAPPINGS: Record<
 > = {
   // Attention
   'content-view': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-view' },
+  'content-complete': { action: 'produce', resourceType: 'credential', defaultUnit: 'unit-each' },
   'path-step-complete': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-step' },
   'session-start': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-session' },
   'session-end': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-minute' },
+
+  // Assessment
+  'assessment-start': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-each' },
+  'assessment-complete': {
+    action: 'produce',
+    resourceType: 'credential',
+    defaultUnit: 'unit-each',
+  },
+  'practice-attempt': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-each' },
+  'quiz-submit': { action: 'produce', resourceType: 'credential', defaultUnit: 'unit-each' },
 
   // Recognition
   'affinity-mark': { action: 'raise', resourceType: 'recognition', defaultUnit: 'unit-affinity' },
   endorsement: { action: 'raise', resourceType: 'recognition', defaultUnit: 'unit-endorsement' },
   citation: { action: 'cite', resourceType: 'recognition', defaultUnit: 'unit-each' },
+  'recognition-given': { action: 'raise', resourceType: 'recognition', defaultUnit: 'unit-each' },
+  'recognition-received': {
+    action: 'raise',
+    resourceType: 'recognition',
+    defaultUnit: 'unit-each',
+  },
 
   // Achievement
   'path-complete': { action: 'produce', resourceType: 'credential', defaultUnit: 'unit-each' },

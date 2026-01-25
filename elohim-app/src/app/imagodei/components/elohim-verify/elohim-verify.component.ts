@@ -16,7 +16,7 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, inject, OnInit, OnDestroy, signal, computed, Input } from '@angular/core';
+import { Component, OnDestroy, signal, computed, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 /** Question from the doorway */
@@ -59,7 +59,7 @@ type VerificationStep = 'intro' | 'questions' | 'submitting' | 'result';
   templateUrl: './elohim-verify.component.html',
   styleUrls: ['./elohim-verify.component.css'],
 })
-export class ElohimVerifyComponent implements OnInit, OnDestroy {
+export class ElohimVerifyComponent implements OnDestroy {
   /** Recovery request ID to link verification to */
   @Input() requestId = '';
 
@@ -119,10 +119,6 @@ export class ElohimVerifyComponent implements OnInit, OnDestroy {
   // ===========================================================================
   // Lifecycle
   // ===========================================================================
-
-  ngOnInit(): void {
-    // Nothing to do on init - wait for user to start
-  }
 
   ngOnDestroy(): void {
     this.stopTimer();

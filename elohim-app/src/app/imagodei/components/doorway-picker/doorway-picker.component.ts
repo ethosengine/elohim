@@ -134,11 +134,12 @@ export class DoorwayPickerComponent implements OnInit {
 
       switch (sortOption) {
         case 'latency':
-        case 'recommended':
+        case 'recommended': {
           // Lower latency is better; null goes to end
           const latA = a.latencyMs ?? Infinity;
           const latB = b.latencyMs ?? Infinity;
           return latA - latB;
+        }
         case 'name':
           return a.name.localeCompare(b.name);
         case 'users':

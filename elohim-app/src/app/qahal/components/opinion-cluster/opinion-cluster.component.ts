@@ -199,39 +199,35 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
     const clusters: OpinionCluster[] = [
       {
         id: 'progressive',
-        name: 'Progressive',
+        label: 'Progressive',
         color: '#3498db',
-        centroid: { x: 0.5, y: 0.5 },
-        size: 0,
-        consensusLevel: 0,
-        statements: [],
+        centroid: [0.5, 0.5],
+        memberCount: 0,
+        averagePosition: 0.5,
       },
       {
         id: 'conservative',
-        name: 'Traditionalist',
+        label: 'Traditionalist',
         color: '#9b59b6',
-        centroid: { x: -0.5, y: 0.5 },
-        size: 0,
-        consensusLevel: 0,
-        statements: [],
+        centroid: [-0.5, 0.5],
+        memberCount: 0,
+        averagePosition: -0.5,
       },
       {
         id: 'pragmatic',
-        name: 'Pragmatic',
+        label: 'Pragmatic',
         color: '#27ae60',
-        centroid: { x: 0, y: -0.5 },
-        size: 0,
-        consensusLevel: 0,
-        statements: [],
+        centroid: [0, -0.5],
+        memberCount: 0,
+        averagePosition: 0,
       },
       {
         id: 'center',
-        name: 'Centrist',
+        label: 'Centrist',
         color: '#f39c12',
-        centroid: { x: 0, y: 0 },
-        size: 0,
-        consensusLevel: 0,
-        statements: [],
+        centroid: [0, 0],
+        memberCount: 0,
+        averagePosition: 0,
       },
     ];
 
@@ -242,7 +238,7 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
 
       for (const cluster of clusters) {
         const dist = Math.sqrt(
-          Math.pow(p.x - cluster.centroid.x, 2) + Math.pow(p.y - cluster.centroid.y, 2)
+          Math.pow(p.x - cluster.centroid[0], 2) + Math.pow(p.y - cluster.centroid[1], 2)
         );
         if (dist < minDist) {
           minDist = dist;
@@ -251,11 +247,11 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
       }
 
       p.cluster = nearestCluster.id;
-      nearestCluster.size++;
+      nearestCluster.memberCount++;
     }
 
     // Filter empty clusters
-    return clusters.filter(c => c.size > 0);
+    return clusters.filter(c => c.memberCount > 0);
   }
 
   /**
@@ -436,8 +432,8 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
   private drawClusters(ctx: CanvasRenderingContext2D, width: number, height: number): void {
     for (const cluster of this.clusters) {
       // Draw cluster region as transparent circle
-      const pos = this.toCanvasCoords(cluster.centroid.x, cluster.centroid.y, width, height);
-      const radius = Math.sqrt(cluster.size) * 20 + 30;
+      const pos = this.toCanvasCoords(cluster.centroid[0], cluster.centroid[1], width, height);
+      const radius = Math.sqrt(cluster.memberCount) * 20 + 30;
 
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
@@ -452,8 +448,8 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
         ctx.font = '12px system-ui, sans-serif';
         ctx.fillStyle = cluster.color;
         ctx.textAlign = 'center';
-        ctx.fillText(cluster.name, pos.x, pos.y - radius - 8);
-        ctx.fillText(`(${cluster.size})`, pos.x, pos.y - radius + 6);
+        ctx.fillText(cluster.label, pos.x, pos.y - radius - 8);
+        ctx.fillText(`(${cluster.memberCount})`, pos.x, pos.y - radius + 6);
       }
     }
   }
@@ -551,7 +547,7 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
       // Label
       ctx.font = '10px system-ui, sans-serif';
       ctx.fillStyle = '#666';
-      ctx.fillText(`${cluster.name} (${cluster.size})`, legendX + 16, y);
+      ctx.fillText(`${cluster.label} (${cluster.memberCount})`, legendX + 16, y);
 
       y += 16;
     }
@@ -636,12 +632,12 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
     // Check if clicked on a cluster
     for (const cluster of this.clusters) {
       const pos = this.toCanvasCoords(
-        cluster.centroid.x,
-        cluster.centroid.y,
+        cluster.centroid[0],
+        cluster.centroid[1],
         canvas.width,
         canvas.height
       );
-      const radius = Math.sqrt(cluster.size) * 20 + 30;
+      const radius = Math.sqrt(cluster.memberCount) * 20 + 30;
       const dist = Math.sqrt(Math.pow(x - pos.x, 2) + Math.pow(y - pos.y, 2));
 
       if (dist < radius) {
@@ -679,6 +675,28 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
     if (this.consensusStatements.includes(statement)) return 'consensus';
     if (this.divisiveStatements.includes(statement)) return 'divisive';
     return 'neutral';
+  }
+
+  /**
+   * Get the cluster for the current user.
+   */
+  getUserCluster(): OpinionCluster | undefined {
+    if (!this.currentUserPosition?.cluster) return undefined;
+    return this.clusters.find(c => c.id === this.currentUserPosition!.cluster);
+  }
+
+  /**
+   * Get the color of the current user's cluster.
+   */
+  getUserClusterColor(): string {
+    return this.getUserCluster()?.color ?? 'transparent';
+  }
+
+  /**
+   * Get the label of the current user's cluster.
+   */
+  getUserClusterLabel(): string {
+    return this.getUserCluster()?.label ?? '';
   }
 }
 

@@ -41,8 +41,8 @@ export class AnalyticsService {
 
     // Initialize dataLayer and gtag
     (window as any).dataLayer = (window as any).dataLayer ?? [];
-    (window as any).gtag = function () {
-      (window as any).dataLayer.push(arguments);
+    (window as any).gtag = (...args: unknown[]) => {
+      (window as any).dataLayer.push(args);
     };
 
     // Load script

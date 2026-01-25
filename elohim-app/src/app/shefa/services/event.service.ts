@@ -26,26 +26,28 @@ import { map } from 'rxjs/operators';
 import { Observable, forkJoin, of } from 'rxjs';
 
 import { EconomicEventView } from '@app/elohim/adapters/storage-types.adapter';
-import { EventQuery } from '@app/elohim/models/economic-event.model';
+import { EventQuery, LamadEventType } from '@app/elohim/models/economic-event.model';
 import { StorageApiService, CreateEventInput } from '@app/elohim/services/storage-api.service';
 
 /**
  * Lamad-specific event types (extends hREA actions with domain semantics)
+ * Values must match LamadEventType from economic-event.model.ts
  */
 export const LamadEventTypes = {
-  CONTENT_VIEW: 'content-view',
-  CONTENT_COMPLETE: 'content-complete',
-  PATH_STEP_COMPLETE: 'path-step-complete',
-  PATH_COMPLETE: 'path-complete',
-  ASSESSMENT_START: 'assessment-start',
-  ASSESSMENT_COMPLETE: 'assessment-complete',
-  PRACTICE_ATTEMPT: 'practice-attempt',
-  QUIZ_SUBMIT: 'quiz-submit',
-  RECOGNITION_GIVEN: 'recognition-given',
-  RECOGNITION_RECEIVED: 'recognition-received',
-} as const;
+  CONTENT_VIEW: 'content-view' as LamadEventType,
+  CONTENT_COMPLETE: 'content-complete' as LamadEventType,
+  PATH_STEP_COMPLETE: 'path-step-complete' as LamadEventType,
+  PATH_COMPLETE: 'path-complete' as LamadEventType,
+  ASSESSMENT_START: 'assessment-start' as LamadEventType,
+  ASSESSMENT_COMPLETE: 'assessment-complete' as LamadEventType,
+  PRACTICE_ATTEMPT: 'practice-attempt' as LamadEventType,
+  QUIZ_SUBMIT: 'quiz-submit' as LamadEventType,
+  RECOGNITION_GIVEN: 'recognition-given' as LamadEventType,
+  RECOGNITION_RECEIVED: 'recognition-received' as LamadEventType,
+};
 
-export type LamadEventType = (typeof LamadEventTypes)[keyof typeof LamadEventTypes];
+// Re-export for backwards compatibility
+export type { LamadEventType };
 
 /**
  * hREA action types
@@ -245,7 +247,7 @@ export class EventService {
    * Get events by Lamad event type.
    */
   getEventsByType(lamadEventType: LamadEventType): Observable<EconomicEventView[]> {
-    return this.storageApi.getEconomicEvents({ lamadEventType });
+    return this.storageApi.getEconomicEvents({ eventTypes: [lamadEventType] });
   }
 
   /**
@@ -266,7 +268,7 @@ export class EventService {
     return this.storageApi
       .getEconomicEvents({
         contentId,
-        lamadEventType,
+        eventTypes: lamadEventType ? [lamadEventType] : undefined,
       })
       .pipe(map(events => events.length));
   }
@@ -293,7 +295,7 @@ export class EventService {
       .getEconomicEvents({
         agentId,
         contentId,
-        lamadEventType: LamadEventTypes.CONTENT_VIEW,
+        eventTypes: [LamadEventTypes.CONTENT_VIEW],
       })
       .pipe(map(events => events.length > 0));
   }
@@ -306,7 +308,7 @@ export class EventService {
       .getEconomicEvents({
         agentId,
         contentId,
-        lamadEventType: LamadEventTypes.CONTENT_COMPLETE,
+        eventTypes: [LamadEventTypes.CONTENT_COMPLETE],
       })
       .pipe(map(events => events.length > 0));
   }

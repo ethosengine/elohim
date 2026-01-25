@@ -45,22 +45,21 @@ import {
 import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
 
 import { SeoService } from '../../../services/seo.service';
+import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';
+import { ContentEditorService } from '../../content-io/services/content-editor.service';
 import { ContentNode } from '../../models/content-node.model';
-import { ContentService } from '../../services/content.service';
-
+import { PathContext } from '../../models/exploration-context.model';
 import {
   RendererRegistryService,
   ContentRenderer,
   RendererCompletionEvent,
 } from '../../renderers/renderer-registry.service';
+import { ContentService } from '../../services/content.service';
 
 // Content I/O for download functionality
-import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';
-import { ContentEditorService } from '../../content-io/services/content-editor.service';
 
 // Exploration components
 import { PathContextService } from '../../services/path-context.service';
-import { PathContext } from '../../models/exploration-context.model';
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 

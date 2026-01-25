@@ -8,10 +8,10 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, computed } from '@angular/core';
 
-import { HealthCheckService, HealthState, HealthCheck } from '../../services/health-check.service';
+import { HealthCheckService, HealthState } from '../../services/health-check.service';
 
 @Component({
-  selector: 'elohim-health-indicator',
+  selector: 'app-health-indicator',
   standalone: true,
   imports: [CommonModule],
   templateUrl: './health-indicator.component.html',

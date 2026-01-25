@@ -269,13 +269,14 @@ export class ProposalVoteComponent implements OnInit, OnDestroy {
   private calculateVoteResults(): void {
     // MVP: Use simulated data or pull from proposal
     // In production, this would query the actual votes
-    if (this.proposal.votes) {
+    if (this.proposal.currentVotes) {
+      const votes = this.proposal.currentVotes;
       this.voteResults = {
-        total: Object.values(this.proposal.votes).reduce((a, b) => a + b, 0),
-        agree: this.proposal.votes['agree'] ?? 0,
-        abstain: this.proposal.votes['abstain'] ?? 0,
-        disagree: this.proposal.votes['disagree'] ?? 0,
-        block: this.proposal.votes['block'] ?? 0,
+        total: Object.values(votes).reduce((a: number, b: number) => a + b, 0),
+        agree: votes['agree'] ?? 0,
+        abstain: votes['abstain'] ?? 0,
+        disagree: votes['disagree'] ?? 0,
+        block: votes['block'] ?? 0,
       };
     }
   }
@@ -284,13 +285,8 @@ export class ProposalVoteComponent implements OnInit, OnDestroy {
    * Initialize SLA countdown timer.
    */
   private initSlaCountdown(): void {
-    // Parse deadline from proposal
-    if (this.proposal.deadline) {
-      this.slaDeadline = new Date(this.proposal.deadline);
-    } else {
-      // Default: 7 days from now
-      this.slaDeadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    }
+    // Default: 7 days from now (deadline field to be added to ProposalRecord)
+    this.slaDeadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     // Update every minute
     interval(60000)

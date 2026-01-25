@@ -125,12 +125,11 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     });
 
     // Configure custom renderer to transform blob URLs in images
-    const self = this; // Capture reference for closure
     this.marked.use({
       renderer: {
-        image(token) {
+        image: token => {
           // Transform blob URLs to full doorway URLs
-          const resolvedHref = self.resolveBlobUrl(token.href);
+          const resolvedHref = this.resolveBlobUrl(token.href);
           const title = token.title ? ` title="${token.title}"` : '';
           return `<img src="${resolvedHref}" alt="${token.text}"${title}>`;
         },
