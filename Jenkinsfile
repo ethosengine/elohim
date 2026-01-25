@@ -85,9 +85,20 @@ def buildSophiaPlugin() {
             # Build all packages (creates dist/ in each package)
             pnpm build
 
+            # Build UMD bundle separately (uses different rollup config)
+            # Must run AFTER main build to overwrite the incorrectly-generated ESM file
+            pnpm --filter @ethosengine/sophia-element build:umd
+
             echo "✅ Sophia packages built successfully"
             ls -la packages/sophia/dist/ || true
             ls -la packages/sophia-element/dist/ || true
+
+            # Verify UMD bundle is actually UMD format (not ESM)
+            if head -c 50 packages/sophia-element/dist/sophia-element.umd.js | grep -q "^import "; then
+                echo "ERROR: sophia-element.umd.js contains ESM syntax instead of UMD"
+                exit 1
+            fi
+            echo "✅ UMD bundle format verified"
         '''
     }
 
