@@ -716,6 +716,7 @@ export class ContentService {
    *
    * Handles multiple formats:
    * - Full URL (https://...): pass through unchanged
+   * - Relative asset path (/images/..., /assets/...): pass through unchanged
    * - Relative path (/blob/sha256-...): extract hash, build URL
    * - Blob hash (sha256-...): build URL directly
    * - Null/undefined: return undefined
@@ -731,6 +732,12 @@ export class ContentService {
       return value;
     }
 
+    // Relative asset paths (static assets served by Angular or CDN) - pass through
+    // These are NOT blob references; they're served from public/images, public/assets, etc.
+    if (value.startsWith('/images/') || value.startsWith('/assets/')) {
+      return value;
+    }
+
     // Extract blob hash from various formats
     let blobHash = value;
 
@@ -741,6 +748,12 @@ export class ContentService {
     // Handle blob/{hash} format (no leading slash)
     else if (value.startsWith('blob/')) {
       blobHash = value.slice(5);
+    }
+
+    // Only convert to blob URL if it looks like a hash (sha256-... or sha256:...)
+    // Other relative paths should pass through unchanged
+    if (!blobHash.startsWith('sha256-') && !blobHash.startsWith('sha256:')) {
+      return value;
     }
 
     // Build full URL using strategy-aware service
