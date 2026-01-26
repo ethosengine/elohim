@@ -115,11 +115,11 @@ class PercentileCalculator {
 })
 export class PerformanceMetricsService {
   // Percentile calculators for response times
-  private queryPercentiles = new PercentileCalculator();
-  private mutationPercentiles = new PercentileCalculator();
+  private readonly queryPercentiles = new PercentileCalculator();
+  private readonly mutationPercentiles = new PercentileCalculator();
 
   // Metrics storage
-  private metrics = signal<LocalMetrics>({
+  private readonly metrics = signal<LocalMetrics>({
     queryResponseTimes: { count: 0, p50: 0, p95: 0, p99: 0, min: 0, max: 0, mean: 0 },
     mutationResponseTimes: { count: 0, p50: 0, p95: 0, p99: 0, min: 0, max: 0, mean: 0 },
     startTime: Date.now(),

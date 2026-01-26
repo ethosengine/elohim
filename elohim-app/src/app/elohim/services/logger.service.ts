@@ -402,8 +402,8 @@ export class LoggerService {
  */
 export class ChildLogger {
   constructor(
-    private parent: LoggerService,
-    private source: string
+    private readonly parent: LoggerService,
+    private readonly source: string
   ) {}
 
   debug(message: string, context?: Record<string, unknown>): void {

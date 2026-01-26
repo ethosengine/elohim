@@ -44,7 +44,7 @@ export class DuplicateDetectionService {
   private hashIndex: HashIndex = {};
 
   // Set of known plaidTransactionIds
-  private plaidIdSet = new Set<string>();
+  private readonly plaidIdSet = new Set<string>();
 
   constructor() {}
 

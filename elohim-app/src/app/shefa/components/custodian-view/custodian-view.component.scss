@@ -12,9 +12,8 @@ $color-danger: #ef4444;
 $color-text: #1f2937;
 $color-text-muted: #6b7280;
 $color-border: #e5e7eb;
-$color-bg: #ffffff;
+$color-bg: #fff;
 $color-bg-subtle: #f9fafb;
-
 $color-helping: #8b5cf6; // Purple for giving
 $color-being-helped: #10b981; // Green for receiving
 $color-balanced: #3b82f6; // Blue for balanced
@@ -294,7 +293,7 @@ $color-balanced: #3b82f6; // Blue for balanced
 
   &:hover {
     border-color: $color-primary;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 5%);
   }
 }
 
@@ -490,7 +489,6 @@ $color-balanced: #3b82f6; // Blue for balanced
   }
 
   p {
-    margin: 0;
     color: $color-text-muted;
     font-size: 0.9rem;
     max-width: 300px;
@@ -540,7 +538,7 @@ $color-balanced: #3b82f6; // Blue for balanced
 // RESPONSIVE
 // =============================================================================
 
-@media (max-width: 640px) {
+@media (width <= 640px) {
   .balance-summary {
     flex-wrap: wrap;
 

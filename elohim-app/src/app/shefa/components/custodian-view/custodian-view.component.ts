@@ -45,9 +45,9 @@ export class CustodianViewComponent implements OnInit, OnDestroy {
   error: string | null = null;
   activeTab: 'helping' | 'beingHelped' = 'helping';
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
-  constructor(private shefaCompute: ShefaComputeService) {}
+  constructor(private readonly shefaCompute: ShefaComputeService) {}
 
   ngOnInit(): void {
     if (!this.operatorId) {

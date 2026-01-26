@@ -43,7 +43,7 @@
 
       .batch-number {
         font-weight: 600;
-        color: #0066cc;
+        color: #06c;
       }
     }
   }
@@ -74,7 +74,7 @@
     padding-top: 90px;
 
     h3 {
-      margin: 0 0 15px 0;
+      margin: 0 0 15px;
       font-size: 16px;
       font-weight: 600;
       color: #1a1a1a;
@@ -117,7 +117,7 @@
     border-radius: 8px;
     padding: 30px;
     margin-bottom: 30px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 5%);
   }
 
   // Transaction summary
@@ -232,7 +232,7 @@
           .btn-edit-category {
             background: none;
             border: none;
-            color: #0066cc;
+            color: #06c;
             cursor: pointer;
             font-size: 16px;
             padding: 0;
@@ -279,7 +279,7 @@
         max-height: 300px;
         overflow-y: auto;
         z-index: 100;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
 
         .category-search {
           display: block;
@@ -397,14 +397,14 @@
       }
 
       p {
-        margin: 5px 0 0 0;
+        margin: 5px 0 0;
         color: #856404;
         font-size: 14px;
 
         .btn-link {
           background: none;
           border: none;
-          color: #0066cc;
+          color: #06c;
           cursor: pointer;
           text-decoration: underline;
           font-weight: 600;
@@ -515,12 +515,12 @@
       cursor: pointer;
       font-size: 14px;
       font-weight: 600;
-      color: #0066cc;
+      color: #06c;
       transition: all 0.2s ease;
 
       &:hover:not(:disabled) {
         background: #f9f9f9;
-        border-color: #0066cc;
+        border-color: #06c;
       }
 
       &:disabled {
@@ -560,7 +560,7 @@
 
         &:focus {
           outline: none;
-          border-color: #0066cc;
+          border-color: #06c;
         }
       }
 
@@ -607,8 +607,8 @@
 
         &:hover:not(:disabled) {
           background: #f9f9f9;
-          border-color: #0066cc;
-          color: #0066cc;
+          border-color: #06c;
+          color: #06c;
         }
 
         &:disabled {
@@ -642,12 +642,12 @@
         font-size: 13px;
 
         &:hover {
-          border-color: #0066cc;
+          border-color: #06c;
           background: #f9f9f9;
         }
 
         &.active {
-          border-color: #0066cc;
+          border-color: #06c;
           background: #e3f2fd;
           font-weight: 600;
         }
@@ -739,7 +739,7 @@
         dt {
           font-weight: 600;
           font-size: 12px;
-          color: #0066cc;
+          color: #06c;
           margin-top: 8px;
 
           &:first-child {
@@ -748,7 +748,7 @@
         }
 
         dd {
-          margin: 2px 0 0 0;
+          margin: 2px 0 0;
           font-size: 11px;
           color: #666;
           padding-left: 12px;
@@ -765,7 +765,7 @@
   .loading-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgb(0 0 0 / 30%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -790,7 +790,7 @@
 }
 
 // Responsive design
-@media (max-width: 1024px) {
+@media (width <= 1024px) {
   .transaction-review-container {
     .review-header {
       right: 0;

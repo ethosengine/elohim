@@ -86,19 +86,19 @@ export class ComputeEventService {
   private config: ComputeEventConfig = DEFAULT_CONFIG;
 
   // Track last usage metrics to calculate delta
-  private lastMetrics$ = new BehaviorSubject<ComputeMetrics | null>(null);
-  private lastAllocations$ = new BehaviorSubject<AllocationSnapshot | null>(null);
+  private readonly lastMetrics$ = new BehaviorSubject<ComputeMetrics | null>(null);
+  private readonly lastAllocations$ = new BehaviorSubject<AllocationSnapshot | null>(null);
 
   // Emit computed events
-  private computeEvents$ = new Subject<ComputeEventPayload>();
+  private readonly computeEvents$ = new Subject<ComputeEventPayload>();
 
   // Track emission to avoid duplicates
   private lastEmissionTime = Date.now();
 
   constructor(
-    private holochain: HolochainClientService,
-    private economicService: EconomicService,
-    private shefaCompute: ShefaComputeService
+    private readonly holochain: HolochainClientService,
+    private readonly economicService: EconomicService,
+    private readonly shefaCompute: ShefaComputeService
   ) {}
 
   /**

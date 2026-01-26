@@ -140,23 +140,26 @@ export class BlobStreamingService {
   maxParallelChunks = 4;
 
   /** Minimum parallel chunks (for stability) */
-  private minParallelChunks = 1;
+  private readonly minParallelChunks = 1;
 
   /** Maximum parallel chunks (limit resource usage) */
-  private maxMaxParallelChunks = 16;
+  private readonly maxMaxParallelChunks = 16;
 
   /** Cached bandwidth probes (expires after 10 minutes) */
-  private bandwidthCache = new Map<string, { result: BandwidthProbeResult; timestamp: number }>();
+  private readonly bandwidthCache = new Map<
+    string,
+    { result: BandwidthProbeResult; timestamp: number }
+  >();
 
   /** Performance metrics history for auto-tuning */
   private performanceHistory: DownloadPerformanceMetrics[] = [];
 
   /** Maximum history entries to keep */
-  private maxHistorySize = 20;
+  private readonly maxHistorySize = 20;
 
   constructor(
-    private http: HttpClient,
-    private doorway: DoorwayClientService
+    private readonly http: HttpClient,
+    private readonly doorway: DoorwayClientService
   ) {}
 
   /**

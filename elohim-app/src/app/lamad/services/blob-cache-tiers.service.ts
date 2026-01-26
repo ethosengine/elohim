@@ -85,7 +85,7 @@ export interface CacheIntegrityCheckResult {
  * All operations are O(1).
  */
 class LRUCache<T> {
-  private cache = new Map<string, CachedItem<T>>();
+  private readonly cache = new Map<string, CachedItem<T>>();
   private currentSize = 0;
   private stats = { hits: 0, misses: 0, evictions: 0 };
 
@@ -244,17 +244,17 @@ class LRUCache<T> {
 })
 export class BlobCacheTiersService {
   // Tier 1: Metadata (unlimited, no eviction)
-  private metadataCache = new Map<string, CachedItem<ContentBlob>>();
+  private readonly metadataCache = new Map<string, CachedItem<ContentBlob>>();
   private metadataStats = { hits: 0, misses: 0, evictions: 0 };
 
   // Tier 2: Blobs (1 GB, LRU, 24h TTL)
-  private blobCache = new LRUCache<Blob>(
+  private readonly blobCache = new LRUCache<Blob>(
     1024 * 1024 * 1024, // 1 GB
     24 * 60 * 60 // 24 hours
   );
 
   // Tier 3: Chunks (10 GB, LRU, 7-day TTL)
-  private chunkCache = new LRUCache<Uint8Array>(
+  private readonly chunkCache = new LRUCache<Uint8Array>(
     10 * 1024 * 1024 * 1024, // 10 GB
     7 * 24 * 60 * 60 // 7 days
   );
@@ -267,8 +267,8 @@ export class BlobCacheTiersService {
   private wasmCacheInitialized = false;
 
   constructor(
-    private injector: Injector,
-    private wasmCache: WasmCacheService
+    private readonly injector: Injector,
+    private readonly wasmCache: WasmCacheService
   ) {
     this.startCleanupTimer();
     this.startIntegrityVerification();

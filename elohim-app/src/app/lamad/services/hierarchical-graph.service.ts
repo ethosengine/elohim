@@ -31,7 +31,7 @@ import { LearningPath, PathChapter, PathModule, PathSection } from '../models/le
  * LRU Cache for cluster data.
  */
 class LRUCache<K, V> {
-  private cache = new Map<K, V>();
+  private readonly cache = new Map<K, V>();
   private readonly maxSize: number;
 
   constructor(maxSize = 50) {
@@ -86,7 +86,7 @@ class LRUCache<K, V> {
 @Injectable({ providedIn: 'root' })
 export class HierarchicalGraphService {
   /** Currently expanded clusters */
-  private expandedClusters = new Set<string>();
+  private readonly expandedClusters = new Set<string>();
 
   /** Cache for expanded cluster children */
   private readonly childrenCache = new LRUCache<string, ClusterNode[]>(50);
@@ -95,7 +95,7 @@ export class HierarchicalGraphService {
   private readonly connectionsCache = new LRUCache<string, ClusterConnection[]>(100);
 
   /** Map from conceptId to containing cluster ID (for relationship aggregation) */
-  private conceptToClusterMap = new Map<string, string>();
+  private readonly conceptToClusterMap = new Map<string, string>();
 
   /** Current graph data (cached observable) */
   private currentGraph$: Observable<ClusterGraphData> | null = null;
@@ -265,7 +265,7 @@ export class HierarchicalGraphService {
     for (const nodeId of visibleNodeIds) {
       // Get the node from cache or graph
       const node = this.findNode(nodeId);
-      if (node && node.parentClusterId) {
+      if (node?.parentClusterId) {
         const siblings = nodesByParent.get(node.parentClusterId) || [];
         siblings.push(node);
         nodesByParent.set(node.parentClusterId, siblings);

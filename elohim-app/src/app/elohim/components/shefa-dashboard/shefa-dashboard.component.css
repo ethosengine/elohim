@@ -19,7 +19,7 @@
   padding: 24px;
   background: white;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
 }
 
 .header-left h1 {
@@ -61,7 +61,7 @@
   background: white;
   border-radius: 12px;
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
   transition:
     transform 0.2s,
     box-shadow 0.2s;
@@ -69,7 +69,7 @@
 
 .card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
 }
 
 .metric-card {
@@ -146,7 +146,7 @@
   background: white;
   padding: 16px;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
 }
 
 .tab-button {
@@ -181,6 +181,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -295,7 +296,7 @@
   padding: 16px;
   background: white;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
 }
 
 .filter-group {
@@ -369,7 +370,7 @@
 
 .tier-badge[data-tier='1'] {
   background: #e7f3ff;
-  color: #0066cc;
+  color: #06c;
 }
 
 .tier-badge[data-tier='2'] {
@@ -422,7 +423,7 @@
   text-align: center;
   background: white;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
   font-size: 16px;
   color: #666;
 }
@@ -502,7 +503,7 @@
   font-size: 13px;
   color: #666;
   padding: 8px;
-  background: rgba(0, 0, 0, 0.03);
+  background: rgb(0 0 0 / 3%);
   border-radius: 4px;
 }
 
@@ -583,7 +584,7 @@
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .shefa-dashboard {
     padding: 16px;
   }

@@ -83,9 +83,9 @@ export interface UrlValidationResult {
 })
 export class BlobFallbackService {
   /** Track URL health for prioritization */
-  private urlHealthMap = new Map<string, UrlHealth>();
+  private readonly urlHealthMap = new Map<string, UrlHealth>();
 
-  constructor(private http: HttpClient) {}
+  constructor(private readonly http: HttpClient) {}
 
   /**
    * Fetch blob with fallback URLs.

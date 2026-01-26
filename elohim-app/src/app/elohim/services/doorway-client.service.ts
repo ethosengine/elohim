@@ -148,7 +148,7 @@ export class DoorwayClientService {
   /** Maximum retries for failed requests */
   private maxRetries = 3;
 
-  constructor(private http: HttpClient) {
+  constructor(private readonly http: HttpClient) {
     // Use environment config or default to same origin
     this.baseUrl = environment.doorwayUrl || '';
   }

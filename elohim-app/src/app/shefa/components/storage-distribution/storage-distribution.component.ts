@@ -51,9 +51,9 @@ export class StorageDistributionComponent implements OnInit, OnDestroy {
   error: string | null = null;
   activeView: 'type' | 'reach' | 'node' = 'type';
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
-  constructor(private shefaCompute: ShefaComputeService) {}
+  constructor(private readonly shefaCompute: ShefaComputeService) {}
 
   ngOnInit(): void {
     this.activeView = this.initialView;

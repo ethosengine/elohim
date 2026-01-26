@@ -553,7 +553,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     return sorted[0]?.key ?? 'governance';
   });
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
   private lastRecognition: Recognition | null = null;
   private psycheAPI: PsycheAPI | null = null;
 

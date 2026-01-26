@@ -129,7 +129,7 @@ export class BlobBootstrapEngine {
   };
 
   // Event listeners (simple pub/sub)
-  private listeners = new Map<
+  private readonly listeners = new Map<
     BlobBootstrapEvent['type'],
     Set<(event: BlobBootstrapEvent) => void>
   >();
@@ -138,10 +138,10 @@ export class BlobBootstrapEngine {
   private initializationStarted = false;
 
   constructor(
-    private holochainChecker: HolochainConnectionChecker,
-    private metadataFetcher: BlobMetadataFetcher,
-    private cacheVerifier: CacheIntegrityVerifier,
-    private config: BlobBootstrapConfig = {}
+    private readonly holochainChecker: HolochainConnectionChecker,
+    private readonly metadataFetcher: BlobMetadataFetcher,
+    private readonly cacheVerifier: CacheIntegrityVerifier,
+    private readonly config: BlobBootstrapConfig = {}
   ) {}
 
   /**

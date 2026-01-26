@@ -81,13 +81,16 @@ export interface BlobReplicationStatus {
 })
 export class CustodianBlobDistributionService {
   /** Cache of available custodians */
-  private custodianCache = new Map<string, CustodianCapability>();
+  private readonly custodianCache = new Map<string, CustodianCapability>();
 
   /** Track active commitments */
-  private blobCommitments = new Map<string, CustodianBlobCommitment[]>();
+  private readonly blobCommitments = new Map<string, CustodianBlobCommitment[]>();
 
   /** Custodian health scores */
-  private custodianHealthScores = new Map<string, { score: number; lastUpdated: number }>();
+  private readonly custodianHealthScores = new Map<
+    string,
+    { score: number; lastUpdated: number }
+  >();
 
   constructor() {
     // Start periodic health check

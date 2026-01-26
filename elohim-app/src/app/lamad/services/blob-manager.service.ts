@@ -120,7 +120,7 @@ export interface BlobsForContentOutput {
 })
 export class BlobManagerService {
   /** Simple in-memory cache for blobs */
-  private blobCache = new Map<string, Blob>();
+  private readonly blobCache = new Map<string, Blob>();
 
   /** Track cache size (bytes) */
   private cacheSize = 0;
@@ -135,9 +135,9 @@ export class BlobManagerService {
   private storageClient: StorageClientService | null = null;
 
   constructor(
-    private verificationService: BlobVerificationService,
-    private fallbackService: BlobFallbackService,
-    private injector: Injector
+    private readonly verificationService: BlobVerificationService,
+    private readonly fallbackService: BlobFallbackService,
+    private readonly injector: Injector
   ) {}
 
   // =========================================================================
@@ -544,7 +544,7 @@ export class BlobManagerService {
   getBlobsForContent(contentId: string): Observable<ContentBlob[]> {
     return from(this.callGetBlobsForContent(contentId)).pipe(
       map(output => {
-        if (!output || !output.blobs || output.blobs.length === 0) {
+        if (!output?.blobs || output.blobs.length === 0) {
           return [];
         }
 

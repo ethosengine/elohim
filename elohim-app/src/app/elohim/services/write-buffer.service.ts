@@ -169,7 +169,7 @@ export class WriteBufferService implements OnDestroy {
   private implementation: 'wasm' | 'typescript' = 'typescript';
   private initPromise: Promise<BufferInitializationResult> | null = null;
 
-  private autoFlushInterval: number | null = null;
+  private readonly autoFlushInterval: number | null = null;
   private flushCallback: FlushCallback | null = null;
   private readonly destroy$ = new Subject<void>();
 

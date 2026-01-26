@@ -460,7 +460,7 @@ export class MasteryGateComponent implements OnInit, OnDestroy {
     return gate?.quizAvailable ?? false;
   });
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
     private readonly adaptationService: PathAdaptationService,

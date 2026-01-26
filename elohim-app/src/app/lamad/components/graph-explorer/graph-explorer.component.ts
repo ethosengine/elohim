@@ -275,7 +275,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: path => {
-          if (!path || !path.chapters || path.chapters.length === 0) {
+          if (!path?.chapters || path.chapters.length === 0) {
             this.error = 'No content available for overview';
             this.isLoading = false;
             return;

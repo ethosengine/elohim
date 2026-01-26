@@ -102,12 +102,12 @@ export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
   computeNeeds: ComputeNeedsAssessment | null = null;
   isLoading = true;
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
   private rawAlerts: OfflineNodeAlert[] = [];
 
   constructor(
-    private shefaCompute: ShefaComputeService,
-    private router: Router
+    private readonly shefaCompute: ShefaComputeService,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {

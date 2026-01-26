@@ -57,7 +57,7 @@ export const MASTERY_LEVEL_ORDER: Record<MasteryLevelType, number> = {
   providedIn: 'root',
 })
 export class MasteryService {
-  constructor(private storageApi: StorageApiService) {}
+  constructor(private readonly storageApi: StorageApiService) {}
 
   // ===========================================================================
   // Query Methods

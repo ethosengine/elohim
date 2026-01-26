@@ -38,7 +38,7 @@
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  background: var(--surface-overlay, rgba(255, 255, 255, 0.9));
+  background: var(--surface-overlay, rgb(255 255 255 / 90%));
   z-index: 10;
 }
 
@@ -73,7 +73,7 @@
   color: var(--primary-color, #007bff);
   text-decoration: none;
   padding: 0.5rem 1rem;
-  border: 1px solid currentColor;
+  border: 1px solid currentcolor;
   border-radius: 4px;
   transition:
     background-color 0.2s,

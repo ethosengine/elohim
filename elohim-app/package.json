@@ -11,6 +11,9 @@
     "build": "ng build",
     "lint": "eslint src --ext .ts,.html",
     "lint:fix": "NODE_OPTIONS='--max-old-space-size=4096' eslint src --ext .ts,.html --fix",
+    "lint:css": "stylelint 'src/**/*.{css,scss}'",
+    "lint:css:fix": "stylelint 'src/**/*.{css,scss}' --fix",
+    "lint:all": "npm run lint && npm run lint:css",
     "format": "prettier --write \"src/**/*.{ts,html,css,scss}\"",
     "format:check": "prettier --check \"src/**/*.{ts,html,css,scss}\"",
     "watch": "ng build --watch --configuration development",
@@ -116,6 +119,8 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
     "sonarqube-scanner": "^4.3.4",
+    "stylelint": "^17.0.0",
+    "stylelint-config-standard-scss": "^17.0.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.50.1"
   },

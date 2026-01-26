@@ -91,7 +91,7 @@ export class BlobVerificationService {
   /** Whether WASM is available */
   private wasmAvailable = false;
 
-  constructor(private doorway: DoorwayClientService) {}
+  constructor(private readonly doorway: DoorwayClientService) {}
 
   /**
    * Verify blob integrity using SHA256 hash.

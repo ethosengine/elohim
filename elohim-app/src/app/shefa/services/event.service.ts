@@ -66,7 +66,7 @@ export type REAAction = (typeof REAActions)[keyof typeof REAActions];
   providedIn: 'root',
 })
 export class EventService {
-  constructor(private storageApi: StorageApiService) {}
+  constructor(private readonly storageApi: StorageApiService) {}
 
   // ===========================================================================
   // Content Interaction Events

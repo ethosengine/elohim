@@ -70,7 +70,7 @@ export interface RecognitionDistribution {
   providedIn: 'root',
 })
 export class StewardshipAllocationService {
-  private storageApi = inject(StorageApiService);
+  private readonly storageApi = inject(StorageApiService);
 
   // ============================================================================
   // Reactive State

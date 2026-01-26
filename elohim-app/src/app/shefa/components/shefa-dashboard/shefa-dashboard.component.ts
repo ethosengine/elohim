@@ -86,12 +86,12 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   mergedConfig: DashboardConfig;
 
   // Cleanup
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
-    private shefaCompute: ShefaComputeService,
-    private familyProtection: FamilyCommunityProtectionService,
-    private computeEvents: ComputeEventService
+    private readonly shefaCompute: ShefaComputeService,
+    private readonly familyProtection: FamilyCommunityProtectionService,
+    private readonly computeEvents: ComputeEventService
   ) {
     this.mergedConfig = { ...DEFAULT_CONFIG, ...this.config };
   }

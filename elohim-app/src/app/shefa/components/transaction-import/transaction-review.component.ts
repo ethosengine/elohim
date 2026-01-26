@@ -87,13 +87,13 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
   allSuggestions: CategorySuggestion[] = [];
 
   // Keyboard handling
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
-    private route: ActivatedRoute,
-    private importService: TransactionImportService,
-    private aiCategorization: AICategorizationService,
-    private budgetReconciliation: BudgetReconciliationService
+    private readonly route: ActivatedRoute,
+    private readonly importService: TransactionImportService,
+    private readonly aiCategorization: AICategorizationService,
+    private readonly budgetReconciliation: BudgetReconciliationService
   ) {}
 
   ngOnInit(): void {

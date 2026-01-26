@@ -133,7 +133,7 @@ export class KnowledgeMapService {
   getDomainMap(mapId: string): Observable<DomainKnowledgeMap | null> {
     return this.getMap(mapId).pipe(
       map(m => {
-        if (m && m.mapType === 'domain') {
+        if (m?.mapType === 'domain') {
           return m as DomainKnowledgeMap;
         }
         return null;
@@ -147,7 +147,7 @@ export class KnowledgeMapService {
   getPersonMap(mapId: string): Observable<PersonKnowledgeMap | null> {
     return this.getMap(mapId).pipe(
       map(m => {
-        if (m && m.mapType === 'person') {
+        if (m?.mapType === 'person') {
           return m as PersonKnowledgeMap;
         }
         return null;
@@ -161,7 +161,7 @@ export class KnowledgeMapService {
   getCollectiveMap(mapId: string): Observable<CollectiveKnowledgeMap | null> {
     return this.getMap(mapId).pipe(
       map(m => {
-        if (m && m.mapType === 'collective') {
+        if (m?.mapType === 'collective') {
           return m as CollectiveKnowledgeMap;
         }
         return null;
@@ -509,7 +509,7 @@ export class KnowledgeMapService {
 
         // Extract suggested updates from Elohim response
         const payload = response.payload as any;
-        if (!payload || payload.type !== 'knowledge-map-update') {
+        if (payload?.type !== 'knowledge-map-update') {
           return [];
         }
 

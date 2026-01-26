@@ -32,7 +32,7 @@
     .subtitle {
       font-size: 0.875rem;
       color: var(--text-secondary, #6b7280);
-      margin: 0.25rem 0 0 0;
+      margin: 0.25rem 0 0;
     }
   }
 
@@ -60,10 +60,12 @@
   &.connected .status-dot {
     background: #10b981;
   }
+
   &.connecting .status-dot {
     background: #f59e0b;
     animation: pulse 1s infinite;
   }
+
   &.error .status-dot {
     background: #ef4444;
   }
@@ -74,6 +76,7 @@
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -186,12 +189,15 @@
       &.health {
         background: #10b981;
       }
+
       &.trust {
         background: #6366f1;
       }
+
       &.impact {
         background: #8b5cf6;
       }
+
       &.success {
         background: #3b82f6;
       }
@@ -236,7 +242,7 @@
   h3 {
     font-size: 1rem;
     font-weight: 600;
-    margin: 0 0 1rem 0;
+    margin: 0 0 1rem;
     color: var(--text-primary, #111827);
   }
 }
@@ -302,12 +308,15 @@
       &.pioneer {
         background: #8b5cf6;
       }
+
       &.steward {
         background: #6366f1;
       }
+
       &.guardian {
         background: #3b82f6;
       }
+
       &.caretaker {
         background: #10b981;
       }
@@ -464,18 +473,22 @@
     background: #d1fae5;
     color: #065f46;
   }
+
   &.degraded {
     background: #fef3c7;
     color: #92400e;
   }
+
   &.offline {
     background: #f3f4f6;
     color: #4b5563;
   }
+
   &.failed {
     background: #fee2e2;
     color: #991b1b;
   }
+
   &.discovered,
   &.registering {
     background: #dbeafe;
@@ -494,18 +507,22 @@
     background: #ede9fe;
     color: #5b21b6;
   }
+
   &.steward {
     background: #e0e7ff;
     color: #3730a3;
   }
+
   &.guardian {
     background: #dbeafe;
     color: #1e40af;
   }
+
   &.caretaker {
     background: #d1fae5;
     color: #065f46;
   }
+
   &.unknown {
     background: #f3f4f6;
     color: #6b7280;
@@ -534,7 +551,7 @@
     font-size: 0.75rem;
     font-weight: 500;
     color: white;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    text-shadow: 0 1px 2px rgb(0 0 0 / 30%);
   }
 }
 
@@ -562,7 +579,7 @@
   h4 {
     font-size: 1rem;
     font-weight: 600;
-    margin: 0 0 1rem 0;
+    margin: 0 0 1rem;
     color: var(--text-primary, #111827);
   }
 }

@@ -28,7 +28,7 @@
   display: flex;
   height: calc(100vh - 64px); /* Adjust based on global header height */
   height: calc(100dvh - 64px); /* Dynamic viewport height for mobile browsers */
-  background-color: var(--lamad-bg-primary, #ffffff);
+  background-color: var(--lamad-bg-primary, #fff);
   overflow: hidden;
   position: relative;
 }
@@ -230,7 +230,7 @@
 }
 
 .step-item.current a {
-  background-color: rgba(99, 102, 241, 0.08);
+  background-color: rgb(99 102 241 / 8%);
   color: var(--lamad-accent-primary, #4f46e5);
   font-weight: 600;
   border-left-color: var(--lamad-accent-primary, #4f46e5);
@@ -291,7 +291,7 @@
   font-size: 1.125rem;
   font-weight: 700;
   color: var(--lamad-text-primary, #111827);
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 0.25rem;
   line-height: 1.3;
 }
 
@@ -357,7 +357,7 @@
 }
 
 .concept-item.current a {
-  background-color: rgba(99, 102, 241, 0.08);
+  background-color: rgb(99 102 241 / 8%);
   color: var(--lamad-accent-primary, #4f46e5);
   font-weight: 600;
   border-left-color: var(--lamad-accent-primary, #4f46e5);
@@ -412,7 +412,7 @@
 /* Breadcrumbs */
 .breadcrumbs {
   padding: 0.75rem 2rem;
-  background-color: var(--lamad-surface, #ffffff);
+  background-color: var(--lamad-surface, #fff);
   border-bottom: 1px solid var(--lamad-border, #f3f4f6);
   display: flex;
   align-items: center;
@@ -435,7 +435,7 @@
   display: none;
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .main-breadcrumbs {
     display: none;
   }
@@ -518,7 +518,7 @@
 .content-title {
   font-size: 1.75rem;
   font-weight: 600;
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.5rem;
   color: var(--lamad-text-primary, #111827);
 }
 
@@ -542,7 +542,7 @@
 }
 
 .view-resource-link:hover {
-  background-color: rgba(99, 102, 241, 0.1);
+  background-color: rgb(99 102 241 / 10%);
   text-decoration: underline;
 }
 
@@ -559,7 +559,7 @@
 .content {
   flex: 1;
   padding: 2rem;
-  background: var(--lamad-bg-primary, #ffffff);
+  background: var(--lamad-bg-primary, #fff);
 }
 
 .content-inner {
@@ -660,7 +660,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
-  background-color: var(--lamad-surface, #ffffff);
+  background-color: var(--lamad-surface, #fff);
   border: 1px solid var(--lamad-border, #d1d5db);
   border-radius: 0.375rem;
   color: var(--lamad-text-primary, #374151);
@@ -685,7 +685,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
-  background-color: rgba(16, 185, 129, 0.1);
+  background-color: rgb(16 185 129 / 10%);
   color: var(--lamad-success, #059669);
   border-radius: 99px;
   font-weight: 600;
@@ -767,21 +767,21 @@
 
 .bloom-seen,
 .bloom-remember {
-  background: rgba(59, 130, 246, 0.1);
+  background: rgb(59 130 246 / 10%);
   color: #2563eb;
   border-color: #3b82f6;
 }
 
 .bloom-understand,
 .bloom-apply {
-  background: rgba(16, 185, 129, 0.1);
+  background: rgb(16 185 129 / 10%);
   color: #059669;
   border-color: #10b981;
 }
 
 .bloom-analyze,
 .bloom-evaluate {
-  background: rgba(124, 58, 237, 0.1);
+  background: rgb(124 58 237 / 10%);
   color: #7c3aed;
   border-color: #8b5cf6;
 }
@@ -790,7 +790,7 @@
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   color: white;
   border-color: #fbbf24;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  box-shadow: 0 4px 12px rgb(245 158 11 / 30%);
 }
 
 .btn-bloom:hover {
@@ -814,7 +814,7 @@
   left: 1rem;
   z-index: 50;
   padding: 0.5rem;
-  background: var(--lamad-surface, #ffffff);
+  background: var(--lamad-surface, #fff);
   border: 1px solid var(--lamad-border, #e5e7eb);
   border-radius: 0.375rem;
   cursor: pointer;
@@ -825,11 +825,8 @@
 .sidebar-backdrop {
   display: none;
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.3);
+  inset: 0;
+  background: rgb(0 0 0 / 30%);
   z-index: 15;
   cursor: pointer;
 }
@@ -882,7 +879,7 @@
 }
 
 .sidebar-expand-btn:hover {
-  background-color: var(--lamad-surface, #ffffff);
+  background-color: var(--lamad-surface, #fff);
   color: var(--lamad-text-primary, #374151);
 }
 
@@ -913,7 +910,7 @@
    Responsive - Tablet & Mobile
    ============================================================================= */
 
-@media (max-width: 1024px) {
+@media (width <= 1024px) {
   /* Hide desktop collapse button on tablet/mobile */
   .sidebar-collapse-btn {
     display: none;
@@ -948,7 +945,7 @@
   }
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
   /* Allow normal document flow on mobile so footer appears at bottom of content */
   .path-player-container {
     height: auto;

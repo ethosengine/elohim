@@ -313,7 +313,7 @@ export class QuizSessionService {
     scoreResult: PerseusScoreResult
   ): QuizResponse | null {
     const session = this.sessions.get(sessionId);
-    if (!session || session.state !== 'in_progress') {
+    if (session?.state !== 'in_progress') {
       return null;
     }
 
@@ -406,7 +406,7 @@ export class QuizSessionService {
    */
   nextQuestion(sessionId: string): SessionQuestion | null {
     const session = this.sessions.get(sessionId);
-    if (!session || session.state !== 'in_progress') {
+    if (session?.state !== 'in_progress') {
       return null;
     }
 
@@ -428,7 +428,7 @@ export class QuizSessionService {
    */
   previousQuestion(sessionId: string): SessionQuestion | null {
     const session = this.sessions.get(sessionId);
-    if (!session || session.state !== 'in_progress') {
+    if (session?.state !== 'in_progress') {
       return null;
     }
 
@@ -450,7 +450,7 @@ export class QuizSessionService {
    */
   skipQuestion(sessionId: string): SessionQuestion | null {
     const session = this.sessions.get(sessionId);
-    if (!session || session.state !== 'in_progress') {
+    if (session?.state !== 'in_progress') {
       return null;
     }
 
@@ -466,7 +466,7 @@ export class QuizSessionService {
    */
   useHint(sessionId: string): boolean {
     const session = this.sessions.get(sessionId);
-    if (!session || session.state !== 'in_progress') {
+    if (session?.state !== 'in_progress') {
       return false;
     }
 

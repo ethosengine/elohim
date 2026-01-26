@@ -69,7 +69,7 @@
   max-width: 400px;
   width: 100%;
   height: auto;
-  filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.3));
+  filter: drop-shadow(0 0 20px rgb(255 255 255 / 30%));
 }
 
 .hero-content h1 {
@@ -79,20 +79,20 @@
   font-style: normal;
   font-variation-settings: 'wdth' 100;
   font-size: 3rem;
-  color: #ffffff;
+  color: #fff;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin: 0.75rem 0;
   text-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.3),
-    0 0 8px rgba(255, 255, 255, 0.3);
+    0 2px 4px rgb(0 0 0 / 30%),
+    0 0 8px rgb(255 255 255 / 30%);
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .hero-content h1:hover {
-  color: rgba(255, 255, 255, 1);
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+  color: rgb(255 255 255 / 100%);
+  text-shadow: 0 0 20px rgb(255 255 255 / 50%);
 }
 
 .hero-subtitle {
@@ -102,10 +102,10 @@
   font-style: normal;
   font-variation-settings: 'wdth' 100;
   font-size: 1.5rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgb(255 255 255 / 90%);
   line-height: 1.6;
-  margin: 0 0 2rem 0;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  margin: 0 0 2rem;
+  text-shadow: 0 2px 4px rgb(0 0 0 / 30%);
 }
 
 /* Button styles */
@@ -113,8 +113,8 @@
 .back-to-logo-button,
 .deep-dive-button,
 .intro-video-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgb(255 255 255 / 10%);
+  border: 2px solid rgb(255 255 255 / 30%);
   color: white;
   padding: 12px 24px;
   font-family: 'Noto Sans', sans-serif;
@@ -132,10 +132,10 @@
 .back-to-logo-button:hover,
 .deep-dive-button:hover,
 .intro-video-button:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: rgb(255 255 255 / 20%);
+  border-color: rgb(255 255 255 / 50%);
   transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgb(255 255 255 / 20%);
 }
 
 /* Video section */
@@ -182,8 +182,8 @@
 .video-subtitle {
   font-family: 'Noto Sans', sans-serif;
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin: 0.75rem 0 0 0;
+  color: rgb(255 255 255 / 70%);
+  margin: 0.75rem 0 0;
   text-align: center;
   font-weight: 300;
   letter-spacing: 0.02em;
@@ -201,8 +201,9 @@
 @keyframes float {
   0%,
   100% {
-    transform: translateY(0px);
+    transform: translateY(0);
   }
+
   50% {
     transform: translateY(-10px);
   }
@@ -221,12 +222,12 @@
 .scroll-indicator svg {
   width: 2rem;
   height: 2rem;
-  fill: rgba(255, 255, 255, 0.7);
+  fill: rgb(255 255 255 / 70%);
   transition: fill 0.3s ease;
 }
 
 .scroll-indicator:hover svg {
-  fill: rgba(255, 255, 255, 1);
+  fill: rgb(255 255 255 / 100%);
 }
 
 @keyframes bounce {
@@ -237,9 +238,11 @@
   100% {
     transform: translateX(-50%) translateY(0);
   }
+
   40% {
     transform: translateX(-50%) translateY(-10px);
   }
+
   60% {
     transform: translateX(-50%) translateY(-5px);
   }
@@ -253,11 +256,11 @@
   height: 0;
   overflow: hidden;
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 40%);
 }
 
 /* Desktop specific adjustments */
-@media (min-width: 769px) {
+@media (width >= 769px) {
   .hero {
     align-items: flex-start;
     padding-top: 4vh;
@@ -287,7 +290,7 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .hero-logo {
     max-width: 300px;
   }
@@ -332,89 +335,110 @@
   :is(body, body[data-theme='device']) .hero::before {
     background: var(--space-black);
   }
+
   :is(body, body[data-theme='device']) .hero-logo {
-    filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.2));
+    filter: drop-shadow(0 0 20px rgb(0 0 0 / 20%));
   }
+
   :is(body, body[data-theme='device']) .hero-content h1 {
     color: #1a1a1a !important;
     text-shadow:
       0 2px 4px #fff8,
       0 0 8px #0001;
   }
+
   :is(body, body[data-theme='device']) .hero-content h1:hover {
     color: #000e !important;
     text-shadow: 0 0 20px #0003;
   }
+
   :is(body, body[data-theme='device']) .hero-subtitle {
     color: #1a1a1ae6 !important;
     text-shadow: 0 2px 4px #fff8;
   }
+
   :is(body, body[data-theme='device']) .video-subtitle {
     color: #1a1a1ab3 !important;
   }
+
   :is(body, body[data-theme='device'])
     :is(.listen-button, .back-to-logo-button, .deep-dive-button, .intro-video-button) {
     background: #fffd !important;
     border: 2px solid #0004 !important;
     color: #1a1a1a !important;
   }
+
   :is(body, body[data-theme='device'])
     :is(.listen-button, .back-to-logo-button, .deep-dive-button, .intro-video-button):hover {
     background: #ffff !important;
     border-color: #0006 !important;
     box-shadow: 0 4px 20px #0002;
   }
+
   :is(body, body[data-theme='device']) .scroll-indicator svg {
     fill: #1a1a1ab3;
   }
+
   :is(body, body[data-theme='device']) .scroll-indicator:hover svg {
     fill: #1a1a1a;
   }
+
   :is(body, body[data-theme='device']) .hero-video {
     box-shadow: 0 8px 32px #0003;
   }
 }
+
 body[data-theme='light'] .hero::before {
   background: var(--space-black);
 }
+
 body[data-theme='light'] .hero-logo {
-  filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(0 0 20px rgb(0 0 0 / 20%));
 }
+
 body[data-theme='light'] .hero-content h1 {
   color: #1a1a1a !important;
   text-shadow:
     0 2px 4px #fff8,
     0 0 8px #0001;
 }
+
 body[data-theme='light'] .hero-content h1:hover {
   color: #000e !important;
   text-shadow: 0 0 20px #0003;
 }
+
 body[data-theme='light'] .hero-subtitle {
   color: #1a1a1ae6 !important;
   text-shadow: 0 2px 4px #fff8;
 }
+
 body[data-theme='light'] .video-subtitle {
   color: #1a1a1ab3 !important;
 }
+
 body[data-theme='light']
   :is(.listen-button, .back-to-logo-button, .deep-dive-button, .intro-video-button) {
   background: #fffd !important;
   border: 2px solid #0004 !important;
   color: #1a1a1a !important;
 }
+
 body[data-theme='light']
   :is(.listen-button, .back-to-logo-button, .deep-dive-button, .intro-video-button):hover {
   background: #ffff !important;
   border-color: #0006 !important;
   box-shadow: 0 4px 20px #0002;
 }
+
 body[data-theme='light'] .scroll-indicator svg {
   fill: #1a1a1ab3;
 }
+
 body[data-theme='light'] .scroll-indicator:hover svg {
   fill: #1a1a1a;
 }
+
 body[data-theme='light'] .hero-video {
   box-shadow: 0 8px 32px #0003;
 }

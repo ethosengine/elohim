@@ -291,7 +291,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    * otherwise falls back to step completion logic.
    */
   isCompleted(): boolean {
-    if (this.pathCompletion && this.pathCompletion.contentCompletionPercentage === 100) {
+    if (this.pathCompletion?.contentCompletionPercentage === 100) {
       return true;
     }
     if (!this.path || !this.progress) return false;

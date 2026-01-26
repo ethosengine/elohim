@@ -3,9 +3,9 @@
   top: 1.5rem;
   right: 1.5rem;
   z-index: 1000;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgb(255 255 255 / 10%);
   backdrop-filter: blur(10px);
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border: 2px solid rgb(255 255 255 / 20%);
   border-radius: 50%;
   width: 3.5rem;
   height: 3.5rem;
@@ -14,14 +14,14 @@
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
 }
 
 .theme-toggle:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: rgb(255 255 255 / 20%);
+  border-color: rgb(255 255 255 / 40%);
   transform: scale(1.1) rotate(15deg);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 20%);
 }
 
 .theme-toggle:active {
@@ -50,7 +50,7 @@
   font-size: 0.65rem;
   font-weight: 600;
   color: var(--text-light);
-  background: rgba(107, 70, 193, 0.9);
+  background: rgb(107 70 193 / 90%);
   border-radius: 50%;
   width: 1rem;
   height: 1rem;
@@ -58,46 +58,46 @@
   align-items: center;
   justify-content: center;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+  border: 1.5px solid rgb(255 255 255 / 30%);
 }
 
 /* Light mode styles */
 body[data-theme='light'] .theme-toggle,
 body.theme-light .theme-toggle {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(0, 0, 0, 0.15);
+  background: rgb(255 255 255 / 70%);
+  border-color: rgb(0 0 0 / 15%);
 }
 
 body[data-theme='light'] .theme-toggle:hover,
 body.theme-light .theme-toggle:hover {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(0, 0, 0, 0.25);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  background: rgb(255 255 255 / 90%);
+  border-color: rgb(0 0 0 / 25%);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 15%);
 }
 
 body[data-theme='light'] .auto-indicator,
 body.theme-light .auto-indicator {
-  color: #ffffff;
-  background: rgba(94, 53, 177, 0.95);
-  border-color: rgba(0, 0, 0, 0.2);
+  color: #fff;
+  background: rgb(94 53 177 / 95%);
+  border-color: rgb(0 0 0 / 20%);
 }
 
 /* Dark mode styles */
 body[data-theme='dark'] .theme-toggle,
 body.theme-dark .theme-toggle {
-  background: rgba(0, 0, 0, 0.3);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgb(0 0 0 / 30%);
+  border-color: rgb(255 255 255 / 20%);
 }
 
 body[data-theme='dark'] .theme-toggle:hover,
 body.theme-dark .theme-toggle:hover {
-  background: rgba(0, 0, 0, 0.4);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgb(0 0 0 / 40%);
+  border-color: rgb(255 255 255 / 30%);
 }
 
 /* Mobile responsiveness */
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .theme-toggle {
     top: 1rem;
     right: 1rem;
@@ -127,7 +127,7 @@ body.theme-dark .theme-toggle:hover {
 
 .theme-toggle.inline-mode:hover {
   transform: none;
-  background: rgba(99, 102, 241, 0.1);
+  background: rgb(99 102 241 / 10%);
   box-shadow: none;
 }
 

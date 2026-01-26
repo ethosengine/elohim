@@ -84,9 +84,9 @@ import { StewardedResourceService } from './stewarded-resources.service';
 })
 export class FlowPlanningService {
   constructor(
-    private holochain: HolochainClientService,
-    private economicService: EconomicService,
-    private resourceService: StewardedResourceService
+    private readonly holochain: HolochainClientService,
+    private readonly economicService: EconomicService,
+    private readonly resourceService: StewardedResourceService
   ) {}
 
   // =========================================================================

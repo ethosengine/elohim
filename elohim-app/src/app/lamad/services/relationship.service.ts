@@ -28,7 +28,7 @@ import { RelationshipQuery, CreateRelationshipInput } from '@app/lamad/models/co
   providedIn: 'root',
 })
 export class RelationshipService {
-  constructor(private storageApi: StorageApiService) {}
+  constructor(private readonly storageApi: StorageApiService) {}
 
   /**
    * Get all relationships for a content node (as source).

@@ -32,7 +32,7 @@ import {
  * Limits memory usage while maintaining fast access to frequently-used data.
  */
 class LRUCache<K, V> {
-  private cache = new Map<K, V>();
+  private readonly cache = new Map<K, V>();
   private readonly maxSize: number;
 
   constructor(maxSize = 100) {
@@ -412,7 +412,7 @@ export class RelatedConceptsService {
 
       // Apply filters
       if (includeTypes && !includeTypes.includes(relType)) continue;
-      if (excludeTypes && excludeTypes.includes(relType)) continue;
+      if (excludeTypes?.includes(relType)) continue;
 
       allRelationships.push({
         id: rel.id,
@@ -447,7 +447,7 @@ export class RelatedConceptsService {
 
       // Apply filters
       if (includeTypes && !includeTypes.includes(relType)) continue;
-      if (excludeTypes && excludeTypes.includes(relType)) continue;
+      if (excludeTypes?.includes(relType)) continue;
 
       allRelationships.push({
         id: rel.id,
@@ -643,7 +643,7 @@ export class RelatedConceptsService {
         direction === 'outgoing' ? [contentId, adjacentId] : [adjacentId, contentId];
 
       const rel = this.findRelationshipBetween(graph, sourceId, targetId);
-      if (rel && rel.relationshipType === relationshipType) {
+      if (rel?.relationshipType === relationshipType) {
         results.push(rel);
       }
     }

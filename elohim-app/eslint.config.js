@@ -29,12 +29,13 @@ module.exports = tseslint.config(
       eslint.configs.recommended,
       ...tseslint.configs.recommended,
       ...tseslint.configs.stylistic,
+      sonarjs.configs.recommended,  // Full SonarQube parity (~266 rules)
     ],
     plugins: {
       "@angular-eslint": angular,
       "import": importPlugin,
       "prettier": prettierPlugin,
-      "sonarjs": sonarjs
+      // Note: sonarjs plugin is registered by sonarjs.configs.recommended in extends
     },
     languageOptions: {
       parserOptions: {
@@ -70,6 +71,12 @@ module.exports = tseslint.config(
       }],
       "@typescript-eslint/no-empty-function": "off",
       "@typescript-eslint/consistent-type-definitions": ["warn", "interface"],
+
+      // TypeScript rules for SonarQube parity
+      "@typescript-eslint/prefer-nullish-coalescing": "warn",   // S6606
+      "@typescript-eslint/prefer-optional-chain": "warn",       // S6582
+      "@typescript-eslint/prefer-readonly": "warn",             // S2933
+      "@typescript-eslint/no-array-constructor": "error",       // S7723
 
       // Import rules - enforce aliases over deep relative imports crossing pillars
       "no-restricted-imports": ["error", {
@@ -111,15 +118,12 @@ module.exports = tseslint.config(
       "prefer-const": "error",
       "no-var": "error",
 
-      // SonarJS rules - mirrors SonarQube analysis for local catching
-      "sonarjs/cognitive-complexity": ["warn", 15],
-      "sonarjs/no-duplicate-string": ["warn", { threshold: 3 }],
-      "sonarjs/no-identical-functions": "warn",
-      "sonarjs/no-collapsible-if": "warn",
-      "sonarjs/no-redundant-jump": "warn",
-      "sonarjs/no-nested-template-literals": "warn",
-      "sonarjs/prefer-immediate-return": "warn",
-      "sonarjs/prefer-single-boolean-return": "warn",
+      // SonarJS overrides (recommended preset enabled in extends)
+      "sonarjs/cognitive-complexity": ["error", 15],  // Strict: error at threshold 15
+      "sonarjs/no-duplicate-string": ["error", { threshold: 3 }],
+
+      // Only disable rules that cause false positives in Angular/RxJS patterns
+      "sonarjs/no-nested-functions": "off",   // Arrow functions in RxJS pipes are idiomatic
 
       // Prettier - auto-fix formatting (disabled in CI for performance)
       "prettier/prettier": [process.env.CI === "true" ? "off" : "error"],

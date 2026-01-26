@@ -62,15 +62,15 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
 
   // Canvas state
   private ctx: CanvasRenderingContext2D | null = null;
-  private animationFrame: number | null = null;
+  private readonly animationFrame: number | null = null;
   private hoverParticipant: ParticipantPosition | null = null;
   private selectedCluster: OpinionCluster | null = null;
 
   // Viewport
   private readonly padding = 40;
-  private scale = 1;
-  private offsetX = 0;
-  private offsetY = 0;
+  private readonly scale = 1;
+  private readonly offsetX = 0;
+  private readonly offsetY = 0;
 
   // Current user position
   currentUserPosition: ParticipantPosition | null = null;

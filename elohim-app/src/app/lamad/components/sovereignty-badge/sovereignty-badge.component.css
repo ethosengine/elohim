@@ -87,7 +87,7 @@
 
 .status-dot--connected {
   background: #4caf50;
-  box-shadow: 0 0 6px rgba(76, 175, 80, 0.5);
+  box-shadow: 0 0 6px rgb(76 175 80 / 50%);
 }
 
 .status-dot--syncing {
@@ -97,7 +97,7 @@
 
 .status-dot--error {
   background: #f44336;
-  box-shadow: 0 0 6px rgba(244, 67, 54, 0.5);
+  box-shadow: 0 0 6px rgb(244 67 54 / 50%);
 }
 
 @keyframes pulse {
@@ -106,6 +106,7 @@
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.6;
     transform: scale(1.1);
@@ -132,7 +133,7 @@
 .stage-tagline {
   font-size: 0.875rem;
   color: var(--lamad-text-secondary);
-  margin: 0.25rem 0 0.75rem 0;
+  margin: 0.25rem 0 0.75rem;
   padding-left: 0.5rem;
 }
 
@@ -179,6 +180,7 @@
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -188,7 +190,7 @@
 .stage-description {
   font-size: 0.875rem;
   color: var(--lamad-text-secondary);
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 0.75rem;
   line-height: 1.5;
 }
 
@@ -224,7 +226,7 @@
 }
 
 .detail-value.monospace {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  font-family: 'SF Mono', Monaco, Inconsolata, monospace;
   word-break: break-all;
 }
 
@@ -259,7 +261,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem;
-  background: rgba(244, 67, 54, 0.1);
+  background: rgb(244 67 54 / 10%);
   border-radius: 6px;
   color: #c62828;
   font-size: 0.875rem;

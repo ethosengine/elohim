@@ -3,9 +3,9 @@
 .constitutional-architecture {
   margin: 2rem 0;
   padding: 1.5rem;
-  background: linear-gradient(135deg, rgba(147, 51, 234, 0.1), rgba(236, 72, 153, 0.1));
+  background: linear-gradient(135deg, rgb(147 51 234 / 10%), rgb(236 72 153 / 10%));
   border-radius: 12px;
-  border: 1px solid rgba(147, 51, 234, 0.2);
+  border: 1px solid rgb(147 51 234 / 20%);
 }
 
 .constitutional-architecture h3 {
@@ -21,7 +21,7 @@
 }
 
 .layer-item {
-  background: linear-gradient(90deg, rgba(147, 51, 234, 0.15), rgba(236, 72, 153, 0.15));
+  background: linear-gradient(90deg, rgb(147 51 234 / 15%), rgb(236 72 153 / 15%));
   padding: 0.75rem 1rem;
   border-radius: 8px;
   border-left: 4px solid #7c3aed;
@@ -31,20 +31,20 @@
 
 .layer-item:first-child {
   border-left-color: #dc2626;
-  background: linear-gradient(90deg, rgba(220, 38, 38, 0.15), rgba(147, 51, 234, 0.15));
+  background: linear-gradient(90deg, rgb(220 38 38 / 15%), rgb(147 51 234 / 15%));
 }
 
 .layer-item:last-child {
   border-left-color: #059669;
-  background: linear-gradient(90deg, rgba(5, 150, 105, 0.15), rgba(16, 185, 129, 0.15));
+  background: linear-gradient(90deg, rgb(5 150 105 / 15%), rgb(16 185 129 / 15%));
 }
 
 .flourishing-models {
   margin-top: 2rem;
   padding: 1.5rem;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(34, 197, 94, 0.1));
+  background: linear-gradient(135deg, rgb(16 185 129 / 10%), rgb(34 197 94 / 10%));
   border-radius: 12px;
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid rgb(16 185 129 / 20%);
 }
 
 .flourishing-models h3 {
@@ -55,9 +55,9 @@
 .architecture-section {
   margin: 2rem 0;
   padding: 2rem;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+  background: linear-gradient(135deg, rgb(99 102 241 / 10%), rgb(139 92 246 / 10%));
   border-radius: 16px;
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  border: 1px solid rgb(99 102 241 / 20%);
 }
 
 .architecture-section h3 {
@@ -80,7 +80,7 @@
 }
 
 .constitutional-layer {
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(239, 68, 68, 0.1));
+  background: linear-gradient(135deg, rgb(220 38 38 / 10%), rgb(239 68 68 / 10%));
   border-color: #dc2626;
 }
 
@@ -90,7 +90,7 @@
 }
 
 .runtime-layer {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(34, 197, 94, 0.1));
+  background: linear-gradient(135deg, rgb(16 185 129 / 10%), rgb(34 197 94 / 10%));
   border-color: #10b981;
 }
 
@@ -109,7 +109,7 @@
 }
 
 .connection-explanation {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(251, 191, 36, 0.1));
+  background: linear-gradient(135deg, rgb(245 158 11 / 10%), rgb(251 191 36 / 10%));
   padding: 1.5rem;
   border-radius: 12px;
   border: 2px solid #f59e0b;
@@ -124,8 +124,8 @@
 /* Light mode theme adjustments - softer, beautiful day colors */
 @media (prefers-color-scheme: light) {
   .constitutional-architecture {
-    background: linear-gradient(135deg, rgba(135, 206, 235, 0.3), rgba(255, 250, 205, 0.25));
-    border-color: rgba(25, 118, 210, 0.4);
+    background: linear-gradient(135deg, rgb(135 206 235 / 30%), rgb(255 250 205 / 25%));
+    border-color: rgb(25 118 210 / 40%);
   }
 
   .constitutional-architecture h3 {
@@ -133,23 +133,23 @@
   }
 
   .layer-item {
-    background: linear-gradient(90deg, rgba(135, 206, 235, 0.35), rgba(255, 250, 205, 0.3));
+    background: linear-gradient(90deg, rgb(135 206 235 / 35%), rgb(255 250 205 / 30%));
     border-left-color: #1976d2;
   }
 
   .layer-item:first-child {
     border-left-color: #c62828;
-    background: linear-gradient(90deg, rgba(220, 38, 38, 0.2), rgba(135, 206, 235, 0.25));
+    background: linear-gradient(90deg, rgb(220 38 38 / 20%), rgb(135 206 235 / 25%));
   }
 
   .layer-item:last-child {
     border-left-color: #00897b;
-    background: linear-gradient(90deg, rgba(0, 137, 123, 0.25), rgba(195, 205, 180, 0.3));
+    background: linear-gradient(90deg, rgb(0 137 123 / 25%), rgb(195 205 180 / 30%));
   }
 
   .flourishing-models {
-    background: linear-gradient(135deg, rgba(195, 205, 180, 0.4), rgba(255, 250, 205, 0.3));
-    border-color: rgba(0, 137, 123, 0.45);
+    background: linear-gradient(135deg, rgb(195 205 180 / 40%), rgb(255 250 205 / 30%));
+    border-color: rgb(0 137 123 / 45%);
   }
 
   .flourishing-models h3 {
@@ -157,8 +157,8 @@
   }
 
   .architecture-section {
-    background: linear-gradient(135deg, rgba(135, 206, 235, 0.3), rgba(195, 205, 180, 0.25));
-    border-color: rgba(25, 118, 210, 0.4);
+    background: linear-gradient(135deg, rgb(135 206 235 / 30%), rgb(195 205 180 / 25%));
+    border-color: rgb(25 118 210 / 40%);
   }
 
   .architecture-section h3 {
@@ -166,7 +166,7 @@
   }
 
   .constitutional-layer {
-    background: linear-gradient(135deg, rgba(220, 38, 38, 0.15), rgba(239, 68, 68, 0.12));
+    background: linear-gradient(135deg, rgb(220 38 38 / 15%), rgb(239 68 68 / 12%));
     border-color: #c62828;
   }
 
@@ -175,7 +175,7 @@
   }
 
   .runtime-layer {
-    background: linear-gradient(135deg, rgba(0, 137, 123, 0.15), rgba(195, 205, 180, 0.2));
+    background: linear-gradient(135deg, rgb(0 137 123 / 15%), rgb(195 205 180 / 20%));
     border-color: #00897b;
   }
 
@@ -184,7 +184,7 @@
   }
 
   .connection-explanation {
-    background: linear-gradient(135deg, rgba(255, 250, 205, 0.45), rgba(251, 191, 36, 0.25));
+    background: linear-gradient(135deg, rgb(255 250 205 / 45%), rgb(251 191 36 / 25%));
     border-color: #f57c00;
   }
 
@@ -193,7 +193,7 @@
   }
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .constitutional-architecture,
   .flourishing-models,
   .architecture-section {

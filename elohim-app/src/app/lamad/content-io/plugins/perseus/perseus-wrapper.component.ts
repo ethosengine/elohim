@@ -135,7 +135,7 @@ export class PerseusWrapperComponent implements AfterViewInit, OnDestroy, OnChan
   // View References
   // ─────────────────────────────────────────────────────────────────────────
 
-  @ViewChild('container') private container!: ElementRef<HTMLDivElement>;
+  @ViewChild('container') private readonly container!: ElementRef<HTMLDivElement>;
 
   private perseusElement: PerseusQuestionElement | null = null;
   private initialized = false;

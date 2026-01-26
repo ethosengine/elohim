@@ -82,8 +82,8 @@ const ALERT_THRESHOLDS = {
 })
 export class StewardedResourceService {
   constructor(
-    private holochain: HolochainClientService,
-    private economicService: EconomicService
+    private readonly holochain: HolochainClientService,
+    private readonly economicService: EconomicService
   ) {}
 
   // =========================================================================

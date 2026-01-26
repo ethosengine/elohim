@@ -80,9 +80,9 @@ export class PlaidIntegrationService {
   private readonly PBKDF2_ITERATIONS = 100000;
 
   // Webhook event subject
-  private webhookReceived = new Subject<PlaidWebhookPayload>();
+  private readonly webhookReceived = new Subject<PlaidWebhookPayload>();
 
-  constructor(private http: HttpClient) {
+  constructor(private readonly http: HttpClient) {
     this.validateEnvironmentConfig();
   }
 

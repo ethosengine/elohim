@@ -11,13 +11,13 @@
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
-  background: var(--surface-ground, rgba(0, 0, 0, 0.05));
+  background: var(--surface-ground, rgb(0 0 0 / 5%));
   border: 1px solid transparent;
 }
 
 .connection-indicator:hover {
-  background: var(--surface-hover, rgba(0, 0, 0, 0.08));
-  border-color: var(--surface-border, rgba(0, 0, 0, 0.1));
+  background: var(--surface-hover, rgb(0 0 0 / 8%));
+  border-color: var(--surface-border, rgb(0 0 0 / 10%));
 }
 
 /* Status Dot */
@@ -42,6 +42,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -99,10 +100,10 @@
   position: absolute;
   top: calc(100% + 0.5rem);
   right: 0;
-  background: var(--surface-card, #ffffff);
+  background: var(--surface-card, #fff);
   border: 1px solid var(--surface-border, #dee2e6);
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
   padding: 0.75rem;
   min-width: 200px;
   z-index: 1000;
@@ -130,16 +131,16 @@
 
 /* Dark Theme Support */
 :host-context(.dark-theme) .connection-indicator {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgb(255 255 255 / 5%);
 }
 
 :host-context(.dark-theme) .connection-indicator:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgb(255 255 255 / 8%);
+  border-color: rgb(255 255 255 / 10%);
 }
 
 :host-context(.dark-theme) .status-label {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgb(255 255 255 / 70%);
 }
 
 :host-context(.dark-theme) .status-tooltip {
@@ -148,15 +149,15 @@
 }
 
 :host-context(.dark-theme) .tooltip-header {
-  color: #ffffff;
+  color: #fff;
 }
 
 :host-context(.dark-theme) .tooltip-description {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgb(255 255 255 / 60%);
 }
 
 /* Responsive - Hide label on small screens */
-@media (max-width: 640px) {
+@media (width <= 640px) {
   .status-label {
     display: none;
   }

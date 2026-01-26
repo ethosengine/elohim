@@ -681,7 +681,7 @@ export class PerseusRendererComponent
 
     // Get selected choice index from the result
     const result = this.lastResult;
-    if (!result || !result.guess) return;
+    if (!result?.guess) return;
 
     // Get the radio widget
     const widgets = question.question?.widgets ?? {};

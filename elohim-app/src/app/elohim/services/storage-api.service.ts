@@ -144,15 +144,15 @@ export interface CreateEventInput {
 })
 export class StorageApiService {
   /** Base URL for elohim-storage API */
-  private baseUrl: string;
+  private readonly baseUrl: string;
 
   /** App ID for multi-tenant scoping */
-  private appId = 'lamad';
+  private readonly appId = 'lamad';
 
   /** Default request timeout in milliseconds */
-  private defaultTimeoutMs = 30000;
+  private readonly defaultTimeoutMs = 30000;
 
-  constructor(private http: HttpClient) {
+  constructor(private readonly http: HttpClient) {
     // Use storageUrl from environment or fall back to doorway URL
     this.baseUrl = environment.holochain?.storageUrl || environment.client?.doorwayUrl || '';
   }

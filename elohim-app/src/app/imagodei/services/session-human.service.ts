@@ -285,7 +285,7 @@ export class SessionHumanService {
 
     // Trigger upgrade prompt on first affinity
     const session = this.sessionSubject.value;
-    if (session && session.stats.nodesWithAffinity === 0 && value > 0) {
+    if (session?.stats.nodesWithAffinity === 0 && value > 0) {
       this.triggerUpgradePrompt('first-affinity');
     }
 
@@ -308,7 +308,7 @@ export class SessionHumanService {
 
     // Trigger upgrade prompt on first path
     const session = this.sessionSubject.value;
-    if (session && session.stats.pathsStarted === 1) {
+    if (session?.stats.pathsStarted === 1) {
       this.triggerUpgradePrompt('path-started');
     }
   }

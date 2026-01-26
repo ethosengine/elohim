@@ -36,7 +36,7 @@
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-light, #dee2e6);
   border-radius: 20px;
-  background: var(--surface-primary, #ffffff);
+  background: var(--surface-primary, #fff);
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 0.875rem;
@@ -61,12 +61,12 @@
 
 .reaction-btn.supportive:hover:not(.active) {
   border-color: var(--success, #27ae60);
-  background: rgba(39, 174, 96, 0.1);
+  background: rgb(39 174 96 / 10%);
 }
 
 .reaction-btn.critical:hover:not(.active) {
   border-color: var(--warning, #f39c12);
-  background: rgba(243, 156, 18, 0.1);
+  background: rgb(243 156 18 / 10%);
 }
 
 .reaction-btn.mediated {
@@ -143,7 +143,7 @@
 .mediation-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgb(0 0 0 / 50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -155,6 +155,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -162,13 +163,13 @@
 
 /* Mediation Dialog */
 .mediation-dialog {
-  background: var(--surface-primary, #ffffff);
+  background: var(--surface-primary, #fff);
   border-radius: 16px;
   max-width: 480px;
   width: 90%;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 20%);
   animation: slideUp 0.3s ease;
 }
 
@@ -177,6 +178,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -247,7 +249,7 @@
 }
 
 .constitutional-reasoning h4 {
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.5rem;
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--primary, #6c5ce7);
@@ -283,7 +285,7 @@
 }
 
 .alternatives-section h4 {
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 0.75rem;
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-secondary, #495057);
@@ -302,7 +304,7 @@
   padding: 0.5rem 1rem;
   border: 2px solid var(--success, #27ae60);
   border-radius: 20px;
-  background: rgba(39, 174, 96, 0.1);
+  background: rgb(39 174 96 / 10%);
   color: var(--success-dark, #1e8449);
   cursor: pointer;
   font-size: 0.875rem;
@@ -359,7 +361,7 @@
 }
 
 /* Responsive */
-@media (max-width: 480px) {
+@media (width <= 480px) {
   .reaction-bar:not(.compact) {
     padding: 0.75rem;
   }
@@ -399,7 +401,7 @@
   }
 
   .reaction-btn:hover {
-    background: var(--surface-hover-dark, #333333);
+    background: var(--surface-hover-dark, #333);
   }
 
   .mediation-dialog {
@@ -407,7 +409,7 @@
   }
 
   .mediation-header {
-    background: linear-gradient(135deg, #2d2d2d 0%, #333333 100%);
+    background: linear-gradient(135deg, #2d2d2d 0%, #333 100%);
     border-color: var(--border-dark, #404040);
   }
 

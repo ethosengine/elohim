@@ -587,8 +587,8 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
     }));
   });
 
-  private destroy$ = new Subject<void>();
-  private sophiaWrapper: SophiaWrapperComponent | null = null;
+  private readonly destroy$ = new Subject<void>();
+  private readonly sophiaWrapper: SophiaWrapperComponent | null = null;
   private pendingRecognition: Recognition | null = null;
 
   constructor(

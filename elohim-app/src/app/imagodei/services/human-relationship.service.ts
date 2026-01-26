@@ -34,7 +34,7 @@ import {
   providedIn: 'root',
 })
 export class HumanRelationshipService {
-  constructor(private storageApi: StorageApiService) {}
+  constructor(private readonly storageApi: StorageApiService) {}
 
   // ===========================================================================
   // Query Methods

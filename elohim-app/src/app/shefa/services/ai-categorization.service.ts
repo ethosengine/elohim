@@ -45,10 +45,10 @@ export class AICategorizationService {
   private readonly BATCH_SIZE = 50; // Max transactions per request
 
   // Learning: store user corrections for few-shot examples
-  private corrections: CorrectionRecord[] = [];
-  private merchantPatterns = new Map<string, { category: string; confidence: number }>();
+  private readonly corrections: CorrectionRecord[] = [];
+  private readonly merchantPatterns = new Map<string, { category: string; confidence: number }>();
 
-  constructor(private elohimStub: ElohimStubService) {
+  constructor(private readonly elohimStub: ElohimStubService) {
     this.initializeDefaultPatterns();
     console.log('[AICategories] Initialized with ElohimStubService');
   }

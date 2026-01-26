@@ -114,14 +114,14 @@ const DEFAULT_CONFIG: ShefaConfig = {
   providedIn: 'root',
 })
 export class ShefaComputeService {
-  private config: ShefaConfig = DEFAULT_CONFIG;
-  private dashboardState$ = new BehaviorSubject<SheafaDashboardState | null>(null);
-  private metricsHistory = new Map<string, MetricHistory[]>();
+  private readonly config: ShefaConfig = DEFAULT_CONFIG;
+  private readonly dashboardState$ = new BehaviorSubject<SheafaDashboardState | null>(null);
+  private readonly metricsHistory = new Map<string, MetricHistory[]>();
 
   constructor(
-    private holochain: HolochainClientService,
-    private economicService: EconomicService,
-    private stewaredResources: StewaredResourcesService
+    private readonly holochain: HolochainClientService,
+    private readonly economicService: EconomicService,
+    private readonly stewaredResources: StewaredResourcesService
   ) {}
 
   /**

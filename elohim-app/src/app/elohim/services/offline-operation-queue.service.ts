@@ -69,8 +69,8 @@ export class OfflineOperationQueueService {
   readonly lastSync = this.lastSyncTime.asReadonly();
 
   // Event callbacks
-  private onQueueChangedCallbacks: ((queue: OfflineOperation[]) => void)[] = [];
-  private onSyncCompleteCallbacks: ((succeeded: number, failed: number) => void)[] = [];
+  private readonly onQueueChangedCallbacks: ((queue: OfflineOperation[]) => void)[] = [];
+  private readonly onSyncCompleteCallbacks: ((succeeded: number, failed: number) => void)[] = [];
 
   constructor() {
     // Watch Holochain connection - auto-sync when connected
@@ -284,7 +284,7 @@ export class OfflineOperationQueueService {
   }
 
   /** Track pending retry timeouts to prevent duplicates */
-  private pendingRetries = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly pendingRetries = new Map<string, ReturnType<typeof setTimeout>>();
 
   /**
    * Retry an operation with exponential backoff

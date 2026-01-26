@@ -7,7 +7,6 @@ $color-success: #10b981;
 $color-warning: #f59e0b;
 $color-danger: #ef4444;
 $color-info: #3b82f6;
-
 $color-bg-light: #f8fafc;
 $color-bg-dark: #1e293b;
 $color-text-light: #64748b;
@@ -19,7 +18,6 @@ $status-online: #10b981;
 $status-degraded: #f59e0b;
 $status-offline: #ef4444;
 $status-maintenance: #8b5cf6;
-
 $protection-high: #10b981;
 $protection-medium: #f59e0b;
 $protection-low: #ef4444;
@@ -57,13 +55,13 @@ $transition-slow: 500ms ease-in-out;
 
 @mixin card-shadow {
   box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.1),
-    0 1px 2px rgba(0, 0, 0, 0.06);
+    0 1px 3px rgb(0 0 0 / 10%),
+    0 1px 2px rgb(0 0 0 / 6%);
 
   &:hover {
     box-shadow:
-      0 4px 6px rgba(0, 0, 0, 0.1),
-      0 2px 4px rgba(0, 0, 0, 0.06);
+      0 4px 6px rgb(0 0 0 / 10%),
+      0 2px 4px rgb(0 0 0 / 6%);
   }
 }
 
@@ -153,16 +151,16 @@ $transition-slow: 500ms ease-in-out;
 // Loading Overlay
 .loading-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.95);
+  inset: 0;
+  background: rgb(255 255 255 / 95%);
+
   @include flex-center;
+
   z-index: 1000;
 
   .spinner {
     @include flex-center;
+
     flex-direction: column;
     gap: $spacing-lg;
 
@@ -208,7 +206,7 @@ $transition-slow: 500ms ease-in-out;
     flex: 1;
 
     h1 {
-      margin: 0 0 $spacing-sm 0;
+      margin: 0 0 $spacing-sm;
       font-size: 1.75rem;
       font-weight: 700;
       color: $color-text-dark;
@@ -223,6 +221,7 @@ $transition-slow: 500ms ease-in-out;
 
   .status-badge {
     @include flex-center;
+
     gap: $spacing-sm;
     padding: $spacing-sm $spacing-md;
     border-radius: $radius-md;
@@ -275,6 +274,7 @@ $transition-slow: 500ms ease-in-out;
 
   .header-stats {
     @include flex-center;
+
     gap: $spacing-2xl;
 
     .stat {
@@ -307,10 +307,12 @@ $transition-slow: 500ms ease-in-out;
 
   .header-actions {
     @include flex-center;
+
     gap: $spacing-md;
 
     .btn-icon {
       @include flex-center;
+
       width: 36px;
       height: 36px;
       border: 1px solid $color-border;
@@ -336,7 +338,7 @@ $transition-slow: 500ms ease-in-out;
     animation: slideDown $transition-normal;
 
     h3 {
-      margin: 0 0 $spacing-lg 0;
+      margin: 0 0 $spacing-lg;
       font-size: 1rem;
       font-weight: 600;
     }
@@ -363,6 +365,7 @@ $transition-slow: 500ms ease-in-out;
 
       .btn-small {
         @include button-base;
+
         padding: $spacing-sm $spacing-md;
         font-size: 0.75rem;
 
@@ -400,6 +403,7 @@ $transition-slow: 500ms ease-in-out;
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -411,6 +415,7 @@ $transition-slow: 500ms ease-in-out;
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -467,6 +472,7 @@ $transition-slow: 500ms ease-in-out;
 
   .nav-btn {
     @include button-base;
+
     white-space: nowrap;
     padding: $spacing-sm $spacing-md;
 
@@ -508,6 +514,7 @@ $transition-slow: 500ms ease-in-out;
   border: 1px solid $color-border;
   border-radius: $radius-lg;
   overflow: hidden;
+
   @include card-shadow;
 
   .panel-header {
@@ -516,7 +523,7 @@ $transition-slow: 500ms ease-in-out;
     background: linear-gradient(135deg, rgba($color-primary, 0.05), rgba($color-info, 0.05));
 
     h2 {
-      margin: 0 0 $spacing-xs 0;
+      margin: 0 0 $spacing-xs;
       font-size: 1.125rem;
       font-weight: 700;
       color: $color-text-dark;
@@ -705,7 +712,7 @@ $transition-slow: 500ms ease-in-out;
     margin-bottom: $spacing-lg;
 
     h4 {
-      margin: 0 0 $spacing-md 0;
+      margin: 0 0 $spacing-md;
       font-size: 0.875rem;
       font-weight: 600;
       text-transform: uppercase;
@@ -911,7 +918,7 @@ $transition-slow: 500ms ease-in-out;
     margin-bottom: $spacing-lg;
 
     h4 {
-      margin: 0 0 $spacing-md 0;
+      margin: 0 0 $spacing-md;
       font-size: 0.875rem;
       font-weight: 600;
       text-transform: uppercase;
@@ -1180,7 +1187,7 @@ $transition-slow: 500ms ease-in-out;
     background: $color-bg-light;
 
     h4 {
-      margin: 0 0 $spacing-md 0;
+      margin: 0 0 $spacing-md;
       font-size: 0.875rem;
       font-weight: 600;
       text-transform: uppercase;
@@ -1252,7 +1259,7 @@ $transition-slow: 500ms ease-in-out;
     margin-bottom: $spacing-lg;
 
     h4 {
-      margin: 0 0 $spacing-md 0;
+      margin: 0 0 $spacing-md;
       font-size: 0.875rem;
       font-weight: 600;
       text-transform: uppercase;
@@ -1302,7 +1309,7 @@ $transition-slow: 500ms ease-in-out;
 
   .limit-alerts {
     h4 {
-      margin: 0 0 $spacing-md 0;
+      margin: 0 0 $spacing-md;
       font-size: 0.875rem;
       font-weight: 600;
       text-transform: uppercase;
@@ -1373,7 +1380,7 @@ $transition-slow: 500ms ease-in-out;
 }
 
 // Responsive Design
-@media (max-width: 1024px) {
+@media (width <= 1024px) {
   .dashboard-header {
     .header-content {
       flex-direction: column;
@@ -1410,7 +1417,7 @@ $transition-slow: 500ms ease-in-out;
   }
 }
 
-@media (max-width: 640px) {
+@media (width <= 640px) {
   .dashboard-header {
     padding: $spacing-lg $spacing-md;
 

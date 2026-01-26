@@ -176,8 +176,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     // Subscribe to path context for return navigation
     this.pathContextService.context$.pipe(takeUntil(this.destroy$)).subscribe(context => {
       this.pathContext = context;
-      this.hasReturnPath =
-        context !== null && context.detourStack !== undefined && context.detourStack.length > 0;
+      this.hasReturnPath = context?.detourStack !== undefined && context.detourStack.length > 0;
     });
   }
 

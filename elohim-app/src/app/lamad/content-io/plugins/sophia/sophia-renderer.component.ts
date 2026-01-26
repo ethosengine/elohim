@@ -636,10 +636,10 @@ export class SophiaRendererComponent
   private psycheAPI: PsycheAPI | null = null;
 
   // Reflection recognitions for psyche-core aggregation
-  private reflectionRecognitions: ReflectionRecognition[] = [];
+  private readonly reflectionRecognitions: ReflectionRecognition[] = [];
 
   // Answer persistence for navigation (momentId → userInput)
-  private answersMap = new Map<string, UserInputMap>();
+  private readonly answersMap = new Map<string, UserInputMap>();
 
   // Aggregated reflection data (populated via Psyche API)
   aggregatedReflection: AggregatedReflection | null = null;
@@ -1078,7 +1078,7 @@ export class SophiaRendererComponent
 
   private emitReflectionCompletion(): void {
     // Guard against null/undefined aggregatedReflection
-    if (!this.aggregatedReflection || !this.aggregatedReflection.subscaleTotals) {
+    if (!this.aggregatedReflection?.subscaleTotals) {
       console.warn('[SophiaRenderer] No aggregated reflection data available');
       // Emit basic completion event without subscale details
       const event: RendererCompletionEvent = {

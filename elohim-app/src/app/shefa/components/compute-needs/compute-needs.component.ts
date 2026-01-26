@@ -48,9 +48,9 @@ export class ComputeNeedsComponent implements OnInit, OnDestroy {
   error: string | null = null;
   selectedRecommendation: NodeRecommendation | null = null;
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
-  constructor(private shefaCompute: ShefaComputeService) {}
+  constructor(private readonly shefaCompute: ShefaComputeService) {}
 
   ngOnInit(): void {
     if (!this.operatorId) {

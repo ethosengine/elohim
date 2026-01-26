@@ -164,7 +164,7 @@ export class PathContextService {
    */
   returnFromDetour(): string[] | null {
     const current = this.contextStack[this.contextStack.length - 1];
-    if (!current || !current.detourStack?.length) {
+    if (!current?.detourStack?.length) {
       return null;
     }
 

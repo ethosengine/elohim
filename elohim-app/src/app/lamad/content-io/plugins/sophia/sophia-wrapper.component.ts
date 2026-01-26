@@ -119,7 +119,7 @@ export class SophiaWrapperComponent implements AfterViewInit, OnDestroy, OnChang
   // View References
   // ─────────────────────────────────────────────────────────────────────────
 
-  @ViewChild('container') private container!: ElementRef<HTMLDivElement>;
+  @ViewChild('container') private readonly container!: ElementRef<HTMLDivElement>;
 
   private sophiaElement: SophiaQuestionElement | null = null;
   private initialized = false;
