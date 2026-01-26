@@ -42,6 +42,7 @@ import groovy.transform.Field
         triggersGenesis: true,
         deploymentCheck: [
             dev: 'https://doorway-dev.elohim.host/health',
+            staging: 'https://doorway-dev.elohim.host/health',  // staging shares doorway-dev
             prod: 'https://doorway.elohim.host/health'
         ]
     ],
@@ -53,6 +54,7 @@ import groovy.transform.Field
         triggersGenesis: true,
         deploymentCheck: [
             dev: 'https://alpha.elohim.host',
+            staging: 'https://staging.elohim.host',
             prod: 'https://elohim.host'
         ]
     ],
@@ -76,10 +78,12 @@ import groovy.transform.Field
 ]
 
 // Environment-specific endpoints for version checking
+// Note: alpha and staging share doorway-dev
 @Field def VERSION_ENDPOINTS = [
     'doorway-dev': 'https://doorway-dev.elohim.host/version',
     'doorway-prod': 'https://doorway.elohim.host/version',
     'app-dev': 'https://alpha.elohim.host/version.json',
+    'app-staging': 'https://staging.elohim.host/version.json',
     'app-prod': 'https://elohim.host/version.json'
 ]
 
